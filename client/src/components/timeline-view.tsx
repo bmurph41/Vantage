@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
-import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 import { parseISO } from "date-fns";
@@ -26,17 +26,24 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
   // Generate timeline header dates
   const generateTimelineDates = () => {
-    const start = startOfWeek(projectStart);
-    const end = endOfWeek(projectEnd);
-
     switch (granularity) {
       case 'daily':
-        return eachDayOfInterval({ start, end });
+        const dailyStart = startOfWeek(projectStart);
+        const dailyEnd = endOfWeek(projectEnd);
+        return eachDayOfInterval({ start: dailyStart, end: dailyEnd });
       case 'weekly':
       case 'biweekly':
-        return eachWeekOfInterval({ start, end });
+        const weeklyStart = startOfWeek(projectStart);
+        const weeklyEnd = endOfWeek(projectEnd);
+        return eachWeekOfInterval({ start: weeklyStart, end: weeklyEnd });
+      case 'monthly':
+        const monthlyStart = startOfMonth(projectStart);
+        const monthlyEnd = endOfMonth(projectEnd);
+        return eachMonthOfInterval({ start: monthlyStart, end: monthlyEnd });
       default:
-        return eachWeekOfInterval({ start, end });
+        const defaultStart = startOfWeek(projectStart);
+        const defaultEnd = endOfWeek(projectEnd);
+        return eachWeekOfInterval({ start: defaultStart, end: defaultEnd });
     }
   };
 
@@ -86,7 +93,12 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             <div className="grid gap-4 w-full text-center text-sm text-muted-foreground" style={{ gridTemplateColumns: `repeat(${Math.min(12, timelineDates.length)}, 1fr)` }}>
               {timelineDates.slice(0, 12).map((date, index) => (
                 <div key={index} data-testid={`timeline-date-${index}`}>
-                  {format(date, granularity === 'daily' ? 'M/d' : 'M/d')}
+                  {format(date, 
+                    granularity === 'daily' ? 'M/d' : 
+                    granularity === 'monthly' ? 'MMM yyyy' : 
+                    granularity === 'weekly' || granularity === 'biweekly' ? 'M/d' : 
+                    'M/d'
+                  )}
                 </div>
               ))}
             </div>
