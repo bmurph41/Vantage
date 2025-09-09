@@ -1,12 +1,108 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
-import { Link } from "wouter";
-import { useProjects } from "@/hooks/use-project";
+import { Link, useLocation } from "wouter";
+import { useProjects, useCreateProject } from "@/hooks/use-project";
 import { format } from "date-fns";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+const createProjectSchema = z.object({
+  name: z.string().min(1, "Project name is required"),
+  description: z.string().optional(),
+});
+
+function CreateProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const createProject = useCreateProject();
+  const [, navigate] = useLocation();
+  
+  const form = useForm({
+    resolver: zodResolver(createProjectSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+    },
+  });
+
+  const onSubmit = async (data: z.infer<typeof createProjectSchema>) => {
+    try {
+      const project = await createProject.mutateAsync({
+        name: data.name,
+        description: data.description,
+        anchorType: "psa",
+        tz: "America/New_York",
+      });
+      onOpenChange(false);
+      form.reset();
+      navigate(`/project/${project.id}`);
+    } catch (error) {
+      console.error("Failed to create project:", error);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md" data-testid="dialog-create-project">
+        <DialogHeader>
+          <DialogTitle>Create New Project</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div>
+            <Label htmlFor="name">Project Name *</Label>
+            <Input
+              id="name"
+              {...form.register("name")}
+              placeholder="Marina Acquisition - Harbor View"
+              data-testid="input-create-project-name"
+            />
+            {form.formState.errors.name && (
+              <p className="text-sm text-destructive mt-1">{form.formState.errors.name.message}</p>
+            )}
+          </div>
+          
+          <div>
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              {...form.register("description")}
+              placeholder="Optional project description..."
+              rows={3}
+              data-testid="textarea-create-project-description"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              data-testid="button-cancel-create-project"
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={createProject.isPending}
+              data-testid="button-submit-create-project"
+            >
+              {createProject.isPending ? "Creating..." : "Create Project"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function Dashboard() {
   const { data: projects = [], isLoading } = useProjects();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -38,7 +134,10 @@ export default function Dashboard() {
               <span className="text-sm text-muted-foreground">MarinaMatch</span>
             </div>
             <div className="flex items-center space-x-4">
-              <Button data-testid="button-new-project">
+              <Button 
+                onClick={() => setIsCreateDialogOpen(true)}
+                data-testid="button-new-project"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 New Project
               </Button>
@@ -71,7 +170,10 @@ export default function Dashboard() {
               <p className="text-muted-foreground mb-4">
                 Create your first due diligence project to get started
               </p>
-              <Button data-testid="button-create-first-project">
+              <Button 
+                onClick={() => setIsCreateDialogOpen(true)}
+                data-testid="button-create-first-project"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First Project
               </Button>
@@ -120,6 +222,11 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+      
+      <CreateProjectDialog 
+        open={isCreateDialogOpen} 
+        onOpenChange={setIsCreateDialogOpen} 
+      />
     </div>
   );
 }
