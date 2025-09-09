@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format } from "date-fns";
+import { format, addDays, parseISO } from "date-fns";
+import { addBusinessDays } from "@/lib/business-days";
 import type { Project, ProjectSettings } from "@shared/schema";
 import { useUpdateProject, useUpdateProjectSettings } from "@/hooks/use-project";
 
@@ -48,6 +49,45 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
   const updateSettings = useUpdateProjectSettings();
   const [extensionDaysArray, setExtensionDaysArray] = useState<number[]>(project.extensionDays || []);
 
+  // Helper function to calculate DD expiration date
+  const calculateDDExpirationDate = (psaDate: string, ddPeriodDays: number, extensionDays: number[], useBusinessDays: boolean, holidayCalendar: string) => {
+    if (!psaDate || !ddPeriodDays) return "";
+    
+    try {
+      const startDate = parseISO(psaDate);
+      let totalDays = ddPeriodDays;
+      
+      // Add extension days
+      if (extensionDays && extensionDays.length > 0) {
+        totalDays += extensionDays.reduce((sum, days) => sum + (days || 0), 0);
+      }
+      
+      const expirationDate = useBusinessDays 
+        ? addBusinessDays(startDate, totalDays, holidayCalendar)
+        : addDays(startDate, totalDays);
+      
+      return format(expirationDate, 'yyyy-MM-dd');
+    } catch {
+      return "";
+    }
+  };
+
+  // Helper function to calculate closing date
+  const calculateClosingDate = (ddExpirationDate: string, daysToClosing: number, useBusinessDays: boolean, holidayCalendar: string) => {
+    if (!ddExpirationDate || !daysToClosing) return "";
+    
+    try {
+      const expirationDate = parseISO(ddExpirationDate);
+      const closingDate = useBusinessDays 
+        ? addBusinessDays(expirationDate, daysToClosing, holidayCalendar)
+        : addDays(expirationDate, daysToClosing);
+      
+      return format(closingDate, 'yyyy-MM-dd');
+    } catch {
+      return "";
+    }
+  };
+
   const projectForm = useForm({
     resolver: zodResolver(projectFormSchema),
     defaultValues: {
@@ -78,6 +118,49 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
       ndaRequired: settings?.ndaRequired || false,
     },
   });
+
+  // Watch form values for automatic calculation
+  const psaSignedDate = projectForm.watch("psaSignedDate");
+  const ddPeriodDays = projectForm.watch("ddPeriodDays");
+  const hasExtensions = projectForm.watch("hasExtensions");
+  const daysToClosing = projectForm.watch("daysToClosing");
+  const useBusinessDays = settingsForm.watch("useBusinessDays");
+  const holidayCalendar = settingsForm.watch("holidayCalendar");
+
+  // Auto-calculate DD Expiration Date
+  useEffect(() => {
+    if (psaSignedDate && ddPeriodDays) {
+      const extensions = hasExtensions ? extensionDaysArray : [];
+      const calculatedDDExpiration = calculateDDExpirationDate(
+        psaSignedDate, 
+        ddPeriodDays, 
+        extensions, 
+        useBusinessDays, 
+        holidayCalendar
+      );
+      
+      if (calculatedDDExpiration && calculatedDDExpiration !== projectForm.getValues("ddExpirationDate")) {
+        projectForm.setValue("ddExpirationDate", calculatedDDExpiration);
+      }
+    }
+  }, [psaSignedDate, ddPeriodDays, hasExtensions, extensionDaysArray, useBusinessDays, holidayCalendar, projectForm]);
+
+  // Auto-calculate Closing Date
+  useEffect(() => {
+    const ddExpirationDate = projectForm.watch("ddExpirationDate");
+    if (ddExpirationDate && daysToClosing) {
+      const calculatedClosing = calculateClosingDate(
+        ddExpirationDate, 
+        daysToClosing, 
+        useBusinessDays, 
+        holidayCalendar
+      );
+      
+      if (calculatedClosing && calculatedClosing !== projectForm.getValues("closingDate")) {
+        projectForm.setValue("closingDate", calculatedClosing);
+      }
+    }
+  }, [projectForm.watch("ddExpirationDate"), daysToClosing, useBusinessDays, holidayCalendar, projectForm]);
 
   const onProjectSubmit = (data: z.infer<typeof projectFormSchema>) => {
     updateProject.mutate({
