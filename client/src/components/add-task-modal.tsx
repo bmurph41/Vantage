@@ -25,6 +25,9 @@ const addTaskFormSchema = z.object({
   durationDays: z.number().min(1, "Duration must be at least 1 day"),
   assignee: z.string().optional(),
   companyHired: z.string().optional(),
+  repName: z.string().optional(),
+  repEmail: z.string().optional(),
+  repPhone: z.string().optional(),
   priority: z.enum(["low", "med", "high"]),
   cost: z.string().optional(),
   notes: z.string().optional(),
@@ -56,6 +59,9 @@ export function AddTaskModal({ isOpen, onClose, projectId }: AddTaskModalProps) 
       durationDays: 7,
       assignee: "",
       companyHired: "",
+      repName: "",
+      repEmail: "",
+      repPhone: "",
       priority: "med",
       cost: "",
       notes: "",
@@ -359,6 +365,46 @@ export function AddTaskModal({ isOpen, onClose, projectId }: AddTaskModalProps) 
                     />
                   </div>
                 </div>
+
+                {/* Rep Contact Info */}
+                {form.watch("companyHired") && (
+                  <div className="space-y-3 bg-gray-50 p-3 rounded-md">
+                    <div className="text-sm font-medium text-gray-700">Rep Contact Information</div>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <Label htmlFor="repName">Rep Name</Label>
+                        <Input
+                          id="repName"
+                          placeholder="Representative name"
+                          {...form.register("repName")}
+                          data-testid="input-rep-name"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor="repEmail">Rep Email</Label>
+                          <Input
+                            id="repEmail"
+                            type="email"
+                            placeholder="rep@company.com"
+                            {...form.register("repEmail")}
+                            data-testid="input-rep-email"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="repPhone">Rep Phone</Label>
+                          <Input
+                            id="repPhone"
+                            type="tel"
+                            placeholder="(555) 123-4567"
+                            {...form.register("repPhone")}
+                            data-testid="input-rep-phone"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="cost">Estimated Cost</Label>
