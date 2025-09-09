@@ -22,6 +22,27 @@ export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
     return t.status !== 'completed' && new Date() > new Date(); // Simplified
   }).length;
 
+  // Calculate total cost from all tasks
+  const totalCost = tasks.reduce((sum, task) => {
+    if (task.cost) {
+      // Remove currency symbols and commas, then parse as float
+      const cleanCost = task.cost.replace(/[$,]/g, '').trim();
+      const numericCost = parseFloat(cleanCost);
+      return sum + (isNaN(numericCost) ? 0 : numericCost);
+    }
+    return sum;
+  }, 0);
+
+  // Format total cost for display
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
   const handleExportCSV = async () => {
     try {
       const csvData = await ddClient.exportCSV(project.id);
@@ -90,7 +111,11 @@ export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
       </div>
       
       {/* Progress Summary */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-5 gap-4 mb-6">
+        <Card className="p-4" data-testid="card-total-cost">
+          <div className="text-2xl font-bold text-foreground">{formatCurrency(totalCost)}</div>
+          <div className="text-sm text-muted-foreground">Total Cost</div>
+        </Card>
         <Card className="p-4" data-testid="card-total-tasks">
           <div className="text-2xl font-bold text-foreground">{totalTasks}</div>
           <div className="text-sm text-muted-foreground">Total Tasks</div>
