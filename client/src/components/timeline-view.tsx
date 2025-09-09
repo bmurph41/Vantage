@@ -28,21 +28,19 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
   const generateTimelineDates = () => {
     switch (granularity) {
       case 'daily':
-        const dailyStart = startOfWeek(projectStart);
-        const dailyEnd = endOfWeek(projectEnd);
-        return eachDayOfInterval({ start: dailyStart, end: dailyEnd });
+        return eachDayOfInterval({ start: projectStart, end: projectEnd });
       case 'weekly':
       case 'biweekly':
         const weeklyStart = startOfWeek(projectStart);
-        const weeklyEnd = endOfWeek(projectEnd);
+        const weeklyEnd = projectEnd; // End at closing date, not end of week
         return eachWeekOfInterval({ start: weeklyStart, end: weeklyEnd });
       case 'monthly':
         const monthlyStart = startOfMonth(projectStart);
-        const monthlyEnd = endOfMonth(projectEnd);
+        const monthlyEnd = projectEnd; // End at closing date, not end of month
         return eachMonthOfInterval({ start: monthlyStart, end: monthlyEnd });
       default:
         const defaultStart = startOfWeek(projectStart);
-        const defaultEnd = endOfWeek(projectEnd);
+        const defaultEnd = projectEnd; // End at closing date, not end of week
         return eachWeekOfInterval({ start: defaultStart, end: defaultEnd });
     }
   };
