@@ -18,6 +18,9 @@ const projectFormSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   description: z.string().optional(),
   anchorType: z.enum(["psa", "custom"]),
+  useBusinessDays: z.boolean(),
+  holidayCalendar: z.enum(["us_federal", "none"]),
+  tz: z.string(),
   psaSignedDate: z.string().optional(),
   ddExpirationDate: z.string().optional(),
   closingDate: z.string().optional(),
@@ -27,12 +30,9 @@ const projectFormSchema = z.object({
   extensionCount: z.number().min(0).max(10).optional(),
   extensionDays: z.array(z.number().min(1)).optional(),
   daysToClosing: z.number().min(1, "Days to closing must be at least 1 day").optional(),
-  tz: z.string(),
 });
 
 const settingsFormSchema = z.object({
-  useBusinessDays: z.boolean(),
-  holidayCalendar: z.enum(["us_federal", "none"]),
   emailReminders: z.boolean(),
   slackNotifications: z.boolean(),
   slackWebhookUrl: z.string().optional(),
@@ -94,6 +94,9 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
       name: project.name,
       description: project.description || "",
       anchorType: project.anchorType,
+      useBusinessDays: settings?.useBusinessDays || false,
+      holidayCalendar: settings?.holidayCalendar || "us_federal",
+      tz: project.tz,
       psaSignedDate: project.psaSignedDate || "",
       ddExpirationDate: project.ddExpirationDate || "",
       closingDate: project.closingDate || "",
@@ -103,15 +106,12 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
       extensionCount: project.extensionCount || 0,
       extensionDays: project.extensionDays || [],
       daysToClosing: project.daysToClosing || undefined,
-      tz: project.tz,
     },
   });
 
   const settingsForm = useForm({
     resolver: zodResolver(settingsFormSchema),
     defaultValues: {
-      useBusinessDays: settings?.useBusinessDays || false,
-      holidayCalendar: settings?.holidayCalendar || "us_federal",
       emailReminders: true, // From notifications JSON
       slackNotifications: false,
       slackWebhookUrl: "",
@@ -124,8 +124,8 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
   const ddPeriodDays = projectForm.watch("ddPeriodDays");
   const hasExtensions = projectForm.watch("hasExtensions");
   const daysToClosing = projectForm.watch("daysToClosing");
-  const useBusinessDays = settingsForm.watch("useBusinessDays");
-  const holidayCalendar = settingsForm.watch("holidayCalendar");
+  const useBusinessDays = projectForm.watch("useBusinessDays");
+  const holidayCalendar = projectForm.watch("holidayCalendar");
 
   // Auto-calculate DD Expiration Date
   useEffect(() => {
@@ -163,6 +163,7 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
   }, [projectForm.watch("ddExpirationDate"), daysToClosing, useBusinessDays, holidayCalendar, projectForm]);
 
   const onProjectSubmit = (data: z.infer<typeof projectFormSchema>) => {
+    // Update project data
     updateProject.mutate({
       id: project.id,
       updates: {
@@ -181,14 +182,29 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
         tz: data.tz,
       },
     });
+    
+    // Update project settings with business days and holiday calendar
+    updateSettings.mutate({
+      projectId: project.id,
+      settings: {
+        useBusinessDays: data.useBusinessDays,
+        holidayCalendar: data.holidayCalendar,
+        ndaRequired: settings?.ndaRequired || false,
+        notificationsJson: settings?.notificationsJson || {
+          emailReminders: true,
+          slackNotifications: false,
+          slackWebhookUrl: "",
+        },
+      },
+    });
   };
 
   const onSettingsSubmit = (data: z.infer<typeof settingsFormSchema>) => {
     updateSettings.mutate({
       projectId: project.id,
       settings: {
-        useBusinessDays: data.useBusinessDays,
-        holidayCalendar: data.holidayCalendar,
+        useBusinessDays: settings?.useBusinessDays || false,
+        holidayCalendar: settings?.holidayCalendar || "us_federal",
         ndaRequired: data.ndaRequired,
         notificationsJson: {
           emailReminders: data.emailReminders,
@@ -242,6 +258,50 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
                 <SelectContent>
                   <SelectItem value="psa">PSA Signed Date</SelectItem>
                   <SelectItem value="custom">Custom Date</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <Label htmlFor="useBusinessDays">Use Business Days</Label>
+              <Switch
+                id="useBusinessDays"
+                checked={projectForm.watch("useBusinessDays")}
+                onCheckedChange={(checked) => projectForm.setValue("useBusinessDays", checked)}
+                data-testid="switch-business-days"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="holidayCalendar">Holiday Calendar</Label>
+              <Select
+                value={projectForm.watch("holidayCalendar")}
+                onValueChange={(value) => projectForm.setValue("holidayCalendar", value as "us_federal" | "none")}
+              >
+                <SelectTrigger data-testid="select-holiday-calendar">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="us_federal">US Federal</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="tz">Project Timezone</Label>
+              <Select
+                value={projectForm.watch("tz")}
+                onValueChange={(value) => projectForm.setValue("tz", value)}
+              >
+                <SelectTrigger data-testid="select-timezone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="America/New_York">Eastern Time</SelectItem>
+                  <SelectItem value="America/Chicago">Central Time</SelectItem>
+                  <SelectItem value="America/Denver">Mountain Time</SelectItem>
+                  <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -394,49 +454,7 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
         </CardHeader>
         <CardContent>
           <form onSubmit={settingsForm.handleSubmit(onSettingsSubmit)} className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="useBusinessDays">Use Business Days</Label>
-              <Switch
-                id="useBusinessDays"
-                checked={settingsForm.watch("useBusinessDays")}
-                onCheckedChange={(checked) => settingsForm.setValue("useBusinessDays", checked)}
-                data-testid="switch-business-days"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="holidayCalendar">Holiday Calendar</Label>
-              <Select
-                value={settingsForm.watch("holidayCalendar")}
-                onValueChange={(value) => settingsForm.setValue("holidayCalendar", value as "us_federal" | "none")}
-              >
-                <SelectTrigger data-testid="select-holiday-calendar">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="us_federal">US Federal</SelectItem>
-                  <SelectItem value="none">None</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="tz">Project Timezone</Label>
-              <Select
-                value={projectForm.watch("tz")}
-                onValueChange={(value) => projectForm.setValue("tz", value)}
-              >
-                <SelectTrigger data-testid="select-timezone">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="America/New_York">Eastern Time</SelectItem>
-                  <SelectItem value="America/Chicago">Central Time</SelectItem>
-                  <SelectItem value="America/Denver">Mountain Time</SelectItem>
-                  <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Settings fields moved to Project Details */}
           </form>
         </CardContent>
       </Card>
