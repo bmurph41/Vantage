@@ -40,6 +40,12 @@ export const projects = pgTable("projects", {
   psaSignedDate: date("psa_signed_date"),
   ddExpirationDate: date("dd_expiration_date"),
   closingDate: date("closing_date"),
+  // DD Timeline calculation fields
+  ddPeriodDays: integer("dd_period_days"),
+  hasExtensions: boolean("has_extensions").notNull().default(false),
+  extensionCount: integer("extension_count").default(0),
+  extensionDays: integer("extension_days").array().default(sql`'{}'`),
+  daysToClosing: integer("days_to_closing"),
   tz: text("tz").notNull().default("America/New_York"),
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
