@@ -447,20 +447,8 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
         </CardContent>
       </Card>
 
-      {/* Project Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Project Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={settingsForm.handleSubmit(onSettingsSubmit)} className="space-y-4">
-            {/* Settings fields moved to Project Details */}
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Notifications */}
-      <Card>
+      {/* Notifications - Full width on second row */}
+      <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle>Notifications</CardTitle>
         </CardHeader>
