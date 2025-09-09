@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 export default function ProjectPage() {
   const { id } = useParams();
-  const [activeTab, setActiveTab] = useState("reports");
+  const [activeTab, setActiveTab] = useState("setup");
   
   const { data, isLoading, error } = useProject(id!);
 
@@ -45,9 +45,9 @@ export default function ProjectPage() {
   const { project, settings, tasks } = data;
 
   const tabs = [
-    { id: "reports", label: "Third-Party Reports" },
-    { id: "timeline", label: "DD Timeline" },
     { id: "setup", label: "Project Setup" },
+    { id: "reports", label: "DD Tasks" },
+    { id: "timeline", label: "DD Timeline" },
     { id: "templates", label: "Templates" },
   ];
 
