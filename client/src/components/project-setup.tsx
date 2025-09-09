@@ -346,7 +346,7 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
                     placeholder="Days from PSA"
                     {...projectForm.register("ddPeriodDays", { valueAsNumber: true })}
                     data-testid="input-dd-period-days"
-                    className="w-32"
+                    className="w-40"
                   />
                   <span className="text-sm text-muted-foreground">days</span>
                 </div>
@@ -393,7 +393,7 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
                           }
                         })}
                         data-testid="input-extension-count"
-                        className="w-20"
+                        className="w-32"
                       />
                       <span className="text-sm text-muted-foreground">extensions</span>
                     </div>
@@ -416,7 +416,7 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
                               projectForm.setValue("extensionDays", newArray);
                             }}
                             data-testid={`input-extension-days-${index}`}
-                            className="w-16"
+                            className="w-20"
                           />
                         </div>
                       ))}
@@ -446,7 +446,7 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
                     placeholder="Days after DD"
                     {...projectForm.register("daysToClosing", { valueAsNumber: true })}
                     data-testid="input-days-to-closing"
-                    className="w-32"
+                    className="w-40"
                   />
                   <span className="text-sm text-muted-foreground">days</span>
                 </div>
