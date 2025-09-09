@@ -28,24 +28,20 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
   });
 
   const getStatusBadge = (status: string) => {
-    const variants = {
-      'not_started': 'secondary',
-      'in_progress': 'default',
-      'completed': 'default',
-      'blocked': 'destructive'
-    } as const;
-
     const colors = {
-      'not_started': 'bg-gray-100 text-gray-800',
-      'in_progress': 'bg-yellow-100 text-yellow-800',
-      'completed': 'bg-green-100 text-green-800',
-      'blocked': 'bg-red-100 text-red-800'
+      'not_started': 'bg-gray-100 text-gray-800 border-gray-200',
+      'in_progress': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'completed': 'bg-green-100 text-green-800 border-green-200',
+      'blocked': 'bg-red-100 text-red-800 border-red-200'
     } as const;
 
     return (
-      <Badge className={colors[status as keyof typeof colors] || colors.not_started} data-testid={`status-${status}`}>
+      <div 
+        className={`px-2 py-1 text-xs font-medium border ${colors[status as keyof typeof colors] || colors.not_started}`}
+        data-testid={`status-${status}`}
+      >
         {status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-      </Badge>
+      </div>
     );
   };
 
