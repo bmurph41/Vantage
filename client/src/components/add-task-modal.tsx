@@ -45,18 +45,18 @@ export function AddTaskModal({ isOpen, onClose, projectId }: AddTaskModalProps) 
   const { toast } = useToast();
   const createTask = useCreateTask();
 
-  const form = useForm({
+  const form = useForm<z.infer<typeof addTaskFormSchema>>({
     resolver: zodResolver(addTaskFormSchema),
     defaultValues: {
       title: "",
       description: "",
-      startStrategy: "offset" as const,
+      startStrategy: "offset",
       startDate: "",
       startOffsetDays: 0,
       durationDays: 7,
       assignee: "",
       companyHired: "",
-      priority: "med" as const,
+      priority: "med",
       cost: "",
       notes: "",
     },
@@ -81,7 +81,7 @@ export function AddTaskModal({ isOpen, onClose, projectId }: AddTaskModalProps) 
       durationDays: template.durationDays,
       assignee: template.defaultAssignee || "",
       companyHired: "",
-      priority: template.priority,
+      priority: template.priority as "low" | "med" | "high",
       cost: template.estimatedCost || "",
       notes: "",
     });
@@ -268,7 +268,7 @@ export function AddTaskModal({ isOpen, onClose, projectId }: AddTaskModalProps) 
                     <Label htmlFor="startStrategy">Start Strategy</Label>
                     <Select
                       value={form.watch("startStrategy")}
-                      onValueChange={(value) => form.setValue("startStrategy", value as "fixed" | "offset")}
+                      onValueChange={(value: string) => form.setValue("startStrategy", value as "fixed" | "offset")}
                     >
                       <SelectTrigger data-testid="select-start-strategy">
                         <SelectValue />
@@ -324,7 +324,7 @@ export function AddTaskModal({ isOpen, onClose, projectId }: AddTaskModalProps) 
                     <Label htmlFor="priority">Priority</Label>
                     <Select
                       value={form.watch("priority")}
-                      onValueChange={(value) => form.setValue("priority", value as "low" | "med" | "high")}
+                      onValueChange={(value: string) => form.setValue("priority", value as "low" | "med" | "high")}
                     >
                       <SelectTrigger data-testid="select-priority">
                         <SelectValue />

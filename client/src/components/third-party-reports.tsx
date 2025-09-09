@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Upload } from "lucide-react";
 import type { Task } from "@shared/schema";
 import { useUpdateTask } from "@/hooks/use-tasks";
+import { AddTaskModal } from "@/components/add-task-modal";
 
 interface ThirdPartyReportsProps {
   tasks: Task[];
@@ -16,6 +17,7 @@ interface ThirdPartyReportsProps {
 export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const updateTask = useUpdateTask();
 
   const filteredTasks = tasks.filter(task => {
@@ -110,7 +112,7 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
               <Upload className="h-4 w-4 mr-2" />
               Import CSV
             </Button>
-            <Button size="sm" data-testid="button-add-task">
+            <Button size="sm" onClick={() => setIsAddTaskModalOpen(true)} data-testid="button-add-task">
               <Plus className="h-4 w-4 mr-2" />
               Add Task
             </Button>
@@ -209,6 +211,12 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
           </table>
         </div>
       </CardContent>
+      
+      <AddTaskModal
+        isOpen={isAddTaskModalOpen}
+        onClose={() => setIsAddTaskModalOpen(false)}
+        projectId={projectId}
+      />
     </Card>
   );
 }
