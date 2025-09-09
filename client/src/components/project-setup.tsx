@@ -20,6 +20,12 @@ const projectFormSchema = z.object({
   psaSignedDate: z.string().optional(),
   ddExpirationDate: z.string().optional(),
   closingDate: z.string().optional(),
+  // DD Timeline calculation fields
+  ddPeriodDays: z.number().min(1, "DD period must be at least 1 day").optional(),
+  hasExtensions: z.boolean(),
+  extensionCount: z.number().min(0).max(10).optional(),
+  extensionDays: z.array(z.number().min(1)).optional(),
+  daysToClosing: z.number().min(1, "Days to closing must be at least 1 day").optional(),
   tz: z.string(),
 });
 
@@ -40,6 +46,7 @@ interface ProjectSetupProps {
 export function ProjectSetup({ project, settings }: ProjectSetupProps) {
   const updateProject = useUpdateProject();
   const updateSettings = useUpdateProjectSettings();
+  const [extensionDaysArray, setExtensionDaysArray] = useState<number[]>(project.extensionDays || []);
 
   const projectForm = useForm({
     resolver: zodResolver(projectFormSchema),
@@ -50,6 +57,12 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
       psaSignedDate: project.psaSignedDate || "",
       ddExpirationDate: project.ddExpirationDate || "",
       closingDate: project.closingDate || "",
+      // DD Timeline fields
+      ddPeriodDays: project.ddPeriodDays || undefined,
+      hasExtensions: project.hasExtensions || false,
+      extensionCount: project.extensionCount || 0,
+      extensionDays: project.extensionDays || [],
+      daysToClosing: project.daysToClosing || undefined,
       tz: project.tz,
     },
   });
@@ -76,6 +89,12 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
         psaSignedDate: data.psaSignedDate || null,
         ddExpirationDate: data.ddExpirationDate || null,
         closingDate: data.closingDate || null,
+        // DD Timeline fields
+        ddPeriodDays: data.ddPeriodDays || null,
+        hasExtensions: data.hasExtensions,
+        extensionCount: data.extensionCount || 0,
+        extensionDays: data.extensionDays || [],
+        daysToClosing: data.daysToClosing || null,
         tz: data.tz,
       },
     });
@@ -182,6 +201,104 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
                 {...projectForm.register("closingDate")}
                 data-testid="input-closing-date"
               />
+            </div>
+            
+            {/* DD Timeline Calculation Fields */}
+            <div className="border-t pt-4 mt-4">
+              <h4 className="text-sm font-medium mb-3">DD Timeline Calculation</h4>
+              
+              <div>
+                <Label htmlFor="ddPeriodDays">DD Period (Days)</Label>
+                <Input
+                  id="ddPeriodDays"
+                  type="number"
+                  min="1"
+                  placeholder="e.g., 45"
+                  {...projectForm.register("ddPeriodDays", { valueAsNumber: true })}
+                  data-testid="input-dd-period-days"
+                />
+                {projectForm.formState.errors.ddPeriodDays && (
+                  <p className="text-sm text-destructive mt-1">{projectForm.formState.errors.ddPeriodDays.message}</p>
+                )}
+              </div>
+              
+              <div className="flex items-center justify-between mt-4">
+                <Label htmlFor="hasExtensions">Extensions?</Label>
+                <Switch
+                  id="hasExtensions"
+                  checked={projectForm.watch("hasExtensions")}
+                  onCheckedChange={(checked) => {
+                    projectForm.setValue("hasExtensions", checked);
+                    if (!checked) {
+                      projectForm.setValue("extensionCount", 0);
+                      projectForm.setValue("extensionDays", []);
+                      setExtensionDaysArray([]);
+                    }
+                  }}
+                  data-testid="switch-has-extensions"
+                />
+              </div>
+              
+              {projectForm.watch("hasExtensions") && (
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <Label htmlFor="extensionCount">Number of Extensions</Label>
+                    <Input
+                      id="extensionCount"
+                      type="number"
+                      min="0"
+                      max="10"
+                      placeholder="e.g., 2"
+                      {...projectForm.register("extensionCount", { 
+                        valueAsNumber: true,
+                        onChange: (e) => {
+                          const count = parseInt(e.target.value) || 0;
+                          const newExtensionDays = Array(count).fill(0).map((_, i) => extensionDaysArray[i] || 0);
+                          setExtensionDaysArray(newExtensionDays);
+                          projectForm.setValue("extensionDays", newExtensionDays);
+                        }
+                      })}
+                      data-testid="input-extension-count"
+                    />
+                  </div>
+                  
+                  {extensionDaysArray.map((days, index) => (
+                    <div key={index}>
+                      <Label htmlFor={`extensionDays-${index}`}>Extension {index + 1} (Days)</Label>
+                      <Input
+                        id={`extensionDays-${index}`}
+                        type="number"
+                        min="1"
+                        placeholder="e.g., 15"
+                        value={days || ""}
+                        onChange={(e) => {
+                          const newValue = parseInt(e.target.value) || 0;
+                          const newArray = [...extensionDaysArray];
+                          newArray[index] = newValue;
+                          setExtensionDaysArray(newArray);
+                          projectForm.setValue("extensionDays", newArray);
+                        }}
+                        data-testid={`input-extension-days-${index}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="mt-4">
+                <Label htmlFor="daysToClosing">Days from DD Expiration to Closing</Label>
+                <Input
+                  id="daysToClosing"
+                  type="number"
+                  min="1"
+                  placeholder="e.g., 30"
+                  {...projectForm.register("daysToClosing", { valueAsNumber: true })}
+                  data-testid="input-days-to-closing"
+                />
+                {projectForm.formState.errors.daysToClosing && (
+                  <p className="text-sm text-destructive mt-1">{projectForm.formState.errors.daysToClosing.message}</p>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
