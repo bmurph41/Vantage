@@ -18,6 +18,7 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const updateTask = useUpdateTask();
 
   const filteredTasks = tasks.filter(task => {
@@ -199,7 +200,15 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
                     {task.cost || '-'}
                   </td>
                   <td className="px-4 py-3">
-                    <Button variant="ghost" size="sm" data-testid={`button-edit-${task.id}`}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        setEditingTask(task);
+                        setIsAddTaskModalOpen(true);
+                      }}
+                      data-testid={`button-edit-${task.id}`}
+                    >
                       Edit
                     </Button>
                   </td>
@@ -219,8 +228,12 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
       
       <AddTaskModal
         isOpen={isAddTaskModalOpen}
-        onClose={() => setIsAddTaskModalOpen(false)}
+        onClose={() => {
+          setIsAddTaskModalOpen(false);
+          setEditingTask(null);
+        }}
         projectId={projectId}
+        editingTask={editingTask}
       />
     </Card>
   );
