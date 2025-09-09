@@ -1,0 +1,241 @@
+import { sql } from "drizzle-orm";
+import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+import { relations } from "drizzle-orm";
+
+// Enums
+export const roleEnum = pgEnum("role", ["owner", "editor", "viewer"]);
+export const anchorTypeEnum = pgEnum("anchor_type", ["psa", "custom"]);
+export const holidayCalendarEnum = pgEnum("holiday_calendar", ["us_federal", "none"]);
+export const startStrategyEnum = pgEnum("start_strategy", ["fixed", "offset"]);
+export const priorityEnum = pgEnum("priority", ["low", "med", "high"]);
+export const statusEnum = pgEnum("status", ["not_started", "in_progress", "blocked", "completed"]);
+
+// Organizations
+export const organizations = pgTable("organizations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Users
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  role: roleEnum("role").notNull().default("viewer"),
+  tz: text("tz").notNull().default("America/New_York"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Projects
+export const projects = pgTable("projects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  anchorType: anchorTypeEnum("anchor_type").notNull().default("psa"),
+  psaSignedDate: date("psa_signed_date"),
+  ddExpirationDate: date("dd_expiration_date"),
+  closingDate: date("closing_date"),
+  tz: text("tz").notNull().default("America/New_York"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Project Settings
+export const projectSettings = pgTable("project_settings", {
+  projectId: varchar("project_id").primaryKey().references(() => projects.id),
+  useBusinessDays: boolean("use_business_days").notNull().default(false),
+  holidayCalendar: holidayCalendarEnum("holiday_calendar").notNull().default("us_federal"),
+  notificationsJson: jsonb("notifications_json").notNull().default(sql`'{}'`),
+  ndaRequired: boolean("nda_required").notNull().default(false),
+});
+
+// Task Templates
+export const taskTemplates = pgTable("task_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  startOffsetDays: integer("start_offset_days").notNull().default(0),
+  durationDays: integer("duration_days").notNull().default(7),
+  anchor: anchorTypeEnum("anchor").notNull().default("psa"),
+  defaultAssignee: text("default_assignee"),
+  defaultDependencies: integer("default_dependencies").array(),
+  label: text("label"),
+  isGlobal: boolean("is_global").notNull().default(true),
+});
+
+// Project Templates
+export const projectTemplates = pgTable("project_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+});
+
+// Project Template Tasks (junction table)
+export const projectTemplateTasks = pgTable("project_template_tasks", {
+  templateId: varchar("template_id").notNull().references(() => projectTemplates.id),
+  taskTemplateId: varchar("task_template_id").notNull().references(() => taskTemplates.id),
+  sortOrder: integer("sort_order").notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.templateId, table.taskTemplateId] }),
+}));
+
+// Tasks
+export const tasks = pgTable("tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  startStrategy: startStrategyEnum("start_strategy").notNull().default("offset"),
+  startDate: date("start_date"),
+  startOffsetDays: integer("start_offset_days"),
+  durationDays: integer("duration_days").notNull(),
+  assignee: text("assignee"),
+  companyHired: text("company_hired"),
+  priority: priorityEnum("priority").notNull().default("med"),
+  status: statusEnum("status").notNull().default("not_started"),
+  completedAt: timestamp("completed_at"),
+  dependencies: varchar("dependencies").array().default(sql`'{}'`),
+  baselineStart: date("baseline_start"),
+  baselineDue: date("baseline_due"),
+  manuallyLocked: boolean("manually_locked").notNull().default(false),
+  cost: text("cost"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Audit Logs
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  entityType: text("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  action: text("action").notNull(),
+  before: jsonb("before"),
+  after: jsonb("after"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Relations
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  users: many(users),
+  projects: many(projects),
+}));
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [users.orgId],
+    references: [organizations.id],
+  }),
+  createdProjects: many(projects),
+  auditLogs: many(auditLogs),
+}));
+
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [projects.orgId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [projects.createdBy],
+    references: [users.id],
+  }),
+  settings: one(projectSettings),
+  tasks: many(tasks),
+  auditLogs: many(auditLogs),
+}));
+
+export const projectSettingsRelations = relations(projectSettings, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectSettings.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const tasksRelations = relations(tasks, ({ one }) => ({
+  project: one(projects, {
+    fields: [tasks.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  project: one(projects, {
+    fields: [auditLogs.projectId],
+    references: [projects.id],
+  }),
+  user: one(users, {
+    fields: [auditLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+// Insert Schemas
+export const insertOrganizationSchema = createInsertSchema(organizations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertProjectSchema = createInsertSchema(projects).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertProjectSettingsSchema = createInsertSchema(projectSettings);
+
+export const insertTaskTemplateSchema = createInsertSchema(taskTemplates).omit({
+  id: true,
+});
+
+export const insertProjectTemplateSchema = createInsertSchema(projectTemplates).omit({
+  id: true,
+});
+
+export const insertTaskSchema = createInsertSchema(tasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Types
+export type Organization = typeof organizations.$inferSelect;
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type Project = typeof projects.$inferSelect;
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+
+export type ProjectSettings = typeof projectSettings.$inferSelect;
+export type InsertProjectSettings = z.infer<typeof insertProjectSettingsSchema>;
+
+export type TaskTemplate = typeof taskTemplates.$inferSelect;
+export type InsertTaskTemplate = z.infer<typeof insertTaskTemplateSchema>;
+
+export type ProjectTemplate = typeof projectTemplates.$inferSelect;
+export type InsertProjectTemplate = z.infer<typeof insertProjectTemplateSchema>;
+
+export type Task = typeof tasks.$inferSelect;
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;

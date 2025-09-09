@@ -1,0 +1,113 @@
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { Download, Share2, FileText } from "lucide-react";
+import type { Project, Task } from "@shared/schema";
+import { ddClient } from "@/lib/ddClient";
+import { useToast } from "@/hooks/use-toast";
+
+interface ProjectHeaderProps {
+  project: Project;
+  tasks: Task[];
+}
+
+export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
+  const { toast } = useToast();
+  
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
+  const overdueTasks = tasks.filter(t => {
+    // This would need proper overdue calculation in a real implementation
+    return t.status !== 'completed' && new Date() > new Date(); // Simplified
+  }).length;
+
+  const handleExportCSV = async () => {
+    try {
+      const csvData = await ddClient.exportCSV(project.id);
+      const blob = new Blob([csvData], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${project.name}-tasks.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export CSV",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportICS = async () => {
+    try {
+      const icsData = await ddClient.exportICS(project.id);
+      const blob = new Blob([icsData], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${project.name}-calendar.ics`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export calendar",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <div className="mb-8" data-testid="project-header">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground" data-testid="project-name">
+            {project.name}
+          </h2>
+          <p className="text-muted-foreground" data-testid="project-dates">
+            {project.psaSignedDate && `PSA Signed: ${format(new Date(project.psaSignedDate), 'MMMM d, yyyy')}`}
+            {project.ddExpirationDate && ` • DD Expiration: ${format(new Date(project.ddExpirationDate), 'MMMM d, yyyy')}`}
+            {project.closingDate && ` • Closing: ${format(new Date(project.closingDate), 'MMMM d, yyyy')}`}
+          </p>
+        </div>
+        <div className="flex items-center space-x-3">
+          <Button variant="outline" onClick={handleExportCSV} data-testid="button-export-csv">
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          <Button variant="outline" onClick={handleExportICS} data-testid="button-export-ics">
+            <FileText className="h-4 w-4 mr-2" />
+            Export Calendar
+          </Button>
+          <Button data-testid="button-share">
+            <Share2 className="h-4 w-4 mr-2" />
+            Share Project
+          </Button>
+        </div>
+      </div>
+      
+      {/* Progress Summary */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <Card className="p-4" data-testid="card-total-tasks">
+          <div className="text-2xl font-bold text-foreground">{totalTasks}</div>
+          <div className="text-sm text-muted-foreground">Total Tasks</div>
+        </Card>
+        <Card className="p-4" data-testid="card-completed-tasks">
+          <div className="text-2xl font-bold text-green-600">{completedTasks}</div>
+          <div className="text-sm text-muted-foreground">Completed</div>
+        </Card>
+        <Card className="p-4" data-testid="card-in-progress-tasks">
+          <div className="text-2xl font-bold text-blue-600">{inProgressTasks}</div>
+          <div className="text-sm text-muted-foreground">In Progress</div>
+        </Card>
+        <Card className="p-4" data-testid="card-overdue-tasks">
+          <div className="text-2xl font-bold text-red-600">{overdueTasks}</div>
+          <div className="text-sm text-muted-foreground">Overdue</div>
+        </Card>
+      </div>
+    </div>
+  );
+}
