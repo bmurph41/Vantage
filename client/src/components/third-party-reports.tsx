@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Upload } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Search, Plus, Upload, Trash2 } from "lucide-react";
 import type { Task } from "@shared/schema";
-import { useUpdateTask } from "@/hooks/use-tasks";
+import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
 import { AddTaskModal } from "@/components/add-task-modal";
 
 interface ThirdPartyReportsProps {
@@ -20,6 +21,7 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
 
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -69,6 +71,10 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
         completedAt: newStatus === 'completed' ? new Date() : undefined
       }
     });
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    deleteTask.mutate(taskId);
   };
 
   return (
@@ -200,17 +206,52 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
                     {task.cost || '-'}
                   </td>
                   <td className="px-4 py-3">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => {
-                        setEditingTask(task);
-                        setIsAddTaskModalOpen(true);
-                      }}
-                      data-testid={`button-edit-${task.id}`}
-                    >
-                      Edit
-                    </Button>
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          setEditingTask(task);
+                          setIsAddTaskModalOpen(true);
+                        }}
+                        data-testid={`button-edit-${task.id}`}
+                      >
+                        Edit
+                      </Button>
+                      
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            data-testid={`button-delete-${task.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete "{task.title}"? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel data-testid={`button-cancel-delete-${task.id}`}>
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => handleDeleteTask(task.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              data-testid={`button-confirm-delete-${task.id}`}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </td>
                 </tr>
               ))}
