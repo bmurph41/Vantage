@@ -160,7 +160,16 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
                   </td>
                   <td className="px-4 py-3" data-testid={`text-company-${task.id}`}>
                     {task.companyHired ? (
-                      <span className="font-medium">{task.companyHired}</span>
+                      <div>
+                        <div className="font-medium">{task.companyHired}</div>
+                        {(task.repName || task.repEmail || task.repPhone) && (
+                          <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                            {task.repName && <div>Rep: {task.repName}</div>}
+                            {task.repEmail && <div>📧 {task.repEmail}</div>}
+                            {task.repPhone && <div>📞 {task.repPhone}</div>}
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
