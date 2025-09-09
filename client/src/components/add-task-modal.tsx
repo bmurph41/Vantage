@@ -13,8 +13,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useCreateTask } from "@/hooks/use-tasks";
+import { useCreateTask, useUpdateTask } from "@/hooks/use-tasks";
 import { marinaDueDiligenceTaskTemplates, taskCategories, searchTasks, type TaskTemplate } from "@/data/marina-due-diligence-tasks";
+import type { Task } from "@shared/schema";
 
 const addTaskFormSchema = z.object({
   title: z.string().min(1, "Task title is required"),
@@ -37,9 +38,10 @@ interface AddTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   projectId: string;
+  editingTask?: Task | null;
 }
 
-export function AddTaskModal({ isOpen, onClose, projectId }: AddTaskModalProps) {
+export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTaskModalProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null);
@@ -47,24 +49,27 @@ export function AddTaskModal({ isOpen, onClose, projectId }: AddTaskModalProps) 
   
   const { toast } = useToast();
   const createTask = useCreateTask();
+  const updateTask = useUpdateTask();
+  
+  const isEditMode = !!editingTask;
 
   const form = useForm<z.infer<typeof addTaskFormSchema>>({
     resolver: zodResolver(addTaskFormSchema),
     defaultValues: {
-      title: "",
-      description: "",
-      startStrategy: "offset",
-      startDate: "",
-      startOffsetDays: 0,
-      durationDays: 7,
-      assignee: "",
-      companyHired: "",
-      repName: "",
-      repEmail: "",
-      repPhone: "",
-      priority: "med",
-      cost: "",
-      notes: "",
+      title: editingTask?.title || "",
+      description: editingTask?.description || "",
+      startStrategy: editingTask?.startStrategy || "offset",
+      startDate: editingTask?.startDate || "",
+      startOffsetDays: editingTask?.startOffsetDays || 0,
+      durationDays: editingTask?.durationDays || 7,
+      assignee: editingTask?.assignee || "",
+      companyHired: editingTask?.companyHired || "",
+      repName: editingTask?.repName || "",
+      repEmail: editingTask?.repEmail || "",
+      repPhone: editingTask?.repPhone || "",
+      priority: editingTask?.priority || "med",
+      cost: editingTask?.cost || "",
+      notes: editingTask?.notes || "",
     },
   });
 
@@ -111,24 +116,44 @@ export function AddTaskModal({ isOpen, onClose, projectId }: AddTaskModalProps) 
   };
 
   const onSubmit = (data: z.infer<typeof addTaskFormSchema>) => {
-    const taskData = {
-      ...data,
-      projectId,
-      status: "not_started" as const,
-    };
-
-    createTask.mutate(
-      { projectId, task: taskData },
-      {
-        onSuccess: () => {
-          toast({
-            title: "Success",
-            description: "Task added successfully",
-          });
-          handleClose();
+    if (isEditMode && editingTask) {
+      // Update existing task
+      updateTask.mutate(
+        {
+          id: editingTask.id,
+          updates: data,
         },
-      }
-    );
+        {
+          onSuccess: () => {
+            toast({
+              title: "Success",
+              description: "Task updated successfully",
+            });
+            handleClose();
+          },
+        }
+      );
+    } else {
+      // Create new task
+      const taskData = {
+        ...data,
+        projectId,
+        status: "not_started" as const,
+      };
+
+      createTask.mutate(
+        { projectId, task: taskData },
+        {
+          onSuccess: () => {
+            toast({
+              title: "Success",
+              description: "Task added successfully",
+            });
+            handleClose();
+          },
+        }
+      );
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -145,17 +170,223 @@ export function AddTaskModal({ isOpen, onClose, projectId }: AddTaskModalProps) 
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>
-            {step === "browse" ? "Add Due Diligence Task" : `Customize: ${selectedTemplate?.name}`}
+            {isEditMode 
+              ? "Edit Task" 
+              : step === "browse" 
+                ? "Add Due Diligence Task" 
+                : `Customize: ${selectedTemplate?.name}`
+            }
           </DialogTitle>
           <DialogDescription>
-            {step === "browse" 
-              ? "Choose from our comprehensive marina due diligence task library" 
-              : "Review and customize the task details before adding to your project"
+            {isEditMode 
+              ? "Modify the task details and save your changes" 
+              : step === "browse" 
+                ? "Choose from our comprehensive marina due diligence task library" 
+                : "Review and customize the task details before adding to your project"
             }
           </DialogDescription>
         </DialogHeader>
 
-        {step === "browse" ? (
+        {isEditMode ? (
+          // Edit mode - show customize form directly
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <ScrollArea className="h-96 pr-4">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="title">Task Title *</Label>
+                  <Input
+                    id="title"
+                    {...form.register("title")}
+                    data-testid="input-task-title"
+                  />
+                  {form.formState.errors.title && (
+                    <p className="text-sm text-destructive mt-1">{form.formState.errors.title.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    {...form.register("description")}
+                    rows={3}
+                    data-testid="textarea-task-description"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="startStrategy">Start Strategy</Label>
+                    <Select
+                      value={form.watch("startStrategy")}
+                      onValueChange={(value: string) => form.setValue("startStrategy", value as "fixed" | "offset")}
+                    >
+                      <SelectTrigger data-testid="select-start-strategy">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fixed">Fixed Date</SelectItem>
+                        <SelectItem value="offset">Days After PSA</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    {form.watch("startStrategy") === "fixed" ? (
+                      <>
+                        <Label htmlFor="startDate">Start Date</Label>
+                        <Input
+                          id="startDate"
+                          type="date"
+                          {...form.register("startDate")}
+                          data-testid="input-start-date"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Label htmlFor="startOffsetDays">Days After PSA</Label>
+                        <Input
+                          id="startOffsetDays"
+                          type="number"
+                          {...form.register("startOffsetDays", { valueAsNumber: true })}
+                          data-testid="input-start-offset"
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="durationDays">Duration (Days) *</Label>
+                    <Input
+                      id="durationDays"
+                      type="number"
+                      min="1"
+                      {...form.register("durationDays", { valueAsNumber: true })}
+                      data-testid="input-duration"
+                    />
+                    {form.formState.errors.durationDays && (
+                      <p className="text-sm text-destructive mt-1">{form.formState.errors.durationDays.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="priority">Priority</Label>
+                    <Select
+                      value={form.watch("priority")}
+                      onValueChange={(value: string) => form.setValue("priority", value as "low" | "med" | "high")}
+                    >
+                      <SelectTrigger data-testid="select-priority">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="med">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="assignee">Task Owner</Label>
+                    <Input
+                      id="assignee"
+                      placeholder="Assign to team member"
+                      {...form.register("assignee")}
+                      data-testid="input-assignee"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="companyHired">Company Hired</Label>
+                    <Input
+                      id="companyHired"
+                      placeholder="Third-party company"
+                      {...form.register("companyHired")}
+                      data-testid="input-company-hired"
+                    />
+                  </div>
+                </div>
+
+                {/* Rep Contact Info */}
+                {form.watch("companyHired") && (
+                  <div className="space-y-3 bg-gray-50 p-3 rounded-md">
+                    <div className="text-sm font-medium text-gray-700">Rep Contact Information</div>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <Label htmlFor="repName">Rep Name</Label>
+                        <Input
+                          id="repName"
+                          placeholder="Representative name"
+                          {...form.register("repName")}
+                          data-testid="input-rep-name"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor="repEmail">Rep Email</Label>
+                          <Input
+                            id="repEmail"
+                            type="email"
+                            placeholder="rep@company.com"
+                            {...form.register("repEmail")}
+                            data-testid="input-rep-email"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="repPhone">Rep Phone</Label>
+                          <Input
+                            id="repPhone"
+                            type="tel"
+                            placeholder="(555) 123-4567"
+                            {...form.register("repPhone")}
+                            data-testid="input-rep-phone"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <Label htmlFor="cost">Estimated Cost</Label>
+                  <Input
+                    id="cost"
+                    placeholder="e.g., $5,000 - $15,000"
+                    {...form.register("cost")}
+                    data-testid="input-cost"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Additional notes or requirements"
+                    {...form.register("notes")}
+                    rows={2}
+                    data-testid="textarea-notes"
+                  />
+                </div>
+              </div>
+            </ScrollArea>
+
+            {/* Form Actions */}
+            <div className="flex justify-end pt-4">
+              <div className="flex space-x-2">
+                <Button type="button" variant="outline" onClick={handleClose} data-testid="button-cancel">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateTask.isPending} data-testid="button-save-task">
+                  {updateTask.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </div>
+          </form>
+        ) : step === "browse" ? (
           <div className="space-y-4">
             {/* Search and Filters */}
             <div className="flex space-x-4">
