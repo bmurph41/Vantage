@@ -81,7 +81,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     const today = new Date();
     let deadlineDate: Date;
     
-    if (task.deadlineType === 'dd_expiration' && project?.ddExpirationDate) {
+    // First priority: Use direct deadline field if set
+    if (task.deadline) {
+      deadlineDate = parseISO(task.deadline);
+    } else if (task.deadlineType === 'dd_expiration' && project?.ddExpirationDate) {
       deadlineDate = parseISO(project.ddExpirationDate);
     } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project?.psaSignedDate) {
       const psaDate = parseISO(project.psaSignedDate);
@@ -114,6 +117,35 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     
     // Allow negative values to show overdue tasks, but ensure we have a reasonable calculation
     return daysRemaining;
+  };
+
+  // Calculate progress based on task's specific start date and deadline
+  const calculateTaskProgress = (task: Task): number => {
+    if (task.status === 'completed') return 100;
+    
+    const today = new Date();
+    
+    // Get task's specific start date
+    const taskStartDate = task.startDate 
+      ? parseISO(task.startDate) 
+      : project?.psaSignedDate 
+        ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
+        : today;
+    
+    // Get task's specific deadline
+    const taskDeadlineDate = calculateDeadlineDate(task);
+    
+    // Calculate total days for this task
+    const totalDays = differenceInDays(taskDeadlineDate, taskStartDate);
+    
+    // Calculate elapsed days
+    const elapsedDays = differenceInDays(today, taskStartDate);
+    
+    // Calculate progress percentage
+    if (totalDays <= 0) return 0;
+    
+    const progress = Math.max(0, Math.min(100, (elapsedDays / totalDays) * 100));
+    return progress;
   };
 
   // Removed floating timeline to prevent scroll issues
@@ -868,9 +900,19 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[28%]">Task</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[18%]">Task Owner</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[22%]">Company Hired</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[16%]">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[14%]">Status</th>
                 <th 
                   className="px-4 py-3 text-left text-sm font-semibold w-[12%] cursor-pointer hover:bg-primary/80 transition-colors"
+                  onClick={() => handleSort('deadline')}
+                  data-testid="header-deadline"
+                >
+                  <div className="flex items-center">
+                    Deadline
+                    {getSortIcon('deadline')}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
                   onClick={() => handleSort('daysRemaining')}
                   data-testid="header-days-remaining"
                 >
@@ -956,6 +998,21 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           <SelectItem value="completed">Completed</SelectItem>
                         </SelectContent>
                       </Select>
+                    </td>
+                    <td className="px-4 py-3" data-testid={`text-deadline-${task.id}`}>
+                      <Input
+                        type="date"
+                        value={task.deadline || ''}
+                        onChange={(e) => {
+                          const newDeadline = e.target.value ? e.target.value : null;
+                          updateTask.mutate({
+                            id: task.id,
+                            updates: { deadline: newDeadline }
+                          });
+                        }}
+                        className="w-full text-xs h-7"
+                        data-testid={`input-deadline-${task.id}`}
+                      />
                     </td>
                     <td className="px-4 py-3 text-center" data-testid={`text-days-remaining-${task.id}`}>
                       <div className="space-y-2">
@@ -1113,7 +1170,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               ))}
               {filteredTasks.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
+                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
                     No tasks found matching your criteria.
                   </td>
                 </tr>

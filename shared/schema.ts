@@ -112,6 +112,7 @@ export const tasks = pgTable("tasks", {
   // New deadline fields
   deadlineType: deadlineTypeEnum("deadline_type").default("days_after_psa"),
   deadlineDays: integer("deadline_days"),
+  deadline: date("deadline"), // Direct deadline date field
   assignee: text("assignee"),
   companyHired: text("company_hired"),
   repName: text("rep_name"),

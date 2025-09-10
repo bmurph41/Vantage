@@ -125,6 +125,7 @@ const addTaskFormSchema = z.object({
   startOffsetDays: z.number().optional(),
   // New deadline fields
   deadlineType: z.enum(["dd_expiration"]).default("dd_expiration"),
+  deadline: z.string().optional(),
   assignee: z.string().optional(),
   companyHired: z.string().optional(),
   repName: z.string().optional(),
@@ -289,6 +290,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           startDate: editingTask.startDate || "",
           startOffsetDays: editingTask.startOffsetDays || 0,
           deadlineType: "dd_expiration",
+          deadline: editingTask.deadline || "",
           assignee: editingTask.assignee || "",
           companyHired: editingTask.companyHired || "",
           repName: editingTask.repName || "",
@@ -315,7 +317,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           startOffsetDays: 0,
     
           deadlineType: "dd_expiration",
-    
+          deadline: "",
           assignee: "",
           companyHired: "",
           repName: "",
@@ -625,11 +627,14 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
 
                 <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <Label htmlFor="deadlineType">Deadline *</Label>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium">DD Expiration</span>
-                      <p className="text-sm text-muted-foreground">Task will be due on DD expiration date</p>
-                    </div>
+                    <Label htmlFor="deadline">Deadline Date</Label>
+                    <Input
+                      id="deadline"
+                      type="date"
+                      {...form.register("deadline")}
+                      data-testid="input-deadline"
+                    />
+                    <p className="text-sm text-muted-foreground">Set a specific deadline date for this task</p>
                   </div>
                 </div>
 
