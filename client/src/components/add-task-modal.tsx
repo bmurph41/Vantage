@@ -166,7 +166,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   // Mutation for saving task as template
   const saveTaskAsTemplate = useMutation({
     mutationFn: async (params: { taskId: string; templateName: string; templateDescription: string; category: string }) => {
-      return apiRequest(`/api/dd/tasks/${params.taskId}/save-as-template`, {
+      const response = await fetch(`/api/dd/tasks/${params.taskId}/save-as-template`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -175,6 +175,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           category: params.category,
         }),
       });
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/task-templates'] });

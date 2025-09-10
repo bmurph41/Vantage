@@ -392,7 +392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const csvHeader = "Title,Description,Assignee,Company Hired,Status,Start Date,Duration Days,Priority,Cost\n";
       const csvRows = tasks.map(task => 
-        `"${task.title}","${task.description || ''}","${task.assignee || ''}","${task.companyHired || ''}","${task.status}","${task.startDate || ''}",${task.durationDays},"${task.priority}","${task.cost || ''}"`
+        `"${task.title}","${task.description || ''}","${task.assignee || ''}","${task.companyHired || ''}","${task.status}","${task.startDate || ''}","${task.deadlineDays || ''}","${task.priority}","${task.cost || ''}"`
       ).join("\n");
       
       res.setHeader("Content-Type", "text/csv");
