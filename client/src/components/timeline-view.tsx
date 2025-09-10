@@ -30,13 +30,11 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
         return eachDayOfInterval({ start: projectStart, end: projectEnd });
       case 'weekly':
       case 'biweekly':
-        const weeklyStart = startOfWeek(projectStart);
-        const weeklyEnd = projectEnd; // End at closing date, not end of week
-        return eachWeekOfInterval({ start: weeklyStart, end: weeklyEnd });
+        // Start exactly at PSA signed date, not beginning of week
+        return eachWeekOfInterval({ start: projectStart, end: projectEnd });
       case 'monthly':
-        const monthlyStart = startOfMonth(projectStart);
-        const monthlyEnd = projectEnd; // End at closing date, not end of month
-        return eachMonthOfInterval({ start: monthlyStart, end: monthlyEnd });
+        // Start exactly at PSA signed date, not beginning of month
+        return eachMonthOfInterval({ start: projectStart, end: projectEnd });
       default:
         return eachDayOfInterval({ start: projectStart, end: projectEnd });
     }
