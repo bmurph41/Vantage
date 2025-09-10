@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -760,166 +760,192 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     onClick={() => toggleTaskExpansion(task.id)}
                     data-testid={`row-task-${task.id}`}
                   >
-                  <td className="px-3 py-3">
-                    <div className="font-medium text-sm leading-tight truncate" title={task.title} data-testid={`text-task-title-${task.id}`}>
-                      {task.title}
-                    </div>
-                    {task.description && (
-                      <div className="text-xs text-muted-foreground mt-1 line-clamp-2" title={task.description} data-testid={`text-task-description-${task.id}`}>
-                        {task.description}
+                    <td className="px-4 py-4">
+                      <div className="font-medium text-sm leading-tight" title={task.title} data-testid={`text-task-title-${task.id}`}>
+                        {task.title}
                       </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    {task.assignee ? (
-                      <div className="flex items-center space-x-2" data-testid={`assignee-${task.id}`}>
-                        <div className={`w-5 h-5 ${getUserColor(task.assignee)} rounded-full flex items-center justify-center text-xs text-white flex-shrink-0`}>
-                          {getUserInitials(task.assignee)}
+                      {task.description && (
+                        <div className="text-xs text-muted-foreground mt-1 line-clamp-2" title={task.description} data-testid={`text-task-description-${task.id}`}>
+                          {task.description}
                         </div>
-                        <span className="text-sm truncate" title={task.assignee}>{task.assignee}</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">-</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3" data-testid={`text-company-${task.id}`}>
-                    {task.companyHired ? (
-                      <div>
-                        <div className="font-medium text-sm leading-tight truncate" title={task.companyHired}>{task.companyHired}</div>
-                        {(task.repName || task.repEmail || task.repPhone) && (
-                          <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                            {task.repName && <div className="truncate" title={`Rep: ${task.repName}`}>Rep: {task.repName}</div>}
-                            {task.repEmail && <div className="truncate" title={task.repEmail}>📧 {task.repEmail}</div>}
-                            {task.repPhone && <div className="truncate" title={task.repPhone}>📞 {task.repPhone}</div>}
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      {task.assignee ? (
+                        <div className="flex items-center space-x-2" data-testid={`assignee-${task.id}`}>
+                          <div className={`w-6 h-6 ${getUserColor(task.assignee)} rounded-full flex items-center justify-center text-xs text-white flex-shrink-0`}>
+                            {getUserInitials(task.assignee)}
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">-</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    <Select
-                      value={task.status}
-                      onValueChange={(value) => handleStatusChange(task.id, value)}
-                    >
-                      <SelectTrigger className="w-full h-8" data-testid={`select-status-${task.id}`}>
-                        <SelectValue>
-                          {getStatusBadge(task.status)}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="to_do">To Do</SelectItem>
-                        <SelectItem value="scheduled">Scheduled</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  <td className="px-3 py-3">
-                    <Select
-                      value={task.paymentStatus || 'not_paid'}
-                      onValueChange={(value) => handlePaymentStatusChange(task.id, value)}
-                    >
-                      <SelectTrigger className="w-full h-8" data-testid={`select-payment-${task.id}`}>
-                        <SelectValue>
-                          {getPaymentStatusBadge(task.paymentStatus || 'not_paid')}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="not_paid">Not Paid</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  <td className="px-3 py-3 text-center" data-testid={`text-days-remaining-${task.id}`}>
-                    {(() => {
-                      const daysRemaining = calculateDaysRemaining(task);
-                      if (task.status === 'completed') {
-                        return <span className="text-green-600 font-medium">Complete</span>;
-                      } else if (daysRemaining === 0) {
-                        return <span className="text-red-600 font-medium">Due Today</span>;
-                      } else if (daysRemaining < 0) {
-                        return <span className="text-red-600 font-medium">Overdue</span>;
-                      } else {
-                        return <span className={`font-medium text-sm ${daysRemaining <= 3 ? 'text-orange-600' : 'text-gray-900'}`}>
-                          {daysRemaining}d
-                        </span>;
-                      }
-                    })()}
-                  </td>
-                  <td className="px-3 py-3 text-muted-foreground" data-testid={`completion-date-${task.id}`}>
-                    <Input
-                      type="datetime-local"
-                      value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 16) : ''}
-                      onChange={(e) => {
-                        const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
-                        updateTask.mutate({
-                          id: task.id,
-                          updates: { completedAt: newCompletedAt }
-                        });
-                      }}
-                      className="w-full text-xs h-8"
-                      data-testid={`input-completion-date-${task.id}`}
-                    />
-                  </td>
-                  <td className="px-3 py-3 text-muted-foreground text-sm text-right" data-testid={`text-cost-${task.id}`}>
-                    {task.cost || '-'}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex space-x-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 px-2 text-xs"
-                        onClick={() => {
-                          setEditingTask(task);
-                          setIsAddTaskModalOpen(true);
-                        }}
-                        data-testid={`button-edit-${task.id}`}
+                          <span className="text-sm" title={task.assignee}>{task.assignee}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4" data-testid={`text-company-${task.id}`}>
+                      {task.companyHired ? (
+                        <div>
+                          <div className="font-medium text-sm leading-tight" title={task.companyHired}>{task.companyHired}</div>
+                          {(task.repName || task.repEmail || task.repPhone) && (
+                            <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                              {task.repName && <div className="truncate" title={`Rep: ${task.repName}`}>Rep: {task.repName}</div>}
+                              {task.repEmail && <div className="truncate" title={task.repEmail}>📧 {task.repEmail}</div>}
+                              {task.repPhone && <div className="truncate" title={task.repPhone}>📞 {task.repPhone}</div>}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Select
+                        value={task.status}
+                        onValueChange={(value) => handleStatusChange(task.id, value)}
                       >
-                        Edit
-                      </Button>
-                      
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="text-destructive hover:text-destructive h-7 px-2"
-                            data-testid={`button-delete-${task.id}`}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Task</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete "{task.title}"? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel data-testid={`button-cancel-delete-${task.id}`}>
-                              Cancel
-                            </AlertDialogCancel>
-                            <AlertDialogAction 
-                              onClick={() => handleDeleteTask(task.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              data-testid={`button-confirm-delete-${task.id}`}
+                        <SelectTrigger className="w-full h-8" data-testid={`select-status-${task.id}`}>
+                          <SelectValue>
+                            {getStatusBadge(task.status)}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="to_do">To Do</SelectItem>
+                          <SelectItem value="scheduled">Scheduled</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="px-4 py-3 text-center" data-testid={`text-days-remaining-${task.id}`}>
+                      {(() => {
+                        const daysRemaining = calculateDaysRemaining(task);
+                        if (task.status === 'completed') {
+                          return <span className="text-green-600 font-medium text-sm">Complete</span>;
+                        } else if (daysRemaining === 0) {
+                          return <span className="text-red-600 font-medium text-sm">Due Today</span>;
+                        } else if (daysRemaining < 0) {
+                          return <span className="text-red-600 font-medium text-sm">Overdue</span>;
+                        } else {
+                          return <span className={`font-medium text-sm ${daysRemaining <= 3 ? 'text-orange-600' : 'text-gray-900'}`}>
+                            {daysRemaining}d
+                          </span>;
+                        }
+                      })()}
+                    </td>
+                  </tr>
+                  
+                  {/* Expanded row with additional details */}
+                  {expandedTasks.has(task.id) && (
+                    <tr className={`${index % 2 === 1 ? 'bg-accent/30' : 'bg-gray-50'} border-t border-gray-200`}>
+                      <td colSpan={5} className="px-4 py-4">
+                        <div className="grid grid-cols-4 gap-4">
+                          {/* Payment Status */}
+                          <div>
+                            <label className="text-xs font-medium text-gray-700 block mb-1">Payment</label>
+                            <Select
+                              value={task.paymentStatus || 'not_paid'}
+                              onValueChange={(value) => handlePaymentStatusChange(task.id, value)}
                             >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </td>
-                </tr>
+                              <SelectTrigger className="w-full h-8" data-testid={`select-payment-${task.id}`}>
+                                <SelectValue>
+                                  {getPaymentStatusBadge(task.paymentStatus || 'not_paid')}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="not_paid">Not Paid</SelectItem>
+                                <SelectItem value="paid">Paid</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          {/* Cost */}
+                          <div>
+                            <label className="text-xs font-medium text-gray-700 block mb-1">Cost</label>
+                            <div className="text-sm text-gray-900 py-1.5" data-testid={`text-cost-${task.id}`}>
+                              {task.cost || '-'}
+                            </div>
+                          </div>
+                          
+                          {/* Completion Date */}
+                          <div>
+                            <label className="text-xs font-medium text-gray-700 block mb-1">Completion Date</label>
+                            <Input
+                              type="datetime-local"
+                              value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => {
+                                const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
+                                updateTask.mutate({
+                                  id: task.id,
+                                  updates: { completedAt: newCompletedAt }
+                                });
+                              }}
+                              className="w-full text-xs h-8"
+                              data-testid={`input-completion-date-${task.id}`}
+                            />
+                          </div>
+                          
+                          {/* Actions */}
+                          <div>
+                            <label className="text-xs font-medium text-gray-700 block mb-1">Actions</label>
+                            <div className="flex space-x-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingTask(task);
+                                  setIsAddTaskModalOpen(true);
+                                }}
+                                data-testid={`button-edit-${task.id}`}
+                              >
+                                Edit
+                              </Button>
+                              
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive h-8 px-2"
+                                    onClick={(e) => e.stopPropagation()}
+                                    data-testid={`button-delete-${task.id}`}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete "{task.title}"? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel data-testid={`button-cancel-delete-${task.id}`}>
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction 
+                                      onClick={() => handleDeleteTask(task.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      data-testid={`button-confirm-delete-${task.id}`}
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
               {filteredTasks.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
+                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
                     No tasks found matching your criteria.
                   </td>
                 </tr>
