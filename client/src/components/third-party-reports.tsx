@@ -914,7 +914,16 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           
                           {/* Cost */}
                           <div>
-                            <label className="text-xs font-medium text-gray-700 block mb-1">Cost</label>
+                            <label 
+                              className="text-xs font-medium text-gray-700 block mb-1 cursor-pointer hover:text-gray-900 flex items-center"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSort('cost');
+                              }}
+                              data-testid="header-cost"
+                            >
+                              Cost {getSortIcon('cost')}
+                            </label>
                             <div className="text-sm text-gray-900 py-1.5" data-testid={`text-cost-${task.id}`}>
                               {task.cost || '-'}
                             </div>
