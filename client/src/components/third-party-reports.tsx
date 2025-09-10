@@ -910,7 +910,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     <div>
                       <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">On-Site</label>
                       <div className="mt-1">
-                        {task.status === "scheduled" ? (
+                        {task.requiresOnSiteInspection && task.status !== "not_started" ? (
                           <input 
                             type="date" 
                             value={task.dateOnSite || ""} 
@@ -922,7 +922,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           <input 
                             type="date" 
                             value={task.dateOnSite} 
-                            className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
                             readOnly
                           />
                         ) : (
