@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Download, Mail, Eye, FileText, Calendar } from "lucide-react";
 import type { Task, Project } from "@shared/schema";
-import { format } from "date-fns";
+import { format, parseISO, addDays, differenceInDays } from "date-fns";
 
 interface ExportReportModalProps {
   isOpen: boolean;
@@ -111,6 +111,62 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
     );
   };
 
+  // Currency formatting utility - same as in ThirdPartyReports
+  const formatCurrency = (value: string): string => {
+    if (!value) return "-";
+    
+    // If already formatted with $, return as is
+    if (value.startsWith("$")) return value;
+    
+    // Remove any non-numeric characters except decimal points
+    const numericValue = value.replace(/[^\d.]/g, "");
+    
+    // If empty or just a decimal point, return dash
+    if (!numericValue || numericValue === ".") return "-";
+    
+    // Parse as number and format with commas and dollar sign
+    const number = parseFloat(numericValue);
+    if (isNaN(number)) return value; // Return original if can't parse
+    
+    // Format with dollar sign and commas, no decimal places for whole numbers
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: number % 1 === 0 ? 0 : 2,
+      maximumFractionDigits: 2
+    }).format(number);
+  };
+
+  // Calculate deadline date - same logic as in ThirdPartyReports
+  const calculateDeadlineDate = (task: Task): Date => {
+    const today = new Date();
+    let deadlineDate: Date;
+    
+    // First priority: Use direct deadline field if set
+    if (task.deadline) {
+      deadlineDate = parseISO(task.deadline);
+    } else if (task.deadlineType === 'dd_expiration' && project?.ddExpirationDate) {
+      deadlineDate = parseISO(project.ddExpirationDate);
+    } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project?.psaSignedDate) {
+      const psaDate = parseISO(project.psaSignedDate);
+      deadlineDate = addDays(psaDate, task.deadlineDays);
+    } else {
+      // Enhanced fallback calculation for tasks without specific deadline types
+      const startDate = task.startDate 
+        ? parseISO(task.startDate) 
+        : project?.psaSignedDate 
+          ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
+          : today;
+      
+      // Use smart defaults based on priority for task duration
+      const defaultDuration = task.priority === 'high' ? 5 : task.priority === 'med' ? 10 : 21;
+      
+      deadlineDate = addDays(startDate, defaultDuration);
+    }
+    
+    return deadlineDate;
+  };
+
   const formatCellValue = (task: Task, columnId: string) => {
     switch (columnId) {
       case 'title':
@@ -126,15 +182,15 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
       case 'priority':
         return task.priority;
       case 'deadline':
-        return 'Calculated'; // Would need deadline calculation logic
+        return format(calculateDeadlineDate(task), 'MMM d, yyyy');
       case 'orderedAt':
         return task.orderedAt ? format(new Date(task.orderedAt), 'MMM d, yyyy') : '-';
       case 'startDate':
-        return task.startDate ? format(new Date(task.startDate), 'MMM d, yyyy') : '-';
+        return task.dateOnSite ? format(new Date(task.dateOnSite), 'MMM d, yyyy') : '-';
       case 'completedAt':
         return task.completedAt ? format(new Date(task.completedAt), 'MMM d, yyyy') : '-';
       case 'cost':
-        return task.cost || '-';
+        return formatCurrency(task.cost || '');
       case 'paymentStatus':
         return task.paymentStatus || 'not_paid';
       case 'repName':
