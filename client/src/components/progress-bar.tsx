@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { effectiveStart, effectiveDue, daysBetween, tzNow } from "@/lib/date-utils";
+import { effectiveStart, effectiveDue, daysBetween, tzNow, getProjectBounds, percentOfRange, clampDate } from "@/lib/date-utils";
 import { startOfDay, isAfter, isBefore, parseISO, addDays } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 
@@ -13,8 +13,11 @@ interface ProgressBarProps {
 export function ProgressBar({ task, project, settings, className }: ProgressBarProps) {
   const today = startOfDay(tzNow('America/New_York'));
   
+  // Get fixed project timeline bounds using new utility function
+  const { start: projectStart, end: projectEnd } = getProjectBounds(project);
+  
   // Calculate individual task start date
-  const start = startOfDay(task.startDate 
+  const taskStart = startOfDay(task.startDate 
     ? parseISO(task.startDate) 
     : project.psaSignedDate 
       ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
@@ -45,37 +48,33 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
     }
   };
   
-  const due = startOfDay(calculateTaskDeadline(task));
+  const taskDeadline = startOfDay(calculateTaskDeadline(task));
   
-  // Calculate project timeline bounds
-  const projectStart = project.psaSignedDate ? startOfDay(parseISO(project.psaSignedDate)) : start;
-  const projectEnd = project.closingDate ? startOfDay(parseISO(project.closingDate)) : due;
+  // NEW FIXED RANGE SYSTEM: All progress bars start from project start and extend to today/deadline
+  const progressStart = projectStart; // Always start from project start
+  const progressEnd = task.status === 'completed' 
+    ? taskDeadline // Completed tasks extend to their deadline
+    : isAfter(today, taskDeadline) 
+      ? taskDeadline // Overdue tasks extend to their deadline
+      : clampDate(today, projectStart, projectEnd); // Active tasks extend to today
   
-  // Calculate task position and width relative to overall timeline
-  const totalProjectDays = Math.max(1, daysBetween(projectStart, projectEnd, settings?.useBusinessDays, settings?.holidayCalendar));
-  const daysFromProjectStart = Math.max(0, daysBetween(projectStart, start, settings?.useBusinessDays, settings?.holidayCalendar));
-  const taskDurationDays = Math.max(1, daysBetween(start, due, settings?.useBusinessDays, settings?.holidayCalendar));
+  // Calculate positioning using fixed range percentages
+  const startPosition = 0; // Always start at 0% (project start)
+  const endPosition = percentOfRange(progressEnd, projectStart, projectEnd);
+  const barWidth = Math.max(1, endPosition - startPosition); // Bar width from start to end
   
-  // Position and width as percentages of the overall timeline
-  const leftPosition = (daysFromProjectStart / totalProjectDays) * 100;
-  const barWidth = (taskDurationDays / totalProjectDays) * 100;
+  // Task deadline position for reference
+  const deadlinePosition = percentOfRange(taskDeadline, projectStart, projectEnd);
+  const taskStartPosition = percentOfRange(taskStart, projectStart, projectEnd);
   
-  // Calculate progress based on timeline positioning (aligns with "today" line)
-  const todayFromProjectStart = Math.max(0, daysBetween(projectStart, today, settings?.useBusinessDays, settings?.holidayCalendar));
-  const todayPosition = (todayFromProjectStart / totalProjectDays) * 100;
-  
-  // Task progress calculation - percentage of task duration that has elapsed up to today
-  const effectiveToday = today < due ? today : due;
-  const elapsed = Math.max(0, Math.min(taskDurationDays, daysBetween(start, effectiveToday, settings?.useBusinessDays, settings?.holidayCalendar)));
+  // Calculate progress statistics for labels
+  const taskDurationDays = Math.max(1, daysBetween(taskStart, taskDeadline, settings?.useBusinessDays, settings?.holidayCalendar));
+  const elapsed = Math.max(0, Math.min(taskDurationDays, daysBetween(taskStart, today < taskDeadline ? today : taskDeadline, settings?.useBusinessDays, settings?.holidayCalendar)));
   const remaining = Math.max(0, taskDurationDays - elapsed);
   
-  // Progress percentage should align with timeline - how much of the task bar should be filled to reach "today"
-  const progressToToday = Math.max(0, Math.min(100, ((todayPosition - leftPosition) / barWidth) * 100));
-  const percentElapsed = Math.round(progressToToday);
-  
   const isCompleted = task.status === 'completed';
-  const isOverdue = !isCompleted && isAfter(today, due);
-  const isNotStarted = isBefore(today, start);
+  const isOverdue = !isCompleted && isAfter(today, taskDeadline);
+  const isNotStarted = isBefore(today, taskStart);
 
   // Format time labels
   const getTimeLabel = (days: number) => {
@@ -86,11 +85,11 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
 
   return (
     <div className={cn("h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner", className)} data-testid="progress-bar">
-      {/* Text labels above progress bars - positioned relative to task bar */}
+      {/* Text labels above progress bars - positioned at center of progress bar */}
       <div 
         className="absolute -top-6 z-10"
         style={{
-          left: `${leftPosition + barWidth/2}%`,
+          left: `${startPosition + barWidth/2}%`,
           transform: 'translateX(-50%)'
         }}
       >
@@ -113,11 +112,11 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
         )}
       </div>
       
-      {/* Task bar positioned and sized based on project timeline */}
+      {/* Progress bar spanning from project start to today/deadline */}
       <div 
         className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 absolute"
         style={{
-          left: `${leftPosition}%`,
+          left: `${startPosition}%`,
           width: `${barWidth}%`
         }}
       >
@@ -131,43 +130,33 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
           <div className="h-full progress-bar-remaining-stripes relative" data-testid="progress-not-started">
           </div>
         ) : (
-          <div className="h-full flex relative" data-testid="progress-in-progress">
-            <div 
-              className="progress-bar-elapsed bg-blue-500" 
-              style={{ width: `${percentElapsed}%` }}
-              data-testid="progress-elapsed"
-            />
-            <div 
-              className="progress-bar-remaining-stripes"
-              style={{ width: `${100 - percentElapsed}%` }}
-              data-testid="progress-remaining"
-            />
+          <div className="h-full bg-blue-500 progress-bar-elapsed relative" data-testid="progress-in-progress">
+            {/* For the new system, the entire bar represents progress from start to today */}
           </div>
         )}
         
-        {/* Start marker */}
+        {/* Task start marker - shows where the task actually begins */}
         <div 
-          className="absolute -top-1 w-1 h-10 rounded-full shadow-sm"
+          className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-orange-500"
           style={{ 
-            left: "0px",
-            backgroundColor: isCompleted ? "#16a34a" : isOverdue ? "#dc2626" : "hsl(221 83% 35%)"
+            left: `${((taskStartPosition - startPosition) / barWidth) * 100}%`,
           }}
-          data-testid="start-marker"
+          data-testid="task-start-marker"
         />
         
-        {/* End marker */}
+        {/* Task deadline marker - shows where the task should end */}
         <div 
           className="absolute -top-1 w-1 h-10 rounded-full shadow-sm"
           style={{ 
-            right: "0px",
+            left: `${Math.min(100, ((deadlinePosition - startPosition) / barWidth) * 100)}%`,
             backgroundColor: isCompleted ? "#16a34a" : isOverdue ? "#dc2626" : "hsl(221 83% 35%)"
           }}
-          data-testid="end-marker"
+          data-testid="task-deadline-marker"
         />
         
         {/* Duration label on hover */}
         <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-          {taskDurationDays} days ({start.toLocaleDateString()} - {due.toLocaleDateString()})
+          {taskDurationDays} days ({taskStart.toLocaleDateString()} - {taskDeadline.toLocaleDateString()})
         </div>
       </div>
     </div>
