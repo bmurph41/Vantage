@@ -1166,6 +1166,34 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     </td>
                   </tr>
                   
+                  {/* Rep Contact Information Row */}
+                  {(task.repName || task.repEmail || task.repPhone) && (
+                    <tr className="bg-gray-50 border-none">
+                      <td colSpan={8} className="px-4 py-2 text-xs text-gray-600" data-testid={`rep-contact-${task.id}`}>
+                        <div className="flex items-center space-x-6">
+                          {task.repName && (
+                            <div className="flex items-center space-x-1">
+                              <span className="font-medium">Rep:</span>
+                              <span>{task.repName}</span>
+                            </div>
+                          )}
+                          {task.repEmail && (
+                            <div className="flex items-center space-x-1">
+                              <span className="font-medium">📧</span>
+                              <span>{task.repEmail}</span>
+                            </div>
+                          )}
+                          {task.repPhone && (
+                            <div className="flex items-center space-x-1">
+                              <span className="font-medium">📞</span>
+                              <span>{task.repPhone}</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  
                 </React.Fragment>
               ))}
               {filteredTasks.length === 0 && (
