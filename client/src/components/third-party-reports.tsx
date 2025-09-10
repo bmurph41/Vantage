@@ -850,10 +850,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               <tr className="bg-primary text-primary-foreground">
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[25%]">Task</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[18%]">Task Owner</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[22%]">Company Hired</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[13%]">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[20%]">Company Hired</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[12%]">Status</th>
                 <th 
-                  className="px-4 py-3 text-left text-sm font-semibold w-[12%] cursor-pointer hover:bg-primary/80 transition-colors"
+                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
                   onClick={() => handleSort('daysRemaining')}
                   data-testid="header-days-remaining"
                 >
@@ -872,6 +872,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     {getSortIcon('cost')}
                   </div>
                 </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[5%]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -959,15 +960,66 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         {formatCurrency(task.cost || '')}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="flex space-x-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 px-2 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTask(task);
+                            setIsAddTaskModalOpen(true);
+                          }}
+                          data-testid={`button-edit-${task.id}`}
+                        >
+                          Edit
+                        </Button>
+                        
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="text-destructive hover:text-destructive h-8 px-2"
+                              onClick={(e) => e.stopPropagation()}
+                              data-testid={`button-delete-${task.id}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{task.title}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel data-testid={`button-cancel-delete-${task.id}`}>
+                                Cancel
+                              </AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => handleDeleteTask(task.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                data-testid={`button-confirm-delete-${task.id}`}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </td>
                   </tr>
                   
                   {/* Expanded row with additional details */}
                   {expandedTasks.has(task.id) && (
                     <tr className={`${index % 2 === 1 ? 'bg-accent/30' : 'bg-gray-50'} border-t border-gray-200`}>
-                      <td colSpan={6} className="px-4 py-4">
-                        <div className="grid grid-cols-3 gap-4">
-                          {/* Payment Status */}
-                          <div>
+                      <td colSpan={7} className="px-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* Payment Status - same width as Task (25%) */}
+                          <div className="w-[25%]">
                             <label className="text-xs font-medium text-gray-700 block mb-1">Payment</label>
                             <Select
                               value={task.paymentStatus || 'not_paid'}
@@ -985,8 +1037,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                             </Select>
                           </div>
                           
-                          {/* Completion Date */}
-                          <div>
+                          {/* Completion Date - same width as Task Owner (18%) */}
+                          <div className="w-[18%]">
                             <label className="text-xs font-medium text-gray-700 block mb-1">Completion Date</label>
                             <Input
                               type="datetime-local"
@@ -1002,60 +1054,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               data-testid={`input-completion-date-${task.id}`}
                             />
                           </div>
-                          
-                          {/* Actions */}
-                          <div>
-                            <label className="text-xs font-medium text-gray-700 block mb-1">Actions</label>
-                            <div className="flex space-x-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-8 px-2 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingTask(task);
-                                  setIsAddTaskModalOpen(true);
-                                }}
-                                data-testid={`button-edit-${task.id}`}
-                              >
-                                Edit
-                              </Button>
-                              
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive h-8 px-2"
-                                    onClick={(e) => e.stopPropagation()}
-                                    data-testid={`button-delete-${task.id}`}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Task</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to delete "{task.title}"? This action cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel data-testid={`button-cancel-delete-${task.id}`}>
-                                      Cancel
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction 
-                                      onClick={() => handleDeleteTask(task.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      data-testid={`button-confirm-delete-${task.id}`}
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </div>
                         </div>
                       </td>
                     </tr>
@@ -1064,7 +1062,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               ))}
               {filteredTasks.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
+                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
                     No tasks found matching your criteria.
                   </td>
                 </tr>
