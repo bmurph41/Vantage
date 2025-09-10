@@ -741,8 +741,20 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       }
                     })()}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground" data-testid={`text-completion-date-${task.id}`}>
-                    {task.completedAt ? new Date(task.completedAt).toLocaleDateString() : '-'}
+                  <td className="px-4 py-3 text-muted-foreground" data-testid={`completion-date-${task.id}`}>
+                    <Input
+                      type="datetime-local"
+                      value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 16) : ''}
+                      onChange={(e) => {
+                        const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
+                        updateTask.mutate({
+                          id: task.id,
+                          updates: { completedAt: newCompletedAt }
+                        });
+                      }}
+                      className="w-full min-w-[180px] text-sm"
+                      data-testid={`input-completion-date-${task.id}`}
+                    />
                   </td>
                   <td className="px-4 py-3 text-muted-foreground" data-testid={`text-cost-${task.id}`}>
                     {task.cost || '-'}

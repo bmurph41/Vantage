@@ -35,6 +35,7 @@ const addTaskFormSchema = z.object({
   priority: z.enum(["low", "med", "high"]),
   status: z.enum(["to_do", "scheduled", "in_progress", "completed", "not_started", "blocked"]).default("to_do"),
   paymentStatus: z.enum(["not_paid", "paid"]).default("not_paid"),
+  completedAt: z.string().optional(),
   cost: z.string().optional(),
   notes: z.string().optional(),
   showOnTimeline: z.boolean().default(false),
@@ -80,6 +81,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       priority: editingTask?.priority || "med",
       status: editingTask?.status || "to_do",
       paymentStatus: editingTask?.paymentStatus || "not_paid",
+      completedAt: editingTask?.completedAt ? new Date(editingTask.completedAt).toISOString().slice(0, 16) : "",
       cost: editingTask?.cost || "",
       notes: editingTask?.notes || "",
       showOnTimeline: editingTask?.showOnTimeline || false,
@@ -91,10 +93,15 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     (formData: z.infer<typeof addTaskFormSchema>) => {
       if (isEditMode && editingTask) {
         setAutoSaveStatus("saving");
+        // Transform completedAt string to Date object
+        const transformedData = {
+          ...formData,
+          completedAt: formData.completedAt ? new Date(formData.completedAt) : undefined,
+        };
         updateTask.mutate(
           {
             id: editingTask.id,
-            updates: formData,
+            updates: transformedData,
           },
           {
             onSuccess: () => {
@@ -187,12 +194,18 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   };
 
   const onSubmit = (data: z.infer<typeof addTaskFormSchema>) => {
+    // Transform completedAt string to Date object
+    const transformedData = {
+      ...data,
+      completedAt: data.completedAt ? new Date(data.completedAt) : undefined,
+    };
+
     if (isEditMode && editingTask) {
       // Update existing task
       updateTask.mutate(
         {
           id: editingTask.id,
-          updates: data,
+          updates: transformedData,
         },
         {
           onSuccess: () => {
@@ -207,7 +220,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     } else {
       // Create new task
       const taskData = {
-        ...data,
+        ...transformedData,
         projectId,
         status: "to_do" as const,
       };
