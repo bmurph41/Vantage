@@ -111,8 +111,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     updateTask.mutate({
       id: taskId,
       updates: { 
-        status: newStatus as any,
-        completedAt: newStatus === 'completed' ? new Date() : undefined
+        status: newStatus as any
       }
     });
   };

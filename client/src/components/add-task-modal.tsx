@@ -432,7 +432,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="status">Status</Label>
                     <Select
@@ -465,6 +465,16 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         <SelectItem value="paid">Paid</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="completedAt">Completion Date</Label>
+                    <Input
+                      id="completedAt"
+                      type="datetime-local"
+                      {...form.register("completedAt")}
+                      data-testid="input-completion-date"
+                    />
                   </div>
                 </div>
 
@@ -773,7 +783,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="status">Status</Label>
                     <Select
@@ -806,6 +816,16 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         <SelectItem value="paid">Paid</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="completedAt">Completion Date</Label>
+                    <Input
+                      id="completedAt"
+                      type="datetime-local"
+                      {...form.register("completedAt")}
+                      data-testid="input-completion-date"
+                    />
                   </div>
                 </div>
 
