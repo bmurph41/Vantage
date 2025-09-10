@@ -74,7 +74,7 @@ export default function ProjectPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <ProjectHeader project={project} tasks={tasks} />
+        <ProjectHeader project={project} tasks={tasks} settings={settings} />
 
         {/* Tab Navigation */}
         <div className="mb-6">

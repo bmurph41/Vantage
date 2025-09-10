@@ -2,20 +2,23 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format, parseISO } from "date-fns";
-import { Download, Share2, FileText } from "lucide-react";
-import type { Project, Task } from "@shared/schema";
+import { Download, Share2, Calendar } from "lucide-react";
+import type { Project, Task, ProjectSettings } from "@shared/schema";
 import { ddClient } from "@/lib/ddClient";
 import { useToast } from "@/hooks/use-toast";
 import { ShareProjectDialog } from "./share-project-dialog";
+import { AddToCalendarDialog } from "./add-to-calendar-dialog";
 
 interface ProjectHeaderProps {
   project: Project;
   tasks: Task[];
+  settings?: ProjectSettings | null;
 }
 
-export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
+export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) {
   const { toast } = useToast();
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isCalendarDialogOpen, setIsCalendarDialogOpen] = useState(false);
   
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
@@ -65,24 +68,6 @@ export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
     }
   };
 
-  const handleExportICS = async () => {
-    try {
-      const icsData = await ddClient.exportICS(project.id);
-      const blob = new Blob([icsData], { type: 'text/calendar' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${project.name}-calendar.ics`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to export calendar",
-        variant: "destructive",
-      });
-    }
-  };
 
   return (
     <div className="mb-8" data-testid="project-header">
@@ -100,9 +85,9 @@ export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
-          <Button variant="outline" onClick={handleExportICS} data-testid="button-export-ics">
-            <FileText className="h-4 w-4 mr-2" />
-            Export Calendar
+          <Button variant="outline" onClick={() => setIsCalendarDialogOpen(true)} data-testid="button-add-to-calendar">
+            <Calendar className="h-4 w-4 mr-2" />
+            Add to Calendar
           </Button>
           <Button onClick={() => setIsShareDialogOpen(true)} data-testid="button-share">
             <Share2 className="h-4 w-4 mr-2" />
@@ -139,6 +124,14 @@ export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
         open={isShareDialogOpen}
         onOpenChange={setIsShareDialogOpen}
         project={project}
+      />
+
+      <AddToCalendarDialog
+        open={isCalendarDialogOpen}
+        onOpenChange={setIsCalendarDialogOpen}
+        project={project}
+        tasks={tasks}
+        settings={settings}
       />
     </div>
   );
