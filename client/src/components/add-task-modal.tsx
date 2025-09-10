@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Clock, DollarSign, Users, AlertCircle, Save, CheckCircle, XCircle } from "lucide-react";
+import { Search, Clock, DollarSign, Users, AlertCircle, Save, CheckCircle, XCircle, Calendar, Play, Circle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -467,10 +467,30 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="to_do">To Do</SelectItem>
-                        <SelectItem value="scheduled">Scheduled</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="to_do">
+                          <div className="flex items-center gap-2">
+                            <Circle className="h-4 w-4 text-gray-500" />
+                            <span>To Do</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="scheduled">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-blue-500" />
+                            <span>Scheduled</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="in_progress">
+                          <div className="flex items-center gap-2">
+                            <Play className="h-4 w-4 text-orange-500" />
+                            <span>In Progress</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="completed">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span>Completed</span>
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -485,8 +505,18 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="not_paid">Not Paid</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="not_paid">
+                          <div className="flex items-center gap-2">
+                            <XCircle className="h-4 w-4 text-red-500" />
+                            <span>Not Paid</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="paid">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span>Paid</span>
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -778,10 +808,30 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="to_do">To Do</SelectItem>
-                        <SelectItem value="scheduled">Scheduled</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="to_do">
+                          <div className="flex items-center gap-2">
+                            <Circle className="h-4 w-4 text-gray-500" />
+                            <span>To Do</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="scheduled">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-blue-500" />
+                            <span>Scheduled</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="in_progress">
+                          <div className="flex items-center gap-2">
+                            <Play className="h-4 w-4 text-orange-500" />
+                            <span>In Progress</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="completed">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span>Completed</span>
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -796,8 +846,18 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="not_paid">Not Paid</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="not_paid">
+                          <div className="flex items-center gap-2">
+                            <XCircle className="h-4 w-4 text-red-500" />
+                            <span>Not Paid</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="paid">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span>Paid</span>
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
