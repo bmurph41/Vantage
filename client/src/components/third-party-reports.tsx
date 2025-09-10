@@ -1327,7 +1327,13 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                                 updates: { orderedAt: newOrderedAt }
                               });
                             }}
-                            className="w-full text-xs h-8"
+                            disabled={task.status !== "scheduled"}
+                            className={`w-full text-xs h-8 ${
+                              task.status !== "scheduled" 
+                                ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                                : ""
+                            }`}
+                            title={task.status !== "scheduled" ? "Only available when task status is 'Scheduled'" : ""}
                             data-testid={`input-ordered-date-${task.id}`}
                           />
                         </div>
