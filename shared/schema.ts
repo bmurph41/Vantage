@@ -69,7 +69,6 @@ export const taskTemplates = pgTable("task_templates", {
   name: text("name").notNull(),
   description: text("description"),
   startOffsetDays: integer("start_offset_days").notNull().default(0),
-  durationDays: integer("duration_days").notNull().default(7),
   anchor: anchorTypeEnum("anchor").notNull().default("psa"),
   defaultAssignee: text("default_assignee"),
   defaultDependencies: integer("default_dependencies").array(),
@@ -103,7 +102,6 @@ export const tasks = pgTable("tasks", {
   startStrategy: startStrategyEnum("start_strategy").notNull().default("offset"),
   startDate: date("start_date"),
   startOffsetDays: integer("start_offset_days"),
-  durationDays: integer("duration_days").notNull(),
   // New deadline fields
   deadlineType: deadlineTypeEnum("deadline_type").default("days_after_psa"),
   deadlineDays: integer("deadline_days"),
