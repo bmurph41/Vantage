@@ -65,28 +65,85 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   const form = useForm<z.infer<typeof addTaskFormSchema>>({
     resolver: zodResolver(addTaskFormSchema),
     defaultValues: {
-      title: editingTask?.title || "",
-      description: editingTask?.description || "",
-      startStrategy: editingTask?.startStrategy || "offset",
-      startDate: editingTask?.startDate || "",
-      startOffsetDays: editingTask?.startOffsetDays || 0,
-      durationDays: editingTask?.durationDays || 7,
-      deadlineType: editingTask?.deadlineType || "days_after_psa",
-      deadlineDays: editingTask?.deadlineDays || 30,
-      assignee: editingTask?.assignee || "",
-      companyHired: editingTask?.companyHired || "",
-      repName: editingTask?.repName || "",
-      repEmail: editingTask?.repEmail || "",
-      repPhone: editingTask?.repPhone || "",
-      priority: editingTask?.priority || "med",
-      status: editingTask?.status || "to_do",
-      paymentStatus: editingTask?.paymentStatus || "not_paid",
-      completedAt: editingTask?.completedAt ? new Date(editingTask.completedAt).toISOString().slice(0, 16) : "",
-      cost: editingTask?.cost || "",
-      notes: editingTask?.notes || "",
-      showOnTimeline: editingTask?.showOnTimeline || false,
+      title: "",
+      description: "",
+      startStrategy: "offset",
+      startDate: "",
+      startOffsetDays: 0,
+      durationDays: 7,
+      deadlineType: "days_after_psa",
+      deadlineDays: 30,
+      assignee: "",
+      companyHired: "",
+      repName: "",
+      repEmail: "",
+      repPhone: "",
+      priority: "med",
+      status: "to_do",
+      paymentStatus: "not_paid",
+      completedAt: "",
+      cost: "",
+      notes: "",
+      showOnTimeline: false,
     },
   });
+
+  // Reset form when editingTask changes or modal opens
+  useEffect(() => {
+    if (isOpen) {
+      if (editingTask) {
+        // Populate form with editing task data
+        form.reset({
+          title: editingTask.title || "",
+          description: editingTask.description || "",
+          startStrategy: editingTask.startStrategy || "offset",
+          startDate: editingTask.startDate || "",
+          startOffsetDays: editingTask.startOffsetDays || 0,
+          durationDays: editingTask.durationDays || 7,
+          deadlineType: editingTask.deadlineType || "days_after_psa",
+          deadlineDays: editingTask.deadlineDays || 30,
+          assignee: editingTask.assignee || "",
+          companyHired: editingTask.companyHired || "",
+          repName: editingTask.repName || "",
+          repEmail: editingTask.repEmail || "",
+          repPhone: editingTask.repPhone || "",
+          priority: editingTask.priority || "med",
+          status: editingTask.status || "to_do",
+          paymentStatus: editingTask.paymentStatus || "not_paid",
+          completedAt: editingTask.completedAt ? new Date(editingTask.completedAt).toISOString().slice(0, 16) : "",
+          cost: editingTask.cost || "",
+          notes: editingTask.notes || "",
+          showOnTimeline: editingTask.showOnTimeline || false,
+        });
+        setStep("customize"); // Go directly to customize step for editing
+      } else {
+        // Reset form for new task
+        form.reset({
+          title: "",
+          description: "",
+          startStrategy: "offset",
+          startDate: "",
+          startOffsetDays: 0,
+          durationDays: 7,
+          deadlineType: "days_after_psa",
+          deadlineDays: 30,
+          assignee: "",
+          companyHired: "",
+          repName: "",
+          repEmail: "",
+          repPhone: "",
+          priority: "med",
+          status: "to_do",
+          paymentStatus: "not_paid",
+          completedAt: "",
+          cost: "",
+          notes: "",
+          showOnTimeline: false,
+        });
+        setStep("browse"); // Start with browse step for new tasks
+      }
+    }
+  }, [isOpen, editingTask, form]);
 
   // Auto-save functionality
   const autoSave = useCallback(
