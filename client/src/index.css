@@ -100,25 +100,31 @@
 
 /* Progress Bar Styles */
 .progress-bar-elapsed {
-  background: linear-gradient(90deg, hsl(221 83% 35%) 0%, hsl(221 83% 35%) 100%);
+  background: linear-gradient(90deg, hsl(221 83% 42%) 0%, hsl(221 83% 35%) 100%);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .progress-bar-remaining {
-  background: repeating-linear-gradient(
-    45deg,
-    hsl(214 32% 91%),
-    hsl(214 32% 91%) 8px,
-    hsl(210 40% 96%) 8px,
-    hsl(210 40% 96%) 16px
+  background: linear-gradient(45deg, 
+    hsl(214 32% 94%) 25%, 
+    transparent 25%, 
+    transparent 50%, 
+    hsl(214 32% 94%) 50%, 
+    hsl(214 32% 94%) 75%, 
+    transparent 75%
   );
+  background-size: 8px 8px;
+  animation: progress-remaining 20s linear infinite;
 }
 
 .progress-bar-completed {
-  background: linear-gradient(90deg, hsl(142 76% 36%) 0%, hsl(142 76% 36%) 100%);
+  background: linear-gradient(90deg, hsl(142 76% 42%) 0%, hsl(142 76% 36%) 100%);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .progress-bar-overdue {
-  background: linear-gradient(90deg, hsl(0 84% 60%) 0%, hsl(0 84% 60%) 100%);
+  background: linear-gradient(90deg, hsl(0 84% 65%) 0%, hsl(0 84% 60%) 100%);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
 }
 
 /* Timeline Grid */
@@ -129,12 +135,19 @@
 
 /* Milestone Marker */
 .milestone-marker {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   background: hsl(221 83% 35%);
   border-radius: 50%;
   border: 3px solid hsl(0 0% 100%);
-  box-shadow: 0 0 0 2px hsl(221 83% 35%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 0 0 1px hsl(221 83% 35%);
+  position: relative;
+  z-index: 10;
+}
+
+@keyframes progress-remaining {
+  0% { background-position: 0 0; }
+  100% { background-position: 32px 0; }
 }
 
 @layer base {

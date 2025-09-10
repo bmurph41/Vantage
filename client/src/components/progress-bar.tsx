@@ -37,10 +37,10 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   const isNotStarted = isBefore(today, start);
 
   return (
-    <div className={cn("h-6 bg-transparent rounded-sm overflow-hidden relative", className)} data-testid="progress-bar">
+    <div className={cn("h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner", className)} data-testid="progress-bar">
       {/* Task bar positioned relative to timeline */}
       <div 
-        className="absolute h-full bg-muted rounded-sm overflow-hidden"
+        className="absolute h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200"
         style={{ 
           left: `${leftPosition}%`, 
           width: `${barWidth}%` 
@@ -69,13 +69,18 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
         
         {/* Start marker */}
         <div 
-          className="absolute -top-1 w-2 h-8 rounded-sm"
+          className="absolute -top-1 w-1 h-10 rounded-full shadow-sm"
           style={{ 
             left: "0px",
             backgroundColor: isCompleted ? "#16a34a" : isOverdue ? "#dc2626" : "hsl(221 83% 35%)"
           }}
           data-testid="start-marker"
         />
+        
+        {/* Duration label on hover */}
+        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+          {taskDurationDays} days
+        </div>
       </div>
     </div>
   );
