@@ -34,6 +34,17 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(false);
   const [taskDisplay, setTaskDisplay] = useState<'all' | 'critical' | 'none' | 'selected'>('all');
   const [selectedTaskPriorities, setSelectedTaskPriorities] = useState<Set<string>>(new Set(['high', 'med', 'low']));
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+
+  const toggleTaskExpansion = (taskId: string) => {
+    const newExpanded = new Set(expandedTasks);
+    if (newExpanded.has(taskId)) {
+      newExpanded.delete(taskId);
+    } else {
+      newExpanded.add(taskId);
+    }
+    setExpandedTasks(newExpanded);
+  };
   // Removed floating timeline to prevent scroll issues
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -730,28 +741,25 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         </div>
 
         {/* Reports Table */}
-        <div className="overflow-x-auto border rounded-lg">
-          <table className="w-full min-w-[1200px] table-fixed" data-testid="tasks-table">
+        <div className="border rounded-lg">
+          <table className="w-full" data-testid="tasks-table">
             <thead>
               <tr className="bg-primary text-primary-foreground">
-                <th className="px-3 py-3 text-left text-sm font-semibold w-[240px]">Task</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold w-[140px]">Task Owner</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold w-[160px]">Company Hired</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold w-[120px]">Status</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold w-[100px]">Payment</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold w-[110px]">Days Remaining</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold w-[180px]">Completion Date</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold w-[100px]">Cost</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold w-[120px]">Actions</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[30%]">Task</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[20%]">Task Owner</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[25%]">Company Hired</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[10%]">Days Remaining</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filteredTasks.map((task, index) => (
-                <tr 
-                  key={task.id} 
-                      className={`hover:bg-accent/50 transition-colors ${index % 2 === 1 ? 'bg-accent/30' : ''}`}
-                  data-testid={`row-task-${task.id}`}
-                >
+                <React.Fragment key={task.id}>
+                  <tr 
+                    className={`hover:bg-accent/50 transition-colors cursor-pointer ${index % 2 === 1 ? 'bg-accent/30' : ''}`}
+                    onClick={() => toggleTaskExpansion(task.id)}
+                    data-testid={`row-task-${task.id}`}
+                  >
                   <td className="px-3 py-3">
                     <div className="font-medium text-sm leading-tight truncate" title={task.title} data-testid={`text-task-title-${task.id}`}>
                       {task.title}
