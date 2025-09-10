@@ -94,19 +94,29 @@ export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
             {project.closingDate && ` • Closing: ${format(new Date(project.closingDate), 'MMMM d, yyyy')}`}
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <Button variant="outline" onClick={handleExportCSV} data-testid="button-export-csv">
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-          <Button variant="outline" onClick={handleExportICS} data-testid="button-export-ics">
-            <FileText className="h-4 w-4 mr-2" />
-            Export Calendar
-          </Button>
-          <Button data-testid="button-share">
-            <Share2 className="h-4 w-4 mr-2" />
-            Share Project
-          </Button>
+        <div className="flex items-center space-x-6">
+          {/* Professional Total Cost Display */}
+          <div className="text-right" data-testid="total-cost-display">
+            <div className="text-2xl font-bold text-slate-900">{formatCurrency(totalCost)}</div>
+            <div className="text-sm font-medium text-slate-600">Total Project Cost</div>
+          </div>
+          
+          <div className="h-8 w-px bg-slate-300"></div>
+          
+          <div className="flex items-center space-x-3">
+            <Button variant="outline" onClick={handleExportCSV} data-testid="button-export-csv">
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+            <Button variant="outline" onClick={handleExportICS} data-testid="button-export-ics">
+              <FileText className="h-4 w-4 mr-2" />
+              Export Calendar
+            </Button>
+            <Button data-testid="button-share">
+              <Share2 className="h-4 w-4 mr-2" />
+              Share Project
+            </Button>
+          </div>
         </div>
       </div>
       
