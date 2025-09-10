@@ -33,6 +33,8 @@ const addTaskFormSchema = z.object({
   repEmail: z.string().optional(),
   repPhone: z.string().optional(),
   priority: z.enum(["low", "med", "high"]),
+  status: z.enum(["to_do", "scheduled", "in_progress", "completed", "not_started", "blocked"]).default("to_do"),
+  paymentStatus: z.enum(["not_paid", "paid"]).default("not_paid"),
   cost: z.string().optional(),
   notes: z.string().optional(),
   showOnTimeline: z.boolean().default(false),
@@ -74,6 +76,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       repEmail: editingTask?.repEmail || "",
       repPhone: editingTask?.repPhone || "",
       priority: editingTask?.priority || "med",
+      status: editingTask?.status || "to_do",
+      paymentStatus: editingTask?.paymentStatus || "not_paid",
       cost: editingTask?.cost || "",
       notes: editingTask?.notes || "",
       showOnTimeline: editingTask?.showOnTimeline || false,
@@ -335,6 +339,42 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         <SelectItem value="low">Low</SelectItem>
                         <SelectItem value="med">Medium</SelectItem>
                         <SelectItem value="high">High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={form.watch("status")}
+                      onValueChange={(value: string) => form.setValue("status", value as any)}
+                    >
+                      <SelectTrigger data-testid="select-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="to_do">To Do</SelectItem>
+                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="paymentStatus">Payment</Label>
+                    <Select
+                      value={form.watch("paymentStatus")}
+                      onValueChange={(value: string) => form.setValue("paymentStatus", value as "not_paid" | "paid")}
+                    >
+                      <SelectTrigger data-testid="select-payment-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not_paid">Not Paid</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -640,6 +680,42 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         <SelectItem value="low">Low</SelectItem>
                         <SelectItem value="med">Medium</SelectItem>
                         <SelectItem value="high">High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={form.watch("status")}
+                      onValueChange={(value: string) => form.setValue("status", value as any)}
+                    >
+                      <SelectTrigger data-testid="select-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="to_do">To Do</SelectItem>
+                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="paymentStatus">Payment</Label>
+                    <Select
+                      value={form.watch("paymentStatus")}
+                      onValueChange={(value: string) => form.setValue("paymentStatus", value as "not_paid" | "paid")}
+                    >
+                      <SelectTrigger data-testid="select-payment-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not_paid">Not Paid</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
