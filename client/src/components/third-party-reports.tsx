@@ -766,14 +766,14 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     {/* Days Remaining, Cost and Actions */}
                     <div className="flex items-center space-x-4">
                       {/* Days Remaining */}
-                      <div className="text-right">
+                      <div className="text-center">
                         <div className="text-sm text-gray-500">Days Remaining</div>
                         <div className="text-lg font-bold text-blue-600">
                           {calculateDaysRemaining(task)}
                         </div>
                       </div>
                       
-                      <div className="text-right">
+                      <div className="text-center">
                         <div className="text-sm text-gray-500">Cost</div>
                         {editingCostTaskId === task.id ? (
                           <Input
@@ -783,7 +783,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                             onChange={(e) => setEditingCostValue(e.target.value)}
                             onBlur={() => handleSaveCost(task.id)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSaveCost(task.id)}
-                            className="w-24 text-right"
+                            className="w-24 text-center"
                             autoFocus
                           />
                         ) : (
