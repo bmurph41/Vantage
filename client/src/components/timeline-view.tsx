@@ -111,13 +111,13 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             </div>
           </div>
 
-          {/* Clean Date Headers */}
-          <div className="mb-4">
-            <div className="grid gap-1 w-full text-center py-3 bg-gray-50 rounded border" style={{ gridTemplateColumns: `repeat(${Math.min(12, timelineDates.length)}, 1fr)` }}>
+          {/* Clean Date Headers with Leader Lines */}
+          <div className="mb-4 relative">
+            <div className="grid gap-1 w-full text-center py-3 bg-gray-50 rounded border relative z-10" style={{ gridTemplateColumns: `repeat(${Math.min(12, timelineDates.length)}, 1fr)` }}>
               {timelineDates.slice(0, 12).map((date, index) => {
                 const isCurrentPeriod = isToday(date);
                 return (
-                  <div key={index} className={`py-2 px-1 text-xs ${
+                  <div key={index} className={`py-2 px-1 text-xs relative ${
                     isCurrentPeriod ? 'bg-blue-50 text-blue-700 font-medium rounded' : 'text-gray-600'
                   }`} data-testid={`timeline-date-${index}`}>
                     <div>
@@ -133,6 +133,8 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                         {format(date, 'yyyy')}
                       </div>
                     )}
+                    {/* Leader line */}
+                    <div className="absolute top-full left-1/2 transform -translate-x-0.5 w-px bg-gray-300 z-0" style={{ height: '400px' }} />
                   </div>
                 );
               })}
