@@ -165,7 +165,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
               
               <div className="h-3 bg-gray-200 rounded-full relative overflow-hidden">
                 <div 
-                  className="absolute top-0 left-0 h-full bg-blue-500 rounded-full transition-all duration-1000 ease-out"
+                  className="absolute top-0 left-0 h-full bg-green-500 rounded-full transition-all duration-1000 ease-out"
                   style={{
                     width: `${(() => {
                       const startDate = parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString());
