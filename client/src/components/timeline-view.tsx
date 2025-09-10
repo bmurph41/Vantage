@@ -211,115 +211,66 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
         </div>
       </div>
 
-      {/* Premium Task Cards */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-            <span className="w-1 h-8 bg-gradient-to-b from-slate-600 to-slate-800 rounded-sm mr-4"></span>
-            Timeline Tasks
-          </h2>
-          <div className="text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
-            {tasks.filter(t => t.showOnTimeline && t.status !== 'completed').length} of {tasks.filter(t => t.showOnTimeline).length} active
-          </div>
-        </div>
-        
-        <div className="grid gap-6">
-          {tasks.filter(t => t.showOnTimeline).map((task, index) => {
-            const isPriorityHigh = task.priority === 'high';
-            const isCompleted = task.status === 'completed';
-            const isBlocked = task.status === 'blocked';
-            
-            return (
-              <Card key={task.id} className={`group hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 border-l-4 ${
-                isPriorityHigh && showCriticalPath ? 'border-l-amber-400 bg-gradient-to-r from-amber-50 to-white shadow-amber-100' :
-                isCompleted ? 'border-l-green-500 bg-gradient-to-r from-green-50 to-white' :
-                isBlocked ? 'border-l-red-500 bg-gradient-to-r from-red-50 to-white' :
-                'border-l-blue-500 bg-gradient-to-r from-blue-50 to-white'
-              } relative overflow-hidden`} data-testid={`timeline-task-${task.id}`}>
-                
-                {/* Subtle Background Pattern */}
-                <div className="absolute inset-0 opacity-5">
-                  <div className="absolute inset-0 bg-grid-pattern"></div>
-                </div>
-                
-                <CardContent className="p-8 relative z-10">
-                  <div className="space-y-6">
-                    {/* Task Header */}
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1" data-testid={`timeline-task-name-${task.id}`}>
-                        <div className="flex items-center space-x-3 mb-3">
-                          <h3 className={`text-xl font-bold ${
-                            isCompleted ? 'text-green-700' :
-                            isBlocked ? 'text-red-700' :
-                            'text-gray-900'
-                          } group-hover:text-blue-600 transition-colors`}>
-                            {task.title}
-                          </h3>
-                                  {isPriorityHigh && showCriticalPath && (
-                            <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-md border border-amber-300">CRITICAL</span>
-                          )}
-                        </div>
-                        
-                        {/* Enhanced Badges */}
-                        <div className="flex items-center space-x-3 text-sm">
-                          {task.assignee && (
-                            <div className="flex items-center space-x-2 bg-white rounded-full px-4 py-2 shadow-sm border border-gray-200">
-                              <div className="w-6 h-6 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-xs font-bold text-white">
-                                {task.assignee.split(' ').map(n => n[0]).join('').toUpperCase()}
-                              </div>
-                              <span className="font-medium text-gray-700">{task.assignee}</span>
-                            </div>
-                          )}
-                          
-                          {task.priority && (
-                            <span className={`px-3 py-1 rounded-md text-xs font-bold shadow-sm border ${
-                              task.priority === 'high' ? 'bg-red-100 text-red-700 border-red-200' :
-                              task.priority === 'med' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                              'bg-green-100 text-green-700 border-green-200'
-                            }`}>
-                              {task.priority === 'high' ? 'HIGH' : task.priority === 'med' ? 'MEDIUM' : 'LOW'}
-                            </span>
-                          )}
-                          
-                          {task.status && (
-                            <span className={`px-3 py-1 rounded-md text-xs font-bold shadow-sm border ${
-                              task.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
-                              task.status === 'in_progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                              task.status === 'blocked' ? 'bg-red-100 text-red-800 border-red-200' :
-                              'bg-gray-100 text-gray-800 border-gray-200'
-                            }`}>
-                              {task.status === 'completed' ? 'COMPLETED' :
-                               task.status === 'in_progress' ? 'IN PROGRESS' :
-                               task.status === 'blocked' ? 'BLOCKED' :
-                               'NOT STARTED'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Enhanced Progress Bar */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-gray-600">Progress Timeline</span>
-                        <span className="text-gray-500">Hover for details</span>
-                      </div>
-                      <div className="relative">
-                        <ProgressBar 
-                          task={task} 
-                          project={project} 
-                          settings={settings}
-                          className={`${showCriticalPath && task.priority === 'high' ? 'ring-2 ring-amber-400 ring-opacity-50 shadow-lg' : 'shadow-md'} group-hover:shadow-xl transition-shadow duration-300`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+      {/* Task Dots on Timeline */}
+      <div className="relative -mt-6 mb-4">
+        {tasks.filter(t => t.showOnTimeline).map((task, index) => {
+          const taskDeadline = task.deadline;
+          if (!taskDeadline) return null;
           
+          const taskPosition = getMilestonePosition(taskDeadline);
+          
+          return (
+            <div 
+              key={task.id}
+              className="absolute flex flex-col items-center transform -translate-x-1/2 z-10 group"
+              style={{ left: `${taskPosition}%` }}
+              data-testid={`task-dot-${task.id}`}
+            >
+              <div className="relative">
+                <div className={`w-3 h-3 rounded-full border-2 border-white shadow-md transition-transform duration-200 ${
+                  task.status === 'completed' ? 'bg-green-500' :
+                  task.status === 'in_progress' ? 'bg-blue-500' :
+                  task.status === 'scheduled' ? 'bg-orange-500' :
+                  'bg-gray-400'
+                }`}>
+                </div>
+              </div>
+              <div className="mt-2 bg-white shadow-lg rounded-lg border border-slate-200 px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                <div className="text-center">
+                  <span className="text-xs font-bold text-gray-700 block">{task.title}</span>
+                  <div className="text-xs text-slate-600 mt-1">{format(parseISO(taskDeadline), 'MMM d, yyyy')}</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* Task Progress Bars Below Timeline */}
+      <div className="space-y-2 mt-6">
+        {tasks.filter(t => t.showOnTimeline).map((task, index) => (
+          <div key={task.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center space-x-3">
+                <span className={`w-3 h-3 rounded-full ${
+                  task.status === 'completed' ? 'bg-green-500' :
+                  task.status === 'in_progress' ? 'bg-blue-500' :
+                  task.status === 'scheduled' ? 'bg-orange-500' :
+                  'bg-gray-400'
+                }`}></span>
+                <span className="text-sm font-medium text-gray-900">{task.title}</span>
+              </div>
+              <span className="text-xs text-gray-500">
+                {task.assignee || 'Unassigned'}
+              </span>
+            </div>
+            <ProgressBar 
+              task={task} 
+              project={project} 
+              settings={settings}
+              className="shadow-sm"
+            />
+          </div>
+        ))}
       </div>
 
       {/* Enhanced Legend */}
