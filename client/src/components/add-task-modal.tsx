@@ -122,11 +122,12 @@ function TaskOwnerSelector({ projectId, value, onChange }: {
 const addTaskFormSchema = z.object({
   title: z.string().min(1, "Task title is required"),
   description: z.string().optional(),
-  startStrategy: z.enum(["fixed", "offset"]),
+  startStrategy: z.enum(["fixed", "offset"]).default("offset"),
   startDate: z.string().optional(),
   startOffsetDays: z.number().optional(),
   // New deadline fields
-  deadlineType: z.enum(["dd_expiration"]).default("dd_expiration"),
+  deadlineType: z.enum(["dd_expiration", "days_after_psa"]).optional(),
+  deadlineDays: z.number().optional(),
   deadline: z.string().optional(),
   assignee: z.string().optional(),
   companyHired: z.string().optional(),
@@ -137,8 +138,8 @@ const addTaskFormSchema = z.object({
   companyCity: z.string().optional(),
   companyState: z.string().optional(),
   companyZip: z.string().optional(),
-  priority: z.enum(["low", "med", "high"]),
-  status: z.enum(["to_do", "scheduled", "in_progress", "completed", "not_started", "blocked"]).default("to_do"),
+  priority: z.enum(["low", "med", "high"]).default("med"),
+  status: z.enum(["not_started", "in_progress", "blocked", "completed", "to_do", "scheduled"]).default("to_do"),
   paymentStatus: z.enum(["not_paid", "paid", "no_cost"]).default("not_paid"),
   dateOnSite: z.string().optional(),
   requiresOnSiteInspection: z.boolean().default(false),
@@ -299,7 +300,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           startStrategy: editingTask.startStrategy || "offset",
           startDate: editingTask.startDate || "",
           startOffsetDays: editingTask.startOffsetDays || 0,
-          deadlineType: "dd_expiration",
+          deadlineType: editingTask.deadlineType || "dd_expiration",
           deadline: editingTask.deadline || "",
           assignee: editingTask.assignee || "",
           companyHired: editingTask.companyHired || "",
@@ -506,9 +507,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   };
 
   const onSubmit = (data: z.infer<typeof addTaskFormSchema>) => {
-    // Transform completedAt string to Date object
+    // Transform data for API (convert completedAt string to Date object)
     const transformedData = {
       ...data,
+      // Convert completedAt string to Date object as backend expects Date
       completedAt: data.completedAt ? new Date(data.completedAt) : undefined,
       // Set dateOnSite based on requiresOnSiteInspection checkbox
       dateOnSite: data.requiresOnSiteInspection ? (data.dateOnSite || "TBD") : "",
