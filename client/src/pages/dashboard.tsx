@@ -248,7 +248,7 @@ export default function Dashboard() {
                               <span className="text-sm font-medium text-gray-700">PSA Signed</span>
                             </div>
                             <span className="text-sm font-semibold text-gray-900">
-                              {format(new Date(project.psaSignedDate), 'MMM d, yyyy')}
+                              {format(new Date(project.psaSignedDate), 'MMM d, yyyy')} ({calculateDaysRemaining(project.psaSignedDate) > 0 ? `${calculateDaysRemaining(project.psaSignedDate)}d remaining` : calculateDaysRemaining(project.psaSignedDate) === 0 ? 'Today' : `${Math.abs(calculateDaysRemaining(project.psaSignedDate))}d ago`})
                             </span>
                           </div>
                         )}
@@ -266,7 +266,7 @@ export default function Dashboard() {
                             <span className={`text-sm font-semibold ${
                               ddExpired ? 'text-red-700' : ddExpiringSoon ? 'text-amber-700' : 'text-gray-900'
                             }`}>
-                              {format(new Date(project.ddExpirationDate), 'MMM d, yyyy')}
+                              {format(new Date(project.ddExpirationDate), 'MMM d, yyyy')} ({calculateDaysRemaining(project.ddExpirationDate) > 0 ? `${calculateDaysRemaining(project.ddExpirationDate)}d remaining` : calculateDaysRemaining(project.ddExpirationDate) === 0 ? 'Today' : `${Math.abs(calculateDaysRemaining(project.ddExpirationDate))}d ago`})
                             </span>
                           </div>
                         )}
@@ -284,7 +284,7 @@ export default function Dashboard() {
                             <span className={`text-sm font-semibold ${
                               closingSoon ? 'text-slate-700' : 'text-gray-900'
                             }`}>
-                              {format(new Date(project.closingDate), 'MMM d, yyyy')}
+                              {format(new Date(project.closingDate), 'MMM d, yyyy')} ({calculateDaysRemaining(project.closingDate) > 0 ? `${calculateDaysRemaining(project.closingDate)}d remaining` : calculateDaysRemaining(project.closingDate) === 0 ? 'Today' : `${Math.abs(calculateDaysRemaining(project.closingDate))}d ago`})
                             </span>
                           </div>
                         )}
