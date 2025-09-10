@@ -164,7 +164,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
               {project.psaSignedDate && (
                 <div 
                   className="absolute top-0 transform -translate-x-1/2 z-10 group cursor-pointer"
-                  style={{ left: "3%" }}
+                  style={{ left: "0%" }}
                   data-testid="milestone-psa"
                 >
                   <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-sm -mt-1 hover:scale-110 transition-transform" />
@@ -190,7 +190,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
               {project.closingDate && (
                 <div 
                   className="absolute top-0 transform -translate-x-1/2 z-10 group cursor-pointer"
-                  style={{ right: "3%" }}
+                  style={{ left: "100%" }}
                   data-testid="milestone-closing"
                 >
                   <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-sm -mt-1 hover:scale-110 transition-transform" />
