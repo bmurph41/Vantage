@@ -34,6 +34,7 @@ export interface IStorage {
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
   getTasksForProject(projectId: string): Promise<Task[]>;
+  getProjectAssignees(projectId: string): Promise<string[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, updates: Partial<InsertTask>): Promise<Task>;
   deleteTask(id: string): Promise<void>;
@@ -134,6 +135,18 @@ export class DatabaseStorage implements IStorage {
 
   async getTasksForProject(projectId: string): Promise<Task[]> {
     return db.select().from(tasks).where(eq(tasks.projectId, projectId));
+  }
+
+  async getProjectAssignees(projectId: string): Promise<string[]> {
+    const assignees = await db
+      .selectDistinct({ assignee: tasks.assignee })
+      .from(tasks)
+      .where(and(eq(tasks.projectId, projectId), sql`${tasks.assignee} IS NOT NULL AND ${tasks.assignee} != ''`));
+
+    // Filter out null or undefined assignees and return only the assignee names
+    return assignees
+      .map(a => a.assignee)
+      .filter((assignee): assignee is string => assignee !== null && assignee !== undefined && assignee.trim() !== '');
   }
 
   async createTask(task: InsertTask): Promise<Task> {

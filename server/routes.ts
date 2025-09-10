@@ -145,6 +145,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dd/projects/:projectId/assignees", async (req: any, res) => {
+    try {
+      const assignees = await storage.getProjectAssignees(req.params.projectId);
+      res.json(assignees);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch assignees" });
+    }
+  });
+
   app.post("/api/dd/projects/:projectId/tasks", async (req: any, res) => {
     try {
       const taskData = insertTaskSchema.parse({
