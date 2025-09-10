@@ -501,6 +501,21 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     setEditingCostValue('');
   };
 
+  // Get border color class based on task status
+  const getTaskBorderColor = (task: Task) => {
+    switch (task.status) {
+      case 'completed':
+        return 'border-green-400';
+      case 'in_progress':
+        return 'border-blue-400';
+      case 'scheduled':
+        return 'border-orange-400';
+      case 'not_started':
+        return 'border-gray-300';
+      default:
+        return 'border-gray-200';
+    }
+  };
 
   return (
     <div>
@@ -557,7 +572,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             <div className="space-y-3">
               <h3>Tasks ({filteredTasks.length})</h3>
               {filteredTasks.map((task) => (
-                <div key={task.id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div key={task.id} className={`bg-white border ${getTaskBorderColor(task)} border-l-4 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow`}>
                   {/* Header Section */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
