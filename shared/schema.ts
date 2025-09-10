@@ -122,6 +122,7 @@ export const tasks = pgTable("tasks", {
   paymentStatus: paymentStatusEnum("payment_status").notNull().default("not_paid"),
   completedAt: timestamp("completed_at"),
   dateOnSite: text("date_on_site"),
+  orderedAt: date("ordered_at"),
   dependencies: varchar("dependencies").array().default(sql`'{}'`),
   baselineStart: date("baseline_start"),
   baselineDue: date("baseline_due"),

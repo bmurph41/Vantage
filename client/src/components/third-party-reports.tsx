@@ -854,12 +854,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
           <table className="w-full" data-testid="tasks-table">
             <thead>
               <tr className="bg-primary text-primary-foreground">
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[25%]">Task</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[28%]">Task</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[18%]">Task Owner</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[20%]">Company Hired</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[22%]">Company Hired</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[16%]">Status</th>
                 <th 
-                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
+                  className="px-4 py-3 text-left text-sm font-semibold w-[12%] cursor-pointer hover:bg-primary/80 transition-colors"
                   onClick={() => handleSort('daysRemaining')}
                   data-testid="header-days-remaining"
                 >
@@ -890,14 +890,27 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     data-testid={`row-task-${task.id}`}
                   >
                     <td className="px-4 py-4">
-                      <div className="font-medium text-sm leading-tight" title={task.title} data-testid={`text-task-title-${task.id}`}>
-                        {task.title}
-                      </div>
-                      {task.description && (
-                        <div className="text-xs text-muted-foreground mt-1 line-clamp-2" title={task.description} data-testid={`text-task-description-${task.id}`}>
-                          {task.description}
+                      <div className="space-y-2">
+                        {/* Task Title and Description */}
+                        <div>
+                          <div className="font-medium text-sm leading-tight" title={task.title} data-testid={`text-task-title-${task.id}`}>
+                            {task.title}
+                          </div>
+                          {task.description && (
+                            <div className="text-xs text-muted-foreground mt-1 line-clamp-2" title={task.description} data-testid={`text-task-description-${task.id}`}>
+                              {task.description}
+                            </div>
+                          )}
                         </div>
-                      )}
+                        
+                        {/* Deadline Date */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 block mb-1">Deadline</label>
+                          <div className="text-xs text-gray-900" data-testid={`text-deadline-${task.id}`}>
+                            {format(calculateDeadlineDate(task), 'MMM d, yyyy')}
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-4">
                       {task.assignee ? (
@@ -931,12 +944,22 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           )}
                         </div>
                         
-                        {/* Deadline Date */}
+                        {/* Ordered Date */}
                         <div>
-                          <label className="text-xs font-medium text-gray-700 block mb-1">Deadline</label>
-                          <div className="text-xs text-gray-900" data-testid={`text-deadline-${task.id}`}>
-                            {format(calculateDeadlineDate(task), 'MMM d, yyyy')}
-                          </div>
+                          <label className="text-xs font-medium text-gray-700 block mb-1">Ordered Date</label>
+                          <Input
+                            type="date"
+                            value={task.orderedAt ? new Date(task.orderedAt).toISOString().slice(0, 10) : ''}
+                            onChange={(e) => {
+                              const newOrderedAt = e.target.value ? e.target.value : null;
+                              updateTask.mutate({
+                                id: task.id,
+                                updates: { orderedAt: newOrderedAt }
+                              });
+                            }}
+                            className="w-full text-xs h-7"
+                            data-testid={`input-ordered-date-${task.id}`}
+                          />
                         </div>
                       </div>
                     </td>
@@ -1023,76 +1046,51 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center" data-testid={`text-cost-${task.id}`}>
-                      <div className="space-y-2">
-                        {/* Cost */}
-                        <div>
-                          {editingCostTaskId === task.id ? (
-                            <Input
-                              type="text"
-                              value={editingCostValue}
-                              onChange={(e) => setEditingCostValue(e.target.value)}
-                              onBlur={() => {
-                                updateTask.mutate({
-                                  id: task.id,
-                                  updates: { cost: editingCostValue }
-                                });
-                                setEditingCostTaskId(null);
-                                setEditingCostValue('');
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  updateTask.mutate({
-                                    id: task.id,
-                                    updates: { cost: editingCostValue }
-                                  });
-                                  setEditingCostTaskId(null);
-                                  setEditingCostValue('');
-                                } else if (e.key === 'Escape') {
-                                  setEditingCostTaskId(null);
-                                  setEditingCostValue('');
-                                }
-                              }}
-                              className="w-24 h-8 text-center text-sm"
-                              placeholder="$0.00"
-                              autoFocus
-                              data-testid={`input-cost-${task.id}`}
-                            />
-                          ) : (
-                            <span 
-                              className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 hover:underline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingCostTaskId(task.id);
-                                setEditingCostValue(task.cost || '');
-                              }}
-                              title="Click to edit cost"
-                              data-testid={`span-cost-${task.id}`}
-                            >
-                              {formatCurrency(task.cost || '')}
-                            </span>
-                          )}
-                        </div>
-                        
-                        {/* Payment Status */}
-                        <div>
-                          <label className="text-xs font-medium text-gray-700 block mb-1">Payment</label>
-                          <Select
-                            value={task.paymentStatus || 'not_paid'}
-                            onValueChange={(value) => handlePaymentStatusChange(task.id, value)}
-                          >
-                            <SelectTrigger className="w-full h-7 text-xs" data-testid={`select-payment-${task.id}`}>
-                              <SelectValue>
-                                {getPaymentStatusBadge(task.paymentStatus || 'not_paid')}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="not_paid">Not Paid</SelectItem>
-                              <SelectItem value="paid">Paid</SelectItem>
-                              <SelectItem value="no_cost">No Cost</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
+                      {editingCostTaskId === task.id ? (
+                        <Input
+                          type="text"
+                          value={editingCostValue}
+                          onChange={(e) => setEditingCostValue(e.target.value)}
+                          onBlur={() => {
+                            updateTask.mutate({
+                              id: task.id,
+                              updates: { cost: editingCostValue }
+                            });
+                            setEditingCostTaskId(null);
+                            setEditingCostValue('');
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              updateTask.mutate({
+                                id: task.id,
+                                updates: { cost: editingCostValue }
+                              });
+                              setEditingCostTaskId(null);
+                              setEditingCostValue('');
+                            } else if (e.key === 'Escape') {
+                              setEditingCostTaskId(null);
+                              setEditingCostValue('');
+                            }
+                          }}
+                          className="w-24 h-8 text-center text-sm"
+                          placeholder="$0.00"
+                          autoFocus
+                          data-testid={`input-cost-${task.id}`}
+                        />
+                      ) : (
+                        <span 
+                          className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 hover:underline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingCostTaskId(task.id);
+                            setEditingCostValue(task.cost || '');
+                          }}
+                          title="Click to edit cost"
+                          data-testid={`span-cost-${task.id}`}
+                        >
+                          {formatCurrency(task.cost || '')}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex space-x-1">
