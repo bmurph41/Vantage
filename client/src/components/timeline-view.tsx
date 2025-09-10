@@ -44,10 +44,19 @@ function useLeaderLines(headerRef: React.RefObject<HTMLDivElement>, contentRef: 
         return cellRect.left + cellRect.width / 2 - contentRect.left;
       });
 
-      // Find all obstacles
-      const obstacles = Array.from(contentContainer.querySelectorAll('.leader-obstacle')) as HTMLElement[];
+      // Find all obstacles within the timeline area only
+      const timelineSection = contentContainer.querySelector('[data-timeline-section]') as HTMLElement;
+      const obstacles = timelineSection ? 
+        Array.from(timelineSection.querySelectorAll('.leader-obstacle')) as HTMLElement[] :
+        [];
+      
       const startY = headerRect.bottom - contentRect.top + 5; // Start just below header
-      const endY = contentContainer.scrollHeight - 10; // End near bottom of content
+      
+      // End at the bottom of the timeline section (progress bars area), not the entire page
+      const timelineBottom = timelineSection ? 
+        timelineSection.getBoundingClientRect().bottom - contentRect.top :
+        startY + 200; // Fallback height if timeline section not found
+      const endY = Math.min(timelineBottom + 10, startY + 300); // Limit maximum height
 
       const newLines = lineXPositions.map(x => {
         // Find obstacles that intersect this line
@@ -308,7 +317,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
           {/* Overall Progress Bar */}
           {project.closingDate && (
-            <div className="mb-4">
+            <div className="mb-4" data-timeline-section>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-medium text-gray-700 leader-obstacle">
                   Overall Progress to Closing
@@ -370,7 +379,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
           {/* Task Progress Bars */}
           {tasks.filter(t => t.showOnTimeline).length > 0 && (
-            <div className="mb-6 space-y-6">
+            <div className="mb-6 space-y-6" data-timeline-section>
               {tasks.filter(t => t.showOnTimeline).map((task) => (
                 <div key={task.id} className="bg-gray-50 rounded-lg p-3 border">
                   <div className="flex items-center justify-between mb-2">
