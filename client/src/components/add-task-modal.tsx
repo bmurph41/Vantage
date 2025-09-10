@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Clock, DollarSign, Users, AlertCircle, Save, CheckCircle, XCircle, Calendar, Play, Circle } from "lucide-react";
+import { Search, Clock, DollarSign, Users, AlertCircle, Save, CheckCircle, XCircle, Calendar, Play, Circle, MinusCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -36,7 +36,7 @@ const addTaskFormSchema = z.object({
   repPhone: z.string().optional(),
   priority: z.enum(["low", "med", "high"]),
   status: z.enum(["to_do", "scheduled", "in_progress", "completed", "not_started", "blocked"]).default("to_do"),
-  paymentStatus: z.enum(["not_paid", "paid"]).default("not_paid"),
+  paymentStatus: z.enum(["not_paid", "paid", "no_cost"]).default("not_paid"),
   dateOnSite: z.string().optional(),
   completedAt: z.string().optional(),
   cost: z.string().optional(),
@@ -592,7 +592,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     <Label htmlFor="paymentStatus">Payment</Label>
                     <Select
                       value={form.watch("paymentStatus")}
-                      onValueChange={(value: string) => form.setValue("paymentStatus", value as "not_paid" | "paid")}
+                      onValueChange={(value: string) => form.setValue("paymentStatus", value as "not_paid" | "paid" | "no_cost")}
                     >
                       <SelectTrigger data-testid="select-payment-status">
                         <SelectValue />
@@ -608,6 +608,12 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             <span>Paid</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="no_cost">
+                          <div className="flex items-center gap-2">
+                            <MinusCircle className="h-4 w-4 text-gray-500" />
+                            <span>No Cost</span>
                           </div>
                         </SelectItem>
                       </SelectContent>
@@ -1020,7 +1026,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     <Label htmlFor="paymentStatus">Payment</Label>
                     <Select
                       value={form.watch("paymentStatus")}
-                      onValueChange={(value: string) => form.setValue("paymentStatus", value as "not_paid" | "paid")}
+                      onValueChange={(value: string) => form.setValue("paymentStatus", value as "not_paid" | "paid" | "no_cost")}
                     >
                       <SelectTrigger data-testid="select-payment-status">
                         <SelectValue />
@@ -1036,6 +1042,12 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             <span>Paid</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="no_cost">
+                          <div className="flex items-center gap-2">
+                            <MinusCircle className="h-4 w-4 text-gray-500" />
+                            <span>No Cost</span>
                           </div>
                         </SelectItem>
                       </SelectContent>
