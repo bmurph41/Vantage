@@ -45,9 +45,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
 
   const getStatusBadge = (status: string) => {
     const colors = {
-      'not_started': 'bg-gray-100 text-gray-800 border-gray-200',
+      'to_do': 'bg-gray-100 text-gray-800 border-gray-200',
+      'scheduled': 'bg-blue-100 text-blue-800 border-blue-200',
       'in_progress': 'bg-yellow-100 text-yellow-800 border-yellow-200',
       'completed': 'bg-green-100 text-green-800 border-green-200',
+      // Legacy status values for backward compatibility
+      'not_started': 'bg-gray-100 text-gray-800 border-gray-200',
       'blocked': 'bg-red-100 text-red-800 border-red-200'
     } as const;
 
@@ -483,10 +486,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="not_started">To Do</SelectItem>
+                  <SelectItem value="to_do">To Do</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="blocked">Blocked</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -573,10 +576,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="not_started">To Do</SelectItem>
+                        <SelectItem value="to_do">To Do</SelectItem>
+                        <SelectItem value="scheduled">Scheduled</SelectItem>
                         <SelectItem value="in_progress">In Progress</SelectItem>
                         <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="blocked">Blocked</SelectItem>
                       </SelectContent>
                     </Select>
                   </td>

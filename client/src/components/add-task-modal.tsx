@@ -148,7 +148,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       const taskData = {
         ...data,
         projectId,
-        status: "not_started" as const,
+        status: "to_do" as const,
       };
 
       createTask.mutate(
