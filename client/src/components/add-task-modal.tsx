@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,10 +52,12 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null);
   const [step, setStep] = useState<"browse" | "customize">("browse");
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   
   const { toast } = useToast();
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
+  const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null);
   
   const isEditMode = !!editingTask;
 
@@ -83,6 +85,61 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       showOnTimeline: editingTask?.showOnTimeline || false,
     },
   });
+
+  // Auto-save functionality
+  const autoSave = useCallback(
+    (formData: z.infer<typeof addTaskFormSchema>) => {
+      if (isEditMode && editingTask) {
+        setAutoSaveStatus("saving");
+        updateTask.mutate(
+          {
+            id: editingTask.id,
+            updates: formData,
+          },
+          {
+            onSuccess: () => {
+              setAutoSaveStatus("saved");
+              setTimeout(() => setAutoSaveStatus("idle"), 2000); // Show "saved" for 2 seconds
+            },
+            onError: () => {
+              setAutoSaveStatus("error");
+              setTimeout(() => setAutoSaveStatus("idle"), 3000); // Show error for 3 seconds
+            },
+          }
+        );
+      }
+    },
+    [isEditMode, editingTask, updateTask]
+  );
+
+  // Watch form changes and auto-save after 2 seconds of inactivity
+  useEffect(() => {
+    if (!isEditMode || !editingTask) return;
+
+    const subscription = form.watch((formData) => {
+      // Clear previous timeout
+      if (autoSaveTimeout) {
+        clearTimeout(autoSaveTimeout);
+      }
+
+      // Set new timeout for auto-save
+      const timeout = setTimeout(() => {
+        const validationResult = addTaskFormSchema.safeParse(formData);
+        if (validationResult.success) {
+          autoSave(validationResult.data);
+        }
+      }, 2000); // Auto-save after 2 seconds of inactivity
+
+      setAutoSaveTimeout(timeout);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      if (autoSaveTimeout) {
+        clearTimeout(autoSaveTimeout);
+      }
+    };
+  }, [form, autoSave, isEditMode, editingTask, autoSaveTimeout]);
 
   // Filter tasks based on search and category
   const filteredTasks = marinaDueDiligenceTaskTemplates.filter(task => {
