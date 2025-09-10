@@ -365,10 +365,18 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     (formData: z.infer<typeof addTaskFormSchema>) => {
       if (isEditMode && editingTask) {
         setAutoSaveStatus("saving");
-        // Transform completedAt string to Date object
+        // Transform data to match backend schema expectations
         const transformedData = {
           ...formData,
-          completedAt: formData.completedAt ? new Date(formData.completedAt) : undefined,
+          // Keep completedAt as string for backend
+          completedAt: formData.completedAt || undefined,
+          // Set dateOnSite based on requiresOnSiteInspection checkbox
+          dateOnSite: formData.requiresOnSiteInspection ? (formData.dateOnSite || "TBD") : "",
+          // Ensure numeric fields are numbers
+          startOffsetDays: formData.startOffsetDays ? Number(formData.startOffsetDays) : undefined,
+          deadlineDays: formData.deadlineDays ? Number(formData.deadlineDays) : undefined,
+          // Remove fields that don't exist in backend schema
+          isInternalTask: undefined,
         };
         updateTask.mutate(
           {
@@ -513,13 +521,19 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   };
 
   const onSubmit = (data: z.infer<typeof addTaskFormSchema>) => {
-    // Transform data for API (convert completedAt string to Date object)
+    // Transform data for API to match backend schema expectations
     const transformedData = {
       ...data,
-      // Convert completedAt string to Date object as backend expects Date
-      completedAt: data.completedAt ? new Date(data.completedAt) : undefined,
+      // Keep completedAt as string for backend (don't convert to Date)
+      completedAt: data.completedAt || undefined,
       // Set dateOnSite based on requiresOnSiteInspection checkbox
       dateOnSite: data.requiresOnSiteInspection ? (data.dateOnSite || "TBD") : "",
+      // Ensure startOffsetDays is a number or undefined
+      startOffsetDays: data.startOffsetDays ? Number(data.startOffsetDays) : undefined,
+      // Ensure deadlineDays is a number or undefined
+      deadlineDays: data.deadlineDays ? Number(data.deadlineDays) : undefined,
+      // Remove fields that shouldn't be sent to backend
+      isInternalTask: undefined, // This field doesn't exist in backend schema
     };
 
     if (isEditMode && editingTask) {
