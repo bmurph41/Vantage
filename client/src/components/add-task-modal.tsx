@@ -536,6 +536,24 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
+                {/* Conditional Date On-Site field when status is "scheduled" */}
+                {form.watch("status") === "scheduled" && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="dateOnSite">Date On-Site *</Label>
+                      <Input
+                        id="dateOnSite"
+                        type="text"
+                        placeholder="MM/DD/YYYY"
+                        {...form.register("dateOnSite")}
+                        data-testid="input-date-on-site"
+                        pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
+                        title="Please enter date in MM/DD/YYYY format"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="assignee">Task Owner</Label>
@@ -876,6 +894,24 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     />
                   </div>
                 </div>
+
+                {/* Conditional Date On-Site field when status is "scheduled" */}
+                {form.watch("status") === "scheduled" && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="dateOnSite">Date On-Site *</Label>
+                      <Input
+                        id="dateOnSite"
+                        type="text"
+                        placeholder="MM/DD/YYYY"
+                        {...form.register("dateOnSite")}
+                        data-testid="input-date-on-site"
+                        pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
+                        title="Please enter date in MM/DD/YYYY format"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
