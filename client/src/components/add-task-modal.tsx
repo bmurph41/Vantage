@@ -368,13 +368,13 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
         // Transform data to match backend schema expectations
         const transformedData = {
           ...formData,
-          // Keep completedAt as string for backend
-          completedAt: formData.completedAt || undefined,
+          // Convert completedAt string to Date object as backend expects Date
+          completedAt: formData.completedAt ? new Date(formData.completedAt) : null,
           // Set dateOnSite based on requiresOnSiteInspection checkbox
           dateOnSite: formData.requiresOnSiteInspection ? (formData.dateOnSite || "TBD") : "",
           // Ensure numeric fields are numbers
-          startOffsetDays: formData.startOffsetDays ? Number(formData.startOffsetDays) : undefined,
-          deadlineDays: formData.deadlineDays ? Number(formData.deadlineDays) : undefined,
+          startOffsetDays: formData.startOffsetDays ? Number(formData.startOffsetDays) : null,
+          deadlineDays: formData.deadlineDays ? Number(formData.deadlineDays) : null,
           // Remove fields that don't exist in backend schema
           isInternalTask: undefined,
         };
@@ -524,14 +524,14 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     // Transform data for API to match backend schema expectations
     const transformedData = {
       ...data,
-      // Keep completedAt as string for backend (don't convert to Date)
-      completedAt: data.completedAt || undefined,
+      // Convert completedAt string to Date object as backend expects Date
+      completedAt: data.completedAt ? new Date(data.completedAt) : null,
       // Set dateOnSite based on requiresOnSiteInspection checkbox
       dateOnSite: data.requiresOnSiteInspection ? (data.dateOnSite || "TBD") : "",
-      // Ensure startOffsetDays is a number or undefined
-      startOffsetDays: data.startOffsetDays ? Number(data.startOffsetDays) : undefined,
-      // Ensure deadlineDays is a number or undefined
-      deadlineDays: data.deadlineDays ? Number(data.deadlineDays) : undefined,
+      // Ensure startOffsetDays is a number or null
+      startOffsetDays: data.startOffsetDays ? Number(data.startOffsetDays) : null,
+      // Ensure deadlineDays is a number or null
+      deadlineDays: data.deadlineDays ? Number(data.deadlineDays) : null,
       // Remove fields that shouldn't be sent to backend
       isInternalTask: undefined, // This field doesn't exist in backend schema
     };

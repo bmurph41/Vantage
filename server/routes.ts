@@ -291,7 +291,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(updated);
     } catch (error) {
-      res.status(400).json({ error: "Invalid update data" });
+      console.error("Task update error:", error);
+      console.error("Request body:", req.body);
+      res.status(400).json({ error: "Invalid update data", details: error.message });
     }
   });
 
