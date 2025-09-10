@@ -740,7 +740,25 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               {task.companyHired}
                             </button>
                           </div>
-                          {getStatusBadge(task.status)}
+                          <Select 
+                            value={task.status} 
+                            onValueChange={(value) => handleStatusChange(task.id, value)}
+                          >
+                            <SelectTrigger 
+                              data-testid={`select-status-${task.id}`} 
+                              className="w-32 h-8 text-xs"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="to_do">To Do</SelectItem>
+                              <SelectItem value="scheduled">Scheduled</SelectItem>
+                              <SelectItem value="in_progress">In Progress</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="not_started">Not Started</SelectItem>
+                              <SelectItem value="blocked">Blocked</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       )}
                     </div>
