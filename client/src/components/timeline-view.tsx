@@ -186,7 +186,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
           {/* Task Progress Bars */}
           {tasks.filter(t => t.showOnTimeline).length > 0 && (
-            <div className="mb-6 space-y-3">
+            <div className="mb-6 space-y-6">
               {tasks.filter(t => t.showOnTimeline).map((task) => (
                 <div key={task.id} className="bg-gray-50 rounded-lg p-3 border">
                   <div className="flex items-center justify-between mb-2">
@@ -203,12 +203,14 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                       {task.assignee || 'Unassigned'}
                     </div>
                   </div>
-                  <ProgressBar 
-                    task={task} 
-                    project={project} 
-                    settings={settings}
-                    className="shadow-sm"
-                  />
+                  <div className="mt-6">
+                    <ProgressBar 
+                      task={task} 
+                      project={project} 
+                      settings={settings}
+                      className="shadow-sm"
+                    />
+                  </div>
                 </div>
               ))}
             </div>
