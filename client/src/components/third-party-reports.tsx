@@ -900,39 +900,16 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       )}
                     </td>
                     <td className="px-4 py-4">
-                      <div className="space-y-2">
-                        {/* Task Owner */}
-                        <div>
-                          {task.assignee ? (
-                            <div className="flex items-center space-x-2" data-testid={`assignee-${task.id}`}>
-                              <div className={`w-6 h-6 ${getUserColor(task.assignee)} rounded-full flex items-center justify-center text-xs text-white flex-shrink-0`}>
-                                {getUserInitials(task.assignee)}
-                              </div>
-                              <span className="text-sm" title={task.assignee}>{task.assignee}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
+                      {task.assignee ? (
+                        <div className="flex items-center space-x-2" data-testid={`assignee-${task.id}`}>
+                          <div className={`w-6 h-6 ${getUserColor(task.assignee)} rounded-full flex items-center justify-center text-xs text-white flex-shrink-0`}>
+                            {getUserInitials(task.assignee)}
+                          </div>
+                          <span className="text-sm" title={task.assignee}>{task.assignee}</span>
                         </div>
-                        
-                        {/* Completion Date */}
-                        <div>
-                          <label className="text-xs font-medium text-gray-700 block mb-1">Completion Date</label>
-                          <Input
-                            type="datetime-local"
-                            value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 16) : ''}
-                            onChange={(e) => {
-                              const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
-                              updateTask.mutate({
-                                id: task.id,
-                                updates: { completedAt: newCompletedAt }
-                              });
-                            }}
-                            className="w-full text-xs h-7"
-                            data-testid={`input-completion-date-${task.id}`}
-                          />
-                        </div>
-                      </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-4" data-testid={`text-company-${task.id}`}>
                       <div className="space-y-2">
@@ -964,22 +941,46 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <Select
-                        value={task.status}
-                        onValueChange={(value) => handleStatusChange(task.id, value)}
-                      >
-                        <SelectTrigger className="w-full h-8" data-testid={`select-status-${task.id}`}>
-                          <SelectValue>
-                            {getStatusBadge(task.status)}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="to_do">To Do</SelectItem>
-                          <SelectItem value="scheduled">Scheduled</SelectItem>
-                          <SelectItem value="in_progress">In Progress</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-2">
+                        {/* Status */}
+                        <div>
+                          <Select
+                            value={task.status}
+                            onValueChange={(value) => handleStatusChange(task.id, value)}
+                          >
+                            <SelectTrigger className="w-full h-8" data-testid={`select-status-${task.id}`}>
+                              <SelectValue>
+                                {getStatusBadge(task.status)}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="to_do">To Do</SelectItem>
+                              <SelectItem value="scheduled">Scheduled</SelectItem>
+                              <SelectItem value="in_progress">In Progress</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Scheduled Date */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 block mb-1">Scheduled Date</label>
+                          <Input
+                            type="date"
+                            value={task.startDate ? new Date(task.startDate).toISOString().slice(0, 10) : ''}
+                            onChange={(e) => {
+                              const newStartDate = e.target.value ? new Date(e.target.value) : undefined;
+                              updateTask.mutate({
+                                id: task.id,
+                                updates: { startDate: newStartDate }
+                              });
+                            }}
+                            className="w-full text-xs h-7"
+                            placeholder="mm/dd/yyyy"
+                            data-testid={`input-scheduled-date-${task.id}`}
+                          />
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center" data-testid={`text-days-remaining-${task.id}`}>
                       {(() => {
@@ -1114,8 +1115,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   {expandedTasks.has(task.id) && (
                     <tr className={`${index % 2 === 1 ? 'bg-accent/30' : 'bg-gray-50'} border-t border-gray-200`}>
                       <td colSpan={7} className="px-4 py-4">
-                        <div className="grid grid-cols-1 gap-4">
-                          {/* Payment Status - full width */}
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* Payment Status */}
                           <div>
                             <label className="text-xs font-medium text-gray-700 block mb-1">Payment</label>
                             <Select
@@ -1133,6 +1134,24 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                                 <SelectItem value="no_cost">No Cost</SelectItem>
                               </SelectContent>
                             </Select>
+                          </div>
+                          
+                          {/* Completion Date */}
+                          <div>
+                            <label className="text-xs font-medium text-gray-700 block mb-1">Completion Date</label>
+                            <Input
+                              type="datetime-local"
+                              value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => {
+                                const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
+                                updateTask.mutate({
+                                  id: task.id,
+                                  updates: { completedAt: newCompletedAt }
+                                });
+                              }}
+                              className="w-full text-xs h-8"
+                              data-testid={`input-completion-date-${task.id}`}
+                            />
                           </div>
                         </div>
                       </td>
