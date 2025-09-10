@@ -19,6 +19,10 @@ interface CompanyDetailsModalProps {
     repName?: string;
     repEmail?: string;
     repPhone?: string;
+    companyAddress?: string;
+    companyCity?: string;
+    companyState?: string;
+    companyZip?: string;
   };
   relatedProjects: Array<{
     project: Project;
@@ -28,6 +32,10 @@ interface CompanyDetailsModalProps {
     repName?: string;
     repEmail?: string;
     repPhone?: string;
+    companyAddress?: string;
+    companyCity?: string;
+    companyState?: string;
+    companyZip?: string;
   }) => Promise<void>;
 }
 
@@ -186,11 +194,65 @@ export function CompanyDetailsModal({
                       className="text-sm"
                     />
                   </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="company-address" className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Street Address
+                    </Label>
+                    <Input
+                      id="company-address"
+                      value={editedContactInfo.companyAddress || ''}
+                      onChange={(e) => setEditedContactInfo(prev => ({ ...prev, companyAddress: e.target.value }))}
+                      placeholder="123 Main Street"
+                      className="text-sm"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="company-city" className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        City
+                      </Label>
+                      <Input
+                        id="company-city"
+                        value={editedContactInfo.companyCity || ''}
+                        onChange={(e) => setEditedContactInfo(prev => ({ ...prev, companyCity: e.target.value }))}
+                        placeholder="City"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="company-state" className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                          State
+                        </Label>
+                        <Input
+                          id="company-state"
+                          value={editedContactInfo.companyState || ''}
+                          onChange={(e) => setEditedContactInfo(prev => ({ ...prev, companyState: e.target.value }))}
+                          placeholder="State"
+                          className="text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="company-zip" className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                          ZIP Code
+                        </Label>
+                        <Input
+                          id="company-zip"
+                          value={editedContactInfo.companyZip || ''}
+                          onChange={(e) => setEditedContactInfo(prev => ({ ...prev, companyZip: e.target.value }))}
+                          placeholder="12345"
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
               <div>
-                {(contactInfo.repName || contactInfo.repEmail || contactInfo.repPhone) ? (
+                {(contactInfo.repName || contactInfo.repEmail || contactInfo.repPhone || contactInfo.companyAddress || contactInfo.companyCity || contactInfo.companyState || contactInfo.companyZip) ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {contactInfo.repName && (
                       <div className="flex items-center space-x-3 p-3 bg-white rounded-md border">
@@ -228,6 +290,29 @@ export function CompanyDetailsModal({
                           >
                             {contactInfo.repPhone}
                           </a>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Address Display */}
+                    {(contactInfo.companyAddress || contactInfo.companyCity || contactInfo.companyState || contactInfo.companyZip) && (
+                      <div className="flex items-start space-x-3 p-3 bg-white rounded-md border">
+                        <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Address</p>
+                          <div className="text-sm font-medium text-gray-900">
+                            {contactInfo.companyAddress && (
+                              <div>{contactInfo.companyAddress}</div>
+                            )}
+                            {(contactInfo.companyCity || contactInfo.companyState || contactInfo.companyZip) && (
+                              <div>
+                                {contactInfo.companyCity}
+                                {contactInfo.companyCity && contactInfo.companyState && ', '}
+                                {contactInfo.companyState}
+                                {contactInfo.companyZip && ` ${contactInfo.companyZip}`}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}

@@ -133,6 +133,10 @@ const addTaskFormSchema = z.object({
   repName: z.string().optional(),
   repEmail: z.string().optional(),
   repPhone: z.string().optional(),
+  companyAddress: z.string().optional(),
+  companyCity: z.string().optional(),
+  companyState: z.string().optional(),
+  companyZip: z.string().optional(),
   priority: z.enum(["low", "med", "high"]),
   status: z.enum(["to_do", "scheduled", "in_progress", "completed", "not_started", "blocked"]).default("to_do"),
   paymentStatus: z.enum(["not_paid", "paid", "no_cost"]).default("not_paid"),
@@ -302,6 +306,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           repName: editingTask.repName || "",
           repEmail: editingTask.repEmail || "",
           repPhone: editingTask.repPhone || "",
+          companyAddress: editingTask.companyAddress || "",
+          companyCity: editingTask.companyCity || "",
+          companyState: editingTask.companyState || "",
+          companyZip: editingTask.companyZip || "",
           priority: editingTask.priority || "med",
           status: editingTask.status || "to_do",
           paymentStatus: editingTask.paymentStatus || "not_paid",
@@ -329,6 +337,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           repName: "",
           repEmail: "",
           repPhone: "",
+          companyAddress: "",
+          companyCity: "",
+          companyState: "",
+          companyZip: "",
           priority: "med",
           status: "to_do",
           paymentStatus: "not_paid",
@@ -425,6 +437,13 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       deadlineType: "dd_expiration" as const,
       assignee: template.defaultAssignee || "",
       companyHired: "",
+      repName: "",
+      repEmail: "",
+      repPhone: "",
+      companyAddress: "",
+      companyCity: "",
+      companyState: "",
+      companyZip: "",
       priority: template.priority as "low" | "med" | "high",
       cost: template.estimatedCost || "",
       notes: "",
@@ -450,6 +469,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       repName: "",
       repEmail: "",
       repPhone: "",
+      companyAddress: "",
+      companyCity: "",
+      companyState: "",
+      companyZip: "",
       priority: "med",
       status: "to_do",
       paymentStatus: "not_paid",
@@ -855,41 +878,90 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 {/* Rep Contact Info */}
                 {form.watch("companyHired") && (
                   <div className="space-y-3 bg-gray-50 p-3 rounded-md">
-                    <div className="text-sm font-medium text-gray-700">Rep Contact Information</div>
-                    <div className="grid grid-cols-1 gap-3">
-                      <div>
-                        <Label htmlFor="repName">Rep Name</Label>
-                        <Input
-                          id="repName"
-                          placeholder="Representative name"
-                          {...form.register("repName")}
-                          data-testid="input-rep-name"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
+                    <div className="text-sm font-medium text-gray-700">Company Information</div>
+                    <div className="grid grid-cols-1 gap-4">
+                      {/* Rep Contact Section */}
+                      <div className="space-y-3">
+                        <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Representative Contact</div>
                         <div>
-                          <Label htmlFor="repEmail">Rep Email</Label>
+                          <Label htmlFor="repName">Rep Name</Label>
                           <Input
-                            id="repEmail"
-                            type="email"
-                            placeholder="rep@company.com"
-                            {...form.register("repEmail")}
-                            data-testid="input-rep-email"
+                            id="repName"
+                            placeholder="Representative name"
+                            {...form.register("repName")}
+                            data-testid="input-rep-name"
                           />
                         </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="repEmail">Rep Email</Label>
+                            <Input
+                              id="repEmail"
+                              type="email"
+                              placeholder="rep@company.com"
+                              {...form.register("repEmail")}
+                              data-testid="input-rep-email"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="repPhone">Rep Phone</Label>
+                            <Input
+                              id="repPhone"
+                              type="tel"
+                              placeholder="(555) 123-4567"
+                              {...form.register("repPhone")}
+                              onBlur={(e) => {
+                                const formatted = formatPhoneNumber(e.target.value);
+                                form.setValue("repPhone", formatted);
+                              }}
+                              data-testid="input-rep-phone"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Company Address Section */}
+                      <div className="space-y-3">
+                        <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Physical Address</div>
                         <div>
-                          <Label htmlFor="repPhone">Rep Phone</Label>
+                          <Label htmlFor="companyAddress">Street Address</Label>
                           <Input
-                            id="repPhone"
-                            type="tel"
-                            placeholder="(555) 123-4567"
-                            {...form.register("repPhone")}
-                            onBlur={(e) => {
-                              const formatted = formatPhoneNumber(e.target.value);
-                              form.setValue("repPhone", formatted);
-                            }}
-                            data-testid="input-rep-phone"
+                            id="companyAddress"
+                            placeholder="123 Main Street"
+                            {...form.register("companyAddress")}
+                            data-testid="input-company-address"
                           />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="companyCity">City</Label>
+                            <Input
+                              id="companyCity"
+                              placeholder="City"
+                              {...form.register("companyCity")}
+                              data-testid="input-company-city"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label htmlFor="companyState">State</Label>
+                              <Input
+                                id="companyState"
+                                placeholder="State"
+                                {...form.register("companyState")}
+                                data-testid="input-company-state"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="companyZip">ZIP Code</Label>
+                              <Input
+                                id="companyZip"
+                                placeholder="12345"
+                                {...form.register("companyZip")}
+                                data-testid="input-company-zip"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1305,41 +1377,90 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 {/* Rep Contact Info */}
                 {form.watch("companyHired") && (
                   <div className="space-y-3 bg-gray-50 p-3 rounded-md">
-                    <div className="text-sm font-medium text-gray-700">Rep Contact Information</div>
-                    <div className="grid grid-cols-1 gap-3">
-                      <div>
-                        <Label htmlFor="repName">Rep Name</Label>
-                        <Input
-                          id="repName"
-                          placeholder="Representative name"
-                          {...form.register("repName")}
-                          data-testid="input-rep-name"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
+                    <div className="text-sm font-medium text-gray-700">Company Information</div>
+                    <div className="grid grid-cols-1 gap-4">
+                      {/* Rep Contact Section */}
+                      <div className="space-y-3">
+                        <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Representative Contact</div>
                         <div>
-                          <Label htmlFor="repEmail">Rep Email</Label>
+                          <Label htmlFor="repName">Rep Name</Label>
                           <Input
-                            id="repEmail"
-                            type="email"
-                            placeholder="rep@company.com"
-                            {...form.register("repEmail")}
-                            data-testid="input-rep-email"
+                            id="repName"
+                            placeholder="Representative name"
+                            {...form.register("repName")}
+                            data-testid="input-rep-name"
                           />
                         </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="repEmail">Rep Email</Label>
+                            <Input
+                              id="repEmail"
+                              type="email"
+                              placeholder="rep@company.com"
+                              {...form.register("repEmail")}
+                              data-testid="input-rep-email"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="repPhone">Rep Phone</Label>
+                            <Input
+                              id="repPhone"
+                              type="tel"
+                              placeholder="(555) 123-4567"
+                              {...form.register("repPhone")}
+                              onBlur={(e) => {
+                                const formatted = formatPhoneNumber(e.target.value);
+                                form.setValue("repPhone", formatted);
+                              }}
+                              data-testid="input-rep-phone"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Company Address Section */}
+                      <div className="space-y-3">
+                        <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Physical Address</div>
                         <div>
-                          <Label htmlFor="repPhone">Rep Phone</Label>
+                          <Label htmlFor="companyAddress">Street Address</Label>
                           <Input
-                            id="repPhone"
-                            type="tel"
-                            placeholder="(555) 123-4567"
-                            {...form.register("repPhone")}
-                            onBlur={(e) => {
-                              const formatted = formatPhoneNumber(e.target.value);
-                              form.setValue("repPhone", formatted);
-                            }}
-                            data-testid="input-rep-phone"
+                            id="companyAddress"
+                            placeholder="123 Main Street"
+                            {...form.register("companyAddress")}
+                            data-testid="input-company-address"
                           />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="companyCity">City</Label>
+                            <Input
+                              id="companyCity"
+                              placeholder="City"
+                              {...form.register("companyCity")}
+                              data-testid="input-company-city"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label htmlFor="companyState">State</Label>
+                              <Input
+                                id="companyState"
+                                placeholder="State"
+                                {...form.register("companyState")}
+                                data-testid="input-company-state"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="companyZip">ZIP Code</Label>
+                              <Input
+                                id="companyZip"
+                                placeholder="12345"
+                                {...form.register("companyZip")}
+                                data-testid="input-company-zip"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>

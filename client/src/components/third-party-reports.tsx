@@ -54,6 +54,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       repName?: string;
       repEmail?: string;
       repPhone?: string;
+      companyAddress?: string;
+      companyCity?: string;
+      companyState?: string;
+      companyZip?: string;
     };
   }>({ isOpen: false, companyName: '', contactInfo: {} });
 
@@ -351,6 +355,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         repName: task.repName || undefined,
         repEmail: task.repEmail || undefined,
         repPhone: task.repPhone || undefined,
+        companyAddress: task.companyAddress || undefined,
+        companyCity: task.companyCity || undefined,
+        companyState: task.companyState || undefined,
+        companyZip: task.companyZip || undefined,
       },
     });
   };
@@ -404,6 +412,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     repName?: string;
     repEmail?: string;
     repPhone?: string;
+    companyAddress?: string;
+    companyCity?: string;
+    companyState?: string;
+    companyZip?: string;
   }) => {
     if (!companyModalData.companyName) return;
     
@@ -420,6 +432,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
           repName: newContactInfo.repName || null,
           repEmail: newContactInfo.repEmail || null,
           repPhone: newContactInfo.repPhone || null,
+          companyAddress: newContactInfo.companyAddress || null,
+          companyCity: newContactInfo.companyCity || null,
+          companyState: newContactInfo.companyState || null,
+          companyZip: newContactInfo.companyZip || null,
         }
       })
     );
