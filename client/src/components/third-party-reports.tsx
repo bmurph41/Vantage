@@ -399,6 +399,38 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     }).filter(Boolean) as Array<{ project: any; tasks: Task[]; }>;
   }, [companyModalData.isOpen, companyModalData.companyName, allTasks, allProjects]);
 
+  // Handle updating contact information for all tasks of this company
+  const handleContactInfoUpdate = async (newContactInfo: {
+    repName?: string;
+    repEmail?: string;
+    repPhone?: string;
+  }) => {
+    if (!companyModalData.companyName) return;
+    
+    // Find all tasks for this company across all projects
+    const companyTasks = allTasks.filter(task => 
+      task.companyHired === companyModalData.companyName
+    );
+    
+    // Update each task with the new contact information
+    const updatePromises = companyTasks.map(task => 
+      updateTask.mutateAsync({
+        id: task.id,
+        repName: newContactInfo.repName || null,
+        repEmail: newContactInfo.repEmail || null,
+        repPhone: newContactInfo.repPhone || null,
+      })
+    );
+    
+    await Promise.all(updatePromises);
+    
+    // Update the modal state with new contact info
+    setCompanyModalData(prev => ({
+      ...prev,
+      contactInfo: newContactInfo,
+    }));
+  };
+
   // Timeline logic
   const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];
 
@@ -1369,6 +1401,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         companyName={companyModalData.companyName}
         contactInfo={companyModalData.contactInfo}
         relatedProjects={relatedProjectsData}
+        onContactInfoUpdate={handleContactInfoUpdate}
       />
     </Card>
   );
