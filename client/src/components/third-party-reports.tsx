@@ -36,36 +36,56 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
-  const filteredTasks = tasks.filter(task => {
-    // Search filter (title, description, company hired)
-    const matchesSearch = searchTerm === "" || 
-      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (task.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (task.companyHired || "").toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Status filter
-    const matchesStatus = statusFilter === "all" || task.status === statusFilter;
-    
-    // Payment filter
-    const matchesPayment = paymentFilter === "all" || task.paymentStatus === paymentFilter;
-    
-    // Assignee filter
-    const matchesAssignee = assigneeFilter === "all" || 
-      (assigneeFilter === "unassigned" && !task.assignee) ||
-      (task.assignee && task.assignee.toLowerCase().includes(assigneeFilter.toLowerCase()));
-    
-    // Cost filter
-    const matchesCost = costFilter === "all" ||
-      (costFilter === "has_cost" && task.cost && task.cost.trim() !== "") ||
-      (costFilter === "no_cost" && (!task.cost || task.cost.trim() === ""));
-    
-    // Completion filter
-    const matchesCompletion = completionFilter === "all" ||
-      (completionFilter === "completed" && task.completedAt) ||
-      (completionFilter === "pending" && !task.completedAt);
-    
-    return matchesSearch && matchesStatus && matchesPayment && matchesAssignee && matchesCost && matchesCompletion;
-  });
+  const filteredTasks = tasks
+    .filter(task => {
+      // Search filter (title, description, company hired)
+      const matchesSearch = searchTerm === "" || 
+        task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (task.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (task.companyHired || "").toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Status filter
+      const matchesStatus = statusFilter === "all" || task.status === statusFilter;
+      
+      // Payment filter
+      const matchesPayment = paymentFilter === "all" || task.paymentStatus === paymentFilter;
+      
+      // Assignee filter
+      const matchesAssignee = assigneeFilter === "all" || 
+        (assigneeFilter === "unassigned" && !task.assignee) ||
+        (task.assignee && task.assignee.toLowerCase().includes(assigneeFilter.toLowerCase()));
+      
+      // Cost filter
+      const matchesCost = costFilter === "all" ||
+        (costFilter === "has_cost" && task.cost && task.cost.trim() !== "") ||
+        (costFilter === "no_cost" && (!task.cost || task.cost.trim() === ""));
+      
+      // Completion filter
+      const matchesCompletion = completionFilter === "all" ||
+        (completionFilter === "completed" && task.completedAt) ||
+        (completionFilter === "pending" && !task.completedAt);
+      
+      return matchesSearch && matchesStatus && matchesPayment && matchesAssignee && matchesCost && matchesCompletion;
+    })
+    .sort((a, b) => {
+      // Stack completed tasks at bottom, sorted by completion date
+      const aCompleted = a.status === 'completed';
+      const bCompleted = b.status === 'completed';
+      
+      // If one is completed and other is not, completed goes to bottom
+      if (aCompleted && !bCompleted) return 1;
+      if (!aCompleted && bCompleted) return -1;
+      
+      // If both are completed, sort by completion date (oldest completed first)
+      if (aCompleted && bCompleted) {
+        const aDate = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+        const bDate = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+        return aDate - bDate;
+      }
+      
+      // If both are not completed, maintain original order (by index in original tasks array)
+      return tasks.indexOf(a) - tasks.indexOf(b);
+    });
 
   // Removed all scroll detection to prevent glitches
 
