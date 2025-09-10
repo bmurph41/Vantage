@@ -225,10 +225,33 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         if (result !== 0) return result;
       }
       
-      // Always maintain original order (by sortOrder field) regardless of status
-      const aSortOrder = a.sortOrder || 0;
-      const bSortOrder = b.sortOrder || 0;
-      return aSortOrder - bSortOrder;
+      // STABLE PRIORITY SORT WITH ARCHIVE SUPPORT
+      // First check for archived tasks (high sortOrder indicates archived)
+      const maxNormalSortOrder = 1000; // Threshold for archived tasks
+      const aIsArchived = (a.sortOrder || 0) > maxNormalSortOrder;
+      const bIsArchived = (b.sortOrder || 0) > maxNormalSortOrder;
+      
+      // Archived tasks always go to bottom, sorted by sortOrder
+      if (aIsArchived && bIsArchived) {
+        return (a.sortOrder || 0) - (b.sortOrder || 0);
+      }
+      if (aIsArchived !== bIsArchived) {
+        return aIsArchived ? 1 : -1; // Archived tasks sink to bottom
+      }
+      
+      // For non-archived tasks: Priority first (High -> Medium -> Low)
+      const priorityOrder = { 'high': 0, 'med': 1, 'low': 2 };
+      const aPriorityRank = priorityOrder[a.priority] ?? 2;
+      const bPriorityRank = priorityOrder[b.priority] ?? 2;
+      
+      if (aPriorityRank !== bPriorityRank) {
+        return aPriorityRank - bPriorityRank;
+      }
+      
+      // Within same priority, sort by most recent update first (with safe date parsing)
+      const aUpdated = a.updatedAt ? new Date(a.updatedAt).getTime() : new Date(a.createdAt).getTime();
+      const bUpdated = b.updatedAt ? new Date(b.updatedAt).getTime() : new Date(b.createdAt).getTime();
+      return bUpdated - aUpdated; // Descending order (most recent first)
     });
 
   // Removed all scroll detection to prevent glitches
