@@ -424,21 +424,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 </div>
 
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="durationDays">Duration (Days) *</Label>
-                    <Input
-                      id="durationDays"
-                      type="number"
-                      min="1"
-                      {...form.register("durationDays", { valueAsNumber: true })}
-                      data-testid="input-duration"
-                    />
-                    {form.formState.errors.durationDays && (
-                      <p className="text-sm text-destructive mt-1">{form.formState.errors.durationDays.message}</p>
-                    )}
-                  </div>
-
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="priority">Priority</Label>
                     <Select
@@ -712,10 +698,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                           <div className="space-y-2 flex-1">
                             <CardTitle className="text-lg">{task.name}</CardTitle>
                             <div className="flex items-center space-x-3 text-sm text-muted-foreground">
-                              <div className="flex items-center">
-                                <Clock className="w-4 h-4 mr-1" />
-                                {task.durationDays} days
-                              </div>
                               {task.estimatedCost && (
                                 <div className="flex items-center">
                                   <DollarSign className="w-4 h-4 mr-1" />
@@ -783,21 +765,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 </div>
 
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="durationDays">Duration (Days) *</Label>
-                    <Input
-                      id="durationDays"
-                      type="number"
-                      min="1"
-                      {...form.register("durationDays", { valueAsNumber: true })}
-                      data-testid="input-duration-days"
-                    />
-                    {form.formState.errors.durationDays && (
-                      <p className="text-sm text-destructive mt-1">{form.formState.errors.durationDays.message}</p>
-                    )}
-                  </div>
-
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="priority">Priority</Label>
                     <Select
