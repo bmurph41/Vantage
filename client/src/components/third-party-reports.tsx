@@ -705,152 +705,189 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             <div className="space-y-3">
               <h3>Tasks ({filteredTasks.length})</h3>
               {filteredTasks.map((task) => (
-                <div key={task.id} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <h4 className="font-medium">{task.title}</h4>
-                      {getStatusBadge(task.status)}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        data-testid={`button-edit-${task.id}`}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditTask(task)}
-                      >
-                        Edit
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            data-testid={`button-delete-${task.id}`}
-                            variant="destructive"
-                            size="sm"
-                          >
-                            Delete
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Task</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete "{task.title}"? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteTask(task.id)}>
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Status:</span>
-                      <Select 
-                        value={task.status} 
-                        onValueChange={(value) => handleStatusChange(task.id, value as any)}
-                      >
-                        <SelectTrigger data-testid={`select-status-${task.id}`} className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="not_started">Not Started</SelectItem>
-                          <SelectItem value="in_progress">In Progress</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="blocked">Blocked</SelectItem>
-                          <SelectItem value="to_do">To Do</SelectItem>
-                          <SelectItem value="scheduled">Scheduled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <span className="text-muted-foreground">Payment:</span>
-                      <Select 
-                        value={task.paymentStatus} 
-                        onValueChange={(value) => handlePaymentStatusChange(task.id, value as any)}
-                      >
-                        <SelectTrigger data-testid={`select-payment-${task.id}`} className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="paid">Paid</SelectItem>
-                          <SelectItem value="not_paid">Not Paid</SelectItem>
-                          <SelectItem value="no_cost">No Cost</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <span className="text-muted-foreground">Cost:</span>
-                      {editingCostTaskId === task.id ? (
-                        <Input
-                          data-testid={`input-cost-${task.id}`}
-                          type="number"
-                          value={editingCostValue}
-                          onChange={(e) => setEditingCostValue(e.target.value)}
-                          onBlur={() => handleSaveCost(task.id)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSaveCost(task.id)}
-                          className="mt-1"
-                          autoFocus
-                        />
-                      ) : (
-                        <div 
-                          className="mt-1 p-2 border rounded cursor-pointer hover:bg-muted"
-                          onClick={() => handleEditCost(task.id, task.cost?.toString() || '0')}
-                        >
-                          {formatCurrency(task.cost || '')}
+                <div key={task.id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+                  {/* Header Section */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">{task.title}</h3>
+                      {task.description && (
+                        <p className="text-sm text-gray-600 mb-3">{task.description}</p>
+                      )}
+                      
+                      {/* Company Badge */}
+                      {task.companyHired && (
+                        <div className="flex items-center space-x-3 mb-3">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                              <span className="text-xs font-semibold text-purple-600">
+                                {task.companyHired.split(' ').map(n => n[0]).join('').toUpperCase()}
+                              </span>
+                            </div>
+                            <button
+                              data-testid={`button-company-${task.id}`}
+                              className="text-sm font-medium text-gray-900 hover:text-primary"
+                              onClick={() => handleCompanyClick(task)}
+                            >
+                              {task.companyHired}
+                            </button>
+                          </div>
+                          {getStatusBadge(task.status)}
                         </div>
                       )}
                     </div>
                     
-                    <div>
-                      <span className="text-muted-foreground">Progress:</span>
-                      <div className="mt-1 text-sm">{Math.round(calculateTaskProgress(task))}%</div>
+                    {/* Cost and Actions */}
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <div className="text-sm text-gray-500">Cost</div>
+                        {editingCostTaskId === task.id ? (
+                          <Input
+                            data-testid={`input-cost-${task.id}`}
+                            type="number"
+                            value={editingCostValue}
+                            onChange={(e) => setEditingCostValue(e.target.value)}
+                            onBlur={() => handleSaveCost(task.id)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveCost(task.id)}
+                            className="w-24 text-right"
+                            autoFocus
+                          />
+                        ) : (
+                          <div 
+                            className="text-lg font-semibold text-gray-900 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded"
+                            onClick={() => handleEditCost(task.id, task.cost?.toString() || '0')}
+                          >
+                            {formatCurrency(task.cost || '')}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          data-testid={`button-edit-${task.id}`}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditTask(task)}
+                          className="h-8 w-8 p-0"
+                        >
+                          ✏️
+                        </Button>
+                        <Button
+                          data-testid={`button-duplicate-${task.id}`}
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                        >
+                          📋
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              data-testid={`button-delete-${task.id}`}
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                            >
+                              🗑️
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{task.title}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteTask(task.id)}>
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   </div>
                   
-                  {task.description && (
-                    <p className="text-sm text-muted-foreground">{task.description}</p>
-                  )}
-                  
-                  {/* Dates Information */}
-                  <div className="text-sm space-y-1">
-                    {task.startDate && (
-                      <div>
-                        <span className="text-muted-foreground">Start Date:</span>
-                        <span className="ml-2">{format(parseISO(task.startDate), 'MM/dd/yyyy')}</span>
-                      </div>
-                    )}
-                    {task.deadline && (
-                      <div>
-                        <span className="text-muted-foreground">Deadline:</span>
-                        <span className="ml-2">{format(parseISO(task.deadline), 'MM/dd/yyyy')}</span>
-                      </div>
-                    )}
+                  {/* Date Fields Section */}
+                  <div className="grid grid-cols-4 gap-4 pt-4 border-t border-gray-100">
                     <div>
-                      <span className="text-muted-foreground">Days Remaining:</span>
-                      <span className="ml-2">{calculateDaysRemaining(task)}</span>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Deadline</label>
+                      <div className="mt-1">
+                        {task.deadline ? (
+                          <input 
+                            type="date" 
+                            value={task.deadline} 
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                            readOnly
+                          />
+                        ) : (
+                          <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Ordered</label>
+                      <div className="mt-1">
+                        {task.orderedAt ? (
+                          <input 
+                            type="date" 
+                            value={task.orderedAt} 
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                            readOnly
+                          />
+                        ) : (
+                          <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">On-Site</label>
+                      <div className="mt-1">
+                        {task.dateOnSite ? (
+                          <input 
+                            type="date" 
+                            value={task.dateOnSite} 
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                            readOnly
+                          />
+                        ) : (
+                          <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</label>
+                      <div className="mt-1">
+                        {task.completedAt ? (
+                          <input 
+                            type="date" 
+                            value={format(task.completedAt, 'yyyy-MM-dd')} 
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                            readOnly
+                          />
+                        ) : (
+                          <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
-                  {task.companyHired && (
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Company:</span>
-                      <button
-                        data-testid={`button-company-${task.id}`}
-                        className="ml-2 text-primary hover:underline"
-                        onClick={() => handleCompanyClick(task)}
-                      >
-                        {task.companyHired}
-                      </button>
+                  {/* Additional Info */}
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
+                    <div className="flex items-center space-x-4">
+                      <span>DD Exp</span>
+                      <span>Closing</span>
                     </div>
-                  )}
+                    <div className="text-right">
+                      <div>Progress: {Math.round(calculateTaskProgress(task))}%</div>
+                      <div>Days: {calculateDaysRemaining(task)}</div>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
