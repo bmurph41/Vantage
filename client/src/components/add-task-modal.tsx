@@ -14,6 +14,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateTask, useUpdateTask } from "@/hooks/use-tasks";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { marinaDueDiligenceTaskTemplates, taskCategories, searchTasks, type TaskTemplate } from "@/data/marina-due-diligence-tasks";
 import type { Task } from "@shared/schema";
 
@@ -53,11 +55,36 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null);
   const [step, setStep] = useState<"browse" | "customize">("browse");
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateCategory, setTemplateCategory] = useState("Custom");
   
   const { toast } = useToast();
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const queryClient = useQueryClient();
+
+  // Mutation for saving task as template
+  const saveTaskAsTemplate = useMutation({
+    mutationFn: async (params: { taskId: string; templateName: string; templateDescription: string; category: string }) => {
+      return apiRequest(`/api/dd/tasks/${params.taskId}/save-as-template`, {
+        method: "POST",
+        body: JSON.stringify({
+          templateName: params.templateName,
+          templateDescription: params.templateDescription,
+          category: params.category,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/task-templates'] });
+      toast({
+        title: "Success",
+        description: "Task saved as template successfully",
+      });
+    },
+  });
   
   const isEditMode = !!editingTask;
 
@@ -302,6 +329,9 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     setSelectedTemplate(null);
     setSearchTerm("");
     setSelectedCategory("all");
+    setSaveAsTemplate(false);
+    setTemplateName("");
+    setTemplateCategory("Custom");
     form.reset();
     onClose();
   };
@@ -341,11 +371,22 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       createTask.mutate(
         { projectId, task: taskData },
         {
-          onSuccess: () => {
+          onSuccess: (createdTask) => {
             toast({
               title: "Success",
               description: "Task added successfully",
             });
+            
+            // If user wants to save as template, do that after task creation
+            if (saveAsTemplate && templateName.trim()) {
+              saveTaskAsTemplate.mutate({
+                taskId: createdTask.id,
+                templateName: templateName.trim(),
+                templateDescription: data.description || "",
+                category: templateCategory,
+              });
+            }
+            
             handleClose();
           },
         }
@@ -668,6 +709,61 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     Show this task on the main project timeline overview
                   </p>
                 </div>
+
+                {/* Save as Template - Only show for new tasks */}
+                {!isEditMode && (
+                  <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="saveAsTemplate"
+                        checked={saveAsTemplate}
+                        onChange={(e) => setSaveAsTemplate(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                        data-testid="checkbox-save-as-template"
+                      />
+                      <Label htmlFor="saveAsTemplate" className="text-sm font-medium text-gray-900">
+                        Save as Template
+                      </Label>
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      Save this task as a reusable template for future projects
+                    </p>
+                    
+                    {saveAsTemplate && (
+                      <div className="space-y-3 mt-3">
+                        <div>
+                          <Label htmlFor="templateName" className="text-sm">Template Name</Label>
+                          <Input
+                            id="templateName"
+                            value={templateName}
+                            onChange={(e) => setTemplateName(e.target.value)}
+                            placeholder="e.g., Marina Survey Template"
+                            className="mt-1"
+                            data-testid="input-template-name"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="templateCategory" className="text-sm">Category</Label>
+                          <Select value={templateCategory} onValueChange={setTemplateCategory}>
+                            <SelectTrigger className="mt-1" data-testid="select-template-category">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Custom">Custom</SelectItem>
+                              <SelectItem value="Financial">Financial</SelectItem>
+                              <SelectItem value="Legal">Legal</SelectItem>
+                              <SelectItem value="Environmental">Environmental</SelectItem>
+                              <SelectItem value="Physical Inspection">Physical Inspection</SelectItem>
+                              <SelectItem value="Permits">Permits</SelectItem>
+                              <SelectItem value="Third-Party Reports">Third-Party Reports</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </ScrollArea>
 
