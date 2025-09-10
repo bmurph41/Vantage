@@ -296,7 +296,7 @@ export default function Dashboard() {
                           <div className="flex items-center justify-between py-3 px-4 bg-slate-50/40 rounded-lg border border-gray-200">
                             <div className="flex items-center gap-2">
                               <DollarSign className="h-5 w-5 text-gray-600" />
-                              <span className="text-sm font-medium text-gray-700">Total Investment</span>
+                              <span className="text-sm font-medium text-gray-700">Total Inspection Costs</span>
                             </div>
                             <span className="text-lg font-bold text-gray-900">
                               {new Intl.NumberFormat('en-US', {
