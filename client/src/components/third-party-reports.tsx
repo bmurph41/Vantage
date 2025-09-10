@@ -903,25 +903,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
           <table className="w-full" data-testid="tasks-table">
             <thead>
               <tr className="bg-primary text-primary-foreground">
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[22%]">Task</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[12%]">Task Owner</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Company Hired</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[8%]">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[30%]">Task</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Task Owner</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[20%]">Company Hired</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[10%]">Status</th>
                 <th 
-                  className="px-4 py-3 text-left text-sm font-semibold w-[9%] cursor-pointer hover:bg-primary/80 transition-colors"
-                  onClick={() => handleSort('deadline')}
-                  data-testid="header-deadline"
-                >
-                  <div className="flex items-center">
-                    Deadline
-                    {getSortIcon('deadline')}
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[9%]">Ordered Date</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[9%]">On-Site Date</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[9%]">Completion Date</th>
-                <th 
-                  className="px-4 py-3 text-left text-sm font-semibold w-[7%] cursor-pointer hover:bg-primary/80 transition-colors"
+                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
                   onClick={() => handleSort('cost')}
                   data-testid="header-cost"
                 >
@@ -930,7 +917,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     {getSortIcon('cost')}
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[5%]">Actions</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -997,78 +984,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           <SelectItem value="completed">Completed</SelectItem>
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-4 py-3" data-testid={`text-deadline-${task.id}`}>
-                      <Input
-                        type="date"
-                        value={task.deadline || ''}
-                        onChange={(e) => {
-                          const newDeadline = e.target.value ? e.target.value : null;
-                          updateTask.mutate({
-                            id: task.id,
-                            updates: { deadline: newDeadline }
-                          });
-                        }}
-                        className="w-full text-xs h-7"
-                        data-testid={`input-deadline-${task.id}`}
-                      />
-                    </td>
-                    <td className="px-4 py-3" data-testid={`text-ordered-date-${task.id}`}>
-                      {task.status === 'scheduled' ? (
-                        <Input
-                          type="date"
-                          value={task.orderedAt || ''}
-                          onChange={(e) => {
-                            const newOrderedAt = e.target.value ? e.target.value : null;
-                            updateTask.mutate({
-                              id: task.id,
-                              updates: { orderedAt: newOrderedAt }
-                            });
-                          }}
-                          className="w-full text-xs h-7"
-                          data-testid={`input-ordered-date-${task.id}`}
-                        />
-                      ) : (
-                        <div className="w-full text-xs h-7 px-3 py-2 border border-input bg-background rounded-md flex items-center text-muted-foreground">
-                          {task.orderedAt || '-'}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3" data-testid={`text-onsite-date-${task.id}`}>
-                      {task.status === 'scheduled' ? (
-                        <Input
-                          type="date"
-                          value={task.dateOnSite || ''}
-                          onChange={(e) => {
-                            const newDateOnSite = e.target.value ? e.target.value : null;
-                            updateTask.mutate({
-                              id: task.id,
-                              updates: { dateOnSite: newDateOnSite }
-                            });
-                          }}
-                          className="w-full text-xs h-7"
-                          data-testid={`input-onsite-date-${task.id}`}
-                        />
-                      ) : (
-                        <div className="w-full text-xs h-7 px-3 py-2 border border-input bg-background rounded-md flex items-center text-muted-foreground">
-                          {task.dateOnSite || '-'}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3" data-testid={`text-completion-date-${task.id}`}>
-                      <Input
-                        type="date"
-                        value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 10) : ''}
-                        onChange={(e) => {
-                          const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
-                          updateTask.mutate({
-                            id: task.id,
-                            updates: { completedAt: newCompletedAt }
-                          });
-                        }}
-                        className="w-full text-xs h-7"
-                        data-testid={`input-completion-date-${task.id}`}
-                      />
                     </td>
                     <td className="px-4 py-3 text-center" data-testid={`text-cost-${task.id}`}>
                       {editingCostTaskId === task.id ? (
@@ -1183,10 +1098,89 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     </td>
                   </tr>
                   
+                  {/* Date Fields Row */}
+                  <tr className="bg-gray-50 border-t-0">
+                    <td colSpan={6} className="px-4 py-3" data-testid={`dates-row-${task.id}`}>
+                      <div className="grid grid-cols-4 gap-4">
+                        {/* Deadline */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Deadline</label>
+                          <Input
+                            type="date"
+                            value={task.deadline || ''}
+                            onChange={(e) => {
+                              const newDeadline = e.target.value ? e.target.value : null;
+                              updateTask.mutate({
+                                id: task.id,
+                                updates: { deadline: newDeadline }
+                              });
+                            }}
+                            className="w-full text-xs h-8"
+                            data-testid={`input-deadline-${task.id}`}
+                          />
+                        </div>
+                        
+                        {/* Ordered Date */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Ordered</label>
+                          <Input
+                            type="date"
+                            value={task.orderedAt || ''}
+                            onChange={(e) => {
+                              const newOrderedAt = e.target.value ? e.target.value : null;
+                              updateTask.mutate({
+                                id: task.id,
+                                updates: { orderedAt: newOrderedAt }
+                              });
+                            }}
+                            className="w-full text-xs h-8"
+                            data-testid={`input-ordered-date-${task.id}`}
+                          />
+                        </div>
+                        
+                        {/* On-Site Date */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">On-Site</label>
+                          <Input
+                            type="date"
+                            value={task.dateOnSite || ''}
+                            onChange={(e) => {
+                              const newDateOnSite = e.target.value ? e.target.value : null;
+                              updateTask.mutate({
+                                id: task.id,
+                                updates: { dateOnSite: newDateOnSite }
+                              });
+                            }}
+                            className="w-full text-xs h-8"
+                            data-testid={`input-onsite-date-${task.id}`}
+                          />
+                        </div>
+                        
+                        {/* Completed Date */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Completed</label>
+                          <Input
+                            type="date"
+                            value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 10) : ''}
+                            onChange={(e) => {
+                              const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
+                              updateTask.mutate({
+                                id: task.id,
+                                updates: { completedAt: newCompletedAt }
+                              });
+                            }}
+                            className="w-full text-xs h-8"
+                            data-testid={`input-completion-date-${task.id}`}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  
                   {/* Rep Contact Information Row */}
                   {(task.repName || task.repEmail || task.repPhone) && (
-                    <tr className="bg-gray-50 border-none">
-                      <td colSpan={10} className="px-4 py-2 text-xs text-gray-600" data-testid={`rep-contact-${task.id}`}>
+                    <tr className="bg-gray-100 border-t-0">
+                      <td colSpan={6} className="px-4 py-2 text-xs text-gray-600" data-testid={`rep-contact-${task.id}`}>
                         <div className="flex items-center space-x-6">
                           {task.repName && (
                             <div className="flex items-center space-x-1">
@@ -1215,7 +1209,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               ))}
               {filteredTasks.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
                     No tasks found matching your criteria.
                   </td>
                 </tr>
