@@ -11,6 +11,7 @@ import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
 import { AddTaskModal } from "@/components/add-task-modal";
 import { TimelineNotes } from "@/components/timeline-notes";
+import { ExportReportModal } from "@/components/export-report-modal";
 import { differenceInDays, parseISO, format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, isToday, isPast, isFuture } from "date-fns";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
@@ -42,6 +43,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [sortColumn, setSortColumn] = useState<'daysRemaining' | 'cost' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const toggleTaskExpansion = (taskId: string) => {
     const newExpanded = new Set(expandedTasks);
@@ -762,7 +764,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   <Plus className="h-4 w-4 mr-2" />
                   Add Task
                 </Button>
-                <Button variant="outline" size="sm" data-testid="button-export-report">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setIsExportModalOpen(true)}
+                  data-testid="button-export-report"
+                >
                   <FileDown className="h-4 w-4 mr-2" />
                   Export Report
                 </Button>
@@ -1206,6 +1213,13 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
           </DialogContent>
         </Dialog>
       )}
+
+      <ExportReportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        tasks={tasks}
+        project={project}
+      />
     </Card>
   );
 }
