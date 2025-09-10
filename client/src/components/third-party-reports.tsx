@@ -1051,12 +1051,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-300">
+            <tbody className="divide-y-8 divide-transparent">
               {filteredTasks.map((task, index) => (
                 <React.Fragment key={task.id}>
                   {/* Main Content Row */}
                   <tr 
-                    className={`hover:bg-blue-50 transition-colors cursor-pointer border border-gray-300 shadow-md ${index % 2 === 1 ? 'bg-gray-50' : 'bg-white'} ${expandedTasks.has(task.id) ? 'ring-2 ring-blue-300' : ''}`}
+                    className={`hover:bg-blue-50 transition-colors cursor-pointer border-2 border-gray-400 shadow-sm bg-white mb-2 ${expandedTasks.has(task.id) ? 'ring-2 ring-blue-300' : ''}`}
                     onClick={() => toggleTaskExpansion(task.id)}
                     data-testid={`row-task-${task.id}`}
                   >
@@ -1255,8 +1255,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   </tr>
                   
                   {/* Date Fields Row */}
-                  <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 border-t-0 border-b border-blue-200">
-                    <td colSpan={7} className="px-6 py-4 border-l-4 border-blue-400 shadow-inner" data-testid={`dates-row-${task.id}`}>
+                  <tr className="bg-white border-2 border-gray-400 shadow-sm">
+                    <td colSpan={7} className="px-6 py-4" data-testid={`dates-row-${task.id}`}>
                       <div className="grid grid-cols-4 gap-4">
                         {/* Deadline */}
                         <div>
