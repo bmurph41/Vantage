@@ -320,24 +320,6 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
           })}
         </div>
           
-        {tasks.filter(t => t.showOnTimeline).length === 0 && (
-          <Card className="border-2 border-dashed border-gray-300" data-testid="text-no-tasks">
-            <CardContent className="text-center py-16">
-              <div className="max-w-md mx-auto">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
-                  <svg className="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">No Tasks</h3>
-                <p className="text-gray-600 mb-6">Add tasks to begin tracking your due diligence progress.</p>
-                <Button className="bg-slate-900 hover:bg-slate-800 text-white font-medium px-6 py-3 rounded-lg shadow-lg transition-all duration-200">
-                  Add Task
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* Enhanced Legend */}
