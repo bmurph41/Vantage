@@ -30,11 +30,19 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   
   // Task progress within its own duration
   const elapsed = Math.max(0, Math.min(taskDurationDays, daysBetween(start, today, settings?.useBusinessDays, settings?.holidayCalendar)));
+  const remaining = Math.max(0, taskDurationDays - elapsed);
   const percentElapsed = Math.round((elapsed / taskDurationDays) * 100);
   
   const isCompleted = task.status === 'completed';
   const isOverdue = !isCompleted && isAfter(today, due);
   const isNotStarted = isBefore(today, start);
+
+  // Format time labels
+  const getTimeLabel = (days: number) => {
+    if (days === 0) return "0 days";
+    if (days === 1) return "1 day";
+    return `${days} days`;
+  };
 
   return (
     <div className={cn("h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner", className)} data-testid="progress-bar">
@@ -47,13 +55,25 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
         }}
       >
         {isCompleted ? (
-          <div className="h-full bg-green-600 progress-bar-completed" data-testid="progress-completed" />
+          <div className="h-full bg-green-600 progress-bar-completed relative flex items-center justify-center" data-testid="progress-completed">
+            <span className="text-white text-xs font-medium px-2 text-center">
+              Completed ({getTimeLabel(taskDurationDays)})
+            </span>
+          </div>
         ) : isOverdue ? (
-          <div className="h-full bg-red-600 progress-bar-overdue" data-testid="progress-overdue" />
+          <div className="h-full bg-red-600 progress-bar-overdue relative flex items-center justify-center" data-testid="progress-overdue">
+            <span className="text-white text-xs font-medium px-2 text-center">
+              Overdue ({getTimeLabel(elapsed)} elapsed)
+            </span>
+          </div>
         ) : isNotStarted ? (
-          <div className="h-full progress-bar-remaining-stripes" data-testid="progress-not-started" />
+          <div className="h-full progress-bar-remaining-stripes relative flex items-center justify-center" data-testid="progress-not-started">
+            <span className="text-gray-700 text-xs font-medium px-2 text-center">
+              {getTimeLabel(taskDurationDays)} remaining
+            </span>
+          </div>
         ) : (
-          <div className="h-full flex" data-testid="progress-in-progress">
+          <div className="h-full flex relative" data-testid="progress-in-progress">
             <div 
               className="progress-bar-elapsed bg-blue-500" 
               style={{ width: `${percentElapsed}%` }}
@@ -64,6 +84,11 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
               style={{ width: `${100 - percentElapsed}%` }}
               data-testid="progress-remaining"
             />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-white text-xs font-medium px-2 text-center drop-shadow-md">
+                {getTimeLabel(elapsed)} elapsed, {getTimeLabel(remaining)} left
+              </span>
+            </div>
           </div>
         )}
         
