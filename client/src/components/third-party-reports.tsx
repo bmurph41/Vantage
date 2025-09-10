@@ -267,7 +267,14 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const getPaymentStatusBadge = (paymentStatus: string) => {
     const colors = {
       'not_paid': 'bg-red-100 text-red-800 border-red-200',
-      'paid': 'bg-green-100 text-green-800 border-green-200'
+      'paid': 'bg-green-100 text-green-800 border-green-200',
+      'no_cost': 'bg-gray-100 text-gray-800 border-gray-200'
+    } as const;
+
+    const labels = {
+      'not_paid': 'Not Paid',
+      'paid': 'Paid',
+      'no_cost': 'No Cost'
     } as const;
 
     return (
@@ -275,7 +282,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         className={`px-2 py-1 text-xs font-medium border ${colors[paymentStatus as keyof typeof colors] || colors.not_paid}`}
         data-testid={`payment-status-${paymentStatus}`}
       >
-        {paymentStatus === 'not_paid' ? 'Not Paid' : 'Paid'}
+        {labels[paymentStatus as keyof typeof labels] || 'Not Paid'}
       </div>
     );
   };
@@ -784,6 +791,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   <SelectItem value="all">All Payment</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
                   <SelectItem value="not_paid">Not Paid</SelectItem>
+                  <SelectItem value="no_cost">No Cost</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -1034,6 +1042,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               <SelectContent>
                                 <SelectItem value="not_paid">Not Paid</SelectItem>
                                 <SelectItem value="paid">Paid</SelectItem>
+                                <SelectItem value="no_cost">No Cost</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
