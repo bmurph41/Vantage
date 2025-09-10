@@ -736,8 +736,16 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       )}
                     </div>
                     
-                    {/* Cost and Actions */}
+                    {/* Days Remaining, Cost and Actions */}
                     <div className="flex items-center space-x-4">
+                      {/* Days Remaining */}
+                      <div className="text-right">
+                        <div className="text-sm text-gray-500">Days Remaining</div>
+                        <div className="text-lg font-bold text-blue-600">
+                          {calculateDaysRemaining(task)}
+                        </div>
+                      </div>
+                      
                       <div className="text-right">
                         <div className="text-sm text-gray-500">Cost</div>
                         {editingCostTaskId === task.id ? (
@@ -885,7 +893,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     </div>
                     <div className="text-right">
                       <div>Progress: {Math.round(calculateTaskProgress(task))}%</div>
-                      <div>Days: {calculateDaysRemaining(task)}</div>
                     </div>
                   </div>
                 </div>
