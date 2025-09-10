@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useProjects, useCreateProject } from "@/hooks/use-project";
-import { format } from "date-fns";
+import { format, differenceInDays, isPast, isToday } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -181,57 +182,131 @@ export default function Dashboard() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => (
-              <Link key={project.id} href={`/project/${project.id}`}>
-                <Card className="hover:shadow-md transition-shadow cursor-pointer" data-testid={`card-project-${project.id}`}>
-                  <CardHeader>
-                    <CardTitle className="text-lg" data-testid={`text-project-name-${project.id}`}>
-                      {project.name}
-                    </CardTitle>
-                    {project.description && (
-                      <p className="text-sm text-muted-foreground" data-testid={`text-project-description-${project.id}`}>
-                        {project.description}
-                      </p>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 text-sm">
-                      {project.psaSignedDate && (
-                        <div className="flex justify-between" data-testid={`text-psa-date-${project.id}`}>
-                          <span className="text-muted-foreground">PSA Signed:</span>
-                          <span>{format(new Date(project.psaSignedDate), 'MMM d, yyyy')}</span>
+            {projects.map((project) => {
+              // Calculate project status based on dates
+              const today = new Date();
+              const ddExpired = project.ddExpirationDate && isPast(new Date(project.ddExpirationDate));
+              const ddExpiringSoon = project.ddExpirationDate && !ddExpired && differenceInDays(new Date(project.ddExpirationDate), today) <= 7;
+              const closingSoon = project.closingDate && differenceInDays(new Date(project.closingDate), today) <= 14;
+              
+              let statusBadge = null;
+              let statusColor = "bg-green-50 border-green-200";
+              
+              if (ddExpired) {
+                statusBadge = { text: "DD Expired", variant: "destructive" as const, icon: AlertTriangle };
+                statusColor = "bg-red-50 border-red-200";
+              } else if (ddExpiringSoon) {
+                statusBadge = { text: "DD Expiring Soon", variant: "secondary" as const, icon: Clock };
+                statusColor = "bg-yellow-50 border-yellow-200";
+              } else if (closingSoon) {
+                statusBadge = { text: "Closing Soon", variant: "default" as const, icon: CheckCircle };
+                statusColor = "bg-blue-50 border-blue-200";
+              }
+              
+              return (
+                <Link key={project.id} href={`/project/${project.id}`}>
+                  <Card className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-2 ${statusColor} hover:scale-[1.02]`} data-testid={`card-project-${project.id}`}>
+                    {/* Header with status badge */}
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Building className="h-5 w-5 text-primary" />
+                            <CardTitle className="text-xl font-bold text-gray-900 leading-tight" data-testid={`text-project-name-${project.id}`}>
+                              {project.name}
+                            </CardTitle>
+                          </div>
+                          {project.description && (
+                            <p className="text-sm text-gray-600 leading-relaxed" data-testid={`text-project-description-${project.id}`}>
+                              {project.description}
+                            </p>
+                          )}
                         </div>
-                      )}
-                      {project.ddExpirationDate && (
-                        <div className="flex justify-between" data-testid={`text-dd-expiration-${project.id}`}>
-                          <span className="text-muted-foreground">DD Expiration:</span>
-                          <span>{format(new Date(project.ddExpirationDate), 'MMM d, yyyy')}</span>
-                        </div>
-                      )}
-                      {project.closingDate && (
-                        <div className="flex justify-between" data-testid={`text-closing-date-${project.id}`}>
-                          <span className="text-muted-foreground">Closing:</span>
-                          <span>{format(new Date(project.closingDate), 'MMM d, yyyy')}</span>
-                        </div>
-                      )}
+                        {statusBadge && (
+                          <Badge variant={statusBadge.variant} className="flex items-center gap-1 text-xs font-medium">
+                            <statusBadge.icon className="h-3 w-3" />
+                            {statusBadge.text}
+                          </Badge>
+                        )}
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent className="space-y-4">
+                      {/* Key Dates Section */}
+                      <div className="space-y-3">
+                        {project.psaSignedDate && (
+                          <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg" data-testid={`text-psa-date-${project.id}`}>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-blue-600" />
+                              <span className="text-sm font-medium text-gray-700">PSA Signed</span>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {format(new Date(project.psaSignedDate), 'MMM d, yyyy')}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {project.ddExpirationDate && (
+                          <div className={`flex items-center justify-between py-2 px-3 rounded-lg ${
+                            ddExpired ? 'bg-red-100' : ddExpiringSoon ? 'bg-yellow-100' : 'bg-gray-50'
+                          }`} data-testid={`text-dd-expiration-${project.id}`}>
+                            <div className="flex items-center gap-2">
+                              <Clock className={`h-4 w-4 ${
+                                ddExpired ? 'text-red-600' : ddExpiringSoon ? 'text-yellow-600' : 'text-gray-600'
+                              }`} />
+                              <span className="text-sm font-medium text-gray-700">DD Expiration</span>
+                            </div>
+                            <span className={`text-sm font-semibold ${
+                              ddExpired ? 'text-red-900' : ddExpiringSoon ? 'text-yellow-900' : 'text-gray-900'
+                            }`}>
+                              {format(new Date(project.ddExpirationDate), 'MMM d, yyyy')}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {project.closingDate && (
+                          <div className={`flex items-center justify-between py-2 px-3 rounded-lg ${
+                            closingSoon ? 'bg-blue-100' : 'bg-gray-50'
+                          }`} data-testid={`text-closing-date-${project.id}`}>
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className={`h-4 w-4 ${
+                                closingSoon ? 'text-blue-600' : 'text-gray-600'
+                              }`} />
+                              <span className="text-sm font-medium text-gray-700">Target Closing</span>
+                            </div>
+                            <span className={`text-sm font-semibold ${
+                              closingSoon ? 'text-blue-900' : 'text-gray-900'
+                            }`}>
+                              {format(new Date(project.closingDate), 'MMM d, yyyy')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Total Cost Section */}
                       {(project as any).totalCost !== undefined && (
-                        <div className="flex justify-between border-t pt-2 mt-2" data-testid={`text-total-cost-${project.id}`}>
-                          <span className="text-muted-foreground font-medium">Total Cost:</span>
-                          <span className="font-bold text-lg">
-                            {new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency: 'USD',
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            }).format((project as any).totalCost)}
-                          </span>
+                        <div className="border-t border-gray-200 pt-4" data-testid={`text-total-cost-${project.id}`}>
+                          <div className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-5 w-5 text-green-600" />
+                              <span className="text-sm font-medium text-green-800">Total Investment</span>
+                            </div>
+                            <span className="text-lg font-bold text-green-900">
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: 'USD',
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0,
+                              }).format((project as any).totalCost)}
+                            </span>
+                          </div>
                         </div>
                       )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
