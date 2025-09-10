@@ -320,6 +320,17 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     });
   };
 
+  const handleArchiveTask = (taskId: string) => {
+    // Move task to bottom by setting sortOrder to a high value
+    const maxSortOrder = Math.max(...tasks.map(t => t.sortOrder || 0));
+    updateTask.mutate({
+      id: taskId,
+      updates: { 
+        sortOrder: maxSortOrder + 1000
+      }
+    });
+  };
+
   const handlePaymentStatusChange = (taskId: string, newPaymentStatus: string) => {
     updateTask.mutate({
       id: taskId,
@@ -934,17 +945,36 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     <div>
                       <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</label>
                       <div className="mt-1">
-                        {task.completedAt ? (
+                        {task.status === "completed" ? (
+                          <input 
+                            type="date" 
+                            value={task.completedAt ? format(task.completedAt, 'yyyy-MM-dd') : ""} 
+                            onChange={(e) => handleDateFieldChange(task.id, 'completedAt', e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            data-testid={`input-completed-${task.id}`}
+                          />
+                        ) : task.completedAt ? (
                           <input 
                             type="date" 
                             value={format(task.completedAt, 'yyyy-MM-dd')} 
-                            className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
                             readOnly
                           />
                         ) : (
                           <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
                         )}
                       </div>
+                      {task.status === "completed" && task.completedAt && (
+                        <div className="mt-2">
+                          <button
+                            onClick={() => handleArchiveTask(task.id)}
+                            className="px-3 py-1 text-xs bg-gray-100 text-gray-700 border border-gray-200 rounded hover:bg-gray-200 transition-colors"
+                            data-testid={`button-archive-${task.id}`}
+                          >
+                            Archive
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   
