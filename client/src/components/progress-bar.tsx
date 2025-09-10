@@ -90,11 +90,11 @@ export function ProgressLegend() {
   return (
     <div className="flex items-center space-x-8 text-sm" data-testid="progress-legend">
       <div className="flex items-center space-x-3">
-        <div className="w-6 h-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded shadow-sm border border-blue-300" />
+        <div className="w-6 h-3 bg-blue-500 rounded shadow-sm border border-blue-300" />
         <span className="font-medium text-gray-700">Time Elapsed</span>
       </div>
       <div className="flex items-center space-x-3">
-        <div className="w-6 h-3 progress-bar-remaining rounded shadow-sm border border-gray-300" />
+        <div className="w-6 h-3 progress-bar-remaining-stripes rounded shadow-sm border border-gray-300" />
         <span className="font-medium text-gray-700">Time Remaining</span>
       </div>
       <div className="flex items-center space-x-3">
