@@ -458,8 +458,11 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       ...data,
       // Convert completedAt string to Date object as backend expects Date
       completedAt: data.completedAt ? new Date(data.completedAt) : null,
+      // Convert empty date strings to null for database compatibility
+      startDate: data.startDate || null,
+      deadline: data.deadline || null,
       // Set dateOnSite based on requiresOnSiteInspection checkbox
-      dateOnSite: data.requiresOnSiteInspection ? (data.dateOnSite || "TBD") : "",
+      dateOnSite: data.requiresOnSiteInspection ? (data.dateOnSite || "TBD") : null,
       // Ensure startOffsetDays is a number or null
       startOffsetDays: data.startOffsetDays ? Number(data.startOffsetDays) : null,
       // Ensure deadlineDays is a number or null
