@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle } from "lucide-react";
+import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle, FileDown } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
 import { AddTaskModal } from "@/components/add-task-modal";
@@ -753,7 +753,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 mr-4">
                 <Button variant="outline" size="sm" data-testid="button-import-csv">
                   <Upload className="h-4 w-4 mr-2" />
                   Import CSV
@@ -761,6 +761,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 <Button size="sm" onClick={() => setIsAddTaskModalOpen(true)} data-testid="button-add-task">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Task
+                </Button>
+                <Button variant="outline" size="sm" data-testid="button-export-report">
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Export Report
                 </Button>
               </div>
             </div>
