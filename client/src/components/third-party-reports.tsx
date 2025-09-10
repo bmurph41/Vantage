@@ -931,8 +931,24 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   {/* Additional Info */}
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
                     <div className="flex items-center space-x-4">
-                      <span>DD Exp</span>
-                      <span>Closing</span>
+                      <button
+                        className="px-2 py-1 bg-orange-100 text-orange-700 border border-orange-200 rounded hover:bg-orange-200 transition-colors"
+                        onClick={() => project?.ddExpirationDate && handleDateFieldChange(task.id, 'deadline', project.ddExpirationDate)}
+                        disabled={!project?.ddExpirationDate}
+                        data-testid={`button-dd-exp-${task.id}`}
+                        title={project?.ddExpirationDate ? `Set deadline to DD Expiration: ${format(parseISO(project.ddExpirationDate), 'MM/dd/yyyy')}` : 'No DD Expiration date set'}
+                      >
+                        DD Exp
+                      </button>
+                      <button
+                        className="px-2 py-1 bg-green-100 text-green-700 border border-green-200 rounded hover:bg-green-200 transition-colors"
+                        onClick={() => project?.closingDate && handleDateFieldChange(task.id, 'deadline', project.closingDate)}
+                        disabled={!project?.closingDate}
+                        data-testid={`button-closing-${task.id}`}
+                        title={project?.closingDate ? `Set deadline to Closing: ${format(parseISO(project.closingDate), 'MM/dd/yyyy')}` : 'No Closing date set'}
+                      >
+                        Closing
+                      </button>
                     </div>
                     <div className="text-right">
                       <div>Task Owner: {task.assignee || "Unassigned"}</div>
