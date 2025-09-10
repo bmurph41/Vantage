@@ -1033,12 +1033,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-gray-300">
               {filteredTasks.map((task, index) => (
                 <React.Fragment key={task.id}>
                   {/* Main Content Row */}
                   <tr 
-                    className={`hover:bg-accent/50 transition-colors cursor-pointer ${index % 2 === 1 ? 'bg-accent/30' : ''}`}
+                    className={`hover:bg-blue-50 transition-colors cursor-pointer border-b-2 border-gray-200 shadow-sm ${index % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}
                     onClick={() => toggleTaskExpansion(task.id)}
                     data-testid={`row-task-${task.id}`}
                   >
@@ -1237,8 +1237,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   </tr>
                   
                   {/* Date Fields Row */}
-                  <tr className="bg-gray-50 border-t-0">
-                    <td colSpan={7} className="px-4 py-3" data-testid={`dates-row-${task.id}`}>
+                  <tr className="bg-gray-100 border-t-0 border-b border-gray-300">
+                    <td colSpan={7} className="px-4 py-3 border-l-4 border-blue-200" data-testid={`dates-row-${task.id}`}>
                       <div className="grid grid-cols-4 gap-4">
                         {/* Deadline */}
                         <div>
@@ -1317,8 +1317,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   
                   {/* Rep Contact Information Row */}
                   {(task.repName || task.repEmail || task.repPhone) && (
-                    <tr className="bg-gray-100 border-t-0">
-                      <td colSpan={7} className="px-4 py-2 text-xs text-gray-600" data-testid={`rep-contact-${task.id}`}>
+                    <tr className="bg-gray-200 border-t-0 border-b-4 border-gray-400">
+                      <td colSpan={7} className="px-4 py-2 text-xs text-gray-600 border-l-4 border-blue-300" data-testid={`rep-contact-${task.id}`}>
                         <div className="flex items-center space-x-6">
                           {task.repName && (
                             <div className="flex items-center space-x-1">

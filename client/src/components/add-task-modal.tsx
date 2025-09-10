@@ -217,7 +217,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   }));
 
   // Combine built-in templates with custom templates
-  const allTemplates = [...marinaDueDiligenceTaskTemplates, ...customTemplates];
+  const allTemplates = [...marinaDueDiligenceTaskTemplates.map(t => ({...t, defaultAssignee: t.defaultAssignee || undefined})), ...customTemplates];
 
   // Extract unique categories from all templates
   const allCategories = Array.from(new Set([
@@ -640,13 +640,13 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         data-testid="input-deadline"
                         className="flex-1"
                       />
-                      {project?.ddExpirationDate && (
+                      {project?.project?.ddExpirationDate && (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            form.setValue("deadline", project.ddExpirationDate!);
+                            form.setValue("deadline", project.project.ddExpirationDate!);
                           }}
                           className="px-3 text-xs whitespace-nowrap"
                           data-testid="button-dd-expiration"
@@ -657,8 +657,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Set a specific deadline date for this task
-                      {project?.ddExpirationDate && (
-                        <span className="block">DD Expiration: {new Date(project.ddExpirationDate).toLocaleDateString()}</span>
+                      {project?.project?.ddExpirationDate && (
+                        <span className="block">DD Expiration: {new Date(project.project.ddExpirationDate).toLocaleDateString()}</span>
                       )}
                     </p>
                   </div>
