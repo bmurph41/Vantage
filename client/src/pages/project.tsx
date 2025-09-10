@@ -6,6 +6,7 @@ import { ProjectHeader } from "@/components/project-header";
 import { ThirdPartyReports } from "@/components/third-party-reports";
 import { ProjectSetup } from "@/components/project-setup";
 import { TemplatesView } from "@/components/templates-view";
+import { TimelineView } from "@/components/timeline-view";
 import { useProject } from "@/hooks/use-project";
 import { cn } from "@/lib/utils";
 
@@ -95,6 +96,11 @@ export default function ProjectPage() {
               </button>
             ))}
           </nav>
+        </div>
+
+        {/* Timeline - Professional View (Under tabs, above content) */}
+        <div className="mb-8">
+          <TimelineView tasks={tasks} project={project} settings={settings} />
         </div>
 
         {/* Tab Content */}
