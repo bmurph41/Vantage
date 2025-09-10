@@ -315,6 +315,15 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     });
   };
 
+  const handleTimelineToggle = (taskId: string, checked: boolean) => {
+    updateTask.mutate({
+      id: taskId,
+      updates: { 
+        showOnTimeline: checked
+      }
+    });
+  };
+
   const handleArchiveTask = (taskId: string) => {
     // Move task to bottom by setting sortOrder to a high value
     const maxSortOrder = Math.max(...tasks.map(t => t.sortOrder || 0));
@@ -615,19 +624,35 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               <SelectItem value="completed">Completed</SelectItem>
                             </SelectContent>
                           </Select>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`on-site-${task.id}`}
-                              checked={task.requiresOnSiteInspection || false}
-                              onCheckedChange={(checked) => handleOnSiteInspectionChange(task.id, checked as boolean)}
-                              data-testid={`checkbox-on-site-${task.id}`}
-                            />
-                            <label 
-                              htmlFor={`on-site-${task.id}`}
-                              className="text-xs text-gray-600 cursor-pointer"
-                            >
-                              On-Site Inspection
-                            </label>
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`on-site-${task.id}`}
+                                checked={task.requiresOnSiteInspection || false}
+                                onCheckedChange={(checked) => handleOnSiteInspectionChange(task.id, checked as boolean)}
+                                data-testid={`checkbox-on-site-${task.id}`}
+                              />
+                              <label 
+                                htmlFor={`on-site-${task.id}`}
+                                className="text-xs text-gray-600 cursor-pointer"
+                              >
+                                On-Site Inspection
+                              </label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`timeline-${task.id}`}
+                                checked={task.showOnTimeline || false}
+                                onCheckedChange={(checked) => handleTimelineToggle(task.id, checked as boolean)}
+                                data-testid={`checkbox-timeline-${task.id}`}
+                              />
+                              <label 
+                                htmlFor={`timeline-${task.id}`}
+                                className="text-xs text-gray-600 cursor-pointer"
+                              >
+                                Add to Timeline
+                              </label>
+                            </div>
                           </div>
                         </div>
                       )}
