@@ -622,6 +622,32 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     setEditingCostValue('');
   };
 
+  // Get task progress info for timeline
+  const getTaskTimelineProgress = (task: Task) => {
+    const progress = calculateTaskProgress(task);
+    
+    // Calculate task start and end positions
+    const taskStartDate = task.startDate 
+      ? parseISO(task.startDate) 
+      : project?.psaSignedDate 
+        ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
+        : new Date();
+    
+    const taskDeadlineDate = calculateDeadlineDate(task);
+    
+    const startPosition = getMilestonePosition(taskStartDate.toISOString());
+    const endPosition = getMilestonePosition(taskDeadlineDate.toISOString());
+    const width = Math.abs(endPosition - startPosition);
+    
+    return {
+      progress,
+      status: task.status,
+      startPosition,
+      endPosition,
+      width
+    };
+  };
+
   return (
     <div>
       <Card data-testid="third-party-reports">
@@ -793,6 +819,26 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     <p className="text-sm text-muted-foreground">{task.description}</p>
                   )}
                   
+                  {/* Dates Information */}
+                  <div className="text-sm space-y-1">
+                    {task.startDate && (
+                      <div>
+                        <span className="text-muted-foreground">Start Date:</span>
+                        <span className="ml-2">{format(parseISO(task.startDate), 'MM/dd/yyyy')}</span>
+                      </div>
+                    )}
+                    {task.deadline && (
+                      <div>
+                        <span className="text-muted-foreground">Deadline:</span>
+                        <span className="ml-2">{format(parseISO(task.deadline), 'MM/dd/yyyy')}</span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-muted-foreground">Days Remaining:</span>
+                      <span className="ml-2">{calculateDaysRemaining(task)}</span>
+                    </div>
+                  </div>
+                  
                   {task.companyHired && (
                     <div className="text-sm">
                       <span className="text-muted-foreground">Company:</span>
@@ -811,9 +857,173 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 </div>
               ))}
             </div>
+
+            {/* Timeline Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Timeline View</h3>
+                <Button
+                  data-testid="button-toggle-timeline"
+                  variant="outline"
+                  onClick={() => setIsTimelineCollapsed(!isTimelineCollapsed)}
+                >
+                  {isTimelineCollapsed ? "Show Timeline" : "Hide Timeline"}
+                </Button>
+              </div>
+
+              {!isTimelineCollapsed && (
+                <div className="space-y-4 border rounded-lg p-4">
+                  {/* Timeline Controls */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <Select value={granularity} onValueChange={setGranularity}>
+                        <SelectTrigger data-testid="select-granularity" className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={taskDisplay} onValueChange={(value) => setTaskDisplay(value as any)}>
+                        <SelectTrigger data-testid="select-task-display" className="w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Tasks</SelectItem>
+                          <SelectItem value="critical">Critical Path</SelectItem>
+                          <SelectItem value="selected">Selected</SelectItem>
+                          <SelectItem value="none">Hide Tasks</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Timeline Visualization */}
+                  {!isTimelineCollapsed && project && (
+                    <div className="relative overflow-x-auto">
+                      {/* Date Headers */}
+                      <div className="flex items-center h-8 border-b">
+                        {timelineDates.map((date, index) => (
+                          <div
+                            key={index}
+                            className="flex-shrink-0 text-xs text-center border-r px-2"
+                            style={{ width: `${100 / timelineDates.length}%` }}
+                          >
+                            {format(new Date(date), granularity === 'daily' ? 'MM/dd' : 'MM/dd')}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Project Milestones */}
+                      <div className="relative h-12 bg-gray-50 border-b">
+                        {/* PSA Signed */}
+                        {project.psaSignedDate && (
+                          <div
+                            className="absolute top-2 w-2 h-8 bg-green-500 rounded"
+                            style={{
+                              left: `${getMilestonePosition(project.psaSignedDate)}%`
+                            }}
+                            title={`PSA Signed: ${format(parseISO(project.psaSignedDate), 'MM/dd/yyyy')}`}
+                          />
+                        )}
+
+                        {/* DD Expiration */}
+                        {project.ddExpirationDate && (
+                          <div
+                            className="absolute top-2 w-2 h-8 bg-orange-500 rounded"
+                            style={{
+                              left: `${getMilestonePosition(project.ddExpirationDate)}%`
+                            }}
+                            title={`DD Expiration: ${format(parseISO(project.ddExpirationDate), 'MM/dd/yyyy')}`}
+                          />
+                        )}
+
+                        {/* Closing Date */}
+                        {project.closingDate && (
+                          <div
+                            className="absolute top-2 w-2 h-8 bg-blue-500 rounded"
+                            style={{
+                              left: `${getMilestonePosition(project.closingDate)}%`
+                            }}
+                            title={`Closing: ${format(parseISO(project.closingDate), 'MM/dd/yyyy')}`}
+                          />
+                        )}
+                      </div>
+
+                      {/* Task Bars */}
+                      <div className="space-y-1">
+                        {getVisibleTasks().map((task, taskIndex) => {
+                          const progress = getTaskTimelineProgress(task);
+                          return (
+                            <div key={task.id} className="relative h-8 border-b">
+                              <div className="flex items-center h-full">
+                                <div className="w-40 px-2 text-xs truncate">
+                                  {task.title}
+                                </div>
+                                <div className="flex-1 relative">
+                                  {/* Task Progress Bar */}
+                                  <div
+                                    className="absolute top-1 h-6 bg-blue-200 border rounded"
+                                    style={{
+                                      left: `${progress.startPosition}%`,
+                                      width: `${progress.width}%`
+                                    }}
+                                  >
+                                    <div
+                                      className="h-full bg-blue-500 rounded"
+                                      style={{ width: `${progress.progress}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
     </Card>
+
+    {/* Add/Edit Task Modal */}
+    <AddTaskModal
+      isOpen={isAddTaskModalOpen}
+      onClose={() => {
+        setIsAddTaskModalOpen(false);
+        setEditingTask(null);
+      }}
+      projectId={projectId}
+      editingTask={editingTask}
+    />
+
+    {/* Company Details Modal */}
+    {isCompanyModalOpen && selectedCompanyId && (
+      <CompanyDetailsModal
+        isOpen={isCompanyModalOpen}
+        onClose={() => setIsCompanyModalOpen(false)}
+        companyName={selectedCompanyId}
+        initialContactInfo={{}}
+        onContactInfoUpdate={async (info) => {
+          // Handle contact info update
+          console.log('Contact info updated:', info);
+        }}
+      />
+    )}
+
+    {/* Export Modal */}
+    <ExportReportModal
+      isOpen={isExportModalOpen}
+      onClose={() => setIsExportModalOpen(false)}
+      tasks={filteredTasks}
+      project={project}
+    />
     </div>
   );
 }
