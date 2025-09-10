@@ -47,6 +47,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [sortColumn, setSortColumn] = useState<'daysRemaining' | 'cost' | 'deadline' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [companyModalData, setCompanyModalData] = useState<{
     isOpen: boolean;
     companyName: string;
@@ -597,6 +599,29 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     };
   };
 
+  // Handle edit task
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setIsAddTaskModalOpen(true);
+  };
+
+  // Handle edit cost
+  const handleEditCost = (taskId: string, currentCost: string) => {
+    setEditingCostTaskId(taskId);
+    setEditingCostValue(currentCost);
+  };
+
+  // Handle save cost
+  const handleSaveCost = (taskId: string) => {
+    const cost = editingCostValue.trim() === '' ? null : editingCostValue;
+    updateTask.mutate({
+      id: taskId,
+      updates: { cost: cost }
+    });
+    setEditingCostTaskId(null);
+    setEditingCostValue('');
+  };
+
   return (
     <div>
       <Card data-testid="third-party-reports">
@@ -605,13 +630,184 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         </CardHeader>
         
         <CardContent className="p-6">
-          <div>
-            <h3>Tasks ({tasks.length})</h3>
+          <div className="space-y-6">
+            {/* Header Controls */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <Input
+                    data-testid="input-search"
+                    placeholder="Search tasks..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="max-w-sm"
+                  />
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger data-testid="select-status" className="w-48">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="not_started">Not Started</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="blocked">Blocked</SelectItem>
+                      <SelectItem value="to_do">To Do</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                    <SelectTrigger data-testid="select-payment" className="w-48">
+                      <SelectValue placeholder="Filter by payment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Payment Status</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="not_paid">Not Paid</SelectItem>
+                      <SelectItem value="no_cost">No Cost</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button data-testid="button-add-task" onClick={() => setIsAddTaskModalOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Task
+                </Button>
+              </div>
+            </div>
+
+            {/* Task List */}
             <div className="space-y-3">
-              {tasks.map((task) => (
-                <div key={task.id} className="border p-4">
-                  <h4>{task.title}</h4>
-                  <p>{task.status}</p>
+              <h3>Tasks ({filteredTasks.length})</h3>
+              {filteredTasks.map((task) => (
+                <div key={task.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <h4 className="font-medium">{task.title}</h4>
+                      {getStatusBadge(task.status)}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        data-testid={`button-edit-${task.id}`}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditTask(task)}
+                      >
+                        Edit
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            data-testid={`button-delete-${task.id}`}
+                            variant="destructive"
+                            size="sm"
+                          >
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete "{task.title}"? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteTask(task.id)}>
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Status:</span>
+                      <Select 
+                        value={task.status} 
+                        onValueChange={(value) => handleStatusChange(task.id, value as any)}
+                      >
+                        <SelectTrigger data-testid={`select-status-${task.id}`} className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="not_started">Not Started</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="blocked">Blocked</SelectItem>
+                          <SelectItem value="to_do">To Do</SelectItem>
+                          <SelectItem value="scheduled">Scheduled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <span className="text-muted-foreground">Payment:</span>
+                      <Select 
+                        value={task.paymentStatus} 
+                        onValueChange={(value) => handlePaymentStatusChange(task.id, value as any)}
+                      >
+                        <SelectTrigger data-testid={`select-payment-${task.id}`} className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="not_paid">Not Paid</SelectItem>
+                          <SelectItem value="no_cost">No Cost</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <span className="text-muted-foreground">Cost:</span>
+                      {editingCostTaskId === task.id ? (
+                        <Input
+                          data-testid={`input-cost-${task.id}`}
+                          type="number"
+                          value={editingCostValue}
+                          onChange={(e) => setEditingCostValue(e.target.value)}
+                          onBlur={() => handleSaveCost(task.id)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSaveCost(task.id)}
+                          className="mt-1"
+                          autoFocus
+                        />
+                      ) : (
+                        <div 
+                          className="mt-1 p-2 border rounded cursor-pointer hover:bg-muted"
+                          onClick={() => handleEditCost(task.id, task.cost?.toString() || '0')}
+                        >
+                          ${task.cost || 0}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <span className="text-muted-foreground">Progress:</span>
+                      <div className="mt-1 text-sm">{Math.round(calculateTaskProgress(task))}%</div>
+                    </div>
+                  </div>
+                  
+                  {task.description && (
+                    <p className="text-sm text-muted-foreground">{task.description}</p>
+                  )}
+                  
+                  {task.companyHired && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Company:</span>
+                      <button
+                        data-testid={`button-company-${task.id}`}
+                        className="ml-2 text-primary hover:underline"
+                        onClick={() => {
+                          setSelectedCompanyId(task.companyHired!);
+                          setIsCompanyModalOpen(true);
+                        }}
+                      >
+                        {task.companyHired}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
