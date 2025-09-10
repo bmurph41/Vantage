@@ -45,7 +45,7 @@ export default function ProjectPage() {
 
   const tabs = [
     { id: "setup", label: "Project Setup" },
-    { id: "reports", label: "DD Tasks" },
+    { id: "reports", label: "Tasks & Timeline" },
     { id: "templates", label: "Templates" },
   ];
 
