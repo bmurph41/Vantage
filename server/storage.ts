@@ -1,11 +1,11 @@
 import { 
   organizations, users, projects, projectSettings, tasks, taskTemplates, 
-  projectTemplates, auditLogs, timelineNotes,
+  projectTemplates, auditLogs, timelineNotes, projectShares,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type TaskTemplate, type ProjectTemplate, type AuditLog,
-  type TimelineNote, type InsertOrganization, type InsertUser, type InsertProject, 
+  type TimelineNote, type ProjectShare, type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask, type InsertTaskTemplate,
-  type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote
+  type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -38,6 +38,13 @@ export interface IStorage {
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, updates: Partial<InsertTask>): Promise<Task>;
   deleteTask(id: string): Promise<void>;
+
+  // Project Shares
+  getProjectShare(shareToken: string): Promise<ProjectShare | undefined>;
+  getProjectShares(projectId: string): Promise<ProjectShare[]>;
+  createProjectShare(share: InsertProjectShare): Promise<ProjectShare>;
+  updateProjectShare(id: string, updates: Partial<InsertProjectShare>): Promise<ProjectShare>;
+  deleteProjectShare(id: string): Promise<void>;
 
   // Task Templates
   getTaskTemplate(id: string): Promise<TaskTemplate | undefined>;
@@ -246,6 +253,35 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(auditLogs)
       .where(eq(auditLogs.projectId, projectId))
       .orderBy(desc(auditLogs.createdAt));
+  }
+
+  async getProjectShare(shareToken: string): Promise<ProjectShare | undefined> {
+    const [share] = await db.select().from(projectShares)
+      .where(and(eq(projectShares.shareToken, shareToken), eq(projectShares.isActive, true)));
+    return share || undefined;
+  }
+
+  async getProjectShares(projectId: string): Promise<ProjectShare[]> {
+    return db.select().from(projectShares)
+      .where(eq(projectShares.projectId, projectId))
+      .orderBy(desc(projectShares.createdAt));
+  }
+
+  async createProjectShare(share: InsertProjectShare): Promise<ProjectShare> {
+    const [created] = await db.insert(projectShares).values(share).returning();
+    return created;
+  }
+
+  async updateProjectShare(id: string, updates: Partial<InsertProjectShare>): Promise<ProjectShare> {
+    const [updated] = await db.update(projectShares)
+      .set(updates)
+      .where(eq(projectShares.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteProjectShare(id: string): Promise<void> {
+    await db.delete(projectShares).where(eq(projectShares.id, id));
   }
 }
 
