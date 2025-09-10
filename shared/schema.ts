@@ -122,6 +122,7 @@ export const tasks = pgTable("tasks", {
   cost: text("cost"),
   notes: text("notes"),
   showOnTimeline: boolean("show_on_timeline").notNull().default(false),
+  sortOrder: integer("sort_order"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
