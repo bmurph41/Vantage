@@ -13,6 +13,8 @@ export const startStrategyEnum = pgEnum("start_strategy", ["fixed", "offset"]);
 export const priorityEnum = pgEnum("priority", ["low", "med", "high"]);
 export const statusEnum = pgEnum("status", ["not_started", "in_progress", "blocked", "completed", "to_do", "scheduled"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["not_paid", "paid", "no_cost"]);
+export const shareAccessEnum = pgEnum("share_access", ["view", "comment"]);
+export const shareTypeEnum = pgEnum("share_type", ["public", "invite", "organization"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -145,6 +147,21 @@ export const timelineNotes = pgTable("timeline_notes", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Project Shares
+export const projectShares = pgTable("project_shares", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  shareType: shareTypeEnum("share_type").notNull().default("public"),
+  accessLevel: shareAccessEnum("access_level").notNull().default("view"),
+  shareToken: varchar("share_token").notNull().unique(), // Unique token for the share link
+  email: text("email"), // Optional: specific email for invite type
+  expiresAt: timestamp("expires_at"), // Optional: expiration date
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastAccessedAt: timestamp("last_accessed_at"),
+});
+
 // Audit Logs
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -185,6 +202,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   settings: one(projectSettings),
   tasks: many(tasks),
   auditLogs: many(auditLogs),
+  shares: many(projectShares),
 }));
 
 export const projectSettingsRelations = relations(projectSettings, ({ one }) => ({
@@ -198,6 +216,17 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   project: one(projects, {
     fields: [tasks.projectId],
     references: [projects.id],
+  }),
+}));
+
+export const projectSharesRelations = relations(projectShares, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectShares.projectId],
+    references: [projects.id],
+  }),
+  creator: one(users, {
+    fields: [projectShares.createdBy],
+    references: [users.id],
   }),
 }));
 
@@ -250,6 +279,11 @@ export const insertTimelineNoteSchema = createInsertSchema(timelineNotes).omit({
   updatedAt: true,
 });
 
+export const insertProjectShareSchema = createInsertSchema(projectShares).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   id: true,
   createdAt: true,
@@ -279,6 +313,9 @@ export type InsertTask = z.infer<typeof insertTaskSchema>;
 
 export type TimelineNote = typeof timelineNotes.$inferSelect;
 export type InsertTimelineNote = z.infer<typeof insertTimelineNoteSchema>;
+
+export type ProjectShare = typeof projectShares.$inferSelect;
+export type InsertProjectShare = z.infer<typeof insertProjectShareSchema>;
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
