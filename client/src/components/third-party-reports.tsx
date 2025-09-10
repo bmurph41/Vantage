@@ -6,22 +6,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Search, Plus, Upload, Trash2 } from "lucide-react";
-import type { Task, Project } from "@shared/schema";
+import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
 import { AddTaskModal } from "@/components/add-task-modal";
-import { differenceInDays, parseISO } from "date-fns";
+import { differenceInDays, parseISO, format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, isToday, isPast, isFuture } from "date-fns";
+import { ProgressBar, ProgressLegend } from "./progress-bar";
+import { TIMELINE_GRANULARITIES } from "@/types/dd";
 
 interface ThirdPartyReportsProps {
   tasks: Task[];
   projectId: string;
   project?: Project;
+  settings?: ProjectSettings | null;
 }
 
-export function ThirdPartyReports({ tasks, projectId, project }: ThirdPartyReportsProps) {
+export function ThirdPartyReports({ tasks, projectId, project, settings }: ThirdPartyReportsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [granularity, setGranularity] = useState('weekly');
+  const [showCriticalPath, setShowCriticalPath] = useState(false);
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
@@ -105,13 +110,164 @@ export function ThirdPartyReports({ tasks, projectId, project }: ThirdPartyRepor
     return Math.max(0, daysRemaining);
   };
 
+  // Timeline logic
+  const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];
+
+  // Calculate timeline bounds
+  const projectStart = project?.psaSignedDate ? parseISO(project.psaSignedDate) : new Date();
+  const projectEnd = project?.closingDate ? parseISO(project.closingDate) : addDays(projectStart, 120);
+
+  // Generate timeline header dates
+  const generateTimelineDates = () => {
+    switch (granularity) {
+      case 'daily':
+        return eachDayOfInterval({ start: projectStart, end: projectEnd });
+      case 'weekly':
+      case 'biweekly':
+        const weeklyStart = startOfWeek(projectStart);
+        const weeklyEnd = projectEnd;
+        return eachWeekOfInterval({ start: weeklyStart, end: weeklyEnd });
+      case 'monthly':
+        const monthlyStart = startOfMonth(projectStart);
+        const monthlyEnd = projectEnd;
+        return eachMonthOfInterval({ start: monthlyStart, end: monthlyEnd });
+      default:
+        const defaultStart = startOfWeek(projectStart);
+        const defaultEnd = projectEnd;
+        return eachWeekOfInterval({ start: defaultStart, end: defaultEnd });
+    }
+  };
+
+  const timelineDates = generateTimelineDates();
+
+  // Get milestone positions as percentages
+  const getMilestonePosition = (date: string) => {
+    const milestoneDate = parseISO(date);
+    const totalDuration = projectEnd.getTime() - projectStart.getTime();
+    const elapsed = milestoneDate.getTime() - projectStart.getTime();
+    return Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+  };
+
   return (
     <Card data-testid="third-party-reports">
       <CardHeader className="bg-primary text-primary-foreground">
-        <CardTitle>Third-Party Reports</CardTitle>
+        <CardTitle>DD Timeline</CardTitle>
       </CardHeader>
       
       <CardContent className="p-6">
+        {/* DD Timeline Section */}
+        <div className="mb-8 space-y-6">
+          {/* Timeline Controls */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <h3 className="text-lg font-semibold text-gray-900">Project Timeline</h3>
+              <div className="bg-gray-100 rounded-lg p-1">
+                <Select value={granularity} onValueChange={setGranularity}>
+                  <SelectTrigger className="w-32 bg-transparent border-0" data-testid="select-granularity">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIMELINE_GRANULARITIES.map(g => (
+                      <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Button
+                variant={showCriticalPath ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowCriticalPath(!showCriticalPath)}
+                className={showCriticalPath ? "bg-amber-500 hover:bg-amber-600 text-white" : ""}
+                data-testid="button-critical-path"
+              >
+                Critical Path
+              </Button>
+              <div className="text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded-lg border">
+                {tasks.filter(t => t.showOnTimeline).length} Timeline Tasks
+              </div>
+            </div>
+          </div>
+
+          {/* Timeline Track */}
+          {project && (
+            <div className="bg-gray-50 rounded-lg p-6 border">
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Key Milestones</h4>
+                
+                {/* Date Headers */}
+                <div className="flex justify-between mb-2 text-xs text-gray-500">
+                  {timelineDates.slice(0, 8).map((date, index) => (
+                    <div key={index}>
+                      {format(date, granularity === 'monthly' ? 'MMM yyyy' : 'MMM d')}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Timeline Track */}
+                <div className="relative h-12 bg-white rounded border shadow-sm overflow-hidden">
+                  {/* Grid Lines */}
+                  <div className="absolute inset-0 flex">
+                    {timelineDates.slice(0, 8).map((date, index) => (
+                      <div key={index} className="flex-1 border-r border-gray-100 last:border-r-0"></div>
+                    ))}
+                  </div>
+
+                  {/* Milestone markers */}
+                  <div className="absolute inset-0 flex items-center">
+                    {/* PSA Signed */}
+                    {project.psaSignedDate && (
+                      <div 
+                        className="absolute flex flex-col items-center transform -translate-x-1/2"
+                        style={{ left: `${getMilestonePosition(project.psaSignedDate)}%` }}
+                      >
+                        <div className="w-3 h-3 bg-blue-600 rounded-full border-2 border-white shadow-md"></div>
+                        <div className="absolute -bottom-8 bg-white shadow-sm rounded px-2 py-1 border border-gray-200 min-w-max">
+                          <div className="text-xs font-semibold text-blue-600">PSA Signed</div>
+                          <div className="text-xs text-gray-500">{format(parseISO(project.psaSignedDate), 'MMM d')}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* DD Expiration */}
+                    {project.ddExpirationDate && (
+                      <div 
+                        className="absolute flex flex-col items-center transform -translate-x-1/2"
+                        style={{ left: `${getMilestonePosition(project.ddExpirationDate)}%` }}
+                      >
+                        <div className="w-3 h-3 bg-amber-600 rounded-full border-2 border-white shadow-md"></div>
+                        <div className="absolute -bottom-8 bg-white shadow-sm rounded px-2 py-1 border border-gray-200 min-w-max">
+                          <div className="text-xs font-semibold text-amber-600">DD Expiration</div>
+                          <div className="text-xs text-gray-500">{format(parseISO(project.ddExpirationDate), 'MMM d')}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Closing */}
+                    {project.closingDate && (
+                      <div 
+                        className="absolute flex flex-col items-center transform -translate-x-1/2"
+                        style={{ left: `${getMilestonePosition(project.closingDate)}%` }}
+                      >
+                        <div className="w-3 h-3 bg-green-600 rounded-full border-2 border-white shadow-md"></div>
+                        <div className="absolute -bottom-8 bg-white shadow-sm rounded px-2 py-1 border border-gray-200 min-w-max">
+                          <div className="text-xs font-semibold text-green-600">Closing</div>
+                          <div className="text-xs text-gray-500">{format(parseISO(project.closingDate), 'MMM d')}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Progress Legend */}
+              <div className="mt-8">
+                <ProgressLegend />
+              </div>
+            </div>
+          )}
+        </div>
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="relative">

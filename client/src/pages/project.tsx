@@ -102,7 +102,7 @@ export default function ProjectPage() {
         {/* Tab Content */}
         <div className="tab-content">
           {activeTab === "reports" && (
-            <ThirdPartyReports tasks={tasks} projectId={project.id} project={project} />
+            <ThirdPartyReports tasks={tasks} projectId={project.id} project={project} settings={settings} />
           )}
           {activeTab === "timeline" && (
             <TimelineView tasks={tasks} project={project} settings={settings} />
