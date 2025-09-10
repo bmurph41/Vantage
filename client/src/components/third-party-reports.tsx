@@ -1243,19 +1243,57 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         {/* Deadline */}
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">Deadline</label>
-                          <Input
-                            type="date"
-                            value={task.deadline || ''}
-                            onChange={(e) => {
-                              const newDeadline = e.target.value ? e.target.value : null;
-                              updateTask.mutate({
-                                id: task.id,
-                                updates: { deadline: newDeadline }
-                              });
-                            }}
-                            className="w-full text-xs h-8"
-                            data-testid={`input-deadline-${task.id}`}
-                          />
+                          <div className="space-y-1">
+                            <Input
+                              type="date"
+                              value={task.deadline || ''}
+                              onChange={(e) => {
+                                const newDeadline = e.target.value ? e.target.value : null;
+                                updateTask.mutate({
+                                  id: task.id,
+                                  updates: { deadline: newDeadline }
+                                });
+                              }}
+                              className="w-full text-xs h-8"
+                              data-testid={`input-deadline-${task.id}`}
+                            />
+                            <div className="flex gap-1">
+                              {project?.ddExpirationDate && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    updateTask.mutate({
+                                      id: task.id,
+                                      updates: { deadline: project.ddExpirationDate! }
+                                    });
+                                  }}
+                                  className="px-1 py-0 text-[10px] h-5 whitespace-nowrap"
+                                  data-testid={`button-dd-expiration-${task.id}`}
+                                >
+                                  DD Exp
+                                </Button>
+                              )}
+                              {project?.closingDate && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    updateTask.mutate({
+                                      id: task.id,
+                                      updates: { deadline: project.closingDate! }
+                                    });
+                                  }}
+                                  className="px-1 py-0 text-[10px] h-5 whitespace-nowrap"
+                                  data-testid={`button-closing-date-${task.id}`}
+                                >
+                                  Closing
+                                </Button>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         
                         {/* Ordered Date */}
