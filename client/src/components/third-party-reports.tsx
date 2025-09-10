@@ -1333,7 +1333,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                                 ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
                                 : ""
                             }`}
-                            title={task.status !== "scheduled" ? "Only available when task status is 'Scheduled'" : ""}
+                            title={task.status !== "scheduled" ? "Task has not been Scheduled" : ""}
                             data-testid={`input-ordered-date-${task.id}`}
                           />
                         </div>
