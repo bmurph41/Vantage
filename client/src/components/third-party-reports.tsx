@@ -895,35 +895,23 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             <tbody className="divide-y divide-border">
               {filteredTasks.map((task, index) => (
                 <React.Fragment key={task.id}>
+                  {/* Main Content Row */}
                   <tr 
                     className={`hover:bg-accent/50 transition-colors cursor-pointer ${index % 2 === 1 ? 'bg-accent/30' : ''}`}
                     onClick={() => toggleTaskExpansion(task.id)}
                     data-testid={`row-task-${task.id}`}
                   >
-                    <td className="px-4 py-4">
-                      <div className="space-y-2">
-                        {/* Task Title and Description */}
-                        <div>
-                          <div className="font-medium text-sm leading-tight" title={task.title} data-testid={`text-task-title-${task.id}`}>
-                            {task.title}
-                          </div>
-                          {task.description && (
-                            <div className="text-xs text-muted-foreground mt-1 line-clamp-2" title={task.description} data-testid={`text-task-description-${task.id}`}>
-                              {task.description}
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Deadline Date */}
-                        <div>
-                          <label className="text-xs font-medium text-gray-700 block mb-1">Deadline</label>
-                          <div className="w-full text-xs h-7 px-3 py-2 border border-input bg-background rounded-md flex items-center" data-testid={`text-deadline-${task.id}`}>
-                            {format(calculateDeadlineDate(task), 'MMM d, yyyy')}
-                          </div>
-                        </div>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-sm leading-tight" title={task.title} data-testid={`text-task-title-${task.id}`}>
+                        {task.title}
                       </div>
+                      {task.description && (
+                        <div className="text-xs text-muted-foreground mt-1 line-clamp-2" title={task.description} data-testid={`text-task-description-${task.id}`}>
+                          {task.description}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-3">
                       {task.assignee ? (
                         <div className="flex items-center space-x-2" data-testid={`assignee-${task.id}`}>
                           <div className={`w-6 h-6 ${getUserColor(task.assignee)} rounded-full flex items-center justify-center text-xs text-white flex-shrink-0`}>
@@ -935,66 +923,39 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         <span className="text-muted-foreground text-sm">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-4" data-testid={`text-company-${task.id}`}>
-                      <div className="space-y-2">
-                        {/* Company Hired */}
+                    <td className="px-4 py-3" data-testid={`text-company-${task.id}`}>
+                      {task.companyHired ? (
                         <div>
-                          {task.companyHired ? (
-                            <div>
-                              <div className="font-medium text-sm leading-tight" title={task.companyHired}>{task.companyHired}</div>
-                              {(task.repName || task.repEmail || task.repPhone) && (
-                                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                                  {task.repName && <div className="truncate" title={`Rep: ${task.repName}`}>Rep: {task.repName}</div>}
-                                  {task.repEmail && <div className="truncate" title={task.repEmail}>📧 {task.repEmail}</div>}
-                                  {task.repPhone && <div className="truncate" title={task.repPhone}>📞 {task.repPhone}</div>}
-                                </div>
-                              )}
+                          <div className="font-medium text-sm leading-tight" title={task.companyHired}>{task.companyHired}</div>
+                          {(task.repName || task.repEmail || task.repPhone) && (
+                            <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                              {task.repName && <div className="truncate" title={`Rep: ${task.repName}`}>Rep: {task.repName}</div>}
+                              {task.repEmail && <div className="truncate" title={task.repEmail}>📧 {task.repEmail}</div>}
+                              {task.repPhone && <div className="truncate" title={task.repPhone}>📞 {task.repPhone}</div>}
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </div>
-                        
-                        {/* Ordered Date */}
-                        <div>
-                          <label className="text-xs font-medium text-gray-700 block mb-1">Ordered Date</label>
-                          <Input
-                            type="date"
-                            value={task.orderedAt ? new Date(task.orderedAt).toISOString().slice(0, 10) : ''}
-                            onChange={(e) => {
-                              const newOrderedAt = e.target.value ? e.target.value : null;
-                              updateTask.mutate({
-                                id: task.id,
-                                updates: { orderedAt: newOrderedAt }
-                              });
-                            }}
-                            className="w-full text-xs h-7"
-                            data-testid={`input-ordered-date-${task.id}`}
-                          />
-                        </div>
-                      </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="space-y-2">
-                        {/* Status */}
-                        <div>
-                          <Select
-                            value={task.status}
-                            onValueChange={(value) => handleStatusChange(task.id, value)}
-                          >
-                            <SelectTrigger className="w-full h-8" data-testid={`select-status-${task.id}`}>
-                              <SelectValue>
-                                {getStatusBadge(task.status)}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="to_do">To Do</SelectItem>
-                              <SelectItem value="scheduled">Scheduled</SelectItem>
-                              <SelectItem value="in_progress">In Progress</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      <Select
+                        value={task.status}
+                        onValueChange={(value) => handleStatusChange(task.id, value)}
+                      >
+                        <SelectTrigger className="w-full h-8" data-testid={`select-status-${task.id}`}>
+                          <SelectValue>
+                            {getStatusBadge(task.status)}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="to_do">To Do</SelectItem>
+                          <SelectItem value="scheduled">Scheduled</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
                         
                         {/* Scheduled Date */}
                         <div>
