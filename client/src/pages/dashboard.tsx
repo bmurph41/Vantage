@@ -190,17 +190,17 @@ export default function Dashboard() {
               const closingSoon = project.closingDate && differenceInDays(new Date(project.closingDate), today) <= 14;
               
               let statusBadge = null;
-              let statusColor = "bg-gray-25 border-gray-150";
+              let statusColor = "bg-gray-50/30 border-gray-200";
               
               if (ddExpired) {
                 statusBadge = { text: "DD Expired", variant: "outline" as const, icon: AlertTriangle };
-                statusColor = "bg-red-25 border-red-150";
+                statusColor = "bg-red-50/30 border-red-200";
               } else if (ddExpiringSoon) {
                 statusBadge = { text: "DD Expiring Soon", variant: "outline" as const, icon: Clock };
-                statusColor = "bg-amber-25 border-amber-150";
+                statusColor = "bg-amber-50/30 border-amber-200";
               } else if (closingSoon) {
                 statusBadge = { text: "Closing Soon", variant: "outline" as const, icon: CheckCircle };
-                statusColor = "bg-slate-25 border-slate-150";
+                statusColor = "bg-slate-50/30 border-slate-200";
               }
               
               return (
@@ -235,7 +235,7 @@ export default function Dashboard() {
                       {/* Key Dates Section */}
                       <div className="space-y-3">
                         {project.psaSignedDate && (
-                          <div className="flex items-center justify-between py-2 px-3 bg-gray-25 rounded-lg" data-testid={`text-psa-date-${project.id}`}>
+                          <div className="flex items-center justify-between py-2 px-3 bg-slate-50/50 rounded-lg" data-testid={`text-psa-date-${project.id}`}>
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-gray-500" />
                               <span className="text-sm font-medium text-gray-700">PSA Signed</span>
@@ -248,7 +248,7 @@ export default function Dashboard() {
                         
                         {project.ddExpirationDate && (
                           <div className={`flex items-center justify-between py-2 px-3 rounded-lg ${
-                            ddExpired ? 'bg-red-25' : ddExpiringSoon ? 'bg-amber-25' : 'bg-gray-25'
+                            ddExpired ? 'bg-red-50/50' : ddExpiringSoon ? 'bg-amber-50/50' : 'bg-slate-50/50'
                           }`} data-testid={`text-dd-expiration-${project.id}`}>
                             <div className="flex items-center gap-2">
                               <Clock className={`h-4 w-4 ${
@@ -266,7 +266,7 @@ export default function Dashboard() {
                         
                         {project.closingDate && (
                           <div className={`flex items-center justify-between py-2 px-3 rounded-lg ${
-                            closingSoon ? 'bg-slate-25' : 'bg-gray-25'
+                            closingSoon ? 'bg-slate-50/50' : 'bg-slate-50/50'
                           }`} data-testid={`text-closing-date-${project.id}`}>
                             <div className="flex items-center gap-2">
                               <CheckCircle className={`h-4 w-4 ${
@@ -286,7 +286,7 @@ export default function Dashboard() {
                       {/* Total Cost Section */}
                       {(project as any).totalCost !== undefined && (
                         <div className="border-t border-gray-200 pt-4" data-testid={`text-total-cost-${project.id}`}>
-                          <div className="flex items-center justify-between py-3 px-4 bg-gray-25 rounded-lg border border-gray-200">
+                          <div className="flex items-center justify-between py-3 px-4 bg-slate-50/40 rounded-lg border border-gray-200">
                             <div className="flex items-center gap-2">
                               <DollarSign className="h-5 w-5 text-gray-600" />
                               <span className="text-sm font-medium text-gray-700">Total Investment</span>
