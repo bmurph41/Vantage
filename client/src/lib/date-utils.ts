@@ -302,10 +302,78 @@ export function getTimelineTicks(granularity: string, opts?: {
 }
 
 /**
- * Legacy function for backward compatibility
+ * Get fixed project timeline bounds from PSA Signed Date to Closing Date
  */
 export function getProjectBounds(project: any): { start: Date; end: Date } {
   const start = startOfDay(project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date());
   const end = startOfDay(project.closingDate ? parseISO(project.closingDate) : addDays(start, 90));
   return { start, end };
+}
+
+/**
+ * Generate timeline ticks between fixed project bounds based on granularity
+ */
+export function getProjectTimelineTicks(project: any, granularity: string): Date[] {
+  const { start, end } = getProjectBounds(project);
+  const ticks: Date[] = [];
+  
+  switch (granularity) {
+    case 'daily':
+      // Show every 5 days between project bounds
+      let dailyCurrent = new Date(start);
+      while (dailyCurrent <= end) {
+        ticks.push(new Date(dailyCurrent));
+        dailyCurrent = addDays(dailyCurrent, 5);
+      }
+      break;
+    
+    case 'weekly':
+      // Show weekly ticks (every Monday) between project bounds
+      let weeklyCurrent = startOfWeek(start, { weekStartsOn: 1 });
+      if (weeklyCurrent < start) {
+        weeklyCurrent = addWeeks(weeklyCurrent, 1);
+      }
+      while (weeklyCurrent <= end) {
+        ticks.push(new Date(weeklyCurrent));
+        weeklyCurrent = addWeeks(weeklyCurrent, 1);
+      }
+      break;
+    
+    case 'biweekly':
+      // Show biweekly ticks between project bounds
+      let biweeklyCurrent = startOfWeek(start, { weekStartsOn: 1 });
+      if (biweeklyCurrent < start) {
+        biweeklyCurrent = addWeeks(biweeklyCurrent, 2);
+      }
+      while (biweeklyCurrent <= end) {
+        ticks.push(new Date(biweeklyCurrent));
+        biweeklyCurrent = addWeeks(biweeklyCurrent, 2);
+      }
+      break;
+    
+    case 'monthly':
+      // Show monthly ticks (first of each month) between project bounds
+      let monthlyCurrent = startOfMonth(start);
+      if (monthlyCurrent < start) {
+        monthlyCurrent = addMonths(monthlyCurrent, 1);
+      }
+      while (monthlyCurrent <= end) {
+        ticks.push(new Date(monthlyCurrent));
+        monthlyCurrent = addMonths(monthlyCurrent, 1);
+      }
+      break;
+    
+    default:
+      // Default to weekly
+      let defaultCurrent = startOfWeek(start, { weekStartsOn: 1 });
+      if (defaultCurrent < start) {
+        defaultCurrent = addWeeks(defaultCurrent, 1);
+      }
+      while (defaultCurrent <= end) {
+        ticks.push(new Date(defaultCurrent));
+        defaultCurrent = addWeeks(defaultCurrent, 1);
+      }
+  }
+  
+  return ticks;
 }

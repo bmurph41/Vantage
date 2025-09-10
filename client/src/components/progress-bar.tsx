@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { effectiveStart, effectiveDue, daysBetween, tzNow, getTimelineWindow, percentOfRange, clampDate } from "@/lib/date-utils";
+import { effectiveStart, effectiveDue, daysBetween, tzNow, getProjectBounds, percentOfRange, clampDate } from "@/lib/date-utils";
 import { startOfDay, isAfter, isBefore, parseISO, addDays } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 
@@ -8,17 +8,13 @@ interface ProgressBarProps {
   project: Project;
   settings?: ProjectSettings | null;
   className?: string;
-  granularity?: string; // Add granularity for timeline window calculation
 }
 
-export function ProgressBar({ task, project, settings, className, granularity = 'weekly' }: ProgressBarProps) {
+export function ProgressBar({ task, project, settings, className }: ProgressBarProps) {
   const today = startOfDay(tzNow('America/New_York'));
   
-  // Calculate project start date (PSA Signed date) as minimum timeline bound
-  const projectStartDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
-  
-  // Get dynamic timeline window bounds with PSA constraint
-  const { start: timelineStart, end: timelineEnd } = getTimelineWindow(granularity, { minStart: projectStartDate });
+  // Get fixed project timeline bounds (PSA Signed Date to Closing Date)
+  const { start: timelineStart, end: timelineEnd } = getProjectBounds(project);
   
   // Calculate individual task start date
   const taskStart = startOfDay(task.startDate 

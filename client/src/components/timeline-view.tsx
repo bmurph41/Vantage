@@ -6,7 +6,7 @@ import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
-import { tzNow, getTimelineWindow, getTimelineTicks, percentOfRange, clampDate } from "@/lib/date-utils";
+import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate } from "@/lib/date-utils";
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -199,22 +199,17 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
   const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];
 
-  // Calculate project start date (PSA Signed date) as minimum timeline bound
-  const projectStartDate = useMemo(() => {
-    return startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
-  }, [project.psaSignedDate, project.createdAt]);
-
-  // Get dynamic sliding window timeline bounds with PSA constraint
+  // Get fixed project timeline bounds (PSA Signed Date to Closing Date)
   const { start: timelineStart, end: timelineEnd } = useMemo(() => 
-    getTimelineWindow(granularity, { minStart: projectStartDate }), 
-    [granularity, projectStartDate]
+    getProjectBounds(project), 
+    [project.psaSignedDate, project.closingDate, project.createdAt]
   );
   const today = startOfDay(tzNow('America/New_York'));
 
-  // Generate visible ticks based on granularity with proper spacing and PSA constraint
+  // Generate visible ticks between project bounds based on granularity
   const visibleTicks = useMemo(() => 
-    getTimelineTicks(granularity, { minStart: projectStartDate }), 
-    [granularity, projectStartDate]
+    getProjectTimelineTicks(project, granularity), 
+    [project, granularity]
   );
 
   // Get milestone position along timeline (0-100%)
@@ -323,7 +318,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             {/* PSA Start Badge - Show when today is before timeline start */}
             {today < timelineStart && (
               <div className="absolute left-0 top-0 bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-br-md border border-green-200 z-40">
-                Starts: {format(projectStartDate, 'M/d/yy')}
+                PSA Signed: {format(timelineStart, 'M/d/yy')}
               </div>
             )}
           </div>
@@ -414,7 +409,6 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                       task={task} 
                       project={project} 
                       settings={settings}
-                      granularity={granularity}
                       className="shadow-sm"
                     />
                   </div>
