@@ -46,13 +46,9 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
 
   return (
     <div className={cn("h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner", className)} data-testid="progress-bar">
-      {/* Task bar positioned relative to timeline */}
+      {/* Task bar spans full width from start date to end date */}
       <div 
-        className="absolute h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200"
-        style={{ 
-          left: `${leftPosition}%`, 
-          width: `${barWidth}%` 
-        }}
+        className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200"
       >
         {isCompleted ? (
           <div className="h-full bg-green-600 progress-bar-completed relative flex items-center justify-center" data-testid="progress-completed">
@@ -102,9 +98,19 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
           data-testid="start-marker"
         />
         
+        {/* End marker */}
+        <div 
+          className="absolute -top-1 w-1 h-10 rounded-full shadow-sm"
+          style={{ 
+            right: "0px",
+            backgroundColor: isCompleted ? "#16a34a" : isOverdue ? "#dc2626" : "hsl(221 83% 35%)"
+          }}
+          data-testid="end-marker"
+        />
+        
         {/* Duration label on hover */}
         <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-          {taskDurationDays} days
+          {taskDurationDays} days ({start.toLocaleDateString()} - {due.toLocaleDateString()})
         </div>
       </div>
     </div>
