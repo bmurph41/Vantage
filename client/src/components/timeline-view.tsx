@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
-import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
+import { tzNow } from "@/lib/date-utils";
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -314,15 +315,16 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 </h3>
                 <div className="text-xs text-gray-600">
                   {(() => {
-                    const startDate = parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString());
-                    const closingDate = parseISO(project.closingDate);
-                    const today = new Date();
+                    const timezone = 'America/New_York';
+                    const today = startOfDay(tzNow(timezone));
+                    const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
+                    const closingDate = startOfDay(parseISO(project.closingDate));
                     
                     if (today >= closingDate) return '100% - Closing reached';
                     
-                    const totalDuration = differenceInDays(closingDate, startDate);
-                    const elapsed = differenceInDays(today, startDate);
-                    const percentage = Math.max(0, Math.min(100, Math.round((elapsed / totalDuration) * 100)));
+                    const totalDays = Math.max(1, differenceInCalendarDays(closingDate, startDate));
+                    const elapsedDays = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today < closingDate ? today : closingDate, startDate)));
+                    const percentage = Math.round((elapsedDays / totalDays) * 100);
                     
                     return `${percentage}% elapsed`;
                   })()}
@@ -334,15 +336,16 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                   className="absolute top-0 left-0 h-full bg-green-500 rounded-full transition-all duration-1000 ease-out"
                   style={{
                     width: `${(() => {
-                      const startDate = parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString());
-                      const closingDate = parseISO(project.closingDate);
-                      const today = new Date();
+                      const timezone = 'America/New_York';
+                      const today = startOfDay(tzNow(timezone));
+                      const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
+                      const closingDate = startOfDay(parseISO(project.closingDate));
                       
                       if (today >= closingDate) return 100;
                       
-                      const totalDuration = differenceInDays(closingDate, startDate);
-                      const elapsed = differenceInDays(today, startDate);
-                      return Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+                      const totalDays = Math.max(1, differenceInCalendarDays(closingDate, startDate));
+                      const elapsedDays = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today < closingDate ? today : closingDate, startDate)));
+                      return Math.max(0, (elapsedDays / totalDays) * 100);
                     })()}%`
                   }}
                 />

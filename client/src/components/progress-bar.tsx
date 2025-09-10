@@ -11,14 +11,14 @@ interface ProgressBarProps {
 }
 
 export function ProgressBar({ task, project, settings, className }: ProgressBarProps) {
-  const today = startOfDay(tzNow(project.tz));
+  const today = startOfDay(tzNow('America/New_York'));
   
   // Calculate individual task start date
-  const start = task.startDate 
+  const start = startOfDay(task.startDate 
     ? parseISO(task.startDate) 
     : project.psaSignedDate 
       ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
-      : today;
+      : today);
   
   // Calculate individual task deadline using same logic as reports
   const calculateTaskDeadline = (task: Task): Date => {
@@ -45,7 +45,7 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
     }
   };
   
-  const due = calculateTaskDeadline(task);
+  const due = startOfDay(calculateTaskDeadline(task));
   
   // Calculate project timeline bounds
   const projectStart = project.psaSignedDate ? startOfDay(parseISO(project.psaSignedDate)) : start;
@@ -60,8 +60,9 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   const leftPosition = (daysFromProjectStart / totalProjectDays) * 100;
   const barWidth = (taskDurationDays / totalProjectDays) * 100;
   
-  // Task progress within its own duration
-  const elapsed = Math.max(0, Math.min(taskDurationDays, daysBetween(start, today, settings?.useBusinessDays, settings?.holidayCalendar)));
+  // Task progress within its own duration - only up to today, never beyond due date
+  const effectiveToday = today < due ? today : due;
+  const elapsed = Math.max(0, Math.min(taskDurationDays, daysBetween(start, effectiveToday, settings?.useBusinessDays, settings?.holidayCalendar)));
   const remaining = Math.max(0, taskDurationDays - elapsed);
   const percentElapsed = Math.round((elapsed / taskDurationDays) * 100);
   
