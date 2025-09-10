@@ -11,7 +11,8 @@ export const deadlineTypeEnum = pgEnum("deadline_type", ["dd_expiration", "days_
 export const holidayCalendarEnum = pgEnum("holiday_calendar", ["us_federal", "none"]);
 export const startStrategyEnum = pgEnum("start_strategy", ["fixed", "offset"]);
 export const priorityEnum = pgEnum("priority", ["low", "med", "high"]);
-export const statusEnum = pgEnum("status", ["not_started", "in_progress", "blocked", "completed"]);
+export const statusEnum = pgEnum("status", ["not_started", "in_progress", "blocked", "completed", "to_do", "scheduled"]);
+export const paymentStatusEnum = pgEnum("payment_status", ["not_paid", "paid"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -113,6 +114,7 @@ export const tasks = pgTable("tasks", {
   repPhone: text("rep_phone"),
   priority: priorityEnum("priority").notNull().default("med"),
   status: statusEnum("status").notNull().default("not_started"),
+  paymentStatus: paymentStatusEnum("payment_status").notNull().default("not_paid"),
   completedAt: timestamp("completed_at"),
   dependencies: varchar("dependencies").array().default(sql`'{}'`),
   baselineStart: date("baseline_start"),
