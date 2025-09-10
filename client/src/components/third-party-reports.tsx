@@ -468,7 +468,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   {project.psaSignedDate && (
                     <div 
                       className="absolute transform -translate-x-1/2"
-                      style={{ left: '0%', top: '0px' }}
+                      style={{ left: `${getMilestonePosition(project.psaSignedDate)}%`, top: '0px' }}
                     >
                       <div className="w-3 h-3 bg-gray-800 border border-white"></div>
                       <div className="absolute top-4 -translate-x-1/2 left-1/2 min-w-max">
@@ -496,7 +496,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   {project.closingDate && (
                     <div 
                       className="absolute transform -translate-x-1/2"
-                      style={{ left: '100%', top: '0px' }}
+                      style={{ left: `${getMilestonePosition(project.closingDate)}%`, top: '0px' }}
                     >
                       <div className="w-3 h-3 bg-gray-800 border border-white"></div>
                       <div className="absolute top-4 -translate-x-1/2 left-1/2 min-w-max">
