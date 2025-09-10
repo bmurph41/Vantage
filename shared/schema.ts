@@ -12,7 +12,7 @@ export const holidayCalendarEnum = pgEnum("holiday_calendar", ["us_federal", "no
 export const startStrategyEnum = pgEnum("start_strategy", ["fixed", "offset"]);
 export const priorityEnum = pgEnum("priority", ["low", "med", "high"]);
 export const statusEnum = pgEnum("status", ["not_started", "in_progress", "blocked", "completed", "to_do", "scheduled"]);
-export const paymentStatusEnum = pgEnum("payment_status", ["not_paid", "paid"]);
+export const paymentStatusEnum = pgEnum("payment_status", ["not_paid", "paid", "no_cost"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
