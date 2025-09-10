@@ -198,7 +198,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const projectStart = project?.psaSignedDate ? parseISO(project.psaSignedDate) : new Date();
   const projectEnd = project?.closingDate ? parseISO(project.closingDate) : addDays(projectStart, 120);
 
-  // Generate timeline header dates - 7-day intervals from PSA + task dates
+  // Generate timeline header dates based on selected granularity + task dates
   const generateTimelineDates = () => {
     const dates = new Set<number>(); // Use timestamps to avoid duplicates
     
@@ -206,11 +206,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     dates.add(projectStart.getTime());
     dates.add(projectEnd.getTime());
     
-    // Add 7-day interval tick marks from PSA signed date
+    // Add tick marks based on selected granularity
+    const intervalDays = selectedGranularity.days;
     let current = new Date(projectStart);
     while (current <= projectEnd) {
       dates.add(current.getTime());
-      current = new Date(current.getTime() + (7 * 24 * 60 * 60 * 1000)); // Add 7 days
+      current = new Date(current.getTime() + (intervalDays * 24 * 60 * 60 * 1000)); // Add interval days
     }
     
     // Add milestone dates if they exist
