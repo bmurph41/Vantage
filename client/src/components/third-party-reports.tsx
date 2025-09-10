@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Plus, Upload, Trash2 } from "lucide-react";
+import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
 import { AddTaskModal } from "@/components/add-task-modal";
@@ -27,6 +27,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
+  const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(false);
+  const [currentTaskInView, setCurrentTaskInView] = useState<string | null>(null);
+  const [isAtTop, setIsAtTop] = useState(true);
+  const taskRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
@@ -36,6 +40,45 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     const matchesStatus = statusFilter === "all" || task.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  // Scroll detection for floating timeline
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      setIsAtTop(scrollTop < 200); // Consider "at top" if within 200px of top
+      
+      if (!isTimelineCollapsed) {
+        // Find which task is currently in view
+        let currentTask = null;
+        const viewportCenter = scrollTop + window.innerHeight / 2;
+        
+        for (const [taskId, ref] of Object.entries(taskRefs.current)) {
+          if (ref) {
+            const rect = ref.getBoundingClientRect();
+            const elementTop = rect.top + scrollTop;
+            const elementBottom = elementTop + rect.height;
+            
+            if (viewportCenter >= elementTop && viewportCenter <= elementBottom) {
+              currentTask = taskId;
+              break;
+            }
+          }
+        }
+        
+        setCurrentTaskInView(currentTask);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Check initial state
+    
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isTimelineCollapsed]);
+
+  // Register task refs
+  const setTaskRef = (taskId: string) => (ref: HTMLTableRowElement | null) => {
+    taskRefs.current[taskId] = ref;
+  };
 
   const getStatusBadge = (status: string) => {
     const colors = {
@@ -200,10 +243,14 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       </CardHeader>
       
       <CardContent className="p-6">
-        {/* Enhanced DD Timeline Section */}
-        <div className="mb-10 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200 shadow-lg">
-          {/* Timeline Header */}
-          <div className="flex items-center justify-between mb-6">
+        {/* Enhanced DD Timeline Section - Collapsible & Floating */}
+        <div className={`mb-10 transition-all duration-300 ${
+          !isTimelineCollapsed && !isAtTop 
+            ? 'fixed top-4 left-4 right-4 z-50 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border-2 border-blue-200 shadow-2xl backdrop-blur-lg' 
+            : 'bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200 shadow-lg'
+        }`}>
+          {/* Timeline Header with Collapse Button */}
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -212,38 +259,56 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900">Project Timeline</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsTimelineCollapsed(!isTimelineCollapsed)}
+                  className="h-8 w-8 p-0 hover:bg-blue-100"
+                  data-testid="button-toggle-timeline"
+                >
+                  {isTimelineCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                </Button>
               </div>
-              <div className="bg-white/70 backdrop-blur rounded-lg p-1 border border-blue-300">
-                <Select value={granularity} onValueChange={setGranularity}>
-                  <SelectTrigger className="w-32 bg-transparent border-0 font-medium" data-testid="select-granularity">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIMELINE_GRANULARITIES.map(g => (
-                      <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!isTimelineCollapsed && (
+                <div className="bg-white/70 backdrop-blur rounded-lg p-1 border border-blue-300">
+                  <Select value={granularity} onValueChange={setGranularity}>
+                    <SelectTrigger className="w-32 bg-transparent border-0 font-medium" data-testid="select-granularity">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIMELINE_GRANULARITIES.map(g => (
+                        <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
-            <div className="flex items-center space-x-4">
-              <Button
-                variant={showCriticalPath ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowCriticalPath(!showCriticalPath)}
-                className={showCriticalPath ? "bg-amber-500 hover:bg-amber-600 text-white shadow-md" : "bg-white border-amber-300 text-amber-700 hover:bg-amber-50"}
-                data-testid="button-critical-path"
-              >
-                Critical Path
-              </Button>
-              <div className="text-sm font-medium text-blue-700 bg-white px-4 py-2 rounded-lg border border-blue-300 shadow-sm">
-                {tasks.filter(t => t.showOnTimeline).length} Timeline Tasks
+            {!isTimelineCollapsed && (
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant={showCriticalPath ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowCriticalPath(!showCriticalPath)}
+                  className={showCriticalPath ? "bg-amber-500 hover:bg-amber-600 text-white shadow-md" : "bg-white border-amber-300 text-amber-700 hover:bg-amber-50"}
+                  data-testid="button-critical-path"
+                >
+                  Critical Path
+                </Button>
+                <div className="text-sm font-medium text-blue-700 bg-white px-4 py-2 rounded-lg border border-blue-300 shadow-sm">
+                  {tasks.filter(t => t.showOnTimeline).length} Timeline Tasks
+                  {!isAtTop && currentTaskInView && (
+                    <span className="ml-2 text-xs text-blue-600">
+                      • Showing: {tasks.find(t => t.id === currentTaskInView)?.title.substring(0, 20)}...
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Enhanced Timeline Track */}
-          {project && (
+          {/* Enhanced Timeline Track - Only show when not collapsed */}
+          {!isTimelineCollapsed && project && (
             <div className="bg-white rounded-xl p-6 border border-blue-200 shadow-inner">
               {/* Date Headers with proper spacing */}
               <div className="mb-4">
@@ -290,9 +355,16 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       })}
                     </div>
 
-                    {/* Task Progress Bars */}
+                    {/* Task Progress Bars - Show all at top, specific task when scrolling */}
                     <div className="absolute inset-0 pt-2 pb-2">
-                      {tasks.filter(t => t.showOnTimeline && (!showCriticalPath || t.priority === 'high')).map((task, taskIndex) => {
+                      {tasks.filter(t => {
+                        const basicFilter = t.showOnTimeline && (!showCriticalPath || t.priority === 'high');
+                        // Show all tasks when at top, or only current task when scrolling
+                        if (isAtTop || !currentTaskInView) {
+                          return basicFilter;
+                        }
+                        return basicFilter && t.id === currentTaskInView;
+                      }).map((task, taskIndex) => {
                         const taskProgress = getTaskProgress(task);
                         const yPosition = 6 + (taskIndex * 12); // Stagger task bars vertically
                         
@@ -390,32 +462,34 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             </div>
           )}
         </div>
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <Input
-                type="text"
-                placeholder="Search tasks..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2"
-                data-testid="input-search"
-              />
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+        {/* Add spacing when timeline is floating */}
+        <div className={`${!isTimelineCollapsed && !isAtTop ? 'pt-32' : ''} transition-all duration-300`}>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search tasks..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2"
+                  data-testid="input-search"
+                />
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40" data-testid="select-status-filter">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="not_started">To Do</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="blocked">Blocked</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40" data-testid="select-status-filter">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="not_started">To Do</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="blocked">Blocked</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <div className="flex items-center space-x-2">
             <Button variant="outline" size="sm" data-testid="button-import-csv">
               <Upload className="h-4 w-4 mr-2" />
@@ -447,7 +521,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               {filteredTasks.map((task, index) => (
                 <tr 
                   key={task.id} 
-                  className={`hover:bg-accent/50 transition-colors ${index % 2 === 1 ? 'bg-accent/30' : ''}`}
+                  ref={setTaskRef(task.id)}
+                  className={`hover:bg-accent/50 transition-colors ${index % 2 === 1 ? 'bg-accent/30' : ''} ${
+                    currentTaskInView === task.id ? 'ring-2 ring-blue-300 bg-blue-50' : ''
+                  }`}
                   data-testid={`row-task-${task.id}`}
                 >
                   <td className="px-4 py-3">
@@ -587,6 +664,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               )}
             </tbody>
           </table>
+        </div>
         </div>
       </CardContent>
       
