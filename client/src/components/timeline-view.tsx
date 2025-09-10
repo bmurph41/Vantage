@@ -157,6 +157,36 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             </div>
           )}
 
+          {/* Task Progress Bars */}
+          {tasks.filter(t => t.showOnTimeline).length > 0 && (
+            <div className="mb-6 space-y-3">
+              {tasks.filter(t => t.showOnTimeline).map((task) => (
+                <div key={task.id} className="bg-gray-50 rounded-lg p-3 border">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className={`w-2 h-2 rounded-full ${
+                        task.status === 'completed' ? 'bg-green-500' :
+                        task.status === 'in_progress' ? 'bg-blue-500' :
+                        task.status === 'scheduled' ? 'bg-blue-600' :
+                        'bg-gray-400'
+                      }`} />
+                      <span className="text-sm font-medium text-gray-900">{task.title}</span>
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {task.assignee || 'Unassigned'}
+                    </div>
+                  </div>
+                  <ProgressBar 
+                    task={task} 
+                    project={project} 
+                    settings={settings}
+                    className="shadow-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Simple Timeline Track */}
           <div className="relative mb-6">
             <div className="h-2 bg-gray-200 rounded-full relative overflow-hidden">
@@ -225,46 +255,6 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
           </div>
         </CardContent>
       </Card>
-
-      {/* Task Progress Cards */}
-      {tasks.filter(t => t.showOnTimeline).length > 0 && (
-        <Card className="shadow-sm">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Timeline Tasks</CardTitle>
-              <div className="text-sm text-gray-600">
-                {tasks.filter(t => t.showOnTimeline).length} tasks
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {tasks.filter(t => t.showOnTimeline).map((task) => (
-              <div key={task.id} className="bg-gray-50 rounded-lg p-4 border">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-3">
-                    <span className={`w-3 h-3 rounded-full ${
-                      task.status === 'completed' ? 'bg-green-500' :
-                      task.status === 'in_progress' ? 'bg-blue-500' :
-                      task.status === 'scheduled' ? 'bg-blue-600' :
-                      'bg-gray-400'
-                    }`} />
-                    <span className="font-medium text-gray-900">{task.title}</span>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    {task.assignee || 'Unassigned'}
-                  </div>
-                </div>
-                <ProgressBar 
-                  task={task} 
-                  project={project} 
-                  settings={settings}
-                  className="shadow-sm"
-                />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Legend */}
       <Card className="shadow-sm">
