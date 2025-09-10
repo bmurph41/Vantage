@@ -9,9 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle, FileDown } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
+import { useQuery } from "@tanstack/react-query";
+import { ddClient } from "@/lib/ddClient";
 import { AddTaskModal } from "@/components/add-task-modal";
 import { TimelineNotes } from "@/components/timeline-notes";
 import { ExportReportModal } from "@/components/export-report-modal";
+import { CompanyDetailsModal } from "@/components/company-details-modal";
 import { differenceInDays, parseISO, format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, isToday, isPast, isFuture } from "date-fns";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
@@ -44,6 +47,15 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [sortColumn, setSortColumn] = useState<'daysRemaining' | 'cost' | 'deadline' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [companyModalData, setCompanyModalData] = useState<{
+    isOpen: boolean;
+    companyName: string;
+    contactInfo: {
+      repName?: string;
+      repEmail?: string;
+      repPhone?: string;
+    };
+  }>({ isOpen: false, companyName: '', contactInfo: {} });
 
   const toggleTaskExpansion = (taskId: string) => {
     const newExpanded = new Set(expandedTasks);
@@ -327,6 +339,65 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const handleDeleteTask = (taskId: string) => {
     deleteTask.mutate(taskId);
   };
+
+  // Handle company click to show details modal
+  const handleCompanyClick = (task: Task) => {
+    if (!task.companyHired) return;
+    
+    setCompanyModalData({
+      isOpen: true,
+      companyName: task.companyHired,
+      contactInfo: {
+        repName: task.repName || undefined,
+        repEmail: task.repEmail || undefined,
+        repPhone: task.repPhone || undefined,
+      },
+    });
+  };
+
+  // Query for all projects to find company usage
+  const { data: allProjects = [] } = useQuery({
+    queryKey: ['/api/dd/projects'],
+    queryFn: () => ddClient.getProjects(),
+    enabled: companyModalData.isOpen,
+  });
+
+  // Query for all tasks from all projects when modal is open
+  const { data: allTasks = [] } = useQuery({
+    queryKey: ['/api/dd/all-tasks', companyModalData.companyName],
+    queryFn: async () => {
+      if (!companyModalData.isOpen || !companyModalData.companyName) return [];
+      
+      const tasksPromises = allProjects.map(project => 
+        ddClient.getTasks(project.id).catch(() => [])
+      );
+      const allProjectTasks = await Promise.all(tasksPromises);
+      return allProjectTasks.flat();
+    },
+    enabled: companyModalData.isOpen && allProjects.length > 0,
+  });
+
+  // Calculate related projects data for the modal
+  const relatedProjectsData = React.useMemo(() => {
+    if (!companyModalData.isOpen || !companyModalData.companyName) return [];
+    
+    const companyTasks = allTasks.filter(task => 
+      task.companyHired === companyModalData.companyName
+    );
+    
+    const projectTasksMap = new Map<string, Task[]>();
+    companyTasks.forEach(task => {
+      if (!projectTasksMap.has(task.projectId)) {
+        projectTasksMap.set(task.projectId, []);
+      }
+      projectTasksMap.get(task.projectId)!.push(task);
+    });
+    
+    return Array.from(projectTasksMap.entries()).map(([projectId, tasks]) => {
+      const project = allProjects.find(p => p.id === projectId);
+      return project ? { project, tasks } : null;
+    }).filter(Boolean) as Array<{ project: any; tasks: Task[]; }>;
+  }, [companyModalData.isOpen, companyModalData.companyName, allTasks, allProjects]);
 
   // Timeline logic
   const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];
@@ -964,7 +1035,16 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     <td className="px-4 py-3" data-testid={`text-company-${task.id}`}>
                       {task.companyHired ? (
                         <div>
-                          <div className="font-medium text-sm leading-tight" title={task.companyHired}>{task.companyHired}</div>
+                          <div 
+                            className="font-medium text-sm leading-tight text-blue-600 hover:text-blue-800 cursor-pointer hover:underline" 
+                            title={`Click to view details for ${task.companyHired}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCompanyClick(task);
+                            }}
+                          >
+                            {task.companyHired}
+                          </div>
                           {(task.repName || task.repEmail || task.repPhone) && (
                             <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
                               {task.repName && <div className="truncate" title={`Rep: ${task.repName}`}>Rep: {task.repName}</div>}
@@ -1281,6 +1361,14 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         onClose={() => setIsExportModalOpen(false)}
         tasks={tasks}
         project={project}
+      />
+
+      <CompanyDetailsModal
+        isOpen={companyModalData.isOpen}
+        onClose={() => setCompanyModalData({ ...companyModalData, isOpen: false })}
+        companyName={companyModalData.companyName}
+        contactInfo={companyModalData.contactInfo}
+        relatedProjects={relatedProjectsData}
       />
     </Card>
   );
