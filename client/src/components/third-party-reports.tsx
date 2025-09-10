@@ -41,39 +41,65 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     return matchesSearch && matchesStatus;
   });
 
-  // Scroll detection for floating timeline
+  // Scroll detection for floating timeline with throttling
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+    
     const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      setIsAtTop(scrollTop < 200); // Consider "at top" if within 200px of top
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       
-      if (!isTimelineCollapsed) {
-        // Find which task is currently in view
-        let currentTask = null;
-        const viewportCenter = scrollTop + window.innerHeight / 2;
+      timeoutId = setTimeout(() => {
+        const scrollTop = window.scrollY;
+        const newIsAtTop = scrollTop < 300; // Consider "at top" if within 300px of top
         
-        for (const [taskId, ref] of Object.entries(taskRefs.current)) {
-          if (ref) {
-            const rect = ref.getBoundingClientRect();
-            const elementTop = rect.top + scrollTop;
-            const elementBottom = elementTop + rect.height;
-            
-            if (viewportCenter >= elementTop && viewportCenter <= elementBottom) {
-              currentTask = taskId;
-              break;
-            }
-          }
+        // Only update if there's actually a change to prevent layout thrashing
+        if (newIsAtTop !== isAtTop) {
+          setIsAtTop(newIsAtTop);
         }
         
-        setCurrentTaskInView(currentTask);
-      }
+        if (!isTimelineCollapsed && !newIsAtTop) {
+          // Find which task is currently in view - only when not at top
+          let currentTask = null;
+          const viewportTop = scrollTop;
+          const viewportBottom = scrollTop + window.innerHeight;
+          const viewportCenter = scrollTop + (window.innerHeight * 0.4); // Use 40% down from top instead of center
+          
+          for (const [taskId, ref] of Object.entries(taskRefs.current)) {
+            if (ref) {
+              const rect = ref.getBoundingClientRect();
+              const elementTop = rect.top + scrollTop;
+              const elementBottom = elementTop + rect.height;
+              
+              // Check if element is in the upper portion of viewport
+              if (elementTop <= viewportCenter && elementBottom >= viewportCenter) {
+                currentTask = taskId;
+                break;
+              }
+            }
+          }
+          
+          if (currentTask !== currentTaskInView) {
+            setCurrentTaskInView(currentTask);
+          }
+        } else if (newIsAtTop && currentTaskInView) {
+          // Clear current task when at top
+          setCurrentTaskInView(null);
+        }
+      }, 16); // Throttle to ~60fps
     };
 
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll(); // Check initial state
     
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isTimelineCollapsed]);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [isTimelineCollapsed, isAtTop, currentTaskInView]);
 
   // Register task refs
   const setTaskRef = (taskId: string) => (ref: HTMLTableRowElement | null) => {
@@ -244,9 +270,9 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       
       <CardContent className="p-6">
         {/* Enhanced DD Timeline Section - Collapsible & Floating */}
-        <div className={`mb-10 transition-all duration-300 ${
+        <div className={`mb-10 transition-all duration-200 ease-in-out ${
           !isTimelineCollapsed && !isAtTop 
-            ? 'fixed top-4 left-4 right-4 z-50 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border-2 border-blue-200 shadow-2xl backdrop-blur-lg' 
+            ? 'fixed top-4 left-4 right-4 z-50 bg-gradient-to-r from-blue-50/95 to-indigo-50/95 rounded-xl p-4 border-2 border-blue-200 shadow-2xl backdrop-blur-sm' 
             : 'bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200 shadow-lg'
         }`}>
           {/* Timeline Header with Collapse Button */}
@@ -462,8 +488,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             </div>
           )}
         </div>
-        {/* Add spacing when timeline is floating */}
-        <div className={`${!isTimelineCollapsed && !isAtTop ? 'pt-32' : ''} transition-all duration-300`}>
+        {/* Add spacing when timeline is floating - only when actually floating */}
+        <div className={`${!isTimelineCollapsed && !isAtTop ? 'pt-28' : ''} transition-all duration-200 ease-in-out`}>
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="relative">
