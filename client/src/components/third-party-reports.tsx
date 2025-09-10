@@ -931,8 +931,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   {/* Expanded row with additional details */}
                   {expandedTasks.has(task.id) && (
                     <tr className={`${index % 2 === 1 ? 'bg-accent/30' : 'bg-gray-50'} border-t border-gray-200`}>
-                      <td colSpan={5} className="px-4 py-4">
-                        <div className="grid grid-cols-4 gap-4">
+                      <td colSpan={6} className="px-4 py-4">
+                        <div className="grid grid-cols-3 gap-4">
                           {/* Payment Status */}
                           <div>
                             <label className="text-xs font-medium text-gray-700 block mb-1">Payment</label>
@@ -950,23 +950,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                                 <SelectItem value="paid">Paid</SelectItem>
                               </SelectContent>
                             </Select>
-                          </div>
-                          
-                          {/* Cost */}
-                          <div>
-                            <label 
-                              className="text-xs font-medium text-gray-700 block mb-1 cursor-pointer hover:text-gray-900 flex items-center"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSort('cost');
-                              }}
-                              data-testid="header-cost"
-                            >
-                              Cost {getSortIcon('cost')}
-                            </label>
-                            <div className="text-sm text-gray-900 py-1.5" data-testid={`text-cost-${task.id}`}>
-                              {task.cost || '-'}
-                            </div>
                           </div>
                           
                           {/* Completion Date */}
@@ -1048,7 +1031,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               ))}
               {filteredTasks.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
                     No tasks found matching your criteria.
                   </td>
                 </tr>
