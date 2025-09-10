@@ -51,16 +51,16 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
         ) : isOverdue ? (
           <div className="h-full bg-red-600 progress-bar-overdue" data-testid="progress-overdue" />
         ) : isNotStarted ? (
-          <div className="h-full bg-muted progress-bar-remaining" data-testid="progress-not-started" />
+          <div className="h-full progress-bar-remaining-stripes" data-testid="progress-not-started" />
         ) : (
           <div className="h-full flex" data-testid="progress-in-progress">
             <div 
-              className="progress-bar-elapsed bg-primary" 
+              className="progress-bar-elapsed bg-blue-500" 
               style={{ width: `${percentElapsed}%` }}
               data-testid="progress-elapsed"
             />
             <div 
-              className="progress-bar-remaining"
+              className="progress-bar-remaining-stripes"
               style={{ width: `${100 - percentElapsed}%` }}
               data-testid="progress-remaining"
             />
