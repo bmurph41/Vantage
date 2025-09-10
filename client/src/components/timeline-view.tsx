@@ -37,6 +37,10 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
           dates.push(new Date(currentDate));
           currentDate = addDays(currentDate, 7);
         }
+        // Ensure closing date is always included if it's not already
+        if (dates.length > 0 && dates[dates.length - 1].getTime() !== projectEnd.getTime()) {
+          dates.push(new Date(projectEnd));
+        }
         return dates;
       case 'biweekly':
         // Generate biweekly dates starting exactly from PSA signed date
@@ -44,12 +48,20 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
           dates.push(new Date(currentDate));
           currentDate = addDays(currentDate, 14);
         }
+        // Ensure closing date is always included if it's not already
+        if (dates.length > 0 && dates[dates.length - 1].getTime() !== projectEnd.getTime()) {
+          dates.push(new Date(projectEnd));
+        }
         return dates;
       case 'monthly':
         // Generate monthly dates starting exactly from PSA signed date
         while (currentDate <= projectEnd) {
           dates.push(new Date(currentDate));
           currentDate = addDays(currentDate, 30); // Approximate monthly interval
+        }
+        // Ensure closing date is always included if it's not already
+        if (dates.length > 0 && dates[dates.length - 1].getTime() !== projectEnd.getTime()) {
+          dates.push(new Date(projectEnd));
         }
         return dates;
       default:
