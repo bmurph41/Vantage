@@ -147,6 +147,7 @@ const addTaskFormSchema = z.object({
   cost: z.string().optional(),
   notes: z.string().optional(),
   showOnTimeline: z.boolean().default(false),
+  isInternalTask: z.boolean().default(false),
 });
 
 interface AddTaskModalProps {
@@ -286,6 +287,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       cost: "",
       notes: "",
       showOnTimeline: false,
+      isInternalTask: false,
     },
   });
 
@@ -320,6 +322,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           cost: editingTask.cost || "",
           notes: editingTask.notes || "",
           showOnTimeline: editingTask.showOnTimeline || false,
+          isInternalTask: !editingTask.companyHired, // Infer from whether company is set
         });
         setStep("customize"); // Go directly to customize step for editing
       } else {
@@ -449,6 +452,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       cost: template.estimatedCost || "",
       notes: "",
       showOnTimeline: false,
+      isInternalTask: false,
     });
     
     setStep("customize");
@@ -483,6 +487,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       cost: "",
       notes: "",
       showOnTimeline: false,
+      isInternalTask: false,
     });
     
     setStep("customize");
@@ -856,6 +861,35 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 )}
 
+                {/* Internal Task Checkbox */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isInternalTask"
+                    checked={form.watch("isInternalTask")}
+                    onCheckedChange={(checked) => {
+                      form.setValue("isInternalTask", !!checked);
+                      // Clear company fields when marking as internal
+                      if (checked) {
+                        form.setValue("companyHired", "");
+                        form.setValue("repName", "");
+                        form.setValue("repEmail", "");
+                        form.setValue("repPhone", "");
+                        form.setValue("companyAddress", "");
+                        form.setValue("companyCity", "");
+                        form.setValue("companyState", "");
+                        form.setValue("companyZip", "");
+                      }
+                    }}
+                    data-testid="checkbox-internal-task"
+                  />
+                  <Label 
+                    htmlFor="isInternalTask" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Internal Task (No Company)
+                  </Label>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="assignee">Task Owner</Label>
@@ -866,19 +900,21 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="companyHired">Company Hired</Label>
-                    <Input
-                      id="companyHired"
-                      placeholder="Third-party company"
-                      {...form.register("companyHired")}
-                      data-testid="input-company-hired"
-                    />
-                  </div>
+                  {!form.watch("isInternalTask") && (
+                    <div>
+                      <Label htmlFor="companyHired">Company Hired</Label>
+                      <Input
+                        id="companyHired"
+                        placeholder="Third-party company"
+                        {...form.register("companyHired")}
+                        data-testid="input-company-hired"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Rep Contact Info */}
-                {form.watch("companyHired") && (
+                {!form.watch("isInternalTask") && form.watch("companyHired") && (
                   <div className="space-y-3 bg-gray-50 p-3 rounded-md">
                     <div className="text-sm font-medium text-gray-700">Company Information</div>
                     <div className="grid grid-cols-1 gap-4">
@@ -1357,6 +1393,35 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 )}
 
+                {/* Internal Task Checkbox */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isInternalTask"
+                    checked={form.watch("isInternalTask")}
+                    onCheckedChange={(checked) => {
+                      form.setValue("isInternalTask", !!checked);
+                      // Clear company fields when marking as internal
+                      if (checked) {
+                        form.setValue("companyHired", "");
+                        form.setValue("repName", "");
+                        form.setValue("repEmail", "");
+                        form.setValue("repPhone", "");
+                        form.setValue("companyAddress", "");
+                        form.setValue("companyCity", "");
+                        form.setValue("companyState", "");
+                        form.setValue("companyZip", "");
+                      }
+                    }}
+                    data-testid="checkbox-internal-task"
+                  />
+                  <Label 
+                    htmlFor="isInternalTask" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Internal Task (No Company)
+                  </Label>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="assignee">Task Owner</Label>
@@ -1367,19 +1432,21 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="companyHired">Company Hired</Label>
-                    <Input
-                      id="companyHired"
-                      placeholder="Third-party company"
-                      {...form.register("companyHired")}
-                      data-testid="input-company-hired"
-                    />
-                  </div>
+                  {!form.watch("isInternalTask") && (
+                    <div>
+                      <Label htmlFor="companyHired">Company Hired</Label>
+                      <Input
+                        id="companyHired"
+                        placeholder="Third-party company"
+                        {...form.register("companyHired")}
+                        data-testid="input-company-hired"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Rep Contact Info */}
-                {form.watch("companyHired") && (
+                {!form.watch("isInternalTask") && form.watch("companyHired") && (
                   <div className="space-y-3 bg-gray-50 p-3 rounded-md">
                     <div className="text-sm font-medium text-gray-700">Company Information</div>
                     <div className="grid grid-cols-1 gap-4">
