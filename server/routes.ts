@@ -171,7 +171,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/dd/tasks/:id", async (req: any, res) => {
     try {
-      console.log("Task update request body:", JSON.stringify(req.body, null, 2));
       const updates = insertTaskSchema.partial().parse(req.body);
       const task = await storage.getTask(req.params.id);
       
@@ -194,12 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(updated);
     } catch (error) {
-      console.error("Task update error:", error);
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
-      }
-      res.status(400).json({ error: "Invalid update data", details: error instanceof Error ? error.message : String(error) });
+      res.status(400).json({ error: "Invalid update data" });
     }
   });
 

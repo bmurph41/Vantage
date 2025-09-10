@@ -25,8 +25,7 @@ const addTaskFormSchema = z.object({
   startOffsetDays: z.number().optional(),
   durationDays: z.number().min(1, "Duration must be at least 1 day"),
   // New deadline fields
-  deadlineType: z.enum(["dd_expiration", "days_after_psa"]).default("days_after_psa"),
-  deadlineDays: z.number().min(1, "Days must be at least 1").optional(),
+  deadlineType: z.enum(["dd_expiration"]).default("dd_expiration"),
   assignee: z.string().optional(),
   companyHired: z.string().optional(),
   repName: z.string().optional(),
@@ -100,8 +99,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       startDate: "",
       startOffsetDays: 0,
       durationDays: 7,
-      deadlineType: "days_after_psa",
-      deadlineDays: 30,
+      deadlineType: "dd_expiration",
+
       assignee: "",
       companyHired: "",
       repName: "",
@@ -129,8 +128,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           startDate: editingTask.startDate || "",
           startOffsetDays: editingTask.startOffsetDays || 0,
           durationDays: editingTask.durationDays || 7,
-          deadlineType: editingTask.deadlineType || "days_after_psa",
-          deadlineDays: editingTask.deadlineDays || 30,
+          deadlineType: "dd_expiration",
           assignee: editingTask.assignee || "",
           companyHired: editingTask.companyHired || "",
           repName: editingTask.repName || "",
@@ -154,8 +152,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           startDate: "",
           startOffsetDays: 0,
           durationDays: 7,
-          deadlineType: "days_after_psa",
-          deadlineDays: 30,
+          deadlineType: "dd_expiration",
+    
           assignee: "",
           companyHired: "",
           repName: "",
@@ -251,8 +249,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       startStrategy: "offset",
       startOffsetDays: template.startOffsetDays,
       durationDays: template.durationDays,
-      deadlineType: "days_after_psa" as const,
-      deadlineDays: template.startOffsetDays + template.durationDays,
+      deadlineType: "dd_expiration" as const,
       assignee: template.defaultAssignee || "",
       companyHired: "",
       priority: template.priority as "low" | "med" | "high",
@@ -415,44 +412,13 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="deadlineType">Deadline *</Label>
-                    <Select
-                      value={form.watch("deadlineType")}
-                      onValueChange={(value: string) => form.setValue("deadlineType", value as "dd_expiration" | "days_after_psa")}
-                    >
-                      <SelectTrigger data-testid="select-deadline-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="dd_expiration">DD Expiration</SelectItem>
-                        <SelectItem value="days_after_psa">Days After Signed PSA</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    {form.watch("deadlineType") === "days_after_psa" && (
-                      <>
-                        <Label htmlFor="deadlineDays">Days After PSA *</Label>
-                        <Input
-                          id="deadlineDays"
-                          type="number"
-                          min="1"
-                          {...form.register("deadlineDays", { valueAsNumber: true })}
-                          data-testid="input-deadline-days"
-                        />
-                        {form.formState.errors.deadlineDays && (
-                          <p className="text-sm text-destructive mt-1">{form.formState.errors.deadlineDays.message}</p>
-                        )}
-                      </>
-                    )}
-                    {form.watch("deadlineType") === "dd_expiration" && (
-                      <div className="pt-6">
-                        <p className="text-sm text-muted-foreground">Task will be due on DD expiration date</p>
-                      </div>
-                    )}
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium">DD Expiration</span>
+                      <p className="text-sm text-muted-foreground">Task will be due on DD expiration date</p>
+                    </div>
                   </div>
                 </div>
 
@@ -767,47 +733,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="startStrategy">Start Strategy</Label>
-                    <Select
-                      value={form.watch("startStrategy")}
-                      onValueChange={(value: string) => form.setValue("startStrategy", value as "fixed" | "offset")}
-                    >
-                      <SelectTrigger data-testid="select-start-strategy">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="fixed">Fixed Date</SelectItem>
-                        <SelectItem value="offset">Days After PSA</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    {form.watch("startStrategy") === "fixed" ? (
-                      <>
-                        <Label htmlFor="startDate">Start Date</Label>
-                        <Input
-                          id="startDate"
-                          type="date"
-                          {...form.register("startDate")}
-                          data-testid="input-start-date"
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <Label htmlFor="startOffsetDays">Days After PSA</Label>
-                        <Input
-                          id="startOffsetDays"
-                          type="number"
-                          {...form.register("startOffsetDays", { valueAsNumber: true })}
-                          data-testid="input-start-offset-days"
-                        />
-                      </>
-                    )}
-                  </div>
-                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
