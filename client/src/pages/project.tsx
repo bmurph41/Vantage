@@ -100,15 +100,16 @@ export default function ProjectPage() {
           </nav>
         </div>
 
-        {/* Timeline - Professional View (Under tabs, above content) */}
-        <div className="mb-8">
-          <TimelineView tasks={tasks} project={project} settings={settings} />
-        </div>
-
         {/* Tab Content */}
         <div className="tab-content">
           {activeTab === "reports" && (
-            <ThirdPartyReports tasks={tasks} projectId={project.id} project={project} settings={settings} />
+            <>
+              {/* Timeline - Professional View (Only on Tasks & Timeline tab) */}
+              <div className="mb-8">
+                <TimelineView tasks={tasks} project={project} settings={settings} />
+              </div>
+              <ThirdPartyReports tasks={tasks} projectId={project.id} project={project} settings={settings} />
+            </>
           )}
           {activeTab === "setup" && (
             <ProjectSetup project={project} settings={settings} />
