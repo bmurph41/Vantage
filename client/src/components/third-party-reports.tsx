@@ -815,18 +815,28 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
           <table className="w-full" data-testid="tasks-table">
             <thead>
               <tr className="bg-primary text-primary-foreground">
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[30%]">Task</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[20%]">Task Owner</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[25%]">Company Hired</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[25%]">Task</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[18%]">Task Owner</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[22%]">Company Hired</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[13%]">Status</th>
                 <th 
-                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
+                  className="px-4 py-3 text-left text-sm font-semibold w-[12%] cursor-pointer hover:bg-primary/80 transition-colors"
                   onClick={() => handleSort('daysRemaining')}
                   data-testid="header-days-remaining"
                 >
                   <div className="flex items-center">
                     Days Remaining
                     {getSortIcon('daysRemaining')}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
+                  onClick={() => handleSort('cost')}
+                  data-testid="header-cost"
+                >
+                  <div className="flex items-center">
+                    Cost
+                    {getSortIcon('cost')}
                   </div>
                 </th>
               </tr>
@@ -910,6 +920,11 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           </span>;
                         }
                       })()}
+                    </td>
+                    <td className="px-4 py-3 text-center" data-testid={`text-cost-${task.id}`}>
+                      <span className="text-sm font-medium text-gray-900">
+                        {task.cost || '-'}
+                      </span>
                     </td>
                   </tr>
                   
