@@ -956,27 +956,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           <SelectItem value="completed">Completed</SelectItem>
                         </SelectContent>
                       </Select>
-                        
-                        {/* Scheduled Date */}
-                        <div>
-                          <label className="text-xs font-medium text-gray-700 block mb-1">Scheduled Date</label>
-                          <Input
-                            type="date"
-                            value={task.startDate || ''}
-                            onChange={(e) => {
-                              const newStartDate = e.target.value ? e.target.value : null;
-                              updateTask.mutate({
-                                id: task.id,
-                                updates: { startDate: newStartDate }
-                              });
-                            }}
-                            disabled={task.status !== 'scheduled' && (!task.dateOnSite || task.status === 'to_do')}
-                            className="w-full text-xs h-7"
-                            placeholder="mm/dd/yyyy"
-                            data-testid={`input-scheduled-date-${task.id}`}
-                          />
-                        </div>
-                      </div>
                     </td>
                     <td className="px-4 py-3 text-center" data-testid={`text-days-remaining-${task.id}`}>
                       <div className="space-y-2">

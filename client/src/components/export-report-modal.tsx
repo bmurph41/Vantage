@@ -176,26 +176,52 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <FileText className="h-5 w-5" />
-            <span>Export Report</span>
+        <DialogHeader className="border-b pb-4">
+          <DialogTitle className="flex items-center space-x-3 text-xl font-semibold">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <FileText className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <span className="text-gray-900">Export Due Diligence Report</span>
+              <p className="text-sm text-gray-500 font-normal mt-1">Generate and share professional reports</p>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="select">Select Data</TabsTrigger>
-            <TabsTrigger value="preview">Preview</TabsTrigger>
-            <TabsTrigger value="export">Export & Send</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 bg-gray-50 p-1 rounded-lg">
+            <TabsTrigger value="select" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                <span>Select Data</span>
+              </div>
+            </TabsTrigger>
+            <TabsTrigger value="preview" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <div className="flex items-center space-x-2">
+                <Eye className="h-4 w-4" />
+                <span>Preview</span>
+              </div>
+            </TabsTrigger>
+            <TabsTrigger value="export" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <div className="flex items-center space-x-2">
+                <Download className="h-4 w-4" />
+                <span>Export & Send</span>
+              </div>
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="select" className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
+          <TabsContent value="select" className="space-y-8 mt-6">
+            <div className="grid grid-cols-2 gap-8">
               {/* Task Selection */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Select Tasks</CardTitle>
+              <Card className="border-2 border-gray-100 hover:border-gray-200 transition-colors">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                  <CardTitle className="text-lg font-semibold flex items-center space-x-2">
+                    <div className="p-1.5 bg-blue-100 rounded-md">
+                      <div className="w-4 h-4 bg-blue-600 rounded-sm"></div>
+                    </div>
+                    <span>Select Tasks</span>
+                  </CardTitle>
+                  <p className="text-sm text-gray-600 mt-1">Choose which tasks to include in your report</p>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center space-x-2">
@@ -228,9 +254,15 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
               </Card>
 
               {/* Column Selection */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Select Columns</CardTitle>
+              <Card className="border-2 border-gray-100 hover:border-gray-200 transition-colors">
+                <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
+                  <CardTitle className="text-lg font-semibold flex items-center space-x-2">
+                    <div className="p-1.5 bg-green-100 rounded-md">
+                      <div className="w-4 h-4 bg-green-600 rounded-sm"></div>
+                    </div>
+                    <span>Select Columns</span>
+                  </CardTitle>
+                  <p className="text-sm text-gray-600 mt-1">Choose which data fields to display</p>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center space-x-2">
@@ -263,9 +295,15 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
             </div>
 
             {/* Additional Options */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Additional Options</CardTitle>
+            <Card className="border-2 border-gray-100 hover:border-gray-200 transition-colors">
+              <CardHeader className="bg-gradient-to-r from-purple-50 to-violet-50 border-b">
+                <CardTitle className="text-lg font-semibold flex items-center space-x-2">
+                  <div className="p-1.5 bg-purple-100 rounded-md">
+                    <div className="w-4 h-4 bg-purple-600 rounded-sm"></div>
+                  </div>
+                  <span>Export Options</span>
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-1">Configure report format and additional features</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-2">
@@ -296,140 +334,184 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
             </Card>
           </TabsContent>
 
-          <TabsContent value="preview" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Report Preview</h3>
-              <div className="text-sm text-muted-foreground">
-                {filteredTasks.length} tasks, {visibleColumns.length} columns
+          <TabsContent value="preview" className="space-y-6 mt-6">
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-6 border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">Report Preview</h3>
+                  <p className="text-sm text-gray-600 mt-1">Review your report before exporting</p>
+                </div>
+                <div className="bg-white px-4 py-2 rounded-lg border shadow-sm">
+                  <div className="text-sm font-medium text-gray-900">{filteredTasks.length} tasks</div>
+                  <div className="text-xs text-gray-500">{visibleColumns.length} columns</div>
+                </div>
               </div>
             </div>
 
-            <div className="border rounded-lg overflow-auto max-h-96">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-muted">
-                    {visibleColumns.map((column) => (
-                      <th key={column.id} className="px-4 py-2 text-left text-sm font-semibold">
-                        {column.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredTasks.map((task) => (
-                    <tr key={task.id} className="hover:bg-muted/50">
+            <div className="border-2 border-gray-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="bg-white overflow-auto max-h-96">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-gray-900 to-gray-800 text-white">
                       {visibleColumns.map((column) => (
-                        <td key={column.id} className="px-4 py-2 text-sm">
-                          {formatCellValue(task, column.id)}
-                        </td>
+                        <th key={column.id} className="px-4 py-3 text-left text-sm font-semibold tracking-wide">
+                          {column.label}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredTasks.map((task, index) => (
+                      <tr key={task.id} className={`hover:bg-blue-50 transition-colors ${
+                        index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                      }`}>
+                        {visibleColumns.map((column) => (
+                          <td key={column.id} className="px-4 py-3 text-sm text-gray-900">
+                            {formatCellValue(task, column.id)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {includeTimeline && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Timeline Preview</CardTitle>
+              <Card className="border-2 border-blue-100 bg-blue-50/30">
+                <CardHeader className="border-b border-blue-200">
+                  <CardTitle className="text-base font-semibold flex items-center space-x-2">
+                    <Calendar className="h-5 w-5 text-blue-600" />
+                    <span>Timeline Visualization</span>
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="bg-muted/30 p-4 rounded text-center text-sm text-muted-foreground">
-                    Timeline visualization will be included in the final report
+                <CardContent className="pt-4">
+                  <div className="bg-gradient-to-r from-blue-100 to-indigo-100 p-6 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-center space-x-3">
+                      <Calendar className="h-8 w-8 text-blue-600" />
+                      <div className="text-center">
+                        <div className="text-sm font-medium text-blue-800">Timeline visualization will be included</div>
+                        <div className="text-xs text-blue-600 mt-1">Professional Gantt-style timeline with milestones</div>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             )}
           </TabsContent>
 
-          <TabsContent value="export" className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
+          <TabsContent value="export" className="space-y-8 mt-6">
+            <div className="grid grid-cols-2 gap-8">
               {/* Download */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Download className="h-5 w-5" />
-                    <span>Download Report</span>
+              <Card className="border-2 border-gray-100 hover:border-blue-200 hover:shadow-lg transition-all duration-200">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                  <CardTitle className="flex items-center space-x-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Download className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <span className="text-lg font-semibold">Download Report</span>
+                      <p className="text-sm text-gray-600 font-normal mt-1">Save to your device</p>
+                    </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Generate and download the report to your device.
-                  </p>
-                  <Button onClick={handleDownload} className="w-full">
+                <CardContent className="space-y-6 pt-6">
+                  <div className="bg-gray-50 p-4 rounded-lg border">
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      Generate a professional {reportFormat.toUpperCase()} report with your selected data and download it directly to your device.
+                    </p>
+                  </div>
+                  <Button onClick={handleDownload} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors">
                     <Download className="h-4 w-4 mr-2" />
-                    Download {reportFormat.toUpperCase()}
+                    Download {reportFormat.toUpperCase()} Report
                   </Button>
                 </CardContent>
               </Card>
 
               {/* Email */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Mail className="h-5 w-5" />
-                    <span>Email Report</span>
+              <Card className="border-2 border-gray-100 hover:border-green-200 hover:shadow-lg transition-all duration-200">
+                <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
+                  <CardTitle className="flex items-center space-x-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <Mail className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <span className="text-lg font-semibold">Email Report</span>
+                      <p className="text-sm text-gray-600 font-normal mt-1">Send directly to recipients</p>
+                    </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-5 pt-6">
                   <div className="space-y-2">
-                    <Label htmlFor="email-to">Email To</Label>
+                    <Label htmlFor="email-to" className="text-sm font-medium text-gray-700">Recipient Email</Label>
                     <Input
                       id="email-to"
                       type="email"
-                      placeholder="recipient@example.com"
+                      placeholder="Enter recipient email address"
                       value={emailTo}
                       onChange={(e) => setEmailTo(e.target.value)}
+                      className="border-gray-300 focus:border-green-500 focus:ring-green-500"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email-subject">Subject</Label>
+                    <Label htmlFor="email-subject" className="text-sm font-medium text-gray-700">Subject Line</Label>
                     <Input
                       id="email-subject"
                       value={emailSubject}
                       onChange={(e) => setEmailSubject(e.target.value)}
+                      className="border-gray-300 focus:border-green-500 focus:ring-green-500"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email-message">Message</Label>
+                    <Label htmlFor="email-message" className="text-sm font-medium text-gray-700">Message</Label>
                     <Textarea
                       id="email-message"
                       rows={3}
                       value={emailMessage}
                       onChange={(e) => setEmailMessage(e.target.value)}
+                      className="border-gray-300 focus:border-green-500 focus:ring-green-500 resize-none"
+                      placeholder="Add a personal message..."
                     />
                   </div>
                   <Button 
                     onClick={handleEmail} 
-                    className="w-full"
+                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white py-3 rounded-lg font-medium transition-colors"
                     disabled={!emailTo}
                   >
                     <Mail className="h-4 w-4 mr-2" />
-                    Send Email
+                    Send Report via Email
                   </Button>
                 </CardContent>
               </Card>
             </div>
 
             {/* Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Export Summary</CardTitle>
+            <Card className="border-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+              <CardHeader className="border-b border-gray-200">
+                <CardTitle className="flex items-center space-x-2 text-lg font-semibold">
+                  <div className="p-1.5 bg-gray-200 rounded-md">
+                    <FileText className="h-4 w-4 text-gray-700" />
+                  </div>
+                  <span>Export Summary</span>
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Selected Tasks:</span> {filteredTasks.length}
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="bg-white p-4 rounded-lg border shadow-sm">
+                    <div className="text-2xl font-bold text-blue-600">{filteredTasks.length}</div>
+                    <div className="text-sm text-gray-600">Selected Tasks</div>
                   </div>
-                  <div>
-                    <span className="font-medium">Selected Columns:</span> {visibleColumns.length}
+                  <div className="bg-white p-4 rounded-lg border shadow-sm">
+                    <div className="text-2xl font-bold text-green-600">{visibleColumns.length}</div>
+                    <div className="text-sm text-gray-600">Data Columns</div>
                   </div>
-                  <div>
-                    <span className="font-medium">Include Timeline:</span> {includeTimeline ? 'Yes' : 'No'}
+                  <div className="bg-white p-4 rounded-lg border shadow-sm">
+                    <div className="text-lg font-semibold text-purple-600">{includeTimeline ? 'Included' : 'Not Included'}</div>
+                    <div className="text-sm text-gray-600">Timeline Chart</div>
                   </div>
-                  <div>
-                    <span className="font-medium">Format:</span> {reportFormat.toUpperCase()}
+                  <div className="bg-white p-4 rounded-lg border shadow-sm">
+                    <div className="text-lg font-semibold text-orange-600">{reportFormat.toUpperCase()}</div>
+                    <div className="text-sm text-gray-600">Export Format</div>
                   </div>
                 </div>
               </CardContent>
@@ -437,30 +519,48 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-between">
-          <Button variant="outline" onClick={onClose}>
+        <div className="flex justify-between items-center pt-6 border-t border-gray-200 bg-gray-50 px-6 py-4 -mx-6 -mb-6 rounded-b-lg">
+          <Button 
+            variant="outline" 
+            onClick={onClose}
+            className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+          >
             Cancel
           </Button>
-          <div className="flex space-x-2">
+          <div className="flex space-x-3">
             {currentTab === 'select' && (
-              <Button onClick={() => setCurrentTab('preview')}>
+              <Button 
+                onClick={() => setCurrentTab('preview')}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors rounded-lg"
+              >
                 <Eye className="h-4 w-4 mr-2" />
-                Preview
+                Preview Report
               </Button>
             )}
             {currentTab === 'preview' && (
               <>
-                <Button variant="outline" onClick={() => setCurrentTab('select')}>
-                  Back
+                <Button 
+                  variant="outline" 
+                  onClick={() => setCurrentTab('select')}
+                  className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  ← Back to Selection
                 </Button>
-                <Button onClick={() => setCurrentTab('export')}>
-                  Continue to Export
+                <Button 
+                  onClick={() => setCurrentTab('export')}
+                  className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-medium transition-colors rounded-lg"
+                >
+                  Continue to Export →
                 </Button>
               </>
             )}
             {currentTab === 'export' && (
-              <Button variant="outline" onClick={() => setCurrentTab('preview')}>
-                Back to Preview
+              <Button 
+                variant="outline" 
+                onClick={() => setCurrentTab('preview')}
+                className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                ← Back to Preview
               </Button>
             )}
           </div>
