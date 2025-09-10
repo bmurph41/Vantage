@@ -30,7 +30,7 @@ function TaskOwnerSelector({ projectId, value, onChange }: {
   const [inputValue, setInputValue] = useState(value);
 
   // Fetch existing assignees for the project
-  const { data: assignees = [] } = useQuery({
+  const { data: assignees = [] } = useQuery<string[]>({
     queryKey: [`/api/dd/projects/${projectId}/assignees`],
     enabled: !!projectId,
   });
@@ -91,7 +91,7 @@ function TaskOwnerSelector({ projectId, value, onChange }: {
       <SelectContent>
         {assignees.length > 0 && (
           <>
-            {assignees.map((assignee) => (
+            {assignees.map((assignee: string) => (
               <SelectItem key={assignee} value={assignee}>
                 {assignee}
               </SelectItem>
@@ -168,6 +168,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     mutationFn: async (params: { taskId: string; templateName: string; templateDescription: string; category: string }) => {
       return apiRequest(`/api/dd/tasks/${params.taskId}/save-as-template`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           templateName: params.templateName,
           templateDescription: params.templateDescription,
@@ -187,7 +188,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   const isEditMode = !!editingTask;
 
   // Fetch custom templates from database
-  const { data: dbTemplates = [] } = useQuery({
+  const { data: dbTemplates = [] } = useQuery<DbTaskTemplate[]>({
     queryKey: ['/api/dd/task-templates'],
     enabled: isOpen, // Only fetch when modal is open
   });
