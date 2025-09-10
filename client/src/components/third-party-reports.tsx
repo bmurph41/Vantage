@@ -804,7 +804,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           className="mt-1 p-2 border rounded cursor-pointer hover:bg-muted"
                           onClick={() => handleEditCost(task.id, task.cost?.toString() || '0')}
                         >
-                          ${task.cost || 0}
+                          {formatCurrency(task.cost || '')}
                         </div>
                       )}
                     </div>
