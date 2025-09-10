@@ -845,10 +845,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       <button
                         data-testid={`button-company-${task.id}`}
                         className="ml-2 text-primary hover:underline"
-                        onClick={() => {
-                          setSelectedCompanyId(task.companyHired!);
-                          setIsCompanyModalOpen(true);
-                        }}
+                        onClick={() => handleCompanyClick(task)}
                       >
                         {task.companyHired}
                       </button>
@@ -1004,16 +1001,14 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     />
 
     {/* Company Details Modal */}
-    {isCompanyModalOpen && selectedCompanyId && (
+    {companyModalData.isOpen && (
       <CompanyDetailsModal
-        isOpen={isCompanyModalOpen}
-        onClose={() => setIsCompanyModalOpen(false)}
-        companyName={selectedCompanyId}
-        initialContactInfo={{}}
-        onContactInfoUpdate={async (info) => {
-          // Handle contact info update
-          console.log('Contact info updated:', info);
-        }}
+        isOpen={companyModalData.isOpen}
+        onClose={() => setCompanyModalData(prev => ({ ...prev, isOpen: false }))}
+        companyName={companyModalData.companyName}
+        contactInfo={companyModalData.contactInfo}
+        relatedProjects={relatedProjectsData}
+        onContactInfoUpdate={handleContactInfoUpdate}
       />
     )}
 
