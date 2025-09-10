@@ -331,23 +331,38 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 </div>
               </div>
               
-              <div className="h-3 bg-gray-200 rounded-full relative overflow-hidden">
+              <div className="h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner">
+                {/* Overall progress bar with timeline positioning */}
+                <div className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200">
+                  <div 
+                    className="h-full bg-green-600 transition-all duration-1000 ease-out"
+                    style={{
+                      width: `${(() => {
+                        const timezone = 'America/New_York';
+                        const today = startOfDay(tzNow(timezone));
+                        const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
+                        const closingDate = startOfDay(parseISO(project.closingDate));
+                        
+                        if (today >= closingDate) return 100;
+                        
+                        const totalDays = Math.max(1, differenceInCalendarDays(closingDate, startDate));
+                        const elapsedDays = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today < closingDate ? today : closingDate, startDate)));
+                        return Math.max(0, (elapsedDays / totalDays) * 100);
+                      })()}%`
+                    }}
+                  />
+                </div>
+                
+                {/* Start marker */}
                 <div 
-                  className="absolute top-0 left-0 h-full bg-green-500 rounded-full transition-all duration-1000 ease-out"
-                  style={{
-                    width: `${(() => {
-                      const timezone = 'America/New_York';
-                      const today = startOfDay(tzNow(timezone));
-                      const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
-                      const closingDate = startOfDay(parseISO(project.closingDate));
-                      
-                      if (today >= closingDate) return 100;
-                      
-                      const totalDays = Math.max(1, differenceInCalendarDays(closingDate, startDate));
-                      const elapsedDays = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today < closingDate ? today : closingDate, startDate)));
-                      return Math.max(0, (elapsedDays / totalDays) * 100);
-                    })()}%`
-                  }}
+                  className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
+                  style={{ left: "0px" }}
+                />
+                
+                {/* End marker */}
+                <div 
+                  className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
+                  style={{ right: "0px" }}
                 />
               </div>
             </div>
