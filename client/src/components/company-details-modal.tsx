@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Mail, Phone, User, Calendar, MapPin, ExternalLink, Edit2, Save, X } from "lucide-react";
+import { formatPhoneNumber } from "@/lib/phone-utils";
 import type { Task, Project } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -177,6 +178,10 @@ export function CompanyDetailsModal({
                       type="tel"
                       value={editedContactInfo.repPhone || ''}
                       onChange={(e) => setEditedContactInfo(prev => ({ ...prev, repPhone: e.target.value }))}
+                      onBlur={(e) => {
+                        const formatted = formatPhoneNumber(e.target.value);
+                        setEditedContactInfo(prev => ({ ...prev, repPhone: formatted }));
+                      }}
                       placeholder="Enter phone number"
                       className="text-sm"
                     />

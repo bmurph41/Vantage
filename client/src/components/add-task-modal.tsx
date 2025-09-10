@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Clock, DollarSign, Users, AlertCircle, Save, CheckCircle, XCircle, Calendar, Play, Circle, MinusCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { formatPhoneNumber } from "@/lib/phone-utils";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateTask, useUpdateTask } from "@/hooks/use-tasks";
@@ -883,6 +884,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                             type="tel"
                             placeholder="(555) 123-4567"
                             {...form.register("repPhone")}
+                            onBlur={(e) => {
+                              const formatted = formatPhoneNumber(e.target.value);
+                              form.setValue("repPhone", formatted);
+                            }}
                             data-testid="input-rep-phone"
                           />
                         </div>
@@ -1329,6 +1334,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                             type="tel"
                             placeholder="(555) 123-4567"
                             {...form.register("repPhone")}
+                            onBlur={(e) => {
+                              const formatted = formatPhoneNumber(e.target.value);
+                              form.setValue("repPhone", formatted);
+                            }}
                             data-testid="input-rep-phone"
                           />
                         </div>
