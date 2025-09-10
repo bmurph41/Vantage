@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
-import { tzNow } from "@/lib/date-utils";
+import { tzNow, getProjectBounds, eachDay, percentOfRange, clampDate, getVisibleTicks } from "@/lib/date-utils";
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -199,57 +199,13 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
   const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];
 
-  // Calculate timeline bounds
-  const projectStart = project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date();
-  const projectEnd = project.closingDate ? parseISO(project.closingDate) : addDays(projectStart, 120);
+  // Get fixed project timeline bounds using new utility function
+  const { start: projectStart, end: projectEnd } = getProjectBounds(project);
+  const today = startOfDay(tzNow('America/New_York'));
 
-  // Generate timeline header dates
-  const generateTimelineDates = () => {
-    const dates: Date[] = [];
-    let currentDate = new Date(projectStart);
-    
-    switch (granularity) {
-      case 'daily':
-        return eachDayOfInterval({ start: projectStart, end: projectEnd });
-      case 'weekly':
-        // Generate weekly dates starting exactly from PSA signed date
-        while (currentDate <= projectEnd) {
-          dates.push(new Date(currentDate));
-          currentDate = addDays(currentDate, 7);
-        }
-        // Ensure closing date is always included if it's not already
-        if (dates.length > 0 && dates[dates.length - 1].getTime() !== projectEnd.getTime()) {
-          dates.push(new Date(projectEnd));
-        }
-        return dates;
-      case 'biweekly':
-        // Generate biweekly dates starting exactly from PSA signed date
-        while (currentDate <= projectEnd) {
-          dates.push(new Date(currentDate));
-          currentDate = addDays(currentDate, 14);
-        }
-        // Ensure closing date is always included if it's not already
-        if (dates.length > 0 && dates[dates.length - 1].getTime() !== projectEnd.getTime()) {
-          dates.push(new Date(projectEnd));
-        }
-        return dates;
-      case 'monthly':
-        // Generate monthly dates starting exactly from PSA signed date
-        while (currentDate <= projectEnd) {
-          dates.push(new Date(currentDate));
-          currentDate = addDays(currentDate, 30); // Approximate monthly interval
-        }
-        // Ensure closing date is always included if it's not already
-        if (dates.length > 0 && dates[dates.length - 1].getTime() !== projectEnd.getTime()) {
-          dates.push(new Date(projectEnd));
-        }
-        return dates;
-      default:
-        return eachDayOfInterval({ start: projectStart, end: projectEnd });
-    }
-  };
-
-  const timelineDates = generateTimelineDates();
+  // Generate all days in project range and get visible ticks based on granularity
+  const allDays = useMemo(() => eachDay(projectStart, projectEnd), [projectStart, projectEnd]);
+  const visibleTicks = useMemo(() => getVisibleTicks(allDays, granularity), [allDays, granularity]);
 
   // Get milestone position along timeline (0-100%)
   const getMilestonePosition = (dateString: string) => {
@@ -293,14 +249,30 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
           {/* Clean Date Headers with Smart Leader Lines */}
           <div className="mb-4 relative">
-            <div className="grid gap-1 w-full text-center py-3 bg-gray-50 rounded border relative z-10" style={{ gridTemplateColumns: `repeat(${Math.min(12, timelineDates.length)}, 1fr)` }} ref={headerRef}>
-              {timelineDates.slice(0, 12).map((date, index) => {
+            <div className="relative w-full h-12 bg-gray-50 rounded border overflow-hidden" ref={headerRef}>
+              {/* Fixed Start and End labels */}
+              <div className="absolute left-0 top-0 bottom-0 flex items-center px-2 bg-blue-100 text-blue-800 text-xs font-medium border-r border-blue-200 z-10">
+                {format(projectStart, 'M/d/yy')}
+              </div>
+              <div className="absolute right-0 top-0 bottom-0 flex items-center px-2 bg-green-100 text-green-800 text-xs font-medium border-l border-green-200 z-10">
+                {format(projectEnd, 'M/d/yy')}
+              </div>
+              
+              {/* Visible tick marks based on granularity */}
+              {visibleTicks.map((date, index) => {
+                const position = percentOfRange(date, projectStart, projectEnd);
                 const isCurrentPeriod = isToday(date);
+                
                 return (
-                  <div key={index} className={`py-2 px-1 text-xs relative ${
-                    isCurrentPeriod ? 'bg-blue-50 text-blue-700 font-medium rounded' : 'text-gray-600'
-                  }`} data-testid={`timeline-date-${index}`}>
-                    <div>
+                  <div 
+                    key={index}
+                    className={`absolute top-0 bottom-0 flex flex-col justify-center items-center transform -translate-x-1/2 px-1 ${
+                      isCurrentPeriod ? 'bg-blue-50 text-blue-700 font-medium rounded z-20' : 'text-gray-600 z-10'
+                    }`}
+                    style={{ left: `${position}%` }}
+                    data-testid={`timeline-date-${index}`}
+                  >
+                    <div className="text-xs whitespace-nowrap">
                       {format(date, 
                         granularity === 'daily' ? 'MMM d' : 
                         granularity === 'monthly' ? 'MMM' : 
@@ -309,7 +281,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                       )}
                     </div>
                     {granularity === 'monthly' && (
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-gray-500">
                         {format(date, 'yyyy')}
                       </div>
                     )}
@@ -321,63 +293,15 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
               <LinesLayer headerRef={headerRef} contentRef={contentRef} />
             </div>
-            {/* Today Vertical Line */}
+            {/* Today Vertical Line - Aligned with Fixed Timeline */}
             {(() => {
-              const today = startOfDay(tzNow('America/New_York'));
-              const todayPosition = (() => {
-                // Find which date period today falls into
-                const visibleDates = timelineDates.slice(0, 12);
-                let todayIndex = -1;
-                let todayOffset = 0;
-                
-                for (let i = 0; i < visibleDates.length; i++) {
-                  const currentDate = visibleDates[i];
-                  const nextDate = visibleDates[i + 1];
-                  
-                  if (granularity === 'monthly') {
-                    // For monthly view, check if today is within this month
-                    const monthStart = startOfMonth(currentDate);
-                    const monthEnd = endOfMonth(currentDate);
-                    if (today >= monthStart && today <= monthEnd) {
-                      todayIndex = i;
-                      // Calculate position within the month
-                      const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
-                      const dayOfMonth = differenceInDays(today, monthStart);
-                      todayOffset = dayOfMonth / daysInMonth;
-                      break;
-                    }
-                  } else if (granularity === 'weekly' || granularity === 'biweekly') {
-                    // For weekly view
-                    const weekStart = startOfWeek(currentDate);
-                    const weekEnd = endOfWeek(currentDate);
-                    if (today >= weekStart && today <= weekEnd) {
-                      todayIndex = i;
-                      const daysInWeek = differenceInDays(weekEnd, weekStart) + 1;
-                      const dayOfWeek = differenceInDays(today, weekStart);
-                      todayOffset = dayOfWeek / daysInWeek;
-                      break;
-                    }
-                  } else {
-                    // For daily view
-                    if (format(today, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd')) {
-                      todayIndex = i;
-                      todayOffset = 0.5; // Center of the day
-                      break;
-                    }
-                  }
-                }
-                
-                if (todayIndex >= 0) {
-                  const cellWidth = 100 / Math.min(12, visibleDates.length);
-                  return (todayIndex * cellWidth) + (todayOffset * cellWidth);
-                }
-                return -1; // Today not visible
-              })();
+              const clampedToday = clampDate(today, projectStart, projectEnd);
+              const todayPosition = percentOfRange(clampedToday, projectStart, projectEnd);
               
-              if (todayPosition >= 0) {
+              if (todayPosition >= 0 && todayPosition <= 100) {
                 return (
                   <div 
-                    className="absolute top-0 bottom-0 w-0.5 bg-blue-500 shadow-lg z-20 pointer-events-none"
+                    className="absolute top-0 bottom-0 w-0.5 bg-blue-500 shadow-lg z-30 pointer-events-none"
                     style={{ 
                       left: `${todayPosition}%`,
                       height: '100%'
