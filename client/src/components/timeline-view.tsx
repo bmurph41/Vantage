@@ -164,8 +164,14 @@ function LinesLayer({ headerRef, contentRef }: LinesLayerProps) {
 
   return (
     <div 
-      className="absolute inset-0 pointer-events-none z-0" 
-      style={{ top: 0, left: 0, right: 0, bottom: 0 }}
+      className="absolute pointer-events-none z-0" 
+      style={{ 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0,
+        clipPath: 'inset(0 0 0 0)' // Ensure lines stay within the container
+      }}
       aria-hidden="true"
     >
       {lines.map((line, lineIndex) =>
@@ -311,8 +317,10 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 );
               })}
             </div>
-            {/* Smart Leader Lines Layer */}
-            <LinesLayer headerRef={headerRef} contentRef={contentRef} />
+            {/* Smart Leader Lines Layer - contained within this timeline section */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+              <LinesLayer headerRef={headerRef} contentRef={contentRef} />
+            </div>
           </div>
 
           {/* Overall Progress Bar */}
