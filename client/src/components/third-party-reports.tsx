@@ -319,6 +319,15 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     });
   };
 
+  const handleDateFieldChange = (taskId: string, fieldName: string, newValue: string) => {
+    updateTask.mutate({
+      id: taskId,
+      updates: { 
+        [fieldName]: newValue || null
+      }
+    });
+  };
+
   const getPaymentStatusBadge = (paymentStatus: string) => {
     const colors = {
       'not_paid': 'bg-red-100 text-red-800 border-red-200',
@@ -839,7 +848,15 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     <div>
                       <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Ordered</label>
                       <div className="mt-1">
-                        {task.orderedAt ? (
+                        {task.status === "scheduled" ? (
+                          <input 
+                            type="date" 
+                            value={task.orderedAt || ""} 
+                            onChange={(e) => handleDateFieldChange(task.id, 'orderedAt', e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            data-testid={`input-ordered-${task.id}`}
+                          />
+                        ) : task.orderedAt ? (
                           <input 
                             type="date" 
                             value={task.orderedAt} 
@@ -855,7 +872,15 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     <div>
                       <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">On-Site</label>
                       <div className="mt-1">
-                        {task.dateOnSite ? (
+                        {task.status === "scheduled" ? (
+                          <input 
+                            type="date" 
+                            value={task.dateOnSite || ""} 
+                            onChange={(e) => handleDateFieldChange(task.id, 'dateOnSite', e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            data-testid={`input-on-site-${task.id}`}
+                          />
+                        ) : task.dateOnSite ? (
                           <input 
                             type="date" 
                             value={task.dateOnSite} 
