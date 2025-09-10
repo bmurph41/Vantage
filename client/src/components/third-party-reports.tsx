@@ -730,19 +730,19 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         </div>
 
         {/* Reports Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full" data-testid="tasks-table">
+        <div className="overflow-x-auto border rounded-lg">
+          <table className="w-full min-w-[1200px] table-fixed" data-testid="tasks-table">
             <thead>
               <tr className="bg-primary text-primary-foreground">
-                <th className="px-4 py-3 text-left text-sm font-semibold">Task</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Task Owner</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Company Hired</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Payment</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Days Remaining</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Completion Date</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Cost</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
+                <th className="px-3 py-3 text-left text-sm font-semibold w-[240px]">Task</th>
+                <th className="px-3 py-3 text-left text-sm font-semibold w-[140px]">Task Owner</th>
+                <th className="px-3 py-3 text-left text-sm font-semibold w-[160px]">Company Hired</th>
+                <th className="px-3 py-3 text-left text-sm font-semibold w-[120px]">Status</th>
+                <th className="px-3 py-3 text-left text-sm font-semibold w-[100px]">Payment</th>
+                <th className="px-3 py-3 text-left text-sm font-semibold w-[110px]">Days Remaining</th>
+                <th className="px-3 py-3 text-left text-sm font-semibold w-[180px]">Completion Date</th>
+                <th className="px-3 py-3 text-left text-sm font-semibold w-[100px]">Cost</th>
+                <th className="px-3 py-3 text-left text-sm font-semibold w-[120px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -752,50 +752,50 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       className={`hover:bg-accent/50 transition-colors ${index % 2 === 1 ? 'bg-accent/30' : ''}`}
                   data-testid={`row-task-${task.id}`}
                 >
-                  <td className="px-4 py-3">
-                    <div className="font-medium" data-testid={`text-task-title-${task.id}`}>
+                  <td className="px-3 py-3">
+                    <div className="font-medium text-sm leading-tight truncate" title={task.title} data-testid={`text-task-title-${task.id}`}>
                       {task.title}
                     </div>
                     {task.description && (
-                      <div className="text-sm text-muted-foreground" data-testid={`text-task-description-${task.id}`}>
+                      <div className="text-xs text-muted-foreground mt-1 line-clamp-2" title={task.description} data-testid={`text-task-description-${task.id}`}>
                         {task.description}
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     {task.assignee ? (
                       <div className="flex items-center space-x-2" data-testid={`assignee-${task.id}`}>
-                        <div className={`w-6 h-6 ${getUserColor(task.assignee)} rounded-full flex items-center justify-center text-xs text-white`}>
+                        <div className={`w-5 h-5 ${getUserColor(task.assignee)} rounded-full flex items-center justify-center text-xs text-white flex-shrink-0`}>
                           {getUserInitials(task.assignee)}
                         </div>
-                        <span>{task.assignee}</span>
+                        <span className="text-sm truncate" title={task.assignee}>{task.assignee}</span>
                       </div>
                     ) : (
-                      <span className="text-muted-foreground">-</span>
+                      <span className="text-muted-foreground text-sm">-</span>
                     )}
                   </td>
-                  <td className="px-4 py-3" data-testid={`text-company-${task.id}`}>
+                  <td className="px-3 py-3" data-testid={`text-company-${task.id}`}>
                     {task.companyHired ? (
                       <div>
-                        <div className="font-medium">{task.companyHired}</div>
+                        <div className="font-medium text-sm leading-tight truncate" title={task.companyHired}>{task.companyHired}</div>
                         {(task.repName || task.repEmail || task.repPhone) && (
                           <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                            {task.repName && <div>Rep: {task.repName}</div>}
-                            {task.repEmail && <div>📧 {task.repEmail}</div>}
-                            {task.repPhone && <div>📞 {task.repPhone}</div>}
+                            {task.repName && <div className="truncate" title={`Rep: ${task.repName}`}>Rep: {task.repName}</div>}
+                            {task.repEmail && <div className="truncate" title={task.repEmail}>📧 {task.repEmail}</div>}
+                            {task.repPhone && <div className="truncate" title={task.repPhone}>📞 {task.repPhone}</div>}
                           </div>
                         )}
                       </div>
                     ) : (
-                      <span className="text-muted-foreground">-</span>
+                      <span className="text-muted-foreground text-sm">-</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <Select
                       value={task.status}
                       onValueChange={(value) => handleStatusChange(task.id, value)}
                     >
-                      <SelectTrigger className="w-32" data-testid={`select-status-${task.id}`}>
+                      <SelectTrigger className="w-full h-8" data-testid={`select-status-${task.id}`}>
                         <SelectValue>
                           {getStatusBadge(task.status)}
                         </SelectValue>
@@ -808,12 +808,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <Select
                       value={task.paymentStatus || 'not_paid'}
                       onValueChange={(value) => handlePaymentStatusChange(task.id, value)}
                     >
-                      <SelectTrigger className="w-28" data-testid={`select-payment-${task.id}`}>
+                      <SelectTrigger className="w-full h-8" data-testid={`select-payment-${task.id}`}>
                         <SelectValue>
                           {getPaymentStatusBadge(task.paymentStatus || 'not_paid')}
                         </SelectValue>
@@ -824,7 +824,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-4 py-3" data-testid={`text-days-remaining-${task.id}`}>
+                  <td className="px-3 py-3 text-center" data-testid={`text-days-remaining-${task.id}`}>
                     {(() => {
                       const daysRemaining = calculateDaysRemaining(task);
                       if (task.status === 'completed') {
@@ -834,13 +834,13 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       } else if (daysRemaining < 0) {
                         return <span className="text-red-600 font-medium">Overdue</span>;
                       } else {
-                        return <span className={`font-medium ${daysRemaining <= 3 ? 'text-orange-600' : 'text-gray-900'}`}>
-                          {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}
+                        return <span className={`font-medium text-sm ${daysRemaining <= 3 ? 'text-orange-600' : 'text-gray-900'}`}>
+                          {daysRemaining}d
                         </span>;
                       }
                     })()}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground" data-testid={`completion-date-${task.id}`}>
+                  <td className="px-3 py-3 text-muted-foreground" data-testid={`completion-date-${task.id}`}>
                     <Input
                       type="datetime-local"
                       value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 16) : ''}
@@ -851,18 +851,19 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           updates: { completedAt: newCompletedAt }
                         });
                       }}
-                      className="w-full min-w-[180px] text-sm"
+                      className="w-full text-xs h-8"
                       data-testid={`input-completion-date-${task.id}`}
                     />
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground" data-testid={`text-cost-${task.id}`}>
+                  <td className="px-3 py-3 text-muted-foreground text-sm text-right" data-testid={`text-cost-${task.id}`}>
                     {task.cost || '-'}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex space-x-2">
+                  <td className="px-3 py-3">
+                    <div className="flex space-x-1">
                       <Button 
                         variant="ghost" 
                         size="sm" 
+                        className="h-7 px-2 text-xs"
                         onClick={() => {
                           setEditingTask(task);
                           setIsAddTaskModalOpen(true);
@@ -877,10 +878,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            className="text-destructive hover:text-destructive"
+                            className="text-destructive hover:text-destructive h-7 px-2"
                             data-testid={`button-delete-${task.id}`}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
