@@ -36,13 +36,13 @@ export function TimelineNotes({ taskId, taskTitle }: TimelineNotesProps) {
   // Fetch timeline notes
   const { data: notes = [], isLoading } = useQuery<TimelineNote[]>({
     queryKey: ['/api/dd/tasks', taskId, 'timeline-notes'],
-    queryFn: () => apiRequest(`/api/dd/tasks/${taskId}/timeline-notes`),
   });
 
   // Create note mutation
   const createNoteMutation = useMutation({
     mutationFn: async (noteData: { content: string; noteType: string }) => {
-      return apiRequest(`/api/dd/tasks/${taskId}/timeline-notes`, "POST", noteData);
+      const response = await apiRequest("POST", `/api/dd/tasks/${taskId}/timeline-notes`, noteData);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/tasks', taskId, 'timeline-notes'] });
@@ -65,7 +65,8 @@ export function TimelineNotes({ taskId, taskTitle }: TimelineNotesProps) {
   // Update note mutation
   const updateNoteMutation = useMutation({
     mutationFn: async ({ id, content }: { id: string; content: string }) => {
-      return apiRequest(`/api/dd/timeline-notes/${id}`, "PUT", { content });
+      const response = await apiRequest("PUT", `/api/dd/timeline-notes/${id}`, { content });
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/tasks', taskId, 'timeline-notes'] });
@@ -88,7 +89,8 @@ export function TimelineNotes({ taskId, taskTitle }: TimelineNotesProps) {
   // Delete note mutation
   const deleteNoteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/dd/timeline-notes/${id}`, "DELETE");
+      const response = await apiRequest("DELETE", `/api/dd/timeline-notes/${id}`);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/tasks', taskId, 'timeline-notes'] });
