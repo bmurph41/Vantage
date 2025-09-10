@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Download, Share2, FileText } from "lucide-react";
 import type { Project, Task } from "@shared/schema";
 import { ddClient } from "@/lib/ddClient";
@@ -89,7 +89,7 @@ export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
             {project.name}
           </h2>
           <p className="text-muted-foreground" data-testid="project-dates">
-            {project.closingDate && `Target Closing Date: ${format(new Date(project.closingDate), 'MMMM d, yyyy')}`}
+            {project.closingDate && `Target Closing Date: ${format(parseISO(project.closingDate), 'MMMM d, yyyy')}`}
           </p>
         </div>
         <div className="flex items-center space-x-3">

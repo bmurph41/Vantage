@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useProjects, useCreateProject } from "@/hooks/use-project";
-import { format, differenceInDays, isPast, isToday } from "date-fns";
+import { format, differenceInDays, isPast, isToday, parseISO } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -192,9 +192,9 @@ export default function Dashboard() {
             {projects.map((project) => {
               // Calculate project status based on dates
               const today = new Date();
-              const ddExpired = project.ddExpirationDate && isPast(new Date(project.ddExpirationDate));
-              const ddExpiringSoon = project.ddExpirationDate && !ddExpired && differenceInDays(new Date(project.ddExpirationDate), today) <= 7;
-              const closingSoon = project.closingDate && differenceInDays(new Date(project.closingDate), today) <= 14;
+              const ddExpired = project.ddExpirationDate && isPast(parseISO(project.ddExpirationDate));
+              const ddExpiringSoon = project.ddExpirationDate && !ddExpired && differenceInDays(parseISO(project.ddExpirationDate), today) <= 7;
+              const closingSoon = project.closingDate && differenceInDays(parseISO(project.closingDate), today) <= 14;
               
               let statusBadge = null;
               let statusColor = "bg-gray-50/30 border-gray-200";
@@ -248,7 +248,7 @@ export default function Dashboard() {
                               <span className="text-sm font-medium text-gray-700">PSA Signed</span>
                             </div>
                             <span className="text-sm font-semibold text-gray-900">
-                              {format(new Date(project.psaSignedDate), 'MMM d, yyyy')}
+                              {format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}
                             </span>
                           </div>
                         )}
@@ -266,7 +266,7 @@ export default function Dashboard() {
                             <span className={`text-sm font-semibold ${
                               ddExpired ? 'text-red-700' : ddExpiringSoon ? 'text-amber-700' : 'text-gray-900'
                             }`}>
-                              {format(new Date(project.ddExpirationDate), 'MMM d, yyyy')} ({calculateDaysRemaining(project.ddExpirationDate) > 0 ? `${calculateDaysRemaining(project.ddExpirationDate)}d remaining` : calculateDaysRemaining(project.ddExpirationDate) === 0 ? 'Today' : `${Math.abs(calculateDaysRemaining(project.ddExpirationDate))}d ago`})
+                              {format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')} ({calculateDaysRemaining(project.ddExpirationDate) > 0 ? `${calculateDaysRemaining(project.ddExpirationDate)}d remaining` : calculateDaysRemaining(project.ddExpirationDate) === 0 ? 'Today' : `${Math.abs(calculateDaysRemaining(project.ddExpirationDate))}d ago`})
                             </span>
                           </div>
                         )}
@@ -284,7 +284,7 @@ export default function Dashboard() {
                             <span className={`text-sm font-semibold ${
                               closingSoon ? 'text-slate-700' : 'text-gray-900'
                             }`}>
-                              {format(new Date(project.closingDate), 'MMM d, yyyy')} ({calculateDaysRemaining(project.closingDate) > 0 ? `${calculateDaysRemaining(project.closingDate)}d remaining` : calculateDaysRemaining(project.closingDate) === 0 ? 'Today' : `${Math.abs(calculateDaysRemaining(project.closingDate))}d ago`})
+                              {format(parseISO(project.closingDate), 'MMM d, yyyy')} ({calculateDaysRemaining(project.closingDate) > 0 ? `${calculateDaysRemaining(project.closingDate)}d remaining` : calculateDaysRemaining(project.closingDate) === 0 ? 'Today' : `${Math.abs(calculateDaysRemaining(project.closingDate))}d ago`})
                             </span>
                           </div>
                         )}

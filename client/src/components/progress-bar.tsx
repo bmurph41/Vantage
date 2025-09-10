@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { effectiveStart, effectiveDue, daysBetween, tzNow } from "@/lib/date-utils";
-import { startOfDay, isAfter, isBefore } from "date-fns";
+import { startOfDay, isAfter, isBefore, parseISO } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 
 interface ProgressBarProps {
@@ -16,8 +16,8 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   const due = effectiveDue(task, { ...project, settings });
   
   // Calculate project timeline bounds
-  const projectStart = project.psaSignedDate ? startOfDay(new Date(project.psaSignedDate)) : start;
-  const projectEnd = project.closingDate ? startOfDay(new Date(project.closingDate)) : due;
+  const projectStart = project.psaSignedDate ? startOfDay(parseISO(project.psaSignedDate)) : start;
+  const projectEnd = project.closingDate ? startOfDay(parseISO(project.closingDate)) : due;
   
   // Calculate task position and width relative to overall timeline
   const totalProjectDays = Math.max(1, daysBetween(projectStart, projectEnd, settings?.useBusinessDays, settings?.holidayCalendar));
