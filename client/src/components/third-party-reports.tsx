@@ -35,6 +35,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [taskDisplay, setTaskDisplay] = useState<'all' | 'critical' | 'none' | 'selected'>('all');
   const [selectedTaskPriorities, setSelectedTaskPriorities] = useState<Set<string>>(new Set(['high', 'med', 'low']));
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [sortColumn, setSortColumn] = useState<'daysRemaining' | 'cost' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const toggleTaskExpansion = (taskId: string) => {
     const newExpanded = new Set(expandedTasks);
@@ -44,6 +46,17 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       newExpanded.add(taskId);
     }
     setExpandedTasks(newExpanded);
+  };
+
+  const handleSort = (column: 'daysRemaining' | 'cost') => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New column, default to descending (highest first)
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
   };
   // Removed floating timeline to prevent scroll issues
   const updateTask = useUpdateTask();
