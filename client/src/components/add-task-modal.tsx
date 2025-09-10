@@ -262,6 +262,35 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     setStep("customize");
   };
 
+  const handleCreateCustomTask = () => {
+    setSelectedTemplate(null);
+    
+    // Reset form with blank data for custom task
+    form.reset({
+      title: "",
+      description: "",
+      startStrategy: "offset",
+      startDate: "",
+      startOffsetDays: 0,
+      deadlineType: "dd_expiration",
+      assignee: "",
+      companyHired: "",
+      repName: "",
+      repEmail: "",
+      repPhone: "",
+      priority: "med",
+      status: "to_do",
+      paymentStatus: "not_paid",
+      dateOnSite: "",
+      completedAt: "",
+      cost: "",
+      notes: "",
+      showOnTimeline: false,
+    });
+    
+    setStep("customize");
+  };
+
   const handleBack = () => {
     setStep("browse");
     setSelectedTemplate(null);
@@ -656,6 +685,28 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           </form>
         ) : step === "browse" ? (
           <div className="space-y-4">
+            {/* Create Custom Task Button */}
+            <div className="flex justify-center p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <Button 
+                onClick={handleCreateCustomTask}
+                className="w-full max-w-sm"
+                data-testid="button-create-custom-task"
+              >
+                Create Custom Task
+              </Button>
+            </div>
+            
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or choose from templates
+                </span>
+              </div>
+            </div>
+
             {/* Search and Filters */}
             <div className="flex space-x-4">
               <div className="relative flex-1">
@@ -987,7 +1038,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   Cancel
                 </Button>
                 <Button type="submit" disabled={createTask.isPending} data-testid="button-add-task">
-                  {createTask.isPending ? "Adding..." : "Add Task"}
+                  {createTask.isPending ? "Adding..." : selectedTemplate ? "Add Task from Template" : "Add Custom Task"}
                 </Button>
               </div>
             </div>
