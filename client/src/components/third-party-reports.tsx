@@ -113,28 +113,32 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   // Timeline logic
   const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];
 
-  // Calculate timeline bounds
+  // Calculate timeline bounds - MUST start at PSA and end at Closing
   const projectStart = project?.psaSignedDate ? parseISO(project.psaSignedDate) : new Date();
   const projectEnd = project?.closingDate ? parseISO(project.closingDate) : addDays(projectStart, 120);
 
-  // Generate timeline header dates
+  // Generate timeline header dates based on granularity
   const generateTimelineDates = () => {
     switch (granularity) {
       case 'daily':
         return eachDayOfInterval({ start: projectStart, end: projectEnd });
       case 'weekly':
+        return eachWeekOfInterval({ start: projectStart, end: projectEnd });
       case 'biweekly':
-        const weeklyStart = startOfWeek(projectStart);
-        const weeklyEnd = projectEnd;
-        return eachWeekOfInterval({ start: weeklyStart, end: weeklyEnd });
+        const biweeklyDates = [];
+        let current = new Date(projectStart);
+        while (current <= projectEnd) {
+          biweeklyDates.push(new Date(current));
+          current.setDate(current.getDate() + 14);
+        }
+        if (biweeklyDates[biweeklyDates.length - 1] < projectEnd) {
+          biweeklyDates.push(new Date(projectEnd));
+        }
+        return biweeklyDates;
       case 'monthly':
-        const monthlyStart = startOfMonth(projectStart);
-        const monthlyEnd = projectEnd;
-        return eachMonthOfInterval({ start: monthlyStart, end: monthlyEnd });
+        return eachMonthOfInterval({ start: projectStart, end: projectEnd });
       default:
-        const defaultStart = startOfWeek(projectStart);
-        const defaultEnd = projectEnd;
-        return eachWeekOfInterval({ start: defaultStart, end: defaultEnd });
+        return eachWeekOfInterval({ start: projectStart, end: projectEnd });
     }
   };
 
@@ -148,6 +152,47 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     return Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
   };
 
+  // Get task progress for timeline
+  const getTaskProgress = (task: Task) => {
+    if (task.status === 'completed') return { progress: 100, status: 'completed' };
+    
+    const today = new Date();
+    let startDate: Date, endDate: Date;
+    
+    if (task.deadlineType === 'dd_expiration' && project?.ddExpirationDate) {
+      endDate = parseISO(project.ddExpirationDate);
+      startDate = project?.psaSignedDate ? parseISO(project.psaSignedDate) : today;
+    } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project?.psaSignedDate) {
+      const psaDate = parseISO(project.psaSignedDate);
+      startDate = new Date(psaDate);
+      endDate = new Date(psaDate);
+      endDate.setDate(endDate.getDate() + task.deadlineDays);
+    } else {
+      // Fallback calculation
+      startDate = task.startDate 
+        ? parseISO(task.startDate) 
+        : project?.psaSignedDate 
+          ? new Date(parseISO(project.psaSignedDate).getTime() + (task.startOffsetDays || 0) * 24 * 60 * 60 * 1000)
+          : today;
+      endDate = new Date(startDate.getTime() + (task.durationDays || 7) * 24 * 60 * 60 * 1000);
+    }
+    
+    const totalDuration = endDate.getTime() - startDate.getTime();
+    const elapsed = today.getTime() - startDate.getTime();
+    const progress = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+    
+    const isOverdue = today > endDate && task.status !== 'completed';
+    const status = isOverdue ? 'overdue' : task.status === 'in_progress' ? 'in_progress' : 'pending';
+    
+    return { 
+      progress, 
+      status,
+      startPosition: getMilestonePosition(startDate.toISOString()),
+      endPosition: getMilestonePosition(endDate.toISOString()),
+      width: Math.abs(getMilestonePosition(endDate.toISOString()) - getMilestonePosition(startDate.toISOString()))
+    };
+  };
+
   return (
     <Card data-testid="third-party-reports">
       <CardHeader className="bg-primary text-primary-foreground">
@@ -155,15 +200,22 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       </CardHeader>
       
       <CardContent className="p-6">
-        {/* DD Timeline Section */}
-        <div className="mb-8 space-y-6">
-          {/* Timeline Controls */}
-          <div className="flex items-center justify-between">
+        {/* Enhanced DD Timeline Section */}
+        <div className="mb-10 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200 shadow-lg">
+          {/* Timeline Header */}
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
-              <h3 className="text-lg font-semibold text-gray-900">Project Timeline</h3>
-              <div className="bg-gray-100 rounded-lg p-1">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Project Timeline</h3>
+              </div>
+              <div className="bg-white/70 backdrop-blur rounded-lg p-1 border border-blue-300">
                 <Select value={granularity} onValueChange={setGranularity}>
-                  <SelectTrigger className="w-32 bg-transparent border-0" data-testid="select-granularity">
+                  <SelectTrigger className="w-32 bg-transparent border-0 font-medium" data-testid="select-granularity">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -179,90 +231,160 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 variant={showCriticalPath ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowCriticalPath(!showCriticalPath)}
-                className={showCriticalPath ? "bg-amber-500 hover:bg-amber-600 text-white" : ""}
+                className={showCriticalPath ? "bg-amber-500 hover:bg-amber-600 text-white shadow-md" : "bg-white border-amber-300 text-amber-700 hover:bg-amber-50"}
                 data-testid="button-critical-path"
               >
                 Critical Path
               </Button>
-              <div className="text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded-lg border">
+              <div className="text-sm font-medium text-blue-700 bg-white px-4 py-2 rounded-lg border border-blue-300 shadow-sm">
                 {tasks.filter(t => t.showOnTimeline).length} Timeline Tasks
               </div>
             </div>
           </div>
 
-          {/* Timeline Track */}
+          {/* Enhanced Timeline Track */}
           {project && (
-            <div className="bg-gray-50 rounded-lg p-6 border">
+            <div className="bg-white rounded-xl p-6 border border-blue-200 shadow-inner">
+              {/* Date Headers with proper spacing */}
               <div className="mb-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Key Milestones</h4>
-                
-                {/* Date Headers */}
-                <div className="flex justify-between mb-2 text-xs text-gray-500">
-                  {timelineDates.slice(0, 8).map((date, index) => (
-                    <div key={index}>
-                      {format(date, granularity === 'monthly' ? 'MMM yyyy' : 'MMM d')}
-                    </div>
-                  ))}
+                <div className="flex justify-between items-center mb-3">
+                  <div className="text-sm font-bold text-blue-700">
+                    Start: {format(projectStart, 'MMM d, yyyy')}
+                  </div>
+                  <div className="text-sm font-bold text-green-700">
+                    Target Close: {format(projectEnd, 'MMM d, yyyy')}
+                  </div>
                 </div>
                 
-                {/* Timeline Track */}
-                <div className="relative h-12 bg-white rounded border shadow-sm overflow-hidden">
-                  {/* Grid Lines */}
-                  <div className="absolute inset-0 flex">
-                    {timelineDates.slice(0, 8).map((date, index) => (
-                      <div key={index} className="flex-1 border-r border-gray-100 last:border-r-0"></div>
-                    ))}
+                {/* Tick marks based on granularity */}
+                <div className="relative">
+                  <div className="flex justify-between text-xs text-gray-600 font-medium mb-2">
+                    {timelineDates.map((date, index) => {
+                      // Show fewer dates for readability
+                      const maxTicks = granularity === 'daily' ? 10 : granularity === 'weekly' ? 8 : 6;
+                      if (index % Math.ceil(timelineDates.length / maxTicks) === 0 || index === timelineDates.length - 1) {
+                        return (
+                          <div key={index} className="text-center">
+                            {format(date, granularity === 'daily' ? 'MMM d' : granularity === 'monthly' ? 'MMM yyyy' : 'MMM d')}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
                   </div>
+                  
+                  {/* Main Timeline Track */}
+                  <div className="relative h-20 bg-gradient-to-r from-gray-100 to-gray-200 rounded-lg border-2 border-gray-300 shadow-inner overflow-visible">
+                    {/* Grid Lines */}
+                    <div className="absolute inset-0 flex">
+                      {timelineDates.map((date, index) => {
+                        const maxTicks = granularity === 'daily' ? 10 : granularity === 'weekly' ? 8 : 6;
+                        if (index % Math.ceil(timelineDates.length / maxTicks) === 0 || index === timelineDates.length - 1) {
+                          return (
+                            <div key={index} className="flex-1 border-r border-gray-300/50 last:border-r-0">
+                              <div className="h-full border-r border-gray-400/30"></div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
 
-                  {/* Milestone markers */}
-                  <div className="absolute inset-0 flex items-center">
-                    {/* PSA Signed */}
-                    {project.psaSignedDate && (
-                      <div 
-                        className="absolute flex flex-col items-center transform -translate-x-1/2"
-                        style={{ left: `${getMilestonePosition(project.psaSignedDate)}%` }}
-                      >
-                        <div className="w-3 h-3 bg-blue-600 rounded-full border-2 border-white shadow-md"></div>
-                        <div className="absolute -bottom-8 bg-white shadow-sm rounded px-2 py-1 border border-gray-200 min-w-max">
-                          <div className="text-xs font-semibold text-blue-600">PSA Signed</div>
-                          <div className="text-xs text-gray-500">{format(parseISO(project.psaSignedDate), 'MMM d')}</div>
-                        </div>
-                      </div>
-                    )}
+                    {/* Task Progress Bars */}
+                    <div className="absolute inset-0 pt-2 pb-2">
+                      {tasks.filter(t => t.showOnTimeline && (!showCriticalPath || t.priority === 'high')).map((task, taskIndex) => {
+                        const taskProgress = getTaskProgress(task);
+                        const yPosition = 6 + (taskIndex * 12); // Stagger task bars vertically
+                        
+                        return (
+                          <div key={task.id} className="absolute" style={{ 
+                            left: `${taskProgress.startPosition}%`, 
+                            width: `${taskProgress.width}%`,
+                            top: `${yPosition}px`,
+                            height: '8px'
+                          }}>
+                            <div className="relative h-full">
+                              <div className={`h-full rounded-sm shadow-sm ${
+                                taskProgress.status === 'completed' ? 'bg-green-500' :
+                                taskProgress.status === 'overdue' ? 'bg-red-500' :
+                                taskProgress.status === 'in_progress' ? 'bg-blue-500' :
+                                'bg-gray-400'
+                              }`}>
+                                <div 
+                                  className={`h-full rounded-sm ${
+                                    taskProgress.status === 'completed' ? 'bg-green-600' :
+                                    taskProgress.status === 'overdue' ? 'bg-red-600' :
+                                    taskProgress.status === 'in_progress' ? 'bg-blue-600' :
+                                    'bg-gray-500'
+                                  }`}
+                                  style={{ width: `${taskProgress.progress}%` }}
+                                ></div>
+                              </div>
+                              <div className="absolute -top-6 left-0 text-xs font-medium text-gray-800 bg-white px-2 py-1 rounded shadow-sm border truncate max-w-32">
+                                {task.title.length > 15 ? task.title.substring(0, 15) + '...' : task.title}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                    {/* DD Expiration */}
-                    {project.ddExpirationDate && (
-                      <div 
-                        className="absolute flex flex-col items-center transform -translate-x-1/2"
-                        style={{ left: `${getMilestonePosition(project.ddExpirationDate)}%` }}
-                      >
-                        <div className="w-3 h-3 bg-amber-600 rounded-full border-2 border-white shadow-md"></div>
-                        <div className="absolute -bottom-8 bg-white shadow-sm rounded px-2 py-1 border border-gray-200 min-w-max">
-                          <div className="text-xs font-semibold text-amber-600">DD Expiration</div>
-                          <div className="text-xs text-gray-500">{format(parseISO(project.ddExpirationDate), 'MMM d')}</div>
+                    {/* Milestone markers */}
+                    <div className="absolute inset-0 flex items-center">
+                      {/* PSA Signed */}
+                      {project.psaSignedDate && (
+                        <div 
+                          className="absolute flex flex-col items-center transform -translate-x-1/2 z-20"
+                          style={{ left: `${getMilestonePosition(project.psaSignedDate)}%` }}
+                        >
+                          <div className="w-4 h-4 bg-blue-600 rounded-full border-4 border-white shadow-lg"></div>
+                          <div className="absolute -bottom-12 bg-blue-100 border-2 border-blue-300 shadow-lg rounded-lg px-3 py-2 min-w-max">
+                            <div className="text-xs font-bold text-blue-800">PSA Signed</div>
+                            <div className="text-xs text-blue-600">{format(parseISO(project.psaSignedDate), 'MMM d')}</div>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Closing */}
-                    {project.closingDate && (
-                      <div 
-                        className="absolute flex flex-col items-center transform -translate-x-1/2"
-                        style={{ left: `${getMilestonePosition(project.closingDate)}%` }}
-                      >
-                        <div className="w-3 h-3 bg-green-600 rounded-full border-2 border-white shadow-md"></div>
-                        <div className="absolute -bottom-8 bg-white shadow-sm rounded px-2 py-1 border border-gray-200 min-w-max">
-                          <div className="text-xs font-semibold text-green-600">Closing</div>
-                          <div className="text-xs text-gray-500">{format(parseISO(project.closingDate), 'MMM d')}</div>
+                      {/* DD Expiration */}
+                      {project.ddExpirationDate && (
+                        <div 
+                          className="absolute flex flex-col items-center transform -translate-x-1/2 z-20"
+                          style={{ left: `${getMilestonePosition(project.ddExpirationDate)}%` }}
+                        >
+                          <div className="w-4 h-4 bg-amber-600 rounded-full border-4 border-white shadow-lg"></div>
+                          <div className="absolute -bottom-12 bg-amber-100 border-2 border-amber-300 shadow-lg rounded-lg px-3 py-2 min-w-max">
+                            <div className="text-xs font-bold text-amber-800">DD Expiration</div>
+                            <div className="text-xs text-amber-600">{format(parseISO(project.ddExpirationDate), 'MMM d')}</div>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+
+                      {/* Closing */}
+                      {project.closingDate && (
+                        <div 
+                          className="absolute flex flex-col items-center transform -translate-x-1/2 z-20"
+                          style={{ left: `${getMilestonePosition(project.closingDate)}%` }}
+                        >
+                          <div className="w-4 h-4 bg-green-600 rounded-full border-4 border-white shadow-lg"></div>
+                          <div className="absolute -bottom-12 bg-green-100 border-2 border-green-300 shadow-lg rounded-lg px-3 py-2 min-w-max">
+                            <div className="text-xs font-bold text-green-800">Closing</div>
+                            <div className="text-xs text-green-600">{format(parseISO(project.closingDate), 'MMM d')}</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
               
-              {/* Progress Legend */}
-              <div className="mt-8">
+              {/* Enhanced Progress Legend */}
+              <div className="mt-8 pt-4 border-t border-blue-200">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-sm font-semibold text-gray-700 mb-2">Timeline Legend</h5>
+                  <div className="text-xs text-gray-500">
+                    Timeline spans from PSA signed to target closing
+                  </div>
+                </div>
                 <ProgressLegend />
               </div>
             </div>
