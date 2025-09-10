@@ -162,22 +162,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         if (result !== 0) return result;
       }
       
-      // Stack completed tasks at bottom, sorted by completion date
-      const aCompleted = a.status === 'completed';
-      const bCompleted = b.status === 'completed';
-      
-      // If one is completed and other is not, completed goes to bottom
-      if (aCompleted && !bCompleted) return 1;
-      if (!aCompleted && bCompleted) return -1;
-      
-      // If both are completed, sort by completion date (oldest completed first)
-      if (aCompleted && bCompleted) {
-        const aDate = a.completedAt ? new Date(a.completedAt).getTime() : 0;
-        const bDate = b.completedAt ? new Date(b.completedAt).getTime() : 0;
-        return aDate - bDate;
-      }
-      
-      // If both are not completed, maintain original order (by sortOrder field)
+      // Always maintain original order (by sortOrder field) regardless of status
       const aSortOrder = a.sortOrder || 0;
       const bSortOrder = b.sortOrder || 0;
       return aSortOrder - bSortOrder;
