@@ -4,9 +4,10 @@ import { storage } from "./storage";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertTaskSchema, 
   insertTaskTemplateSchema, insertProjectTemplateSchema, insertAuditLogSchema,
-  insertTimelineNoteSchema 
+  insertTimelineNoteSchema, insertProjectShareSchema 
 } from "@shared/schema";
 import { z } from "zod";
+import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Middleware for authentication (simplified for demo)
@@ -132,6 +133,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error) {
       res.status(400).json({ error: "Invalid settings data" });
+    }
+  });
+
+  // Project Shares
+  app.get("/api/dd/projects/:id/shares", async (req: any, res) => {
+    try {
+      const shares = await storage.getProjectShares(req.params.id);
+      res.json(shares);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch project shares" });
+    }
+  });
+
+  app.post("/api/dd/projects/:id/shares", async (req: any, res) => {
+    try {
+      const shareToken = crypto.randomBytes(32).toString('hex');
+      const shareData = insertProjectShareSchema.parse({
+        ...req.body,
+        projectId: req.params.id,
+        shareToken: shareToken,
+        createdBy: req.user.id,
+      });
+      
+      const share = await storage.createProjectShare(shareData);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: req.params.id,
+        userId: req.user.id,
+        entityType: "project_share",
+        entityId: share.id,
+        action: "created",
+        after: share,
+      });
+
+      res.json(share);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid share data" });
+    }
+  });
+
+  app.delete("/api/dd/shares/:id", async (req: any, res) => {
+    try {
+      await storage.deleteProjectShare(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete share" });
+    }
+  });
+
+  // Public shared project access (no authentication required)
+  app.get("/api/shared/:token", async (req: any, res) => {
+    try {
+      const share = await storage.getProjectShare(req.params.token);
+      if (!share) {
+        return res.status(404).json({ error: "Share not found or expired" });
+      }
+
+      // Check if share is expired
+      if (share.expiresAt && new Date() > share.expiresAt) {
+        return res.status(404).json({ error: "Share has expired" });
+      }
+
+      // Update last accessed time
+      await storage.updateProjectShare(share.id, {
+        lastAccessedAt: new Date(),
+      });
+
+      const project = await storage.getProject(share.projectId);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      const settings = await storage.getProjectSettings(project.id);
+      const tasks = await storage.getTasksForProject(project.id);
+
+      res.json({ 
+        project, 
+        settings, 
+        tasks, 
+        shareInfo: {
+          accessLevel: share.accessLevel,
+          shareType: share.shareType,
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shared project" });
     }
   });
 
