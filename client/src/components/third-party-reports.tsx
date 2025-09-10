@@ -264,12 +264,24 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     dates.add(projectStart.getTime());
     dates.add(projectEnd.getTime());
     
-    // Add tick marks based on selected granularity
+    // Add tick marks based on selected granularity with proper spacing
     const intervalDays = selectedGranularity.days;
     let current = new Date(projectStart);
-    while (current <= projectEnd) {
+    
+    // Add regular interval tick marks
+    while (current < projectEnd) {
       dates.add(current.getTime());
-      current = new Date(current.getTime() + (intervalDays * 24 * 60 * 60 * 1000)); // Add interval days
+      
+      // Calculate next interval date
+      const nextDate = new Date(current);
+      nextDate.setDate(nextDate.getDate() + intervalDays);
+      
+      // If next date would exceed project end, we're done with regular intervals
+      if (nextDate >= projectEnd) {
+        break;
+      }
+      
+      current = nextDate;
     }
     
     // Add milestone dates if they exist
@@ -277,18 +289,31 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       dates.add(parseISO(project.ddExpirationDate).getTime());
     }
     
-    // Add important task dates to ensure they have tick marks
+    // Add important task dates to ensure they have tick marks (when tasks are toggled on timeline)
     tasks.filter(t => t.showOnTimeline && (!showCriticalPath || t.priority === 'high')).forEach(task => {
-      // Add task start dates
+      // Add task deadline dates
       if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project?.psaSignedDate) {
         const psaDate = parseISO(project.psaSignedDate);
-        const taskEnd = new Date(psaDate);
-        taskEnd.setDate(taskEnd.getDate() + task.deadlineDays);
-        dates.add(taskEnd.getTime());
+        const taskDeadline = new Date(psaDate);
+        taskDeadline.setDate(taskDeadline.getDate() + task.deadlineDays);
+        dates.add(taskDeadline.getTime());
       } else if (task.deadlineType === 'dd_expiration' && project?.ddExpirationDate) {
         dates.add(parseISO(project.ddExpirationDate).getTime());
       } else if (task.startDate) {
-        dates.add(parseISO(task.startDate).getTime());
+        // Add both start date and calculated end date if available
+        const startDate = parseISO(task.startDate);
+        dates.add(startDate.getTime());
+        
+        if (task.durationDays) {
+          const endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + task.durationDays);
+          dates.add(endDate.getTime());
+        }
+      }
+      
+      // If task has a specific completion date, add that too
+      if (task.completedAt) {
+        dates.add(new Date(task.completedAt).getTime());
       }
     });
     
