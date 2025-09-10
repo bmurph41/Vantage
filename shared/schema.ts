@@ -125,9 +125,22 @@ export const tasks = pgTable("tasks", {
   baselineDue: date("baseline_due"),
   manuallyLocked: boolean("manually_locked").notNull().default(false),
   cost: text("cost"),
-  notes: text("notes"),
+  notes: text("notes"), // Keep for backward compatibility
   showOnTimeline: boolean("show_on_timeline").notNull().default(false),
   sortOrder: integer("sort_order"),
+  taskOwner: varchar("task_owner").references(() => users.id), // Team member who owns the task
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Timeline Notes
+export const timelineNotes = pgTable("timeline_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  noteType: text("note_type").notNull().default("general"), // general, status_update, contact_interaction, etc.
+  metadata: jsonb("metadata").default(sql`'{}'`), // For future CRM integration data
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -231,6 +244,12 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   updatedAt: true,
 });
 
+export const insertTimelineNoteSchema = createInsertSchema(timelineNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   id: true,
   createdAt: true,
@@ -257,6 +276,9 @@ export type InsertProjectTemplate = z.infer<typeof insertProjectTemplateSchema>;
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
+
+export type TimelineNote = typeof timelineNotes.$inferSelect;
+export type InsertTimelineNote = z.infer<typeof insertTimelineNoteSchema>;
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
