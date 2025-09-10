@@ -1021,7 +1021,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
 
         {/* Reports Table */}
         <div className="border rounded-lg">
-          <table className="w-full" data-testid="tasks-table">
+          <table className="w-full border-collapse" data-testid="tasks-table">
             <thead>
               <tr className="bg-primary text-primary-foreground">
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[25%]">Task</th>
@@ -1056,9 +1056,9 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 <React.Fragment key={task.id}>
                   {/* Main Content Row */}
                   <tr 
-                    className={`hover:bg-blue-50 transition-colors cursor-pointer bg-white mb-2 ${
+                    className={`hover:bg-blue-50 transition-colors cursor-pointer bg-white ${
                       expandedTasks.has(task.id) 
-                        ? 'border-t-2 border-l-2 border-r-2 border-gray-400 ring-2 ring-blue-300' 
+                        ? 'border-t-2 border-l-2 border-r-2 border-gray-400' 
                         : 'border-2 border-gray-400 shadow-sm'
                     }`}
                     onClick={() => toggleTaskExpansion(task.id)}
@@ -1259,8 +1259,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   </tr>
                   
                   {/* Date Fields Row */}
-                  <tr className="bg-white border-l-2 border-r-2 border-b-2 border-gray-400 shadow-sm">
-                    <td colSpan={7} className="px-6 py-4" data-testid={`dates-row-${task.id}`}>
+                  <tr className="bg-white border-l-2 border-r-2 border-b-2 border-gray-400">
+                    <td colSpan={7} className="px-6 pt-0 pb-4" data-testid={`dates-row-${task.id}`}>
                       <div className="grid grid-cols-4 gap-4">
                         {/* Deadline */}
                         <div>
