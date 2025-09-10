@@ -8,7 +8,7 @@ import {
   type InsertProjectTemplate, type InsertAuditLog
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Organizations

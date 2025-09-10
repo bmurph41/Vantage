@@ -141,8 +141,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         return aDate - bDate;
       }
       
-      // If both are not completed, maintain original order (by index in original tasks array)
-      return tasks.indexOf(a) - tasks.indexOf(b);
+      // If both are not completed, maintain original order (by sortOrder field)
+      const aSortOrder = a.sortOrder || 0;
+      const bSortOrder = b.sortOrder || 0;
+      return aSortOrder - bSortOrder;
     });
 
   // Removed all scroll detection to prevent glitches
@@ -268,7 +270,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         : project?.psaSignedDate 
           ? new Date(parseISO(project.psaSignedDate).getTime() + (task.startOffsetDays || 0) * 24 * 60 * 60 * 1000)
           : today;
-      deadlineDate = new Date(startDate.getTime() + (task.durationDays || 7) * 24 * 60 * 60 * 1000);
+      deadlineDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000); // Default to 7 days
     }
     
     const daysRemaining = differenceInDays(deadlineDate, today);
@@ -330,11 +332,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         const startDate = parseISO(task.startDate);
         dates.add(startDate.getTime());
         
-        if (task.durationDays) {
-          const endDate = new Date(startDate);
-          endDate.setDate(endDate.getDate() + task.durationDays);
-          dates.add(endDate.getTime());
-        }
+        // Use a default task duration for display purposes
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 7); // Default to 7 days
+        dates.add(endDate.getTime());
       }
       
       // If task has a specific completion date, add that too
@@ -394,7 +395,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         : project?.psaSignedDate 
           ? new Date(parseISO(project.psaSignedDate).getTime() + (task.startOffsetDays || 0) * 24 * 60 * 60 * 1000)
           : today;
-      endDate = new Date(startDate.getTime() + (task.durationDays || 7) * 24 * 60 * 60 * 1000);
+      endDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000); // Default to 7 days
     }
     
     // Calculate progress
