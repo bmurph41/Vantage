@@ -167,7 +167,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   const { data: projectData } = useProject(projectId);
   const project = projectData?.project;
   const [step, setStep] = useState<"browse" | "customize">("browse");
-  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [templateCategory, setTemplateCategory] = useState("Custom");
@@ -175,7 +174,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   const { toast } = useToast();
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
-  const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null);
   const queryClient = useQueryClient();
 
   // Mutation for saving task as template
@@ -360,73 +358,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     }
   }, [isOpen, editingTask, form]);
 
-  // Auto-save functionality
-  const autoSave = useCallback(
-    (formData: z.infer<typeof addTaskFormSchema>) => {
-      if (isEditMode && editingTask) {
-        setAutoSaveStatus("saving");
-        // Transform data to match backend schema expectations
-        const transformedData = {
-          ...formData,
-          // Convert completedAt string to Date object as backend expects Date
-          completedAt: formData.completedAt ? new Date(formData.completedAt) : null,
-          // Set dateOnSite based on requiresOnSiteInspection checkbox
-          dateOnSite: formData.requiresOnSiteInspection ? (formData.dateOnSite || "TBD") : "",
-          // Ensure numeric fields are numbers
-          startOffsetDays: formData.startOffsetDays ? Number(formData.startOffsetDays) : null,
-          deadlineDays: formData.deadlineDays ? Number(formData.deadlineDays) : null,
-          // Remove fields that don't exist in backend schema
-          isInternalTask: undefined,
-        };
-        updateTask.mutate(
-          {
-            id: editingTask.id,
-            updates: transformedData,
-          },
-          {
-            onSuccess: () => {
-              setAutoSaveStatus("saved");
-              setTimeout(() => setAutoSaveStatus("idle"), 2000); // Show "saved" for 2 seconds
-            },
-            onError: () => {
-              setAutoSaveStatus("error");
-              setTimeout(() => setAutoSaveStatus("idle"), 3000); // Show error for 3 seconds
-            },
-          }
-        );
-      }
-    },
-    [isEditMode, editingTask, updateTask]
-  );
 
-  // Watch form changes and auto-save after 2 seconds of inactivity
-  useEffect(() => {
-    if (!isEditMode || !editingTask) return;
-
-    const subscription = form.watch((formData) => {
-      // Clear previous timeout
-      if (autoSaveTimeout) {
-        clearTimeout(autoSaveTimeout);
-      }
-
-      // Set new timeout for auto-save
-      const timeout = setTimeout(() => {
-        const validationResult = addTaskFormSchema.safeParse(formData);
-        if (validationResult.success) {
-          autoSave(validationResult.data);
-        }
-      }, 2000); // Auto-save after 2 seconds of inactivity
-
-      setAutoSaveTimeout(timeout);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-      if (autoSaveTimeout) {
-        clearTimeout(autoSaveTimeout);
-      }
-    };
-  }, [form, autoSave, isEditMode, editingTask, autoSaveTimeout]);
 
   // Filter tasks based on search and category
   const filteredTasks = allTemplates.filter(task => {
@@ -612,33 +544,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     }
   };
 
-  const getAutoSaveIndicator = () => {
-    switch (autoSaveStatus) {
-      case "saving":
-        return (
-          <div className="flex items-center space-x-1 text-blue-600">
-            <Save className="h-3 w-3 animate-pulse" />
-            <span className="text-xs">Saving...</span>
-          </div>
-        );
-      case "saved":
-        return (
-          <div className="flex items-center space-x-1 text-green-600">
-            <CheckCircle className="h-3 w-3" />
-            <span className="text-xs">Saved</span>
-          </div>
-        );
-      case "error":
-        return (
-          <div className="flex items-center space-x-1 text-red-600">
-            <XCircle className="h-3 w-3" />
-            <span className="text-xs">Save failed</span>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -653,7 +558,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   : `Customize: ${selectedTemplate?.name}`
               }
             </DialogTitle>
-            {isEditMode && getAutoSaveIndicator()}
           </div>
           <DialogDescription>
             {isEditMode 
