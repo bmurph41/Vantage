@@ -7,6 +7,7 @@ import { relations } from "drizzle-orm";
 // Enums
 export const roleEnum = pgEnum("role", ["owner", "editor", "viewer"]);
 export const anchorTypeEnum = pgEnum("anchor_type", ["psa", "custom"]);
+export const deadlineTypeEnum = pgEnum("deadline_type", ["dd_expiration", "days_after_psa"]);
 export const holidayCalendarEnum = pgEnum("holiday_calendar", ["us_federal", "none"]);
 export const startStrategyEnum = pgEnum("start_strategy", ["fixed", "offset"]);
 export const priorityEnum = pgEnum("priority", ["low", "med", "high"]);
@@ -102,6 +103,9 @@ export const tasks = pgTable("tasks", {
   startDate: date("start_date"),
   startOffsetDays: integer("start_offset_days"),
   durationDays: integer("duration_days").notNull(),
+  // New deadline fields
+  deadlineType: deadlineTypeEnum("deadline_type").default("days_after_psa"),
+  deadlineDays: integer("deadline_days"),
   assignee: text("assignee"),
   companyHired: text("company_hired"),
   repName: text("rep_name"),

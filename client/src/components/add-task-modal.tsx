@@ -24,6 +24,9 @@ const addTaskFormSchema = z.object({
   startDate: z.string().optional(),
   startOffsetDays: z.number().optional(),
   durationDays: z.number().min(1, "Duration must be at least 1 day"),
+  // New deadline fields
+  deadlineType: z.enum(["dd_expiration", "days_after_psa"]).default("days_after_psa"),
+  deadlineDays: z.number().min(1, "Days must be at least 1").optional(),
   assignee: z.string().optional(),
   companyHired: z.string().optional(),
   repName: z.string().optional(),
@@ -62,6 +65,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       startDate: editingTask?.startDate || "",
       startOffsetDays: editingTask?.startOffsetDays || 0,
       durationDays: editingTask?.durationDays || 7,
+      deadlineType: editingTask?.deadlineType || "days_after_psa",
+      deadlineDays: editingTask?.deadlineDays || 30,
       assignee: editingTask?.assignee || "",
       companyHired: editingTask?.companyHired || "",
       repName: editingTask?.repName || "",
@@ -212,6 +217,47 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     rows={3}
                     data-testid="textarea-task-description"
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="deadlineType">Deadline *</Label>
+                    <Select
+                      value={form.watch("deadlineType")}
+                      onValueChange={(value: string) => form.setValue("deadlineType", value as "dd_expiration" | "days_after_psa")}
+                    >
+                      <SelectTrigger data-testid="select-deadline-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dd_expiration">DD Expiration</SelectItem>
+                        <SelectItem value="days_after_psa">Days After Signed PSA</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    {form.watch("deadlineType") === "days_after_psa" && (
+                      <>
+                        <Label htmlFor="deadlineDays">Days After PSA *</Label>
+                        <Input
+                          id="deadlineDays"
+                          type="number"
+                          min="1"
+                          {...form.register("deadlineDays", { valueAsNumber: true })}
+                          data-testid="input-deadline-days"
+                        />
+                        {form.formState.errors.deadlineDays && (
+                          <p className="text-sm text-destructive mt-1">{form.formState.errors.deadlineDays.message}</p>
+                        )}
+                      </>
+                    )}
+                    {form.watch("deadlineType") === "dd_expiration" && (
+                      <div className="pt-6">
+                        <p className="text-sm text-muted-foreground">Task will be due on DD expiration date</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
