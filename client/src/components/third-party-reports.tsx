@@ -175,6 +175,32 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     return assignee.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  // Currency formatting utility
+  const formatCurrency = (value: string): string => {
+    if (!value) return "-";
+    
+    // If already formatted with $, return as is
+    if (value.startsWith("$")) return value;
+    
+    // Remove any non-numeric characters except decimal points
+    const numericValue = value.replace(/[^\d.]/g, "");
+    
+    // If empty or just a decimal point, return dash
+    if (!numericValue || numericValue === ".") return "-";
+    
+    // Parse as number and format with commas and dollar sign
+    const number = parseFloat(numericValue);
+    if (isNaN(number)) return value; // Return original if can't parse
+    
+    // Format with dollar sign and commas, no decimal places for whole numbers
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: number % 1 === 0 ? 0 : 2,
+      maximumFractionDigits: 2
+    }).format(number);
+  };
+
   const getUserColor = (assignee: string | null) => {
     const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
     if (!assignee) return 'bg-gray-500';
@@ -923,7 +949,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     </td>
                     <td className="px-4 py-3 text-center" data-testid={`text-cost-${task.id}`}>
                       <span className="text-sm font-medium text-gray-900">
-                        {task.cost || '-'}
+                        {formatCurrency(task.cost || '')}
                       </span>
                     </td>
                   </tr>
