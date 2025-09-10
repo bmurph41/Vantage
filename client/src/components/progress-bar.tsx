@@ -50,21 +50,21 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   
   const taskDeadline = startOfDay(calculateTaskDeadline(task));
   
-  // DYNAMIC SLIDING WINDOW SYSTEM: Progress bars start from task start and extend to today/deadline
-  const progressStart = taskStart; // Start from actual task start
-  const progressEnd = task.status === 'completed' 
-    ? taskDeadline // Completed tasks extend to their deadline
-    : isAfter(today, taskDeadline) 
-      ? taskDeadline // Overdue tasks extend to their deadline
-      : clampDate(today, taskStart, taskDeadline); // Active tasks extend to today (within task bounds)
-  
-  // Calculate positioning using dynamic timeline window percentages  
-  const startPosition = percentOfRange(progressStart, timelineStart, timelineEnd);
-  const endPosition = percentOfRange(progressEnd, timelineStart, timelineEnd);
-  const barWidth = Math.max(1, endPosition - startPosition); // Bar width from task start to progress end
-  
-  // Task deadline position for reference
+  // NEW SYSTEM: All task bars span from PSA Signed Date to task deadline
+  const barStartPosition = 0; // Always start from PSA Signed Date (left edge)
   const deadlinePosition = percentOfRange(taskDeadline, timelineStart, timelineEnd);
+  const barWidth = Math.max(1, deadlinePosition); // Bar width from PSA to task deadline
+  
+  // Calculate positions for elapsed and remaining sections within the bar
+  const todayPosition = percentOfRange(today, timelineStart, timelineEnd);
+  // For completed tasks, the entire bar should be "elapsed" (solid color)
+  const elapsedWidth = task.status === 'completed'
+    ? deadlinePosition // Full bar for completed tasks
+    : Math.max(0, Math.min(deadlinePosition, todayPosition)); // PSA to today for active tasks
+  const remainingStart = elapsedWidth; // Start of remaining section
+  const remainingWidth = Math.max(0, deadlinePosition - elapsedWidth); // Today to deadline
+  
+  // Task start position for reference marker
   const taskStartPosition = percentOfRange(taskStart, timelineStart, timelineEnd);
   
   // Calculate progress statistics for labels
@@ -89,7 +89,7 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
       <div 
         className="absolute -top-6 z-10"
         style={{
-          left: `${startPosition + barWidth/2}%`,
+          left: `${barStartPosition + barWidth/2}%`,
           transform: 'translateX(-50%)'
         }}
       >
@@ -112,34 +112,49 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
         )}
       </div>
       
-      {/* Progress bar spanning from project start to today/deadline */}
+      {/* Progress bar spanning from PSA Signed Date to task deadline */}
       <div 
         className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 absolute"
         style={{
-          left: `${startPosition}%`,
+          left: `${barStartPosition}%`,
           width: `${barWidth}%`
         }}
       >
-        {isCompleted ? (
-          <div className="h-full bg-green-600 progress-bar-completed relative" data-testid="progress-completed">
-          </div>
-        ) : isOverdue ? (
-          <div className="h-full bg-red-600 progress-bar-overdue relative" data-testid="progress-overdue">
-          </div>
-        ) : isNotStarted ? (
-          <div className="h-full progress-bar-remaining-stripes relative" data-testid="progress-not-started">
-          </div>
-        ) : (
-          <div className="h-full bg-blue-500 progress-bar-elapsed relative" data-testid="progress-in-progress">
-            {/* For the new system, the entire bar represents progress from start to today */}
-          </div>
+        {/* Elapsed time section (PSA to today) - solid color */}
+        {elapsedWidth > 0 && (
+          <div 
+            className={`h-full absolute ${
+              isCompleted ? 'bg-green-600' : 
+              isOverdue ? 'bg-red-600' : 
+              'bg-blue-500'
+            }`}
+            style={{
+              left: '0%',
+              width: `${(elapsedWidth / barWidth) * 100}%`
+            }}
+            data-testid="progress-elapsed"
+          />
+        )}
+        
+        {/* Remaining time section (today to deadline) - shaded */}
+        {remainingWidth > 0 && !isCompleted && (
+          <div 
+            className={`h-full absolute ${
+              isOverdue ? 'bg-red-300' : 'progress-bar-remaining-stripes'
+            }`}
+            style={{
+              left: `${(remainingStart / barWidth) * 100}%`,
+              width: `${(remainingWidth / barWidth) * 100}%`
+            }}
+            data-testid="progress-remaining"
+          />
         )}
         
         {/* Task start marker - shows where the task actually begins */}
         <div 
           className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-orange-500"
           style={{ 
-            left: `${((taskStartPosition - startPosition) / barWidth) * 100}%`,
+            left: `${(taskStartPosition / barWidth) * 100}%`,
           }}
           data-testid="task-start-marker"
         />
@@ -148,7 +163,7 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
         <div 
           className="absolute -top-1 w-1 h-10 rounded-full shadow-sm"
           style={{ 
-            left: `${Math.min(100, ((deadlinePosition - startPosition) / barWidth) * 100)}%`,
+            left: `100%`,
             backgroundColor: isCompleted ? "#16a34a" : isOverdue ? "#dc2626" : "hsl(221 83% 35%)"
           }}
           data-testid="task-deadline-marker"
