@@ -935,6 +935,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       <span>Closing</span>
                     </div>
                     <div className="text-right">
+                      <div>Task Owner: {task.assignee || "Unassigned"}</div>
                       <div>Progress: {Math.round(calculateTaskProgress(task))}%</div>
                     </div>
                   </div>
