@@ -275,13 +275,23 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                   return (
                     <div 
                       key={index}
-                      className={`absolute top-0 bottom-0 flex flex-col justify-center items-center transform -translate-x-1/2 px-1 ${
-                        isCurrentPeriod ? 'bg-blue-50 text-blue-700 font-medium rounded z-20' : 'text-gray-600 z-10'
+                      className={`absolute top-0 bottom-0 flex flex-col justify-center items-center transform -translate-x-1/2 ${
+                        granularity === 'monthly' 
+                          ? `px-3 mx-1 rounded-lg border transition-all duration-200 hover:shadow-md z-20 ${
+                              isCurrentPeriod 
+                                ? 'bg-blue-100 text-blue-800 border-blue-300 font-semibold shadow-sm' 
+                                : index % 2 === 0 
+                                  ? 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100' 
+                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`
+                          : `px-1 ${isCurrentPeriod ? 'bg-blue-50 text-blue-700 font-medium rounded z-20' : 'text-gray-600 z-10'}`
                       }`}
                       style={{ left: `${position}%` }}
                       data-testid={`timeline-date-${index}`}
                     >
-                      <div className="text-xs whitespace-nowrap">
+                      <div className={`whitespace-nowrap ${
+                        granularity === 'monthly' ? 'text-sm font-medium' : 'text-xs'
+                      }`}>
                         {format(date, 
                           granularity === 'daily' ? 'MMM d' : 
                           granularity === 'monthly' ? 'MMM' : 
@@ -290,7 +300,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                         )}
                       </div>
                       {granularity === 'monthly' && (
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 font-normal">
                           {format(date, 'yyyy')}
                         </div>
                       )}
