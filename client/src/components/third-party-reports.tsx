@@ -6,16 +6,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Search, Plus, Upload, Trash2 } from "lucide-react";
-import type { Task } from "@shared/schema";
+import type { Task, Project } from "@shared/schema";
 import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
 import { AddTaskModal } from "@/components/add-task-modal";
+import { differenceInDays, parseISO } from "date-fns";
 
 interface ThirdPartyReportsProps {
   tasks: Task[];
   projectId: string;
+  project?: Project;
 }
 
-export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) {
+export function ThirdPartyReports({ tasks, projectId, project }: ThirdPartyReportsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
@@ -77,6 +79,32 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
     deleteTask.mutate(taskId);
   };
 
+  const calculateDaysRemaining = (task: Task) => {
+    if (task.status === 'completed') return 0;
+    
+    const today = new Date();
+    let deadlineDate: Date;
+    
+    if (task.deadlineType === 'dd_expiration' && project?.ddExpirationDate) {
+      deadlineDate = parseISO(project.ddExpirationDate);
+    } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project?.psaSignedDate) {
+      const psaDate = parseISO(project.psaSignedDate);
+      deadlineDate = new Date(psaDate);
+      deadlineDate.setDate(deadlineDate.getDate() + task.deadlineDays);
+    } else {
+      // Fallback to old duration calculation if new fields aren't available
+      const startDate = task.startDate 
+        ? parseISO(task.startDate) 
+        : project?.psaSignedDate 
+          ? new Date(parseISO(project.psaSignedDate).getTime() + (task.startOffsetDays || 0) * 24 * 60 * 60 * 1000)
+          : today;
+      deadlineDate = new Date(startDate.getTime() + (task.durationDays || 7) * 24 * 60 * 60 * 1000);
+    }
+    
+    const daysRemaining = differenceInDays(deadlineDate, today);
+    return Math.max(0, daysRemaining);
+  };
+
   return (
     <Card data-testid="third-party-reports">
       <CardHeader className="bg-primary text-primary-foreground">
@@ -131,6 +159,7 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
                 <th className="px-4 py-3 text-left text-sm font-semibold">Task Owner</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Company Hired</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Days Remaining</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Completion Date</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Cost</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
@@ -199,6 +228,22 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
                       </SelectContent>
                     </Select>
                   </td>
+                  <td className="px-4 py-3" data-testid={`text-days-remaining-${task.id}`}>
+                    {(() => {
+                      const daysRemaining = calculateDaysRemaining(task);
+                      if (task.status === 'completed') {
+                        return <span className="text-green-600 font-medium">Complete</span>;
+                      } else if (daysRemaining === 0) {
+                        return <span className="text-red-600 font-medium">Due Today</span>;
+                      } else if (daysRemaining < 0) {
+                        return <span className="text-red-600 font-medium">Overdue</span>;
+                      } else {
+                        return <span className={`font-medium ${daysRemaining <= 3 ? 'text-orange-600' : 'text-gray-900'}`}>
+                          {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}
+                        </span>;
+                      }
+                    })()}
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground" data-testid={`text-completion-date-${task.id}`}>
                     {task.completedAt ? new Date(task.completedAt).toLocaleDateString() : '-'}
                   </td>
@@ -257,7 +302,7 @@ export function ThirdPartyReports({ tasks, projectId }: ThirdPartyReportsProps) 
               ))}
               {filteredTasks.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
+                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
                     No tasks found matching your criteria.
                   </td>
                 </tr>

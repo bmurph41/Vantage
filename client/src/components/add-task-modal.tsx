@@ -95,6 +95,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       startStrategy: "offset",
       startOffsetDays: template.startOffsetDays,
       durationDays: template.durationDays,
+      deadlineType: "days_after_psa" as const,
+      deadlineDays: template.startOffsetDays + template.durationDays,
       assignee: template.defaultAssignee || "",
       companyHired: "",
       priority: template.priority as "low" | "med" | "high",
