@@ -13,6 +13,7 @@ import { Search, Clock, DollarSign, Users, AlertCircle, Save, CheckCircle, XCirc
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { formatPhoneNumber } from "@/lib/phone-utils";
+import { toStateAbbr } from "@/lib/state-utils";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateTask, useUpdateTask } from "@/hooks/use-tasks";
@@ -960,7 +961,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       
                       {/* Company Address Section */}
                       <div className="space-y-3">
-                        <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Physical Address</div>
+
                         <div>
                           <Label htmlFor="companyAddress">Street Address</Label>
                           <Input
@@ -987,6 +988,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                                 id="companyState"
                                 placeholder="State"
                                 {...form.register("companyState")}
+                                onBlur={(e) => {
+                                  const formatted = toStateAbbr(e.target.value);
+                                  form.setValue("companyState", formatted);
+                                }}
                                 data-testid="input-company-state"
                               />
                             </div>
@@ -1492,7 +1497,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       
                       {/* Company Address Section */}
                       <div className="space-y-3">
-                        <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Physical Address</div>
+
                         <div>
                           <Label htmlFor="companyAddress">Street Address</Label>
                           <Input
@@ -1519,6 +1524,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                                 id="companyState"
                                 placeholder="State"
                                 {...form.register("companyState")}
+                                onBlur={(e) => {
+                                  const formatted = toStateAbbr(e.target.value);
+                                  form.setValue("companyState", formatted);
+                                }}
                                 data-testid="input-company-state"
                               />
                             </div>

@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Mail, Phone, User, Calendar, MapPin, ExternalLink, Edit2, Save, X } from "lucide-react";
 import { formatPhoneNumber } from "@/lib/phone-utils";
+import { toStateAbbr } from "@/lib/state-utils";
 import type { Task, Project } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -230,6 +231,10 @@ export function CompanyDetailsModal({
                           id="company-state"
                           value={editedContactInfo.companyState || ''}
                           onChange={(e) => setEditedContactInfo(prev => ({ ...prev, companyState: e.target.value }))}
+                          onBlur={(e) => {
+                            const formatted = toStateAbbr(e.target.value);
+                            setEditedContactInfo(prev => ({ ...prev, companyState: formatted }));
+                          }}
                           placeholder="State"
                           className="text-sm"
                         />
