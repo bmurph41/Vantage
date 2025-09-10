@@ -214,6 +214,19 @@ export default function Dashboard() {
                           <span>{format(new Date(project.closingDate), 'MMM d, yyyy')}</span>
                         </div>
                       )}
+                      {(project as any).totalCost !== undefined && (
+                        <div className="flex justify-between border-t pt-2 mt-2" data-testid={`text-total-cost-${project.id}`}>
+                          <span className="text-muted-foreground font-medium">Total Cost:</span>
+                          <span className="font-bold text-lg">
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: 'USD',
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            }).format((project as any).totalCost)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

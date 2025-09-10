@@ -21,7 +21,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dd/projects", async (req: any, res) => {
     try {
       const projects = await storage.getProjectsForOrg(req.user.orgId);
-      res.json(projects);
+      
+      // Calculate total cost for each project
+      const projectsWithCost = await Promise.all(
+        projects.map(async (project) => {
+          const tasks = await storage.getTasksForProject(project.id);
+          
+          // Calculate total cost from all tasks
+          const totalCost = tasks.reduce((sum, task) => {
+            if (task.cost) {
+              // Remove currency symbols and commas, then parse as float
+              const cleanCost = task.cost.replace(/[$,]/g, '').trim();
+              const numericCost = parseFloat(cleanCost);
+              return sum + (isNaN(numericCost) ? 0 : numericCost);
+            }
+            return sum;
+          }, 0);
+          
+          return {
+            ...project,
+            totalCost
+          };
+        })
+      );
+      
+      res.json(projectsWithCost);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch projects" });
     }
