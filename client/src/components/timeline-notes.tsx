@@ -34,7 +34,7 @@ export function TimelineNotes({ taskId, taskTitle }: TimelineNotesProps) {
   const queryClient = useQueryClient();
 
   // Fetch timeline notes
-  const { data: notes = [], isLoading } = useQuery({
+  const { data: notes = [], isLoading } = useQuery<TimelineNote[]>({
     queryKey: ['/api/dd/tasks', taskId, 'timeline-notes'],
     queryFn: () => apiRequest(`/api/dd/tasks/${taskId}/timeline-notes`),
   });
@@ -42,10 +42,7 @@ export function TimelineNotes({ taskId, taskTitle }: TimelineNotesProps) {
   // Create note mutation
   const createNoteMutation = useMutation({
     mutationFn: async (noteData: { content: string; noteType: string }) => {
-      return apiRequest(`/api/dd/tasks/${taskId}/timeline-notes`, {
-        method: "POST",
-        body: JSON.stringify(noteData),
-      });
+      return apiRequest(`/api/dd/tasks/${taskId}/timeline-notes`, "POST", noteData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/tasks', taskId, 'timeline-notes'] });
@@ -68,10 +65,7 @@ export function TimelineNotes({ taskId, taskTitle }: TimelineNotesProps) {
   // Update note mutation
   const updateNoteMutation = useMutation({
     mutationFn: async ({ id, content }: { id: string; content: string }) => {
-      return apiRequest(`/api/dd/timeline-notes/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ content }),
-      });
+      return apiRequest(`/api/dd/timeline-notes/${id}`, "PUT", { content });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/tasks', taskId, 'timeline-notes'] });
@@ -94,9 +88,7 @@ export function TimelineNotes({ taskId, taskTitle }: TimelineNotesProps) {
   // Delete note mutation
   const deleteNoteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/dd/timeline-notes/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest(`/api/dd/timeline-notes/${id}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/tasks', taskId, 'timeline-notes'] });
