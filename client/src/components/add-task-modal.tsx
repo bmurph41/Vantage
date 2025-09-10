@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateTask, useUpdateTask } from "@/hooks/use-tasks";
+import { useProject } from "@/hooks/use-project";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { marinaDueDiligenceTaskTemplates, taskCategories, searchTasks, type TaskTemplate } from "@/data/marina-due-diligence-tasks";
@@ -153,6 +154,9 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null);
+  
+  // Fetch project data to access DD expiration date
+  const { data: project } = useProject(projectId);
   const [step, setStep] = useState<"browse" | "customize">("browse");
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
@@ -628,13 +632,35 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="deadline">Deadline Date</Label>
-                    <Input
-                      id="deadline"
-                      type="date"
-                      {...form.register("deadline")}
-                      data-testid="input-deadline"
-                    />
-                    <p className="text-sm text-muted-foreground">Set a specific deadline date for this task</p>
+                    <div className="flex gap-2">
+                      <Input
+                        id="deadline"
+                        type="date"
+                        {...form.register("deadline")}
+                        data-testid="input-deadline"
+                        className="flex-1"
+                      />
+                      {project?.ddExpirationDate && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            form.setValue("deadline", project.ddExpirationDate!);
+                          }}
+                          className="px-3 text-xs whitespace-nowrap"
+                          data-testid="button-dd-expiration"
+                        >
+                          Use DD Expiration
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Set a specific deadline date for this task
+                      {project?.ddExpirationDate && (
+                        <span className="block">DD Expiration: {new Date(project.ddExpirationDate).toLocaleDateString()}</span>
+                      )}
+                    </p>
                   </div>
                 </div>
 
