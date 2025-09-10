@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 export default function ProjectPage() {
   const { id } = useParams();
-  const [activeTab, setActiveTab] = useState("setup");
+  const [activeTab, setActiveTab] = useState("reports");
   
   const { data, isLoading, error } = useProject(id!);
 
@@ -44,8 +44,8 @@ export default function ProjectPage() {
   const { project, settings, tasks } = data;
 
   const tabs = [
-    { id: "setup", label: "Project Setup" },
     { id: "reports", label: "Tasks & Timeline" },
+    { id: "setup", label: "Project Setup" },
     { id: "templates", label: "Templates" },
   ];
 
