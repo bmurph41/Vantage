@@ -73,9 +73,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     );
   };
 
-  const calculateDaysRemaining = (task: Task) => {
-    if (task.status === 'completed') return 0;
-    
+  const calculateDeadlineDate = (task: Task): Date => {
     const today = new Date();
     let deadlineDate: Date;
     
@@ -97,6 +95,15 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       
       deadlineDate = addDays(startDate, defaultDuration);
     }
+    
+    return deadlineDate;
+  };
+
+  const calculateDaysRemaining = (task: Task) => {
+    if (task.status === 'completed') return 0;
+    
+    const today = new Date();
+    const deadlineDate = calculateDeadlineDate(task);
     
     // Calculate days remaining
     const daysRemaining = differenceInDays(deadlineDate, today);
@@ -891,32 +898,68 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       )}
                     </td>
                     <td className="px-4 py-4">
-                      {task.assignee ? (
-                        <div className="flex items-center space-x-2" data-testid={`assignee-${task.id}`}>
-                          <div className={`w-6 h-6 ${getUserColor(task.assignee)} rounded-full flex items-center justify-center text-xs text-white flex-shrink-0`}>
-                            {getUserInitials(task.assignee)}
-                          </div>
-                          <span className="text-sm" title={task.assignee}>{task.assignee}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4" data-testid={`text-company-${task.id}`}>
-                      {task.companyHired ? (
+                      <div className="space-y-2">
+                        {/* Task Owner */}
                         <div>
-                          <div className="font-medium text-sm leading-tight" title={task.companyHired}>{task.companyHired}</div>
-                          {(task.repName || task.repEmail || task.repPhone) && (
-                            <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                              {task.repName && <div className="truncate" title={`Rep: ${task.repName}`}>Rep: {task.repName}</div>}
-                              {task.repEmail && <div className="truncate" title={task.repEmail}>📧 {task.repEmail}</div>}
-                              {task.repPhone && <div className="truncate" title={task.repPhone}>📞 {task.repPhone}</div>}
+                          {task.assignee ? (
+                            <div className="flex items-center space-x-2" data-testid={`assignee-${task.id}`}>
+                              <div className={`w-6 h-6 ${getUserColor(task.assignee)} rounded-full flex items-center justify-center text-xs text-white flex-shrink-0`}>
+                                {getUserInitials(task.assignee)}
+                              </div>
+                              <span className="text-sm" title={task.assignee}>{task.assignee}</span>
                             </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
-                      )}
+                        
+                        {/* Completion Date */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 block mb-1">Completion Date</label>
+                          <Input
+                            type="datetime-local"
+                            value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 16) : ''}
+                            onChange={(e) => {
+                              const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
+                              updateTask.mutate({
+                                id: task.id,
+                                updates: { completedAt: newCompletedAt }
+                              });
+                            }}
+                            className="w-full text-xs h-7"
+                            data-testid={`input-completion-date-${task.id}`}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4" data-testid={`text-company-${task.id}`}>
+                      <div className="space-y-2">
+                        {/* Company Hired */}
+                        <div>
+                          {task.companyHired ? (
+                            <div>
+                              <div className="font-medium text-sm leading-tight" title={task.companyHired}>{task.companyHired}</div>
+                              {(task.repName || task.repEmail || task.repPhone) && (
+                                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                  {task.repName && <div className="truncate" title={`Rep: ${task.repName}`}>Rep: {task.repName}</div>}
+                                  {task.repEmail && <div className="truncate" title={task.repEmail}>📧 {task.repEmail}</div>}
+                                  {task.repPhone && <div className="truncate" title={task.repPhone}>📞 {task.repPhone}</div>}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </div>
+                        
+                        {/* Deadline Date */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 block mb-1">Deadline</label>
+                          <div className="text-xs text-gray-900" data-testid={`text-deadline-${task.id}`}>
+                            {format(calculateDeadlineDate(task), 'MMM d, yyyy')}
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <Select
@@ -1027,9 +1070,9 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   {expandedTasks.has(task.id) && (
                     <tr className={`${index % 2 === 1 ? 'bg-accent/30' : 'bg-gray-50'} border-t border-gray-200`}>
                       <td colSpan={7} className="px-4 py-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          {/* Payment Status - same width as Task (25%) */}
-                          <div className="w-[25%]">
+                        <div className="grid grid-cols-1 gap-4">
+                          {/* Payment Status - full width */}
+                          <div>
                             <label className="text-xs font-medium text-gray-700 block mb-1">Payment</label>
                             <Select
                               value={task.paymentStatus || 'not_paid'}
@@ -1046,24 +1089,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                                 <SelectItem value="no_cost">No Cost</SelectItem>
                               </SelectContent>
                             </Select>
-                          </div>
-                          
-                          {/* Completion Date - same width as Task Owner (18%) */}
-                          <div className="w-[18%]">
-                            <label className="text-xs font-medium text-gray-700 block mb-1">Completion Date</label>
-                            <Input
-                              type="datetime-local"
-                              value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 16) : ''}
-                              onChange={(e) => {
-                                const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
-                                updateTask.mutate({
-                                  id: task.id,
-                                  updates: { completedAt: newCompletedAt }
-                                });
-                              }}
-                              className="w-full text-xs h-8"
-                              data-testid={`input-completion-date-${task.id}`}
-                            />
                           </div>
                         </div>
                       </td>
