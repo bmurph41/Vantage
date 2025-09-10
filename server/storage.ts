@@ -1,11 +1,11 @@
 import { 
   organizations, users, projects, projectSettings, tasks, taskTemplates, 
-  projectTemplates, auditLogs,
+  projectTemplates, auditLogs, timelineNotes,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type TaskTemplate, type ProjectTemplate, type AuditLog,
-  type InsertOrganization, type InsertUser, type InsertProject, 
+  type TimelineNote, type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask, type InsertTaskTemplate,
-  type InsertProjectTemplate, type InsertAuditLog
+  type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -49,6 +49,12 @@ export interface IStorage {
   getProjectTemplatesForOrg(orgId: string): Promise<ProjectTemplate[]>;
   getGlobalProjectTemplates(): Promise<ProjectTemplate[]>;
   createProjectTemplate(template: InsertProjectTemplate): Promise<ProjectTemplate>;
+
+  // Timeline Notes
+  getTimelineNotesForTask(taskId: string): Promise<TimelineNote[]>;
+  createTimelineNote(note: InsertTimelineNote): Promise<TimelineNote>;
+  updateTimelineNote(id: string, updates: Partial<InsertTimelineNote>): Promise<TimelineNote>;
+  deleteTimelineNote(id: string): Promise<void>;
 
   // Audit Logs
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
@@ -193,6 +199,29 @@ export class DatabaseStorage implements IStorage {
   async createProjectTemplate(template: InsertProjectTemplate): Promise<ProjectTemplate> {
     const [created] = await db.insert(projectTemplates).values(template).returning();
     return created;
+  }
+
+  async getTimelineNotesForTask(taskId: string): Promise<TimelineNote[]> {
+    return db.select().from(timelineNotes)
+      .where(eq(timelineNotes.taskId, taskId))
+      .orderBy(desc(timelineNotes.createdAt));
+  }
+
+  async createTimelineNote(note: InsertTimelineNote): Promise<TimelineNote> {
+    const [created] = await db.insert(timelineNotes).values(note).returning();
+    return created;
+  }
+
+  async updateTimelineNote(id: string, updates: Partial<InsertTimelineNote>): Promise<TimelineNote> {
+    const [updated] = await db.update(timelineNotes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(timelineNotes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTimelineNote(id: string): Promise<void> {
+    await db.delete(timelineNotes).where(eq(timelineNotes.id, id));
   }
 
   async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {

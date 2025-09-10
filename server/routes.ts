@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertTaskSchema, 
-  insertTaskTemplateSchema, insertProjectTemplateSchema, insertAuditLogSchema 
+  insertTaskTemplateSchema, insertProjectTemplateSchema, insertAuditLogSchema,
+  insertTimelineNoteSchema 
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -219,6 +220,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // Timeline Notes
+  app.get("/api/dd/tasks/:taskId/timeline-notes", async (req: any, res) => {
+    try {
+      const notes = await storage.getTimelineNotesForTask(req.params.taskId);
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch timeline notes" });
+    }
+  });
+
+  app.post("/api/dd/tasks/:taskId/timeline-notes", async (req: any, res) => {
+    try {
+      const noteData = insertTimelineNoteSchema.parse({
+        ...req.body,
+        taskId: req.params.taskId,
+        authorId: req.user.id,
+      });
+      
+      const note = await storage.createTimelineNote(noteData);
+      res.json(note);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid note data" });
+    }
+  });
+
+  app.put("/api/dd/timeline-notes/:id", async (req: any, res) => {
+    try {
+      const updates = insertTimelineNoteSchema.partial().parse(req.body);
+      const note = await storage.updateTimelineNote(req.params.id, updates);
+      res.json(note);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid update data" });
+    }
+  });
+
+  app.delete("/api/dd/timeline-notes/:id", async (req: any, res) => {
+    try {
+      await storage.deleteTimelineNote(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete note" });
     }
   });
 
