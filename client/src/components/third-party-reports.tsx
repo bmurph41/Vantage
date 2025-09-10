@@ -58,6 +58,17 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       setSortDirection('desc');
     }
   };
+
+  const getSortIcon = (column: 'daysRemaining' | 'cost') => {
+    if (sortColumn !== column) {
+      return null;
+    }
+    return sortDirection === 'asc' ? (
+      <ChevronUp className="w-4 h-4 ml-1" />
+    ) : (
+      <ChevronDown className="w-4 h-4 ml-1" />
+    );
+  };
   // Removed floating timeline to prevent scroll issues
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -94,6 +105,27 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       return matchesSearch && matchesStatus && matchesPayment && matchesAssignee && matchesCost && matchesCompletion;
     })
     .sort((a, b) => {
+      // If sorting is active, handle that first
+      if (sortColumn && sortColumn !== null) {
+        let aValue: number;
+        let bValue: number;
+        
+        if (sortColumn === 'daysRemaining') {
+          aValue = calculateDaysRemaining(a);
+          bValue = calculateDaysRemaining(b);
+        } else if (sortColumn === 'cost') {
+          // Parse cost as number, treating empty/null as 0
+          aValue = a.cost ? parseFloat(a.cost.replace(/[^0-9.-]/g, '')) || 0 : 0;
+          bValue = b.cost ? parseFloat(b.cost.replace(/[^0-9.-]/g, '')) || 0 : 0;
+        } else {
+          aValue = 0;
+          bValue = 0;
+        }
+        
+        const result = sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+        if (result !== 0) return result;
+      }
+      
       // Stack completed tasks at bottom, sorted by completion date
       const aCompleted = a.status === 'completed';
       const bCompleted = b.status === 'completed';
@@ -762,7 +794,16 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[20%]">Task Owner</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[25%]">Company Hired</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Status</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[10%]">Days Remaining</th>
+                <th 
+                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
+                  onClick={() => handleSort('daysRemaining')}
+                  data-testid="header-days-remaining"
+                >
+                  <div className="flex items-center">
+                    Days Remaining
+                    {getSortIcon('daysRemaining')}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
