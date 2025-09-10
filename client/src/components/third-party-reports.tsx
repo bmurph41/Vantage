@@ -23,6 +23,10 @@ interface ThirdPartyReportsProps {
 export function ThirdPartyReports({ tasks, projectId, project, settings }: ThirdPartyReportsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [costFilter, setCostFilter] = useState("all");
+  const [completionFilter, setCompletionFilter] = useState("all");
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [granularity, setGranularity] = useState('weekly');
@@ -33,10 +37,34 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const deleteTask = useDeleteTask();
 
   const filteredTasks = tasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (task.description || "").toLowerCase().includes(searchTerm.toLowerCase());
+    // Search filter (title, description, company hired)
+    const matchesSearch = searchTerm === "" || 
+      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.companyHired || "").toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Status filter
     const matchesStatus = statusFilter === "all" || task.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    
+    // Payment filter
+    const matchesPayment = paymentFilter === "all" || task.paymentStatus === paymentFilter;
+    
+    // Assignee filter
+    const matchesAssignee = assigneeFilter === "all" || 
+      (assigneeFilter === "unassigned" && !task.assignee) ||
+      (task.assignee && task.assignee.toLowerCase().includes(assigneeFilter.toLowerCase()));
+    
+    // Cost filter
+    const matchesCost = costFilter === "all" ||
+      (costFilter === "has_cost" && task.cost && task.cost.trim() !== "") ||
+      (costFilter === "no_cost" && (!task.cost || task.cost.trim() === ""));
+    
+    // Completion filter
+    const matchesCompletion = completionFilter === "all" ||
+      (completionFilter === "completed" && task.completedAt) ||
+      (completionFilter === "pending" && !task.completedAt);
+    
+    return matchesSearch && matchesStatus && matchesPayment && matchesAssignee && matchesCost && matchesCompletion;
   });
 
   // Removed all scroll detection to prevent glitches
