@@ -90,20 +90,20 @@ export function ProgressLegend() {
   return (
     <div className="flex items-center space-x-8 text-sm" data-testid="progress-legend">
       <div className="flex items-center space-x-3">
-        <div className="w-6 h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-sm border border-blue-300" />
-        <span className="font-medium text-gray-700">⏱️ Time Elapsed</span>
+        <div className="w-6 h-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded shadow-sm border border-blue-300" />
+        <span className="font-medium text-gray-700">Time Elapsed</span>
       </div>
       <div className="flex items-center space-x-3">
-        <div className="w-6 h-4 progress-bar-remaining rounded-lg shadow-sm border border-gray-300" />
-        <span className="font-medium text-gray-700">⏳ Time Remaining</span>
+        <div className="w-6 h-3 progress-bar-remaining rounded shadow-sm border border-gray-300" />
+        <span className="font-medium text-gray-700">Time Remaining</span>
       </div>
       <div className="flex items-center space-x-3">
-        <div className="w-6 h-4 bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow-sm border border-green-300" />
-        <span className="font-medium text-gray-700">✅ Completed</span>
+        <div className="w-6 h-3 bg-gradient-to-r from-green-500 to-green-600 rounded shadow-sm border border-green-300" />
+        <span className="font-medium text-gray-700">Completed</span>
       </div>
       <div className="flex items-center space-x-3">
-        <div className="w-6 h-4 bg-gradient-to-r from-red-500 to-red-600 rounded-lg shadow-sm border border-red-300" />
-        <span className="font-medium text-gray-700">🚨 Overdue</span>
+        <div className="w-6 h-3 bg-gradient-to-r from-red-500 to-red-600 rounded shadow-sm border border-red-300" />
+        <span className="font-medium text-gray-700">Overdue</span>
       </div>
     </div>
   );

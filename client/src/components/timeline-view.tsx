@@ -62,7 +62,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">Due Diligence Timeline</h1>
-              <p className="text-blue-200/80 text-lg">Track project milestones and task progress</p>
+              <p className="text-blue-200/80 text-lg">Project milestones and task progress overview</p>
             </div>
             <div className="flex items-center space-x-4">
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-1">
@@ -83,12 +83,12 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 onClick={() => setShowCriticalPath(!showCriticalPath)}
                 className={`${
                   showCriticalPath 
-                    ? "bg-amber-500 hover:bg-amber-600 text-amber-900 shadow-lg shadow-amber-500/25" 
+                    ? "bg-amber-500 hover:bg-amber-600 text-white shadow-lg" 
                     : "bg-white/10 hover:bg-white/20 text-white border-white/20"
                 } transition-all duration-200 font-semibold px-6`}
                 data-testid="button-critical-path"
               >
-                ⚡ Critical Path
+                Critical Path
               </Button>
             </div>
           </div>
@@ -98,11 +98,11 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white flex items-center">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3 animate-pulse"></span>
+                  <span className="w-1 h-6 bg-blue-400 rounded-full mr-3"></span>
                   Project Timeline Overview
                 </h2>
-                <div className="text-sm text-blue-200/70 bg-white/5 px-3 py-1 rounded-full">
-                  {tasks.length} Active Tasks
+                <div className="text-sm text-blue-200/70 bg-white/5 px-4 py-2 rounded-lg border border-white/10">
+                  {tasks.length} Tasks
                 </div>
               </div>
               
@@ -157,16 +157,13 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                       data-testid="milestone-psa"
                     >
                       <div className="relative">
-                        <div className="w-6 h-6 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full border-4 border-white shadow-xl group-hover:scale-110 transition-transform duration-200 flex items-center justify-center">
-                          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                        <div className="w-4 h-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full border-2 border-white shadow-lg transition-transform duration-200">
                         </div>
-                        <div className="absolute -inset-2 bg-blue-400/20 rounded-full animate-ping group-hover:animate-none"></div>
                       </div>
-                      <div className="mt-3 bg-white shadow-xl rounded-lg border border-slate-200 px-4 py-3 group-hover:shadow-2xl transition-shadow duration-200">
+                      <div className="mt-3 bg-white shadow-lg rounded-lg border border-slate-200 px-3 py-2 group-hover:shadow-xl transition-shadow duration-200">
                         <div className="text-center">
-                          <span className="text-sm font-bold text-blue-600 block">🏁 PSA Signed</span>
-                          <div className="text-xs text-slate-600 mt-1 font-medium">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
-                          <div className="text-xs text-green-600 mt-1">✓ Completed</div>
+                          <span className="text-xs font-bold text-blue-600 block">PSA Signed</span>
+                          <div className="text-xs text-slate-600 mt-1">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
                         </div>
                       </div>
                     </div>
@@ -178,16 +175,13 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                       data-testid="milestone-dd-expiration"
                     >
                       <div className="relative">
-                        <div className="w-6 h-6 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full border-4 border-white shadow-xl group-hover:scale-110 transition-transform duration-200 flex items-center justify-center">
-                          <div className="text-xs">⚠️</div>
+                        <div className="w-4 h-4 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full border-2 border-white shadow-lg transition-transform duration-200">
                         </div>
-                        <div className="absolute -inset-2 bg-amber-400/20 rounded-full animate-ping group-hover:animate-none"></div>
                       </div>
-                      <div className="mt-3 bg-white shadow-xl rounded-lg border border-slate-200 px-4 py-3 group-hover:shadow-2xl transition-shadow duration-200">
+                      <div className="mt-3 bg-white shadow-lg rounded-lg border border-slate-200 px-3 py-2 group-hover:shadow-xl transition-shadow duration-200">
                         <div className="text-center">
-                          <span className="text-sm font-bold text-amber-600 block">⏰ DD Expiration</span>
-                          <div className="text-xs text-slate-600 mt-1 font-medium">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
-                          <div className="text-xs text-amber-600 mt-1">Critical Deadline</div>
+                          <span className="text-xs font-bold text-amber-600 block">DD Expiration</span>
+                          <div className="text-xs text-slate-600 mt-1">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
                         </div>
                       </div>
                     </div>
@@ -199,16 +193,13 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                       data-testid="milestone-closing"
                     >
                       <div className="relative">
-                        <div className="w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full border-4 border-white shadow-xl group-hover:scale-110 transition-transform duration-200 flex items-center justify-center">
-                          <div className="text-xs">🎯</div>
+                        <div className="w-4 h-4 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full border-2 border-white shadow-lg transition-transform duration-200">
                         </div>
-                        <div className="absolute -inset-2 bg-green-400/20 rounded-full animate-ping group-hover:animate-none"></div>
                       </div>
-                      <div className="mt-3 bg-white shadow-xl rounded-lg border border-slate-200 px-4 py-3 group-hover:shadow-2xl transition-shadow duration-200">
+                      <div className="mt-3 bg-white shadow-lg rounded-lg border border-slate-200 px-3 py-2 group-hover:shadow-xl transition-shadow duration-200">
                         <div className="text-center">
-                          <span className="text-sm font-bold text-green-600 block">🏠 Closing</span>
-                          <div className="text-xs text-slate-600 mt-1 font-medium">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
-                          <div className="text-xs text-green-600 mt-1">Final Goal</div>
+                          <span className="text-xs font-bold text-green-600 block">Closing</span>
+                          <div className="text-xs text-slate-600 mt-1">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
                         </div>
                       </div>
                     </div>
@@ -222,13 +213,13 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
       {/* Premium Task Cards */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-            <span className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-4"></span>
-            Active Tasks
+            <span className="w-1 h-8 bg-gradient-to-b from-slate-600 to-slate-800 rounded-sm mr-4"></span>
+            Project Tasks
           </h2>
-          <div className="text-sm text-gray-500 bg-gray-50 px-4 py-2 rounded-full border">
-            {tasks.filter(t => t.status !== 'completed').length} of {tasks.length} remaining
+          <div className="text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+            {tasks.filter(t => t.status !== 'completed').length} of {tasks.length} active
           </div>
         </div>
         
@@ -264,10 +255,8 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                           } group-hover:text-blue-600 transition-colors`}>
                             {task.title}
                           </h3>
-                          {isPriorityHigh && showCriticalPath && (
-                            <div className="animate-pulse">
-                              <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full border border-amber-300">⚡ CRITICAL</span>
-                            </div>
+                                  {isPriorityHigh && showCriticalPath && (
+                            <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-md border border-amber-300">CRITICAL</span>
                           )}
                         </div>
                         
@@ -283,26 +272,26 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                           )}
                           
                           {task.priority && (
-                            <span className={`px-4 py-2 rounded-full text-sm font-bold shadow-sm border ${
+                            <span className={`px-3 py-1 rounded-md text-xs font-bold shadow-sm border ${
                               task.priority === 'high' ? 'bg-red-100 text-red-700 border-red-200' :
                               task.priority === 'med' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
                               'bg-green-100 text-green-700 border-green-200'
                             }`}>
-                              {task.priority === 'high' ? '🔥 HIGH' : task.priority === 'med' ? '⚡ MEDIUM' : '✅ LOW'}
+                              {task.priority === 'high' ? 'HIGH' : task.priority === 'med' ? 'MEDIUM' : 'LOW'}
                             </span>
                           )}
                           
                           {task.status && (
-                            <span className={`px-4 py-2 rounded-full text-sm font-bold shadow-sm border ${
+                            <span className={`px-3 py-1 rounded-md text-xs font-bold shadow-sm border ${
                               task.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
                               task.status === 'in_progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
                               task.status === 'blocked' ? 'bg-red-100 text-red-800 border-red-200' :
                               'bg-gray-100 text-gray-800 border-gray-200'
                             }`}>
-                              {task.status === 'completed' ? '✅ COMPLETED' :
-                               task.status === 'in_progress' ? '🔄 IN PROGRESS' :
-                               task.status === 'blocked' ? '🚫 BLOCKED' :
-                               '⏸️ NOT STARTED'}
+                              {task.status === 'completed' ? 'COMPLETED' :
+                               task.status === 'in_progress' ? 'IN PROGRESS' :
+                               task.status === 'blocked' ? 'BLOCKED' :
+                               'NOT STARTED'}
                             </span>
                           )}
                         </div>
@@ -340,10 +329,10 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">No Tasks Yet</h3>
-                <p className="text-gray-600 mb-6">Add some tasks to see them displayed in the timeline.</p>
-                <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold px-8 py-3 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200">
-                  + Add Your First Task
+                <h3 className="text-xl font-bold text-gray-900 mb-3">No Tasks</h3>
+                <p className="text-gray-600 mb-6">Add tasks to begin tracking your due diligence progress.</p>
+                <Button className="bg-slate-900 hover:bg-slate-800 text-white font-medium px-6 py-3 rounded-lg shadow-lg transition-all duration-200">
+                  Add Task
                 </Button>
               </div>
             </CardContent>
@@ -356,8 +345,8 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <h4 className="text-lg font-bold text-gray-900">📊 Timeline Legend</h4>
-              <span className="text-sm text-gray-500 bg-white px-3 py-1 rounded-full border">Visual Guide</span>
+              <h4 className="text-lg font-semibold text-gray-900">Timeline Legend</h4>
+              <span className="text-sm text-gray-500 bg-white px-3 py-1 rounded-md border border-gray-200">Progress Indicators</span>
             </div>
             <div className="flex items-center space-x-8">
               <ProgressLegend />
