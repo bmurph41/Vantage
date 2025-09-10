@@ -456,47 +456,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="startStrategy">Start Strategy</Label>
-                    <Select
-                      value={form.watch("startStrategy")}
-                      onValueChange={(value: string) => form.setValue("startStrategy", value as "fixed" | "offset")}
-                    >
-                      <SelectTrigger data-testid="select-start-strategy">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="fixed">Fixed Date</SelectItem>
-                        <SelectItem value="offset">Days After PSA</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    {form.watch("startStrategy") === "fixed" ? (
-                      <>
-                        <Label htmlFor="startDate">Start Date</Label>
-                        <Input
-                          id="startDate"
-                          type="date"
-                          {...form.register("startDate")}
-                          data-testid="input-start-date"
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <Label htmlFor="startOffsetDays">Days After PSA</Label>
-                        <Input
-                          id="startOffsetDays"
-                          type="number"
-                          {...form.register("startOffsetDays", { valueAsNumber: true })}
-                          data-testid="input-start-offset"
-                        />
-                      </>
-                    )}
-                  </div>
-                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
