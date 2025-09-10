@@ -28,9 +28,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(false);
-  const [currentTaskInView, setCurrentTaskInView] = useState<string | null>(null);
   const [isAtTop, setIsAtTop] = useState(true);
-  const taskRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
@@ -41,82 +39,35 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     return matchesSearch && matchesStatus;
   });
 
-  // Scroll detection for floating timeline with improved performance
+  // Simple scroll detection for floating timeline
   useEffect(() => {
-    let rafId: number | null = null;
+    let ticking = false;
     
     const handleScroll = () => {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const scrollTop = window.scrollY;
+          const newIsAtTop = scrollTop < 200;
+          
+          // Only update state if there's a change
+          if (newIsAtTop !== isAtTop) {
+            setIsAtTop(newIsAtTop);
+          }
+          
+          ticking = false;
+        });
+        ticking = true;
       }
-      
-      rafId = requestAnimationFrame(() => {
-        const scrollTop = window.scrollY;
-        const newIsAtTop = scrollTop < 250; // Consider "at top" if within 250px of top
-        
-        // Only update if there's actually a change
-        if (newIsAtTop !== isAtTop) {
-          setIsAtTop(newIsAtTop);
-        }
-        
-        if (!isTimelineCollapsed) {
-          // Find which task is currently in view
-          let currentTask = null;
-          
-          if (!newIsAtTop) {
-            const viewportTop = scrollTop;
-            const viewportHeight = window.innerHeight;
-            const checkPoint = viewportTop + (viewportHeight * 0.3); // 30% down from top of viewport
-            
-            // Find the task that's most prominently in view
-            let bestTask = null;
-            let bestOverlap = 0;
-            
-            for (const [taskId, ref] of Object.entries(taskRefs.current)) {
-              if (ref) {
-                const rect = ref.getBoundingClientRect();
-                const elementTop = rect.top + scrollTop;
-                const elementBottom = elementTop + rect.height;
-                
-                // Check if element intersects with our check area
-                if (elementTop <= checkPoint && elementBottom >= checkPoint) {
-                  const overlapStart = Math.max(elementTop, viewportTop);
-                  const overlapEnd = Math.min(elementBottom, viewportTop + viewportHeight);
-                  const overlap = Math.max(0, overlapEnd - overlapStart);
-                  
-                  if (overlap > bestOverlap) {
-                    bestOverlap = overlap;
-                    bestTask = taskId;
-                  }
-                }
-              }
-            }
-            
-            currentTask = bestTask;
-          }
-          
-          if (currentTask !== currentTaskInView) {
-            setCurrentTaskInView(currentTask);
-          }
-        }
-      });
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); // Check initial state
     
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-      }
     };
-  }, [isTimelineCollapsed, isAtTop, currentTaskInView]);
+  }, [isAtTop]);
 
-  // Register task refs
-  const setTaskRef = (taskId: string) => (ref: HTMLTableRowElement | null) => {
-    taskRefs.current[taskId] = ref;
-  };
+  // Removed task refs to prevent scroll glitches
 
   const getStatusBadge = (status: string) => {
     const colors = {
@@ -360,11 +311,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 </Button>
                 <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 border border-gray-200">
                   {tasks.filter(t => t.showOnTimeline).length} Tasks
-                  {!isAtTop && currentTaskInView && (
-                    <span className="ml-2 text-xs text-gray-500">
-                      • {tasks.find(t => t.id === currentTaskInView)?.title.substring(0, 15)}...
-                    </span>
-                  )}
                 </div>
               </div>
             )}
@@ -428,13 +374,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   ></div>
 
                   {/* Task Progress Overlays */}
-                  {tasks.filter(t => {
-                    const basicFilter = t.showOnTimeline && (!showCriticalPath || t.priority === 'high');
-                    if (isAtTop || !currentTaskInView) {
-                      return basicFilter;
-                    }
-                    return basicFilter && t.id === currentTaskInView;
-                  }).map((task, taskIndex) => {
+                  {tasks.filter(t => t.showOnTimeline && (!showCriticalPath || t.priority === 'high')).map((task, taskIndex) => {
                     const taskProgress = getTaskProgress(task);
                     
                     return (
@@ -552,8 +492,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             </div>
           )}
         </div>
-        {/* Add spacing when timeline is floating - only when actually floating */}
-        <div className={`${!isTimelineCollapsed && !isAtTop ? 'pt-28' : ''} transition-all duration-200 ease-in-out`}>
+        {/* Add spacing when timeline is floating */}
+        <div className={`${!isTimelineCollapsed && !isAtTop ? 'pt-20' : ''} transition-all duration-300 ease-in-out`}>
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="relative">
@@ -611,10 +551,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               {filteredTasks.map((task, index) => (
                 <tr 
                   key={task.id} 
-                  ref={setTaskRef(task.id)}
-                  className={`hover:bg-accent/50 transition-colors ${index % 2 === 1 ? 'bg-accent/30' : ''} ${
-                    currentTaskInView === task.id ? 'ring-2 ring-blue-300 bg-blue-50' : ''
-                  }`}
+                      className={`hover:bg-accent/50 transition-colors ${index % 2 === 1 ? 'bg-accent/30' : ''}`}
                   data-testid={`row-task-${task.id}`}
                 >
                   <td className="px-4 py-3">
