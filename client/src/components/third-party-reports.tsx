@@ -686,7 +686,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       <SelectItem value="not_started">Not Started</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="blocked">Blocked</SelectItem>
                       <SelectItem value="to_do">To Do</SelectItem>
                       <SelectItem value="scheduled">Scheduled</SelectItem>
                     </SelectContent>
@@ -756,7 +755,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               <SelectItem value="in_progress">In Progress</SelectItem>
                               <SelectItem value="completed">Completed</SelectItem>
                               <SelectItem value="not_started">Not Started</SelectItem>
-                              <SelectItem value="blocked">Blocked</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
