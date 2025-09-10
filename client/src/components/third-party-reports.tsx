@@ -41,7 +41,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [taskDisplay, setTaskDisplay] = useState<'all' | 'critical' | 'none' | 'selected'>('all');
   const [selectedTaskPriorities, setSelectedTaskPriorities] = useState<Set<string>>(new Set(['high', 'med', 'low']));
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [sortColumn, setSortColumn] = useState<'daysRemaining' | 'cost' | null>(null);
+  const [sortColumn, setSortColumn] = useState<'daysRemaining' | 'cost' | 'deadline' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -55,7 +55,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     setExpandedTasks(newExpanded);
   };
 
-  const handleSort = (column: 'daysRemaining' | 'cost') => {
+  const handleSort = (column: 'daysRemaining' | 'cost' | 'deadline') => {
     if (sortColumn === column) {
       // Toggle direction if same column
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -66,7 +66,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     }
   };
 
-  const getSortIcon = (column: 'daysRemaining' | 'cost') => {
+  const getSortIcon = (column: 'daysRemaining' | 'cost' | 'deadline') => {
     if (sortColumn !== column) {
       return null;
     }
@@ -196,6 +196,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
           // Parse cost as number, treating empty/null as 0
           aValue = a.cost ? parseFloat(a.cost.replace(/[^0-9.-]/g, '')) || 0 : 0;
           bValue = b.cost ? parseFloat(b.cost.replace(/[^0-9.-]/g, '')) || 0 : 0;
+        } else if (sortColumn === 'deadline') {
+          // Sort by deadline date
+          const aDeadline = calculateDeadlineDate(a);
+          const bDeadline = calculateDeadlineDate(b);
+          aValue = aDeadline.getTime();
+          bValue = bDeadline.getTime();
         } else {
           aValue = 0;
           bValue = 0;
@@ -897,12 +903,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
           <table className="w-full" data-testid="tasks-table">
             <thead>
               <tr className="bg-primary text-primary-foreground">
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[28%]">Task</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[18%]">Task Owner</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[22%]">Company Hired</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[14%]">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[22%]">Task</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[12%]">Task Owner</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Company Hired</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[8%]">Status</th>
                 <th 
-                  className="px-4 py-3 text-left text-sm font-semibold w-[12%] cursor-pointer hover:bg-primary/80 transition-colors"
+                  className="px-4 py-3 text-left text-sm font-semibold w-[9%] cursor-pointer hover:bg-primary/80 transition-colors"
                   onClick={() => handleSort('deadline')}
                   data-testid="header-deadline"
                 >
@@ -911,18 +917,11 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     {getSortIcon('deadline')}
                   </div>
                 </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[9%]">Ordered Date</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[9%]">On-Site Date</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[9%]">Completion Date</th>
                 <th 
-                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
-                  onClick={() => handleSort('daysRemaining')}
-                  data-testid="header-days-remaining"
-                >
-                  <div className="flex items-center">
-                    Days Remaining
-                    {getSortIcon('daysRemaining')}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
+                  className="px-4 py-3 text-left text-sm font-semibold w-[7%] cursor-pointer hover:bg-primary/80 transition-colors"
                   onClick={() => handleSort('cost')}
                   data-testid="header-cost"
                 >
@@ -1014,44 +1013,62 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         data-testid={`input-deadline-${task.id}`}
                       />
                     </td>
-                    <td className="px-4 py-3 text-center" data-testid={`text-days-remaining-${task.id}`}>
-                      <div className="space-y-2">
-                        {/* Days Remaining */}
-                        <div>
-                          {(() => {
-                            const daysRemaining = calculateDaysRemaining(task);
-                            if (task.status === 'completed') {
-                              return <span className="text-green-600 font-medium text-sm">Complete</span>;
-                            } else if (daysRemaining === 0) {
-                              return <span className="text-red-600 font-medium text-sm">Due Today</span>;
-                            } else if (daysRemaining < 0) {
-                              return <span className="text-red-600 font-medium text-sm">Overdue</span>;
-                            } else {
-                              return <span className={`font-medium text-sm ${daysRemaining <= 3 ? 'text-orange-600' : 'text-gray-900'}`}>
-                                {daysRemaining}d
-                              </span>;
-                            }
-                          })()}
+                    <td className="px-4 py-3" data-testid={`text-ordered-date-${task.id}`}>
+                      {task.status === 'scheduled' ? (
+                        <Input
+                          type="date"
+                          value={task.orderedAt || ''}
+                          onChange={(e) => {
+                            const newOrderedAt = e.target.value ? e.target.value : null;
+                            updateTask.mutate({
+                              id: task.id,
+                              updates: { orderedAt: newOrderedAt }
+                            });
+                          }}
+                          className="w-full text-xs h-7"
+                          data-testid={`input-ordered-date-${task.id}`}
+                        />
+                      ) : (
+                        <div className="w-full text-xs h-7 px-3 py-2 border border-input bg-background rounded-md flex items-center text-muted-foreground">
+                          {task.orderedAt || '-'}
                         </div>
-                        
-                        {/* Completion Date */}
-                        <div>
-                          <label className="text-xs font-medium text-gray-700 block mb-1">Completion Date</label>
-                          <Input
-                            type="date"
-                            value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 10) : ''}
-                            onChange={(e) => {
-                              const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
-                              updateTask.mutate({
-                                id: task.id,
-                                updates: { completedAt: newCompletedAt }
-                              });
-                            }}
-                            className="w-full text-xs h-7"
-                            data-testid={`input-completion-date-${task.id}`}
-                          />
+                      )}
+                    </td>
+                    <td className="px-4 py-3" data-testid={`text-onsite-date-${task.id}`}>
+                      {task.status === 'scheduled' ? (
+                        <Input
+                          type="date"
+                          value={task.dateOnSite || ''}
+                          onChange={(e) => {
+                            const newDateOnSite = e.target.value ? e.target.value : null;
+                            updateTask.mutate({
+                              id: task.id,
+                              updates: { dateOnSite: newDateOnSite }
+                            });
+                          }}
+                          className="w-full text-xs h-7"
+                          data-testid={`input-onsite-date-${task.id}`}
+                        />
+                      ) : (
+                        <div className="w-full text-xs h-7 px-3 py-2 border border-input bg-background rounded-md flex items-center text-muted-foreground">
+                          {task.dateOnSite || '-'}
                         </div>
-                      </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3" data-testid={`text-completion-date-${task.id}`}>
+                      <Input
+                        type="date"
+                        value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 10) : ''}
+                        onChange={(e) => {
+                          const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
+                          updateTask.mutate({
+                            id: task.id,
+                            updates: { completedAt: newCompletedAt }
+                          });
+                        }}
+                        className="w-full text-xs h-7"
+                        data-testid={`input-completion-date-${task.id}`}
+                      />
                     </td>
                     <td className="px-4 py-3 text-center" data-testid={`text-cost-${task.id}`}>
                       {editingCostTaskId === task.id ? (
@@ -1169,7 +1186,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   {/* Rep Contact Information Row */}
                   {(task.repName || task.repEmail || task.repPhone) && (
                     <tr className="bg-gray-50 border-none">
-                      <td colSpan={8} className="px-4 py-2 text-xs text-gray-600" data-testid={`rep-contact-${task.id}`}>
+                      <td colSpan={10} className="px-4 py-2 text-xs text-gray-600" data-testid={`rep-contact-${task.id}`}>
                         <div className="flex items-center space-x-6">
                           {task.repName && (
                             <div className="flex items-center space-x-1">
@@ -1198,7 +1215,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               ))}
               {filteredTasks.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
+                  <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
                     No tasks found matching your criteria.
                   </td>
                 </tr>
