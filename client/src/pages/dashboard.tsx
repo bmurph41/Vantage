@@ -105,6 +105,13 @@ export default function Dashboard() {
   const { data: projects = [], isLoading } = useProjects();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
+  // Calculate days remaining from today to a target date
+  const calculateDaysRemaining = (targetDate: string): number => {
+    const today = new Date();
+    const target = new Date(targetDate);
+    return differenceInDays(target, today);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
