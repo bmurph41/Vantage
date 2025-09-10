@@ -81,19 +81,19 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
       {/* Text labels above progress bars */}
       <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10">
         {isCompleted ? (
-          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap">
+          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle">
             Completed ({getTimeLabel(taskDurationDays)})
           </span>
         ) : isOverdue ? (
-          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap">
+          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle">
             Overdue ({getTimeLabel(elapsed)} elapsed)
           </span>
         ) : isNotStarted ? (
-          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap">
+          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle">
             {getTimeLabel(taskDurationDays)} remaining
           </span>
         ) : (
-          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap">
+          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle">
             {getTimeLabel(elapsed)} elapsed, {getTimeLabel(remaining)} left
           </span>
         )}

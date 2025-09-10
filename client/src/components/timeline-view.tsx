@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,173 @@ interface TimelineViewProps {
   settings?: ProjectSettings | null;
 }
 
+// Smart leader lines component
+interface LinesLayerProps {
+  headerRef: React.RefObject<HTMLDivElement>;
+  contentRef: React.RefObject<HTMLDivElement>;
+}
+
+function useLeaderLines(headerRef: React.RefObject<HTMLDivElement>, contentRef: React.RefObject<HTMLDivElement>) {
+  const [lines, setLines] = useState<Array<{ x: number; segments: Array<{ top: number; height: number }> }>>([]);
+
+  const computeLines = useCallback(() => {
+    if (!headerRef.current || !contentRef.current) return;
+
+    requestAnimationFrame(() => {
+      const headerGrid = headerRef.current;
+      const contentContainer = contentRef.current;
+      if (!headerGrid || !contentContainer) return;
+
+      const headerRect = headerGrid.getBoundingClientRect();
+      const contentRect = contentContainer.getBoundingClientRect();
+      
+      // Get header cells (date cells)
+      const headerCells = Array.from(headerGrid.children) as HTMLElement[];
+      const maxLines = Math.min(12, headerCells.length);
+      
+      // Calculate line X positions
+      const lineXPositions = headerCells.slice(0, maxLines).map(cell => {
+        const cellRect = cell.getBoundingClientRect();
+        return cellRect.left + cellRect.width / 2 - contentRect.left;
+      });
+
+      // Find all obstacles
+      const obstacles = Array.from(contentContainer.querySelectorAll('.leader-obstacle')) as HTMLElement[];
+      const startY = headerRect.bottom - contentRect.top + 5; // Start just below header
+      const endY = contentContainer.scrollHeight - 10; // End near bottom of content
+
+      const newLines = lineXPositions.map(x => {
+        // Find obstacles that intersect this line
+        const lineObstacles = obstacles
+          .map(obstacle => {
+            const rect = obstacle.getBoundingClientRect();
+            const relativeTop = rect.top - contentRect.top;
+            const relativeBottom = rect.bottom - contentRect.top;
+            
+            // Check if obstacle horizontally intersects with line (with padding)
+            const leftBound = rect.left - contentRect.left - 6;
+            const rightBound = rect.right - contentRect.left + 6;
+            
+            if (x >= leftBound && x <= rightBound) {
+              return {
+                top: Math.max(0, relativeTop - 4),
+                bottom: relativeBottom + 4
+              };
+            }
+            return null;
+          })
+          .filter(Boolean)
+          .sort((a, b) => a!.top - b!.top);
+
+        // Merge overlapping obstacles
+        const mergedObstacles: Array<{ top: number; bottom: number }> = [];
+        lineObstacles.forEach(obstacle => {
+          if (!obstacle) return;
+          const last = mergedObstacles[mergedObstacles.length - 1];
+          if (last && obstacle.top <= last.bottom) {
+            last.bottom = Math.max(last.bottom, obstacle.bottom);
+          } else {
+            mergedObstacles.push(obstacle);
+          }
+        });
+
+        // Create line segments between obstacles
+        const segments: Array<{ top: number; height: number }> = [];
+        let currentY = startY;
+
+        mergedObstacles.forEach(obstacle => {
+          if (currentY < obstacle.top) {
+            const height = obstacle.top - currentY;
+            if (height >= 2) { // Minimum segment height
+              segments.push({ top: currentY, height });
+            }
+          }
+          currentY = Math.max(currentY, obstacle.bottom);
+        });
+
+        // Add final segment if there's space
+        if (currentY < endY) {
+          const height = endY - currentY;
+          if (height >= 2) {
+            segments.push({ top: currentY, height });
+          }
+        }
+
+        return { x, segments };
+      });
+
+      setLines(newLines);
+    });
+  }, [headerRef, contentRef]);
+
+  useEffect(() => {
+    computeLines();
+
+    // Set up observers for dynamic updates
+    const resizeObserver = new ResizeObserver(computeLines);
+    const mutationObserver = new MutationObserver(computeLines);
+
+    if (headerRef.current) resizeObserver.observe(headerRef.current);
+    if (contentRef.current) {
+      resizeObserver.observe(contentRef.current);
+      mutationObserver.observe(contentRef.current, { 
+        childList: true, 
+        subtree: true, 
+        attributes: true, 
+        attributeFilter: ['class', 'style'] 
+      });
+    }
+
+    // Debounced window resize
+    let resizeTimeout: NodeJS.Timeout;
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(computeLines, 16);
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
+    };
+  }, [computeLines]);
+
+  return lines;
+}
+
+function LinesLayer({ headerRef, contentRef }: LinesLayerProps) {
+  const lines = useLeaderLines(headerRef, contentRef);
+
+  return (
+    <div 
+      className="absolute inset-0 pointer-events-none z-0" 
+      style={{ top: 0, left: 0, right: 0, bottom: 0 }}
+      aria-hidden="true"
+    >
+      {lines.map((line, lineIndex) =>
+        line.segments.map((segment, segmentIndex) => (
+          <div
+            key={`${lineIndex}-${segmentIndex}`}
+            className="absolute w-px bg-gray-300/80"
+            style={{
+              left: line.x,
+              top: segment.top,
+              height: segment.height,
+            }}
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
 export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];
 
@@ -83,7 +247,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
     <div className="space-y-6" data-testid="timeline-view">
       {/* Professional Header */}
       <Card className="shadow-sm">
-        <CardContent className="p-6">
+        <CardContent className="p-6 relative" ref={contentRef}>
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900 mb-1">Project Timeline</h1>
@@ -111,9 +275,9 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             </div>
           </div>
 
-          {/* Clean Date Headers with Leader Lines */}
+          {/* Clean Date Headers with Smart Leader Lines */}
           <div className="mb-4 relative">
-            <div className="grid gap-1 w-full text-center py-3 bg-gray-50 rounded border relative z-10" style={{ gridTemplateColumns: `repeat(${Math.min(12, timelineDates.length)}, 1fr)` }}>
+            <div className="grid gap-1 w-full text-center py-3 bg-gray-50 rounded border relative z-10" style={{ gridTemplateColumns: `repeat(${Math.min(12, timelineDates.length)}, 1fr)` }} ref={headerRef}>
               {timelineDates.slice(0, 12).map((date, index) => {
                 const isCurrentPeriod = isToday(date);
                 return (
@@ -133,19 +297,19 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                         {format(date, 'yyyy')}
                       </div>
                     )}
-                    {/* Leader line */}
-                    <div className="absolute top-full left-1/2 transform -translate-x-0.5 w-px bg-gray-300 z-0" style={{ height: '400px' }} />
                   </div>
                 );
               })}
             </div>
+            {/* Smart Leader Lines Layer */}
+            <LinesLayer headerRef={headerRef} contentRef={contentRef} />
           </div>
 
           {/* Overall Progress Bar */}
           {project.closingDate && (
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-700">
+                <h3 className="text-sm font-medium text-gray-700 leader-obstacle">
                   Overall Progress to Closing
                 </h3>
                 <div className="text-xs text-gray-600">
@@ -199,7 +363,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                         task.status === 'scheduled' ? 'bg-blue-600' :
                         'bg-gray-400'
                       }`} />
-                      <span className="text-sm font-medium text-gray-900">{task.title}</span>
+                      <span className="text-sm font-medium text-gray-900 leader-obstacle">{task.title}</span>
                     </div>
                     <div className="text-xs text-gray-600">
                       {task.assignee || 'Unassigned'}
