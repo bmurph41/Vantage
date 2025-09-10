@@ -1,9 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Building2, Mail, Phone, User, Calendar, MapPin, ExternalLink } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Building2, Mail, Phone, User, Calendar, MapPin, ExternalLink, Edit2, Save, X } from "lucide-react";
 import type { Task, Project } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -20,6 +23,11 @@ interface CompanyDetailsModalProps {
     project: Project;
     tasks: Task[];
   }>;
+  onContactInfoUpdate?: (contactInfo: {
+    repName?: string;
+    repEmail?: string;
+    repPhone?: string;
+  }) => Promise<void>;
 }
 
 export function CompanyDetailsModal({ 
@@ -27,8 +35,45 @@ export function CompanyDetailsModal({
   onClose, 
   companyName, 
   contactInfo,
-  relatedProjects 
+  relatedProjects,
+  onContactInfoUpdate 
 }: CompanyDetailsModalProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContactInfo, setEditedContactInfo] = useState(contactInfo);
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+
+  // Update local state when props change
+  React.useEffect(() => {
+    setEditedContactInfo(contactInfo);
+  }, [contactInfo]);
+
+  const handleSave = async () => {
+    if (!onContactInfoUpdate) return;
+    
+    setIsSaving(true);
+    try {
+      await onContactInfoUpdate(editedContactInfo);
+      setIsEditing(false);
+      toast({
+        title: "Contact information updated",
+        description: `Updated contact details for ${companyName}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error updating contact information",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditedContactInfo(contactInfo);
+    setIsEditing(false);
+  };
   const totalTasksWithCompany = relatedProjects.reduce((sum, proj) => sum + proj.tasks.length, 0);
   const completedTasks = relatedProjects.reduce((sum, proj) => 
     sum + proj.tasks.filter(task => task.status === 'completed').length, 0
@@ -52,57 +97,152 @@ export function CompanyDetailsModal({
         <div className="space-y-6">
           {/* Contact Information Section */}
           <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center space-x-2 mb-4">
-              <User className="h-5 w-5 text-gray-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Contact Information</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <User className="h-5 w-5 text-gray-600" />
+                <h3 className="text-lg font-semibold text-gray-900">Contact Information</h3>
+              </div>
+              {!isEditing && onContactInfoUpdate && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setIsEditing(true)}
+                  className="flex items-center space-x-1"
+                >
+                  <Edit2 className="h-3 w-3" />
+                  <span>Edit</span>
+                </Button>
+              )}
+              {isEditing && (
+                <div className="flex items-center space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleCancel}
+                    disabled={isSaving}
+                    className="flex items-center space-x-1"
+                  >
+                    <X className="h-3 w-3" />
+                    <span>Cancel</span>
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="flex items-center space-x-1"
+                  >
+                    <Save className="h-3 w-3" />
+                    <span>{isSaving ? 'Saving...' : 'Save'}</span>
+                  </Button>
+                </div>
+              )}
             </div>
             
-            {(contactInfo.repName || contactInfo.repEmail || contactInfo.repPhone) ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {contactInfo.repName && (
-                  <div className="flex items-center space-x-3 p-3 bg-white rounded-md border">
-                    <User className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Representative</p>
-                      <p className="text-sm font-medium text-gray-900">{contactInfo.repName}</p>
-                    </div>
+            {isEditing ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="rep-name" className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Representative Name
+                    </Label>
+                    <Input
+                      id="rep-name"
+                      value={editedContactInfo.repName || ''}
+                      onChange={(e) => setEditedContactInfo(prev => ({ ...prev, repName: e.target.value }))}
+                      placeholder="Enter representative name"
+                      className="text-sm"
+                    />
                   </div>
-                )}
-                
-                {contactInfo.repEmail && (
-                  <div className="flex items-center space-x-3 p-3 bg-white rounded-md border">
-                    <Mail className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</p>
-                      <a 
-                        href={`mailto:${contactInfo.repEmail}`} 
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                      >
-                        {contactInfo.repEmail}
-                      </a>
-                    </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="rep-email" className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Email Address
+                    </Label>
+                    <Input
+                      id="rep-email"
+                      type="email"
+                      value={editedContactInfo.repEmail || ''}
+                      onChange={(e) => setEditedContactInfo(prev => ({ ...prev, repEmail: e.target.value }))}
+                      placeholder="Enter email address"
+                      className="text-sm"
+                    />
                   </div>
-                )}
-                
-                {contactInfo.repPhone && (
-                  <div className="flex items-center space-x-3 p-3 bg-white rounded-md border">
-                    <Phone className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</p>
-                      <a 
-                        href={`tel:${contactInfo.repPhone}`} 
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                      >
-                        {contactInfo.repPhone}
-                      </a>
-                    </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="rep-phone" className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Phone Number
+                    </Label>
+                    <Input
+                      id="rep-phone"
+                      type="tel"
+                      value={editedContactInfo.repPhone || ''}
+                      onChange={(e) => setEditedContactInfo(prev => ({ ...prev, repPhone: e.target.value }))}
+                      placeholder="Enter phone number"
+                      className="text-sm"
+                    />
                   </div>
-                )}
+                </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Building2 className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-sm">No contact information available for this company</p>
+              <div>
+                {(contactInfo.repName || contactInfo.repEmail || contactInfo.repPhone) ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {contactInfo.repName && (
+                      <div className="flex items-center space-x-3 p-3 bg-white rounded-md border">
+                        <User className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Representative</p>
+                          <p className="text-sm font-medium text-gray-900">{contactInfo.repName}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {contactInfo.repEmail && (
+                      <div className="flex items-center space-x-3 p-3 bg-white rounded-md border">
+                        <Mail className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</p>
+                          <a 
+                            href={`mailto:${contactInfo.repEmail}`} 
+                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {contactInfo.repEmail}
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {contactInfo.repPhone && (
+                      <div className="flex items-center space-x-3 p-3 bg-white rounded-md border">
+                        <Phone className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</p>
+                          <a 
+                            href={`tel:${contactInfo.repPhone}`} 
+                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {contactInfo.repPhone}
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Building2 className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p className="text-sm">No contact information available for this company</p>
+                    {onContactInfoUpdate && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setIsEditing(true)}
+                        className="mt-3"
+                      >
+                        Add Contact Information
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
