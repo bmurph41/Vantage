@@ -5,10 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
 import { AddTaskModal } from "@/components/add-task-modal";
+import { TimelineNotes } from "@/components/timeline-notes";
 import { differenceInDays, parseISO, format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, isToday, isPast, isFuture } from "date-fns";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
@@ -29,6 +31,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [completionFilter, setCompletionFilter] = useState("all");
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [timelineNotesTask, setTimelineNotesTask] = useState<Task | null>(null);
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(false);
@@ -984,6 +987,19 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         >
                           Edit
                         </Button>
+
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 px-2 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTimelineNotesTask(task);
+                          }}
+                          data-testid={`button-timeline-notes-${task.id}`}
+                        >
+                          <MessageCircle className="h-3 w-3" />
+                        </Button>
                         
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -1092,6 +1108,26 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         projectId={projectId}
         editingTask={editingTask}
       />
+
+      {/* Timeline Notes Modal */}
+      {timelineNotesTask && (
+        <Dialog open={!!timelineNotesTask} onOpenChange={() => setTimelineNotesTask(null)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5" />
+                Timeline Notes: {timelineNotesTask.title}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-hidden">
+              <TimelineNotes 
+                taskId={timelineNotesTask.id} 
+                taskTitle={timelineNotesTask.title}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   );
 }

@@ -18,7 +18,6 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { marinaDueDiligenceTaskTemplates, taskCategories, searchTasks, type TaskTemplate } from "@/data/marina-due-diligence-tasks";
 import type { Task, TaskTemplate as DbTaskTemplate } from "@shared/schema";
-import { TimelineNotes } from "@/components/timeline-notes";
 
 // Task Owner Selector Component
 function TaskOwnerSelector({ projectId, value, onChange }: { 
@@ -906,15 +905,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
               </div>
             </ScrollArea>
 
-            {/* Timeline Notes Section - Only for existing tasks */}
-            {isEditMode && editingTask && (
-              <div className="mt-6 border-t pt-4">
-                <TimelineNotes 
-                  taskId={editingTask.id} 
-                  taskTitle={editingTask.title}
-                />
-              </div>
-            )}
 
             {/* Form Actions */}
             <div className="flex justify-end pt-4">
