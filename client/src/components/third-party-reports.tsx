@@ -520,21 +520,38 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         </div>
         {/* Task content section */}
         <div>
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="Search tasks..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2"
-                  data-testid="input-search"
-                />
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className="mb-4 space-y-4">
+            {/* Search and Primary Filters */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4 flex-wrap">
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="Search tasks, companies, descriptions..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-2 w-80"
+                    data-testid="input-search"
+                  />
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                </div>
               </div>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="sm" data-testid="button-import-csv">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import CSV
+                </Button>
+                <Button size="sm" onClick={() => setIsAddTaskModalOpen(true)} data-testid="button-add-task">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Task
+                </Button>
+              </div>
+            </div>
+            
+            {/* Filter Row */}
+            <div className="flex items-center space-x-3 flex-wrap">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40" data-testid="select-status-filter">
+                <SelectTrigger className="w-36" data-testid="select-status-filter">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -545,17 +562,73 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   <SelectItem value="completed">Completed</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                <SelectTrigger className="w-36" data-testid="select-payment-filter">
+                  <SelectValue placeholder="Payment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Payment</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="not_paid">Not Paid</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                <SelectTrigger className="w-36" data-testid="select-assignee-filter">
+                  <SelectValue placeholder="Task Owner" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Owners</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {Array.from(new Set(tasks.filter(t => t.assignee).map(t => t.assignee))).map((assignee) => (
+                    <SelectItem key={assignee} value={assignee || ""}>{assignee}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={costFilter} onValueChange={setCostFilter}>
+                <SelectTrigger className="w-32" data-testid="select-cost-filter">
+                  <SelectValue placeholder="Cost" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Cost</SelectItem>
+                  <SelectItem value="has_cost">Has Cost</SelectItem>
+                  <SelectItem value="no_cost">No Cost</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={completionFilter} onValueChange={setCompletionFilter}>
+                <SelectTrigger className="w-36" data-testid="select-completion-filter">
+                  <SelectValue placeholder="Completion" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Tasks</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Clear Filters Button */}
+              {(statusFilter !== "all" || paymentFilter !== "all" || assigneeFilter !== "all" || 
+                costFilter !== "all" || completionFilter !== "all" || searchTerm !== "") && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setSearchTerm("");
+                    setStatusFilter("all");
+                    setPaymentFilter("all");
+                    setAssigneeFilter("all");
+                    setCostFilter("all");
+                    setCompletionFilter("all");
+                  }}
+                  data-testid="button-clear-filters"
+                >
+                  Clear Filters
+                </Button>
+              )}
             </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" data-testid="button-import-csv">
-              <Upload className="h-4 w-4 mr-2" />
-              Import CSV
-            </Button>
-            <Button size="sm" onClick={() => setIsAddTaskModalOpen(true)} data-testid="button-add-task">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button>
-          </div>
         </div>
 
         {/* Reports Table */}
