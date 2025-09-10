@@ -89,6 +89,31 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     });
   };
 
+  const handlePaymentStatusChange = (taskId: string, newPaymentStatus: string) => {
+    updateTask.mutate({
+      id: taskId,
+      updates: { 
+        paymentStatus: newPaymentStatus as any
+      }
+    });
+  };
+
+  const getPaymentStatusBadge = (paymentStatus: string) => {
+    const colors = {
+      'not_paid': 'bg-red-100 text-red-800 border-red-200',
+      'paid': 'bg-green-100 text-green-800 border-green-200'
+    } as const;
+
+    return (
+      <div 
+        className={`px-2 py-1 text-xs font-medium border ${colors[paymentStatus as keyof typeof colors] || colors.not_paid}`}
+        data-testid={`payment-status-${paymentStatus}`}
+      >
+        {paymentStatus === 'not_paid' ? 'Not Paid' : 'Paid'}
+      </div>
+    );
+  };
+
   const handleDeleteTask = (taskId: string) => {
     deleteTask.mutate(taskId);
   };
@@ -514,6 +539,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 <th className="px-4 py-3 text-left text-sm font-semibold">Task Owner</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Company Hired</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Payment</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Days Remaining</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Completion Date</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Cost</th>
@@ -580,6 +606,22 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         <SelectItem value="scheduled">Scheduled</SelectItem>
                         <SelectItem value="in_progress">In Progress</SelectItem>
                         <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Select
+                      value={task.paymentStatus || 'not_paid'}
+                      onValueChange={(value) => handlePaymentStatusChange(task.id, value)}
+                    >
+                      <SelectTrigger className="w-28" data-testid={`select-payment-${task.id}`}>
+                        <SelectValue>
+                          {getPaymentStatusBadge(task.paymentStatus || 'not_paid')}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not_paid">Not Paid</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
                       </SelectContent>
                     </Select>
                   </td>
@@ -657,7 +699,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               ))}
               {filteredTasks.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
+                  <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
                     No tasks found matching your criteria.
                   </td>
                 </tr>
