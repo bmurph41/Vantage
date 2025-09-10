@@ -79,8 +79,14 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
 
   return (
     <div className={cn("h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner", className)} data-testid="progress-bar">
-      {/* Text labels above progress bars */}
-      <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10">
+      {/* Text labels above progress bars - positioned relative to task bar */}
+      <div 
+        className="absolute -top-6 z-10"
+        style={{
+          left: `${leftPosition + barWidth/2}%`,
+          transform: 'translateX(-50%)'
+        }}
+      >
         {isCompleted ? (
           <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle">
             Completed ({getTimeLabel(taskDurationDays)})
@@ -100,9 +106,13 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
         )}
       </div>
       
-      {/* Task bar spans full width from start date to end date */}
+      {/* Task bar positioned and sized based on project timeline */}
       <div 
-        className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200"
+        className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 absolute"
+        style={{
+          left: `${leftPosition}%`,
+          width: `${barWidth}%`
+        }}
       >
         {isCompleted ? (
           <div className="h-full bg-green-600 progress-bar-completed relative" data-testid="progress-completed">
