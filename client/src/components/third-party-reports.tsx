@@ -370,202 +370,183 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             )}
           </div>
 
-          {/* Professional Timeline Track */}
+          {/* Clean Professional Timeline */}
           {!isTimelineCollapsed && project && (
             <div className="bg-white border-t border-gray-200 px-6 pb-6">
-              {/* Professional Date Headers */}
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-gray-700"></div>
-                    <div>
-                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Start</div>
-                      <div className="text-sm font-semibold text-gray-900">
-                        {format(projectStart, 'MMM d, yyyy')}
-                      </div>
+              {/* Start/End Date Headers */}
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-gray-800"></div>
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">START</div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      {format(projectStart, 'MMM d, yyyy')}
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div>
-                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Close</div>
-                      <div className="text-sm font-semibold text-gray-900">
-                        {format(projectEnd, 'MMM d, yyyy')}
-                      </div>
-                    </div>
-                    <div className="w-2 h-2 bg-gray-700"></div>
                   </div>
                 </div>
-                
-                {/* Professional Timeline Container */}
-                <div className="bg-gray-50 border border-gray-200 p-4">
-                  {/* Date Markers - Show strategic dates */}
-                  <div className="flex justify-between items-end mb-3">
-                    {timelineDates.map((date, index) => {
-                      // Show fewer tick marks for clarity - important dates only
-                      const isFirstOrLast = index === 0 || index === timelineDates.length - 1;
-                      const isPSADate = project?.psaSignedDate && Math.abs(date.getTime() - parseISO(project.psaSignedDate).getTime()) < 24 * 60 * 60 * 1000;
-                      const isDDExpiration = project?.ddExpirationDate && Math.abs(date.getTime() - parseISO(project.ddExpirationDate).getTime()) < 24 * 60 * 60 * 1000;
-                      const isClosingDate = project?.closingDate && Math.abs(date.getTime() - parseISO(project.closingDate).getTime()) < 24 * 60 * 60 * 1000;
-                      
-                      // Show every 2nd or 3rd tick mark for weekly intervals, plus important dates
-                      const isIntervalTick = index % 2 === 0; // Show every other tick for readability
-                      const shouldShow = isFirstOrLast || isPSADate || isDDExpiration || isClosingDate || (isIntervalTick && timelineDates.length <= 12);
-                      
-                      if (shouldShow) {
-                        return (
-                          <div key={index} className="flex flex-col items-center">
-                            <div className="text-xs text-gray-600 mb-1">
-                              {format(date, 'M/d')}
-                            </div>
-                            <div className="w-px h-3 bg-gray-400"></div>
-                          </div>
-                        );
-                      }
-                      return <div key={index} className="flex-1"></div>;
-                    })}
+                <div className="flex items-center space-x-2">
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide text-right">CLOSE</div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      {format(projectEnd, 'MMM d, yyyy')}
+                    </div>
+                  </div>
+                  <div className="w-3 h-3 bg-gray-800"></div>
+                </div>
+              </div>
+
+              {/* Timeline Track */}
+              <div className="relative mb-8">
+                {/* Clean tick marks - only start, milestone, and end */}
+                <div className="flex justify-between items-end mb-2">
+                  {/* Start date */}
+                  <div className="text-xs text-gray-600">
+                    {format(projectStart, 'M/d')}
                   </div>
                   
-                  {/* Professional Timeline Track */}
-                  <div className="relative h-16 bg-white border border-gray-300 overflow-visible">
-                    {/* Base Timeline Line */}
-                    <div className="absolute top-1/2 left-0 right-0 h-px bg-gray-400 transform -translate-y-1/2"></div>
-                    
-                    {/* Vertical Grid Lines */}
-                    <div className="absolute inset-0">
-                      {timelineDates.map((date, index) => {
-                        // Only show grid lines for the same dates we show tick marks above
-                        const isFirstOrLast = index === 0 || index === timelineDates.length - 1;
-                        const isPSADate = project?.psaSignedDate && Math.abs(date.getTime() - parseISO(project.psaSignedDate).getTime()) < 24 * 60 * 60 * 1000;
-                        const isDDExpiration = project?.ddExpirationDate && Math.abs(date.getTime() - parseISO(project.ddExpirationDate).getTime()) < 24 * 60 * 60 * 1000;
-                        const isClosingDate = project?.closingDate && Math.abs(date.getTime() - parseISO(project.closingDate).getTime()) < 24 * 60 * 60 * 1000;
-                        const isIntervalTick = index % 2 === 0;
-                        const shouldShow = isPSADate || isDDExpiration || isClosingDate || (isIntervalTick && timelineDates.length <= 12);
-                        
-                        if (shouldShow && !isFirstOrLast) {
-                          return (
-                            <div 
-                              key={index} 
-                              className="absolute w-px h-full bg-gray-300" 
-                              style={{ left: `${(index / (timelineDates.length - 1)) * 100}%` }}
-                            ></div>
-                          );
-                        }
-                        return null;
-                      })}
+                  {/* DD Expiration date if exists */}
+                  {project?.ddExpirationDate && (
+                    <div className="text-xs text-gray-600">
+                      {format(parseISO(project.ddExpirationDate), 'M/d')}
                     </div>
-
-                    {/* Professional Task Progress Bars */}
-                    <div className="absolute inset-0 pt-2 pb-2">
-                      {tasks.filter(t => {
-                        const basicFilter = t.showOnTimeline && (!showCriticalPath || t.priority === 'high');
-                        if (isAtTop || !currentTaskInView) {
-                          return basicFilter;
-                        }
-                        return basicFilter && t.id === currentTaskInView;
-                      }).map((task, taskIndex) => {
-                        const taskProgress = getTaskProgress(task);
-                        const yPosition = 4 + (taskIndex * 10);
-                        
-                        return (
-                          <div key={task.id} className="absolute group" style={{ 
-                            left: `${taskProgress.startPosition}%`, 
-                            width: `${taskProgress.width}%`,
-                            top: `${yPosition}px`,
-                            height: '8px'
-                          }}>
-                            <div className="relative h-full">
-                              {/* Task Bar */}
-                              <div className={`h-full border ${
-                                taskProgress.status === 'completed' ? 'bg-green-600 border-green-700' :
-                                taskProgress.status === 'overdue' ? 'bg-red-600 border-red-700' :
-                                taskProgress.status === 'in_progress' ? 'bg-blue-600 border-blue-700' :
-                                'bg-gray-400 border-gray-500'
-                              }`}>
-                                {/* Progress Fill */}
-                                <div 
-                                  className={`h-full ${
-                                    taskProgress.status === 'completed' ? 'bg-green-700' :
-                                    taskProgress.status === 'overdue' ? 'bg-red-700' :
-                                    taskProgress.status === 'in_progress' ? 'bg-blue-700' :
-                                    'bg-gray-600'
-                                  }`}
-                                  style={{ width: `${taskProgress.progress}%` }}
-                                ></div>
-                              </div>
-                              
-                              {/* Task Label */}
-                              <div className="absolute -top-6 left-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                                <div className="text-xs font-medium text-gray-900 bg-white px-2 py-1 border border-gray-300 shadow whitespace-nowrap">
-                                  {task.title}
-                                  <div className="text-xs text-gray-600">
-                                    {taskProgress.progress}% complete
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Professional Milestone Markers */}
-                    <div className="absolute inset-0 flex items-center z-10">
-                      {/* PSA Signed - Always at 0% */}
-                      {project.psaSignedDate && (
-                        <div 
-                          className="absolute flex flex-col items-center transform -translate-x-1/2"
-                          style={{ left: '0%' }}
-                        >
-                          <div className="w-4 h-4 bg-gray-700 border-2 border-white shadow"></div>
-                          <div className="absolute -bottom-12 bg-white border border-gray-300 shadow px-3 py-1 min-w-max">
-                            <div className="text-xs font-semibold text-gray-900">PSA Signed</div>
-                            <div className="text-xs text-gray-600">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* DD Expiration */}
-                      {project.ddExpirationDate && (
-                        <div 
-                          className="absolute flex flex-col items-center transform -translate-x-1/2"
-                          style={{ left: `${getMilestonePosition(project.ddExpirationDate)}%` }}
-                        >
-                          <div className="w-4 h-4 bg-orange-600 border-2 border-white shadow"></div>
-                          <div className="absolute -bottom-12 bg-white border border-gray-300 shadow px-3 py-1 min-w-max">
-                            <div className="text-xs font-semibold text-gray-900">DD Expiration</div>
-                            <div className="text-xs text-gray-600">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Closing - Always at 100% */}
-                      {project.closingDate && (
-                        <div 
-                          className="absolute flex flex-col items-center transform -translate-x-1/2"
-                          style={{ left: '100%' }}
-                        >
-                          <div className="w-4 h-4 bg-gray-700 border-2 border-white shadow"></div>
-                          <div className="absolute -bottom-12 bg-white border border-gray-300 shadow px-3 py-1 min-w-max">
-                            <div className="text-xs font-semibold text-gray-900">Target Close</div>
-                            <div className="text-xs text-gray-600">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                  )}
+                  
+                  {/* End date */}
+                  <div className="text-xs text-gray-600">
+                    {format(projectEnd, 'M/d')}
                   </div>
+                </div>
+
+                {/* Main Timeline Bar */}
+                <div className="relative h-8 bg-gray-200 border border-gray-300">
+                  {/* Progress bar showing elapsed time */}
+                  <div 
+                    className="absolute left-0 top-0 h-full bg-blue-500"
+                    style={{ 
+                      width: `${Math.min(100, Math.max(0, ((new Date().getTime() - projectStart.getTime()) / (projectEnd.getTime() - projectStart.getTime())) * 100))}%` 
+                    }}
+                  ></div>
+
+                  {/* Task Progress Overlays */}
+                  {tasks.filter(t => {
+                    const basicFilter = t.showOnTimeline && (!showCriticalPath || t.priority === 'high');
+                    if (isAtTop || !currentTaskInView) {
+                      return basicFilter;
+                    }
+                    return basicFilter && t.id === currentTaskInView;
+                  }).map((task, taskIndex) => {
+                    const taskProgress = getTaskProgress(task);
+                    
+                    return (
+                      <div 
+                        key={task.id} 
+                        className="absolute top-0 h-full group"
+                        style={{ 
+                          left: `${taskProgress.startPosition}%`, 
+                          width: `${taskProgress.width}%`
+                        }}
+                      >
+                        {/* Task bar with status color */}
+                        <div className={`h-full opacity-80 ${
+                          taskProgress.status === 'completed' ? 'bg-green-500' :
+                          taskProgress.status === 'overdue' ? 'bg-red-500' :
+                          taskProgress.status === 'in_progress' ? 'bg-blue-600' :
+                          'bg-gray-400'
+                        }`}>
+                          {/* Progress within task */}
+                          <div 
+                            className={`h-full ${
+                              taskProgress.status === 'completed' ? 'bg-green-600' :
+                              taskProgress.status === 'overdue' ? 'bg-red-600' :
+                              taskProgress.status === 'in_progress' ? 'bg-blue-700' :
+                              'bg-gray-500'
+                            }`}
+                            style={{ width: `${taskProgress.progress}%` }}
+                          ></div>
+                        </div>
+                        
+                        {/* Hover tooltip */}
+                        <div className="absolute -top-10 left-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10">
+                          <div className="text-xs font-medium text-gray-900 bg-white px-2 py-1 border border-gray-300 shadow whitespace-nowrap rounded">
+                            {task.title} - {taskProgress.progress}% complete
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Milestone Markers Below Timeline */}
+                <div className="relative mt-2">
+                  {/* PSA Signed */}
+                  {project.psaSignedDate && (
+                    <div 
+                      className="absolute transform -translate-x-1/2"
+                      style={{ left: '0%', top: '0px' }}
+                    >
+                      <div className="w-3 h-3 bg-gray-800 border border-white"></div>
+                      <div className="absolute top-4 -translate-x-1/2 left-1/2 min-w-max">
+                        <div className="text-xs font-semibold text-gray-900">PSA Signed</div>
+                        <div className="text-xs text-gray-600">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* DD Expiration */}
+                  {project.ddExpirationDate && (
+                    <div 
+                      className="absolute transform -translate-x-1/2"
+                      style={{ left: `${getMilestonePosition(project.ddExpirationDate)}%`, top: '0px' }}
+                    >
+                      <div className="w-3 h-3 bg-orange-500 border border-white"></div>
+                      <div className="absolute top-4 -translate-x-1/2 left-1/2 min-w-max">
+                        <div className="text-xs font-semibold text-gray-900">DD Expiration</div>
+                        <div className="text-xs text-gray-600">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Target Close */}
+                  {project.closingDate && (
+                    <div 
+                      className="absolute transform -translate-x-1/2"
+                      style={{ left: '100%', top: '0px' }}
+                    >
+                      <div className="w-3 h-3 bg-gray-800 border border-white"></div>
+                      <div className="absolute top-4 -translate-x-1/2 left-1/2 min-w-max">
+                        <div className="text-xs font-semibold text-gray-900">Target Close</div>
+                        <div className="text-xs text-gray-600">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               
-              {/* Professional Legend */}
-              <div className="mt-6 pt-4 border-t border-gray-200">
+              {/* Clean Legend */}
+              <div className="mt-16 pt-4 border-t border-gray-200">
                 <div className="flex items-center justify-between mb-3">
                   <h5 className="text-sm font-semibold text-gray-900">Legend</h5>
-                  <div className="text-xs text-gray-600 bg-gray-100 px-2 py-1">
+                  <div className="text-xs text-gray-600">
                     Duration: {differenceInDays(projectEnd, projectStart)} days
                   </div>
                 </div>
-                <div className="bg-gray-50 border border-gray-200 p-3">
-                  <ProgressLegend />
+                <div className="flex items-center space-x-6">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-3 bg-blue-500"></div>
+                    <span className="text-xs text-gray-700">Time Elapsed</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-3 bg-gray-200"></div>
+                    <span className="text-xs text-gray-700">Time Remaining</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-3 bg-green-500"></div>
+                    <span className="text-xs text-gray-700">Completed</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-3 bg-red-500"></div>
+                    <span className="text-xs text-gray-700">Overdue</span>
+                  </div>
                 </div>
               </div>
             </div>
