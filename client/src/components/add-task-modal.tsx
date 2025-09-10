@@ -17,7 +17,8 @@ import { useCreateTask, useUpdateTask } from "@/hooks/use-tasks";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { marinaDueDiligenceTaskTemplates, taskCategories, searchTasks, type TaskTemplate } from "@/data/marina-due-diligence-tasks";
-import type { Task } from "@shared/schema";
+import type { Task, TaskTemplate as DbTaskTemplate } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
 
 const addTaskFormSchema = z.object({
   title: z.string().min(1, "Task title is required"),
@@ -87,6 +88,37 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   });
   
   const isEditMode = !!editingTask;
+
+  // Fetch custom templates from database
+  const { data: dbTemplates = [] } = useQuery({
+    queryKey: ['/api/dd/task-templates'],
+    enabled: isOpen, // Only fetch when modal is open
+  });
+
+  // Convert database templates to frontend TaskTemplate format
+  const customTemplates: TaskTemplate[] = dbTemplates.map((dbTemplate: DbTaskTemplate) => ({
+    id: dbTemplate.id,
+    name: dbTemplate.name,
+    description: dbTemplate.description || "",
+    startOffsetDays: dbTemplate.startOffsetDays,
+    durationDays: 1, // Default value since it's required by frontend interface
+    anchor: dbTemplate.anchor,
+    defaultAssignee: dbTemplate.defaultAssignee,
+    label: dbTemplate.label || dbTemplate.name,
+    priority: dbTemplate.priority,
+    category: dbTemplate.category || "Custom",
+    estimatedCost: dbTemplate.estimatedCost,
+    typicalCompanies: dbTemplate.typicalCompanies || [],
+  }));
+
+  // Combine built-in templates with custom templates
+  const allTemplates = [...marinaDueDiligenceTaskTemplates, ...customTemplates];
+
+  // Extract unique categories from all templates
+  const allCategories = Array.from(new Set([
+    ...taskCategories,
+    ...customTemplates.map(t => t.category).filter(Boolean)
+  ]));
 
   // Currency formatting utility
   const formatCurrency = (value: string): string => {
@@ -262,8 +294,11 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   }, [form, autoSave, isEditMode, editingTask, autoSaveTimeout]);
 
   // Filter tasks based on search and category
-  const filteredTasks = marinaDueDiligenceTaskTemplates.filter(task => {
-    const matchesSearch = searchTerm === "" || searchTasks(searchTerm).includes(task);
+  const filteredTasks = allTemplates.filter(task => {
+    const matchesSearch = searchTerm === "" || 
+      task.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.category && task.category.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === "all" || task.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -821,7 +856,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {taskCategories.map(category => (
+                  {allCategories.map(category => (
                     <SelectItem key={category} value={category}>
                       {category}
                     </SelectItem>
