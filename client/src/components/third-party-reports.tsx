@@ -28,7 +28,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(false);
-  const [isAtTop, setIsAtTop] = useState(true);
+  // Removed floating timeline to prevent scroll issues
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
@@ -39,33 +39,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     return matchesSearch && matchesStatus;
   });
 
-  // Simple scroll detection for floating timeline
-  useEffect(() => {
-    let ticking = false;
-    
-    const handleScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          const scrollTop = window.scrollY;
-          const newIsAtTop = scrollTop < 200;
-          
-          // Only update state if there's a change
-          if (newIsAtTop !== isAtTop) {
-            setIsAtTop(newIsAtTop);
-          }
-          
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, [isAtTop]);
+  // Removed all scroll detection to prevent glitches
 
   // Removed task refs to prevent scroll glitches
 
@@ -257,12 +231,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       </CardHeader>
       
       <CardContent className="p-6">
-        {/* Professional DD Timeline Section - Collapsible & Floating */}
-        <div className={`mb-10 transition-all duration-300 ease-in-out ${
-          !isTimelineCollapsed && !isAtTop 
-            ? 'fixed top-4 left-4 right-4 z-50 bg-white/95 backdrop-blur-lg border border-gray-200 shadow-xl' 
-            : 'bg-white border border-gray-200 shadow-sm'
-        }`}>
+        {/* Professional DD Timeline Section - Static */}
+        <div className="mb-10 bg-white border border-gray-200 shadow-sm">
           {/* Professional Timeline Header */}
           <div className="flex items-center justify-between mb-6 p-6">
             <div className="flex items-center space-x-4">
@@ -492,8 +462,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             </div>
           )}
         </div>
-        {/* Add spacing when timeline is floating */}
-        <div className={`${!isTimelineCollapsed && !isAtTop ? 'pt-20' : ''} transition-all duration-300 ease-in-out`}>
+        {/* Task content section */}
+        <div>
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="relative">
