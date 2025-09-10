@@ -62,6 +62,35 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   
   const isEditMode = !!editingTask;
 
+  // Currency formatting utility
+  const formatCurrency = (value: string): string => {
+    if (!value) return "";
+    
+    // Remove any non-numeric characters except decimal points
+    const numericValue = value.replace(/[^\d.]/g, "");
+    
+    // If empty or just a decimal point, return as is
+    if (!numericValue || numericValue === ".") return numericValue;
+    
+    // Parse as number and format with commas and dollar sign
+    const number = parseFloat(numericValue);
+    if (isNaN(number)) return numericValue;
+    
+    // Format with dollar sign and commas, no decimal places for whole numbers
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: number % 1 === 0 ? 0 : 2,
+      maximumFractionDigits: 2
+    }).format(number);
+  };
+
+  // Handle cost field formatting
+  const handleCostBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const formatted = formatCurrency(e.target.value);
+    form.setValue("cost", formatted);
+  };
+
   const form = useForm<z.infer<typeof addTaskFormSchema>>({
     resolver: zodResolver(addTaskFormSchema),
     defaultValues: {
@@ -614,8 +643,9 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <Label htmlFor="cost">Estimated Cost</Label>
                   <Input
                     id="cost"
-                    placeholder="e.g., $5,000 - $15,000"
+                    placeholder="e.g., 5000 or $5,000"
                     {...form.register("cost")}
+                    onBlur={handleCostBlur}
                     data-testid="input-cost"
                   />
                 </div>
@@ -965,8 +995,9 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <Label htmlFor="cost">Estimated Cost</Label>
                   <Input
                     id="cost"
-                    placeholder="e.g., $5,000 - $15,000"
+                    placeholder="e.g., 5000 or $5,000"
                     {...form.register("cost")}
+                    onBlur={handleCostBlur}
                     data-testid="input-cost"
                   />
                 </div>
