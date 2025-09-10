@@ -190,17 +190,17 @@ export default function Dashboard() {
               const closingSoon = project.closingDate && differenceInDays(new Date(project.closingDate), today) <= 14;
               
               let statusBadge = null;
-              let statusColor = "bg-green-50 border-green-200";
+              let statusColor = "bg-gray-25 border-gray-150";
               
               if (ddExpired) {
-                statusBadge = { text: "DD Expired", variant: "destructive" as const, icon: AlertTriangle };
-                statusColor = "bg-red-50 border-red-200";
+                statusBadge = { text: "DD Expired", variant: "outline" as const, icon: AlertTriangle };
+                statusColor = "bg-red-25 border-red-150";
               } else if (ddExpiringSoon) {
-                statusBadge = { text: "DD Expiring Soon", variant: "secondary" as const, icon: Clock };
-                statusColor = "bg-yellow-50 border-yellow-200";
+                statusBadge = { text: "DD Expiring Soon", variant: "outline" as const, icon: Clock };
+                statusColor = "bg-amber-25 border-amber-150";
               } else if (closingSoon) {
-                statusBadge = { text: "Closing Soon", variant: "default" as const, icon: CheckCircle };
-                statusColor = "bg-blue-50 border-blue-200";
+                statusBadge = { text: "Closing Soon", variant: "outline" as const, icon: CheckCircle };
+                statusColor = "bg-slate-25 border-slate-150";
               }
               
               return (
@@ -223,7 +223,7 @@ export default function Dashboard() {
                           )}
                         </div>
                         {statusBadge && (
-                          <Badge variant={statusBadge.variant} className="flex items-center gap-1 text-xs font-medium">
+                          <Badge variant={statusBadge.variant} className="flex items-center gap-1 text-xs font-medium text-gray-600 border-gray-300">
                             <statusBadge.icon className="h-3 w-3" />
                             {statusBadge.text}
                           </Badge>
@@ -235,9 +235,9 @@ export default function Dashboard() {
                       {/* Key Dates Section */}
                       <div className="space-y-3">
                         {project.psaSignedDate && (
-                          <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg" data-testid={`text-psa-date-${project.id}`}>
+                          <div className="flex items-center justify-between py-2 px-3 bg-gray-25 rounded-lg" data-testid={`text-psa-date-${project.id}`}>
                             <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-blue-600" />
+                              <Calendar className="h-4 w-4 text-gray-500" />
                               <span className="text-sm font-medium text-gray-700">PSA Signed</span>
                             </div>
                             <span className="text-sm font-semibold text-gray-900">
@@ -248,16 +248,16 @@ export default function Dashboard() {
                         
                         {project.ddExpirationDate && (
                           <div className={`flex items-center justify-between py-2 px-3 rounded-lg ${
-                            ddExpired ? 'bg-red-100' : ddExpiringSoon ? 'bg-yellow-100' : 'bg-gray-50'
+                            ddExpired ? 'bg-red-25' : ddExpiringSoon ? 'bg-amber-25' : 'bg-gray-25'
                           }`} data-testid={`text-dd-expiration-${project.id}`}>
                             <div className="flex items-center gap-2">
                               <Clock className={`h-4 w-4 ${
-                                ddExpired ? 'text-red-600' : ddExpiringSoon ? 'text-yellow-600' : 'text-gray-600'
+                                ddExpired ? 'text-red-500' : ddExpiringSoon ? 'text-amber-500' : 'text-gray-500'
                               }`} />
                               <span className="text-sm font-medium text-gray-700">DD Expiration</span>
                             </div>
                             <span className={`text-sm font-semibold ${
-                              ddExpired ? 'text-red-900' : ddExpiringSoon ? 'text-yellow-900' : 'text-gray-900'
+                              ddExpired ? 'text-red-700' : ddExpiringSoon ? 'text-amber-700' : 'text-gray-900'
                             }`}>
                               {format(new Date(project.ddExpirationDate), 'MMM d, yyyy')}
                             </span>
@@ -266,16 +266,16 @@ export default function Dashboard() {
                         
                         {project.closingDate && (
                           <div className={`flex items-center justify-between py-2 px-3 rounded-lg ${
-                            closingSoon ? 'bg-blue-100' : 'bg-gray-50'
+                            closingSoon ? 'bg-slate-25' : 'bg-gray-25'
                           }`} data-testid={`text-closing-date-${project.id}`}>
                             <div className="flex items-center gap-2">
                               <CheckCircle className={`h-4 w-4 ${
-                                closingSoon ? 'text-blue-600' : 'text-gray-600'
+                                closingSoon ? 'text-slate-500' : 'text-gray-500'
                               }`} />
                               <span className="text-sm font-medium text-gray-700">Target Closing</span>
                             </div>
                             <span className={`text-sm font-semibold ${
-                              closingSoon ? 'text-blue-900' : 'text-gray-900'
+                              closingSoon ? 'text-slate-700' : 'text-gray-900'
                             }`}>
                               {format(new Date(project.closingDate), 'MMM d, yyyy')}
                             </span>
@@ -286,12 +286,12 @@ export default function Dashboard() {
                       {/* Total Cost Section */}
                       {(project as any).totalCost !== undefined && (
                         <div className="border-t border-gray-200 pt-4" data-testid={`text-total-cost-${project.id}`}>
-                          <div className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                          <div className="flex items-center justify-between py-3 px-4 bg-gray-25 rounded-lg border border-gray-200">
                             <div className="flex items-center gap-2">
-                              <DollarSign className="h-5 w-5 text-green-600" />
-                              <span className="text-sm font-medium text-green-800">Total Investment</span>
+                              <DollarSign className="h-5 w-5 text-gray-600" />
+                              <span className="text-sm font-medium text-gray-700">Total Investment</span>
                             </div>
-                            <span className="text-lg font-bold text-green-900">
+                            <span className="text-lg font-bold text-gray-900">
                               {new Intl.NumberFormat('en-US', {
                                 style: 'currency',
                                 currency: 'USD',
