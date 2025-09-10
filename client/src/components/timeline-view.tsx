@@ -140,6 +140,56 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 </div>
               </div>
           
+              {/* General Progress Bar - Time Towards Closing */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-white flex items-center">
+                    <span className="w-1 h-5 bg-green-400 rounded-full mr-3"></span>
+                    Overall Progress to Closing
+                  </h3>
+                  <div className="text-sm text-green-200/70 bg-white/5 px-3 py-1 rounded-lg border border-white/10">
+                    {(() => {
+                      if (!project.closingDate) return 'No closing date set';
+                      const startDate = parseISO(project.startDate || project.createdAt || new Date().toISOString());
+                      const closingDate = parseISO(project.closingDate);
+                      const today = new Date();
+                      
+                      if (today >= closingDate) return '100% - Closing reached';
+                      
+                      const totalDuration = differenceInDays(closingDate, startDate);
+                      const elapsed = differenceInDays(today, startDate);
+                      const percentage = Math.max(0, Math.min(100, Math.round((elapsed / totalDuration) * 100)));
+                      
+                      return `${percentage}% elapsed`;
+                    })()}
+                  </div>
+                </div>
+                
+                <div className="h-4 bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 rounded-full shadow-inner relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-pulse"></div>
+                  {project.closingDate && (
+                    <div 
+                      className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full shadow-md transition-all duration-1000 ease-out"
+                      style={{
+                        width: `${(() => {
+                          const startDate = parseISO(project.startDate || project.createdAt || new Date().toISOString());
+                          const closingDate = parseISO(project.closingDate);
+                          const today = new Date();
+                          
+                          if (today >= closingDate) return 100;
+                          
+                          const totalDuration = differenceInDays(closingDate, startDate);
+                          const elapsed = differenceInDays(today, startDate);
+                          return Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+                        })()}%`
+                      }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent rounded-full"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Premium Milestone Timeline */}
               <div className="relative">
                 {/* Animated Timeline Track */}
