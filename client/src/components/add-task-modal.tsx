@@ -537,6 +537,14 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
             });
             handleClose();
           },
+          onError: (error) => {
+            toast({
+              title: "Error",
+              description: "Failed to update task. Please try again.",
+              variant: "destructive",
+            });
+            console.error("Task update error:", error);
+          },
         }
       );
     } else {
@@ -567,6 +575,14 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
             }
             
             handleClose();
+          },
+          onError: (error) => {
+            toast({
+              title: "Error",
+              description: "Failed to create task. Please try again.",
+              variant: "destructive",
+            });
+            console.error("Task creation error:", error);
           },
         }
       );
