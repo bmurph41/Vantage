@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -133,6 +134,7 @@ const addTaskFormSchema = z.object({
   status: z.enum(["to_do", "scheduled", "in_progress", "completed", "not_started", "blocked"]).default("to_do"),
   paymentStatus: z.enum(["not_paid", "paid", "no_cost"]).default("not_paid"),
   dateOnSite: z.string().optional(),
+  requiresOnSiteInspection: z.boolean().default(false),
   completedAt: z.string().optional(),
   cost: z.string().optional(),
   notes: z.string().optional(),
@@ -267,6 +269,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       status: "to_do",
       paymentStatus: "not_paid",
       dateOnSite: "",
+      requiresOnSiteInspection: false,
       completedAt: "",
       cost: "",
       notes: "",
@@ -295,6 +298,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           status: editingTask.status || "to_do",
           paymentStatus: editingTask.paymentStatus || "not_paid",
           dateOnSite: editingTask.dateOnSite || "",
+          requiresOnSiteInspection: !!editingTask.dateOnSite,
           completedAt: editingTask.completedAt ? new Date(editingTask.completedAt).toISOString().slice(0, 16) : "",
           cost: editingTask.cost || "",
           notes: editingTask.notes || "",
@@ -442,6 +446,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       status: "to_do",
       paymentStatus: "not_paid",
       dateOnSite: "",
+      requiresOnSiteInspection: false,
       completedAt: "",
       cost: "",
       notes: "",
@@ -474,6 +479,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     const transformedData = {
       ...data,
       completedAt: data.completedAt ? new Date(data.completedAt) : undefined,
+      // Set dateOnSite based on requiresOnSiteInspection checkbox
+      dateOnSite: data.requiresOnSiteInspection ? (data.dateOnSite || "TBD") : "",
     };
 
     if (isEditMode && editingTask) {
@@ -728,8 +735,30 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
-                {/* Conditional Date On-Site field when status is "scheduled" */}
-                {form.watch("status") === "scheduled" && (
+                {/* On-Site Inspection Checkbox */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="requiresOnSiteInspection"
+                    checked={form.watch("requiresOnSiteInspection")}
+                    onCheckedChange={(checked) => {
+                      form.setValue("requiresOnSiteInspection", !!checked);
+                      // Clear dateOnSite if unchecked
+                      if (!checked) {
+                        form.setValue("dateOnSite", "");
+                      }
+                    }}
+                    data-testid="checkbox-requires-onsite"
+                  />
+                  <Label 
+                    htmlFor="requiresOnSiteInspection" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Requires On-Site Inspection
+                  </Label>
+                </div>
+
+                {/* Conditional Date On-Site field when requires on-site inspection */}
+                {form.watch("requiresOnSiteInspection") && (
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <Label htmlFor="dateOnSite">Date On-Site *</Label>
@@ -1152,8 +1181,30 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
-                {/* Conditional Date On-Site field when status is "scheduled" */}
-                {form.watch("status") === "scheduled" && (
+                {/* On-Site Inspection Checkbox */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="requiresOnSiteInspection"
+                    checked={form.watch("requiresOnSiteInspection")}
+                    onCheckedChange={(checked) => {
+                      form.setValue("requiresOnSiteInspection", !!checked);
+                      // Clear dateOnSite if unchecked
+                      if (!checked) {
+                        form.setValue("dateOnSite", "");
+                      }
+                    }}
+                    data-testid="checkbox-requires-onsite"
+                  />
+                  <Label 
+                    htmlFor="requiresOnSiteInspection" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Requires On-Site Inspection
+                  </Label>
+                </div>
+
+                {/* Conditional Date On-Site field when requires on-site inspection */}
+                {form.watch("requiresOnSiteInspection") && (
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <Label htmlFor="dateOnSite">Date On-Site *</Label>
