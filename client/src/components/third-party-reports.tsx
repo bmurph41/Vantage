@@ -32,6 +32,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [timelineNotesTask, setTimelineNotesTask] = useState<Task | null>(null);
+  const [editingCostTaskId, setEditingCostTaskId] = useState<string | null>(null);
+  const [editingCostValue, setEditingCostValue] = useState<string>('');
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(false);
@@ -996,9 +998,51 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       })()}
                     </td>
                     <td className="px-4 py-3 text-center" data-testid={`text-cost-${task.id}`}>
-                      <span className="text-sm font-medium text-gray-900">
-                        {formatCurrency(task.cost || '')}
-                      </span>
+                      {editingCostTaskId === task.id ? (
+                        <Input
+                          type="text"
+                          value={editingCostValue}
+                          onChange={(e) => setEditingCostValue(e.target.value)}
+                          onBlur={() => {
+                            updateTask.mutate({
+                              id: task.id,
+                              updates: { cost: editingCostValue }
+                            });
+                            setEditingCostTaskId(null);
+                            setEditingCostValue('');
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              updateTask.mutate({
+                                id: task.id,
+                                updates: { cost: editingCostValue }
+                              });
+                              setEditingCostTaskId(null);
+                              setEditingCostValue('');
+                            } else if (e.key === 'Escape') {
+                              setEditingCostTaskId(null);
+                              setEditingCostValue('');
+                            }
+                          }}
+                          className="w-24 h-8 text-center text-sm"
+                          placeholder="$0.00"
+                          autoFocus
+                          data-testid={`input-cost-${task.id}`}
+                        />
+                      ) : (
+                        <span 
+                          className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 hover:underline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingCostTaskId(task.id);
+                            setEditingCostValue(task.cost || '');
+                          }}
+                          title="Click to edit cost"
+                          data-testid={`span-cost-${task.id}`}
+                        >
+                          {formatCurrency(task.cost || '')}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex space-x-1">
