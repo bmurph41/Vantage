@@ -2,6 +2,10 @@ import {
   format, 
   startOfDay, 
   addDays, 
+  addWeeks,
+  addMonths,
+  startOfWeek,
+  startOfMonth,
   differenceInDays, 
   isAfter, 
   isBefore,
@@ -126,31 +130,50 @@ export function effectiveDue(task: any, project: any): Date {
   return addDays(start, task.durationDays);
 }
 
-// New Timeline Utility Functions for Fixed Range System
+// DYNAMIC SLIDING WINDOW TIMELINE UTILITIES
 
 /**
- * Get the project timeline bounds (start and end dates)
+ * Get dynamic timeline window centered around today's date
  */
-export function getProjectBounds(project: any): { start: Date; end: Date } {
-  const start = startOfDay(project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date());
-  const end = startOfDay(project.closingDate ? parseISO(project.closingDate) : addDays(start, 90));
-  return { start, end };
-}
-
-/**
- * Generate all days between start and end dates
- */
-export function eachDay(start: Date, end: Date): Date[] {
-  const days: Date[] = [];
-  let current = startOfDay(start);
-  const endDay = startOfDay(end);
+export function getTimelineWindow(granularity: string): { start: Date; end: Date } {
+  const today = startOfDay(tzNow('America/New_York'));
   
-  while (current <= endDay) {
-    days.push(new Date(current));
-    current = addDays(current, 1);
+  switch (granularity) {
+    case 'daily':
+      // Show 60 days: 30 before today, 30 after today
+      return {
+        start: addDays(today, -30),
+        end: addDays(today, 30)
+      };
+    
+    case 'weekly':
+      // Show 16 weeks: 8 weeks before today, 8 weeks after today  
+      return {
+        start: addWeeks(today, -8),
+        end: addWeeks(today, 8)
+      };
+    
+    case 'biweekly':
+      // Show 24 weeks: 12 weeks before today, 12 weeks after today
+      return {
+        start: addWeeks(today, -12),
+        end: addWeeks(today, 12)
+      };
+    
+    case 'monthly':
+      // Show 12 months: 6 months before today, 6 months after today
+      return {
+        start: addMonths(today, -6),
+        end: addMonths(today, 6)
+      };
+    
+    default:
+      // Default to weekly view
+      return {
+        start: addWeeks(today, -8),
+        end: addWeeks(today, 8)
+      };
   }
-  
-  return days;
 }
 
 /**
@@ -165,7 +188,7 @@ export function percentOfRange(date: Date, start: Date, end: Date): number {
 }
 
 /**
- * Clamp a date to be within the project range
+ * Clamp a date to stay within the given range
  */
 export function clampDate(date: Date, start: Date, end: Date): Date {
   if (isBefore(date, start)) return start;
@@ -174,48 +197,66 @@ export function clampDate(date: Date, start: Date, end: Date): Date {
 }
 
 /**
- * Get visible tick marks based on granularity
+ * Generate visible timeline ticks with proper spacing for each granularity
  */
-export function getVisibleTicks(allDays: Date[], granularity: string): Date[] {
-  if (!allDays.length) return [];
-  
-  const start = allDays[0];
-  const end = allDays[allDays.length - 1];
+export function getTimelineTicks(granularity: string): Date[] {
+  const { start, end } = getTimelineWindow(granularity);
+  const ticks: Date[] = [];
   
   switch (granularity) {
     case 'daily':
-      return allDays;
-      
+      // Show every 5 days to keep it legible (12 ticks for 60-day window)
+      let dailyCurrent = new Date(start);
+      while (dailyCurrent <= end) {
+        ticks.push(new Date(dailyCurrent));
+        dailyCurrent = addDays(dailyCurrent, 5);
+      }
+      break;
+    
     case 'weekly':
-      const weeklyTicks: Date[] = [];
-      let current = startOfDay(start);
-      while (current <= end) {
-        weeklyTicks.push(new Date(current));
-        current = addDays(current, 7);
+      // Show weekly ticks (every Monday)
+      let weeklyCurrent = startOfWeek(start, { weekStartsOn: 1 }); // Start on Monday
+      while (weeklyCurrent <= end) {
+        ticks.push(new Date(weeklyCurrent));
+        weeklyCurrent = addWeeks(weeklyCurrent, 1);
       }
-      return weeklyTicks;
-      
+      break;
+    
     case 'biweekly':
-      const biweeklyTicks: Date[] = [];
-      let biweeklyCurrent = startOfDay(start);
+      // Show biweekly ticks
+      let biweeklyCurrent = startOfWeek(start, { weekStartsOn: 1 });
       while (biweeklyCurrent <= end) {
-        biweeklyTicks.push(new Date(biweeklyCurrent));
-        biweeklyCurrent = addDays(biweeklyCurrent, 14);
+        ticks.push(new Date(biweeklyCurrent));
+        biweeklyCurrent = addWeeks(biweeklyCurrent, 2);
       }
-      return biweeklyTicks;
-      
+      break;
+    
     case 'monthly':
-      const monthlyTicks: Date[] = [];
-      let monthlyCurrent = startOfDay(start);
+      // Show monthly ticks (first of each month)
+      let monthlyCurrent = startOfMonth(start);
       while (monthlyCurrent <= end) {
-        monthlyTicks.push(new Date(monthlyCurrent));
-        // Move to first day of next month
-        const nextMonth = new Date(monthlyCurrent.getFullYear(), monthlyCurrent.getMonth() + 1, 1);
-        monthlyCurrent = nextMonth > end ? addDays(end, 1) : nextMonth;
+        ticks.push(new Date(monthlyCurrent));
+        monthlyCurrent = addMonths(monthlyCurrent, 1);
       }
-      return monthlyTicks;
-      
+      break;
+    
     default:
-      return allDays;
+      // Default to weekly
+      let defaultCurrent = startOfWeek(start, { weekStartsOn: 1 });
+      while (defaultCurrent <= end) {
+        ticks.push(new Date(defaultCurrent));
+        defaultCurrent = addWeeks(defaultCurrent, 1);
+      }
   }
+  
+  return ticks;
+}
+
+/**
+ * Legacy function for backward compatibility
+ */
+export function getProjectBounds(project: any): { start: Date; end: Date } {
+  const start = startOfDay(project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date());
+  const end = startOfDay(project.closingDate ? parseISO(project.closingDate) : addDays(start, 90));
+  return { start, end };
 }

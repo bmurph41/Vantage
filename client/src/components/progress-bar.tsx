@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { effectiveStart, effectiveDue, daysBetween, tzNow, getProjectBounds, percentOfRange, clampDate } from "@/lib/date-utils";
+import { effectiveStart, effectiveDue, daysBetween, tzNow, getTimelineWindow, percentOfRange, clampDate } from "@/lib/date-utils";
 import { startOfDay, isAfter, isBefore, parseISO, addDays } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 
@@ -8,13 +8,14 @@ interface ProgressBarProps {
   project: Project;
   settings?: ProjectSettings | null;
   className?: string;
+  granularity?: string; // Add granularity for timeline window calculation
 }
 
-export function ProgressBar({ task, project, settings, className }: ProgressBarProps) {
+export function ProgressBar({ task, project, settings, className, granularity = 'weekly' }: ProgressBarProps) {
   const today = startOfDay(tzNow('America/New_York'));
   
-  // Get fixed project timeline bounds using new utility function
-  const { start: projectStart, end: projectEnd } = getProjectBounds(project);
+  // Get dynamic timeline window bounds
+  const { start: timelineStart, end: timelineEnd } = getTimelineWindow(granularity);
   
   // Calculate individual task start date
   const taskStart = startOfDay(task.startDate 
@@ -50,22 +51,22 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   
   const taskDeadline = startOfDay(calculateTaskDeadline(task));
   
-  // NEW FIXED RANGE SYSTEM: All progress bars start from project start and extend to today/deadline
-  const progressStart = projectStart; // Always start from project start
+  // DYNAMIC SLIDING WINDOW SYSTEM: Progress bars start from task start and extend to today/deadline
+  const progressStart = taskStart; // Start from actual task start
   const progressEnd = task.status === 'completed' 
     ? taskDeadline // Completed tasks extend to their deadline
     : isAfter(today, taskDeadline) 
       ? taskDeadline // Overdue tasks extend to their deadline
-      : clampDate(today, projectStart, projectEnd); // Active tasks extend to today
+      : clampDate(today, taskStart, taskDeadline); // Active tasks extend to today (within task bounds)
   
-  // Calculate positioning using fixed range percentages
-  const startPosition = 0; // Always start at 0% (project start)
-  const endPosition = percentOfRange(progressEnd, projectStart, projectEnd);
-  const barWidth = Math.max(1, endPosition - startPosition); // Bar width from start to end
+  // Calculate positioning using dynamic timeline window percentages  
+  const startPosition = percentOfRange(progressStart, timelineStart, timelineEnd);
+  const endPosition = percentOfRange(progressEnd, timelineStart, timelineEnd);
+  const barWidth = Math.max(1, endPosition - startPosition); // Bar width from task start to progress end
   
   // Task deadline position for reference
-  const deadlinePosition = percentOfRange(taskDeadline, projectStart, projectEnd);
-  const taskStartPosition = percentOfRange(taskStart, projectStart, projectEnd);
+  const deadlinePosition = percentOfRange(taskDeadline, timelineStart, timelineEnd);
+  const taskStartPosition = percentOfRange(taskStart, timelineStart, timelineEnd);
   
   // Calculate progress statistics for labels
   const taskDurationDays = Math.max(1, daysBetween(taskStart, taskDeadline, settings?.useBusinessDays, settings?.holidayCalendar));

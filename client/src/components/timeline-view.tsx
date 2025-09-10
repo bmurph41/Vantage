@@ -6,7 +6,7 @@ import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
-import { tzNow, getProjectBounds, eachDay, percentOfRange, clampDate, getVisibleTicks } from "@/lib/date-utils";
+import { tzNow, getTimelineWindow, getTimelineTicks, percentOfRange, clampDate } from "@/lib/date-utils";
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -199,20 +199,17 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
   const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];
 
-  // Get fixed project timeline bounds using new utility function
-  const { start: projectStart, end: projectEnd } = getProjectBounds(project);
+  // Get dynamic sliding window timeline bounds 
+  const { start: timelineStart, end: timelineEnd } = useMemo(() => getTimelineWindow(granularity), [granularity]);
   const today = startOfDay(tzNow('America/New_York'));
 
-  // Generate all days in project range and get visible ticks based on granularity
-  const allDays = useMemo(() => eachDay(projectStart, projectEnd), [projectStart, projectEnd]);
-  const visibleTicks = useMemo(() => getVisibleTicks(allDays, granularity), [allDays, granularity]);
+  // Generate visible ticks based on granularity with proper spacing
+  const visibleTicks = useMemo(() => getTimelineTicks(granularity), [granularity]);
 
   // Get milestone position along timeline (0-100%)
   const getMilestonePosition = (dateString: string) => {
     const date = parseISO(dateString);
-    const totalDuration = differenceInDays(projectEnd, projectStart);
-    const elapsed = differenceInDays(date, projectStart);
-    return Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+    return percentOfRange(date, timelineStart, timelineEnd);
   };
 
   return (
@@ -250,17 +247,17 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
           {/* Clean Date Headers with Smart Leader Lines */}
           <div className="mb-4 relative">
             <div className="relative w-full h-12 bg-gray-50 rounded border overflow-hidden" ref={headerRef}>
-              {/* Fixed Start and End labels */}
+              {/* Dynamic Start and End labels */}
               <div className="absolute left-0 top-0 bottom-0 flex items-center px-2 bg-blue-100 text-blue-800 text-xs font-medium border-r border-blue-200 z-10">
-                {format(projectStart, 'M/d/yy')}
+                {format(timelineStart, 'M/d/yy')}
               </div>
               <div className="absolute right-0 top-0 bottom-0 flex items-center px-2 bg-green-100 text-green-800 text-xs font-medium border-l border-green-200 z-10">
-                {format(projectEnd, 'M/d/yy')}
+                {format(timelineEnd, 'M/d/yy')}
               </div>
               
               {/* Visible tick marks based on granularity */}
               {visibleTicks.map((date, index) => {
-                const position = percentOfRange(date, projectStart, projectEnd);
+                const position = percentOfRange(date, timelineStart, timelineEnd);
                 const isCurrentPeriod = isToday(date);
                 
                 return (
@@ -293,10 +290,10 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
               <LinesLayer headerRef={headerRef} contentRef={contentRef} />
             </div>
-            {/* Today Vertical Line - Aligned with Fixed Timeline */}
+            {/* Today Vertical Line - Aligned with Dynamic Timeline */}
             {(() => {
-              const clampedToday = clampDate(today, projectStart, projectEnd);
-              const todayPosition = percentOfRange(clampedToday, projectStart, projectEnd);
+              const clampedToday = clampDate(today, timelineStart, timelineEnd);
+              const todayPosition = percentOfRange(clampedToday, timelineStart, timelineEnd);
               
               if (todayPosition >= 0 && todayPosition <= 100) {
                 return (
@@ -400,6 +397,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                       task={task} 
                       project={project} 
                       settings={settings}
+                      granularity={granularity}
                       className="shadow-sm"
                     />
                   </div>
