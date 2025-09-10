@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle, FileDown } from "lucide-react";
@@ -306,6 +307,15 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       id: taskId,
       updates: { 
         status: newStatus as any
+      }
+    });
+  };
+
+  const handleOnSiteInspectionChange = (taskId: string, checked: boolean) => {
+    updateTask.mutate({
+      id: taskId,
+      updates: { 
+        requiresOnSiteInspection: checked
       }
     });
   };
@@ -755,6 +765,20 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               <SelectItem value="completed">Completed</SelectItem>
                             </SelectContent>
                           </Select>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`on-site-${task.id}`}
+                              checked={task.requiresOnSiteInspection || false}
+                              onCheckedChange={(checked) => handleOnSiteInspectionChange(task.id, checked as boolean)}
+                              data-testid={`checkbox-on-site-${task.id}`}
+                            />
+                            <label 
+                              htmlFor={`on-site-${task.id}`}
+                              className="text-xs text-gray-600 cursor-pointer"
+                            >
+                              On-Site Inspection
+                            </label>
+                          </div>
                         </div>
                       )}
                     </div>
