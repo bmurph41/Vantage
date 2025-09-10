@@ -131,7 +131,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTask(task: InsertTask): Promise<Task> {
-    const [created] = await db.insert(tasks).values(task).returning();
+    // Get the highest sortOrder for this project to assign the next order
+    const maxSortOrder = await db
+      .select({ maxOrder: sql<number>`COALESCE(MAX(sort_order), 0)` })
+      .from(tasks)
+      .where(eq(tasks.projectId, task.projectId));
+
+    const nextSortOrder = (maxSortOrder[0]?.maxOrder || 0) + 1;
+
+    const [created] = await db.insert(tasks).values({
+      ...task,
+      sortOrder: nextSortOrder
+    }).returning();
     return created;
   }
 
