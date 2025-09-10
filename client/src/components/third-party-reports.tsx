@@ -684,10 +684,9 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     <SelectContent>
                       <SelectItem value="all">All Statuses</SelectItem>
                       <SelectItem value="not_started">Not Started</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="to_do">To Do</SelectItem>
-                      <SelectItem value="scheduled">Scheduled</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={paymentFilter} onValueChange={setPaymentFilter}>
@@ -750,11 +749,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="to_do">To Do</SelectItem>
+                              <SelectItem value="not_started">Not Started</SelectItem>
                               <SelectItem value="scheduled">Scheduled</SelectItem>
                               <SelectItem value="in_progress">In Progress</SelectItem>
                               <SelectItem value="completed">Completed</SelectItem>
-                              <SelectItem value="not_started">Not Started</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
