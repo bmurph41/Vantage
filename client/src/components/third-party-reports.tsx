@@ -198,29 +198,45 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const projectStart = project?.psaSignedDate ? parseISO(project.psaSignedDate) : new Date();
   const projectEnd = project?.closingDate ? parseISO(project.closingDate) : addDays(projectStart, 120);
 
-  // Generate timeline header dates based on granularity
+  // Generate timeline header dates - 7-day intervals from PSA + task dates
   const generateTimelineDates = () => {
-    switch (granularity) {
-      case 'daily':
-        return eachDayOfInterval({ start: projectStart, end: projectEnd });
-      case 'weekly':
-        return eachWeekOfInterval({ start: projectStart, end: projectEnd });
-      case 'biweekly':
-        const biweeklyDates = [];
-        let current = new Date(projectStart);
-        while (current <= projectEnd) {
-          biweeklyDates.push(new Date(current));
-          current.setDate(current.getDate() + 14);
-        }
-        if (biweeklyDates[biweeklyDates.length - 1] < projectEnd) {
-          biweeklyDates.push(new Date(projectEnd));
-        }
-        return biweeklyDates;
-      case 'monthly':
-        return eachMonthOfInterval({ start: projectStart, end: projectEnd });
-      default:
-        return eachWeekOfInterval({ start: projectStart, end: projectEnd });
+    const dates = new Set<number>(); // Use timestamps to avoid duplicates
+    
+    // Always include start and end dates
+    dates.add(projectStart.getTime());
+    dates.add(projectEnd.getTime());
+    
+    // Add 7-day interval tick marks from PSA signed date
+    let current = new Date(projectStart);
+    while (current <= projectEnd) {
+      dates.add(current.getTime());
+      current = new Date(current.getTime() + (7 * 24 * 60 * 60 * 1000)); // Add 7 days
     }
+    
+    // Add milestone dates if they exist
+    if (project?.ddExpirationDate) {
+      dates.add(parseISO(project.ddExpirationDate).getTime());
+    }
+    
+    // Add important task dates to ensure they have tick marks
+    tasks.filter(t => t.showOnTimeline && (!showCriticalPath || t.priority === 'high')).forEach(task => {
+      // Add task start dates
+      if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project?.psaSignedDate) {
+        const psaDate = parseISO(project.psaSignedDate);
+        const taskEnd = new Date(psaDate);
+        taskEnd.setDate(taskEnd.getDate() + task.deadlineDays);
+        dates.add(taskEnd.getTime());
+      } else if (task.deadlineType === 'dd_expiration' && project?.ddExpirationDate) {
+        dates.add(parseISO(project.ddExpirationDate).getTime());
+      } else if (task.startDate) {
+        dates.add(parseISO(task.startDate).getTime());
+      }
+    });
+    
+    // Convert back to dates and sort chronologically
+    return Array.from(dates)
+      .map(timestamp => new Date(timestamp))
+      .sort((a, b) => a.getTime() - b.getTime());
   };
 
   const timelineDates = generateTimelineDates();
@@ -382,19 +398,24 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 
                 {/* Professional Timeline Container */}
                 <div className="bg-gray-50 border border-gray-200 p-4">
-                  {/* Date Markers */}
+                  {/* Date Markers - Show strategic dates */}
                   <div className="flex justify-between items-end mb-3">
                     {timelineDates.map((date, index) => {
-                      const maxTicks = granularity === 'daily' ? 6 : granularity === 'weekly' ? 5 : 4;
-                      const shouldShow = index % Math.ceil(timelineDates.length / maxTicks) === 0 || 
-                                        index === timelineDates.length - 1 ||
-                                        index === 0;
+                      // Show fewer tick marks for clarity - important dates only
+                      const isFirstOrLast = index === 0 || index === timelineDates.length - 1;
+                      const isPSADate = project?.psaSignedDate && Math.abs(date.getTime() - parseISO(project.psaSignedDate).getTime()) < 24 * 60 * 60 * 1000;
+                      const isDDExpiration = project?.ddExpirationDate && Math.abs(date.getTime() - parseISO(project.ddExpirationDate).getTime()) < 24 * 60 * 60 * 1000;
+                      const isClosingDate = project?.closingDate && Math.abs(date.getTime() - parseISO(project.closingDate).getTime()) < 24 * 60 * 60 * 1000;
+                      
+                      // Show every 2nd or 3rd tick mark for weekly intervals, plus important dates
+                      const isIntervalTick = index % 2 === 0; // Show every other tick for readability
+                      const shouldShow = isFirstOrLast || isPSADate || isDDExpiration || isClosingDate || (isIntervalTick && timelineDates.length <= 12);
                       
                       if (shouldShow) {
                         return (
                           <div key={index} className="flex flex-col items-center">
                             <div className="text-xs text-gray-600 mb-1">
-                              {format(date, granularity === 'daily' ? 'M/d' : granularity === 'monthly' ? 'MMM' : 'M/d')}
+                              {format(date, 'M/d')}
                             </div>
                             <div className="w-px h-3 bg-gray-400"></div>
                           </div>
@@ -412,12 +433,15 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     {/* Vertical Grid Lines */}
                     <div className="absolute inset-0">
                       {timelineDates.map((date, index) => {
-                        const maxTicks = granularity === 'daily' ? 6 : granularity === 'weekly' ? 5 : 4;
-                        const shouldShow = index % Math.ceil(timelineDates.length / maxTicks) === 0 || 
-                                          index === timelineDates.length - 1 ||
-                                          index === 0;
+                        // Only show grid lines for the same dates we show tick marks above
+                        const isFirstOrLast = index === 0 || index === timelineDates.length - 1;
+                        const isPSADate = project?.psaSignedDate && Math.abs(date.getTime() - parseISO(project.psaSignedDate).getTime()) < 24 * 60 * 60 * 1000;
+                        const isDDExpiration = project?.ddExpirationDate && Math.abs(date.getTime() - parseISO(project.ddExpirationDate).getTime()) < 24 * 60 * 60 * 1000;
+                        const isClosingDate = project?.closingDate && Math.abs(date.getTime() - parseISO(project.closingDate).getTime()) < 24 * 60 * 60 * 1000;
+                        const isIntervalTick = index % 2 === 0;
+                        const shouldShow = isPSADate || isDDExpiration || isClosingDate || (isIntervalTick && timelineDates.length <= 12);
                         
-                        if (shouldShow && index !== 0 && index !== timelineDates.length - 1) {
+                        if (shouldShow && !isFirstOrLast) {
                           return (
                             <div 
                               key={index} 
