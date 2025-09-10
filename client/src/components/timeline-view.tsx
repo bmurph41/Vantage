@@ -321,6 +321,73 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
               <LinesLayer headerRef={headerRef} contentRef={contentRef} />
             </div>
+            {/* Today Vertical Line */}
+            {(() => {
+              const today = startOfDay(tzNow('America/New_York'));
+              const todayPosition = (() => {
+                // Find which date period today falls into
+                const visibleDates = timelineDates.slice(0, 12);
+                let todayIndex = -1;
+                let todayOffset = 0;
+                
+                for (let i = 0; i < visibleDates.length; i++) {
+                  const currentDate = visibleDates[i];
+                  const nextDate = visibleDates[i + 1];
+                  
+                  if (granularity === 'monthly') {
+                    // For monthly view, check if today is within this month
+                    const monthStart = startOfMonth(currentDate);
+                    const monthEnd = endOfMonth(currentDate);
+                    if (today >= monthStart && today <= monthEnd) {
+                      todayIndex = i;
+                      // Calculate position within the month
+                      const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
+                      const dayOfMonth = differenceInDays(today, monthStart);
+                      todayOffset = dayOfMonth / daysInMonth;
+                      break;
+                    }
+                  } else if (granularity === 'weekly' || granularity === 'biweekly') {
+                    // For weekly view
+                    const weekStart = startOfWeek(currentDate);
+                    const weekEnd = endOfWeek(currentDate);
+                    if (today >= weekStart && today <= weekEnd) {
+                      todayIndex = i;
+                      const daysInWeek = differenceInDays(weekEnd, weekStart) + 1;
+                      const dayOfWeek = differenceInDays(today, weekStart);
+                      todayOffset = dayOfWeek / daysInWeek;
+                      break;
+                    }
+                  } else {
+                    // For daily view
+                    if (format(today, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd')) {
+                      todayIndex = i;
+                      todayOffset = 0.5; // Center of the day
+                      break;
+                    }
+                  }
+                }
+                
+                if (todayIndex >= 0) {
+                  const cellWidth = 100 / Math.min(12, visibleDates.length);
+                  return (todayIndex * cellWidth) + (todayOffset * cellWidth);
+                }
+                return -1; // Today not visible
+              })();
+              
+              if (todayPosition >= 0) {
+                return (
+                  <div 
+                    className="absolute top-0 bottom-0 w-0.5 bg-blue-500 shadow-lg z-20 pointer-events-none"
+                    style={{ 
+                      left: `${todayPosition}%`,
+                      height: '100%'
+                    }}
+                    data-testid="today-line"
+                  />
+                );
+              }
+              return null;
+            })()}
           </div>
 
           {/* Overall Progress Bar */}

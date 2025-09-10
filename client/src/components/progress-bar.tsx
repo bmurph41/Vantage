@@ -60,11 +60,18 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   const leftPosition = (daysFromProjectStart / totalProjectDays) * 100;
   const barWidth = (taskDurationDays / totalProjectDays) * 100;
   
-  // Task progress within its own duration - only up to today, never beyond due date
+  // Calculate progress based on timeline positioning (aligns with "today" line)
+  const todayFromProjectStart = Math.max(0, daysBetween(projectStart, today, settings?.useBusinessDays, settings?.holidayCalendar));
+  const todayPosition = (todayFromProjectStart / totalProjectDays) * 100;
+  
+  // Task progress calculation - percentage of task duration that has elapsed up to today
   const effectiveToday = today < due ? today : due;
   const elapsed = Math.max(0, Math.min(taskDurationDays, daysBetween(start, effectiveToday, settings?.useBusinessDays, settings?.holidayCalendar)));
   const remaining = Math.max(0, taskDurationDays - elapsed);
-  const percentElapsed = Math.round((elapsed / taskDurationDays) * 100);
+  
+  // Progress percentage should align with timeline - how much of the task bar should be filled to reach "today"
+  const progressToToday = Math.max(0, Math.min(100, ((todayPosition - leftPosition) / barWidth) * 100));
+  const percentElapsed = Math.round(progressToToday);
   
   const isCompleted = task.status === 'completed';
   const isOverdue = !isCompleted && isAfter(today, due);
