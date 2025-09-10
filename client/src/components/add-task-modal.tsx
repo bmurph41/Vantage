@@ -14,12 +14,108 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateTask, useUpdateTask } from "@/hooks/use-tasks";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { marinaDueDiligenceTaskTemplates, taskCategories, searchTasks, type TaskTemplate } from "@/data/marina-due-diligence-tasks";
 import type { Task, TaskTemplate as DbTaskTemplate } from "@shared/schema";
-import { useQuery } from "@tanstack/react-query";
 import { TimelineNotes } from "@/components/timeline-notes";
+
+// Task Owner Selector Component
+function TaskOwnerSelector({ projectId, value, onChange }: { 
+  projectId: string; 
+  value: string; 
+  onChange: (value: string) => void; 
+}) {
+  const [showInput, setShowInput] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
+
+  // Fetch existing assignees for the project
+  const { data: assignees = [] } = useQuery({
+    queryKey: [`/api/dd/projects/${projectId}/assignees`],
+    enabled: !!projectId,
+  });
+
+  const handleSelectChange = (selectedValue: string) => {
+    if (selectedValue === "manual_entry") {
+      setShowInput(true);
+      setInputValue(value);
+    } else {
+      setShowInput(false);
+      onChange(selectedValue);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    onChange(newValue);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setShowInput(false);
+      setInputValue(value);
+    }
+  };
+
+  if (showInput) {
+    return (
+      <div className="relative">
+        <Input
+          value={inputValue}
+          onChange={handleInputChange}
+          onKeyDown={handleInputKeyDown}
+          onBlur={() => setShowInput(false)}
+          placeholder="Enter team member name"
+          autoFocus
+          data-testid="input-assignee-manual"
+        />
+        <Button 
+          type="button"
+          variant="ghost" 
+          size="sm" 
+          className="absolute right-1 top-1 h-6 w-6 p-0"
+          onClick={() => setShowInput(false)}
+        >
+          ×
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Select value={value || ""} onValueChange={handleSelectChange}>
+      <SelectTrigger data-testid="select-task-owner">
+        <SelectValue placeholder="Select or enter team member" />
+      </SelectTrigger>
+      <SelectContent>
+        {assignees.length > 0 && (
+          <>
+            {assignees.map((assignee) => (
+              <SelectItem key={assignee} value={assignee}>
+                {assignee}
+              </SelectItem>
+            ))}
+            <SelectItem value="manual_entry">
+              <div className="flex items-center gap-2 text-blue-600">
+                <Users className="h-4 w-4" />
+                <span>Enter new name...</span>
+              </div>
+            </SelectItem>
+          </>
+        )}
+        {assignees.length === 0 && (
+          <SelectItem value="manual_entry">
+            <div className="flex items-center gap-2 text-blue-600">
+              <Users className="h-4 w-4" />
+              <span>Enter team member name...</span>
+            </div>
+          </SelectItem>
+        )}
+      </SelectContent>
+    </Select>
+  );
+}
 
 const addTaskFormSchema = z.object({
   title: z.string().min(1, "Task title is required"),
@@ -652,11 +748,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="assignee">Task Owner</Label>
-                    <Input
-                      id="assignee"
-                      placeholder="Assign to team member"
-                      {...form.register("assignee")}
-                      data-testid="input-assignee"
+                    <TaskOwnerSelector 
+                      projectId={projectId}
+                      value={form.watch("assignee") || ""}
+                      onChange={(value) => form.setValue("assignee", value)}
                     />
                   </div>
 
@@ -1086,11 +1181,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="assignee">Task Owner</Label>
-                    <Input
-                      id="assignee"
-                      placeholder="Assign to team member"
-                      {...form.register("assignee")}
-                      data-testid="input-assignee"
+                    <TaskOwnerSelector 
+                      projectId={projectId}
+                      value={form.watch("assignee") || ""}
+                      onChange={(value) => form.setValue("assignee", value)}
                     />
                   </div>
 
