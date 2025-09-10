@@ -598,14 +598,16 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   };
 
   return (
-    <Card data-testid="third-party-reports">
-      <CardHeader className="bg-primary text-primary-foreground">
-        <CardTitle>DD Timeline</CardTitle>
-      </CardHeader>
-      
-      <CardContent className="p-6">
-        {/* Professional DD Timeline Section - Static */}
-        <div className="mb-10 bg-white border border-gray-200 shadow-sm">
+    <>
+      <Card data-testid="third-party-reports">
+        <CardHeader className="bg-primary text-primary-foreground">
+          <CardTitle>DD Timeline</CardTitle>
+        </CardHeader>
+        
+        <CardContent className="p-6">
+          <div>
+            {/* Professional DD Timeline Section - Static */}
+            <div className="mb-10 bg-white border border-gray-200 shadow-sm">
           {/* Professional Timeline Header */}
           <div className="flex items-center justify-between mb-6 p-6">
             <div className="flex items-center space-x-4">
@@ -1019,74 +1021,71 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             </div>
         </div>
 
-        {/* Reports Table */}
-        <div className="border rounded-lg">
-          <table className="w-full border-collapse" data-testid="tasks-table">
-            <thead>
-              <tr className="bg-primary text-primary-foreground">
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[25%]">Task</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[12%]">Task Owner</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[18%]">Company Hired</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[10%]">Status</th>
-                <th 
-                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
-                  onClick={() => handleSort('daysRemaining')}
-                  data-testid="header-days-remaining"
-                >
-                  <div className="flex items-center">
-                    Days Remaining
-                    {getSortIcon('daysRemaining')}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
-                  onClick={() => handleSort('cost')}
-                  data-testid="header-cost"
-                >
-                  <div className="flex items-center">
-                    Cost
-                    {getSortIcon('cost')}
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y-8 divide-transparent">
-              {filteredTasks.map((task, index) => (
-                <React.Fragment key={task.id}>
-                  {/* Main Content Row */}
-                  <tr 
-                    className={`hover:bg-blue-50 transition-colors cursor-pointer bg-white ${
-                      expandedTasks.has(task.id) 
-                        ? 'border-t-2 border-l-2 border-r-2 border-gray-400' 
-                        : 'border-2 border-gray-400 shadow-sm'
-                    }`}
-                    onClick={() => toggleTaskExpansion(task.id)}
-                    data-testid={`row-task-${task.id}`}
+        {/* Sort Controls */}
+        <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 rounded-lg">
+          <h3 className="text-sm font-semibold text-gray-700">Tasks ({filteredTasks.length})</h3>
+          <div className="flex items-center gap-3 text-sm">
+            <button 
+              className="flex items-center gap-1 text-gray-600 hover:text-gray-900 cursor-pointer"
+              onClick={() => handleSort('daysRemaining')}
+              data-testid="header-days-remaining"
+            >
+              Days Remaining
+              {getSortIcon('daysRemaining')}
+            </button>
+            <button 
+              className="flex items-center gap-1 text-gray-600 hover:text-gray-900 cursor-pointer"
+              onClick={() => handleSort('cost')}
+              data-testid="header-cost"
+            >
+              Cost
+              {getSortIcon('cost')}
+            </button>
+          </div>
+        </div>
+
+        {/* Tasks List */}
+        <div className="space-y-3" data-testid="tasks-list">
+              {filteredTasks.map((task, index) => {
+                const project = allProjects.find(p => p.id === task.projectId);
+                return (
+                  <div 
+                    key={task.id}
+                    className="border-2 border-gray-300 rounded-md shadow-sm bg-white hover:shadow-md transition-shadow"
+                    data-testid={`card-task-${task.id}`}
                   >
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-sm leading-tight mb-1" title={task.title} data-testid={`text-task-title-${task.id}`}>
-                        {task.title}
-                      </div>
-                      {task.description && (
-                        <div className="text-xs text-muted-foreground mt-1 line-clamp-2" title={task.description} data-testid={`text-task-description-${task.id}`}>
-                          {task.description}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {task.assignee ? (
-                        <div className="flex items-center space-x-2" data-testid={`assignee-${task.id}`}>
-                          <div className={`w-6 h-6 ${getUserColor(task.assignee)} rounded-full flex items-center justify-center text-xs text-white flex-shrink-0`}>
-                            {getUserInitials(task.assignee)}
+                    <div 
+                      className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => toggleTaskExpansion(task.id)}
+                      data-testid={`summary-task-${task.id}`}
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
+                        {/* Task Info - Col 1 */}
+                        <div className="md:col-span-2">
+                          <div className="font-semibold text-sm leading-tight mb-1" title={task.title} data-testid={`text-task-title-${task.id}`}>
+                            {task.title}
                           </div>
-                          <span className="text-sm" title={task.assignee}>{task.assignee}</span>
+                          {task.description && (
+                            <div className="text-xs text-muted-foreground mt-1 line-clamp-2" title={task.description} data-testid={`text-task-description-${task.id}`}>
+                              {task.description}
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3" data-testid={`text-company-${task.id}`}>
+                        {/* Assignee - Col 2 */}
+                        <div>
+                          {task.assignee ? (
+                            <div className="flex items-center space-x-2" data-testid={`assignee-${task.id}`}>
+                              <div className={`w-6 h-6 ${getUserColor(task.assignee)} rounded-full flex items-center justify-center text-xs text-white flex-shrink-0`}>
+                                {getUserInitials(task.assignee)}
+                              </div>
+                              <span className="text-sm hidden md:block" title={task.assignee}>{task.assignee}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </div>
+                        {/* Company - Col 3 */}
+                        <div data-testid={`text-company-${task.id}`}>
                       {task.companyHired ? (
                         <div>
                           <div 
@@ -1109,159 +1108,164 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         </div>
                       ) : (
                         <span className="text-muted-foreground text-sm">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Select
-                        value={task.status}
-                        onValueChange={(value) => handleStatusChange(task.id, value)}
-                      >
-                        <SelectTrigger className="w-full h-8" data-testid={`select-status-${task.id}`}>
-                          <SelectValue>
-                            {getStatusBadge(task.status)}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="to_do">To Do</SelectItem>
-                          <SelectItem value="scheduled">Scheduled</SelectItem>
-                          <SelectItem value="in_progress">In Progress</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-4 py-3 text-center" data-testid={`text-days-remaining-${task.id}`}>
-                      {(() => {
-                        const daysRemaining = calculateDaysRemaining(task);
-                        if (task.status === 'completed') {
-                          return <span className="text-green-600 font-medium text-sm">Complete</span>;
-                        } else if (daysRemaining === 0) {
-                          return <span className="text-red-600 font-medium text-sm">Due Today</span>;
-                        } else if (daysRemaining < 0) {
-                          return <span className="text-red-600 font-medium text-sm">Overdue</span>;
-                        } else {
-                          return <span className={`font-medium text-sm ${daysRemaining <= 3 ? 'text-orange-600' : 'text-gray-900'}`}>
-                            {daysRemaining}d
-                          </span>;
-                        }
-                      })()}
-                    </td>
-                    <td className="px-4 py-3 text-center" data-testid={`text-cost-${task.id}`}>
-                      {editingCostTaskId === task.id ? (
-                        <Input
-                          type="text"
-                          value={editingCostValue}
-                          onChange={(e) => setEditingCostValue(e.target.value)}
-                          onBlur={() => {
-                            updateTask.mutate({
-                              id: task.id,
-                              updates: { cost: editingCostValue }
-                            });
-                            setEditingCostTaskId(null);
-                            setEditingCostValue('');
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              updateTask.mutate({
-                                id: task.id,
-                                updates: { cost: editingCostValue }
-                              });
-                              setEditingCostTaskId(null);
-                              setEditingCostValue('');
-                            } else if (e.key === 'Escape') {
-                              setEditingCostTaskId(null);
-                              setEditingCostValue('');
+                          )}
+                        </div>
+                        {/* Status - Col 4 */}
+                        <div>
+                          <Select
+                            value={task.status}
+                            onValueChange={(value) => handleStatusChange(task.id, value)}
+                          >
+                            <SelectTrigger className="w-full h-8" data-testid={`select-status-${task.id}`}>
+                              <SelectValue>
+                                {getStatusBadge(task.status)}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="to_do">To Do</SelectItem>
+                              <SelectItem value="scheduled">Scheduled</SelectItem>
+                              <SelectItem value="in_progress">In Progress</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {/* Days Remaining - Col 5 */}
+                        <div className="text-center" data-testid={`text-days-remaining-${task.id}`}>
+                          {(() => {
+                            const daysRemaining = calculateDaysRemaining(task);
+                            if (task.status === 'completed') {
+                              return <span className="text-green-600 font-medium text-sm">Complete</span>;
+                            } else if (daysRemaining === 0) {
+                              return <span className="text-red-600 font-medium text-sm">Due Today</span>;
+                            } else if (daysRemaining < 0) {
+                              return <span className="text-red-600 font-medium text-sm">Overdue</span>;
+                            } else {
+                              return <span className={`font-medium text-sm ${daysRemaining <= 3 ? 'text-orange-600' : 'text-gray-900'}`}>
+                                {daysRemaining}d
+                              </span>;
                             }
-                          }}
-                          className="w-24 h-8 text-center text-sm"
-                          placeholder="$0.00"
-                          autoFocus
-                          data-testid={`input-cost-${task.id}`}
-                        />
-                      ) : (
-                        <span 
-                          className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 hover:underline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingCostTaskId(task.id);
-                            setEditingCostValue(task.cost || '');
-                          }}
-                          title="Click to edit cost"
-                          data-testid={`span-cost-${task.id}`}
-                        >
-                          {formatCurrency(task.cost || '')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex space-x-1">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 px-2 text-xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingTask(task);
-                            setIsAddTaskModalOpen(true);
-                          }}
-                          data-testid={`button-edit-${task.id}`}
-                        >
-                          Edit
-                        </Button>
-
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 px-2 text-xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setTimelineNotesTask(task);
-                          }}
-                          data-testid={`button-timeline-notes-${task.id}`}
-                        >
-                          <MessageCircle className="h-3 w-3" />
-                        </Button>
-                        
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
+                          })()}
+                        </div>
+                        {/* Cost - Col 6 */}
+                        <div className="text-center" data-testid={`text-cost-${task.id}`}>
+                          {editingCostTaskId === task.id ? (
+                            <Input
+                              type="text"
+                              value={editingCostValue}
+                              onChange={(e) => setEditingCostValue(e.target.value)}
+                              onBlur={() => {
+                                updateTask.mutate({
+                                  id: task.id,
+                                  updates: { cost: editingCostValue }
+                                });
+                                setEditingCostTaskId(null);
+                                setEditingCostValue('');
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  updateTask.mutate({
+                                    id: task.id,
+                                    updates: { cost: editingCostValue }
+                                  });
+                                  setEditingCostTaskId(null);
+                                  setEditingCostValue('');
+                                } else if (e.key === 'Escape') {
+                                  setEditingCostTaskId(null);
+                                  setEditingCostValue('');
+                                }
+                              }}
+                              className="w-24 h-8 text-center text-sm"
+                              placeholder="$0.00"
+                              autoFocus
+                              data-testid={`input-cost-${task.id}`}
+                            />
+                          ) : (
+                            <span 
+                              className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 hover:underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingCostTaskId(task.id);
+                                setEditingCostValue(task.cost || '');
+                              }}
+                              title="Click to edit cost"
+                              data-testid={`span-cost-${task.id}`}
+                            >
+                              {formatCurrency(task.cost || '')}
+                            </span>
+                          )}
+                        </div>
+                        {/* Actions - Col 7 */}
+                        <div>
+                          <div className="flex space-x-1">
                             <Button 
                               variant="outline" 
-                              size="sm"
-                              className="text-destructive hover:text-destructive h-8 px-2"
-                              onClick={(e) => e.stopPropagation()}
-                              data-testid={`button-delete-${task.id}`}
+                              size="sm" 
+                              className="h-8 px-2 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTask(task);
+                                setIsAddTaskModalOpen(true);
+                              }}
+                              data-testid={`button-edit-${task.id}`}
                             >
-                              <Trash2 className="h-3 w-3" />
+                              Edit
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Task</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete "{task.title}"? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel data-testid={`button-cancel-delete-${task.id}`}>
-                                Cancel
-                              </AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={() => handleDeleteTask(task.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                data-testid={`button-confirm-delete-${task.id}`}
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-8 px-2 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTimelineNotesTask(task);
+                              }}
+                              data-testid={`button-timeline-notes-${task.id}`}
+                            >
+                              <MessageCircle className="h-3 w-3" />
+                            </Button>
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive h-8 px-2"
+                                  onClick={(e) => e.stopPropagation()}
+                                  data-testid={`button-delete-${task.id}`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete "{task.title}"? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel data-testid={`button-cancel-delete-${task.id}`}>
+                                    Cancel
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleDeleteTask(task.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    data-testid={`button-confirm-delete-${task.id}`}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
                       </div>
-                    </td>
-                  </tr>
-                  
-                  {/* Date Fields Row */}
-                  <tr className="bg-white border-l-2 border-r-2 border-b-2 border-gray-400">
-                    <td colSpan={7} className="px-6 pt-0 pb-4" data-testid={`dates-row-${task.id}`}>
-                      <div className="grid grid-cols-4 gap-4">
+                    </div>
+
+                    {/* Expandable Details Section */}
+                    {expandedTasks.has(task.id) && (
+                      <div className="border-t bg-gray-50 p-4" data-testid={`dates-row-${task.id}`}>
+                        <div className="grid grid-cols-4 gap-4">
                         {/* Deadline */}
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">Deadline</label>
@@ -1377,104 +1381,93 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                             data-testid={`input-completion-date-${task.id}`}
                           />
                         </div>
+                        
+                        {/* Rep Contact Information */}
+                        {(task.repName || task.repEmail || task.repPhone) && (
+                          <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded text-xs text-gray-700" data-testid={`rep-contact-${task.id}`}>
+                            <div className="flex items-center space-x-6">
+                              {task.repName && (
+                                <div className="flex items-center space-x-1">
+                                  <span className="font-medium">Rep:</span>
+                                  <span>{task.repName}</span>
+                                </div>
+                              )}
+                              {task.repEmail && (
+                                <div className="flex items-center space-x-1">
+                                  <span className="font-medium">📧</span>
+                                  <span>{task.repEmail}</span>
+                                </div>
+                              )}
+                              {task.repPhone && (
+                                <div className="flex items-center space-x-1">
+                                  <span className="font-medium">📞</span>
+                                  <span>{task.repPhone}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </td>
-                  </tr>
-                  
-                  {/* Rep Contact Information Row */}
-                  {(task.repName || task.repEmail || task.repPhone) && (
-                    <tr className="bg-gradient-to-r from-gray-100 to-slate-100 border-t-0 border-b-2 border-blue-300">
-                      <td colSpan={7} className="px-6 py-3 text-xs text-gray-700 border-l-4 border-blue-500 shadow-inner" data-testid={`rep-contact-${task.id}`}>
-                        <div className="flex items-center space-x-6">
-                          {task.repName && (
-                            <div className="flex items-center space-x-1">
-                              <span className="font-medium">Rep:</span>
-                              <span>{task.repName}</span>
-                            </div>
-                          )}
-                          {task.repEmail && (
-                            <div className="flex items-center space-x-1">
-                              <span className="font-medium">📧</span>
-                              <span>{task.repEmail}</span>
-                            </div>
-                          )}
-                          {task.repPhone && (
-                            <div className="flex items-center space-x-1">
-                              <span className="font-medium">📞</span>
-                              <span>{task.repPhone}</span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  
-                  {/* Task Group Separator */}
-                  {index < filteredTasks.length - 1 && (
-                    <tr className="h-4">
-                      <td colSpan={7} className="bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 border-b-2 border-gray-400 shadow-sm"></td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
-              {filteredTasks.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
-                    No tasks found matching your criteria.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        </div>
-      </CardContent>
-      
-      <AddTaskModal
-        isOpen={isAddTaskModalOpen}
-        onClose={() => {
-          setIsAddTaskModalOpen(false);
-          setEditingTask(null);
-        }}
-        projectId={projectId}
-        editingTask={editingTask}
-      />
-
-      {/* Timeline Notes Modal */}
-      {timelineNotesTask && (
-        <Dialog open={!!timelineNotesTask} onOpenChange={() => setTimelineNotesTask(null)}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5" />
-                Timeline Notes: {timelineNotesTask.title}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 overflow-hidden">
-              <TimelineNotes 
-                taskId={timelineNotesTask.id} 
-                taskTitle={timelineNotesTask.title}
-              />
+                    )}
+                  </div>
+                )
+              })}
+          {filteredTasks.length === 0 && (
+            <div className="px-4 py-8 text-center text-muted-foreground border-2 border-gray-200 rounded-md" data-testid="text-no-tasks">
+              No tasks found matching your criteria.
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      <ExportReportModal
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
-        tasks={tasks}
-        project={project}
-      />
-
-      <CompanyDetailsModal
-        isOpen={companyModalData.isOpen}
-        onClose={() => setCompanyModalData({ ...companyModalData, isOpen: false })}
-        companyName={companyModalData.companyName}
-        contactInfo={companyModalData.contactInfo}
-        relatedProjects={relatedProjectsData}
-        onContactInfoUpdate={handleContactInfoUpdate}
-      />
+          )}
+        </div>
+          </div>
+        </CardContent>
     </Card>
+      
+    {/* Modals - moved outside Card component */}
+    <AddTaskModal
+      isOpen={isAddTaskModalOpen}
+      onClose={() => {
+        setIsAddTaskModalOpen(false);
+        setEditingTask(null);
+      }}
+      projectId={projectId}
+      editingTask={editingTask}
+    />
+
+    {/* Timeline Notes Modal */}
+    {timelineNotesTask && (
+      <Dialog open={!!timelineNotesTask} onOpenChange={() => setTimelineNotesTask(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Timeline Notes: {timelineNotesTask.title}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            <TimelineNotes 
+              taskId={timelineNotesTask.id} 
+              taskTitle={timelineNotesTask.title}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    )}
+
+    <ExportReportModal
+      isOpen={isExportModalOpen}
+      onClose={() => setIsExportModalOpen(false)}
+      tasks={tasks}
+      project={project}
+    />
+
+    <CompanyDetailsModal
+      isOpen={companyModalData.isOpen}
+      onClose={() => setCompanyModalData({ ...companyModalData, isOpen: false })}
+      companyName={companyModalData.companyName}
+      contactInfo={companyModalData.contactInfo}
+      relatedProjects={relatedProjectsData}
+      onContactInfoUpdate={handleContactInfoUpdate}
+    />
+    </>
   );
 }
