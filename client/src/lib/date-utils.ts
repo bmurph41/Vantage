@@ -133,47 +133,83 @@ export function effectiveDue(task: any, project: any): Date {
 // DYNAMIC SLIDING WINDOW TIMELINE UTILITIES
 
 /**
- * Get dynamic timeline window centered around today's date
+ * Get dynamic timeline window centered around today's date, with optional constraints
  */
-export function getTimelineWindow(granularity: string): { start: Date; end: Date } {
-  const today = startOfDay(tzNow('America/New_York'));
+export function getTimelineWindow(granularity: string, opts?: { 
+  minStart?: Date; 
+  maxEnd?: Date; 
+  anchor?: Date; 
+}): { start: Date; end: Date } {
+  const anchor = opts?.anchor || startOfDay(tzNow('America/New_York'));
+  
+  // Determine half-span based on granularity
+  let halfSpanDays: number;
+  let addFunction: (date: Date, amount: number) => Date;
+  let amount: number;
   
   switch (granularity) {
     case 'daily':
-      // Show 60 days: 30 before today, 30 after today
-      return {
-        start: addDays(today, -30),
-        end: addDays(today, 30)
-      };
+      halfSpanDays = 30; // 30 days before and after
+      addFunction = addDays;
+      amount = 30;
+      break;
     
     case 'weekly':
-      // Show 16 weeks: 8 weeks before today, 8 weeks after today  
-      return {
-        start: addWeeks(today, -8),
-        end: addWeeks(today, 8)
-      };
+      halfSpanDays = 8 * 7; // 8 weeks before and after
+      addFunction = addWeeks;
+      amount = 8;
+      break;
     
     case 'biweekly':
-      // Show 24 weeks: 12 weeks before today, 12 weeks after today
-      return {
-        start: addWeeks(today, -12),
-        end: addWeeks(today, 12)
-      };
+      halfSpanDays = 12 * 7; // 12 weeks before and after
+      addFunction = addWeeks;
+      amount = 12;
+      break;
     
     case 'monthly':
-      // Show 12 months: 6 months before today, 6 months after today
-      return {
-        start: addMonths(today, -6),
-        end: addMonths(today, 6)
-      };
+      halfSpanDays = 6 * 30; // Approximate 6 months before and after
+      addFunction = addMonths;
+      amount = 6;
+      break;
     
     default:
       // Default to weekly view
-      return {
-        start: addWeeks(today, -8),
-        end: addWeeks(today, 8)
-      };
+      halfSpanDays = 8 * 7;
+      addFunction = addWeeks;
+      amount = 8;
   }
+  
+  // Calculate proposed window
+  const proposedStart = addFunction(anchor, -amount);
+  const proposedEnd = addFunction(anchor, amount);
+  
+  // Apply constraints
+  let finalStart = proposedStart;
+  let finalEnd = proposedEnd;
+  
+  // If minStart is provided and proposed start is before it, shift the window right
+  if (opts?.minStart && isBefore(proposedStart, opts.minStart)) {
+    finalStart = opts.minStart;
+    // Maintain the full span by extending the end
+    finalEnd = addDays(finalStart, halfSpanDays * 2);
+  }
+  
+  // If maxEnd is provided and final end is after it, clamp the end
+  if (opts?.maxEnd && isAfter(finalEnd, opts.maxEnd)) {
+    finalEnd = opts.maxEnd;
+    // If clamping collapses the span, adjust start to maintain reasonable span
+    const minimalStart = addDays(finalEnd, -(halfSpanDays * 2));
+    if (opts?.minStart) {
+      finalStart = isAfter(minimalStart, opts.minStart) ? minimalStart : opts.minStart;
+    } else {
+      finalStart = minimalStart;
+    }
+  }
+  
+  return {
+    start: finalStart,
+    end: finalEnd
+  };
 }
 
 /**
@@ -199,8 +235,12 @@ export function clampDate(date: Date, start: Date, end: Date): Date {
 /**
  * Generate visible timeline ticks with proper spacing for each granularity
  */
-export function getTimelineTicks(granularity: string): Date[] {
-  const { start, end } = getTimelineWindow(granularity);
+export function getTimelineTicks(granularity: string, opts?: { 
+  minStart?: Date; 
+  maxEnd?: Date; 
+  anchor?: Date; 
+}): Date[] {
+  const { start, end } = getTimelineWindow(granularity, opts);
   const ticks: Date[] = [];
   
   switch (granularity) {
@@ -214,8 +254,11 @@ export function getTimelineTicks(granularity: string): Date[] {
       break;
     
     case 'weekly':
-      // Show weekly ticks (every Monday)
+      // Show weekly ticks (every Monday), but never before timeline start
       let weeklyCurrent = startOfWeek(start, { weekStartsOn: 1 }); // Start on Monday
+      if (weeklyCurrent < start) {
+        weeklyCurrent = addWeeks(weeklyCurrent, 1);
+      }
       while (weeklyCurrent <= end) {
         ticks.push(new Date(weeklyCurrent));
         weeklyCurrent = addWeeks(weeklyCurrent, 1);
@@ -223,8 +266,11 @@ export function getTimelineTicks(granularity: string): Date[] {
       break;
     
     case 'biweekly':
-      // Show biweekly ticks
+      // Show biweekly ticks, but never before timeline start
       let biweeklyCurrent = startOfWeek(start, { weekStartsOn: 1 });
+      if (biweeklyCurrent < start) {
+        biweeklyCurrent = addWeeks(biweeklyCurrent, 2);
+      }
       while (biweeklyCurrent <= end) {
         ticks.push(new Date(biweeklyCurrent));
         biweeklyCurrent = addWeeks(biweeklyCurrent, 2);
@@ -232,8 +278,11 @@ export function getTimelineTicks(granularity: string): Date[] {
       break;
     
     case 'monthly':
-      // Show monthly ticks (first of each month)
+      // Show monthly ticks (first of each month), but never before timeline start
       let monthlyCurrent = startOfMonth(start);
+      if (monthlyCurrent < start) {
+        monthlyCurrent = addMonths(monthlyCurrent, 1);
+      }
       while (monthlyCurrent <= end) {
         ticks.push(new Date(monthlyCurrent));
         monthlyCurrent = addMonths(monthlyCurrent, 1);

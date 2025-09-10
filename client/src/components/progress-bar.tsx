@@ -14,8 +14,11 @@ interface ProgressBarProps {
 export function ProgressBar({ task, project, settings, className, granularity = 'weekly' }: ProgressBarProps) {
   const today = startOfDay(tzNow('America/New_York'));
   
-  // Get dynamic timeline window bounds
-  const { start: timelineStart, end: timelineEnd } = getTimelineWindow(granularity);
+  // Calculate project start date (PSA Signed date) as minimum timeline bound
+  const projectStartDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
+  
+  // Get dynamic timeline window bounds with PSA constraint
+  const { start: timelineStart, end: timelineEnd } = getTimelineWindow(granularity, { minStart: projectStartDate });
   
   // Calculate individual task start date
   const taskStart = startOfDay(task.startDate 

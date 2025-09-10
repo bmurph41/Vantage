@@ -199,12 +199,23 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
   const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];
 
-  // Get dynamic sliding window timeline bounds 
-  const { start: timelineStart, end: timelineEnd } = useMemo(() => getTimelineWindow(granularity), [granularity]);
+  // Calculate project start date (PSA Signed date) as minimum timeline bound
+  const projectStartDate = useMemo(() => {
+    return startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
+  }, [project.psaSignedDate, project.createdAt]);
+
+  // Get dynamic sliding window timeline bounds with PSA constraint
+  const { start: timelineStart, end: timelineEnd } = useMemo(() => 
+    getTimelineWindow(granularity, { minStart: projectStartDate }), 
+    [granularity, projectStartDate]
+  );
   const today = startOfDay(tzNow('America/New_York'));
 
-  // Generate visible ticks based on granularity with proper spacing
-  const visibleTicks = useMemo(() => getTimelineTicks(granularity), [granularity]);
+  // Generate visible ticks based on granularity with proper spacing and PSA constraint
+  const visibleTicks = useMemo(() => 
+    getTimelineTicks(granularity, { minStart: projectStartDate }), 
+    [granularity, projectStartDate]
+  );
 
   // Get milestone position along timeline (0-100%)
   const getMilestonePosition = (dateString: string) => {
@@ -290,12 +301,11 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
               <LinesLayer headerRef={headerRef} contentRef={contentRef} />
             </div>
-            {/* Today Vertical Line - Aligned with Dynamic Timeline */}
+            {/* Today Vertical Line - Only show if today is within timeline bounds */}
             {(() => {
-              const clampedToday = clampDate(today, timelineStart, timelineEnd);
-              const todayPosition = percentOfRange(clampedToday, timelineStart, timelineEnd);
-              
-              if (todayPosition >= 0 && todayPosition <= 100) {
+              // Only show Today line if today is within or after the timeline start
+              if (today >= timelineStart && today <= timelineEnd) {
+                const todayPosition = percentOfRange(today, timelineStart, timelineEnd);
                 return (
                   <div 
                     className="absolute top-0 bottom-0 w-0.5 bg-blue-500 shadow-lg z-30 pointer-events-none"
@@ -309,6 +319,13 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
               }
               return null;
             })()}
+
+            {/* PSA Start Badge - Show when today is before timeline start */}
+            {today < timelineStart && (
+              <div className="absolute left-0 top-0 bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-br-md border border-green-200 z-40">
+                Starts: {format(projectStartDate, 'M/d/yy')}
+              </div>
+            )}
           </div>
 
           {/* Overall Progress Bar */}
