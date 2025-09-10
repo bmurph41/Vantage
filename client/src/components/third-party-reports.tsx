@@ -910,7 +910,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         {/* Deadline Date */}
                         <div>
                           <label className="text-xs font-medium text-gray-700 block mb-1">Deadline</label>
-                          <div className="text-xs text-gray-900" data-testid={`text-deadline-${task.id}`}>
+                          <div className="w-full text-xs h-7 px-3 py-2 border border-input bg-background rounded-md flex items-center" data-testid={`text-deadline-${task.id}`}>
                             {format(calculateDeadlineDate(task), 'MMM d, yyyy')}
                           </div>
                         </div>
