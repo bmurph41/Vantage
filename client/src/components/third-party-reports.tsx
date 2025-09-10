@@ -1002,7 +1002,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                                 updates: { startDate: newStartDate }
                               });
                             }}
-                            disabled={!task.dateOnSite || task.status === 'to_do'}
+                            disabled={task.status !== 'scheduled' && (!task.dateOnSite || task.status === 'to_do')}
                             className="w-full text-xs h-7"
                             placeholder="mm/dd/yyyy"
                             data-testid={`input-scheduled-date-${task.id}`}
