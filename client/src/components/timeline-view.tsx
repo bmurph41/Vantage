@@ -261,36 +261,42 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 {format(timelineEnd, 'M/d/yy')}
               </div>
               
-              {/* Visible tick marks based on granularity */}
-              {visibleTicks.map((date, index) => {
-                const position = percentOfRange(date, timelineStart, timelineEnd);
-                const isCurrentPeriod = isToday(date);
-                
-                return (
-                  <div 
-                    key={index}
-                    className={`absolute top-0 bottom-0 flex flex-col justify-center items-center transform -translate-x-1/2 px-1 ${
-                      isCurrentPeriod ? 'bg-blue-50 text-blue-700 font-medium rounded z-20' : 'text-gray-600 z-10'
-                    }`}
-                    style={{ left: `${position}%` }}
-                    data-testid={`timeline-date-${index}`}
-                  >
-                    <div className="text-xs whitespace-nowrap">
-                      {format(date, 
-                        granularity === 'daily' ? 'MMM d' : 
-                        granularity === 'monthly' ? 'MMM' : 
-                        granularity === 'weekly' || granularity === 'biweekly' ? 'M/d' : 
-                        'M/d'
+              {/* Visible tick marks based on granularity - exclude start/end to prevent overlap */}
+              {visibleTicks
+                .filter(date => {
+                  const position = percentOfRange(date, timelineStart, timelineEnd);
+                  // Filter out dates too close to start (0%) or end (100%) to prevent overlap
+                  return position > 8 && position < 92;
+                })
+                .map((date, index) => {
+                  const position = percentOfRange(date, timelineStart, timelineEnd);
+                  const isCurrentPeriod = isToday(date);
+                  
+                  return (
+                    <div 
+                      key={index}
+                      className={`absolute top-0 bottom-0 flex flex-col justify-center items-center transform -translate-x-1/2 px-1 ${
+                        isCurrentPeriod ? 'bg-blue-50 text-blue-700 font-medium rounded z-20' : 'text-gray-600 z-10'
+                      }`}
+                      style={{ left: `${position}%` }}
+                      data-testid={`timeline-date-${index}`}
+                    >
+                      <div className="text-xs whitespace-nowrap">
+                        {format(date, 
+                          granularity === 'daily' ? 'MMM d' : 
+                          granularity === 'monthly' ? 'MMM' : 
+                          granularity === 'weekly' || granularity === 'biweekly' ? 'M/d' : 
+                          'M/d'
+                        )}
+                      </div>
+                      {granularity === 'monthly' && (
+                        <div className="text-xs text-gray-500">
+                          {format(date, 'yyyy')}
+                        </div>
                       )}
                     </div>
-                    {granularity === 'monthly' && (
-                      <div className="text-xs text-gray-500">
-                        {format(date, 'yyyy')}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
             {/* Smart Leader Lines Layer - contained within this timeline section */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
