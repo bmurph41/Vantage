@@ -333,93 +333,129 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             )}
           </div>
 
-          {/* Enhanced Timeline Track - Only show when not collapsed */}
+          {/* Modern Timeline Track - Only show when not collapsed */}
           {!isTimelineCollapsed && project && (
-            <div className="bg-white rounded-xl p-6 border border-blue-200 shadow-inner">
-              {/* Date Headers with proper spacing */}
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-3">
-                  <div className="text-sm font-bold text-blue-700">
-                    Start: {format(projectStart, 'MMM d, yyyy')}
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-8 border border-slate-200/60 shadow-xl">
+              {/* Enhanced Date Headers */}
+              <div className="mb-8">
+                <div className="flex justify-between items-center mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full shadow-lg"></div>
+                    <div>
+                      <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Project Start</div>
+                      <div className="text-lg font-bold text-slate-800">
+                        {format(projectStart, 'MMM d, yyyy')}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm font-bold text-green-700">
-                    Target Close: {format(projectEnd, 'MMM d, yyyy')}
+                  <div className="flex items-center space-x-3">
+                    <div>
+                      <div className="text-xs font-medium text-slate-500 uppercase tracking-wide text-right">Target Close</div>
+                      <div className="text-lg font-bold text-slate-800">
+                        {format(projectEnd, 'MMM d, yyyy')}
+                      </div>
+                    </div>
+                    <div className="w-3 h-3 bg-emerald-500 rounded-full shadow-lg"></div>
                   </div>
                 </div>
                 
-                {/* Tick marks based on granularity */}
-                <div className="relative">
-                  <div className="flex justify-between text-xs text-gray-600 font-medium mb-2">
+                {/* Modern Timeline Container */}
+                <div className="relative bg-gradient-to-r from-slate-50 via-white to-slate-50 rounded-2xl p-6 border border-slate-200/60 shadow-inner">
+                  {/* Date Tick Marks */}
+                  <div className="flex justify-between items-end mb-4">
                     {timelineDates.map((date, index) => {
-                      // Show fewer dates for readability
-                      const maxTicks = granularity === 'daily' ? 10 : granularity === 'weekly' ? 8 : 6;
-                      if (index % Math.ceil(timelineDates.length / maxTicks) === 0 || index === timelineDates.length - 1) {
+                      const maxTicks = granularity === 'daily' ? 8 : granularity === 'weekly' ? 6 : 5;
+                      const shouldShow = index % Math.ceil(timelineDates.length / maxTicks) === 0 || 
+                                        index === timelineDates.length - 1 ||
+                                        index === 0;
+                      
+                      if (shouldShow) {
                         return (
-                          <div key={index} className="text-center">
-                            {format(date, granularity === 'daily' ? 'MMM d' : granularity === 'monthly' ? 'MMM yyyy' : 'MMM d')}
+                          <div key={index} className="flex flex-col items-center">
+                            <div className="text-xs font-semibold text-slate-600 mb-1">
+                              {format(date, granularity === 'daily' ? 'MMM d' : granularity === 'monthly' ? 'MMM' : 'MMM d')}
+                            </div>
+                            <div className="w-px h-4 bg-slate-300"></div>
                           </div>
                         );
                       }
-                      return null;
+                      return <div key={index} className="flex-1"></div>;
                     })}
                   </div>
                   
-                  {/* Main Timeline Track */}
-                  <div className="relative h-20 bg-gradient-to-r from-gray-100 to-gray-200 rounded-lg border-2 border-gray-300 shadow-inner overflow-visible">
-                    {/* Grid Lines */}
-                    <div className="absolute inset-0 flex">
+                  {/* Modern Timeline Track */}
+                  <div className="relative h-24 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 rounded-xl border border-slate-300/50 shadow-inner overflow-visible">
+                    {/* Progress Base Line */}
+                    <div className="absolute top-1/2 left-0 right-0 h-1 bg-gradient-to-r from-blue-300 via-slate-300 to-emerald-300 transform -translate-y-1/2 rounded-full"></div>
+                    
+                    {/* Grid Markers */}
+                    <div className="absolute inset-0 flex items-center">
                       {timelineDates.map((date, index) => {
-                        const maxTicks = granularity === 'daily' ? 10 : granularity === 'weekly' ? 8 : 6;
-                        if (index % Math.ceil(timelineDates.length / maxTicks) === 0 || index === timelineDates.length - 1) {
+                        const maxTicks = granularity === 'daily' ? 8 : granularity === 'weekly' ? 6 : 5;
+                        const shouldShow = index % Math.ceil(timelineDates.length / maxTicks) === 0 || 
+                                          index === timelineDates.length - 1 ||
+                                          index === 0;
+                        
+                        if (shouldShow && index !== 0 && index !== timelineDates.length - 1) {
                           return (
-                            <div key={index} className="flex-1 border-r border-gray-300/50 last:border-r-0">
-                              <div className="h-full border-r border-gray-400/30"></div>
-                            </div>
+                            <div 
+                              key={index} 
+                              className="absolute w-px h-full bg-slate-300/60" 
+                              style={{ left: `${(index / (timelineDates.length - 1)) * 100}%` }}
+                            ></div>
                           );
                         }
                         return null;
                       })}
                     </div>
 
-                    {/* Task Progress Bars - Show all at top, specific task when scrolling */}
-                    <div className="absolute inset-0 pt-2 pb-2">
+                    {/* Modern Task Progress Bars */}
+                    <div className="absolute inset-0 pt-4 pb-4">
                       {tasks.filter(t => {
                         const basicFilter = t.showOnTimeline && (!showCriticalPath || t.priority === 'high');
-                        // Show all tasks when at top, or only current task when scrolling
                         if (isAtTop || !currentTaskInView) {
                           return basicFilter;
                         }
                         return basicFilter && t.id === currentTaskInView;
                       }).map((task, taskIndex) => {
                         const taskProgress = getTaskProgress(task);
-                        const yPosition = 6 + (taskIndex * 12); // Stagger task bars vertically
+                        const yPosition = 8 + (taskIndex * 14); // Better spacing for modern look
                         
                         return (
-                          <div key={task.id} className="absolute" style={{ 
+                          <div key={task.id} className="absolute group" style={{ 
                             left: `${taskProgress.startPosition}%`, 
                             width: `${taskProgress.width}%`,
                             top: `${yPosition}px`,
-                            height: '8px'
+                            height: '10px'
                           }}>
                             <div className="relative h-full">
-                              <div className={`h-full rounded-sm shadow-sm ${
-                                taskProgress.status === 'completed' ? 'bg-green-500' :
-                                taskProgress.status === 'overdue' ? 'bg-red-500' :
-                                taskProgress.status === 'in_progress' ? 'bg-blue-500' :
-                                'bg-gray-400'
+                              {/* Task Bar Background */}
+                              <div className={`h-full rounded-full shadow-lg border-2 border-white ${
+                                taskProgress.status === 'completed' ? 'bg-emerald-400' :
+                                taskProgress.status === 'overdue' ? 'bg-rose-400' :
+                                taskProgress.status === 'in_progress' ? 'bg-blue-400' :
+                                'bg-slate-300'
                               }`}>
+                                {/* Progress Fill */}
                                 <div 
-                                  className={`h-full rounded-sm ${
-                                    taskProgress.status === 'completed' ? 'bg-green-600' :
-                                    taskProgress.status === 'overdue' ? 'bg-red-600' :
+                                  className={`h-full rounded-full transition-all duration-300 ${
+                                    taskProgress.status === 'completed' ? 'bg-emerald-600' :
+                                    taskProgress.status === 'overdue' ? 'bg-rose-600' :
                                     taskProgress.status === 'in_progress' ? 'bg-blue-600' :
-                                    'bg-gray-500'
+                                    'bg-slate-500'
                                   }`}
                                   style={{ width: `${taskProgress.progress}%` }}
                                 ></div>
                               </div>
-                              <div className="absolute -top-6 left-0 text-xs font-medium text-gray-800 bg-white px-2 py-1 rounded shadow-sm border truncate max-w-32">
-                                {task.title.length > 15 ? task.title.substring(0, 15) + '...' : task.title}
+                              
+                              {/* Modern Task Label */}
+                              <div className="absolute -top-8 left-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                <div className="text-xs font-semibold text-slate-700 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-lg shadow-lg border border-slate-200 whitespace-nowrap">
+                                  {task.title}
+                                  <div className="text-xs font-normal text-slate-500 mt-0.5">
+                                    {taskProgress.progress}% complete
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -427,18 +463,21 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       })}
                     </div>
 
-                    {/* Milestone markers */}
-                    <div className="absolute inset-0 flex items-center">
-                      {/* PSA Signed */}
+                    {/* Modern Milestone Markers */}
+                    <div className="absolute inset-0 flex items-center z-30">
+                      {/* PSA Signed - Always at 0% */}
                       {project.psaSignedDate && (
                         <div 
-                          className="absolute flex flex-col items-center transform -translate-x-1/2 z-20"
-                          style={{ left: `${getMilestonePosition(project.psaSignedDate)}%` }}
+                          className="absolute flex flex-col items-center transform -translate-x-1/2"
+                          style={{ left: '0%' }}
                         >
-                          <div className="w-4 h-4 bg-blue-600 rounded-full border-4 border-white shadow-lg"></div>
-                          <div className="absolute -bottom-12 bg-blue-100 border-2 border-blue-300 shadow-lg rounded-lg px-3 py-2 min-w-max">
+                          <div className="relative">
+                            <div className="w-6 h-6 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full border-4 border-white shadow-xl"></div>
+                            <div className="absolute inset-0 w-6 h-6 bg-blue-400 rounded-full animate-ping opacity-20"></div>
+                          </div>
+                          <div className="absolute -bottom-16 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 shadow-xl rounded-xl px-4 py-2 min-w-max">
                             <div className="text-xs font-bold text-blue-800">PSA Signed</div>
-                            <div className="text-xs text-blue-600">{format(parseISO(project.psaSignedDate), 'MMM d')}</div>
+                            <div className="text-xs text-blue-600 font-semibold">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
                           </div>
                         </div>
                       )}
@@ -446,27 +485,33 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       {/* DD Expiration */}
                       {project.ddExpirationDate && (
                         <div 
-                          className="absolute flex flex-col items-center transform -translate-x-1/2 z-20"
+                          className="absolute flex flex-col items-center transform -translate-x-1/2"
                           style={{ left: `${getMilestonePosition(project.ddExpirationDate)}%` }}
                         >
-                          <div className="w-4 h-4 bg-amber-600 rounded-full border-4 border-white shadow-lg"></div>
-                          <div className="absolute -bottom-12 bg-amber-100 border-2 border-amber-300 shadow-lg rounded-lg px-3 py-2 min-w-max">
+                          <div className="relative">
+                            <div className="w-6 h-6 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full border-4 border-white shadow-xl"></div>
+                            <div className="absolute inset-0 w-6 h-6 bg-amber-400 rounded-full animate-pulse opacity-30"></div>
+                          </div>
+                          <div className="absolute -bottom-16 bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 shadow-xl rounded-xl px-4 py-2 min-w-max">
                             <div className="text-xs font-bold text-amber-800">DD Expiration</div>
-                            <div className="text-xs text-amber-600">{format(parseISO(project.ddExpirationDate), 'MMM d')}</div>
+                            <div className="text-xs text-amber-600 font-semibold">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
                           </div>
                         </div>
                       )}
 
-                      {/* Closing */}
+                      {/* Closing - Always at 100% */}
                       {project.closingDate && (
                         <div 
-                          className="absolute flex flex-col items-center transform -translate-x-1/2 z-20"
-                          style={{ left: `${getMilestonePosition(project.closingDate)}%` }}
+                          className="absolute flex flex-col items-center transform -translate-x-1/2"
+                          style={{ left: '100%' }}
                         >
-                          <div className="w-4 h-4 bg-green-600 rounded-full border-4 border-white shadow-lg"></div>
-                          <div className="absolute -bottom-12 bg-green-100 border-2 border-green-300 shadow-lg rounded-lg px-3 py-2 min-w-max">
-                            <div className="text-xs font-bold text-green-800">Closing</div>
-                            <div className="text-xs text-green-600">{format(parseISO(project.closingDate), 'MMM d')}</div>
+                          <div className="relative">
+                            <div className="w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full border-4 border-white shadow-xl"></div>
+                            <div className="absolute inset-0 w-6 h-6 bg-emerald-400 rounded-full animate-ping opacity-20"></div>
+                          </div>
+                          <div className="absolute -bottom-16 bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 shadow-xl rounded-xl px-4 py-2 min-w-max">
+                            <div className="text-xs font-bold text-emerald-800">Target Close</div>
+                            <div className="text-xs text-emerald-600 font-semibold">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
                           </div>
                         </div>
                       )}
@@ -475,15 +520,17 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 </div>
               </div>
               
-              {/* Enhanced Progress Legend */}
-              <div className="mt-8 pt-4 border-t border-blue-200">
-                <div className="flex items-center justify-between">
-                  <h5 className="text-sm font-semibold text-gray-700 mb-2">Timeline Legend</h5>
-                  <div className="text-xs text-gray-500">
-                    Timeline spans from PSA signed to target closing
+              {/* Modern Progress Legend */}
+              <div className="mt-10 pt-6 border-t border-slate-200/60">
+                <div className="flex items-center justify-between mb-4">
+                  <h5 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Timeline Legend</h5>
+                  <div className="text-xs text-slate-500 font-medium bg-slate-50 px-3 py-1 rounded-full">
+                    Project Duration: {differenceInDays(projectEnd, projectStart)} days
                   </div>
                 </div>
-                <ProgressLegend />
+                <div className="bg-gradient-to-r from-slate-50 to-white rounded-xl p-4 border border-slate-200/60">
+                  <ProgressLegend />
+                </div>
               </div>
             </div>
           )}
