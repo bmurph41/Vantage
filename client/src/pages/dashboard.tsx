@@ -188,7 +188,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             {projects.map((project) => {
               // Calculate project status based on dates
               const today = new Date();
@@ -248,7 +248,7 @@ export default function Dashboard() {
                               <span className="text-sm font-medium text-gray-700">PSA Signed</span>
                             </div>
                             <span className="text-sm font-semibold text-gray-900">
-                              {format(new Date(project.psaSignedDate), 'MMM d, yyyy')} ({calculateDaysRemaining(project.psaSignedDate) > 0 ? `${calculateDaysRemaining(project.psaSignedDate)}d remaining` : calculateDaysRemaining(project.psaSignedDate) === 0 ? 'Today' : `${Math.abs(calculateDaysRemaining(project.psaSignedDate))}d ago`})
+                              {format(new Date(project.psaSignedDate), 'MMM d, yyyy')}
                             </span>
                           </div>
                         )}
