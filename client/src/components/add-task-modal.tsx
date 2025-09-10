@@ -970,16 +970,18 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 )}
 
-                <div>
-                  <Label htmlFor="cost">Estimated Cost</Label>
-                  <Input
-                    id="cost"
-                    placeholder="e.g., 5000 or $5,000"
-                    {...form.register("cost")}
-                    onBlur={handleCostBlur}
-                    data-testid="input-cost"
-                  />
-                </div>
+                {form.watch("paymentStatus") !== "no_cost" && (
+                  <div>
+                    <Label htmlFor="cost">Estimated Cost</Label>
+                    <Input
+                      id="cost"
+                      placeholder="e.g., 5000 or $5,000"
+                      {...form.register("cost")}
+                      onBlur={handleCostBlur}
+                      data-testid="input-cost"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="notes">Notes</Label>
@@ -1469,16 +1471,18 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 )}
 
-                <div>
-                  <Label htmlFor="cost">Estimated Cost</Label>
-                  <Input
-                    id="cost"
-                    placeholder="e.g., 5000 or $5,000"
-                    {...form.register("cost")}
-                    onBlur={handleCostBlur}
-                    data-testid="input-cost"
-                  />
-                </div>
+                {form.watch("paymentStatus") !== "no_cost" && (
+                  <div>
+                    <Label htmlFor="cost">Estimated Cost</Label>
+                    <Input
+                      id="cost"
+                      placeholder="e.g., 5000 or $5,000"
+                      {...form.register("cost")}
+                      onBlur={handleCostBlur}
+                      data-testid="input-cost"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="notes">Notes</Label>
