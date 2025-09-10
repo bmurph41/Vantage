@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { effectiveStart, effectiveDue, daysBetween, tzNow } from "@/lib/date-utils";
-import { startOfDay, isAfter, isBefore, parseISO } from "date-fns";
+import { startOfDay, isAfter, isBefore, parseISO, addDays } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 
 interface ProgressBarProps {
@@ -12,8 +12,40 @@ interface ProgressBarProps {
 
 export function ProgressBar({ task, project, settings, className }: ProgressBarProps) {
   const today = startOfDay(tzNow(project.tz));
-  const start = effectiveStart(task, { ...project, settings });
-  const due = effectiveDue(task, { ...project, settings });
+  
+  // Calculate individual task start date
+  const start = task.startDate 
+    ? parseISO(task.startDate) 
+    : project.psaSignedDate 
+      ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
+      : today;
+  
+  // Calculate individual task deadline using same logic as reports
+  const calculateTaskDeadline = (task: Task): Date => {
+    // First priority: Use direct deadline field if set
+    if (task.deadline) {
+      return parseISO(task.deadline);
+    } else if (task.deadlineType === 'dd_expiration' && project.ddExpirationDate) {
+      return parseISO(project.ddExpirationDate);
+    } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project.psaSignedDate) {
+      const psaDate = parseISO(project.psaSignedDate);
+      return addDays(psaDate, task.deadlineDays);
+    } else {
+      // Enhanced fallback calculation for tasks without specific deadline types
+      const startDate = task.startDate 
+        ? parseISO(task.startDate) 
+        : project.psaSignedDate 
+          ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
+          : today;
+      
+      // Use smart defaults based on priority for task duration
+      const defaultDuration = task.priority === 'high' ? 5 : task.priority === 'med' ? 10 : 21;
+      
+      return addDays(startDate, defaultDuration);
+    }
+  };
+  
+  const due = calculateTaskDeadline(task);
   
   // Calculate project timeline bounds
   const projectStart = project.psaSignedDate ? startOfDay(parseISO(project.psaSignedDate)) : start;
