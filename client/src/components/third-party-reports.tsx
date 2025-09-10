@@ -460,57 +460,84 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   </div>
                 </div>
 
-                {/* Main Timeline Bar */}
-                <div className="relative h-8 bg-gray-200 border border-gray-300">
-                  {/* Progress bar showing elapsed time */}
-                  <div 
-                    className="absolute left-0 top-0 h-full bg-blue-500"
-                    style={{ 
-                      width: `${Math.min(100, Math.max(0, ((new Date().getTime() - projectStart.getTime()) / (projectEnd.getTime() - projectStart.getTime())) * 100))}%` 
-                    }}
-                  ></div>
+                {/* Main Timeline Bar with multiple task rows */}
+                <div className="space-y-2">
+                  {/* Main project progress bar */}
+                  <div className="relative h-6 bg-gray-200 border border-gray-300 rounded">
+                    <div 
+                      className="absolute left-0 top-0 h-full bg-blue-500 rounded-l"
+                      style={{ 
+                        width: `${Math.min(100, Math.max(0, ((new Date().getTime() - projectStart.getTime()) / (projectEnd.getTime() - projectStart.getTime())) * 100))}%` 
+                      }}
+                    ></div>
+                    <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-gray-700">
+                      Project Progress
+                    </div>
+                  </div>
 
-                  {/* Task Progress Overlays */}
-                  {getVisibleTasks().map((task, taskIndex) => {
-                    const taskProgress = getTaskProgress(task);
-                    
-                    return (
-                      <div 
-                        key={task.id} 
-                        className="absolute top-0 h-full group"
-                        style={{ 
-                          left: `${taskProgress.startPosition}%`, 
-                          width: `${taskProgress.width}%`
-                        }}
-                      >
-                        {/* Task bar with status color */}
-                        <div className={`h-full opacity-80 ${
-                          taskProgress.status === 'completed' ? 'bg-green-500' :
-                          taskProgress.status === 'overdue' ? 'bg-red-500' :
-                          taskProgress.status === 'in_progress' ? 'bg-blue-600' :
-                          'bg-gray-400'
-                        }`}>
-                          {/* Progress within task */}
-                          <div 
-                            className={`h-full ${
-                              taskProgress.status === 'completed' ? 'bg-green-600' :
-                              taskProgress.status === 'overdue' ? 'bg-red-600' :
-                              taskProgress.status === 'in_progress' ? 'bg-blue-700' :
-                              'bg-gray-500'
-                            }`}
-                            style={{ width: `${taskProgress.progress}%` }}
-                          ></div>
-                        </div>
+                  {/* Task Progress Overlays - Each task gets its own row */}
+                  {getVisibleTasks().length > 0 && (
+                    <div className="space-y-1">
+                      {getVisibleTasks().map((task, taskIndex) => {
+                        const taskProgress = getTaskProgress(task);
                         
-                        {/* Hover tooltip */}
-                        <div className="absolute -top-10 left-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10">
-                          <div className="text-xs font-medium text-gray-900 bg-white px-2 py-1 border border-gray-300 shadow whitespace-nowrap rounded">
-                            {task.title} - {taskProgress.progress}% complete
+                        return (
+                          <div key={task.id} className="relative h-4 bg-gray-100 border border-gray-200 rounded group">
+                            {/* Task duration bar */}
+                            <div 
+                              className={`absolute top-0 h-full border border-gray-300 opacity-90 rounded ${
+                                task.priority === 'high' ? 'bg-red-200' :
+                                task.priority === 'med' ? 'bg-yellow-200' :
+                                'bg-green-200'
+                              }`}
+                              style={{ 
+                                left: `${taskProgress.startPosition}%`, 
+                                width: `${taskProgress.width}%`
+                              }}
+                            >
+                              {/* Progress within task */}
+                              <div 
+                                className={`h-full rounded-l ${
+                                  taskProgress.status === 'completed' ? 'bg-green-500' :
+                                  taskProgress.status === 'overdue' ? 'bg-red-500' :
+                                  taskProgress.status === 'in_progress' ? 'bg-blue-500' :
+                                  'bg-gray-400'
+                                }`}
+                                style={{ width: `${taskProgress.progress}%` }}
+                              ></div>
+                            </div>
+                            
+                            {/* Task label */}
+                            <div className="absolute inset-0 flex items-center px-2">
+                              <span className="text-xs font-medium text-gray-700 truncate">
+                                {task.title}
+                              </span>
+                            </div>
+                            
+                            {/* Priority indicator */}
+                            <div className={`absolute right-1 top-1 w-2 h-2 rounded-full ${
+                              task.priority === 'high' ? 'bg-red-500' :
+                              task.priority === 'med' ? 'bg-yellow-500' :
+                              'bg-green-500'
+                            }`}></div>
+                            
+                            {/* Enhanced hover tooltip */}
+                            <div className="absolute -top-12 left-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20 pointer-events-none">
+                              <div className="text-xs bg-gray-900 text-white px-3 py-2 rounded shadow-lg whitespace-nowrap">
+                                <div className="font-medium">{task.title}</div>
+                                <div className="text-gray-300">
+                                  Progress: {Math.round(taskProgress.progress)}% • 
+                                  Priority: {task.priority.toUpperCase()} • 
+                                  Status: {task.status.replace('_', ' ').toUpperCase()}
+                                </div>
+                                {task.assignee && <div className="text-gray-300">Assigned: {task.assignee}</div>}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Milestone Markers Below Timeline */}
