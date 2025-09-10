@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { ProjectHeader } from "@/components/project-header";
 import { ThirdPartyReports } from "@/components/third-party-reports";
-import { TimelineView } from "@/components/timeline-view";
 import { ProjectSetup } from "@/components/project-setup";
 import { TemplatesView } from "@/components/templates-view";
 import { useProject } from "@/hooks/use-project";
@@ -47,7 +46,6 @@ export default function ProjectPage() {
   const tabs = [
     { id: "setup", label: "Project Setup" },
     { id: "reports", label: "DD Tasks" },
-    { id: "timeline", label: "DD Timeline" },
     { id: "templates", label: "Templates" },
   ];
 
@@ -103,9 +101,6 @@ export default function ProjectPage() {
         <div className="tab-content">
           {activeTab === "reports" && (
             <ThirdPartyReports tasks={tasks} projectId={project.id} project={project} settings={settings} />
-          )}
-          {activeTab === "timeline" && (
-            <TimelineView tasks={tasks} project={project} settings={settings} />
           )}
           {activeTab === "setup" && (
             <ProjectSetup project={project} settings={settings} />
