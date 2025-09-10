@@ -69,6 +69,39 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       <ChevronDown className="w-4 h-4 ml-1" />
     );
   };
+
+  const calculateDaysRemaining = (task: Task) => {
+    if (task.status === 'completed') return 0;
+    
+    const today = new Date();
+    let deadlineDate: Date;
+    
+    if (task.deadlineType === 'dd_expiration' && project?.ddExpirationDate) {
+      deadlineDate = parseISO(project.ddExpirationDate);
+    } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project?.psaSignedDate) {
+      const psaDate = parseISO(project.psaSignedDate);
+      deadlineDate = addDays(psaDate, task.deadlineDays);
+    } else {
+      // Enhanced fallback calculation for tasks without specific deadline types
+      const startDate = task.startDate 
+        ? parseISO(task.startDate) 
+        : project?.psaSignedDate 
+          ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
+          : today;
+      
+      // Use smart defaults based on priority for task duration
+      const defaultDuration = task.priority === 'high' ? 5 : task.priority === 'med' ? 10 : 21;
+      
+      deadlineDate = addDays(startDate, defaultDuration);
+    }
+    
+    // Calculate days remaining
+    const daysRemaining = differenceInDays(deadlineDate, today);
+    
+    // Allow negative values to show overdue tasks, but ensure we have a reasonable calculation
+    return daysRemaining;
+  };
+
   // Removed floating timeline to prevent scroll issues
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -249,38 +282,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
 
   const handleDeleteTask = (taskId: string) => {
     deleteTask.mutate(taskId);
-  };
-
-  const calculateDaysRemaining = (task: Task) => {
-    if (task.status === 'completed') return 0;
-    
-    const today = new Date();
-    let deadlineDate: Date;
-    
-    if (task.deadlineType === 'dd_expiration' && project?.ddExpirationDate) {
-      deadlineDate = parseISO(project.ddExpirationDate);
-    } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project?.psaSignedDate) {
-      const psaDate = parseISO(project.psaSignedDate);
-      deadlineDate = addDays(psaDate, task.deadlineDays);
-    } else {
-      // Enhanced fallback calculation for tasks without specific deadline types
-      const startDate = task.startDate 
-        ? parseISO(task.startDate) 
-        : project?.psaSignedDate 
-          ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
-          : today;
-      
-      // Use smart defaults based on priority for task duration
-      const defaultDuration = task.priority === 'high' ? 5 : task.priority === 'med' ? 10 : 21;
-      
-      deadlineDate = addDays(startDate, defaultDuration);
-    }
-    
-    // Calculate days remaining
-    const daysRemaining = differenceInDays(deadlineDate, today);
-    
-    // Allow negative values to show overdue tasks, but ensure we have a reasonable calculation
-    return daysRemaining;
   };
 
   // Timeline logic
