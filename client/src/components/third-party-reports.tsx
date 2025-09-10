@@ -32,6 +32,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState(false);
+  const [taskDisplay, setTaskDisplay] = useState<'all' | 'critical' | 'none' | 'selected'>('all');
+  const [selectedTaskPriorities, setSelectedTaskPriorities] = useState<Set<string>>(new Set(['high', 'med', 'low']));
   // Removed floating timeline to prevent scroll issues
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -250,6 +252,21 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     return Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
   };
 
+  // Get visible tasks based on display filter
+  const getVisibleTasks = () => {
+    switch (taskDisplay) {
+      case 'none':
+        return [];
+      case 'critical':
+        return tasks.filter(t => t.priority === 'high');
+      case 'selected':
+        return tasks.filter(t => selectedTaskPriorities.has(t.priority));
+      case 'all':
+      default:
+        return tasks;
+    }
+  };
+
   // Get task progress for timeline
   const getTaskProgress = (task: Task) => {
     const today = new Date();
@@ -346,17 +363,51 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             </div>
             {!isTimelineCollapsed && (
               <div className="flex items-center space-x-4">
-                <Button
-                  variant={showCriticalPath ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setShowCriticalPath(!showCriticalPath)}
-                  className={showCriticalPath ? "bg-gray-800 hover:bg-gray-900 text-white" : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"}
-                  data-testid="button-critical-path"
-                >
-                  Critical Path
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <Select value={taskDisplay} onValueChange={setTaskDisplay}>
+                    <SelectTrigger className="w-32 bg-white border-gray-300 text-sm" data-testid="select-task-display">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Tasks</SelectItem>
+                      <SelectItem value="critical">Critical Only</SelectItem>
+                      <SelectItem value="selected">By Priority</SelectItem>
+                      <SelectItem value="none">Hide Tasks</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  {taskDisplay === 'selected' && (
+                    <div className="flex items-center space-x-1">
+                      {['high', 'med', 'low'].map(priority => (
+                        <Button
+                          key={priority}
+                          variant={selectedTaskPriorities.has(priority) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => {
+                            const newSet = new Set(selectedTaskPriorities);
+                            if (newSet.has(priority)) {
+                              newSet.delete(priority);
+                            } else {
+                              newSet.add(priority);
+                            }
+                            setSelectedTaskPriorities(newSet);
+                          }}
+                          className={`h-6 px-2 text-xs ${
+                            priority === 'high' ? 'border-red-300 text-red-700' :
+                            priority === 'med' ? 'border-yellow-300 text-yellow-700' :
+                            'border-green-300 text-green-700'
+                          }`}
+                          data-testid={`button-priority-${priority}`}
+                        >
+                          {priority === 'high' ? 'H' : priority === 'med' ? 'M' : 'L'}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
                 <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 border border-gray-200">
-                  {tasks.filter(t => t.showOnTimeline).length} Tasks
+                  {getVisibleTasks().length} of {tasks.length} Tasks
                 </div>
               </div>
             )}
@@ -420,7 +471,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   ></div>
 
                   {/* Task Progress Overlays */}
-                  {tasks.filter(t => t.showOnTimeline && (!showCriticalPath || t.priority === 'high')).map((task, taskIndex) => {
+                  {getVisibleTasks().map((task, taskIndex) => {
                     const taskProgress = getTaskProgress(task);
                     
                     return (
