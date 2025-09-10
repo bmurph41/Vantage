@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Clock, DollarSign, Users, AlertCircle } from "lucide-react";
+import { Search, Clock, DollarSign, Users, AlertCircle, Save, CheckCircle, XCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -236,18 +236,49 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     }
   };
 
+  const getAutoSaveIndicator = () => {
+    switch (autoSaveStatus) {
+      case "saving":
+        return (
+          <div className="flex items-center space-x-1 text-blue-600">
+            <Save className="h-3 w-3 animate-pulse" />
+            <span className="text-xs">Saving...</span>
+          </div>
+        );
+      case "saved":
+        return (
+          <div className="flex items-center space-x-1 text-green-600">
+            <CheckCircle className="h-3 w-3" />
+            <span className="text-xs">Saved</span>
+          </div>
+        );
+      case "error":
+        return (
+          <div className="flex items-center space-x-1 text-red-600">
+            <XCircle className="h-3 w-3" />
+            <span className="text-xs">Save failed</span>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>
-            {isEditMode 
-              ? "Edit Task" 
-              : step === "browse" 
-                ? "Add Due Diligence Task" 
-                : `Customize: ${selectedTemplate?.name}`
-            }
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>
+              {isEditMode 
+                ? "Edit Task" 
+                : step === "browse" 
+                  ? "Add Due Diligence Task" 
+                  : `Customize: ${selectedTemplate?.name}`
+              }
+            </DialogTitle>
+            {isEditMode && getAutoSaveIndicator()}
+          </div>
           <DialogDescription>
             {isEditMode 
               ? "Modify the task details and save your changes" 
