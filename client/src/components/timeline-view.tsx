@@ -25,16 +25,33 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
   // Generate timeline header dates
   const generateTimelineDates = () => {
+    const dates: Date[] = [];
+    let currentDate = new Date(projectStart);
+    
     switch (granularity) {
       case 'daily':
         return eachDayOfInterval({ start: projectStart, end: projectEnd });
       case 'weekly':
+        // Generate weekly dates starting exactly from PSA signed date
+        while (currentDate <= projectEnd) {
+          dates.push(new Date(currentDate));
+          currentDate = addDays(currentDate, 7);
+        }
+        return dates;
       case 'biweekly':
-        // Start exactly at PSA signed date, not beginning of week
-        return eachWeekOfInterval({ start: projectStart, end: projectEnd });
+        // Generate biweekly dates starting exactly from PSA signed date
+        while (currentDate <= projectEnd) {
+          dates.push(new Date(currentDate));
+          currentDate = addDays(currentDate, 14);
+        }
+        return dates;
       case 'monthly':
-        // Start exactly at PSA signed date, not beginning of month
-        return eachMonthOfInterval({ start: projectStart, end: projectEnd });
+        // Generate monthly dates starting exactly from PSA signed date
+        while (currentDate <= projectEnd) {
+          dates.push(new Date(currentDate));
+          currentDate = addDays(currentDate, 30); // Approximate monthly interval
+        }
+        return dates;
       default:
         return eachDayOfInterval({ start: projectStart, end: projectEnd });
     }
