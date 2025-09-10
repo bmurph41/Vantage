@@ -261,37 +261,25 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       deadlineDate = parseISO(project.ddExpirationDate);
     } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project?.psaSignedDate) {
       const psaDate = parseISO(project.psaSignedDate);
-      deadlineDate = new Date(psaDate);
-      deadlineDate.setDate(deadlineDate.getDate() + task.deadlineDays);
-    } else if (task.deadlineType === 'specific_date' && task.dueDate) {
-      deadlineDate = parseISO(task.dueDate);
+      deadlineDate = addDays(psaDate, task.deadlineDays);
     } else {
-      // Enhanced fallback calculation
+      // Enhanced fallback calculation for tasks without specific deadline types
       const startDate = task.startDate 
         ? parseISO(task.startDate) 
         : project?.psaSignedDate 
-          ? (() => {
-              const baseDate = parseISO(project.psaSignedDate);
-              // Add start offset days using proper date math
-              return addDays(baseDate, task.startOffsetDays || 0);
-            })()
+          ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
           : today;
       
-      // Use task duration if available, otherwise default based on priority
-      const defaultDuration = task.priority === 'high' ? 3 : task.priority === 'med' ? 7 : 14;
-      const taskDuration = task.durationDays || defaultDuration;
+      // Use smart defaults based on priority for task duration
+      const defaultDuration = task.priority === 'high' ? 5 : task.priority === 'med' ? 10 : 21;
       
-      deadlineDate = addDays(startDate, taskDuration);
+      deadlineDate = addDays(startDate, defaultDuration);
     }
     
-    // Calculate business days remaining, accounting for weekends
+    // Calculate days remaining
     const daysRemaining = differenceInDays(deadlineDate, today);
     
-    // If deadline has passed, return 0
-    if (daysRemaining < 0) return 0;
-    
-    // For overdue detection, we want to show negative days
-    // But for display purposes, we can use Math.max(0, daysRemaining) later
+    // Allow negative values to show overdue tasks, but ensure we have a reasonable calculation
     return daysRemaining;
   };
 
