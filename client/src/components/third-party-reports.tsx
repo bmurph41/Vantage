@@ -967,9 +967,9 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           <label className="text-xs font-medium text-gray-700 block mb-1">Scheduled Date</label>
                           <Input
                             type="date"
-                            value={task.startDate ? new Date(task.startDate).toISOString().slice(0, 10) : ''}
+                            value={task.startDate || ''}
                             onChange={(e) => {
-                              const newStartDate = e.target.value ? new Date(e.target.value) : undefined;
+                              const newStartDate = e.target.value ? e.target.value : null;
                               updateTask.mutate({
                                 id: task.id,
                                 updates: { startDate: newStartDate }
@@ -983,67 +983,115 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center" data-testid={`text-days-remaining-${task.id}`}>
-                      {(() => {
-                        const daysRemaining = calculateDaysRemaining(task);
-                        if (task.status === 'completed') {
-                          return <span className="text-green-600 font-medium text-sm">Complete</span>;
-                        } else if (daysRemaining === 0) {
-                          return <span className="text-red-600 font-medium text-sm">Due Today</span>;
-                        } else if (daysRemaining < 0) {
-                          return <span className="text-red-600 font-medium text-sm">Overdue</span>;
-                        } else {
-                          return <span className={`font-medium text-sm ${daysRemaining <= 3 ? 'text-orange-600' : 'text-gray-900'}`}>
-                            {daysRemaining}d
-                          </span>;
-                        }
-                      })()}
-                    </td>
-                    <td className="px-4 py-3 text-center" data-testid={`text-cost-${task.id}`}>
-                      {editingCostTaskId === task.id ? (
-                        <Input
-                          type="text"
-                          value={editingCostValue}
-                          onChange={(e) => setEditingCostValue(e.target.value)}
-                          onBlur={() => {
-                            updateTask.mutate({
-                              id: task.id,
-                              updates: { cost: editingCostValue }
-                            });
-                            setEditingCostTaskId(null);
-                            setEditingCostValue('');
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+                      <div className="space-y-2">
+                        {/* Days Remaining */}
+                        <div>
+                          {(() => {
+                            const daysRemaining = calculateDaysRemaining(task);
+                            if (task.status === 'completed') {
+                              return <span className="text-green-600 font-medium text-sm">Complete</span>;
+                            } else if (daysRemaining === 0) {
+                              return <span className="text-red-600 font-medium text-sm">Due Today</span>;
+                            } else if (daysRemaining < 0) {
+                              return <span className="text-red-600 font-medium text-sm">Overdue</span>;
+                            } else {
+                              return <span className={`font-medium text-sm ${daysRemaining <= 3 ? 'text-orange-600' : 'text-gray-900'}`}>
+                                {daysRemaining}d
+                              </span>;
+                            }
+                          })()}
+                        </div>
+                        
+                        {/* Completion Date */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 block mb-1">Completion Date</label>
+                          <Input
+                            type="datetime-local"
+                            value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 16) : ''}
+                            onChange={(e) => {
+                              const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
                               updateTask.mutate({
                                 id: task.id,
-                                updates: { cost: editingCostValue }
+                                updates: { completedAt: newCompletedAt }
                               });
-                              setEditingCostTaskId(null);
-                              setEditingCostValue('');
-                            } else if (e.key === 'Escape') {
-                              setEditingCostTaskId(null);
-                              setEditingCostValue('');
-                            }
-                          }}
-                          className="w-24 h-8 text-center text-sm"
-                          placeholder="$0.00"
-                          autoFocus
-                          data-testid={`input-cost-${task.id}`}
-                        />
-                      ) : (
-                        <span 
-                          className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 hover:underline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingCostTaskId(task.id);
-                            setEditingCostValue(task.cost || '');
-                          }}
-                          title="Click to edit cost"
-                          data-testid={`span-cost-${task.id}`}
-                        >
-                          {formatCurrency(task.cost || '')}
-                        </span>
-                      )}
+                            }}
+                            className="w-full text-xs h-7"
+                            data-testid={`input-completion-date-${task.id}`}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center" data-testid={`text-cost-${task.id}`}>
+                      <div className="space-y-2">
+                        {/* Cost */}
+                        <div>
+                          {editingCostTaskId === task.id ? (
+                            <Input
+                              type="text"
+                              value={editingCostValue}
+                              onChange={(e) => setEditingCostValue(e.target.value)}
+                              onBlur={() => {
+                                updateTask.mutate({
+                                  id: task.id,
+                                  updates: { cost: editingCostValue }
+                                });
+                                setEditingCostTaskId(null);
+                                setEditingCostValue('');
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  updateTask.mutate({
+                                    id: task.id,
+                                    updates: { cost: editingCostValue }
+                                  });
+                                  setEditingCostTaskId(null);
+                                  setEditingCostValue('');
+                                } else if (e.key === 'Escape') {
+                                  setEditingCostTaskId(null);
+                                  setEditingCostValue('');
+                                }
+                              }}
+                              className="w-24 h-8 text-center text-sm"
+                              placeholder="$0.00"
+                              autoFocus
+                              data-testid={`input-cost-${task.id}`}
+                            />
+                          ) : (
+                            <span 
+                              className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 hover:underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingCostTaskId(task.id);
+                                setEditingCostValue(task.cost || '');
+                              }}
+                              title="Click to edit cost"
+                              data-testid={`span-cost-${task.id}`}
+                            >
+                              {formatCurrency(task.cost || '')}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Payment Status */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 block mb-1">Payment</label>
+                          <Select
+                            value={task.paymentStatus || 'not_paid'}
+                            onValueChange={(value) => handlePaymentStatusChange(task.id, value)}
+                          >
+                            <SelectTrigger className="w-full h-7 text-xs" data-testid={`select-payment-${task.id}`}>
+                              <SelectValue>
+                                {getPaymentStatusBadge(task.paymentStatus || 'not_paid')}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="not_paid">Not Paid</SelectItem>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="no_cost">No Cost</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex space-x-1">
@@ -1111,52 +1159,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     </td>
                   </tr>
                   
-                  {/* Expanded row with additional details */}
-                  {expandedTasks.has(task.id) && (
-                    <tr className={`${index % 2 === 1 ? 'bg-accent/30' : 'bg-gray-50'} border-t border-gray-200`}>
-                      <td colSpan={7} className="px-4 py-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          {/* Payment Status */}
-                          <div>
-                            <label className="text-xs font-medium text-gray-700 block mb-1">Payment</label>
-                            <Select
-                              value={task.paymentStatus || 'not_paid'}
-                              onValueChange={(value) => handlePaymentStatusChange(task.id, value)}
-                            >
-                              <SelectTrigger className="w-full h-8" data-testid={`select-payment-${task.id}`}>
-                                <SelectValue>
-                                  {getPaymentStatusBadge(task.paymentStatus || 'not_paid')}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="not_paid">Not Paid</SelectItem>
-                                <SelectItem value="paid">Paid</SelectItem>
-                                <SelectItem value="no_cost">No Cost</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          {/* Completion Date */}
-                          <div>
-                            <label className="text-xs font-medium text-gray-700 block mb-1">Completion Date</label>
-                            <Input
-                              type="datetime-local"
-                              value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 16) : ''}
-                              onChange={(e) => {
-                                const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
-                                updateTask.mutate({
-                                  id: task.id,
-                                  updates: { completedAt: newCompletedAt }
-                                });
-                              }}
-                              className="w-full text-xs h-8"
-                              data-testid={`input-completion-date-${task.id}`}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
                 </React.Fragment>
               ))}
               {filteredTasks.length === 0 && (
