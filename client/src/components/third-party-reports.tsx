@@ -518,7 +518,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       case 'in_progress':
         return 'border-blue-400';
       case 'scheduled':
-        return 'border-orange-400';
+        return 'border-blue-500';
       case 'not_started':
         return 'border-gray-300';
       default:

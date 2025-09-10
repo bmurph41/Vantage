@@ -150,7 +150,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                   <div className="text-sm text-green-200/70 bg-white/5 px-3 py-1 rounded-lg border border-white/10">
                     {(() => {
                       if (!project.closingDate) return 'No closing date set';
-                      const startDate = parseISO(project.startDate || project.createdAt || new Date().toISOString());
+                      const startDate = parseISO(project.psaSignedDate || project.createdAt || new Date().toISOString());
                       const closingDate = parseISO(project.closingDate);
                       const today = new Date();
                       
@@ -172,7 +172,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                       className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full shadow-md transition-all duration-1000 ease-out"
                       style={{
                         width: `${(() => {
-                          const startDate = parseISO(project.startDate || project.createdAt || new Date().toISOString());
+                          const startDate = parseISO(project.psaSignedDate || project.createdAt || new Date().toISOString());
                           const closingDate = parseISO(project.closingDate);
                           const today = new Date();
                           
@@ -280,7 +280,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 <div className={`w-3 h-3 rounded-full border-2 border-white shadow-md transition-transform duration-200 ${
                   task.status === 'completed' ? 'bg-green-500' :
                   task.status === 'in_progress' ? 'bg-blue-500' :
-                  task.status === 'scheduled' ? 'bg-orange-500' :
+                  task.status === 'scheduled' ? 'bg-blue-600' :
                   'bg-gray-400'
                 }`}>
                 </div>
@@ -304,7 +304,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 <span className={`w-3 h-3 rounded-full ${
                   task.status === 'completed' ? 'bg-green-500' :
                   task.status === 'in_progress' ? 'bg-blue-500' :
-                  task.status === 'scheduled' ? 'bg-orange-500' :
+                  task.status === 'scheduled' ? 'bg-blue-600' :
                   'bg-gray-400'
                 }`}></span>
                 <span className="text-sm font-medium text-gray-900">{task.title}</span>

@@ -93,7 +93,7 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
       case 'in_progress':
         return 'text-blue-600 bg-blue-100';
       case 'scheduled':
-        return 'text-orange-600 bg-orange-100';
+        return 'text-blue-600 bg-blue-100';
       case 'not_started':
         return 'text-gray-600 bg-gray-100';
       default:
