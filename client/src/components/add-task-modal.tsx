@@ -35,6 +35,7 @@ const addTaskFormSchema = z.object({
   priority: z.enum(["low", "med", "high"]),
   cost: z.string().optional(),
   notes: z.string().optional(),
+  showOnTimeline: z.boolean().default(false),
 });
 
 interface AddTaskModalProps {
@@ -75,6 +76,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       priority: editingTask?.priority || "med",
       cost: editingTask?.cost || "",
       notes: editingTask?.notes || "",
+      showOnTimeline: editingTask?.showOnTimeline || false,
     },
   });
 
@@ -102,6 +104,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       priority: template.priority as "low" | "med" | "high",
       cost: template.estimatedCost || "",
       notes: "",
+      showOnTimeline: false,
     });
     
     setStep("customize");
@@ -418,6 +421,25 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     rows={2}
                     data-testid="textarea-notes"
                   />
+                </div>
+
+                {/* Timeline Display Toggle */}
+                <div className="flex items-center space-x-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="showOnTimeline"
+                      {...form.register("showOnTimeline")}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                      data-testid="checkbox-show-on-timeline"
+                    />
+                    <Label htmlFor="showOnTimeline" className="text-sm font-medium text-gray-900">
+                      Display on Timeline
+                    </Label>
+                  </div>
+                  <p className="text-xs text-gray-600">
+                    Show this task on the main project timeline overview
+                  </p>
                 </div>
               </div>
             </ScrollArea>

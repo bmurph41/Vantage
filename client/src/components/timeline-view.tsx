@@ -55,9 +55,9 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
   };
 
   return (
-    <div className="space-y-6" data-testid="timeline-view">
-      {/* Enhanced Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 rounded-2xl shadow-2xl border border-slate-800">
+    <div className="space-y-8" data-testid="timeline-view">
+      {/* Professional Header */}
+      <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 rounded-lg shadow-lg border border-slate-700">
         <div className="p-8">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -102,7 +102,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                   Project Timeline Overview
                 </h2>
                 <div className="text-sm text-blue-200/70 bg-white/5 px-4 py-2 rounded-lg border border-white/10">
-                  {tasks.length} Tasks
+                  {tasks.filter(t => t.showOnTimeline).length} Timeline Tasks
                 </div>
               </div>
               
@@ -216,15 +216,15 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-gray-900 flex items-center">
             <span className="w-1 h-8 bg-gradient-to-b from-slate-600 to-slate-800 rounded-sm mr-4"></span>
-            Project Tasks
+            Timeline Tasks
           </h2>
           <div className="text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
-            {tasks.filter(t => t.status !== 'completed').length} of {tasks.length} active
+            {tasks.filter(t => t.showOnTimeline && t.status !== 'completed').length} of {tasks.filter(t => t.showOnTimeline).length} active
           </div>
         </div>
         
         <div className="grid gap-6">
-          {tasks.map((task, index) => {
+          {tasks.filter(t => t.showOnTimeline).map((task, index) => {
             const isPriorityHigh = task.priority === 'high';
             const isCompleted = task.status === 'completed';
             const isBlocked = task.status === 'blocked';
@@ -320,7 +320,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
           })}
         </div>
           
-        {tasks.length === 0 && (
+        {tasks.filter(t => t.showOnTimeline).length === 0 && (
           <Card className="border-2 border-dashed border-gray-300" data-testid="text-no-tasks">
             <CardContent className="text-center py-16">
               <div className="max-w-md mx-auto">

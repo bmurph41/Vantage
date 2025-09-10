@@ -120,6 +120,7 @@ export const tasks = pgTable("tasks", {
   manuallyLocked: boolean("manually_locked").notNull().default(false),
   cost: text("cost"),
   notes: text("notes"),
+  showOnTimeline: boolean("show_on_timeline").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
