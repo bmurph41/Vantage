@@ -848,7 +848,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[25%]">Task</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[18%]">Task Owner</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[20%]">Company Hired</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[12%]">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Status</th>
                 <th 
                   className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
                   onClick={() => handleSort('daysRemaining')}
