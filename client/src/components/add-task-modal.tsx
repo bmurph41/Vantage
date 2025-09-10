@@ -23,7 +23,6 @@ const addTaskFormSchema = z.object({
   startStrategy: z.enum(["fixed", "offset"]),
   startDate: z.string().optional(),
   startOffsetDays: z.number().optional(),
-  durationDays: z.number().min(1, "Duration must be at least 1 day"),
   // New deadline fields
   deadlineType: z.enum(["dd_expiration"]).default("dd_expiration"),
   assignee: z.string().optional(),
@@ -99,7 +98,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       startStrategy: "offset",
       startDate: "",
       startOffsetDays: 0,
-      durationDays: 7,
+
       deadlineType: "dd_expiration",
 
       assignee: "",
@@ -129,7 +128,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           startStrategy: editingTask.startStrategy || "offset",
           startDate: editingTask.startDate || "",
           startOffsetDays: editingTask.startOffsetDays || 0,
-          durationDays: editingTask.durationDays || 7,
           deadlineType: "dd_expiration",
           assignee: editingTask.assignee || "",
           companyHired: editingTask.companyHired || "",
@@ -154,7 +152,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           startStrategy: "offset",
           startDate: "",
           startOffsetDays: 0,
-          durationDays: 7,
+    
           deadlineType: "dd_expiration",
     
           assignee: "",
@@ -252,7 +250,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       description: template.description,
       startStrategy: "offset",
       startOffsetDays: template.startOffsetDays,
-      durationDays: template.durationDays,
       deadlineType: "dd_expiration" as const,
       assignee: template.defaultAssignee || "",
       companyHired: "",
