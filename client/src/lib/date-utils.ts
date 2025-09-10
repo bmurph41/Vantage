@@ -125,3 +125,97 @@ export function effectiveDue(task: any, project: any): Date {
   
   return addDays(start, task.durationDays);
 }
+
+// New Timeline Utility Functions for Fixed Range System
+
+/**
+ * Get the project timeline bounds (start and end dates)
+ */
+export function getProjectBounds(project: any): { start: Date; end: Date } {
+  const start = startOfDay(project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date());
+  const end = startOfDay(project.closingDate ? parseISO(project.closingDate) : addDays(start, 90));
+  return { start, end };
+}
+
+/**
+ * Generate all days between start and end dates
+ */
+export function eachDay(start: Date, end: Date): Date[] {
+  const days: Date[] = [];
+  let current = startOfDay(start);
+  const endDay = startOfDay(end);
+  
+  while (current <= endDay) {
+    days.push(new Date(current));
+    current = addDays(current, 1);
+  }
+  
+  return days;
+}
+
+/**
+ * Calculate percentage position of a date within a range
+ */
+export function percentOfRange(date: Date, start: Date, end: Date): number {
+  const total = differenceInDays(end, start);
+  if (total <= 0) return 0;
+  
+  const elapsed = differenceInDays(date, start);
+  return Math.max(0, Math.min(100, (elapsed / total) * 100));
+}
+
+/**
+ * Clamp a date to be within the project range
+ */
+export function clampDate(date: Date, start: Date, end: Date): Date {
+  if (isBefore(date, start)) return start;
+  if (isAfter(date, end)) return end;
+  return date;
+}
+
+/**
+ * Get visible tick marks based on granularity
+ */
+export function getVisibleTicks(allDays: Date[], granularity: string): Date[] {
+  if (!allDays.length) return [];
+  
+  const start = allDays[0];
+  const end = allDays[allDays.length - 1];
+  
+  switch (granularity) {
+    case 'daily':
+      return allDays;
+      
+    case 'weekly':
+      const weeklyTicks: Date[] = [];
+      let current = startOfDay(start);
+      while (current <= end) {
+        weeklyTicks.push(new Date(current));
+        current = addDays(current, 7);
+      }
+      return weeklyTicks;
+      
+    case 'biweekly':
+      const biweeklyTicks: Date[] = [];
+      let biweeklyCurrent = startOfDay(start);
+      while (biweeklyCurrent <= end) {
+        biweeklyTicks.push(new Date(biweeklyCurrent));
+        biweeklyCurrent = addDays(biweeklyCurrent, 14);
+      }
+      return biweeklyTicks;
+      
+    case 'monthly':
+      const monthlyTicks: Date[] = [];
+      let monthlyCurrent = startOfDay(start);
+      while (monthlyCurrent <= end) {
+        monthlyTicks.push(new Date(monthlyCurrent));
+        // Move to first day of next month
+        const nextMonth = new Date(monthlyCurrent.getFullYear(), monthlyCurrent.getMonth() + 1, 1);
+        monthlyCurrent = nextMonth > end ? addDays(end, 1) : nextMonth;
+      }
+      return monthlyTicks;
+      
+    default:
+      return allDays;
+  }
+}
