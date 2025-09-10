@@ -98,33 +98,79 @@
   --shadow-2xl: 0px 2px 0px 0px hsl(221 83% 35% / 0.00);
 }
 
-/* Progress Bar Styles */
+/* Enhanced Progress Bar Styles */
 .progress-bar-elapsed {
-  background: linear-gradient(90deg, hsl(221 83% 42%) 0%, hsl(221 83% 35%) 100%);
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+  background: linear-gradient(135deg, hsl(221 83% 50%) 0%, hsl(221 83% 40%) 50%, hsl(221 83% 35%) 100%);
+  box-shadow: 
+    inset 0 1px 3px rgba(0,0,0,0.2),
+    0 1px 2px rgba(59, 130, 246, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar-elapsed::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 2s infinite;
 }
 
 .progress-bar-remaining {
   background: linear-gradient(45deg, 
-    hsl(214 32% 94%) 25%, 
-    transparent 25%, 
-    transparent 50%, 
-    hsl(214 32% 94%) 50%, 
-    hsl(214 32% 94%) 75%, 
-    transparent 75%
+    hsl(214 32% 92%) 25%, 
+    hsl(214 32% 96%) 25%, 
+    hsl(214 32% 96%) 50%, 
+    hsl(214 32% 92%) 50%, 
+    hsl(214 32% 92%) 75%, 
+    hsl(214 32% 96%) 75%
   );
-  background-size: 8px 8px;
-  animation: progress-remaining 20s linear infinite;
+  background-size: 12px 12px;
+  animation: progress-remaining 15s linear infinite;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .progress-bar-completed {
-  background: linear-gradient(90deg, hsl(142 76% 42%) 0%, hsl(142 76% 36%) 100%);
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+  background: linear-gradient(135deg, hsl(142 76% 50%) 0%, hsl(142 76% 42%) 50%, hsl(142 76% 36%) 100%);
+  box-shadow: 
+    inset 0 1px 3px rgba(0,0,0,0.2),
+    0 1px 2px rgba(34, 197, 94, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar-completed::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 2s infinite;
 }
 
 .progress-bar-overdue {
-  background: linear-gradient(90deg, hsl(0 84% 65%) 0%, hsl(0 84% 60%) 100%);
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+  background: linear-gradient(135deg, hsl(0 84% 70%) 0%, hsl(0 84% 65%) 50%, hsl(0 84% 60%) 100%);
+  box-shadow: 
+    inset 0 1px 3px rgba(0,0,0,0.2),
+    0 1px 2px rgba(239, 68, 68, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar-overdue::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 1.5s infinite;
 }
 
 /* Timeline Grid */
@@ -133,21 +179,48 @@
   background-size: 120px 100%;
 }
 
-/* Milestone Marker */
+/* Enhanced Milestone Marker */
 .milestone-marker {
-  width: 16px;
-  height: 16px;
-  background: hsl(221 83% 35%);
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, hsl(221 83% 45%) 0%, hsl(221 83% 35%) 100%);
   border-radius: 50%;
-  border: 3px solid hsl(0 0% 100%);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 0 0 1px hsl(221 83% 35%);
+  border: 4px solid hsl(0 0% 100%);
+  box-shadow: 
+    0 4px 12px rgba(0,0,0,0.2), 
+    0 2px 4px rgba(59, 130, 246, 0.3),
+    0 0 0 2px hsl(221 83% 35%),
+    inset 0 1px 2px rgba(255,255,255,0.3);
   position: relative;
   z-index: 10;
+  transition: all 0.3s ease;
+}
+
+.milestone-marker:hover {
+  transform: scale(1.1);
+  box-shadow: 
+    0 6px 16px rgba(0,0,0,0.25), 
+    0 3px 6px rgba(59, 130, 246, 0.4),
+    0 0 0 3px hsl(221 83% 35%),
+    inset 0 1px 2px rgba(255,255,255,0.4);
+}
+
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
 }
 
 @keyframes progress-remaining {
   0% { background-position: 0 0; }
-  100% { background-position: 32px 0; }
+  100% { background-position: 48px 0; }
+}
+
+/* Background Pattern */
+.bg-grid-pattern {
+  background-image: 
+    linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
 @layer base {

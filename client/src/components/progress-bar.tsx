@@ -88,22 +88,22 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
 
 export function ProgressLegend() {
   return (
-    <div className="flex items-center space-x-6 text-xs" data-testid="progress-legend">
-      <div className="flex items-center space-x-2">
-        <div className="w-4 h-3 bg-primary rounded-sm" />
-        <span>Time Elapsed</span>
+    <div className="flex items-center space-x-8 text-sm" data-testid="progress-legend">
+      <div className="flex items-center space-x-3">
+        <div className="w-6 h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-sm border border-blue-300" />
+        <span className="font-medium text-gray-700">⏱️ Time Elapsed</span>
       </div>
-      <div className="flex items-center space-x-2">
-        <div className="w-4 h-3 progress-bar-remaining rounded-sm" />
-        <span>Time Remaining</span>
+      <div className="flex items-center space-x-3">
+        <div className="w-6 h-4 progress-bar-remaining rounded-lg shadow-sm border border-gray-300" />
+        <span className="font-medium text-gray-700">⏳ Time Remaining</span>
       </div>
-      <div className="flex items-center space-x-2">
-        <div className="w-4 h-3 bg-green-600 rounded-sm" />
-        <span>Completed</span>
+      <div className="flex items-center space-x-3">
+        <div className="w-6 h-4 bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow-sm border border-green-300" />
+        <span className="font-medium text-gray-700">✅ Completed</span>
       </div>
-      <div className="flex items-center space-x-2">
-        <div className="w-4 h-3 bg-red-600 rounded-sm" />
-        <span>Overdue</span>
+      <div className="flex items-center space-x-3">
+        <div className="w-6 h-4 bg-gradient-to-r from-red-500 to-red-600 rounded-lg shadow-sm border border-red-300" />
+        <span className="font-medium text-gray-700">🚨 Overdue</span>
       </div>
     </div>
   );
