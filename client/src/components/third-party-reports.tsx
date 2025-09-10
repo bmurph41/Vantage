@@ -416,9 +416,11 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     const updatePromises = companyTasks.map(task => 
       updateTask.mutateAsync({
         id: task.id,
-        repName: newContactInfo.repName || null,
-        repEmail: newContactInfo.repEmail || null,
-        repPhone: newContactInfo.repPhone || null,
+        updates: {
+          repName: newContactInfo.repName || null,
+          repEmail: newContactInfo.repEmail || null,
+          repPhone: newContactInfo.repPhone || null,
+        }
       })
     );
     
@@ -1038,12 +1040,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 <React.Fragment key={task.id}>
                   {/* Main Content Row */}
                   <tr 
-                    className={`hover:bg-blue-50 transition-colors cursor-pointer border-b-2 border-gray-200 shadow-sm ${index % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}
+                    className={`hover:bg-blue-50 transition-colors cursor-pointer border border-gray-300 shadow-md ${index % 2 === 1 ? 'bg-gray-50' : 'bg-white'} ${expandedTasks.has(task.id) ? 'ring-2 ring-blue-300' : ''}`}
                     onClick={() => toggleTaskExpansion(task.id)}
                     data-testid={`row-task-${task.id}`}
                   >
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-sm leading-tight" title={task.title} data-testid={`text-task-title-${task.id}`}>
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-sm leading-tight mb-1" title={task.title} data-testid={`text-task-title-${task.id}`}>
                         {task.title}
                       </div>
                       {task.description && (
@@ -1237,8 +1239,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   </tr>
                   
                   {/* Date Fields Row */}
-                  <tr className="bg-gray-100 border-t-0 border-b border-gray-300">
-                    <td colSpan={7} className="px-4 py-3 border-l-4 border-blue-200" data-testid={`dates-row-${task.id}`}>
+                  <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 border-t-0 border-b border-blue-200">
+                    <td colSpan={7} className="px-6 py-4 border-l-4 border-blue-400 shadow-inner" data-testid={`dates-row-${task.id}`}>
                       <div className="grid grid-cols-4 gap-4">
                         {/* Deadline */}
                         <div>
@@ -1355,8 +1357,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   
                   {/* Rep Contact Information Row */}
                   {(task.repName || task.repEmail || task.repPhone) && (
-                    <tr className="bg-gray-200 border-t-0 border-b-4 border-gray-400">
-                      <td colSpan={7} className="px-4 py-2 text-xs text-gray-600 border-l-4 border-blue-300" data-testid={`rep-contact-${task.id}`}>
+                    <tr className="bg-gradient-to-r from-gray-100 to-slate-100 border-t-0 border-b-2 border-blue-300">
+                      <td colSpan={7} className="px-6 py-3 text-xs text-gray-700 border-l-4 border-blue-500 shadow-inner" data-testid={`rep-contact-${task.id}`}>
                         <div className="flex items-center space-x-6">
                           {task.repName && (
                             <div className="flex items-center space-x-1">
@@ -1381,6 +1383,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     </tr>
                   )}
                   
+                  {/* Task Group Separator */}
+                  {index < filteredTasks.length - 1 && (
+                    <tr className="h-4">
+                      <td colSpan={7} className="bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 border-b-2 border-gray-400 shadow-sm"></td>
+                    </tr>
+                  )}
                 </React.Fragment>
               ))}
               {filteredTasks.length === 0 && (
