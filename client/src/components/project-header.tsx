@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format, parseISO } from "date-fns";
@@ -5,6 +6,7 @@ import { Download, Share2, FileText } from "lucide-react";
 import type { Project, Task } from "@shared/schema";
 import { ddClient } from "@/lib/ddClient";
 import { useToast } from "@/hooks/use-toast";
+import { ShareProjectDialog } from "./share-project-dialog";
 
 interface ProjectHeaderProps {
   project: Project;
@@ -13,6 +15,7 @@ interface ProjectHeaderProps {
 
 export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
   const { toast } = useToast();
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
@@ -101,7 +104,7 @@ export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
             <FileText className="h-4 w-4 mr-2" />
             Export Calendar
           </Button>
-          <Button data-testid="button-share">
+          <Button onClick={() => setIsShareDialogOpen(true)} data-testid="button-share">
             <Share2 className="h-4 w-4 mr-2" />
             Share Project
           </Button>
@@ -131,6 +134,12 @@ export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
           <div className="text-sm text-muted-foreground">Overdue</div>
         </Card>
       </div>
+
+      <ShareProjectDialog
+        open={isShareDialogOpen}
+        onOpenChange={setIsShareDialogOpen}
+        project={project}
+      />
     </div>
   );
 }
