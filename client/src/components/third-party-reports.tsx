@@ -1034,8 +1034,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         <div>
                           <label className="text-xs font-medium text-gray-700 block mb-1">Completion Date</label>
                           <Input
-                            type="datetime-local"
-                            value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 16) : ''}
+                            type="date"
+                            value={task.completedAt ? new Date(task.completedAt).toISOString().slice(0, 10) : ''}
                             onChange={(e) => {
                               const newCompletedAt = e.target.value ? new Date(e.target.value) : undefined;
                               updateTask.mutate({
