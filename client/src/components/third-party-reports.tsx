@@ -903,10 +903,20 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
           <table className="w-full" data-testid="tasks-table">
             <thead>
               <tr className="bg-primary text-primary-foreground">
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[30%]">Task</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[15%]">Task Owner</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-[20%]">Company Hired</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[25%]">Task</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[12%]">Task Owner</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-[18%]">Company Hired</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold w-[10%]">Status</th>
+                <th 
+                  className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
+                  onClick={() => handleSort('daysRemaining')}
+                  data-testid="header-days-remaining"
+                >
+                  <div className="flex items-center">
+                    Days Remaining
+                    {getSortIcon('daysRemaining')}
+                  </div>
+                </th>
                 <th 
                   className="px-4 py-3 text-left text-sm font-semibold w-[10%] cursor-pointer hover:bg-primary/80 transition-colors"
                   onClick={() => handleSort('cost')}
@@ -984,6 +994,22 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           <SelectItem value="completed">Completed</SelectItem>
                         </SelectContent>
                       </Select>
+                    </td>
+                    <td className="px-4 py-3 text-center" data-testid={`text-days-remaining-${task.id}`}>
+                      {(() => {
+                        const daysRemaining = calculateDaysRemaining(task);
+                        if (task.status === 'completed') {
+                          return <span className="text-green-600 font-medium text-sm">Complete</span>;
+                        } else if (daysRemaining === 0) {
+                          return <span className="text-red-600 font-medium text-sm">Due Today</span>;
+                        } else if (daysRemaining < 0) {
+                          return <span className="text-red-600 font-medium text-sm">Overdue</span>;
+                        } else {
+                          return <span className={`font-medium text-sm ${daysRemaining <= 3 ? 'text-orange-600' : 'text-gray-900'}`}>
+                            {daysRemaining}d
+                          </span>;
+                        }
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-center" data-testid={`text-cost-${task.id}`}>
                       {editingCostTaskId === task.id ? (
@@ -1100,7 +1126,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   
                   {/* Date Fields Row */}
                   <tr className="bg-gray-50 border-t-0">
-                    <td colSpan={6} className="px-4 py-3" data-testid={`dates-row-${task.id}`}>
+                    <td colSpan={7} className="px-4 py-3" data-testid={`dates-row-${task.id}`}>
                       <div className="grid grid-cols-4 gap-4">
                         {/* Deadline */}
                         <div>
@@ -1180,7 +1206,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   {/* Rep Contact Information Row */}
                   {(task.repName || task.repEmail || task.repPhone) && (
                     <tr className="bg-gray-100 border-t-0">
-                      <td colSpan={6} className="px-4 py-2 text-xs text-gray-600" data-testid={`rep-contact-${task.id}`}>
+                      <td colSpan={7} className="px-4 py-2 text-xs text-gray-600" data-testid={`rep-contact-${task.id}`}>
                         <div className="flex items-center space-x-6">
                           {task.repName && (
                             <div className="flex items-center space-x-1">
@@ -1209,7 +1235,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               ))}
               {filteredTasks.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
+                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground" data-testid="text-no-tasks">
                     No tasks found matching your criteria.
                   </td>
                 </tr>
