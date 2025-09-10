@@ -89,9 +89,7 @@ export function ProjectHeader({ project, tasks }: ProjectHeaderProps) {
             {project.name}
           </h2>
           <p className="text-muted-foreground" data-testid="project-dates">
-            {project.psaSignedDate && `PSA Signed: ${format(new Date(project.psaSignedDate), 'MMMM d, yyyy')}`}
-            {project.ddExpirationDate && ` • DD Expiration: ${format(new Date(project.ddExpirationDate), 'MMMM d, yyyy')}`}
-            {project.closingDate && ` • Closing: ${format(new Date(project.closingDate), 'MMMM d, yyyy')}`}
+            {project.closingDate && `Target Closing Date: ${format(new Date(project.closingDate), 'MMMM d, yyyy')}`}
           </p>
         </div>
         <div className="flex items-center space-x-3">
