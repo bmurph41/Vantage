@@ -364,7 +364,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
             {!isTimelineCollapsed && (
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
-                  <Select value={taskDisplay} onValueChange={setTaskDisplay}>
+                  <Select value={taskDisplay} onValueChange={(value) => setTaskDisplay(value as 'all' | 'critical' | 'none' | 'selected')}>
                     <SelectTrigger className="w-32 bg-white border-gray-300 text-sm" data-testid="select-task-display">
                       <SelectValue />
                     </SelectTrigger>
