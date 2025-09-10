@@ -73,7 +73,12 @@ export const taskTemplates = pgTable("task_templates", {
   defaultAssignee: text("default_assignee"),
   defaultDependencies: integer("default_dependencies").array(),
   label: text("label"),
-  isGlobal: boolean("is_global").notNull().default(true),
+  priority: priorityEnum("priority").notNull().default("med"),
+  category: text("category"),
+  estimatedCost: text("estimated_cost"),
+  typicalCompanies: text("typical_companies").array(),
+  isGlobal: boolean("is_global").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // Project Templates
