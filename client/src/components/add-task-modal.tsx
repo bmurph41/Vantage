@@ -156,7 +156,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null);
   
   // Fetch project data to access DD expiration date
-  const { data: project } = useProject(projectId);
+  const { data: projectData } = useProject(projectId);
+  const project = projectData?.project;
   const [step, setStep] = useState<"browse" | "customize">("browse");
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
@@ -208,11 +209,11 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     startOffsetDays: dbTemplate.startOffsetDays,
     durationDays: 1, // Default value since it's required by frontend interface
     anchor: dbTemplate.anchor,
-    defaultAssignee: dbTemplate.defaultAssignee,
+    defaultAssignee: dbTemplate.defaultAssignee || undefined,
     label: dbTemplate.label || dbTemplate.name,
     priority: dbTemplate.priority,
     category: dbTemplate.category || "Custom",
-    estimatedCost: dbTemplate.estimatedCost,
+    estimatedCost: dbTemplate.estimatedCost || undefined,
     typicalCompanies: dbTemplate.typicalCompanies || [],
   }));
 
@@ -640,25 +641,48 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         data-testid="input-deadline"
                         className="flex-1"
                       />
-                      {project?.project?.ddExpirationDate && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            form.setValue("deadline", project.project.ddExpirationDate!);
-                          }}
-                          className="px-3 text-xs whitespace-nowrap"
-                          data-testid="button-dd-expiration"
-                        >
-                          Use DD Expiration
-                        </Button>
-                      )}
+                      <div className="flex gap-1">
+                        {project?.ddExpirationDate && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              form.setValue("deadline", project.ddExpirationDate!);
+                            }}
+                            className="px-2 text-xs whitespace-nowrap"
+                            data-testid="button-dd-expiration"
+                          >
+                            DD Expiration
+                          </Button>
+                        )}
+                        {project?.closingDate && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              form.setValue("deadline", project.closingDate!);
+                            }}
+                            className="px-2 text-xs whitespace-nowrap"
+                            data-testid="button-closing-date"
+                          >
+                            Closing Date
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Set a specific deadline date for this task
-                      {project?.project?.ddExpirationDate && (
-                        <span className="block">DD Expiration: {new Date(project.project.ddExpirationDate).toLocaleDateString()}</span>
+                      {(project?.ddExpirationDate || project?.closingDate) && (
+                        <div className="text-xs mt-1">
+                          {project?.ddExpirationDate && (
+                            <span className="block">DD Expiration: {new Date(project.ddExpirationDate).toLocaleDateString()}</span>
+                          )}
+                          {project?.closingDate && (
+                            <span className="block">Closing Date: {new Date(project.closingDate).toLocaleDateString()}</span>
+                          )}
+                        </div>
                       )}
                     </p>
                   </div>
