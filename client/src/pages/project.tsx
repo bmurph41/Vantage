@@ -7,6 +7,7 @@ import { ThirdPartyReports } from "@/components/third-party-reports";
 import { ProjectSetup } from "@/components/project-setup";
 import { TemplatesView } from "@/components/templates-view";
 import { TimelineView } from "@/components/timeline-view";
+import { TaskOwnersView } from "@/components/task-owners-view";
 import { useProject } from "@/hooks/use-project";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,7 @@ export default function ProjectPage() {
   const tabs = [
     { id: "reports", label: "Tasks & Timeline" },
     { id: "setup", label: "Project Setup" },
+    { id: "owners", label: "Task Owners" },
     { id: "templates", label: "Templates" },
   ];
 
@@ -110,6 +112,9 @@ export default function ProjectPage() {
           )}
           {activeTab === "setup" && (
             <ProjectSetup project={project} settings={settings} />
+          )}
+          {activeTab === "owners" && (
+            <TaskOwnersView tasks={tasks} />
           )}
           {activeTab === "templates" && (
             <TemplatesView projectId={project.id} />
