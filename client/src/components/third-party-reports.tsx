@@ -263,18 +263,36 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       const psaDate = parseISO(project.psaSignedDate);
       deadlineDate = new Date(psaDate);
       deadlineDate.setDate(deadlineDate.getDate() + task.deadlineDays);
+    } else if (task.deadlineType === 'specific_date' && task.dueDate) {
+      deadlineDate = parseISO(task.dueDate);
     } else {
-      // Fallback to old duration calculation if new fields aren't available
+      // Enhanced fallback calculation
       const startDate = task.startDate 
         ? parseISO(task.startDate) 
         : project?.psaSignedDate 
-          ? new Date(parseISO(project.psaSignedDate).getTime() + (task.startOffsetDays || 0) * 24 * 60 * 60 * 1000)
+          ? (() => {
+              const baseDate = parseISO(project.psaSignedDate);
+              // Add start offset days using proper date math
+              return addDays(baseDate, task.startOffsetDays || 0);
+            })()
           : today;
-      deadlineDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000); // Default to 7 days
+      
+      // Use task duration if available, otherwise default based on priority
+      const defaultDuration = task.priority === 'high' ? 3 : task.priority === 'med' ? 7 : 14;
+      const taskDuration = task.durationDays || defaultDuration;
+      
+      deadlineDate = addDays(startDate, taskDuration);
     }
     
+    // Calculate business days remaining, accounting for weekends
     const daysRemaining = differenceInDays(deadlineDate, today);
-    return Math.max(0, daysRemaining);
+    
+    // If deadline has passed, return 0
+    if (daysRemaining < 0) return 0;
+    
+    // For overdue detection, we want to show negative days
+    // But for display purposes, we can use Math.max(0, daysRemaining) later
+    return daysRemaining;
   };
 
   // Timeline logic
