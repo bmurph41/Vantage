@@ -41,53 +41,65 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     return matchesSearch && matchesStatus;
   });
 
-  // Scroll detection for floating timeline with throttling
+  // Scroll detection for floating timeline with improved performance
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout | null = null;
+    let rafId: number | null = null;
     
     const handleScroll = () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (rafId) {
+        cancelAnimationFrame(rafId);
       }
       
-      timeoutId = setTimeout(() => {
+      rafId = requestAnimationFrame(() => {
         const scrollTop = window.scrollY;
-        const newIsAtTop = scrollTop < 300; // Consider "at top" if within 300px of top
+        const newIsAtTop = scrollTop < 250; // Consider "at top" if within 250px of top
         
-        // Only update if there's actually a change to prevent layout thrashing
+        // Only update if there's actually a change
         if (newIsAtTop !== isAtTop) {
           setIsAtTop(newIsAtTop);
         }
         
-        if (!isTimelineCollapsed && !newIsAtTop) {
-          // Find which task is currently in view - only when not at top
+        if (!isTimelineCollapsed) {
+          // Find which task is currently in view
           let currentTask = null;
-          const viewportTop = scrollTop;
-          const viewportBottom = scrollTop + window.innerHeight;
-          const viewportCenter = scrollTop + (window.innerHeight * 0.4); // Use 40% down from top instead of center
           
-          for (const [taskId, ref] of Object.entries(taskRefs.current)) {
-            if (ref) {
-              const rect = ref.getBoundingClientRect();
-              const elementTop = rect.top + scrollTop;
-              const elementBottom = elementTop + rect.height;
-              
-              // Check if element is in the upper portion of viewport
-              if (elementTop <= viewportCenter && elementBottom >= viewportCenter) {
-                currentTask = taskId;
-                break;
+          if (!newIsAtTop) {
+            const viewportTop = scrollTop;
+            const viewportHeight = window.innerHeight;
+            const checkPoint = viewportTop + (viewportHeight * 0.3); // 30% down from top of viewport
+            
+            // Find the task that's most prominently in view
+            let bestTask = null;
+            let bestOverlap = 0;
+            
+            for (const [taskId, ref] of Object.entries(taskRefs.current)) {
+              if (ref) {
+                const rect = ref.getBoundingClientRect();
+                const elementTop = rect.top + scrollTop;
+                const elementBottom = elementTop + rect.height;
+                
+                // Check if element intersects with our check area
+                if (elementTop <= checkPoint && elementBottom >= checkPoint) {
+                  const overlapStart = Math.max(elementTop, viewportTop);
+                  const overlapEnd = Math.min(elementBottom, viewportTop + viewportHeight);
+                  const overlap = Math.max(0, overlapEnd - overlapStart);
+                  
+                  if (overlap > bestOverlap) {
+                    bestOverlap = overlap;
+                    bestTask = taskId;
+                  }
+                }
               }
             }
+            
+            currentTask = bestTask;
           }
           
           if (currentTask !== currentTaskInView) {
             setCurrentTaskInView(currentTask);
           }
-        } else if (newIsAtTop && currentTaskInView) {
-          // Clear current task when at top
-          setCurrentTaskInView(null);
         }
-      }, 16); // Throttle to ~60fps
+      });
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -95,8 +107,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (rafId) {
+        cancelAnimationFrame(rafId);
       }
     };
   }, [isTimelineCollapsed, isAtTop, currentTaskInView]);
@@ -223,8 +235,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
 
   // Get task progress for timeline
   const getTaskProgress = (task: Task) => {
-    if (task.status === 'completed') return { progress: 100, status: 'completed' };
-    
     const today = new Date();
     let startDate: Date, endDate: Date;
     
@@ -246,12 +256,23 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       endDate = new Date(startDate.getTime() + (task.durationDays || 7) * 24 * 60 * 60 * 1000);
     }
     
+    // Calculate progress
     const totalDuration = endDate.getTime() - startDate.getTime();
     const elapsed = today.getTime() - startDate.getTime();
-    const progress = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+    let progress = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
     
-    const isOverdue = today > endDate && task.status !== 'completed';
-    const status = isOverdue ? 'overdue' : task.status === 'in_progress' ? 'in_progress' : 'pending';
+    // Determine status
+    let status: string;
+    if (task.status === 'completed') {
+      progress = 100;
+      status = 'completed';
+    } else if (today > endDate) {
+      status = 'overdue';
+    } else if (task.status === 'in_progress') {
+      status = 'in_progress';
+    } else {
+      status = 'pending';
+    }
     
     return { 
       progress, 
