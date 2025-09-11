@@ -23,6 +23,7 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
   const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
+  const notStartedTasks = tasks.filter(t => t.status === 'not_started' || t.status === 'scheduled').length;
   const overdueTasks = tasks.filter(t => {
     // This would need proper overdue calculation in a real implementation
     return t.status !== 'completed' && new Date() > new Date(); // Simplified
@@ -97,7 +98,7 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
       </div>
       
       {/* Progress Summary */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-6 gap-4 mb-6">
         <Card className="p-4" data-testid="card-total-cost">
           <div className="text-2xl font-bold text-foreground">{formatCurrency(totalCost)}</div>
           <div className="text-sm text-muted-foreground">Total Cost</div>
@@ -113,6 +114,10 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
         <Card className="p-4" data-testid="card-in-progress-tasks">
           <div className="text-2xl font-bold text-blue-600">{inProgressTasks}</div>
           <div className="text-sm text-muted-foreground">In Progress</div>
+        </Card>
+        <Card className="p-4" data-testid="card-not-started-tasks">
+          <div className="text-2xl font-bold text-gray-600">{notStartedTasks}</div>
+          <div className="text-sm text-muted-foreground">Not Started</div>
         </Card>
         <Card className="p-4" data-testid="card-overdue-tasks">
           <div className="text-2xl font-bold text-red-600">{overdueTasks}</div>
