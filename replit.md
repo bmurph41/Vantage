@@ -8,6 +8,12 @@ A full-stack Due Diligence Tracker application for managing marina acquisition p
 
 Preferred communication style: Simple, everyday language.
 
+**Code Editing Guidelines:**
+- Always preserve existing formatting - do not edit formatting unless specifically requested
+- Build incrementally on the existing app - never replace what is not suggested to change
+- Make only minimal changes needed for the specific request
+- Maintain existing code structure and patterns
+
 ## System Architecture
 
 ### Frontend Architecture
