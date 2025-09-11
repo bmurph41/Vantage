@@ -166,96 +166,60 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
-  const filteredTasks = tasks
-    .filter(task => {
-      // Search filter (title, description, company hired)
-      const matchesSearch = searchTerm === "" || 
-        task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (task.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (task.companyHired || "").toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Status filter
-      const matchesStatus = statusFilter === "all" || task.status === statusFilter;
-      
-      // Payment filter
-      const matchesPayment = paymentFilter === "all" || task.paymentStatus === paymentFilter;
-      
-      // Assignee filter
-      const matchesAssignee = assigneeFilter === "all" || 
-        (assigneeFilter === "unassigned" && !task.assignee) ||
-        (task.assignee && task.assignee.toLowerCase().includes(assigneeFilter.toLowerCase()));
-      
-      // Cost filter
-      const matchesCost = costFilter === "all" ||
-        (costFilter === "has_cost" && task.cost && task.cost.trim() !== "") ||
-        (costFilter === "no_cost" && (!task.cost || task.cost.trim() === ""));
-      
-      // Completion filter
-      const matchesCompletion = completionFilter === "all" ||
-        (completionFilter === "completed" && task.completedAt) ||
-        (completionFilter === "pending" && !task.completedAt);
-      
-      return matchesSearch && matchesStatus && matchesPayment && matchesAssignee && matchesCost && matchesCompletion;
-    })
-    .sort((a, b) => {
-      // If sorting is active, handle that first
-      if (sortColumn && sortColumn !== null) {
-        let aValue: number;
-        let bValue: number;
-        
-        if (sortColumn === 'daysRemaining') {
-          const aRemaining = calculateDaysRemaining(a);
-          const bRemaining = calculateDaysRemaining(b);
-          // Treat "Overdue" as -1 for sorting purposes, completed tasks as 0, others as their numeric value
-          aValue = aRemaining === "Overdue" ? -1 : (typeof aRemaining === 'number' ? aRemaining : 0);
-          bValue = bRemaining === "Overdue" ? -1 : (typeof bRemaining === 'number' ? bRemaining : 0);
-        } else if (sortColumn === 'cost') {
-          // Parse cost as number, treating empty/null as 0
-          aValue = a.cost ? parseFloat(a.cost.replace(/[^0-9.-]/g, '')) || 0 : 0;
-          bValue = b.cost ? parseFloat(b.cost.replace(/[^0-9.-]/g, '')) || 0 : 0;
-        } else if (sortColumn === 'deadline') {
-          // Sort by deadline date
-          const aDeadline = calculateDeadlineDate(a);
-          const bDeadline = calculateDeadlineDate(b);
-          aValue = aDeadline.getTime();
-          bValue = bDeadline.getTime();
-        } else {
-          aValue = 0;
-          bValue = 0;
-        }
-        
-        const result = sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
-        if (result !== 0) return result;
-      }
-      
-      // STABLE PRIORITY SORT WITH ARCHIVE SUPPORT
-      // First check for archived tasks (high sortOrder indicates archived)
-      const maxNormalSortOrder = 1000; // Threshold for archived tasks
-      const aIsArchived = (a.sortOrder || 0) > maxNormalSortOrder;
-      const bIsArchived = (b.sortOrder || 0) > maxNormalSortOrder;
-      
-      // Archived tasks always go to bottom, sorted by sortOrder
-      if (aIsArchived && bIsArchived) {
-        return (a.sortOrder || 0) - (b.sortOrder || 0);
-      }
-      if (aIsArchived !== bIsArchived) {
-        return aIsArchived ? 1 : -1; // Archived tasks sink to bottom
-      }
-      
-      // For non-archived tasks: Priority first (High -> Medium -> Low)
-      const priorityOrder = { 'high': 0, 'med': 1, 'low': 2 };
-      const aPriorityRank = priorityOrder[a.priority] ?? 2;
-      const bPriorityRank = priorityOrder[b.priority] ?? 2;
-      
-      if (aPriorityRank !== bPriorityRank) {
-        return aPriorityRank - bPriorityRank;
-      }
-      
-      // Within same priority, sort by most recent update first (with safe date parsing)
-      const aUpdated = a.updatedAt ? new Date(a.updatedAt).getTime() : new Date(a.createdAt).getTime();
-      const bUpdated = b.updatedAt ? new Date(b.updatedAt).getTime() : new Date(b.createdAt).getTime();
-      return bUpdated - aUpdated; // Descending order (most recent first)
-    });
+  // Split into completed and non-completed tasks with filtering
+  const completedTasks = tasks.filter(task => {
+    const baseFilter = searchTerm === "" || 
+      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.companyHired || "").toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || task.status === statusFilter;
+    const matchesPayment = paymentFilter === "all" || task.paymentStatus === paymentFilter;
+    const matchesAssignee = assigneeFilter === "all" || 
+      (assigneeFilter === "unassigned" && !task.assignee) ||
+      (task.assignee && task.assignee.toLowerCase().includes(assigneeFilter.toLowerCase()));
+    const matchesCost = costFilter === "all" ||
+      (costFilter === "has_cost" && task.cost && task.cost.trim() !== "") ||
+      (costFilter === "no_cost" && (!task.cost || task.cost.trim() === ""));
+    const matchesCompletion = completionFilter === "all" ||
+      (completionFilter === "completed" && task.completedAt) ||
+      (completionFilter === "pending" && !task.completedAt);
+    
+    return task.status === 'completed' && baseFilter && matchesStatus && matchesPayment && matchesAssignee && matchesCost && matchesCompletion;
+  }).sort((a, b) => {
+    // Sort completed tasks by completion date, most recent first
+    const aCompleted = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+    const bCompleted = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+    return bCompleted - aCompleted;
+  });
+
+  const activeTasks = tasks.filter(task => {
+    const baseFilter = searchTerm === "" || 
+      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.companyHired || "").toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || task.status === statusFilter;
+    const matchesPayment = paymentFilter === "all" || task.paymentStatus === paymentFilter;
+    const matchesAssignee = assigneeFilter === "all" || 
+      (assigneeFilter === "unassigned" && !task.assignee) ||
+      (task.assignee && task.assignee.toLowerCase().includes(assigneeFilter.toLowerCase()));
+    const matchesCost = costFilter === "all" ||
+      (costFilter === "has_cost" && task.cost && task.cost.trim() !== "") ||
+      (costFilter === "no_cost" && (!task.cost || task.cost.trim() === ""));
+    const matchesCompletion = completionFilter === "all" ||
+      (completionFilter === "completed" && task.completedAt) ||
+      (completionFilter === "pending" && !task.completedAt);
+    
+    return task.status !== 'completed' && baseFilter && matchesStatus && matchesPayment && matchesAssignee && matchesCost && matchesCompletion;
+  }).sort((a, b) => {
+    // For active tasks, maintain fixed position based on creation order
+    const aCreated = new Date(a.createdAt).getTime();
+    const bCreated = new Date(b.createdAt).getTime();
+    return aCreated - bCreated; // Oldest first to maintain stable order
+  });
+
+  const filteredTasks = [...activeTasks, ...completedTasks];
 
   // Removed all scroll detection to prevent glitches
 
@@ -605,8 +569,323 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
 
             {/* Task List */}
             <div className="space-y-3">
-              <h3>Tasks ({filteredTasks.length})</h3>
-              {filteredTasks.map((task) => (
+              {/* Active Tasks Section */}
+              {activeTasks.length > 0 && (
+                <>
+                  <h3>Active Tasks ({activeTasks.length})</h3>
+                  {activeTasks.map((task) => (
+                    <div key={task.id} className={`bg-white border ${getTaskBorderColor(task)} border-l-4 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow`}>
+                      {/* Header Section */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-1">{task.title}</h3>
+                          {task.description && (
+                            <p className="text-sm text-gray-600 mb-3">{task.description}</p>
+                          )}
+                          
+                          {/* Company Badge - Always show either company name or "Internal" */}
+                          <div className="flex items-center space-x-3 mb-3">
+                            <div className="flex items-center space-x-2">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                task.companyHired 
+                                  ? 'bg-purple-100' 
+                                  : 'bg-gray-100'
+                              }`}>
+                                <span className={`text-xs font-semibold ${
+                                  task.companyHired 
+                                    ? 'text-purple-600' 
+                                    : 'text-gray-600'
+                                }`}>
+                                  {task.companyHired 
+                                    ? task.companyHired.split(' ').map(n => n[0]).join('').toUpperCase()
+                                    : 'IN'
+                                  }
+                                </span>
+                              </div>
+                              {task.companyHired ? (
+                                <button
+                                  data-testid={`button-company-${task.id}`}
+                                  className="text-sm font-medium text-gray-900 hover:text-primary"
+                                  onClick={() => handleCompanyClick(task)}
+                                >
+                                  {task.companyHired}
+                                </button>
+                              ) : (
+                                <span className="text-sm font-medium text-gray-600">
+                                  Internal
+                                </span>
+                              )}
+                            </div>
+                            
+                            {/* Status Selector - Always visible */}
+                            <Select 
+                              value={task.status} 
+                              onValueChange={(value) => handleStatusChange(task.id, value)}
+                            >
+                              <SelectTrigger 
+                                data-testid={`select-status-${task.id}`} 
+                                className="w-32 h-8 text-xs"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="not_started">Not Started</SelectItem>
+                                <SelectItem value="scheduled">Scheduled</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            
+                            {/* Checkboxes - Timeline always visible, On-Site only for external tasks */}
+                            <div className="flex items-center space-x-4">
+                              {/* Only show On-Site Inspection checkbox for external tasks */}
+                              {task.companyHired && (
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`on-site-${task.id}`}
+                                    checked={task.requiresOnSiteInspection || false}
+                                    onCheckedChange={(checked) => handleOnSiteInspectionChange(task.id, checked as boolean)}
+                                    data-testid={`checkbox-on-site-${task.id}`}
+                                  />
+                                  <label 
+                                    htmlFor={`on-site-${task.id}`}
+                                    className="text-xs text-gray-600 cursor-pointer"
+                                  >
+                                    On-Site Inspection
+                                  </label>
+                                </div>
+                              )}
+                              
+                              {/* Timeline checkbox always visible */}
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`timeline-${task.id}`}
+                                  checked={task.showOnTimeline || false}
+                                  onCheckedChange={(checked) => handleTimelineToggle(task.id, checked as boolean)}
+                                  data-testid={`checkbox-timeline-${task.id}`}
+                                />
+                                <label 
+                                  htmlFor={`timeline-${task.id}`}
+                                  className="text-xs text-gray-600 cursor-pointer"
+                                >
+                                  Show on Timeline
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Action Buttons - Right side */}
+                        <div className="flex items-center space-x-2 ml-4">
+                          <Button
+                            data-testid={`button-edit-${task.id}`}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditTask(task)}
+                            className="h-8 w-8 p-0"
+                          >
+                            ✏️
+                          </Button>
+                          <Button
+                            data-testid={`button-duplicate-${task.id}`}
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                          >
+                            📋
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                data-testid={`button-delete-${task.id}`}
+                                variant="outline"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                              >
+                                🗑️
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete "{task.title}"? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteTask(task.id)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                      
+                      {/* Date Fields Section */}
+                      <div className={`grid gap-4 pt-4 border-t border-gray-100 ${
+                        task.companyHired ? 'grid-cols-4' : 'grid-cols-2'
+                      }`}>
+                        <div>
+                          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Deadline</label>
+                          <div className="mt-1">
+                            {task.deadline ? (
+                              <input 
+                                type="date" 
+                                value={task.deadline} 
+                                onChange={!task.companyHired ? (e) => handleDateFieldChange(task.id, 'deadline', e.target.value) : undefined}
+                                className={`w-full text-sm border border-gray-200 rounded px-2 py-1 ${
+                                  !task.companyHired ? 'focus:ring-2 focus:ring-blue-500 focus:border-blue-500' : 'bg-gray-50'
+                                }`}
+                                readOnly={!!task.companyHired}
+                                data-testid={`input-deadline-${task.id}`}
+                              />
+                            ) : !task.companyHired ? (
+                              <input 
+                                type="date" 
+                                value=""
+                                onChange={(e) => handleDateFieldChange(task.id, 'deadline', e.target.value)}
+                                className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                data-testid={`input-deadline-${task.id}`}
+                              />
+                            ) : (
+                              <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Only show Engaged field for external tasks */}
+                        {task.companyHired && (
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Engaged</label>
+                            <div className="mt-1">
+                              {task.status !== "not_started" ? (
+                                <input 
+                                  type="date" 
+                                  value={task.orderedAt || ""} 
+                                  onChange={(e) => handleDateFieldChange(task.id, 'orderedAt', e.target.value)}
+                                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                  data-testid={`input-ordered-${task.id}`}
+                                />
+                              ) : task.orderedAt ? (
+                                <input 
+                                  type="date" 
+                                  value={task.orderedAt} 
+                                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
+                                  readOnly
+                                />
+                              ) : (
+                                <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Only show On-Site field for external tasks */}
+                        {task.companyHired && (
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">On-Site</label>
+                            <div className="mt-1">
+                              {task.requiresOnSiteInspection && task.status !== "not_started" ? (
+                                <input 
+                                  type="date" 
+                                  value={task.dateOnSite || ""} 
+                                  onChange={(e) => handleDateFieldChange(task.id, 'dateOnSite', e.target.value)}
+                                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                  data-testid={`input-on-site-${task.id}`}
+                                />
+                              ) : task.dateOnSite ? (
+                                <input 
+                                  type="date" 
+                                  value={task.dateOnSite} 
+                                  className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
+                                  readOnly
+                                />
+                              ) : (
+                                <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div>
+                          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</label>
+                          <div className="mt-1">
+                            {task.status !== "not_started" ? (
+                              <input 
+                                type="date" 
+                                value={task.completedAt ? new Date(task.completedAt).toISOString().split('T')[0] : ""} 
+                                onChange={(e) => handleDateFieldChange(task.id, 'completedAt', e.target.value)}
+                                className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                data-testid={`input-completed-${task.id}`}
+                              />
+                            ) : task.completedAt ? (
+                              <input 
+                                type="date" 
+                                value={new Date(task.completedAt).toISOString().split('T')[0]} 
+                                className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
+                                readOnly
+                              />
+                            ) : (
+                              <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Days Remaining and Cost Row */}
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-4">
+                        <div className="flex items-center space-x-4">
+                          {/* Days Remaining */}
+                          <div className="text-center">
+                            <div className="text-sm text-gray-500">Days Remaining</div>
+                            <div className={`text-lg font-bold ${
+                              calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
+                            }`}>
+                              {calculateDaysRemaining(task)}
+                            </div>
+                          </div>
+                          
+                          {/* Cost section - only show if paymentStatus is not "no_cost" */}
+                          {task.paymentStatus !== 'no_cost' && (
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Cost</label>
+                              <input 
+                                type="text" 
+                                value={task.cost || ""} 
+                                onChange={(e) => handleDateFieldChange(task.id, 'cost', e.target.value)}
+                                onBlur={(e) => {
+                                  const formatted = formatCurrency(e.target.value);
+                                  handleDateFieldChange(task.id, 'cost', formatted);
+                                }}
+                                placeholder="$0.00"
+                                className="w-32 text-sm border border-gray-200 rounded px-3 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                data-testid={`input-cost-${task.id}`}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="text-right">
+                          <div>Task Owner: {task.assignee || "Unassigned"}</div>
+                          <div>Progress: {Math.round(calculateTaskProgress(task))}%</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Completed Tasks Section */}
+              {completedTasks.length > 0 && (
+                <>
+                  <div className="pt-6">
+                    <h3 className="text-lg font-semibold text-gray-600 mb-3 pb-2 border-b border-gray-200">
+                      Completed ({completedTasks.length})
+                    </h3>
+                  </div>
+                  {completedTasks.map((task) => (
                 <div key={task.id} className={`bg-white border ${getTaskBorderColor(task)} border-l-4 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow`}>
                   {/* Header Section */}
                   <div className="flex items-start justify-between mb-4">
@@ -944,6 +1223,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   </div>
                 </div>
               ))}
+                </>
+              )}
             </div>
 
           </div>
