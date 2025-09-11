@@ -140,7 +140,7 @@ const addTaskFormSchema = z.object({
   companyState: z.string().optional(),
   companyZip: z.string().optional(),
   priority: z.enum(["low", "med", "high"]).default("med"),
-  status: z.enum(["not_started", "in_progress", "blocked", "completed", "to_do", "scheduled"]).default("to_do"),
+  status: z.enum(["not_started", "in_progress", "blocked", "completed", "scheduled"]).default("not_started"),
   paymentStatus: z.enum(["not_paid", "paid", "no_cost"]).default("not_paid"),
   dateOnSite: z.string().optional(),
   requiresOnSiteInspection: z.boolean().default(false),
@@ -278,7 +278,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       repEmail: "",
       repPhone: "",
       priority: "med",
-      status: "to_do",
+      status: "not_started",
       paymentStatus: "not_paid",
       dateOnSite: "",
       requiresOnSiteInspection: false,
@@ -313,7 +313,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           companyState: editingTask.companyState || "",
           companyZip: editingTask.companyZip || "",
           priority: editingTask.priority || "med",
-          status: editingTask.status || "to_do",
+          status: editingTask.status || "not_started",
           paymentStatus: editingTask.paymentStatus || "not_paid",
           dateOnSite: editingTask.dateOnSite || "",
           requiresOnSiteInspection: !!editingTask.dateOnSite,
@@ -345,7 +345,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           companyState: "",
           companyZip: "",
           priority: "med",
-          status: "to_do",
+          status: "not_started",
           paymentStatus: "not_paid",
           dateOnSite: "",
           completedAt: "",
@@ -420,7 +420,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       companyState: "",
       companyZip: "",
       priority: "med",
-      status: "to_do",
+      status: "not_started",
       paymentStatus: "not_paid",
       dateOnSite: "",
       requiresOnSiteInspection: false,
@@ -501,7 +501,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       const taskData = {
         ...transformedData,
         projectId,
-        status: "to_do" as const,
+        status: "not_started" as const,
       };
 
       createTask.mutate(
@@ -688,10 +688,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="to_do">
+                        <SelectItem value="not_started">
                           <div className="flex items-center gap-2">
                             <Circle className="h-4 w-4 text-gray-500" />
-                            <span>To Do</span>
+                            <span>Not Started</span>
                           </div>
                         </SelectItem>
                         <SelectItem value="scheduled">
@@ -1289,10 +1289,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="to_do">
+                        <SelectItem value="not_started">
                           <div className="flex items-center gap-2">
                             <Circle className="h-4 w-4 text-gray-500" />
-                            <span>To Do</span>
+                            <span>Not Started</span>
                           </div>
                         </SelectItem>
                         <SelectItem value="scheduled">
