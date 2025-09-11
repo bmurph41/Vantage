@@ -613,15 +613,26 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         <p className="text-sm text-gray-600 mb-3">{task.description}</p>
                       )}
                       
-                      {/* Company Badge */}
-                      {task.companyHired && (
-                        <div className="flex items-center space-x-3 mb-3">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                              <span className="text-xs font-semibold text-purple-600">
-                                {task.companyHired.split(' ').map(n => n[0]).join('').toUpperCase()}
-                              </span>
-                            </div>
+                      {/* Company Badge - Always show either company name or "Internal" */}
+                      <div className="flex items-center space-x-3 mb-3">
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            task.companyHired 
+                              ? 'bg-purple-100' 
+                              : 'bg-gray-100'
+                          }`}>
+                            <span className={`text-xs font-semibold ${
+                              task.companyHired 
+                                ? 'text-purple-600' 
+                                : 'text-gray-600'
+                            }`}>
+                              {task.companyHired 
+                                ? task.companyHired.split(' ').map(n => n[0]).join('').toUpperCase()
+                                : 'IN'
+                              }
+                            </span>
+                          </div>
+                          {task.companyHired ? (
                             <button
                               data-testid={`button-company-${task.id}`}
                               className="text-sm font-medium text-gray-900 hover:text-primary"
@@ -629,56 +640,64 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                             >
                               {task.companyHired}
                             </button>
-                          </div>
-                          <Select 
-                            value={task.status} 
-                            onValueChange={(value) => handleStatusChange(task.id, value)}
+                          ) : (
+                            <span className="text-sm font-medium text-gray-600">
+                              Internal
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Status Selector - Always visible */}
+                        <Select 
+                          value={task.status} 
+                          onValueChange={(value) => handleStatusChange(task.id, value)}
+                        >
+                          <SelectTrigger 
+                            data-testid={`select-status-${task.id}`} 
+                            className="w-32 h-8 text-xs"
                           >
-                            <SelectTrigger 
-                              data-testid={`select-status-${task.id}`} 
-                              className="w-32 h-8 text-xs"
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="not_started">Not Started</SelectItem>
+                            <SelectItem value="scheduled">Scheduled</SelectItem>
+                            <SelectItem value="in_progress">In Progress</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        
+                        {/* Checkboxes - Always visible */}
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`on-site-${task.id}`}
+                              checked={task.requiresOnSiteInspection || false}
+                              onCheckedChange={(checked) => handleOnSiteInspectionChange(task.id, checked as boolean)}
+                              data-testid={`checkbox-on-site-${task.id}`}
+                            />
+                            <label 
+                              htmlFor={`on-site-${task.id}`}
+                              className="text-xs text-gray-600 cursor-pointer"
                             >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="not_started">Not Started</SelectItem>
-                              <SelectItem value="scheduled">Scheduled</SelectItem>
-                              <SelectItem value="in_progress">In Progress</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`on-site-${task.id}`}
-                                checked={task.requiresOnSiteInspection || false}
-                                onCheckedChange={(checked) => handleOnSiteInspectionChange(task.id, checked as boolean)}
-                                data-testid={`checkbox-on-site-${task.id}`}
-                              />
-                              <label 
-                                htmlFor={`on-site-${task.id}`}
-                                className="text-xs text-gray-600 cursor-pointer"
-                              >
-                                On-Site Inspection
-                              </label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`timeline-${task.id}`}
-                                checked={task.showOnTimeline || false}
-                                onCheckedChange={(checked) => handleTimelineToggle(task.id, checked as boolean)}
-                                data-testid={`checkbox-timeline-${task.id}`}
-                              />
-                              <label 
-                                htmlFor={`timeline-${task.id}`}
-                                className="text-xs text-gray-600 cursor-pointer"
-                              >
-                                Add to Timeline
-                              </label>
-                            </div>
+                              On-Site Inspection
+                            </label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`timeline-${task.id}`}
+                              checked={task.showOnTimeline || false}
+                              onCheckedChange={(checked) => handleTimelineToggle(task.id, checked as boolean)}
+                              data-testid={`checkbox-timeline-${task.id}`}
+                            />
+                            <label 
+                              htmlFor={`timeline-${task.id}`}
+                              className="text-xs text-gray-600 cursor-pointer"
+                            >
+                              Add to Timeline
+                            </label>
                           </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                     
                     {/* Days Remaining, Cost and Actions */}
