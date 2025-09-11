@@ -844,7 +844,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         <div>
                           <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</label>
                           <div className="mt-1">
-                            {task.status !== "not_started" ? (
+                            {task.status === "completed" ? (
                               <input 
                                 type="date" 
                                 value={task.completedAt ? new Date(task.completedAt).toISOString().split('T')[0] : ""} 
