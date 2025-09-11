@@ -676,7 +676,17 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         </div>
                         
                         {/* Cost and Days Remaining - Top Right */}
-                        <div className="flex flex-col items-end space-y-3 mr-4">
+                        <div className="flex flex-row items-end space-x-3 mr-4">
+                          {/* Days Remaining */}
+                          <div className="text-center">
+                            <div className="text-sm text-gray-500 mb-1">Days Remaining</div>
+                            <div className={`text-base font-bold ${
+                              calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
+                            }`}>
+                              {calculateDaysRemaining(task)}
+                            </div>
+                          </div>
+                          
                           {/* Cost section - only show if paymentStatus is not "no_cost" */}
                           {task.paymentStatus !== 'no_cost' && (
                             <div className="text-center">
@@ -695,16 +705,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               />
                             </div>
                           )}
-                          
-                          {/* Days Remaining */}
-                          <div className="text-center">
-                            <div className="text-sm text-gray-500 mb-1">Days Remaining</div>
-                            <div className={`text-base font-bold ${
-                              calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
-                            }`}>
-                              {calculateDaysRemaining(task)}
-                            </div>
-                          </div>
                         </div>
                         
                         {/* Action Buttons - Right side */}
@@ -1008,7 +1008,17 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     </div>
                     
                     {/* Cost and Days Remaining - Top Right */}
-                    <div className="flex flex-col items-end space-y-3 mr-4">
+                    <div className="flex flex-row items-end space-x-3 mr-4">
+                      {/* Days Remaining */}
+                      <div className="text-center">
+                        <div className="text-sm text-gray-500 mb-1">Days Remaining</div>
+                        <div className={`text-base font-bold ${
+                          calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
+                        }`}>
+                          {calculateDaysRemaining(task)}
+                        </div>
+                      </div>
+                      
                       {/* Cost section - only show if paymentStatus is not "no_cost" */}
                       {task.paymentStatus !== 'no_cost' && (
                         <div className="text-center">
@@ -1034,16 +1044,6 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           )}
                         </div>
                       )}
-                      
-                      {/* Days Remaining */}
-                      <div className="text-center">
-                        <div className="text-sm text-gray-500 mb-1">Days Remaining</div>
-                        <div className={`text-base font-bold ${
-                          calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
-                        }`}>
-                          {calculateDaysRemaining(task)}
-                        </div>
-                      </div>
                     </div>
                     
                     {/* Action Buttons - Right side */}
