@@ -620,9 +620,9 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                               form.setValue("deadline", project.ddExpirationDate!);
                             }}
                             className="px-2 text-xs whitespace-nowrap"
-                            data-testid="button-dd-expiration"
+                            data-testid="button-dd-exp"
                           >
-                            DD Expiration
+                            DD Exp
                           </Button>
                         )}
                         {project?.closingDate && (
@@ -634,9 +634,9 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                               form.setValue("deadline", project.closingDate!);
                             }}
                             className="px-2 text-xs whitespace-nowrap"
-                            data-testid="button-closing-date"
+                            data-testid="button-closing"
                           >
-                            Closing Date
+                            Closing
                           </Button>
                         )}
                       </div>
@@ -833,6 +833,64 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   >
                     Internal Task (No Company)
                   </Label>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <Label htmlFor="deadline">Deadline Date</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="deadline"
+                        type="date"
+                        {...form.register("deadline")}
+                        data-testid="input-deadline"
+                        className="flex-1"
+                      />
+                      <div className="flex gap-1">
+                        {project?.ddExpirationDate && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              form.setValue("deadline", project.ddExpirationDate!);
+                            }}
+                            className="px-2 text-xs whitespace-nowrap"
+                            data-testid="button-dd-exp"
+                          >
+                            DD Exp
+                          </Button>
+                        )}
+                        {project?.closingDate && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              form.setValue("deadline", project.closingDate!);
+                            }}
+                            className="px-2 text-xs whitespace-nowrap"
+                            data-testid="button-closing"
+                          >
+                            Closing
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Set a specific deadline date for this task
+                      {(project?.ddExpirationDate || project?.closingDate) && (
+                        <div className="text-xs mt-1">
+                          {project?.ddExpirationDate && (
+                            <span className="block">DD Exp: {project.ddExpirationDate}</span>
+                          )}
+                          {project?.closingDate && (
+                            <span className="block">Closing: {project.closingDate}</span>
+                          )}
+                        </div>
+                      )}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1376,6 +1434,64 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   >
                     Internal Task (No Company)
                   </Label>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <Label htmlFor="deadline">Deadline Date</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="deadline"
+                        type="date"
+                        {...form.register("deadline")}
+                        data-testid="input-deadline"
+                        className="flex-1"
+                      />
+                      <div className="flex gap-1">
+                        {project?.ddExpirationDate && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              form.setValue("deadline", project.ddExpirationDate!);
+                            }}
+                            className="px-2 text-xs whitespace-nowrap"
+                            data-testid="button-dd-exp"
+                          >
+                            DD Exp
+                          </Button>
+                        )}
+                        {project?.closingDate && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              form.setValue("deadline", project.closingDate!);
+                            }}
+                            className="px-2 text-xs whitespace-nowrap"
+                            data-testid="button-closing"
+                          >
+                            Closing
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Set a specific deadline date for this task
+                      {(project?.ddExpirationDate || project?.closingDate) && (
+                        <div className="text-xs mt-1">
+                          {project?.ddExpirationDate && (
+                            <span className="block">DD Exp: {project.ddExpirationDate}</span>
+                          )}
+                          {project?.closingDate && (
+                            <span className="block">Closing: {project.closingDate}</span>
+                          )}
+                        </div>
+                      )}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
