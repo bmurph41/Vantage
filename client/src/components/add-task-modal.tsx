@@ -759,44 +759,49 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
-                {/* On-Site Inspection Checkbox */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="requiresOnSiteInspection"
-                    checked={form.watch("requiresOnSiteInspection")}
-                    onCheckedChange={(checked) => {
-                      form.setValue("requiresOnSiteInspection", !!checked);
-                      // Clear dateOnSite if unchecked
-                      if (!checked) {
-                        form.setValue("dateOnSite", "");
-                      }
-                    }}
-                    data-testid="checkbox-requires-onsite"
-                  />
-                  <Label 
-                    htmlFor="requiresOnSiteInspection" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Requires On-Site Inspection
-                  </Label>
-                </div>
-
-                {/* Conditional Date On-Site field when requires on-site inspection */}
-                {form.watch("requiresOnSiteInspection") && (
-                  <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <Label htmlFor="dateOnSite">Date On-Site *</Label>
-                      <Input
-                        id="dateOnSite"
-                        type="text"
-                        placeholder="MM/DD/YYYY"
-                        {...form.register("dateOnSite")}
-                        data-testid="input-date-on-site"
-                        pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
-                        title="Please enter date in MM/DD/YYYY format"
+                {/* Only show on-site inspection fields for external tasks */}
+                {!form.watch("isInternalTask") && (
+                  <>
+                    {/* On-Site Inspection Checkbox */}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="requiresOnSiteInspection"
+                        checked={form.watch("requiresOnSiteInspection")}
+                        onCheckedChange={(checked) => {
+                          form.setValue("requiresOnSiteInspection", !!checked);
+                          // Clear dateOnSite if unchecked
+                          if (!checked) {
+                            form.setValue("dateOnSite", "");
+                          }
+                        }}
+                        data-testid="checkbox-requires-onsite"
                       />
+                      <Label 
+                        htmlFor="requiresOnSiteInspection" 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Requires On-Site Inspection
+                      </Label>
                     </div>
-                  </div>
+
+                    {/* Conditional Date On-Site field when requires on-site inspection */}
+                    {form.watch("requiresOnSiteInspection") && (
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <Label htmlFor="dateOnSite">Date On-Site *</Label>
+                          <Input
+                            id="dateOnSite"
+                            type="text"
+                            placeholder="MM/DD/YYYY"
+                            {...form.register("dateOnSite")}
+                            data-testid="input-date-on-site"
+                            pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
+                            title="Please enter date in MM/DD/YYYY format"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Internal Task Checkbox */}
@@ -806,7 +811,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     checked={form.watch("isInternalTask")}
                     onCheckedChange={(checked) => {
                       form.setValue("isInternalTask", !!checked);
-                      // Clear company fields when marking as internal
+                      // Clear company fields and on-site fields when marking as internal
                       if (checked) {
                         form.setValue("companyHired", "");
                         form.setValue("repName", "");
@@ -816,6 +821,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         form.setValue("companyCity", "");
                         form.setValue("companyState", "");
                         form.setValue("companyZip", "");
+                        form.setValue("requiresOnSiteInspection", false);
+                        form.setValue("dateOnSite", "");
                       }
                     }}
                     data-testid="checkbox-internal-task"
@@ -1295,44 +1302,49 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
-                {/* On-Site Inspection Checkbox */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="requiresOnSiteInspection"
-                    checked={form.watch("requiresOnSiteInspection")}
-                    onCheckedChange={(checked) => {
-                      form.setValue("requiresOnSiteInspection", !!checked);
-                      // Clear dateOnSite if unchecked
-                      if (!checked) {
-                        form.setValue("dateOnSite", "");
-                      }
-                    }}
-                    data-testid="checkbox-requires-onsite"
-                  />
-                  <Label 
-                    htmlFor="requiresOnSiteInspection" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Requires On-Site Inspection
-                  </Label>
-                </div>
-
-                {/* Conditional Date On-Site field when requires on-site inspection */}
-                {form.watch("requiresOnSiteInspection") && (
-                  <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <Label htmlFor="dateOnSite">Date On-Site *</Label>
-                      <Input
-                        id="dateOnSite"
-                        type="text"
-                        placeholder="MM/DD/YYYY"
-                        {...form.register("dateOnSite")}
-                        data-testid="input-date-on-site"
-                        pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
-                        title="Please enter date in MM/DD/YYYY format"
+                {/* Only show on-site inspection fields for external tasks */}
+                {!form.watch("isInternalTask") && (
+                  <>
+                    {/* On-Site Inspection Checkbox */}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="requiresOnSiteInspection"
+                        checked={form.watch("requiresOnSiteInspection")}
+                        onCheckedChange={(checked) => {
+                          form.setValue("requiresOnSiteInspection", !!checked);
+                          // Clear dateOnSite if unchecked
+                          if (!checked) {
+                            form.setValue("dateOnSite", "");
+                          }
+                        }}
+                        data-testid="checkbox-requires-onsite"
                       />
+                      <Label 
+                        htmlFor="requiresOnSiteInspection" 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Requires On-Site Inspection
+                      </Label>
                     </div>
-                  </div>
+
+                    {/* Conditional Date On-Site field when requires on-site inspection */}
+                    {form.watch("requiresOnSiteInspection") && (
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <Label htmlFor="dateOnSite">Date On-Site *</Label>
+                          <Input
+                            id="dateOnSite"
+                            type="text"
+                            placeholder="MM/DD/YYYY"
+                            {...form.register("dateOnSite")}
+                            data-testid="input-date-on-site"
+                            pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
+                            title="Please enter date in MM/DD/YYYY format"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Internal Task Checkbox */}
@@ -1342,7 +1354,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     checked={form.watch("isInternalTask")}
                     onCheckedChange={(checked) => {
                       form.setValue("isInternalTask", !!checked);
-                      // Clear company fields when marking as internal
+                      // Clear company fields and on-site fields when marking as internal
                       if (checked) {
                         form.setValue("companyHired", "");
                         form.setValue("repName", "");
@@ -1352,6 +1364,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         form.setValue("companyCity", "");
                         form.setValue("companyState", "");
                         form.setValue("companyZip", "");
+                        form.setValue("requiresOnSiteInspection", false);
+                        form.setValue("dateOnSite", "");
                       }
                     }}
                     data-testid="checkbox-internal-task"

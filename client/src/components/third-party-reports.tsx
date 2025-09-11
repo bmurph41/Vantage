@@ -666,22 +666,25 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           </SelectContent>
                         </Select>
                         
-                        {/* Checkboxes - Always visible */}
+                        {/* Checkboxes - Timeline always visible, On-Site only for external tasks */}
                         <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`on-site-${task.id}`}
-                              checked={task.requiresOnSiteInspection || false}
-                              onCheckedChange={(checked) => handleOnSiteInspectionChange(task.id, checked as boolean)}
-                              data-testid={`checkbox-on-site-${task.id}`}
-                            />
-                            <label 
-                              htmlFor={`on-site-${task.id}`}
-                              className="text-xs text-gray-600 cursor-pointer"
-                            >
-                              On-Site Inspection
-                            </label>
-                          </div>
+                          {/* Only show On-Site Inspection checkbox for external tasks */}
+                          {task.companyHired && (
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`on-site-${task.id}`}
+                                checked={task.requiresOnSiteInspection || false}
+                                onCheckedChange={(checked) => handleOnSiteInspectionChange(task.id, checked as boolean)}
+                                data-testid={`checkbox-on-site-${task.id}`}
+                              />
+                              <label 
+                                htmlFor={`on-site-${task.id}`}
+                                className="text-xs text-gray-600 cursor-pointer"
+                              >
+                                On-Site Inspection
+                              </label>
+                            </div>
+                          )}
                           <div className="flex items-center space-x-2">
                             <Checkbox
                               id={`timeline-${task.id}`}
@@ -786,7 +789,9 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   </div>
                   
                   {/* Date Fields Section */}
-                  <div className="grid grid-cols-4 gap-4 pt-4 border-t border-gray-100">
+                  <div className={`grid gap-4 pt-4 border-t border-gray-100 ${
+                    task.companyHired ? 'grid-cols-4' : 'grid-cols-2'
+                  }`}>
                     <div>
                       <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Deadline</label>
                       <div className="mt-1">
@@ -803,53 +808,59 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       </div>
                     </div>
                     
-                    <div>
-                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Engaged</label>
-                      <div className="mt-1">
-                        {task.status !== "not_started" ? (
-                          <input 
-                            type="date" 
-                            value={task.orderedAt || ""} 
-                            onChange={(e) => handleDateFieldChange(task.id, 'orderedAt', e.target.value)}
-                            className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            data-testid={`input-ordered-${task.id}`}
-                          />
-                        ) : task.orderedAt ? (
-                          <input 
-                            type="date" 
-                            value={task.orderedAt} 
-                            className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
-                            readOnly
-                          />
-                        ) : (
-                          <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
-                        )}
+                    {/* Only show Engaged field for external tasks */}
+                    {task.companyHired && (
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Engaged</label>
+                        <div className="mt-1">
+                          {task.status !== "not_started" ? (
+                            <input 
+                              type="date" 
+                              value={task.orderedAt || ""} 
+                              onChange={(e) => handleDateFieldChange(task.id, 'orderedAt', e.target.value)}
+                              className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              data-testid={`input-ordered-${task.id}`}
+                            />
+                          ) : task.orderedAt ? (
+                            <input 
+                              type="date" 
+                              value={task.orderedAt} 
+                              className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
+                              readOnly
+                            />
+                          ) : (
+                            <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     
-                    <div>
-                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">On-Site</label>
-                      <div className="mt-1">
-                        {task.requiresOnSiteInspection && task.status !== "not_started" ? (
-                          <input 
-                            type="date" 
-                            value={task.dateOnSite || ""} 
-                            onChange={(e) => handleDateFieldChange(task.id, 'dateOnSite', e.target.value)}
-                            className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            data-testid={`input-on-site-${task.id}`}
-                          />
-                        ) : task.dateOnSite ? (
-                          <input 
-                            type="date" 
-                            value={task.dateOnSite} 
-                            className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
-                            readOnly
-                          />
-                        ) : (
-                          <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
-                        )}
+                    {/* Only show On-Site field for external tasks */}
+                    {task.companyHired && (
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">On-Site</label>
+                        <div className="mt-1">
+                          {task.requiresOnSiteInspection && task.status !== "not_started" ? (
+                            <input 
+                              type="date" 
+                              value={task.dateOnSite || ""} 
+                              onChange={(e) => handleDateFieldChange(task.id, 'dateOnSite', e.target.value)}
+                              className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              data-testid={`input-on-site-${task.id}`}
+                            />
+                          ) : task.dateOnSite ? (
+                            <input 
+                              type="date" 
+                              value={task.dateOnSite} 
+                              className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
+                              readOnly
+                            />
+                          ) : (
+                            <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     
                     <div>
                       <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</label>
