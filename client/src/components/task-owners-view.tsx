@@ -13,6 +13,7 @@ interface OwnerStats {
   name: string;
   totalTasks: number;
   notStarted: number;
+  engaged: number;
   scheduled: number;
   inProgress: number;
   completed: number;
@@ -28,6 +29,7 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
     const ownerMap = new Map<string, {
       totalTasks: number;
       notStarted: number;
+      engaged: number;
       scheduled: number;
       inProgress: number;
       completed: number;
@@ -42,6 +44,7 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
         ownerMap.set(owner, {
           totalTasks: 0,
           notStarted: 0,
+          engaged: 0,
           scheduled: 0,
           inProgress: 0,
           completed: 0,
@@ -63,6 +66,9 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
         switch (task.status) {
           case 'not_started':
             stats.notStarted++;
+            break;
+          case 'engaged':
+            stats.engaged++;
             break;
           case 'scheduled':
             stats.scheduled++;
@@ -106,6 +112,8 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
         return 'text-green-600 bg-green-100';
       case 'in_progress':
         return 'text-blue-600 bg-blue-100';
+      case 'engaged':
+        return 'text-purple-600 bg-purple-100';
       case 'scheduled':
         return 'text-blue-600 bg-blue-100';
       case 'not_started':
@@ -123,6 +131,8 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
         return <CheckCircle className="w-4 h-4" />;
       case 'in_progress':
         return <PlayCircle className="w-4 h-4" />;
+      case 'engaged':
+        return <User className="w-4 h-4" />;
       case 'scheduled':
         return <Calendar className="w-4 h-4" />;
       case 'not_started':

@@ -630,6 +630,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="not_started">Not Started</SelectItem>
+                                <SelectItem value="engaged">Engaged</SelectItem>
                                 <SelectItem value="scheduled">Scheduled</SelectItem>
                                 <SelectItem value="in_progress">In Progress</SelectItem>
                                 <SelectItem value="completed">Completed</SelectItem>

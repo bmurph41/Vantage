@@ -140,7 +140,7 @@ const addTaskFormSchema = z.object({
   companyState: z.string().optional(),
   companyZip: z.string().optional(),
   priority: z.enum(["low", "med", "high"]).default("med"),
-  status: z.enum(["not_started", "in_progress", "blocked", "completed", "scheduled"]).default("not_started"),
+  status: z.enum(["not_started", "engaged", "scheduled", "in_progress", "completed"]).default("not_started"),
   paymentStatus: z.enum(["not_paid", "paid", "no_cost"]).default("not_paid"),
   dateOnSite: z.string().optional(),
   requiresOnSiteInspection: z.boolean().default(false),
@@ -692,6 +692,12 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                           <div className="flex items-center gap-2">
                             <Circle className="h-4 w-4 text-gray-500" />
                             <span>Not Started</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="engaged">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-purple-500" />
+                            <span>Engaged</span>
                           </div>
                         </SelectItem>
                         <SelectItem value="scheduled">
@@ -1293,6 +1299,12 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                           <div className="flex items-center gap-2">
                             <Circle className="h-4 w-4 text-gray-500" />
                             <span>Not Started</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="engaged">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-purple-500" />
+                            <span>Engaged</span>
                           </div>
                         </SelectItem>
                         <SelectItem value="scheduled">
