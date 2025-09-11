@@ -799,8 +799,20 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           <input 
                             type="date" 
                             value={task.deadline} 
-                            className="w-full text-sm border border-gray-200 rounded px-2 py-1"
-                            readOnly
+                            onChange={!task.companyHired ? (e) => handleDateFieldChange(task.id, 'deadline', e.target.value) : undefined}
+                            className={`w-full text-sm border border-gray-200 rounded px-2 py-1 ${
+                              !task.companyHired ? 'focus:ring-2 focus:ring-blue-500 focus:border-blue-500' : 'bg-gray-50'
+                            }`}
+                            readOnly={!!task.companyHired}
+                            data-testid={`input-deadline-${task.id}`}
+                          />
+                        ) : !task.companyHired ? (
+                          <input 
+                            type="date" 
+                            value=""
+                            onChange={(e) => handleDateFieldChange(task.id, 'deadline', e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            data-testid={`input-deadline-${task.id}`}
                           />
                         ) : (
                           <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
