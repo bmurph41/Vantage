@@ -691,28 +691,31 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         </div>
                       </div>
                       
-                      <div className="text-center">
-                        <div className="text-sm text-gray-500">Cost</div>
-                        {editingCostTaskId === task.id ? (
-                          <Input
-                            data-testid={`input-cost-${task.id}`}
-                            type="number"
-                            value={editingCostValue}
-                            onChange={(e) => setEditingCostValue(e.target.value)}
-                            onBlur={() => handleSaveCost(task.id)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSaveCost(task.id)}
-                            className="w-24 text-center"
-                            autoFocus
-                          />
-                        ) : (
-                          <div 
-                            className="text-lg font-semibold text-gray-900 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded"
-                            onClick={() => handleEditCost(task.id, task.cost?.toString() || '0')}
-                          >
-                            {formatCurrency(task.cost || '')}
-                          </div>
-                        )}
-                      </div>
+                      {/* Cost section - only show if paymentStatus is not "no_cost" */}
+                      {task.paymentStatus !== 'no_cost' && (
+                        <div className="text-center">
+                          <div className="text-sm text-gray-500">Cost</div>
+                          {editingCostTaskId === task.id ? (
+                            <Input
+                              data-testid={`input-cost-${task.id}`}
+                              type="number"
+                              value={editingCostValue}
+                              onChange={(e) => setEditingCostValue(e.target.value)}
+                              onBlur={() => handleSaveCost(task.id)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleSaveCost(task.id)}
+                              className="w-24 text-center"
+                              autoFocus
+                            />
+                          ) : (
+                            <div 
+                              className="text-lg font-semibold text-gray-900 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded"
+                              onClick={() => handleEditCost(task.id, task.cost?.toString() || '0')}
+                            >
+                              {formatCurrency(task.cost || '')}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       
                       {/* Action Buttons */}
                       <div className="flex items-center space-x-2">
