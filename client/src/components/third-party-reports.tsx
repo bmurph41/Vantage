@@ -120,7 +120,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     return deadlineDate;
   };
 
-  const calculateDaysRemaining = (task: Task) => {
+  const calculateDaysRemaining = (task: Task): number | string => {
     if (task.status === 'completed') return 0;
     
     const today = new Date();
@@ -129,8 +129,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     // Calculate days remaining
     const daysRemaining = differenceInDays(deadlineDate, today);
     
-    // Allow negative values to show overdue tasks, but ensure we have a reasonable calculation
-    return daysRemaining;
+    // Return "Overdue" if negative, otherwise return the number of days
+    return daysRemaining < 0 ? "Overdue" : daysRemaining;
   };
 
   // Calculate progress based on task's specific start date and deadline
@@ -204,8 +204,11 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
         let bValue: number;
         
         if (sortColumn === 'daysRemaining') {
-          aValue = calculateDaysRemaining(a);
-          bValue = calculateDaysRemaining(b);
+          const aRemaining = calculateDaysRemaining(a);
+          const bRemaining = calculateDaysRemaining(b);
+          // Treat "Overdue" as -1 for sorting purposes, completed tasks as 0, others as their numeric value
+          aValue = aRemaining === "Overdue" ? -1 : (typeof aRemaining === 'number' ? aRemaining : 0);
+          bValue = bRemaining === "Overdue" ? -1 : (typeof bRemaining === 'number' ? bRemaining : 0);
         } else if (sortColumn === 'cost') {
           // Parse cost as number, treating empty/null as 0
           aValue = a.cost ? parseFloat(a.cost.replace(/[^0-9.-]/g, '')) || 0 : 0;
@@ -708,7 +711,9 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       {/* Days Remaining */}
                       <div className="text-center">
                         <div className="text-sm text-gray-500">Days Remaining</div>
-                        <div className="text-lg font-bold text-blue-600">
+                        <div className={`text-lg font-bold ${
+                          calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
+                        }`}>
                           {calculateDaysRemaining(task)}
                         </div>
                       </div>
