@@ -675,22 +675,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           </div>
                         </div>
                         
-                        {/* Days Remaining and Cost - Top Right */}
-                        <div className="flex flex-col items-end space-y-2 mr-4">
-                          {/* Days Remaining */}
-                          <div className="text-center">
-                            <div className="text-xs text-gray-500 mb-1">Days Remaining</div>
-                            <div className={`text-sm font-bold ${
-                              calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
-                            }`}>
-                              {calculateDaysRemaining(task)}
-                            </div>
-                          </div>
-                          
+                        {/* Cost and Days Remaining - Top Right */}
+                        <div className="flex flex-col items-end space-y-3 mr-4">
                           {/* Cost section - only show if paymentStatus is not "no_cost" */}
                           {task.paymentStatus !== 'no_cost' && (
                             <div className="text-center">
-                              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Cost</label>
+                              <label className="block text-sm font-medium text-gray-500 uppercase tracking-wide mb-1">Cost</label>
                               <input 
                                 type="text" 
                                 value={task.cost || ""} 
@@ -700,11 +690,21 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                                   handleDateFieldChange(task.id, 'cost', formatted);
                                 }}
                                 placeholder="$0.00"
-                                className="w-20 text-xs border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
+                                className="w-24 text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
                                 data-testid={`input-cost-${task.id}`}
                               />
                             </div>
                           )}
+                          
+                          {/* Days Remaining */}
+                          <div className="text-center">
+                            <div className="text-sm text-gray-500 mb-1">Days Remaining</div>
+                            <div className={`text-base font-bold ${
+                              calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
+                            }`}>
+                              {calculateDaysRemaining(task)}
+                            </div>
+                          </div>
                         </div>
                         
                         {/* Action Buttons - Right side */}
@@ -1010,22 +1010,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       </div>
                     </div>
                     
-                    {/* Days Remaining and Cost - Top Right */}
-                    <div className="flex flex-col items-end space-y-2 mr-4">
-                      {/* Days Remaining */}
-                      <div className="text-center">
-                        <div className="text-xs text-gray-500 mb-1">Days Remaining</div>
-                        <div className={`text-sm font-bold ${
-                          calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
-                        }`}>
-                          {calculateDaysRemaining(task)}
-                        </div>
-                      </div>
-                      
+                    {/* Cost and Days Remaining - Top Right */}
+                    <div className="flex flex-col items-end space-y-3 mr-4">
                       {/* Cost section - only show if paymentStatus is not "no_cost" */}
                       {task.paymentStatus !== 'no_cost' && (
                         <div className="text-center">
-                          <div className="text-xs text-gray-500 mb-1">Cost</div>
+                          <div className="text-sm text-gray-500 mb-1">Cost</div>
                           {editingCostTaskId === task.id ? (
                             <Input
                               data-testid={`input-cost-${task.id}`}
@@ -1034,12 +1024,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               onChange={(e) => setEditingCostValue(e.target.value)}
                               onBlur={() => handleSaveCost(task.id)}
                               onKeyDown={(e) => e.key === 'Enter' && handleSaveCost(task.id)}
-                              className="w-20 text-xs text-center"
+                              className="w-24 text-sm text-center"
                               autoFocus
                             />
                           ) : (
                             <div 
-                              className="text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded"
+                              className="text-base font-semibold text-gray-900 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded"
                               onClick={() => handleEditCost(task.id, task.cost?.toString() || '0')}
                             >
                               {formatCurrency(task.cost || '')}
@@ -1047,6 +1037,16 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           )}
                         </div>
                       )}
+                      
+                      {/* Days Remaining */}
+                      <div className="text-center">
+                        <div className="text-sm text-gray-500 mb-1">Days Remaining</div>
+                        <div className={`text-base font-bold ${
+                          calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
+                        }`}>
+                          {calculateDaysRemaining(task)}
+                        </div>
+                      </div>
                     </div>
                     
                     {/* Action Buttons - Right side */}
