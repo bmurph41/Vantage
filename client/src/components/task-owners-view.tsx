@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { User, CheckCircle, Clock, PlayCircle, Calendar } from "lucide-react";
+import { User, CheckCircle, Clock, PlayCircle, Calendar, AlertTriangle } from "lucide-react";
+import { parseISO, isBefore, startOfDay } from "date-fns";
 import type { Task } from "@shared/schema";
 
 interface TaskOwnersViewProps {
@@ -15,6 +16,7 @@ interface OwnerStats {
   scheduled: number;
   inProgress: number;
   completed: number;
+  overdue: number;
   contributionPercent: number;
   overallProgress: number;
 }
@@ -22,12 +24,14 @@ interface OwnerStats {
 export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
   // Calculate stats by owner
   const calculateOwnerStats = (): OwnerStats[] => {
+    const today = startOfDay(new Date());
     const ownerMap = new Map<string, {
       totalTasks: number;
       notStarted: number;
       scheduled: number;
       inProgress: number;
       completed: number;
+      overdue: number;
     }>();
 
     // Count tasks by owner and status
@@ -41,25 +45,35 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
           scheduled: 0,
           inProgress: 0,
           completed: 0,
+          overdue: 0,
         });
       }
 
       const stats = ownerMap.get(owner)!;
       stats.totalTasks++;
 
-      switch (task.status) {
-        case 'not_started':
-          stats.notStarted++;
-          break;
-        case 'scheduled':
-          stats.scheduled++;
-          break;
-        case 'in_progress':
-          stats.inProgress++;
-          break;
-        case 'completed':
-          stats.completed++;
-          break;
+      // Check if task is overdue (has deadline and is past due, not completed)
+      const isOverdue = task.deadline && 
+        task.status !== 'completed' && 
+        isBefore(parseISO(task.deadline), today);
+
+      if (isOverdue) {
+        stats.overdue++;
+      } else {
+        switch (task.status) {
+          case 'not_started':
+            stats.notStarted++;
+            break;
+          case 'scheduled':
+            stats.scheduled++;
+            break;
+          case 'in_progress':
+            stats.inProgress++;
+            break;
+          case 'completed':
+            stats.completed++;
+            break;
+        }
       }
     });
 
@@ -96,6 +110,8 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
         return 'text-blue-600 bg-blue-100';
       case 'not_started':
         return 'text-gray-600 bg-gray-100';
+      case 'overdue':
+        return 'text-red-600 bg-red-100';
       default:
         return 'text-gray-600 bg-gray-100';
     }
@@ -111,6 +127,8 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
         return <Calendar className="w-4 h-4" />;
       case 'not_started':
         return <Clock className="w-4 h-4" />;
+      case 'overdue':
+        return <AlertTriangle className="w-4 h-4" />;
       default:
         return <Clock className="w-4 h-4" />;
     }
@@ -168,44 +186,34 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
                 </div>
 
                 {/* Status Breakdown */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className={`flex items-center space-x-2 p-3 rounded-lg ${getStatusColor('not_started')}`}>
-                    {getStatusIcon('not_started')}
-                    <div>
-                      <div className="font-semibold" data-testid={`not-started-${owner.name}`}>
-                        {owner.notStarted}
-                      </div>
-                      <div className="text-xs">Not Started</div>
-                    </div>
-                  </div>
-
-                  <div className={`flex items-center space-x-2 p-3 rounded-lg ${getStatusColor('scheduled')}`}>
-                    {getStatusIcon('scheduled')}
-                    <div>
-                      <div className="font-semibold" data-testid={`scheduled-${owner.name}`}>
-                        {owner.scheduled}
-                      </div>
-                      <div className="text-xs">Scheduled</div>
-                    </div>
-                  </div>
-
-                  <div className={`flex items-center space-x-2 p-3 rounded-lg ${getStatusColor('in_progress')}`}>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className={`flex items-center space-x-2 p-2 rounded-lg ${getStatusColor('in_progress')}`}>
                     {getStatusIcon('in_progress')}
                     <div>
-                      <div className="font-semibold" data-testid={`in-progress-${owner.name}`}>
+                      <div className="font-semibold text-sm" data-testid={`in-progress-${owner.name}`}>
                         {owner.inProgress}
                       </div>
                       <div className="text-xs">In Progress</div>
                     </div>
                   </div>
 
-                  <div className={`flex items-center space-x-2 p-3 rounded-lg ${getStatusColor('completed')}`}>
-                    {getStatusIcon('completed')}
+                  <div className={`flex items-center space-x-2 p-2 rounded-lg ${getStatusColor('not_started')}`}>
+                    {getStatusIcon('not_started')}
                     <div>
-                      <div className="font-semibold" data-testid={`completed-${owner.name}`}>
-                        {owner.completed}
+                      <div className="font-semibold text-sm" data-testid={`not-started-${owner.name}`}>
+                        {owner.notStarted + owner.scheduled}
                       </div>
-                      <div className="text-xs">Completed</div>
+                      <div className="text-xs">Not Started</div>
+                    </div>
+                  </div>
+
+                  <div className={`flex items-center space-x-2 p-2 rounded-lg ${getStatusColor('overdue')}`}>
+                    {getStatusIcon('overdue')}
+                    <div>
+                      <div className="font-semibold text-sm" data-testid={`overdue-${owner.name}`}>
+                        {owner.overdue}
+                      </div>
+                      <div className="text-xs">Overdue</div>
                     </div>
                   </div>
                 </div>
