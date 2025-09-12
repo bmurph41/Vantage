@@ -3,12 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
+import { TimelineNotes } from "./timeline-notes";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
+import { StickyNote } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate } from "@/lib/date-utils";
 import { calculateCriticalPath, isTaskCritical, getNearCriticalTasks, type CriticalPathResult } from "@/lib/critical-path";
+import { useQuery } from "@tanstack/react-query";
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -196,6 +200,7 @@ function LinesLayer({ headerRef, contentRef }: LinesLayerProps) {
 export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
+  const [notesDialogTaskId, setNotesDialogTaskId] = useState<string | null>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -207,6 +212,55 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
     [project.psaSignedDate, project.closingDate, project.createdAt]
   );
   const today = startOfDay(tzNow('America/New_York'));
+
+  // Memoize timeline tasks and task IDs to stabilize dependencies
+  const timelineTasks = useMemo(() => tasks.filter(t => t.showOnTimeline), [tasks]);
+  const taskIds = useMemo(() => timelineTasks.map(t => t.id), [timelineTasks]);
+  
+  // Create a stable query key that doesn't change when taskIds array reference changes
+  const taskIdsKey = useMemo(() => taskIds.sort().join(','), [taskIds]);
+  
+  // Create a map to store note counts for each task
+  const [noteCounts, setNoteCounts] = useState<Record<string, number>>({});
+
+  // Fetch notes for all timeline tasks - always call useQuery to avoid hooks violation
+  const noteQueries = useQuery({
+    queryKey: ['timeline-notes-batch', taskIdsKey],
+    queryFn: async () => {
+      if (taskIds.length === 0) return [];
+      
+      const results = await Promise.all(
+        taskIds.map(async (taskId) => {
+          try {
+            const response = await fetch(`/api/dd/tasks/${taskId}/timeline-notes`);
+            const notes = await response.json();
+            return { taskId, count: Array.isArray(notes) ? notes.length : 0 };
+          } catch (error) {
+            console.warn(`Failed to fetch notes for task ${taskId}:`, error);
+            return { taskId, count: 0 };
+          }
+        })
+      );
+      return results;
+    },
+    // Always enable the query but return empty array when no tasks
+    enabled: true,
+  });
+
+  // Update note counts when query data changes
+  useEffect(() => {
+    if (noteQueries.data && Array.isArray(noteQueries.data)) {
+      const counts = noteQueries.data.reduce((acc, { taskId, count }) => {
+        acc[taskId] = count;
+        return acc;
+      }, {} as Record<string, number>);
+      setNoteCounts(counts);
+    }
+  }, [noteQueries.data]);
+
+  const getTaskNoteCount = (taskId: string) => {
+    return noteCounts[taskId] || 0;
+  };
 
   // Generate visible ticks between project bounds based on granularity
   const visibleTicks = useMemo(() => 
@@ -485,6 +539,26 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                         <div className="text-xs text-gray-600">
                           {task.assignee || 'Unassigned'}
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600 relative"
+                          onClick={() => setNotesDialogTaskId(task.id)}
+                          data-testid={`button-notes-${task.id}`}
+                        >
+                          <StickyNote className="h-4 w-4" />
+                          {(() => {
+                            const noteCount = getTaskNoteCount(task.id);
+                            if (noteCount > 0) {
+                              return (
+                                <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
+                                  {noteCount > 9 ? '9+' : noteCount}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </Button>
                       </div>
                     </div>
                     <div className="mt-6">
@@ -581,6 +655,30 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Timeline Notes Dialog */}
+      <Dialog open={!!notesDialogTaskId} onOpenChange={() => setNotesDialogTaskId(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden" data-testid="dialog-timeline-notes">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <StickyNote className="h-5 w-5" />
+              Timeline Notes
+              {notesDialogTaskId && (() => {
+                const task = tasks.find(t => t.id === notesDialogTaskId);
+                return task ? ` - ${task.title}` : '';
+              })()}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            {notesDialogTaskId && (() => {
+              const task = tasks.find(t => t.id === notesDialogTaskId);
+              return task ? (
+                <TimelineNotes taskId={task.id} taskTitle={task.title} />
+              ) : null;
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

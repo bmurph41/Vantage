@@ -45,7 +45,12 @@ export function TimelineNotes({ taskId, taskTitle }: TimelineNotesProps) {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate both individual task notes and batch note count queries
       queryClient.invalidateQueries({ queryKey: ['/api/dd/tasks', taskId, 'timeline-notes'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          Array.isArray(query.queryKey) && query.queryKey[0] === 'timeline-notes-batch'
+      });
       setNewNote({ content: "", noteType: "general" });
       setIsAddingNote(false);
       toast({
@@ -69,7 +74,12 @@ export function TimelineNotes({ taskId, taskTitle }: TimelineNotesProps) {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate both individual task notes and batch note count queries
       queryClient.invalidateQueries({ queryKey: ['/api/dd/tasks', taskId, 'timeline-notes'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          Array.isArray(query.queryKey) && query.queryKey[0] === 'timeline-notes-batch'
+      });
       setEditingNoteId(null);
       setEditContent("");
       toast({
@@ -93,7 +103,12 @@ export function TimelineNotes({ taskId, taskTitle }: TimelineNotesProps) {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate both individual task notes and batch note count queries
       queryClient.invalidateQueries({ queryKey: ['/api/dd/tasks', taskId, 'timeline-notes'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          Array.isArray(query.queryKey) && query.queryKey[0] === 'timeline-notes-batch'
+      });
       toast({
         title: "Success",
         description: "Note deleted successfully",
