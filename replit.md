@@ -51,6 +51,10 @@ Preferred communication style: Simple, everyday language.
 - **Template System**: Reusable project and task templates for standardization
 - **CSV Import/Export**: Data interchange capabilities for external tools
 - **Holiday Calendar Integration**: US Federal holiday support for business day calculations
+- **Task Dependencies**: Multi-select dependency management with critical path analysis capabilities
+
+### Future Integration Requirements
+- **Financial Model Integration**: Transaction costs from this Due Diligence Tracker will flow into the Transaction Costs tab of the related Financial Model app once all applications are merged into a single monorepo. This app serves as the primary driver for transaction cost details and timeline data.
 
 ## External Dependencies
 

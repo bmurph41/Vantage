@@ -130,7 +130,7 @@ function TaskDependenciesSelector({
   projectId: string; 
   value: string[]; 
   onChange: (value: string[]) => void; 
-  currentTaskId?: string; 
+  currentTaskId?: string | undefined; 
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -1130,7 +1130,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     projectId={projectId}
                     value={form.watch("dependencies") || []}
                     onChange={(value) => form.setValue("dependencies", value)}
-                    currentTaskId={isEditMode && editingTask ? editingTask.id : undefined}
+                    currentTaskId={editingTask?.id}
                   />
                   <p className="text-sm text-muted-foreground">
                     Select tasks that must be completed before this task can begin
@@ -1851,7 +1851,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     projectId={projectId}
                     value={form.watch("dependencies") || []}
                     onChange={(value) => form.setValue("dependencies", value)}
-                    currentTaskId={isEditMode && editingTask ? editingTask.id : undefined}
+                    currentTaskId={editingTask?.id}
                   />
                   <p className="text-sm text-muted-foreground">
                     Select tasks that must be completed before this task can begin
