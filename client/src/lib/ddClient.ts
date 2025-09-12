@@ -1,5 +1,5 @@
 import { apiRequest } from "./queryClient";
-import type { Project, ProjectSettings, Task, TaskTemplate, ProjectTemplate } from "@shared/schema";
+import type { Project, ProjectSettings, Task, ProjectTemplate } from "@shared/schema";
 import type { ProjectWithDetails } from "@/types/dd";
 
 export const ddClient = {
@@ -51,15 +51,6 @@ export const ddClient = {
   },
 
   // Templates
-  async getTaskTemplates(): Promise<TaskTemplate[]> {
-    const response = await apiRequest('GET', '/api/dd/task-templates');
-    return response.json();
-  },
-
-  async createTaskTemplate(template: Partial<TaskTemplate>): Promise<TaskTemplate> {
-    const response = await apiRequest('POST', '/api/dd/task-templates', template);
-    return response.json();
-  },
 
   async getProjectTemplates(): Promise<ProjectTemplate[]> {
     const response = await apiRequest('GET', '/api/dd/project-templates');
