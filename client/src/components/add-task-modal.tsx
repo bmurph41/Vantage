@@ -120,6 +120,152 @@ function TaskOwnerSelector({ projectId, value, onChange }: {
   );
 }
 
+// Task Dependencies Selector Component
+function TaskDependenciesSelector({ 
+  projectId, 
+  value, 
+  onChange, 
+  currentTaskId 
+}: { 
+  projectId: string; 
+  value: string[]; 
+  onChange: (value: string[]) => void; 
+  currentTaskId?: string; 
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Fetch existing tasks for the project
+  const { data: projectData } = useProject(projectId);
+  const availableTasks = projectData?.tasks || [];
+
+  // Filter out the current task being edited to prevent circular dependencies
+  const selectableTasks = availableTasks.filter(task => task.id !== currentTaskId);
+
+  const handleTaskToggle = (taskId: string) => {
+    const updatedDependencies = value.includes(taskId)
+      ? value.filter(id => id !== taskId)
+      : [...value, taskId];
+    onChange(updatedDependencies);
+  };
+
+  const removeAllDependencies = () => {
+    onChange([]);
+  };
+
+  const getSelectedTaskNames = () => {
+    return value.map(taskId => {
+      const task = selectableTasks.find(t => t.id === taskId);
+      return task ? task.title : taskId;
+    });
+  };
+
+  if (selectableTasks.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+        No existing tasks available for dependencies. Create some tasks first to set up dependencies.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full justify-between h-auto min-h-10 p-3"
+        data-testid="button-select-dependencies"
+      >
+        <div className="flex flex-wrap gap-1">
+          {value.length === 0 ? (
+            <span className="text-muted-foreground">Select task dependencies...</span>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {getSelectedTaskNames().map((taskName, index) => (
+                <Badge key={index} variant="secondary" className="text-xs">
+                  {taskName}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 ml-2">
+          {value.length > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 hover:bg-destructive hover:text-destructive-foreground"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeAllDependencies();
+              }}
+              data-testid="button-clear-dependencies"
+            >
+              <XCircle className="h-3 w-3" />
+            </Button>
+          )}
+          <div className="text-xs text-muted-foreground">
+            {value.length}/{selectableTasks.length}
+          </div>
+        </div>
+      </Button>
+
+      {isOpen && (
+        <Card className="border">
+          <CardContent className="p-0">
+            <ScrollArea className="max-h-48">
+              <div className="p-2 space-y-1">
+                {selectableTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer"
+                    onClick={() => handleTaskToggle(task.id)}
+                    data-testid={`dependency-option-${task.id}`}
+                  >
+                    <Checkbox
+                      checked={value.includes(task.id)}
+                      className="pointer-events-none"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <div className="text-sm font-medium">{task.title}</div>
+                      {task.assignee && (
+                        <div className="text-xs text-muted-foreground">
+                          Assigned to: {task.assignee}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-xs">
+                        <Badge
+                          variant={
+                            task.priority === "high" ? "destructive" :
+                            task.priority === "med" ? "default" : "secondary"
+                          }
+                          className="text-xs"
+                        >
+                          {task.priority}
+                        </Badge>
+                        <Badge
+                          variant={
+                            task.status === "completed" ? "outline" :
+                            task.status === "in_progress" ? "default" : "secondary"
+                          }
+                          className="text-xs"
+                        >
+                          {task.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 const addTaskFormSchema = z.object({
   title: z.string().min(1, "Task title is required"),
   description: z.string().optional(),
@@ -151,6 +297,7 @@ const addTaskFormSchema = z.object({
   notes: z.string().optional(),
   showOnTimeline: z.boolean().default(false),
   isInternalTask: z.boolean().default(false),
+  dependencies: z.array(z.string()).default([]),
 });
 
 interface AddTaskModalProps {
@@ -291,6 +438,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       notes: "",
       showOnTimeline: false,
       isInternalTask: false,
+      dependencies: [],
     },
   });
 
@@ -328,6 +476,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           notes: editingTask.notes || "",
           showOnTimeline: editingTask.showOnTimeline || false,
           isInternalTask: !editingTask.companyHired, // Infer from whether company is set
+          dependencies: editingTask.dependencies || [],
         });
         setStep("customize"); // Go directly to customize step for editing
       } else {
@@ -358,6 +507,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           cost: "",
           notes: "",
           showOnTimeline: false,
+          dependencies: [],
         });
         setStep("browse"); // Start with browse step for new tasks
       }
@@ -400,6 +550,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       notes: "",
       showOnTimeline: false,
       isInternalTask: false,
+      dependencies: [],
     });
     
     setStep("customize");
@@ -435,6 +586,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       notes: "",
       showOnTimeline: false,
       isInternalTask: false,
+      dependencies: [],
     });
     
     setStep("customize");
@@ -969,6 +1121,20 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       />
                     </div>
                   )}
+                </div>
+
+                {/* Task Dependencies Section */}
+                <div className="space-y-2">
+                  <Label htmlFor="dependencies">Task Dependencies</Label>
+                  <TaskDependenciesSelector 
+                    projectId={projectId}
+                    value={form.watch("dependencies") || []}
+                    onChange={(value) => form.setValue("dependencies", value)}
+                    currentTaskId={isEditMode && editingTask ? editingTask.id : undefined}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Select tasks that must be completed before this task can begin
+                  </p>
                 </div>
 
                 {/* Rep Contact Info */}
@@ -1676,6 +1842,20 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       />
                     </div>
                   )}
+                </div>
+
+                {/* Task Dependencies Section */}
+                <div className="space-y-2">
+                  <Label htmlFor="dependencies">Task Dependencies</Label>
+                  <TaskDependenciesSelector 
+                    projectId={projectId}
+                    value={form.watch("dependencies") || []}
+                    onChange={(value) => form.setValue("dependencies", value)}
+                    currentTaskId={isEditMode && editingTask ? editingTask.id : undefined}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Select tasks that must be completed before this task can begin
+                  </p>
                 </div>
 
                 {/* Rep Contact Info */}
