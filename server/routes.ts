@@ -513,10 +513,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Template not found" });
       }
 
-      // In a full implementation, this would create tasks from template
-      // For now, return success
-      res.json({ success: true, message: "Template applied successfully" });
+      // Create tasks from template blueprint
+      const createdTasks = [];
+      if (template.tasksBlueprint && template.tasksBlueprint.length > 0) {
+        for (const taskTitle of template.tasksBlueprint) {
+          if (taskTitle && taskTitle.trim()) {
+            const taskData = {
+              projectId: req.params.projectId,
+              title: taskTitle.trim(),
+              description: "",
+              startStrategy: "offset" as const,
+              startOffsetDays: 0,
+              deadlineType: "days_after_psa" as const,
+              deadlineDays: 30,
+              assignee: "",
+              companyHired: "",
+              repName: "",
+              repEmail: "",
+              repPhone: "",
+              companyAddress: "",
+              companySuite: "",
+              companyCity: "",
+              companyState: "",
+              companyZip: "",
+              priority: "med" as const,
+              status: "not_started" as const,
+              paymentStatus: "not_paid" as const,
+              requiresOnSiteInspection: false,
+              dateOnSite: "",
+              dependencies: [],
+              manuallyLocked: false,
+              cost: "",
+              notes: "",
+              showOnTimeline: false,
+            };
+
+            const task = await storage.createTask(taskData);
+            createdTasks.push(task);
+
+            // Create audit log for each task
+            await storage.createAuditLog({
+              projectId: task.projectId,
+              userId: req.user.id,
+              entityType: "task",
+              entityId: task.id,
+              action: "created",
+              after: task,
+            });
+          }
+        }
+      }
+
+      // Create audit log for template application
+      await storage.createAuditLog({
+        projectId: req.params.projectId,
+        userId: req.user.id,
+        entityType: "project",
+        entityId: req.params.projectId,
+        action: "template_applied",
+        after: { templateId: template.id, templateName: template.name, tasksCreated: createdTasks.length },
+      });
+
+      res.json({ 
+        success: true, 
+        message: `Template applied successfully. Created ${createdTasks.length} tasks.`,
+        tasksCreated: createdTasks.length,
+        tasks: createdTasks
+      });
     } catch (error) {
+      console.error("Apply template error:", error);
       res.status(500).json({ error: "Failed to apply template" });
     }
   });

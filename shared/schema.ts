@@ -76,6 +76,7 @@ export const projectTemplates = pgTable("project_templates", {
   orgId: varchar("org_id").references(() => organizations.id),
   name: text("name").notNull(),
   description: text("description"),
+  tasksBlueprint: text("tasks_blueprint").array().default(sql`'{}'`),
 });
 
 
