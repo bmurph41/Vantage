@@ -47,7 +47,7 @@ export default function ProjectPage() {
 
   const tabs = [
     { id: "reports", label: "Tasks & Timeline" },
-    { id: "setup", label: "Project Setup" },
+    { id: "setup", label: "Deal Details" },
     { id: "owners", label: "Task Owners" },
     { id: "templates", label: "Templates" },
   ];
@@ -112,7 +112,7 @@ export default function ProjectPage() {
             </>
           )}
           {activeTab === "setup" && (
-            <ProjectSetup project={project} settings={settings} />
+            <ProjectSetup project={project} settings={settings} tasks={tasks} />
           )}
           {activeTab === "owners" && (
             <TaskOwnersView tasks={tasks} />

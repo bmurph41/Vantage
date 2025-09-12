@@ -50,6 +50,11 @@ export const projects = pgTable("projects", {
   extensionCount: integer("extension_count").default(0),
   extensionDays: integer("extension_days").array().default(sql`'{}'`),
   daysToClosing: integer("days_to_closing"),
+  // Key Contacts
+  seller: text("seller"),
+  ourAttorney: text("our_attorney"),
+  titleInsuranceCompany: text("title_insurance_company"),
+  lender: text("lender"),
   tz: text("tz").notNull().default("America/New_York"),
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),

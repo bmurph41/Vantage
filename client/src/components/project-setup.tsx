@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, addDays, parseISO } from "date-fns";
 import { addBusinessDays } from "@/lib/business-days";
-import type { Project, ProjectSettings } from "@shared/schema";
+import type { Project, ProjectSettings, Task } from "@shared/schema";
 import { useUpdateProject, useUpdateProjectSettings } from "@/hooks/use-project";
 
 const projectFormSchema = z.object({
@@ -30,6 +30,11 @@ const projectFormSchema = z.object({
   extensionCount: z.number().min(0).max(10).optional(),
   extensionDays: z.array(z.number().min(1)).optional(),
   daysToClosing: z.number().min(1, "Days to closing must be at least 1 day").optional(),
+  // Key Contacts
+  seller: z.string().optional(),
+  ourAttorney: z.string().optional(),
+  titleInsuranceCompany: z.string().optional(),
+  lender: z.string().optional(),
 });
 
 const settingsFormSchema = z.object({
@@ -42,9 +47,10 @@ const settingsFormSchema = z.object({
 interface ProjectSetupProps {
   project: Project;
   settings?: ProjectSettings | null;
+  tasks: Task[];
 }
 
-export function ProjectSetup({ project, settings }: ProjectSetupProps) {
+export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const updateProject = useUpdateProject();
   const updateSettings = useUpdateProjectSettings();
   const [extensionDaysArray, setExtensionDaysArray] = useState<number[]>(project.extensionDays || []);
@@ -454,6 +460,94 @@ export function ProjectSetup({ project, settings }: ProjectSetupProps) {
               {projectForm.formState.errors.daysToClosing && (
                 <p className="text-sm text-destructive mt-1">{projectForm.formState.errors.daysToClosing.message}</p>
               )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Key Contacts */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Key Contacts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Company Reps from Tasks */}
+            <div>
+              <Label className="text-sm font-medium">Company Representatives</Label>
+              <div className="mt-2 space-y-2">
+                {tasks.filter((task: Task) => task.companyHired && task.repName).length > 0 ? (
+                  <div className="space-y-1">
+                    {tasks
+                      .filter((task: Task) => task.companyHired && task.repName)
+                      .reduce((unique: Task[], task: Task) => {
+                        const key = `${task.companyHired}-${task.repName}`;
+                        if (!unique.some((item: Task) => `${item.companyHired}-${item.repName}` === key)) {
+                          unique.push(task);
+                        }
+                        return unique;
+                      }, [] as Task[])
+                      .map((task: Task, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                          <div>
+                            <div className="font-medium text-sm">{task.repName}</div>
+                            <div className="text-xs text-muted-foreground">{task.companyHired}</div>
+                            {task.repEmail && (
+                              <div className="text-xs text-muted-foreground">{task.repEmail}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No company representatives added yet. Add contacts through individual tasks.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Deal Contacts */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="seller">Seller(s)</Label>
+                <Input
+                  id="seller"
+                  {...projectForm.register("seller")}
+                  placeholder="Seller name or entity"
+                  data-testid="input-seller"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="ourAttorney">Our Attorney</Label>
+                <Input
+                  id="ourAttorney"
+                  {...projectForm.register("ourAttorney")}
+                  placeholder="Attorney name or firm"
+                  data-testid="input-our-attorney"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="titleInsuranceCompany">Title Insurance Company</Label>
+                <Input
+                  id="titleInsuranceCompany"
+                  {...projectForm.register("titleInsuranceCompany")}
+                  placeholder="Title insurance company"
+                  data-testid="input-title-insurance"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="lender">Lender</Label>
+                <Input
+                  id="lender"
+                  {...projectForm.register("lender")}
+                  placeholder="Lending institution"
+                  data-testid="input-lender"
+                />
+              </div>
             </div>
           </div>
         </CardContent>
