@@ -91,6 +91,16 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
     return `${days} days`;
   };
 
+  // Get text color class based on remaining days and task status
+  const getTextColorClass = () => {
+    if (isOverdue || remaining <= 5) {
+      return "text-red-600";
+    } else if (remaining >= 6 && remaining <= 14) {
+      return "text-orange-600";
+    }
+    return "text-black";
+  };
+
   return (
     <div className={cn("h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner", className)} data-testid="progress-bar">
       {/* Text labels above progress bars - positioned at center of task timeline */}
@@ -106,15 +116,15 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
             Completed ({getTimeLabel(taskDurationDays)})
           </span>
         ) : isOverdue ? (
-          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle">
+          <span className={`${getTextColorClass()} text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle`}>
             Overdue ({getTimeLabel(elapsed)} elapsed)
           </span>
         ) : isNotStarted ? (
-          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle">
+          <span className={`${getTextColorClass()} text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle`}>
             {getTimeLabel(taskDurationDays)} remaining
           </span>
         ) : (
-          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle">
+          <span className={`${getTextColorClass()} text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle`}>
             {getTimeLabel(elapsed)} elapsed, {getTimeLabel(remaining)} left
           </span>
         )}
