@@ -688,7 +688,13 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     <Label htmlFor="status">Status</Label>
                     <Select
                       value={form.watch("status")}
-                      onValueChange={(value: string) => form.setValue("status", value as any)}
+                      onValueChange={(value: string) => {
+                        form.setValue("status", value as any);
+                        // Clear dateEngaged if status is not 'engaged'
+                        if (value !== "engaged") {
+                          form.setValue("dateEngaged", "");
+                        }
+                      }}
                     >
                       <SelectTrigger data-testid="select-status">
                         <SelectValue />
@@ -770,6 +776,24 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     />
                   </div>
                 </div>
+
+                {/* Conditional Date Engaged field when status is 'engaged' */}
+                {form.watch("status") === "engaged" && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="dateEngaged">Date Engaged *</Label>
+                      <Input
+                        id="dateEngaged"
+                        type="date"
+                        {...form.register("dateEngaged")}
+                        data-testid="input-date-engaged"
+                      />
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Date when the company was engaged for this task
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Only show on-site inspection fields for external tasks */}
                 {!form.watch("isInternalTask") && (
@@ -1295,7 +1319,13 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     <Label htmlFor="status">Status</Label>
                     <Select
                       value={form.watch("status")}
-                      onValueChange={(value: string) => form.setValue("status", value as any)}
+                      onValueChange={(value: string) => {
+                        form.setValue("status", value as any);
+                        // Clear dateEngaged if status is not 'engaged'
+                        if (value !== "engaged") {
+                          form.setValue("dateEngaged", "");
+                        }
+                      }}
                     >
                       <SelectTrigger data-testid="select-status">
                         <SelectValue />
@@ -1377,6 +1407,24 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     />
                   </div>
                 </div>
+
+                {/* Conditional Date Engaged field when status is 'engaged' */}
+                {form.watch("status") === "engaged" && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="dateEngaged">Date Engaged *</Label>
+                      <Input
+                        id="dateEngaged"
+                        type="date"
+                        {...form.register("dateEngaged")}
+                        data-testid="input-date-engaged"
+                      />
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Date when the company was engaged for this task
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Only show on-site inspection fields for external tasks */}
                 {!form.watch("isInternalTask") && (
