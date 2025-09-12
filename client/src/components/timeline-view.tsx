@@ -2,11 +2,13 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate } from "@/lib/date-utils";
+import { calculateCriticalPath, isTaskCritical, getNearCriticalTasks, type CriticalPathResult } from "@/lib/critical-path";
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -212,6 +214,18 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
     [project, granularity]
   );
 
+  // Calculate critical path when tasks or showCriticalPath changes
+  const criticalPathResult = useMemo(() => {
+    if (!showCriticalPath) return null;
+    
+    try {
+      return calculateCriticalPath(tasks, project, settings);
+    } catch (error) {
+      console.warn('Critical path calculation failed:', error);
+      return null;
+    }
+  }, [tasks, project, settings, showCriticalPath]);
+
   // Get milestone position along timeline (0-100%)
   const getMilestonePosition = (dateString: string) => {
     const date = parseISO(dateString);
@@ -246,6 +260,11 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 data-testid="button-critical-path"
               >
                 Critical Path
+                {showCriticalPath && criticalPathResult && (
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    {criticalPathResult.criticalPath.length}
+                  </Badge>
+                )}
               </Button>
             </div>
           </div>
@@ -401,35 +420,86 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             </div>
           )}
 
+          {/* Critical Path Summary */}
+          {showCriticalPath && criticalPathResult && (
+            <div className="mb-6" data-timeline-section>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-amber-800 leader-obstacle">
+                    Critical Path Analysis
+                  </h3>
+                  <div className="flex items-center space-x-4 text-xs text-amber-700">
+                    <span>Project Duration: <strong>{criticalPathResult.projectDuration} days</strong></span>
+                    <span>Critical Tasks: <strong>{criticalPathResult.criticalPath.length}</strong></span>
+                  </div>
+                </div>
+                <div className="text-xs text-amber-700">
+                  <strong>Critical Path:</strong> Tasks that cannot be delayed without affecting the project completion date.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Task Progress Bars */}
           {tasks.filter(t => t.showOnTimeline).length > 0 && (
             <div className="mb-6 space-y-6" data-timeline-section>
-              {tasks.filter(t => t.showOnTimeline).map((task) => (
-                <div key={task.id} className="bg-gray-50 rounded-lg p-3 border">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <span className={`w-2 h-2 rounded-full ${
-                        task.status === 'completed' ? 'bg-green-500' :
-                        task.status === 'in_progress' ? 'bg-blue-500' :
-                        task.status === 'scheduled' ? 'bg-blue-600' :
-                        'bg-gray-400'
-                      }`} />
-                      <span className="text-sm font-medium text-gray-900 leader-obstacle">{task.title}</span>
+              {tasks.filter(t => t.showOnTimeline).map((task) => {
+                const isCritical = showCriticalPath && criticalPathResult ? isTaskCritical(task.id, criticalPathResult) : false;
+                const criticalInfo = showCriticalPath && criticalPathResult ? criticalPathResult.nodes.get(task.id) : null;
+                
+                return (
+                  <div key={task.id} className={`rounded-lg p-3 border transition-all duration-200 ${
+                    isCritical 
+                      ? 'bg-red-50 border-red-200 shadow-md' 
+                      : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <span className={`w-2 h-2 rounded-full ${
+                          isCritical ? 'bg-red-500' :
+                          task.status === 'completed' ? 'bg-green-500' :
+                          task.status === 'in_progress' ? 'bg-blue-500' :
+                          task.status === 'scheduled' ? 'bg-blue-600' :
+                          'bg-gray-400'
+                        }`} />
+                        <span className={`text-sm font-medium leader-obstacle ${
+                          isCritical ? 'text-red-900' : 'text-gray-900'
+                        }`}>{task.title}</span>
+                        {isCritical && (
+                          <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                            Critical
+                          </Badge>
+                        )}
+                        {showCriticalPath && criticalInfo && criticalInfo.float > 0 && criticalInfo.float <= 2 && (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5 text-amber-700 border-amber-300">
+                            Near Critical ({Math.round(criticalInfo.float)}d float)
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        {showCriticalPath && criticalInfo && (
+                          <div className="text-xs text-gray-600">
+                            Float: <strong>{Math.round(criticalInfo.float)}d</strong>
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-600">
+                          {task.assignee || 'Unassigned'}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-600">
-                      {task.assignee || 'Unassigned'}
+                    <div className="mt-6">
+                      <ProgressBar 
+                        task={task} 
+                        project={project} 
+                        settings={settings}
+                        className={`shadow-sm ${
+                          isCritical ? 'ring-2 ring-red-200' : ''
+                        }`}
+                      />
                     </div>
                   </div>
-                  <div className="mt-6">
-                    <ProgressBar 
-                      task={task} 
-                      project={project} 
-                      settings={settings}
-                      className="shadow-sm"
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
