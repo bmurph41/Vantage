@@ -211,7 +211,7 @@ export default function Dashboard() {
               }
               
               return (
-                <Link key={project.id} href={`/project/${project.id}`}>
+                <Link key={project.id} href={`/projects/${project.id}`}>
                   <Card className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-2 ${statusColor} hover:scale-[1.02]`} data-testid={`card-project-${project.id}`}>
                     {/* Header with status badge */}
                     <CardHeader className="pb-3">
