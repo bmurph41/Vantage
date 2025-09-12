@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertTaskSchema, 
-  insertTaskTemplateSchema, insertProjectTemplateSchema, insertAuditLogSchema,
+  insertProjectTemplateSchema, insertAuditLogSchema,
   insertTimelineNoteSchema, insertProjectShareSchema 
 } from "@shared/schema";
 import { z } from "zod";
@@ -475,75 +475,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Task Templates
-  app.get("/api/dd/task-templates", async (req: any, res) => {
-    try {
-      const [orgTemplates, globalTemplates] = await Promise.all([
-        storage.getTaskTemplatesForOrg(req.user.orgId),
-        storage.getGlobalTaskTemplates(),
-      ]);
-      res.json([...orgTemplates, ...globalTemplates]);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch task templates" });
-    }
-  });
-
-  app.post("/api/dd/task-templates", async (req: any, res) => {
-    try {
-      const templateData = insertTaskTemplateSchema.parse({
-        ...req.body,
-        orgId: req.user.orgId,
-        isGlobal: false,
-      });
-      
-      const template = await storage.createTaskTemplate(templateData);
-      res.json(template);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid template data" });
-    }
-  });
-
-  // Create template from existing task
-  app.post("/api/dd/tasks/:taskId/save-as-template", async (req: any, res) => {
-    try {
-      const task = await storage.getTask(req.params.taskId);
-      if (!task) {
-        return res.status(404).json({ error: "Task not found" });
-      }
-
-      const { templateName, templateDescription, category } = req.body;
-      
-      // Create template from task data
-      const templateData = insertTaskTemplateSchema.parse({
-        name: templateName || task.title,
-        description: templateDescription || task.description,
-        startOffsetDays: task.startOffsetDays || 0,
-        anchor: "psa",
-        defaultAssignee: task.assignee,
-        label: task.title,
-        priority: task.priority,
-        category: category || "Custom",
-        estimatedCost: task.cost,
-        orgId: req.user.orgId,
-        isGlobal: false,
-      });
-      
-      const template = await storage.createTaskTemplate(templateData);
-      res.json(template);
-    } catch (error) {
-      console.error("Error creating template from task:", error);
-      res.status(400).json({ error: "Failed to create template from task" });
-    }
-  });
 
   // Project Templates
   app.get("/api/dd/project-templates", async (req: any, res) => {
     try {
-      const [orgTemplates, globalTemplates] = await Promise.all([
-        storage.getProjectTemplatesForOrg(req.user.orgId),
-        storage.getGlobalProjectTemplates(),
-      ]);
-      res.json([...orgTemplates, ...globalTemplates]);
+      const templates = await storage.getProjectTemplatesForOrg(req.user.orgId);
+      res.json(templates);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch project templates" });
     }

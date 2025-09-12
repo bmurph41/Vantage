@@ -1,10 +1,10 @@
 import { 
-  organizations, users, projects, projectSettings, tasks, taskTemplates, 
+  organizations, users, projects, projectSettings, tasks, 
   projectTemplates, auditLogs, timelineNotes, projectShares,
   type Organization, type User, type Project, type ProjectSettings, 
-  type Task, type TaskTemplate, type ProjectTemplate, type AuditLog,
+  type Task, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type InsertOrganization, type InsertUser, type InsertProject, 
-  type InsertProjectSettings, type InsertTask, type InsertTaskTemplate,
+  type InsertProjectSettings, type InsertTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare
 } from "@shared/schema";
 import { db } from "./db";
@@ -46,16 +46,10 @@ export interface IStorage {
   updateProjectShare(id: string, updates: Partial<InsertProjectShare>): Promise<ProjectShare>;
   deleteProjectShare(id: string): Promise<void>;
 
-  // Task Templates
-  getTaskTemplate(id: string): Promise<TaskTemplate | undefined>;
-  getTaskTemplatesForOrg(orgId: string): Promise<TaskTemplate[]>;
-  getGlobalTaskTemplates(): Promise<TaskTemplate[]>;
-  createTaskTemplate(template: InsertTaskTemplate): Promise<TaskTemplate>;
 
   // Project Templates
   getProjectTemplate(id: string): Promise<ProjectTemplate | undefined>;
   getProjectTemplatesForOrg(orgId: string): Promise<ProjectTemplate[]>;
-  getGlobalProjectTemplates(): Promise<ProjectTemplate[]>;
   createProjectTemplate(template: InsertProjectTemplate): Promise<ProjectTemplate>;
 
   // Timeline Notes
@@ -187,23 +181,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(tasks).where(eq(tasks.id, id));
   }
 
-  async getTaskTemplate(id: string): Promise<TaskTemplate | undefined> {
-    const [template] = await db.select().from(taskTemplates).where(eq(taskTemplates.id, id));
-    return template || undefined;
-  }
-
-  async getTaskTemplatesForOrg(orgId: string): Promise<TaskTemplate[]> {
-    return db.select().from(taskTemplates).where(eq(taskTemplates.orgId, orgId));
-  }
-
-  async getGlobalTaskTemplates(): Promise<TaskTemplate[]> {
-    return db.select().from(taskTemplates).where(eq(taskTemplates.isGlobal, true));
-  }
-
-  async createTaskTemplate(template: InsertTaskTemplate): Promise<TaskTemplate> {
-    const [created] = await db.insert(taskTemplates).values(template).returning();
-    return created;
-  }
 
   async getProjectTemplate(id: string): Promise<ProjectTemplate | undefined> {
     const [template] = await db.select().from(projectTemplates).where(eq(projectTemplates.id, id));
@@ -214,10 +191,6 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(projectTemplates).where(eq(projectTemplates.orgId, orgId));
   }
 
-  async getGlobalProjectTemplates(): Promise<ProjectTemplate[]> {
-    // Project templates don't have isGlobal field, return empty for now
-    return [];
-  }
 
   async createProjectTemplate(template: InsertProjectTemplate): Promise<ProjectTemplate> {
     const [created] = await db.insert(projectTemplates).values(template).returning();

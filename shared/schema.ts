@@ -69,24 +69,6 @@ export const projectSettings = pgTable("project_settings", {
   ndaRequired: boolean("nda_required").notNull().default(false),
 });
 
-// Task Templates
-export const taskTemplates = pgTable("task_templates", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  orgId: varchar("org_id").references(() => organizations.id),
-  name: text("name").notNull(),
-  description: text("description"),
-  startOffsetDays: integer("start_offset_days").notNull().default(0),
-  anchor: anchorTypeEnum("anchor").notNull().default("psa"),
-  defaultAssignee: text("default_assignee"),
-  defaultDependencies: integer("default_dependencies").array(),
-  label: text("label"),
-  priority: priorityEnum("priority").notNull().default("med"),
-  category: text("category"),
-  estimatedCost: text("estimated_cost"),
-  typicalCompanies: text("typical_companies").array(),
-  isGlobal: boolean("is_global").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
 
 // Project Templates
 export const projectTemplates = pgTable("project_templates", {
@@ -96,14 +78,6 @@ export const projectTemplates = pgTable("project_templates", {
   description: text("description"),
 });
 
-// Project Template Tasks (junction table)
-export const projectTemplateTasks = pgTable("project_template_tasks", {
-  templateId: varchar("template_id").notNull().references(() => projectTemplates.id),
-  taskTemplateId: varchar("task_template_id").notNull().references(() => taskTemplates.id),
-  sortOrder: integer("sort_order").notNull(),
-}, (table) => ({
-  pk: primaryKey({ columns: [table.templateId, table.taskTemplateId] }),
-}));
 
 // Tasks
 export const tasks = pgTable("tasks", {
@@ -273,9 +247,6 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
 
 export const insertProjectSettingsSchema = createInsertSchema(projectSettings);
 
-export const insertTaskTemplateSchema = createInsertSchema(taskTemplates).omit({
-  id: true,
-});
 
 export const insertProjectTemplateSchema = createInsertSchema(projectTemplates).omit({
   id: true,
@@ -316,8 +287,6 @@ export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type ProjectSettings = typeof projectSettings.$inferSelect;
 export type InsertProjectSettings = z.infer<typeof insertProjectSettingsSchema>;
 
-export type TaskTemplate = typeof taskTemplates.$inferSelect;
-export type InsertTaskTemplate = z.infer<typeof insertTaskTemplateSchema>;
 
 export type ProjectTemplate = typeof projectTemplates.$inferSelect;
 export type InsertProjectTemplate = z.infer<typeof insertProjectTemplateSchema>;
