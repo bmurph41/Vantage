@@ -507,7 +507,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       const taskData = {
         ...transformedData,
         projectId,
-        status: "not_started" as const,
+        status: data.status, // Use the status selected by the user in the form
       };
 
       createTask.mutate(

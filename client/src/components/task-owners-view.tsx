@@ -196,7 +196,7 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
                 </div>
 
                 {/* Status Breakdown */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div className={`flex items-center space-x-2 p-2 rounded-lg ${getStatusColor('in_progress')}`}>
                     {getStatusIcon('in_progress')}
                     <div>
@@ -204,6 +204,16 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
                         {owner.inProgress}
                       </div>
                       <div className="text-xs">In Progress</div>
+                    </div>
+                  </div>
+
+                  <div className={`flex items-center space-x-2 p-2 rounded-lg ${getStatusColor('engaged')}`}>
+                    {getStatusIcon('engaged')}
+                    <div>
+                      <div className="font-semibold text-sm" data-testid={`engaged-${owner.name}`}>
+                        {owner.engaged}
+                      </div>
+                      <div className="text-xs">Engaged</div>
                     </div>
                   </div>
 
