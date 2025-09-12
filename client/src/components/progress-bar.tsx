@@ -50,7 +50,7 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   
   const taskDeadline = startOfDay(calculateTaskDeadline(task));
   
-  // Calculate task status first (needed for positioning calculations)
+  // Calculate task status variables first - these are used throughout the component
   const isCompleted = task.status === 'completed';
   const isOverdue = !isCompleted && isAfter(today, taskDeadline);
   const isNotStarted = isBefore(today, taskStart);
