@@ -872,6 +872,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         form.setValue("repEmail", "");
                         form.setValue("repPhone", "");
                         form.setValue("companyAddress", "");
+                        form.setValue("companySuite", "");
                         form.setValue("companyCity", "");
                         form.setValue("companyState", "");
                         form.setValue("companyZip", "");
@@ -1025,6 +1026,15 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                             placeholder="123 Main Street"
                             {...form.register("companyAddress")}
                             data-testid="input-company-address"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="companySuite">Suite/Unit</Label>
+                          <Input
+                            id="companySuite"
+                            placeholder="Suite, Unit, or Floor"
+                            {...form.register("companySuite")}
+                            data-testid="input-company-suite"
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
@@ -1521,6 +1531,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         form.setValue("repEmail", "");
                         form.setValue("repPhone", "");
                         form.setValue("companyAddress", "");
+                        form.setValue("companySuite", "");
                         form.setValue("companyCity", "");
                         form.setValue("companyState", "");
                         form.setValue("companyZip", "");
@@ -1674,6 +1685,15 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                             placeholder="123 Main Street"
                             {...form.register("companyAddress")}
                             data-testid="input-company-address"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="companySuite">Suite/Unit</Label>
+                          <Input
+                            id="companySuite"
+                            placeholder="Suite, Unit, or Floor"
+                            {...form.register("companySuite")}
+                            data-testid="input-company-suite"
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
