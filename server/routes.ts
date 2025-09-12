@@ -244,8 +244,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/dd/projects/:projectId/tasks", async (req: any, res) => {
     try {
+      // Extract isInternalTask field before validation
+      const { isInternalTask, ...taskPayload } = req.body;
+      
+      // If it's an internal task, clear company-related fields
+      if (isInternalTask) {
+        taskPayload.companyHired = "";
+        taskPayload.repName = "";
+        taskPayload.repEmail = "";
+        taskPayload.repPhone = "";
+        taskPayload.companyAddress = "";
+        taskPayload.companySuite = "";
+        taskPayload.companyCity = "";
+        taskPayload.companyState = "";
+        taskPayload.companyZip = "";
+        taskPayload.requiresOnSiteInspection = false;
+        taskPayload.dateOnSite = "";
+      }
+
       const taskData = insertTaskSchema.parse({
-        ...req.body,
+        ...taskPayload,
         projectId: req.params.projectId,
       });
       
@@ -281,13 +299,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(task);
     } catch (error) {
-      res.status(400).json({ error: "Invalid task data" });
+      console.error("Task creation error:", error);
+      console.error("Request body:", req.body);
+      
+      if (error instanceof z.ZodError) {
+        // Return detailed validation errors
+        const fieldErrors = error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message
+        }));
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: fieldErrors,
+          message: "Please check the highlighted fields and try again."
+        });
+      }
+      
+      res.status(400).json({ 
+        error: "Invalid task data", 
+        details: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 
   app.patch("/api/dd/tasks/:id", async (req: any, res) => {
     try {
-      const updates = insertTaskSchema.partial().parse(req.body);
+      // Extract isInternalTask field before validation
+      const { isInternalTask, ...taskPayload } = req.body;
+      
+      // If it's an internal task, clear company-related fields
+      if (isInternalTask) {
+        taskPayload.companyHired = "";
+        taskPayload.repName = "";
+        taskPayload.repEmail = "";
+        taskPayload.repPhone = "";
+        taskPayload.companyAddress = "";
+        taskPayload.companySuite = "";
+        taskPayload.companyCity = "";
+        taskPayload.companyState = "";
+        taskPayload.companyZip = "";
+        taskPayload.requiresOnSiteInspection = false;
+        taskPayload.dateOnSite = "";
+      }
+
+      const updates = insertTaskSchema.partial().parse(taskPayload);
       const task = await storage.getTask(req.params.id);
       
       if (!task) {
@@ -330,7 +385,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Task update error:", error);
       console.error("Request body:", req.body);
-      res.status(400).json({ error: "Invalid update data", details: error instanceof Error ? error.message : String(error) });
+      
+      if (error instanceof z.ZodError) {
+        // Return detailed validation errors
+        const fieldErrors = error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message
+        }));
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: fieldErrors,
+          message: "Please check the highlighted fields and try again."
+        });
+      }
+      
+      res.status(400).json({ 
+        error: "Invalid update data", 
+        details: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 
