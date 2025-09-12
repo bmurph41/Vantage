@@ -249,6 +249,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId: req.params.projectId,
       });
       
+      // Check for circular dependencies if dependencies are provided
+      if (taskData.dependencies && taskData.dependencies.length > 0) {
+        // Generate a temporary ID for the new task to use in validation
+        const tempTaskId = crypto.randomBytes(16).toString('hex');
+        const hasCircularDep = await storage.hasCircularDependency(
+          req.params.projectId,
+          tempTaskId,
+          taskData.dependencies
+        );
+        
+        if (hasCircularDep) {
+          return res.status(400).json({ 
+            error: "Circular dependency detected",
+            message: "The specified dependencies would create a circular dependency. Please review your task dependencies."
+          });
+        }
+      }
+      
       const task = await storage.createTask(taskData);
 
       // Create audit log
@@ -274,6 +292,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
+      }
+
+      // Check for circular dependencies if dependencies are being updated
+      if (updates.dependencies !== undefined) {
+        const dependenciesToCheck = updates.dependencies || [];
+        if (dependenciesToCheck.length > 0) {
+          const hasCircularDep = await storage.hasCircularDependency(
+            task.projectId,
+            task.id,
+            dependenciesToCheck
+          );
+          
+          if (hasCircularDep) {
+            return res.status(400).json({ 
+              error: "Circular dependency detected",
+              message: "The updated dependencies would create a circular dependency. Please review your task dependencies."
+            });
+          }
+        }
       }
 
       const updated = await storage.updateTask(req.params.id, updates);

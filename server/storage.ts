@@ -67,6 +67,9 @@ export interface IStorage {
   // Audit Logs
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogsForProject(projectId: string): Promise<AuditLog[]>;
+
+  // Dependency Validation
+  hasCircularDependency(projectId: string, taskId: string, dependencies: string[]): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -282,6 +285,61 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProjectShare(id: string): Promise<void> {
     await db.delete(projectShares).where(eq(projectShares.id, id));
+  }
+
+  async hasCircularDependency(projectId: string, taskId: string, dependencies: string[]): Promise<boolean> {
+    // Get all tasks for the project to build the dependency graph
+    const allTasks = await this.getTasksForProject(projectId);
+    
+    // Build a dependency map: taskId -> dependencies[]
+    const dependencyMap = new Map<string, string[]>();
+    
+    // Add existing dependencies from all tasks
+    for (const task of allTasks) {
+      // Skip the task being created/updated to simulate the new dependency state
+      if (task.id !== taskId) {
+        dependencyMap.set(task.id, task.dependencies || []);
+      }
+    }
+    
+    // Add the new/updated task with its proposed dependencies
+    dependencyMap.set(taskId, dependencies);
+    
+    // Use DFS to detect cycles
+    const visited = new Set<string>();
+    const recursionStack = new Set<string>();
+    
+    const hasCycleDFS = (currentTaskId: string): boolean => {
+      // Mark current task as visited and in recursion stack
+      visited.add(currentTaskId);
+      recursionStack.add(currentTaskId);
+      
+      // Get dependencies for current task
+      const taskDependencies = dependencyMap.get(currentTaskId) || [];
+      
+      // Visit all dependencies
+      for (const depId of taskDependencies) {
+        // Skip empty or null dependencies
+        if (!depId || depId.trim() === '') continue;
+        
+        // If dependency is in recursion stack, we found a cycle
+        if (recursionStack.has(depId)) {
+          return true;
+        }
+        
+        // If dependency hasn't been visited, recursively check it
+        if (!visited.has(depId) && hasCycleDFS(depId)) {
+          return true;
+        }
+      }
+      
+      // Remove current task from recursion stack
+      recursionStack.delete(currentTaskId);
+      return false;
+    };
+    
+    // Check for cycles starting from the task being created/updated
+    return hasCycleDFS(taskId);
   }
 }
 
