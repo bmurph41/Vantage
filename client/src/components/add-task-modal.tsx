@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Clock, DollarSign, Users, AlertCircle, Save, CheckCircle, XCircle, Calendar, Play, Circle, MinusCircle } from "lucide-react";
+import { Search, Clock, DollarSign, Users, AlertCircle, Save, CheckCircle, XCircle, Calendar, Play, Circle, MinusCircle, MapPin } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { formatPhoneNumber } from "@/lib/phone-utils";
@@ -1016,59 +1016,107 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         </div>
                       </div>
                       
-                      {/* Company Address Section */}
+                      {/* Company Address Section - Geocoding Ready Structure */}
                       <div className="space-y-3">
+                        <div className="text-xs font-medium text-gray-600 uppercase tracking-wide flex items-center justify-between">
+                          <span>Company Address</span>
+                          {/* Placeholder Auto-fill Button - Ready for Future Geocoding Integration */}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs opacity-50 cursor-not-allowed"
+                            disabled
+                            data-testid="button-autofill-address"
+                            data-geocoding-trigger="true"
+                            title="Auto-fill address (Coming Soon)"
+                          >
+                            <MapPin className="h-3 w-3 mr-1" />
+                            Auto-fill
+                          </Button>
+                        </div>
 
-                        <div>
-                          <Label htmlFor="companyAddress">Street Address</Label>
-                          <Input
-                            id="companyAddress"
-                            placeholder="123 Main Street"
-                            {...form.register("companyAddress")}
-                            data-testid="input-company-address"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="companySuite">Suite/Unit</Label>
-                          <Input
-                            id="companySuite"
-                            placeholder="Suite, Unit, or Floor"
-                            {...form.register("companySuite")}
-                            data-testid="input-company-suite"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        {/* 
+                          GEOCODING INTEGRATION NOTES:
+                          - This container is structured for easy geocoding integration
+                          - Add 'data-geocoding-container' attribute to enable autocomplete
+                          - Individual fields have 'data-geocoding-field' attributes for mapping
+                          - Auto-fill button above is ready to trigger geocoding services
+                          - Form validation can be enhanced with address validation in the future
+                          
+                          Future Integration Steps:
+                          1. Enable the auto-fill button and add onClick handler
+                          2. Add autocomplete props to the street address input
+                          3. Implement address parsing to populate individual fields
+                          4. Add address validation using geocoding service
+                        */}
+                        <div 
+                          className="space-y-3"
+                          data-geocoding-container="true"
+                          data-testid="container-address-geocoding"
+                        >
                           <div>
-                            <Label htmlFor="companyCity">City</Label>
+                            <Label htmlFor="companyAddress">Street Address</Label>
                             <Input
-                              id="companyCity"
-                              placeholder="City"
-                              {...form.register("companyCity")}
-                              data-testid="input-company-city"
+                              id="companyAddress"
+                              placeholder="123 Main Street"
+                              {...form.register("companyAddress")}
+                              data-testid="input-company-address"
+                              data-geocoding-field="street_address"
+                              data-geocoding-primary="true"
+                              autoComplete="street-address"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label htmlFor="companySuite">Suite/Unit</Label>
+                            <Input
+                              id="companySuite"
+                              placeholder="Suite, Unit, or Floor"
+                              {...form.register("companySuite")}
+                              data-testid="input-company-suite"
+                              data-geocoding-field="subpremise"
+                              autoComplete="address-line2"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <Label htmlFor="companyState">State</Label>
+                              <Label htmlFor="companyCity">City</Label>
                               <Input
-                                id="companyState"
-                                placeholder="State"
-                                {...form.register("companyState")}
-                                onBlur={(e) => {
-                                  const formatted = toStateAbbr(e.target.value);
-                                  form.setValue("companyState", formatted);
-                                }}
-                                data-testid="input-company-state"
+                                id="companyCity"
+                                placeholder="City"
+                                {...form.register("companyCity")}
+                                data-testid="input-company-city"
+                                data-geocoding-field="locality"
+                                autoComplete="address-level2"
                               />
                             </div>
-                            <div>
-                              <Label htmlFor="companyZip">ZIP Code</Label>
-                              <Input
-                                id="companyZip"
-                                placeholder="12345"
-                                {...form.register("companyZip")}
-                                data-testid="input-company-zip"
-                              />
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label htmlFor="companyState">State</Label>
+                                <Input
+                                  id="companyState"
+                                  placeholder="State"
+                                  {...form.register("companyState")}
+                                  onBlur={(e) => {
+                                    const formatted = toStateAbbr(e.target.value);
+                                    form.setValue("companyState", formatted);
+                                  }}
+                                  data-testid="input-company-state"
+                                  data-geocoding-field="administrative_area_level_1"
+                                  autoComplete="address-level1"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="companyZip">ZIP Code</Label>
+                                <Input
+                                  id="companyZip"
+                                  placeholder="12345"
+                                  {...form.register("companyZip")}
+                                  data-testid="input-company-zip"
+                                  data-geocoding-field="postal_code"
+                                  autoComplete="postal-code"
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1675,59 +1723,107 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         </div>
                       </div>
                       
-                      {/* Company Address Section */}
+                      {/* Company Address Section - Geocoding Ready Structure */}
                       <div className="space-y-3">
+                        <div className="text-xs font-medium text-gray-600 uppercase tracking-wide flex items-center justify-between">
+                          <span>Company Address</span>
+                          {/* Placeholder Auto-fill Button - Ready for Future Geocoding Integration */}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs opacity-50 cursor-not-allowed"
+                            disabled
+                            data-testid="button-autofill-address"
+                            data-geocoding-trigger="true"
+                            title="Auto-fill address (Coming Soon)"
+                          >
+                            <MapPin className="h-3 w-3 mr-1" />
+                            Auto-fill
+                          </Button>
+                        </div>
 
-                        <div>
-                          <Label htmlFor="companyAddress">Street Address</Label>
-                          <Input
-                            id="companyAddress"
-                            placeholder="123 Main Street"
-                            {...form.register("companyAddress")}
-                            data-testid="input-company-address"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="companySuite">Suite/Unit</Label>
-                          <Input
-                            id="companySuite"
-                            placeholder="Suite, Unit, or Floor"
-                            {...form.register("companySuite")}
-                            data-testid="input-company-suite"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        {/* 
+                          GEOCODING INTEGRATION NOTES:
+                          - This container is structured for easy geocoding integration
+                          - Add 'data-geocoding-container' attribute to enable autocomplete
+                          - Individual fields have 'data-geocoding-field' attributes for mapping
+                          - Auto-fill button above is ready to trigger geocoding services
+                          - Form validation can be enhanced with address validation in the future
+                          
+                          Future Integration Steps:
+                          1. Enable the auto-fill button and add onClick handler
+                          2. Add autocomplete props to the street address input
+                          3. Implement address parsing to populate individual fields
+                          4. Add address validation using geocoding service
+                        */}
+                        <div 
+                          className="space-y-3"
+                          data-geocoding-container="true"
+                          data-testid="container-address-geocoding"
+                        >
                           <div>
-                            <Label htmlFor="companyCity">City</Label>
+                            <Label htmlFor="companyAddress">Street Address</Label>
                             <Input
-                              id="companyCity"
-                              placeholder="City"
-                              {...form.register("companyCity")}
-                              data-testid="input-company-city"
+                              id="companyAddress"
+                              placeholder="123 Main Street"
+                              {...form.register("companyAddress")}
+                              data-testid="input-company-address"
+                              data-geocoding-field="street_address"
+                              data-geocoding-primary="true"
+                              autoComplete="street-address"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label htmlFor="companySuite">Suite/Unit</Label>
+                            <Input
+                              id="companySuite"
+                              placeholder="Suite, Unit, or Floor"
+                              {...form.register("companySuite")}
+                              data-testid="input-company-suite"
+                              data-geocoding-field="subpremise"
+                              autoComplete="address-line2"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <Label htmlFor="companyState">State</Label>
+                              <Label htmlFor="companyCity">City</Label>
                               <Input
-                                id="companyState"
-                                placeholder="State"
-                                {...form.register("companyState")}
-                                onBlur={(e) => {
-                                  const formatted = toStateAbbr(e.target.value);
-                                  form.setValue("companyState", formatted);
-                                }}
-                                data-testid="input-company-state"
+                                id="companyCity"
+                                placeholder="City"
+                                {...form.register("companyCity")}
+                                data-testid="input-company-city"
+                                data-geocoding-field="locality"
+                                autoComplete="address-level2"
                               />
                             </div>
-                            <div>
-                              <Label htmlFor="companyZip">ZIP Code</Label>
-                              <Input
-                                id="companyZip"
-                                placeholder="12345"
-                                {...form.register("companyZip")}
-                                data-testid="input-company-zip"
-                              />
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label htmlFor="companyState">State</Label>
+                                <Input
+                                  id="companyState"
+                                  placeholder="State"
+                                  {...form.register("companyState")}
+                                  onBlur={(e) => {
+                                    const formatted = toStateAbbr(e.target.value);
+                                    form.setValue("companyState", formatted);
+                                  }}
+                                  data-testid="input-company-state"
+                                  data-geocoding-field="administrative_area_level_1"
+                                  autoComplete="address-level1"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="companyZip">ZIP Code</Label>
+                                <Input
+                                  id="companyZip"
+                                  placeholder="12345"
+                                  {...form.register("companyZip")}
+                                  data-testid="input-company-zip"
+                                  data-geocoding-field="postal_code"
+                                  autoComplete="postal-code"
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
