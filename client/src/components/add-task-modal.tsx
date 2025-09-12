@@ -795,10 +795,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 )}
 
-                {/* Only show on-site inspection fields for external tasks */}
-                {!form.watch("isInternalTask") && (
-                  <>
-                    {/* On-Site Inspection Checkbox */}
+                {/* Checkboxes row - On-Site Inspection and Add to Timeline */}
+                <div className="flex flex-wrap items-center gap-6">
+                  {/* On-Site Inspection Checkbox - only for external tasks */}
+                  {!form.watch("isInternalTask") && (
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="requiresOnSiteInspection"
@@ -819,25 +819,43 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         Requires On-Site Inspection
                       </Label>
                     </div>
+                  )}
 
-                    {/* Conditional Date On-Site field when requires on-site inspection */}
-                    {form.watch("requiresOnSiteInspection") && (
-                      <div className="grid grid-cols-1 gap-4">
-                        <div>
-                          <Label htmlFor="dateOnSite">Date On-Site *</Label>
-                          <Input
-                            id="dateOnSite"
-                            type="text"
-                            placeholder="MM/DD/YYYY"
-                            {...form.register("dateOnSite")}
-                            data-testid="input-date-on-site"
-                            pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
-                            title="Please enter date in MM/DD/YYYY format"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </>
+                  {/* Add to Timeline Checkbox - available for all tasks */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="showOnTimeline"
+                      checked={form.watch("showOnTimeline")}
+                      onCheckedChange={(checked) => {
+                        form.setValue("showOnTimeline", !!checked);
+                      }}
+                      data-testid="checkbox-add-to-timeline"
+                    />
+                    <Label 
+                      htmlFor="showOnTimeline" 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Add to Timeline
+                    </Label>
+                  </div>
+                </div>
+
+                {/* Conditional Date On-Site field when requires on-site inspection */}
+                {!form.watch("isInternalTask") && form.watch("requiresOnSiteInspection") && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="dateOnSite">Date On-Site *</Label>
+                      <Input
+                        id="dateOnSite"
+                        type="text"
+                        placeholder="MM/DD/YYYY"
+                        {...form.register("dateOnSite")}
+                        data-testid="input-date-on-site"
+                        pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
+                        title="Please enter date in MM/DD/YYYY format"
+                      />
+                    </div>
+                  </div>
                 )}
 
                 {/* Internal Task Checkbox */}
@@ -1426,10 +1444,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 )}
 
-                {/* Only show on-site inspection fields for external tasks */}
-                {!form.watch("isInternalTask") && (
-                  <>
-                    {/* On-Site Inspection Checkbox */}
+                {/* Checkboxes row - On-Site Inspection and Add to Timeline */}
+                <div className="flex flex-wrap items-center gap-6">
+                  {/* On-Site Inspection Checkbox - only for external tasks */}
+                  {!form.watch("isInternalTask") && (
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="requiresOnSiteInspection"
@@ -1450,25 +1468,43 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         Requires On-Site Inspection
                       </Label>
                     </div>
+                  )}
 
-                    {/* Conditional Date On-Site field when requires on-site inspection */}
-                    {form.watch("requiresOnSiteInspection") && (
-                      <div className="grid grid-cols-1 gap-4">
-                        <div>
-                          <Label htmlFor="dateOnSite">Date On-Site *</Label>
-                          <Input
-                            id="dateOnSite"
-                            type="text"
-                            placeholder="MM/DD/YYYY"
-                            {...form.register("dateOnSite")}
-                            data-testid="input-date-on-site"
-                            pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
-                            title="Please enter date in MM/DD/YYYY format"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </>
+                  {/* Add to Timeline Checkbox - available for all tasks */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="showOnTimeline"
+                      checked={form.watch("showOnTimeline")}
+                      onCheckedChange={(checked) => {
+                        form.setValue("showOnTimeline", !!checked);
+                      }}
+                      data-testid="checkbox-add-to-timeline"
+                    />
+                    <Label 
+                      htmlFor="showOnTimeline" 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Add to Timeline
+                    </Label>
+                  </div>
+                </div>
+
+                {/* Conditional Date On-Site field when requires on-site inspection */}
+                {!form.watch("isInternalTask") && form.watch("requiresOnSiteInspection") && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="dateOnSite">Date On-Site *</Label>
+                      <Input
+                        id="dateOnSite"
+                        type="text"
+                        placeholder="MM/DD/YYYY"
+                        {...form.register("dateOnSite")}
+                        data-testid="input-date-on-site"
+                        pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
+                        title="Please enter date in MM/DD/YYYY format"
+                      />
+                    </div>
+                  </div>
                 )}
 
                 {/* Internal Task Checkbox */}
