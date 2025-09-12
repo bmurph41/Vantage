@@ -53,16 +53,19 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   // NEW SYSTEM: All task bars span from PSA Signed Date to task deadline
   const barStartPosition = 0; // Always start from PSA Signed Date (left edge)
   const deadlinePosition = percentOfRange(taskDeadline, timelineStart, timelineEnd);
-  const barWidth = Math.max(1, deadlinePosition); // Bar width from PSA to task deadline
+  const todayPosition = percentOfRange(today, timelineStart, timelineEnd);
+  
+  // Bar should end at current day OR deadline, whichever comes first
+  const barEndPosition = Math.min(deadlinePosition, todayPosition);
+  const barWidth = Math.max(1, barEndPosition); // Bar width from PSA to current day or deadline
   
   // Calculate positions for elapsed and remaining sections within the bar
-  const todayPosition = percentOfRange(today, timelineStart, timelineEnd);
   // For completed tasks, the entire bar should be "elapsed" (solid color)
   const elapsedWidth = task.status === 'completed'
-    ? deadlinePosition // Full bar for completed tasks
-    : Math.max(0, Math.min(deadlinePosition, todayPosition)); // PSA to today for active tasks
+    ? barEndPosition // Full bar for completed tasks (to current day or deadline)
+    : Math.max(0, Math.min(barEndPosition, todayPosition)); // PSA to today for active tasks
   const remainingStart = elapsedWidth; // Start of remaining section
-  const remainingWidth = Math.max(0, deadlinePosition - elapsedWidth); // Today to deadline
+  const remainingWidth = Math.max(0, barEndPosition - elapsedWidth); // Today to bar end
   
   // Task start position for reference marker
   const taskStartPosition = percentOfRange(taskStart, timelineStart, timelineEnd);
