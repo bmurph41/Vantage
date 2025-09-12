@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Download, Mail, Eye, FileText, Calendar } from "lucide-react";
 import type { Task, Project } from "@shared/schema";
-import { format, parseISO, addDays, differenceInDays } from "date-fns";
+import { format, parseISO, addDays, differenceInDays, isValid } from "date-fns";
 
 interface ExportReportModalProps {
   isOpen: boolean;
@@ -182,13 +182,39 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
       case 'priority':
         return task.priority;
       case 'deadline':
-        return format(calculateDeadlineDate(task), 'MMM d, yyyy');
+        try {
+          const deadlineDate = calculateDeadlineDate(task);
+          return isValid(deadlineDate) ? format(deadlineDate, 'MMM d, yyyy') : '-';
+        } catch {
+          return '-';
+        }
       case 'orderedAt':
-        return task.orderedAt ? format(new Date(task.orderedAt), 'MMM d, yyyy') : '-';
+        return task.orderedAt ? (() => {
+          try {
+            const date = new Date(task.orderedAt!);
+            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+          } catch {
+            return '-';
+          }
+        })() : '-';
       case 'startDate':
-        return task.dateOnSite ? format(new Date(task.dateOnSite), 'MMM d, yyyy') : '-';
+        return task.dateOnSite ? (() => {
+          try {
+            const date = new Date(task.dateOnSite!);
+            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+          } catch {
+            return '-';
+          }
+        })() : '-';
       case 'completedAt':
-        return task.completedAt ? format(new Date(task.completedAt), 'MMM d, yyyy') : '-';
+        return task.completedAt ? (() => {
+          try {
+            const date = new Date(task.completedAt!);
+            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+          } catch {
+            return '-';
+          }
+        })() : '-';
       case 'cost':
         return formatCurrency(task.cost || '');
       case 'paymentStatus':
