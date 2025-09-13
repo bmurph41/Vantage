@@ -558,6 +558,7 @@ const getUniqueCompaniesHired = (tasks: Task[]): string[] => {
 const getCompanyContacts = (tasks: Task[]) => {
   const companyMap = new Map<string, {
     name: string;
+    taskNames: Set<string>;
     representatives: {
       name?: string;
       email?: string;
@@ -580,12 +581,18 @@ const getCompanyContacts = (tasks: Task[]) => {
       if (!companyMap.has(companyName)) {
         companyMap.set(companyName, {
           name: companyName,
+          taskNames: new Set(),
           representatives: [],
           assignees: new Set()
         });
       }
       
       const company = companyMap.get(companyName)!;
+      
+      // Add task name
+      if (task.title && task.title.trim()) {
+        company.taskNames.add(task.title.trim());
+      }
       
       // Add representative if available
       if (task.repName || task.repEmail || task.repPhone) {
@@ -937,11 +944,10 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
           
           {companyContacts.length > 0 && (
             <View style={styles.contactItem}>
-              <Text style={styles.contactTitle}>Third-Party Companies</Text>
               {companyContacts.map((company, index) => (
                 <View key={index} style={{ marginBottom: 8, paddingLeft: 10 }}>
                   <Text style={[styles.contactDetail, { fontWeight: 'bold', marginBottom: 2 }]}>
-                    {company.name}
+                    {Array.from(company.taskNames).join(', ')} - {company.name}
                   </Text>
                   
                   {company.representatives.length > 0 && (
