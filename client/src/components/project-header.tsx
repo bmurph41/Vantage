@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format, parseISO } from "date-fns";
-import { Download, Share2, Calendar } from "lucide-react";
+import { Download, Share2, Calendar, FileText } from "lucide-react";
 import type { Project, Task, ProjectSettings } from "@shared/schema";
 import { ddClient } from "@/lib/ddClient";
 import { useToast } from "@/hooks/use-toast";
 import { ShareProjectDialog } from "./share-project-dialog";
 import { AddToCalendarDialog } from "./add-to-calendar-dialog";
+import { generateWhitePaperPDF } from "./white-paper-export";
 
 interface ProjectHeaderProps {
   project: Project;
@@ -69,6 +70,22 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
     }
   };
 
+  const handleExportReport = async () => {
+    try {
+      await generateWhitePaperPDF(project, tasks, settings);
+      toast({
+        title: "Success",
+        description: "Due diligence report exported successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export report",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   return (
     <div className="mb-8" data-testid="project-header">
@@ -82,6 +99,10 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
           </p>
         </div>
         <div className="flex items-center space-x-3">
+          <Button variant="outline" onClick={handleExportReport} data-testid="button-export-report">
+            <FileText className="h-4 w-4 mr-2" />
+            Export Report
+          </Button>
           <Button variant="outline" onClick={handleExportCSV} data-testid="button-export-csv">
             <Download className="h-4 w-4 mr-2" />
             Export CSV
