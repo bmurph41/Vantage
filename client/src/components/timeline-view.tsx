@@ -324,8 +324,8 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             </div>
           </div>
 
-          {/* Clean Date Headers with Smart Leader Lines */}
-          <div className="mb-4 relative">
+          {/* Project Timeline Headers - Moved above milestone sections */}
+          <div className="mb-6 relative">
             <div className="relative w-full h-12 bg-gray-50 rounded border overflow-hidden" ref={headerRef}>
               {/* Dynamic Start and End labels */}
               <div className="absolute left-0 top-0 bottom-0 flex items-center px-2 bg-blue-100 text-blue-800 text-xs font-medium border-r border-blue-200 z-10">
