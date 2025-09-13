@@ -472,9 +472,9 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                       elapsedWidth = 0; // No elapsed time
                       remainingWidth = barWidth; // Full bar is remaining
                     } else {
-                      // In progress: elapsed from start to today, remaining from today to deadline
-                      elapsedWidth = Math.max(0, todayPos - startPos);
-                      remainingWidth = Math.max(0, endPos - todayPos);
+                      // In progress: elapsed from start to today (never past closing), remaining from today to deadline
+                      elapsedWidth = Math.max(0, Math.min(todayPos, endPos) - startPos);
+                      remainingWidth = Math.max(0, endPos - Math.min(todayPos, endPos));
                     }
                     
                     return (

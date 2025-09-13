@@ -87,10 +87,10 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
     elapsedWidth = Math.max(0, taskDeadlinePosition - taskStartPosition);
     remainingWidth = 0; // No remaining time for overdue tasks
   } else {
-    // For in-progress tasks, elapsed goes from task start to today
-    // CRITICAL FIX: Ensure elapsed never goes past today, even if deadline is before today
+    // For in-progress tasks, elapsed goes from task start to today (never past today)
+    // CRITICAL FIX: Elapsed section ends at today's position, never extends past it
     elapsedEndPosition = Math.min(todayPosition, taskDeadlinePosition);
-    elapsedWidth = Math.max(0, Math.min(todayPosition - taskStartPosition, taskDeadlinePosition - taskStartPosition));
+    elapsedWidth = Math.max(0, Math.min(todayPosition, taskDeadlinePosition) - taskStartPosition);
     remainingWidth = Math.max(0, taskDeadlinePosition - Math.min(todayPosition, taskDeadlinePosition));
   }
   
