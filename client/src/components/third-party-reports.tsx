@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle, FileDown } from "lucide-react";
+import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle, FileDown, Edit, StickyNote } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
 import { useQuery } from "@tanstack/react-query";
@@ -709,33 +709,36 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         </div>
                         
                         {/* Action Buttons - Right side */}
-                        <div className="flex items-center space-x-2 ml-4">
+                        <div className="flex flex-col items-center space-y-2 ml-4">
+                          {/* Edit Button */}
                           <Button
                             data-testid={`button-edit-${task.id}`}
-                            variant="outline"
-                            size="sm"
                             onClick={() => handleEditTask(task)}
-                            className="h-8 w-8 p-0"
+                            className="h-8 px-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium border-0 shadow-sm"
                           >
-                            ✏️
+                            <Edit className="w-3 h-3 mr-1" />
+                            Edit
                           </Button>
+                          
+                          {/* Add Note Button */}
                           <Button
-                            data-testid={`button-duplicate-${task.id}`}
-                            variant="outline"
-                            size="sm"
-                            className="h-8 w-8 p-0"
+                            data-testid={`button-add-note-${task.id}`}
+                            onClick={() => setTimelineNotesTask(task)}
+                            className="h-8 px-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium border-0 shadow-sm"
                           >
-                            📋
+                            <StickyNote className="w-3 h-3 mr-1" />
+                            Note
                           </Button>
+                          
+                          {/* Delete Button */}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
                                 data-testid={`button-delete-${task.id}`}
-                                variant="outline"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                className="h-8 px-3 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs font-medium border-0 shadow-sm"
                               >
-                                🗑️
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                Delete
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -1285,6 +1288,21 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       tasks={filteredTasks}
       project={project}
     />
+
+    {/* Timeline Notes Modal */}
+    {timelineNotesTask && (
+      <Dialog open={!!timelineNotesTask} onOpenChange={() => setTimelineNotesTask(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Timeline Notes - {timelineNotesTask.title}</DialogTitle>
+          </DialogHeader>
+          <TimelineNotes
+            taskId={timelineNotesTask.id}
+            taskTitle={timelineNotesTask.title}
+          />
+        </DialogContent>
+      </Dialog>
+    )}
     </div>
   );
 }
