@@ -6,7 +6,8 @@ import {
   addMonths,
   startOfWeek,
   startOfMonth,
-  differenceInDays, 
+  differenceInDays,
+  differenceInCalendarDays, 
   isAfter, 
   isBefore,
   parseISO 
@@ -216,10 +217,10 @@ export function getTimelineWindow(granularity: string, opts?: {
  * Calculate percentage position of a date within a range
  */
 export function percentOfRange(date: Date, start: Date, end: Date): number {
-  const total = differenceInDays(end, start);
+  const total = differenceInCalendarDays(end, start);
   if (total <= 0) return 0;
   
-  const elapsed = differenceInDays(date, start);
+  const elapsed = differenceInCalendarDays(date, start);
   return Math.max(0, Math.min(100, (elapsed / total) * 100));
 }
 
