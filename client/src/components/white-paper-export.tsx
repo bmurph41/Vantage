@@ -696,19 +696,10 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
         <Text style={styles.header}>Executive Summary</Text>
         
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Project Overview</Text>
+          <Text style={styles.sectionTitle}>Deal Overview</Text>
           <Text style={styles.text}>
-            <Text style={styles.bold}>Project:</Text> {project.name}
+            <Text style={styles.bold}>Deal:</Text> {project.name}
           </Text>
-          {project.description && (
-            <Text style={styles.text}>
-              <Text style={styles.bold}>Description:</Text> {project.description}
-            </Text>
-          )}
-          
-          <View style={overallRiskIndicator.style}>
-            <Text>{overallRiskIndicator.text}</Text>
-          </View>
         </View>
 
         <View style={styles.section}>
