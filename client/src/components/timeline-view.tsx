@@ -452,12 +452,21 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                     const endPos = percentOfRange(closingDate, timelineStart, timelineEnd);
                     const todayPos = percentOfRange(today, timelineStart, timelineEnd);
                     
-                    // Progress bar spans full duration from PSA to closing
-                    const barWidth = Math.max(1, endPos - startPos);
-                    
                     // Determine project status
                     const isCompleted = today >= closingDate;
                     const isNotStarted = today < startDate;
+                    
+                    // Progress bar positioning - clamp container to today for in-progress
+                    let barEndPos: number;
+                    if (isCompleted || isNotStarted) {
+                      // For completed/not-started projects, span full duration
+                      barEndPos = endPos;
+                    } else {
+                      // For in-progress projects, clamp container to today (don't extend past today)
+                      barEndPos = Math.min(todayPos, endPos);
+                    }
+                    
+                    const barWidth = Math.max(1, barEndPos - startPos);
                     
                     // Calculate elapsed and remaining widths
                     let elapsedWidth = 0;
@@ -470,9 +479,9 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                       elapsedWidth = 0; // No elapsed time
                       remainingWidth = barWidth; // Full bar is remaining
                     } else {
-                      // In progress: elapsed from start to today (never past closing), remaining from today to deadline
-                      elapsedWidth = Math.max(0, Math.min(todayPos, endPos) - startPos);
-                      remainingWidth = Math.max(0, endPos - Math.min(todayPos, endPos));
+                      // In progress: elapsed from start to today, remaining is 0 (container is clamped to today)
+                      elapsedWidth = Math.max(0, todayPos - startPos);
+                      remainingWidth = 0; // No remaining width since container ends at today
                     }
                     
                     return (
