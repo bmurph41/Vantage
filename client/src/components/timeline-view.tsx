@@ -4,18 +4,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { TimelineNotes } from "./timeline-notes";
-import { AddTaskModal } from "./add-task-modal";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
-import { StickyNote, Edit, Trash2 } from "lucide-react";
+import { StickyNote } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate } from "@/lib/date-utils";
 import { calculateCriticalPath, isTaskCritical, getNearCriticalTasks, type CriticalPathResult } from "@/lib/critical-path";
 import { useQuery } from "@tanstack/react-query";
-import { useDeleteTask } from "@/hooks/use-tasks";
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -204,12 +201,9 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [notesDialogTaskId, setNotesDialogTaskId] = useState<string | null>(null);
-  const [editDialogTaskId, setEditDialogTaskId] = useState<string | null>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Hook for deleting tasks
-  const deleteTask = useDeleteTask();
 
   const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];
 
@@ -546,79 +540,28 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                         <div className="text-xs text-gray-600">
                           {task.assignee || 'Unassigned'}
                         </div>
-                        {/* Three-Button Stack Design */}
-                        <div className="flex flex-col space-y-1">
-                          {/* Edit Button */}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-3 text-xs rounded-full bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-all duration-200 shadow-sm"
-                            onClick={() => setEditDialogTaskId(task.id)}
-                            disabled={deleteTask.isPending}
-                            data-testid={`button-edit-${task.id}`}
-                          >
-                            <Edit className="h-3 w-3 mr-1" />
-                            Edit
-                          </Button>
-                          
-                          {/* Add Note Button */}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-3 text-xs rounded-full bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-all duration-200 shadow-sm relative"
-                            onClick={() => setNotesDialogTaskId(task.id)}
-                            disabled={deleteTask.isPending}
-                            data-testid={`button-notes-${task.id}`}
-                          >
-                            <StickyNote className="h-3 w-3 mr-1" />
-                            Note
-                            {(() => {
-                              const noteCount = getTaskNoteCount(task.id);
-                              if (noteCount > 0) {
-                                return (
-                                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center shadow-md">
-                                    {noteCount > 9 ? '9+' : noteCount}
-                                  </span>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </Button>
-                          
-                          {/* Delete Button with Confirmation */}
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-3 text-xs rounded-full bg-red-50 border-red-200 text-red-700 hover:bg-red-100 hover:border-red-300 transition-all duration-200 shadow-sm"
-                                disabled={deleteTask.isPending}
-                                data-testid={`button-delete-${task.id}`}
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                {deleteTask.isPending ? 'Deleting...' : 'Delete'}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Task</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete "{task.title}"? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel disabled={deleteTask.isPending}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  onClick={() => deleteTask.mutate(task.id)}
-                                  disabled={deleteTask.isPending}
-                                  className="bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                                >
-                                  {deleteTask.isPending ? 'Deleting...' : 'Delete'}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
+                        {/* Simple Note Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors relative"
+                          onClick={() => setNotesDialogTaskId(task.id)}
+                          data-testid={`button-notes-${task.id}`}
+                        >
+                          <StickyNote className="h-3 w-3 mr-1" />
+                          Notes
+                          {(() => {
+                            const noteCount = getTaskNoteCount(task.id);
+                            if (noteCount > 0) {
+                              return (
+                                <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center shadow-md">
+                                  {noteCount > 9 ? '9+' : noteCount}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </Button>
                       </div>
                     </div>
                     <div className="mt-6">
@@ -740,18 +683,6 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Task Modal */}
-      {editDialogTaskId && (() => {
-        const editingTask = tasks.find(t => t.id === editDialogTaskId);
-        return editingTask ? (
-          <AddTaskModal
-            isOpen={!!editDialogTaskId}
-            onClose={() => setEditDialogTaskId(null)}
-            projectId={project.id}
-            editingTask={editingTask}
-          />
-        ) : null;
-      })()}
     </div>
   );
 }
