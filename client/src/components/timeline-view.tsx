@@ -426,10 +426,9 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                   </div>
                   <div className="text-xs text-gray-600">
                     {(() => {
-                      const timezone = 'America/New_York';
-                      const today = startOfDay(tzNow(timezone));
-                      const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
-                      const closingDate = startOfDay(parseISO(project.closingDate));
+                      // Use the same timeline bounds as the main timeline for perfect alignment
+                      const startDate = timelineStart;
+                      const closingDate = timelineEnd;
                       
                       if (today >= closingDate) return '100% - Closing reached';
                       
@@ -444,10 +443,9 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 
                 <div className="h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner">
                   {(() => {
-                    const timezone = 'America/New_York';
-                    const today = startOfDay(tzNow(timezone));
-                    const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
-                    const closingDate = startOfDay(parseISO(project.closingDate));
+                    // Use the same timeline bounds as the main timeline for perfect alignment
+                    const startDate = timelineStart;
+                    const closingDate = timelineEnd;
                     
                     // Calculate positions within timeline 
                     const startPos = percentOfRange(startDate, timelineStart, timelineEnd);
