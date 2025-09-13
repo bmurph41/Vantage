@@ -866,6 +866,8 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
                       <View style={{ flexDirection: 'row', marginBottom: 8, paddingBottom: 4, borderBottom: '1 solid #e2e8f0' }}>
                         <Text style={[styles.text, { flex: 3, fontWeight: 'bold', fontSize: 10 }]}>DD Task</Text>
                         <Text style={[styles.text, { flex: 2, fontWeight: 'bold', fontSize: 10 }]}>Task Owner</Text>
+                        <Text style={[styles.text, { flex: 2, fontWeight: 'bold', fontSize: 10 }]}>Company Hired</Text>
+                        <Text style={[styles.text, { flex: 1, fontWeight: 'bold', fontSize: 10 }]}>Cost</Text>
                         <Text style={[styles.text, { flex: 1, fontWeight: 'bold', fontSize: 10 }]}>Status</Text>
                       </View>
                       
@@ -874,6 +876,8 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
                         <View key={task.id} style={{ flexDirection: 'row', marginBottom: 6, paddingVertical: 4 }}>
                           <Text style={[styles.text, { flex: 3, fontSize: 9 }]}>{task.title}</Text>
                           <Text style={[styles.text, { flex: 2, fontSize: 9 }]}>{task.assignee || 'Unassigned'}</Text>
+                          <Text style={[styles.text, { flex: 2, fontSize: 9 }]}>{task.companyHired || 'Internal'}</Text>
+                          <Text style={[styles.text, { flex: 1, fontSize: 9 }]}>{task.companyHired ? formatCurrency(task.cost || '') : '---'}</Text>
                           <View style={{ flex: 1 }}>
                             <View style={getStatusStyle(task.status)}>
                               <Text style={{ fontSize: 8 }}>{formatStatus(task.status)}</Text>
