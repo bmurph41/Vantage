@@ -51,8 +51,8 @@ export const projects = pgTable("projects", {
   extensionDays: integer("extension_days").array().default(sql`'{}'`),
   daysToClosing: integer("days_to_closing"),
   // Key Contacts
-  seller: text("seller"),
-  ourAttorney: text("our_attorney"),
+  seller: text("seller").array().default(sql`'{}'`),
+  ourAttorney: text("our_attorney").array().default(sql`'{}'`),
   titleInsuranceCompany: text("title_insurance_company"),
   lender: text("lender"),
   tz: text("tz").notNull().default("America/New_York"),

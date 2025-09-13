@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Plus, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -31,8 +32,8 @@ const projectFormSchema = z.object({
   extensionDays: z.array(z.number().min(1)).optional(),
   daysToClosing: z.number().min(1, "Days to closing must be at least 1 day").optional(),
   // Key Contacts
-  seller: z.string().optional(),
-  ourAttorney: z.string().optional(),
+  seller: z.array(z.string()).optional(),
+  ourAttorney: z.array(z.string()).optional(),
   titleInsuranceCompany: z.string().optional(),
   lender: z.string().optional(),
 });
@@ -54,6 +55,8 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const updateProject = useUpdateProject();
   const updateSettings = useUpdateProjectSettings();
   const [extensionDaysArray, setExtensionDaysArray] = useState<number[]>(project.extensionDays || []);
+  const [sellersArray, setSellersArray] = useState<string[]>(project.seller || []);
+  const [attorneysArray, setAttorneysArray] = useState<string[]>(project.ourAttorney || []);
 
   // Helper function to calculate DD expiration date
   const calculateDDExpirationDate = (psaDate: string, ddPeriodDays: number, extensionDays: number[], useBusinessDays: boolean, holidayCalendar: string) => {
@@ -112,6 +115,11 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
       extensionCount: project.extensionCount || 0,
       extensionDays: project.extensionDays || [],
       daysToClosing: project.daysToClosing || 15,
+      // Key Contacts
+      seller: project.seller || [],
+      ourAttorney: project.ourAttorney || [],
+      titleInsuranceCompany: project.titleInsuranceCompany || "",
+      lender: project.lender || "",
     },
   });
 
@@ -168,6 +176,58 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
     }
   }, [projectForm.watch("ddExpirationDate"), daysToClosing, useBusinessDays, holidayCalendar, projectForm]);
 
+  // Helper functions for seller array
+  const addSeller = () => {
+    const newSellers = [...sellersArray, ""];
+    setSellersArray(newSellers);
+    projectForm.setValue("seller", newSellers);
+  };
+
+  const removeSeller = (index: number) => {
+    const newSellers = sellersArray.filter((_, i) => i !== index);
+    setSellersArray(newSellers);
+    projectForm.setValue("seller", newSellers);
+  };
+
+  const updateSeller = (index: number, value: string) => {
+    const newSellers = [...sellersArray];
+    newSellers[index] = value;
+    setSellersArray(newSellers);
+    projectForm.setValue("seller", newSellers);
+  };
+
+  // Helper functions for attorney array
+  const addAttorney = () => {
+    const newAttorneys = [...attorneysArray, ""];
+    setAttorneysArray(newAttorneys);
+    projectForm.setValue("ourAttorney", newAttorneys);
+  };
+
+  const removeAttorney = (index: number) => {
+    const newAttorneys = attorneysArray.filter((_, i) => i !== index);
+    setAttorneysArray(newAttorneys);
+    projectForm.setValue("ourAttorney", newAttorneys);
+  };
+
+  const updateAttorney = (index: number, value: string) => {
+    const newAttorneys = [...attorneysArray];
+    newAttorneys[index] = value;
+    setAttorneysArray(newAttorneys);
+    projectForm.setValue("ourAttorney", newAttorneys);
+  };
+
+  // Initialize arrays with at least one empty entry if they're empty
+  useEffect(() => {
+    if (sellersArray.length === 0) {
+      setSellersArray([""]);
+      projectForm.setValue("seller", [""]);
+    }
+    if (attorneysArray.length === 0) {
+      setAttorneysArray([""]);
+      projectForm.setValue("ourAttorney", [""]);
+    }
+  }, []);
+
   const onProjectSubmit = (data: z.infer<typeof projectFormSchema>) => {
     // Update project data
     updateProject.mutate({
@@ -185,6 +245,11 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
         extensionCount: data.extensionCount || 0,
         extensionDays: data.extensionDays || [],
         daysToClosing: data.daysToClosing || null,
+        // Key Contacts - filter out empty strings
+        seller: (data.seller || []).filter(s => s.trim() !== ""),
+        ourAttorney: (data.ourAttorney || []).filter(a => a.trim() !== ""),
+        titleInsuranceCompany: data.titleInsuranceCompany || null,
+        lender: data.lender || null,
         tz: data.tz,
       },
     });
@@ -508,45 +573,110 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
             </div>
 
             {/* Deal Contacts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-6">
+              {/* Sellers Array */}
               <div>
-                <Label htmlFor="seller">Seller(s)</Label>
-                <Input
-                  id="seller"
-                  {...projectForm.register("seller")}
-                  placeholder="Seller name or entity"
-                  data-testid="input-seller"
-                />
+                <Label className="text-sm font-medium">Seller(s)</Label>
+                <div className="mt-2 space-y-2">
+                  {sellersArray.map((seller, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <Input
+                        value={seller}
+                        onChange={(e) => updateSeller(index, e.target.value)}
+                        placeholder="Seller name or entity"
+                        data-testid={`input-seller-${index}`}
+                        className="flex-1"
+                      />
+                      {sellersArray.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeSeller(index)}
+                          data-testid={`button-remove-seller-${index}`}
+                          className="shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addSeller}
+                    data-testid="button-add-seller"
+                    className="mt-2"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Seller
+                  </Button>
+                </div>
               </div>
-              
+
+              {/* Attorneys Array */}
               <div>
-                <Label htmlFor="ourAttorney">Our Attorney</Label>
-                <Input
-                  id="ourAttorney"
-                  {...projectForm.register("ourAttorney")}
-                  placeholder="Attorney name or firm"
-                  data-testid="input-our-attorney"
-                />
+                <Label className="text-sm font-medium">Our Attorney</Label>
+                <div className="mt-2 space-y-2">
+                  {attorneysArray.map((attorney, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <Input
+                        value={attorney}
+                        onChange={(e) => updateAttorney(index, e.target.value)}
+                        placeholder="Attorney name or firm"
+                        data-testid={`input-attorney-${index}`}
+                        className="flex-1"
+                      />
+                      {attorneysArray.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeAttorney(index)}
+                          data-testid={`button-remove-attorney-${index}`}
+                          className="shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addAttorney}
+                    data-testid="button-add-attorney"
+                    className="mt-2"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Attorney
+                  </Button>
+                </div>
               </div>
-              
-              <div>
-                <Label htmlFor="titleInsuranceCompany">Title Insurance Company</Label>
-                <Input
-                  id="titleInsuranceCompany"
-                  {...projectForm.register("titleInsuranceCompany")}
-                  placeholder="Title insurance company"
-                  data-testid="input-title-insurance"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="lender">Lender</Label>
-                <Input
-                  id="lender"
-                  {...projectForm.register("lender")}
-                  placeholder="Lending institution"
-                  data-testid="input-lender"
-                />
+
+              {/* Other Single Contact Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="titleInsuranceCompany">Title Insurance Company</Label>
+                  <Input
+                    id="titleInsuranceCompany"
+                    {...projectForm.register("titleInsuranceCompany")}
+                    placeholder="Title insurance company"
+                    data-testid="input-title-insurance"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="lender">Lender</Label>
+                  <Input
+                    id="lender"
+                    {...projectForm.register("lender")}
+                    placeholder="Lending institution"
+                    data-testid="input-lender"
+                  />
+                </div>
               </div>
             </div>
           </div>
