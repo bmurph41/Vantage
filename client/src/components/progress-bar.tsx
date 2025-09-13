@@ -66,23 +66,54 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   const barWidth = Math.max(1, barEndPosition - barStartPosition); // Task duration span
   
   // Calculate elapsed time within the task timeline
-  // Elapsed = from task start to today (or deadline if completed early)
-  const elapsedEndPosition = isCompleted 
-    ? taskDeadlinePosition // For completed tasks, show full bar as elapsed
-    : Math.min(todayPosition, taskDeadlinePosition); // For active tasks, elapsed up to today or deadline
+  // CRITICAL FIX: Only show elapsed progress if task has actually started
+  let elapsedEndPosition: number;
+  let elapsedWidth: number;
+  let remainingWidth: number;
   
-  const elapsedStartPosition = Math.max(taskStartPosition, taskStartPosition); // Always start from task start
-  const elapsedWidth = Math.max(0, elapsedEndPosition - elapsedStartPosition);
-  
-  // Calculate remaining time within the task timeline
-  const remainingStartPosition = elapsedEndPosition;
-  const remainingEndPosition = taskDeadlinePosition;
-  const remainingWidth = Math.max(0, remainingEndPosition - remainingStartPosition);
+  if (isCompleted) {
+    // For completed tasks, show full bar as elapsed
+    elapsedEndPosition = taskDeadlinePosition;
+    elapsedWidth = Math.max(0, taskDeadlinePosition - taskStartPosition);
+    remainingWidth = 0;
+  } else if (isNotStarted) {
+    // For tasks that haven't started, show NO elapsed progress
+    elapsedEndPosition = taskStartPosition; // No progress beyond task start
+    elapsedWidth = 0; // No elapsed width for unstarted tasks
+    remainingWidth = Math.max(0, taskDeadlinePosition - taskStartPosition); // Full task width as remaining
+  } else if (isOverdue) {
+    // For overdue tasks, elapsed goes from task start to deadline
+    elapsedEndPosition = taskDeadlinePosition;
+    elapsedWidth = Math.max(0, taskDeadlinePosition - taskStartPosition);
+    remainingWidth = 0; // No remaining time for overdue tasks
+  } else {
+    // For in-progress tasks, elapsed goes from task start to today
+    elapsedEndPosition = todayPosition;
+    elapsedWidth = Math.max(0, todayPosition - taskStartPosition);
+    remainingWidth = Math.max(0, taskDeadlinePosition - todayPosition);
+  }
   
   // Calculate progress statistics for labels
   const taskDurationDays = Math.max(1, daysBetween(taskStart, taskDeadline, settings?.useBusinessDays, settings?.holidayCalendar));
-  const elapsed = Math.max(0, Math.min(taskDurationDays, daysBetween(taskStart, today < taskDeadline ? today : taskDeadline, settings?.useBusinessDays, settings?.holidayCalendar)));
-  const remaining = Math.max(0, taskDurationDays - elapsed);
+  
+  // CRITICAL FIX: Only calculate elapsed days if task has started
+  let elapsed: number;
+  let remaining: number;
+  
+  if (isCompleted) {
+    elapsed = taskDurationDays; // Full duration for completed tasks
+    remaining = 0;
+  } else if (isNotStarted) {
+    elapsed = 0; // No elapsed time for unstarted tasks
+    remaining = taskDurationDays; // Full duration remaining
+  } else if (isOverdue) {
+    elapsed = taskDurationDays; // Full duration elapsed for overdue tasks
+    remaining = 0;
+  } else {
+    // For in-progress tasks, calculate actual elapsed time from task start to today
+    elapsed = Math.max(0, daysBetween(taskStart, today, settings?.useBusinessDays, settings?.holidayCalendar));
+    remaining = Math.max(0, taskDurationDays - elapsed);
+  }
 
   // Format time labels
   const getTimeLabel = (days: number) => {
