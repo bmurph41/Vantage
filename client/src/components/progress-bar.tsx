@@ -60,21 +60,9 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   const taskDeadlinePosition = percentOfRange(taskDeadline, timelineStart, timelineEnd);
   const todayPosition = percentOfRange(today, timelineStart, timelineEnd);
   
-  // Progress bar positioning - clamp container to today for in-progress tasks
+  // Progress bar spans from PSA start to task deadline (full duration)
   const barStartPosition = taskStartPosition;
-  let barEndPosition: number;
-  
-  if (isCompleted || isOverdue) {
-    // For completed/overdue tasks, span full duration to deadline
-    barEndPosition = taskDeadlinePosition;
-  } else if (isNotStarted) {
-    // For not-started tasks, span full duration to deadline
-    barEndPosition = taskDeadlinePosition;
-  } else {
-    // For in-progress tasks, clamp container to today (don't extend past today)
-    barEndPosition = Math.min(todayPosition, taskDeadlinePosition);
-  }
-  
+  const barEndPosition = taskDeadlinePosition;
   const barWidth = Math.max(1, barEndPosition - barStartPosition);
   
   // Calculate elapsed time within the task timeline
@@ -99,11 +87,10 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
     elapsedWidth = Math.max(0, taskDeadlinePosition - taskStartPosition);
     remainingWidth = 0; // No remaining time for overdue tasks
   } else {
-    // For in-progress tasks, elapsed goes from task start to today
-    // Container is clamped to today, so no remaining section needed
+    // For in-progress tasks, elapsed goes from task start to today (never past deadline)
     elapsedEndPosition = Math.min(todayPosition, taskDeadlinePosition);
     elapsedWidth = Math.max(0, Math.min(todayPosition, taskDeadlinePosition) - taskStartPosition);
-    remainingWidth = 0; // No remaining width since container ends at today
+    remainingWidth = Math.max(0, taskDeadlinePosition - Math.min(todayPosition, taskDeadlinePosition));
   }
   
   // Calculate progress statistics for labels
