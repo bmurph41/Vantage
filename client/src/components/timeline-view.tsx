@@ -449,32 +449,37 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                     const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
                     const closingDate = startOfDay(parseISO(project.closingDate));
                     
-                    // Calculate positions within timeline using same logic as task bars
+                    // Calculate positions within timeline 
                     const startPos = percentOfRange(startDate, timelineStart, timelineEnd);
                     const endPos = percentOfRange(closingDate, timelineStart, timelineEnd);
                     const todayPos = percentOfRange(today, timelineStart, timelineEnd);
+                    
+                    // Progress bar spans full duration from PSA to closing
+                    const barWidth = Math.max(1, endPos - startPos);
                     
                     // Determine project status
                     const isCompleted = today >= closingDate;
                     const isNotStarted = today < startDate;
                     
-                    // Clamp bar end position to today for in-progress projects
-                    const barEndPos = (isCompleted || isNotStarted) ? endPos : Math.min(todayPos, endPos);
-                    const barWidth = Math.max(1, barEndPos - startPos);
+                    // Calculate elapsed and remaining widths
+                    let elapsedWidth = 0;
+                    let remainingWidth = 0;
                     
-                    // Calculate fill percentage within the clamped bar
-                    let fillPercentage = 0;
                     if (isCompleted) {
-                      fillPercentage = 100;
-                    } else if (!isNotStarted) {
-                      const totalDays = Math.max(1, differenceInCalendarDays(closingDate, startDate));
-                      const elapsedDays = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today < closingDate ? today : closingDate, startDate)));
-                      fillPercentage = Math.max(0, (elapsedDays / totalDays) * 100);
+                      elapsedWidth = barWidth; // Full bar is elapsed
+                      remainingWidth = 0;
+                    } else if (isNotStarted) {
+                      elapsedWidth = 0; // No elapsed time
+                      remainingWidth = barWidth; // Full bar is remaining
+                    } else {
+                      // In progress: elapsed from start to today, remaining from today to deadline
+                      elapsedWidth = Math.max(0, todayPos - startPos);
+                      remainingWidth = Math.max(0, endPos - todayPos);
                     }
                     
                     return (
                       <>
-                        {/* Overall progress bar container - clamped to today for in-progress */}
+                        {/* Overall progress bar container - spans full PSA to closing duration */}
                         <div 
                           className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 absolute"
                           style={{
@@ -482,12 +487,27 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                             width: `${barWidth}%`
                           }}
                         >
-                          <div 
-                            className="h-full bg-green-600 transition-all duration-1000 ease-out"
-                            style={{
-                              width: `${fillPercentage}%`
-                            }}
-                          />
+                          {/* Elapsed time section (PSA start to today) - solid green */}
+                          {elapsedWidth > 0 && (
+                            <div 
+                              className="h-full bg-green-600 absolute"
+                              style={{
+                                left: '0%',
+                                width: `${(elapsedWidth / barWidth) * 100}%`
+                              }}
+                            />
+                          )}
+                          
+                          {/* Remaining time section (today to closing) - lighter green */}
+                          {remainingWidth > 0 && !isCompleted && (
+                            <div 
+                              className="h-full bg-green-200 opacity-60 absolute"
+                              style={{
+                                left: `${(elapsedWidth / barWidth) * 100}%`,
+                                width: `${(remainingWidth / barWidth) * 100}%`
+                              }}
+                            />
+                          )}
                         </div>
                         
                         {/* Start marker */}
@@ -496,7 +516,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                           style={{ left: `${startPos}%` }}
                         />
                         
-                        {/* End marker - positioned at actual closing date */}
+                        {/* End marker */}
                         <div 
                           className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
                           style={{ left: `${endPos}%` }}
