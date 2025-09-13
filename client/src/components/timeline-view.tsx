@@ -439,8 +439,14 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
               </div>
               
               <div className="h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner">
-                {/* Overall progress bar with timeline positioning */}
-                <div className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200">
+                {/* Overall progress bar with timeline positioning - matches task bar width */}
+                <div 
+                  className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 absolute"
+                  style={{
+                    left: '0%',
+                    width: '100%'
+                  }}
+                >
                   <div 
                     className="h-full bg-green-600 transition-all duration-1000 ease-out"
                     style={{
