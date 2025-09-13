@@ -793,7 +793,6 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
         <Text style={styles.header}>DD Timeline</Text>
         
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Project Milestones</Text>
           {(() => {
             // Build milestones from project dates and task deadlines
             const milestones: Array<{ name: string; date: string; tasks: Task[] }> = [];
