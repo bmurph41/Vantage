@@ -53,14 +53,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#2d3748',
-    marginBottom: 12,
-    backgroundColor: '#f7fafc',
-    padding: 8,
-    borderLeft: '4 solid #4299e1',
-    paddingLeft: 12,
+    color: '#1f2937',
+    marginBottom: 16,
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderLeft: '4 solid #3b82f6',
+    paddingLeft: 16,
+    borderRadius: '0 6 6 0',
   },
   subsectionTitle: {
     fontSize: 14,
@@ -84,73 +85,105 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 20,
-    gap: 12,
+    marginBottom: 24,
+    gap: 16,
   },
   kpiCard: {
-    width: '46%',
-    padding: 14,
-    marginBottom: 18,
-    backgroundColor: 'white',
-    borderRadius: 6,
-    border: '1.5 solid #e2e8f0',
-    boxShadow: '0 1 3 rgba(0,0,0,0.04)',
-    minHeight: 100,
+    width: '47%',
+    padding: 20,
+    marginBottom: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    border: '1 solid #e2e8f0',
+    boxShadow: '0 4 12 rgba(0,0,0,0.08)',
+    minHeight: 140,
+    position: 'relative',
   },
   kpiNumber: {
-    fontSize: 28,
+    fontSize: 36,
     fontWeight: 'bold',
-    color: '#1a365d',
-    marginBottom: 6,
+    color: '#1a202c',
+    marginBottom: 8,
+    lineHeight: 1.1,
   },
   kpiLabel: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#4a5568',
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   kpiSubtext: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#718096',
-    marginTop: 4,
+    marginTop: 6,
+    lineHeight: 1.4,
   },
   // Progress visualization
   progressContainer: {
-    marginTop: 10,
-    height: 10,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 5,
+    marginTop: 12,
+    height: 8,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#38a169',
-    borderRadius: 5,
+    backgroundColor: '#10b981',
+    borderRadius: 4,
   },
   progressFillWarning: {
-    backgroundColor: '#d69e2e',
+    backgroundColor: '#f59e0b',
   },
   progressFillDanger: {
-    backgroundColor: '#e53e3e',
+    backgroundColor: '#ef4444',
   },
-  // Risk indicator styles
+  // Risk indicator styles  
   riskIndicator: {
     fontSize: 10,
     fontWeight: 'bold',
-    padding: 4,
-    borderRadius: 3,
+    padding: '6 12',
+    borderRadius: 6,
     color: 'white',
     textAlign: 'center',
-    marginTop: 5,
+    marginTop: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   riskLow: {
-    backgroundColor: '#38a169',
+    backgroundColor: '#10b981',
   },
   riskMedium: {
-    backgroundColor: '#d69e2e',
+    backgroundColor: '#f59e0b',
   },
   riskHigh: {
-    backgroundColor: '#e53e3e',
+    backgroundColor: '#ef4444',
+  },
+  // Status card styles for Task Status Breakdown
+  statusCard: {
+    width: '47%',
+    padding: 16,
+    marginBottom: 14,
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    border: '1 solid #e5e7eb',
+    boxShadow: '0 2 8 rgba(0,0,0,0.06)',
+    minHeight: 90,
+    textAlign: 'center',
+  },
+  statusNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 6,
+    lineHeight: 1,
+  },
+  statusLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   taskRow: {
     display: 'flex',
@@ -758,27 +791,27 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
           </View>
         </View>
 
-        <View style={[styles.section, { marginBottom: 15 }]}>
+        <View style={[styles.section, { marginBottom: 24 }]}>
           <Text style={styles.sectionTitle}>Task Status Breakdown</Text>
           <View style={styles.kpiGrid}>
-            <View style={[styles.kpiCard, { padding: 12, marginBottom: 10 }]}>
-              <Text style={[styles.kpiNumber, { fontSize: 24, marginBottom: 4 }]}>{kpis.completedTasks}</Text>
-              <Text style={styles.kpiLabel}>Completed</Text>
+            <View style={styles.statusCard}>
+              <Text style={[styles.statusNumber, { color: '#10b981' }]}>{kpis.completedTasks}</Text>
+              <Text style={styles.statusLabel}>Completed</Text>
             </View>
             
-            <View style={[styles.kpiCard, { padding: 12, marginBottom: 10 }]}>
-              <Text style={[styles.kpiNumber, { fontSize: 24, marginBottom: 4 }]}>{kpis.inProgressTasks}</Text>
-              <Text style={styles.kpiLabel}>In Progress</Text>
+            <View style={styles.statusCard}>
+              <Text style={[styles.statusNumber, { color: '#3b82f6' }]}>{kpis.inProgressTasks}</Text>
+              <Text style={styles.statusLabel}>In Progress</Text>
             </View>
             
-            <View style={[styles.kpiCard, { padding: 12, marginBottom: 10 }]}>
-              <Text style={[styles.kpiNumber, { fontSize: 24, marginBottom: 4 }]}>{kpis.notStartedTasks}</Text>
-              <Text style={styles.kpiLabel}>Not Started</Text>
+            <View style={styles.statusCard}>
+              <Text style={[styles.statusNumber, { color: '#6b7280' }]}>{kpis.notStartedTasks}</Text>
+              <Text style={styles.statusLabel}>Not Started</Text>
             </View>
             
-            <View style={[styles.kpiCard, { padding: 12, marginBottom: 10 }]}>
-              <Text style={[styles.kpiNumber, { fontSize: 24, marginBottom: 4 }]}>{kpis.totalTasks}</Text>
-              <Text style={styles.kpiLabel}>Total Tasks</Text>
+            <View style={styles.statusCard}>
+              <Text style={[styles.statusNumber, { color: '#1f2937' }]}>{kpis.totalTasks}</Text>
+              <Text style={styles.statusLabel}>Total Tasks</Text>
             </View>
           </View>
         </View>
