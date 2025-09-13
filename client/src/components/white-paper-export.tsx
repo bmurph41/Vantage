@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '100%',
+    minHeight: '80%',
     textAlign: 'center',
   },
   coverTitle: {
@@ -693,7 +693,7 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
 
       {/* Executive KPI Dashboard */}
       <Page size="A4" style={styles.page}>
-        <Text style={styles.header}>Executive Dashboard</Text>
+        <Text style={styles.header}>Executive Summary</Text>
         
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Project Overview</Text>
