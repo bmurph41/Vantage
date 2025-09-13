@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parseISO, isValid, differenceInDays } from 'date-fns';
 import type { Project, Task, ProjectSettings } from '@shared/schema';
 
 interface WhitePaperProps {
@@ -78,29 +78,77 @@ const styles = StyleSheet.create({
   bold: {
     fontWeight: 'bold',
   },
-  summaryGrid: {
+  // Enhanced KPI Dashboard styles
+  kpiGrid: {
     display: 'flex',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 30,
   },
-  summaryItem: {
-    flex: 1,
-    padding: 12,
-    margin: 4,
-    backgroundColor: '#f8fafc',
-    borderRadius: 4,
-    border: '1 solid #e2e8f0',
+  kpiCard: {
+    width: '48%',
+    padding: 20,
+    marginBottom: 15,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    border: '2 solid #e2e8f0',
+    boxShadow: '0 2 4 rgba(0,0,0,0.05)',
   },
-  summaryNumber: {
-    fontSize: 18,
+  kpiNumber: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#2b6cb0',
+    color: '#1a365d',
+    marginBottom: 8,
+  },
+  kpiLabel: {
+    fontSize: 12,
+    color: '#4a5568',
+    fontWeight: 'bold',
     marginBottom: 4,
   },
-  summaryLabel: {
+  kpiSubtext: {
     fontSize: 10,
     color: '#718096',
+    marginTop: 4,
+  },
+  // Progress visualization
+  progressContainer: {
+    marginTop: 10,
+    height: 10,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#38a169',
+    borderRadius: 5,
+  },
+  progressFillWarning: {
+    backgroundColor: '#d69e2e',
+  },
+  progressFillDanger: {
+    backgroundColor: '#e53e3e',
+  },
+  // Risk indicator styles
+  riskIndicator: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    padding: 4,
+    borderRadius: 3,
+    color: 'white',
+    textAlign: 'center',
+    marginTop: 5,
+  },
+  riskLow: {
+    backgroundColor: '#38a169',
+  },
+  riskMedium: {
+    backgroundColor: '#d69e2e',
+  },
+  riskHigh: {
+    backgroundColor: '#e53e3e',
   },
   taskRow: {
     display: 'flex',
@@ -288,6 +336,179 @@ const formatStatus = (status: string): string => {
   }
 };
 
+// Calculate KPIs and metrics
+const calculateProjectKPIs = (project: Project, tasks: Task[]) => {
+  const today = new Date();
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const inProgressTasks = tasks.filter(t => t.status === 'in_progress' || t.status === 'engaged' || t.status === 'scheduled').length;
+  const notStartedTasks = tasks.filter(t => t.status === 'not_started').length;
+  
+  // Calculate completion percentage
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  
+  // Calculate total cost
+  const totalCost = tasks.reduce((sum, task) => {
+    if (task.cost) {
+      const cleanCost = task.cost.replace(/[$,]/g, '').trim();
+      const numericCost = parseFloat(cleanCost);
+      return sum + (isNaN(numericCost) ? 0 : numericCost);
+    }
+    return sum;
+  }, 0);
+  
+  // Calculate days to DD expiration
+  let daysToExpiration = null;
+  let expirationRisk = 'low';
+  if (project.ddExpirationDate) {
+    try {
+      const expirationDate = parseISO(project.ddExpirationDate);
+      if (isValid(expirationDate)) {
+        daysToExpiration = differenceInDays(expirationDate, today);
+        if (daysToExpiration < 0) {
+          expirationRisk = 'high';
+        } else if (daysToExpiration <= 7) {
+          expirationRisk = 'high';
+        } else if (daysToExpiration <= 30) {
+          expirationRisk = 'medium';
+        }
+      }
+    } catch {
+      // Handle invalid date
+    }
+  }
+  
+  // Find overdue tasks (tasks with deadlines in the past)
+  const overdueTasks = tasks.filter(task => {
+    if (!task.deadline) return false;
+    try {
+      const deadline = parseISO(task.deadline);
+      return isValid(deadline) && differenceInDays(today, deadline) > 0 && task.status !== 'completed';
+    } catch {
+      return false;
+    }
+  });
+  
+  // Find upcoming critical deadlines (within 7 days)
+  const upcomingDeadlines = tasks.filter(task => {
+    if (!task.deadline || task.status === 'completed') return false;
+    try {
+      const deadline = parseISO(task.deadline);
+      if (!isValid(deadline)) return false;
+      const daysUntilDeadline = differenceInDays(deadline, today);
+      return daysUntilDeadline >= 0 && daysUntilDeadline <= 7;
+    } catch {
+      return false;
+    }
+  });
+  
+  // Calculate overall project risk
+  let overallRisk = 'low';
+  if (overdueTasks.length > 0 || expirationRisk === 'high' || completionRate < 50) {
+    overallRisk = 'high';
+  } else if (upcomingDeadlines.length > 3 || expirationRisk === 'medium' || completionRate < 75) {
+    overallRisk = 'medium';
+  }
+  
+  return {
+    totalTasks,
+    completedTasks,
+    inProgressTasks,
+    notStartedTasks,
+    completionRate,
+    totalCost,
+    daysToExpiration,
+    expirationRisk,
+    overdueTasks,
+    upcomingDeadlines,
+    overallRisk
+  };
+};
+
+// Get risk indicator style and text
+const getRiskIndicator = (risk: string) => {
+  switch (risk) {
+    case 'high':
+      return { style: [styles.riskIndicator, styles.riskHigh], text: 'HIGH RISK' };
+    case 'medium':
+      return { style: [styles.riskIndicator, styles.riskMedium], text: 'MEDIUM RISK' };
+    default:
+      return { style: [styles.riskIndicator, styles.riskLow], text: 'LOW RISK' };
+  }
+};
+
+// Calculate timeline health indicators
+const calculateTimelineHealth = (project: Project) => {
+  const today = new Date();
+  const milestones = [];
+  
+  // PSA Signed Date
+  if (project.psaSignedDate) {
+    try {
+      const psaDate = parseISO(project.psaSignedDate);
+      if (isValid(psaDate)) {
+        milestones.push({
+          name: 'PSA Signed',
+          date: psaDate,
+          dateString: project.psaSignedDate,
+          status: 'completed',
+          daysFromToday: differenceInDays(today, psaDate)
+        });
+      }
+    } catch {
+      // Handle invalid date
+    }
+  }
+  
+  // DD Expiration Date
+  if (project.ddExpirationDate) {
+    try {
+      const ddDate = parseISO(project.ddExpirationDate);
+      if (isValid(ddDate)) {
+        const daysFromToday = differenceInDays(ddDate, today);
+        let status = 'upcoming';
+        if (daysFromToday < 0) status = 'overdue';
+        else if (daysFromToday <= 7) status = 'urgent';
+        
+        milestones.push({
+          name: 'Due Diligence Expiration',
+          date: ddDate,
+          dateString: project.ddExpirationDate,
+          status,
+          daysFromToday
+        });
+      }
+    } catch {
+      // Handle invalid date
+    }
+  }
+  
+  // Closing Date
+  if (project.closingDate) {
+    try {
+      const closingDate = parseISO(project.closingDate);
+      if (isValid(closingDate)) {
+        const daysFromToday = differenceInDays(closingDate, today);
+        let status = 'upcoming';
+        if (daysFromToday < 0) status = 'overdue';
+        else if (daysFromToday <= 14) status = 'urgent';
+        
+        milestones.push({
+          name: 'Target Closing Date',
+          date: closingDate,
+          dateString: project.closingDate,
+          status,
+          daysFromToday
+        });
+      }
+    } catch {
+      // Handle invalid date
+    }
+  }
+  
+  return milestones.sort((a, b) => a.date.getTime() - b.date.getTime());
+};
+
 // Group tasks by category
 const groupTasksByCategory = (tasks: Task[]) => {
   const categories: { [key: string]: Task[] } = {};
@@ -322,23 +543,12 @@ const groupTasksByCategory = (tasks: Task[]) => {
 };
 
 export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps) => {
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
-  const inProgressTasks = tasks.filter(t => t.status === 'in_progress' || t.status === 'engaged' || t.status === 'scheduled').length;
-  const notStartedTasks = tasks.filter(t => t.status === 'not_started').length;
-  
-  // Calculate total cost
-  const totalCost = tasks.reduce((sum, task) => {
-    if (task.cost) {
-      const cleanCost = task.cost.replace(/[$,]/g, '').trim();
-      const numericCost = parseFloat(cleanCost);
-      return sum + (isNaN(numericCost) ? 0 : numericCost);
-    }
-    return sum;
-  }, 0);
-
+  // Calculate comprehensive KPIs and metrics
+  const kpis = calculateProjectKPIs(project, tasks);
+  const timelineHealth = calculateTimelineHealth(project);
   const categorizedTasks = groupTasksByCategory(tasks);
   const currentDate = format(new Date(), 'MMMM d, yyyy');
+  const overallRiskIndicator = getRiskIndicator(kpis.overallRisk);
   
   return (
     <Document>
@@ -357,98 +567,207 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
         </Text>
       </Page>
 
-      {/* Executive Summary */}
+      {/* Executive KPI Dashboard */}
       <Page size="A4" style={styles.page}>
-        <Text style={styles.header}>Executive Summary</Text>
+        <Text style={styles.header}>Executive Dashboard</Text>
         
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Project Overview</Text>
           <Text style={styles.text}>
-            <Text style={styles.bold}>Project Name:</Text> {project.name}
+            <Text style={styles.bold}>Project:</Text> {project.name}
           </Text>
           {project.description && (
             <Text style={styles.text}>
               <Text style={styles.bold}>Description:</Text> {project.description}
             </Text>
           )}
-          <Text style={styles.text}>
-            <Text style={styles.bold}>PSA Signed Date:</Text> {formatDate(project.psaSignedDate)}
-          </Text>
-          <Text style={styles.text}>
-            <Text style={styles.bold}>Due Diligence Expiration:</Text> {formatDate(project.ddExpirationDate)}
-          </Text>
-          <Text style={styles.text}>
-            <Text style={styles.bold}>Target Closing Date:</Text> {formatDate(project.closingDate)}
-          </Text>
+          
+          <View style={overallRiskIndicator.style}>
+            <Text>{overallRiskIndicator.text}</Text>
+          </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Due Diligence Summary</Text>
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>{totalTasks}</Text>
-              <Text style={styles.summaryLabel}>Total Tasks</Text>
+          <Text style={styles.sectionTitle}>Key Performance Indicators</Text>
+          <View style={styles.kpiGrid}>
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiNumber}>{kpis.completionRate}%</Text>
+              <Text style={styles.kpiLabel}>Completion Rate</Text>
+              <Text style={styles.kpiSubtext}>{kpis.completedTasks} of {kpis.totalTasks} tasks completed</Text>
+              <View style={styles.progressContainer}>
+                <View style={[styles.progressFill, { width: `${kpis.completionRate}%` }]} />
+              </View>
             </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>{completedTasks}</Text>
-              <Text style={styles.summaryLabel}>Completed</Text>
+            
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiNumber}>
+                {kpis.daysToExpiration !== null ? 
+                  (kpis.daysToExpiration >= 0 ? kpis.daysToExpiration : 'EXPIRED') : 
+                  'N/A'
+                }
+              </Text>
+              <Text style={styles.kpiLabel}>Days to DD Expiration</Text>
+              <Text style={styles.kpiSubtext}>
+                {kpis.daysToExpiration !== null && kpis.daysToExpiration >= 0 ? 
+                  `Expires ${formatDate(project.ddExpirationDate)}` : 
+                  kpis.daysToExpiration !== null && kpis.daysToExpiration < 0 ?
+                    'Due diligence period expired' :
+                    'No expiration date set'
+                }
+              </Text>
+              <View style={getRiskIndicator(kpis.expirationRisk).style}>
+                <Text>{getRiskIndicator(kpis.expirationRisk).text}</Text>
+              </View>
             </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>{inProgressTasks}</Text>
-              <Text style={styles.summaryLabel}>In Progress</Text>
+            
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiNumber}>{formatCurrency(kpis.totalCost.toString())}</Text>
+              <Text style={styles.kpiLabel}>Total Project Cost</Text>
+              <Text style={styles.kpiSubtext}>Estimated due diligence expenses</Text>
             </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryNumber}>{notStartedTasks}</Text>
-              <Text style={styles.summaryLabel}>Not Started</Text>
+            
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiNumber}>{kpis.overdueTasks.length}</Text>
+              <Text style={styles.kpiLabel}>Overdue Tasks</Text>
+              <Text style={styles.kpiSubtext}>
+                {kpis.upcomingDeadlines.length} tasks due within 7 days
+              </Text>
+              {kpis.overdueTasks.length > 0 && (
+                <View style={getRiskIndicator('high').style}>
+                  <Text>ATTENTION REQUIRED</Text>
+                </View>
+              )}
             </View>
           </View>
-          
-          <Text style={styles.text}>
-            <Text style={styles.bold}>Estimated Total Cost:</Text> {formatCurrency(totalCost.toString())}
-          </Text>
-          
-          <Text style={styles.text}>
-            <Text style={styles.bold}>Completion Rate:</Text> {totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%
-          </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Project Timeline</Text>
-          <View style={styles.timelineContainer}>
-            <View style={[styles.timelineItem, project.ddExpirationDate || project.closingDate ? {} : styles.timelineLastItem]}>
-              <View style={styles.timelineDot} />
-              {(project.ddExpirationDate || project.closingDate) && <View style={styles.timelineLine} />}
-              <View style={styles.timelineContent}>
-                <Text style={styles.timelineLabel}>PSA Signed</Text>
-                <Text style={styles.timelineDate}>{formatDate(project.psaSignedDate)}</Text>
-              </View>
+          <Text style={styles.sectionTitle}>Task Status Breakdown</Text>
+          <View style={styles.kpiGrid}>
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiNumber}>{kpis.completedTasks}</Text>
+              <Text style={styles.kpiLabel}>Completed</Text>
             </View>
             
-            {project.ddExpirationDate && (
-              <View style={[styles.timelineItem, project.closingDate ? {} : styles.timelineLastItem]}>
-                <View style={styles.timelineDot} />
-                {project.closingDate && <View style={styles.timelineLine} />}
-                <View style={styles.timelineContent}>
-                  <Text style={styles.timelineLabel}>Due Diligence Expiration</Text>
-                  <Text style={styles.timelineDate}>{formatDate(project.ddExpirationDate)}</Text>
-                </View>
-              </View>
-            )}
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiNumber}>{kpis.inProgressTasks}</Text>
+              <Text style={styles.kpiLabel}>In Progress</Text>
+            </View>
             
-            {project.closingDate && (
-              <View style={[styles.timelineItem, styles.timelineLastItem]}>
-                <View style={styles.timelineDot} />
-                <View style={styles.timelineContent}>
-                  <Text style={styles.timelineLabel}>Target Closing Date</Text>
-                  <Text style={styles.timelineDate}>{formatDate(project.closingDate)}</Text>
-                </View>
-              </View>
-            )}
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiNumber}>{kpis.notStartedTasks}</Text>
+              <Text style={styles.kpiLabel}>Not Started</Text>
+            </View>
+            
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiNumber}>{kpis.totalTasks}</Text>
+              <Text style={styles.kpiLabel}>Total Tasks</Text>
+            </View>
           </View>
         </View>
+
 
         <Text style={styles.footer}>
           Confidential Due Diligence Report - {project.name} | Page 2
+        </Text>
+      </Page>
+
+      {/* Timeline & Schedule Health */}
+      <Page size="A4" style={styles.page}>
+        <Text style={styles.header}>Project Timeline & Schedule Health</Text>
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Project Milestones</Text>
+          <View style={styles.timelineContainer}>
+            {timelineHealth.map((milestone, index) => {
+              const isLast = index === timelineHealth.length - 1;
+              const getDotColor = (status: string) => {
+                switch (status) {
+                  case 'completed': return '#38a169';
+                  case 'urgent': return '#d69e2e';
+                  case 'overdue': return '#e53e3e';
+                  default: return '#4299e1';
+                }
+              };
+              
+              return (
+                <View key={index} style={[styles.timelineItem, isLast ? styles.timelineLastItem : {}]}>
+                  <View style={[styles.timelineDot, { backgroundColor: getDotColor(milestone.status) }]} />
+                  {!isLast && <View style={styles.timelineLine} />}
+                  <View style={styles.timelineContent}>
+                    <Text style={styles.timelineLabel}>{milestone.name}</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.timelineDate}>{formatDate(milestone.dateString)}</Text>
+                      <Text style={[styles.kpiSubtext, { fontSize: 9 }]}>
+                        {milestone.status === 'completed' 
+                          ? `${Math.abs(milestone.daysFromToday)} days ago`
+                          : milestone.daysFromToday < 0
+                            ? `${Math.abs(milestone.daysFromToday)} days overdue`
+                            : `${milestone.daysFromToday} days remaining`
+                        }
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+          
+          {timelineHealth.length === 0 && (
+            <Text style={styles.text}>No project milestones defined.</Text>
+          )}
+        </View>
+
+        <Text style={styles.footer}>
+          Confidential Due Diligence Report - {project.name} | Page 3
+        </Text>
+      </Page>
+
+      {/* Risks & Upcoming Deadlines */}
+      <Page size="A4" style={styles.page}>
+        <Text style={styles.header}>Risk Analysis & Upcoming Deadlines</Text>
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Project Risk Assessment</Text>
+          <View style={overallRiskIndicator.style}>
+            <Text>Overall Project Risk: {overallRiskIndicator.text}</Text>
+          </View>
+          
+          {kpis.overdueTasks.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.subsectionTitle}>Overdue Tasks ({kpis.overdueTasks.length})</Text>
+              {kpis.overdueTasks.slice(0, 10).map((task) => (
+                <View key={task.id} style={styles.taskRow}>
+                  <Text style={[styles.taskTitle, { color: '#e53e3e' }]}>{task.title}</Text>
+                  <Text style={styles.taskDetail}>{task.assignee || 'Unassigned'}</Text>
+                  <Text style={styles.taskDetail}>{formatDate(task.deadline)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          
+          {kpis.upcomingDeadlines.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.subsectionTitle}>Upcoming Deadlines (Next 7 Days)</Text>
+              {kpis.upcomingDeadlines.slice(0, 10).map((task) => (
+                <View key={task.id} style={styles.taskRow}>
+                  <Text style={[styles.taskTitle, { color: '#d69e2e' }]}>{task.title}</Text>
+                  <Text style={styles.taskDetail}>{task.assignee || 'Unassigned'}</Text>
+                  <Text style={styles.taskDetail}>{formatDate(task.deadline)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          
+          {kpis.overdueTasks.length === 0 && kpis.upcomingDeadlines.length === 0 && (
+            <Text style={styles.text}>
+              <Text style={styles.bold}>Good news!</Text> No overdue tasks or immediate upcoming deadlines.
+            </Text>
+          )}
+        </View>
+
+        <Text style={styles.footer}>
+          Confidential Due Diligence Report - {project.name} | Page 4
         </Text>
       </Page>
 
