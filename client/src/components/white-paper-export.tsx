@@ -895,54 +895,6 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
         </Text>
       </Page>
 
-      {/* Risks & Upcoming Deadlines */}
-      <Page size="A4" style={styles.page}>
-        <Text style={styles.header}>Risk Analysis & Upcoming Deadlines</Text>
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Project Risk Assessment</Text>
-          <View style={overallRiskIndicator.style}>
-            <Text>Overall Project Risk: {overallRiskIndicator.text}</Text>
-          </View>
-          
-          {kpis.overdueTasks.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.subsectionTitle}>Overdue Tasks ({kpis.overdueTasks.length})</Text>
-              {kpis.overdueTasks.slice(0, 10).map((task) => (
-                <View key={task.id} style={styles.taskRow}>
-                  <Text style={[styles.taskTitle, { color: '#e53e3e' }]}>{task.title}</Text>
-                  <Text style={styles.taskDetail}>{task.assignee || 'Unassigned'}</Text>
-                  <Text style={styles.taskDetail}>{formatDate(task.deadline)}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-          
-          {kpis.upcomingDeadlines.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.subsectionTitle}>Upcoming Deadlines (Next 7 Days)</Text>
-              {kpis.upcomingDeadlines.slice(0, 10).map((task) => (
-                <View key={task.id} style={styles.taskRow}>
-                  <Text style={[styles.taskTitle, { color: '#d69e2e' }]}>{task.title}</Text>
-                  <Text style={styles.taskDetail}>{task.assignee || 'Unassigned'}</Text>
-                  <Text style={styles.taskDetail}>{formatDate(task.deadline)}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-          
-          {kpis.overdueTasks.length === 0 && kpis.upcomingDeadlines.length === 0 && (
-            <Text style={styles.text}>
-              <Text style={styles.bold}>Good news!</Text> No overdue tasks or immediate upcoming deadlines.
-            </Text>
-          )}
-        </View>
-
-        <Text style={styles.footer}>
-          Confidential Due Diligence Report - {project.name} | Page 4
-        </Text>
-      </Page>
-
       {/* Key Contacts */}
       <Page size="A4" style={styles.page}>
         <Text style={styles.header}>Key Contacts</Text>
@@ -1036,7 +988,7 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
         </View>
 
         <Text style={styles.footer}>
-          Confidential Due Diligence Report - {project.name} | Page 5
+          Confidential Due Diligence Report - {project.name} | Page 4
         </Text>
       </Page>
 
@@ -1068,7 +1020,7 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
         </View>
 
         <Text style={styles.footer}>
-          Confidential Due Diligence Report - {project.name} | Page 6
+          Confidential Due Diligence Report - {project.name} | Page 5
         </Text>
       </Page>
     </Document>
