@@ -443,44 +443,67 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 </div>
                 
                 <div className="h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner">
-                  {/* Overall progress bar with timeline positioning - matches task bar width */}
-                  <div 
-                    className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 absolute"
-                    style={{
-                      left: '0%',
-                      width: '100%'
-                    }}
-                  >
-                    <div 
-                      className="h-full bg-green-600 transition-all duration-1000 ease-out"
-                      style={{
-                        width: `${(() => {
-                          const timezone = 'America/New_York';
-                          const today = startOfDay(tzNow(timezone));
-                          const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
-                          const closingDate = startOfDay(parseISO(project.closingDate));
-                          
-                          if (today >= closingDate) return 100;
-                          
-                          const totalDays = Math.max(1, differenceInCalendarDays(closingDate, startDate));
-                          const elapsedDays = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today < closingDate ? today : closingDate, startDate)));
-                          return Math.max(0, (elapsedDays / totalDays) * 100);
-                        })()}%`
-                      }}
-                    />
-                  </div>
-                  
-                  {/* Start marker */}
-                  <div 
-                    className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
-                    style={{ left: "0px" }}
-                  />
-                  
-                  {/* End marker */}
-                  <div 
-                    className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
-                    style={{ right: "0px" }}
-                  />
+                  {(() => {
+                    const timezone = 'America/New_York';
+                    const today = startOfDay(tzNow(timezone));
+                    const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
+                    const closingDate = startOfDay(parseISO(project.closingDate));
+                    
+                    // Calculate positions within timeline using same logic as task bars
+                    const startPos = percentOfRange(startDate, timelineStart, timelineEnd);
+                    const endPos = percentOfRange(closingDate, timelineStart, timelineEnd);
+                    const todayPos = percentOfRange(today, timelineStart, timelineEnd);
+                    
+                    // Determine project status
+                    const isCompleted = today >= closingDate;
+                    const isNotStarted = today < startDate;
+                    
+                    // Clamp bar end position to today for in-progress projects
+                    const barEndPos = (isCompleted || isNotStarted) ? endPos : Math.min(todayPos, endPos);
+                    const barWidth = Math.max(1, barEndPos - startPos);
+                    
+                    // Calculate fill percentage within the clamped bar
+                    let fillPercentage = 0;
+                    if (isCompleted) {
+                      fillPercentage = 100;
+                    } else if (!isNotStarted) {
+                      const totalDays = Math.max(1, differenceInCalendarDays(closingDate, startDate));
+                      const elapsedDays = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today < closingDate ? today : closingDate, startDate)));
+                      fillPercentage = Math.max(0, (elapsedDays / totalDays) * 100);
+                    }
+                    
+                    return (
+                      <>
+                        {/* Overall progress bar container - clamped to today for in-progress */}
+                        <div 
+                          className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 absolute"
+                          style={{
+                            left: `${startPos}%`,
+                            width: `${barWidth}%`
+                          }}
+                        >
+                          <div 
+                            className="h-full bg-green-600 transition-all duration-1000 ease-out"
+                            style={{
+                              width: `${fillPercentage}%`
+                            }}
+                          />
+                        </div>
+                        
+                        {/* Start marker */}
+                        <div 
+                          className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
+                          style={{ left: `${startPos}%` }}
+                        />
+                        
+                        {/* End marker - positioned at actual closing date */}
+                        <div 
+                          className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
+                          style={{ left: `${endPos}%` }}
+                        />
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
