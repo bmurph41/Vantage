@@ -995,37 +995,6 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
         </Text>
       </Page>
 
-      {/* Detailed Task List */}
-      <Page size="A4" style={styles.page}>
-        <Text style={styles.header}>Detailed Task List</Text>
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>All Due Diligence Tasks</Text>
-          
-          {tasks.map((task) => (
-            <View key={task.id} style={styles.taskRow}>
-              <View style={{ flex: 3 }}>
-                <Text style={styles.taskTitle}>{task.title}</Text>
-                {task.description && (
-                  <Text style={[styles.taskDetail, { fontSize: 8, marginTop: 2 }]}>
-                    {task.description.length > 100 ? task.description.substring(0, 100) + '...' : task.description}
-                  </Text>
-                )}
-              </View>
-              <Text style={styles.taskDetail}>{task.assignee || 'Unassigned'}</Text>
-              <Text style={styles.taskDetail}>{task.companyHired || 'N/A'}</Text>
-              <Text style={styles.taskDetail}>{formatCurrency(task.cost || '')}</Text>
-              <View style={getStatusStyle(task.status)}>
-                <Text>{formatStatus(task.status)}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        <Text style={styles.footer}>
-          Confidential Due Diligence Report - {project.name} | Page 5
-        </Text>
-      </Page>
     </Document>
   );
 };
