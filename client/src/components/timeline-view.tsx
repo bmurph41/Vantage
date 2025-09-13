@@ -415,68 +415,73 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
           {/* Overall Progress Bar */}
           {project.closingDate && (
-            <div className="mb-4" data-timeline-section>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-700 leader-obstacle">
-                  Overall Progress to Closing
-                </h3>
-                <div className="text-xs text-gray-600">
-                  {(() => {
-                    const timezone = 'America/New_York';
-                    const today = startOfDay(tzNow(timezone));
-                    const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
-                    const closingDate = startOfDay(parseISO(project.closingDate));
-                    
-                    if (today >= closingDate) return '100% - Closing reached';
-                    
-                    const totalDays = Math.max(1, differenceInCalendarDays(closingDate, startDate));
-                    const elapsedDays = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today < closingDate ? today : closingDate, startDate)));
-                    const percentage = Math.round((elapsedDays / totalDays) * 100);
-                    
-                    return `${percentage}% elapsed`;
-                  })()}
+            <div className="mb-6" data-timeline-section>
+              <div className="rounded-lg p-3 border bg-gray-50 border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500" />
+                    <h3 className="text-sm font-medium text-gray-900 leader-obstacle">
+                      Overall Progress to Closing
+                    </h3>
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    {(() => {
+                      const timezone = 'America/New_York';
+                      const today = startOfDay(tzNow(timezone));
+                      const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
+                      const closingDate = startOfDay(parseISO(project.closingDate));
+                      
+                      if (today >= closingDate) return '100% - Closing reached';
+                      
+                      const totalDays = Math.max(1, differenceInCalendarDays(closingDate, startDate));
+                      const elapsedDays = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today < closingDate ? today : closingDate, startDate)));
+                      const percentage = Math.round((elapsedDays / totalDays) * 100);
+                      
+                      return `${percentage}% elapsed`;
+                    })()}
+                  </div>
                 </div>
-              </div>
-              
-              <div className="h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner">
-                {/* Overall progress bar with timeline positioning - matches task bar width */}
-                <div 
-                  className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 absolute"
-                  style={{
-                    left: '0%',
-                    width: '100%'
-                  }}
-                >
+                
+                <div className="h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner">
+                  {/* Overall progress bar with timeline positioning - matches task bar width */}
                   <div 
-                    className="h-full bg-green-600 transition-all duration-1000 ease-out"
+                    className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 absolute"
                     style={{
-                      width: `${(() => {
-                        const timezone = 'America/New_York';
-                        const today = startOfDay(tzNow(timezone));
-                        const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
-                        const closingDate = startOfDay(parseISO(project.closingDate));
-                        
-                        if (today >= closingDate) return 100;
-                        
-                        const totalDays = Math.max(1, differenceInCalendarDays(closingDate, startDate));
-                        const elapsedDays = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today < closingDate ? today : closingDate, startDate)));
-                        return Math.max(0, (elapsedDays / totalDays) * 100);
-                      })()}%`
+                      left: '0%',
+                      width: '100%'
                     }}
+                  >
+                    <div 
+                      className="h-full bg-green-600 transition-all duration-1000 ease-out"
+                      style={{
+                        width: `${(() => {
+                          const timezone = 'America/New_York';
+                          const today = startOfDay(tzNow(timezone));
+                          const startDate = startOfDay(parseISO(project.psaSignedDate || (project.createdAt instanceof Date ? project.createdAt.toISOString() : project.createdAt) || new Date().toISOString()));
+                          const closingDate = startOfDay(parseISO(project.closingDate));
+                          
+                          if (today >= closingDate) return 100;
+                          
+                          const totalDays = Math.max(1, differenceInCalendarDays(closingDate, startDate));
+                          const elapsedDays = Math.max(0, Math.min(totalDays, differenceInCalendarDays(today < closingDate ? today : closingDate, startDate)));
+                          return Math.max(0, (elapsedDays / totalDays) * 100);
+                        })()}%`
+                      }}
+                    />
+                  </div>
+                  
+                  {/* Start marker */}
+                  <div 
+                    className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
+                    style={{ left: "0px" }}
+                  />
+                  
+                  {/* End marker */}
+                  <div 
+                    className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
+                    style={{ right: "0px" }}
                   />
                 </div>
-                
-                {/* Start marker */}
-                <div 
-                  className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
-                  style={{ left: "0px" }}
-                />
-                
-                {/* End marker */}
-                <div 
-                  className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
-                  style={{ right: "0px" }}
-                />
               </div>
             </div>
           )}
