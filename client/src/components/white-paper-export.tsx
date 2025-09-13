@@ -794,63 +794,100 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
         
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Project Milestones</Text>
-          <View style={styles.timelineContainer}>
-            {timelineHealth.map((milestone, index) => {
-              const isLast = index === timelineHealth.length - 1;
-              const getDotColor = (status: string) => {
-                switch (status) {
-                  case 'completed': return '#38a169';
-                  case 'urgent': return '#d69e2e';
-                  case 'overdue': return '#e53e3e';
-                  default: return '#4299e1';
-                }
-              };
-              
-              return (
-                <View key={index} style={[styles.timelineItem, isLast ? styles.timelineLastItem : {}]}>
-                  <View style={[styles.timelineDot, { backgroundColor: getDotColor(milestone.status) }]} />
-                  {!isLast && <View style={styles.timelineLine} />}
-                  <View style={styles.timelineContent}>
-                    <Text style={styles.timelineLabel}>{milestone.name}</Text>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.timelineDate}>{formatDate(milestone.dateString)}</Text>
-                      <Text style={[styles.kpiSubtext, { fontSize: 9 }]}>
-                        {milestone.status === 'completed' 
-                          ? `${Math.abs(milestone.daysFromToday)} days ago`
-                          : milestone.daysFromToday < 0
-                            ? `${Math.abs(milestone.daysFromToday)} days overdue`
-                            : `${milestone.daysFromToday} days remaining`
-                        }
-                      </Text>
+          {(() => {
+            // Build milestones from project dates and task deadlines
+            const milestones: Array<{ name: string; date: string; tasks: Task[] }> = [];
+            
+            // Add project milestone dates
+            if (project.psaSignedDate) {
+              milestones.push({ 
+                name: 'PSA Signed', 
+                date: project.psaSignedDate, 
+                tasks: []
+              });
+            }
+            if (project.ddExpirationDate) {
+              milestones.push({ 
+                name: 'DD Expiration', 
+                date: project.ddExpirationDate, 
+                tasks: tasks.filter(task => 
+                  task.deadline === project.ddExpirationDate ||
+                  task.deadlineType === 'dd_expiration'
+                )
+              });
+            }
+            if (project.closingDate) {
+              milestones.push({ 
+                name: 'Target Closing Date', 
+                date: project.closingDate, 
+                tasks: tasks.filter(task => task.deadline === project.closingDate)
+              });
+            }
+            
+            // Add unique task deadlines that aren't already covered
+            const existingDates = new Set(milestones.map(m => m.date));
+            const uniqueTaskDeadlines = Array.from(new Set(
+              tasks
+                .filter(task => task.deadline && !existingDates.has(task.deadline))
+                .map(task => task.deadline!)
+            )).sort();
+            
+            uniqueTaskDeadlines.forEach(deadline => {
+              const tasksForDate = tasks.filter(task => task.deadline === deadline);
+              if (tasksForDate.length > 0) {
+                milestones.push({
+                  name: `Task Deadline`,
+                  date: deadline,
+                  tasks: tasksForDate
+                });
+              }
+            });
+            
+            // Sort milestones by date
+            milestones.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            
+            return milestones.length === 0 ? (
+              <Text style={styles.text}>No project milestones defined.</Text>
+            ) : (
+              milestones.map((milestone, index) => (
+                <View key={index} style={{ marginBottom: 20 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <Text style={[styles.timelineLabel, { fontSize: 14, fontWeight: 'bold' }]}>
+                      {milestone.name}
+                    </Text>
+                    <Text style={[styles.timelineDate, { marginLeft: 10 }]}>
+                      {formatDate(milestone.date)}
+                    </Text>
+                  </View>
+                  
+                  {milestone.tasks.length > 0 && (
+                    <View style={{ marginLeft: 20 }}>
+                      {/* Column Headers */}
+                      <View style={{ flexDirection: 'row', marginBottom: 8, paddingBottom: 4, borderBottom: '1 solid #e2e8f0' }}>
+                        <Text style={[styles.text, { flex: 3, fontWeight: 'bold', fontSize: 10 }]}>DD Task</Text>
+                        <Text style={[styles.text, { flex: 2, fontWeight: 'bold', fontSize: 10 }]}>Task Owner</Text>
+                        <Text style={[styles.text, { flex: 1, fontWeight: 'bold', fontSize: 10 }]}>Status</Text>
+                      </View>
+                      
+                      {/* Task Rows */}
+                      {milestone.tasks.map((task) => (
+                        <View key={task.id} style={{ flexDirection: 'row', marginBottom: 6, paddingVertical: 4 }}>
+                          <Text style={[styles.text, { flex: 3, fontSize: 9 }]}>{task.title}</Text>
+                          <Text style={[styles.text, { flex: 2, fontSize: 9 }]}>{task.assignee || 'Unassigned'}</Text>
+                          <View style={{ flex: 1 }}>
+                            <View style={getStatusStyle(task.status)}>
+                              <Text style={{ fontSize: 8 }}>{formatStatus(task.status)}</Text>
+                            </View>
+                          </View>
+                        </View>
+                      ))}
                     </View>
-                  </View>
+                  )}
                 </View>
-              );
-            })}
-          </View>
+              ))
+            );
+          })()}
           
-          {timelineHealth.length === 0 && (
-            <Text style={styles.text}>No project milestones defined.</Text>
-          )}
-          
-          {/* Add Task Summary for DD Expiration */}
-          {project.ddExpirationDate && ddTasks.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.subsectionTitle}>Tasks Due by DD Expiration</Text>
-              <Text style={styles.text}>
-                <Text style={styles.bold}>{ddTasks.length}</Text> tasks need to be completed by {formatDate(project.ddExpirationDate)}:
-              </Text>
-              {ddTasks.map((task) => (
-                <View key={task.id} style={[styles.taskRow, { marginLeft: 20, backgroundColor: '#fef5e7' }]}>
-                  <Text style={styles.taskTitle}>{task.title}</Text>
-                  <Text style={styles.taskDetail}>{task.assignee || 'Unassigned'}</Text>
-                  <View style={getStatusStyle(task.status)}>
-                    <Text>{formatStatus(task.status)}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
         </View>
 
         <Text style={styles.footer}>
