@@ -703,15 +703,8 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
       <Page size="A4" style={styles.page}>
         <Text style={styles.header}>Executive Summary</Text>
         
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Deal Overview</Text>
-          <Text style={styles.text}>
-            <Text style={styles.bold}>Deal:</Text> {project.name}
-          </Text>
-        </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Key Performance Indicators</Text>
           <View style={styles.kpiGrid}>
             <View style={styles.kpiCard}>
               <Text style={styles.kpiNumber}>{kpis.completionRate}%</Text>
