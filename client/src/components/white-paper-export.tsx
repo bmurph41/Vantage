@@ -790,7 +790,7 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
 
       {/* Timeline & Schedule Health */}
       <Page size="A4" style={styles.page}>
-        <Text style={styles.header}>Project Timeline & Schedule Health</Text>
+        <Text style={styles.header}>DD Timeline</Text>
         
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Project Milestones</Text>
