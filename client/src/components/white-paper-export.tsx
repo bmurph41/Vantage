@@ -738,7 +738,7 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
             
             <View style={styles.kpiCard}>
               <Text style={styles.kpiNumber}>{formatCurrency(kpis.totalCost.toString())}</Text>
-              <Text style={styles.kpiLabel}>Total Project Cost</Text>
+              <Text style={styles.kpiLabel}>Total Cost</Text>
               <Text style={styles.kpiSubtext}>Estimated due diligence expenses</Text>
             </View>
             
