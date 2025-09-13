@@ -1,4 +1,4 @@
-import type { Project, ProjectSettings, Task, TaskTemplate, ProjectTemplate } from "@shared/schema";
+import type { Project, ProjectSettings, Task } from "@shared/schema";
 
 export interface ProjectWithDetails {
   project: Project;

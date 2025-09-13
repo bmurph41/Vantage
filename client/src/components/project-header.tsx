@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format, parseISO } from "date-fns";
-import { Download, Share2, Calendar, FileText } from "lucide-react";
+import { Download, Share2, Calendar, FileText, Loader2 } from "lucide-react";
 import type { Project, Task, ProjectSettings } from "@shared/schema";
 import { ddClient } from "@/lib/ddClient";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +20,7 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
   const { toast } = useToast();
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isCalendarDialogOpen, setIsCalendarDialogOpen] = useState(false);
+  const [isExportingReport, setIsExportingReport] = useState(false);
   
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
@@ -71,6 +72,9 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
   };
 
   const handleExportReport = async () => {
+    if (isExportingReport) return; // Prevent duplicate clicks
+    
+    setIsExportingReport(true);
     try {
       await generateWhitePaperPDF(project, tasks, settings);
       toast({
@@ -83,6 +87,8 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
         description: "Failed to export report",
         variant: "destructive",
       });
+    } finally {
+      setIsExportingReport(false);
     }
   };
 
@@ -99,9 +105,18 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
           </p>
         </div>
         <div className="flex items-center space-x-3">
-          <Button variant="outline" onClick={handleExportReport} data-testid="button-export-report">
-            <FileText className="h-4 w-4 mr-2" />
-            Export Report
+          <Button 
+            variant="outline" 
+            onClick={handleExportReport} 
+            disabled={isExportingReport}
+            data-testid="button-export-report"
+          >
+            {isExportingReport ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4 mr-2" />
+            )}
+            {isExportingReport ? "Generating..." : "Export Report"}
           </Button>
           <Button variant="outline" onClick={handleExportCSV} data-testid="button-export-csv">
             <Download className="h-4 w-4 mr-2" />

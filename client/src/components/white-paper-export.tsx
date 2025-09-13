@@ -170,6 +170,59 @@ const styles = StyleSheet.create({
   pageBreak: {
     marginTop: 40,
   },
+  // Timeline styles
+  timelineContainer: {
+    marginTop: 20,
+    marginBottom: 20,
+    backgroundColor: '#f8fafc',
+    border: '1 solid #e2e8f0',
+    borderRadius: 6,
+    padding: 16,
+  },
+  timelineItem: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+    position: 'relative',
+  },
+  timelineLastItem: {
+    marginBottom: 0,
+  },
+  timelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4299e1',
+    marginRight: 12,
+    border: '2 solid #ffffff',
+    boxShadow: '0 0 0 2px #e2e8f0',
+  },
+  timelineContent: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  timelineLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#2d3748',
+  },
+  timelineDate: {
+    fontSize: 11,
+    color: '#4a5568',
+    fontWeight: 'normal',
+  },
+  timelineLine: {
+    position: 'absolute',
+    left: 5,
+    top: 12,
+    bottom: -15,
+    width: 2,
+    backgroundColor: '#e2e8f0',
+  },
 });
 
 // Format currency values
@@ -357,6 +410,41 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
           <Text style={styles.text}>
             <Text style={styles.bold}>Completion Rate:</Text> {totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%
           </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Project Timeline</Text>
+          <View style={styles.timelineContainer}>
+            <View style={[styles.timelineItem, project.ddExpirationDate || project.closingDate ? {} : styles.timelineLastItem]}>
+              <View style={styles.timelineDot} />
+              {(project.ddExpirationDate || project.closingDate) && <View style={styles.timelineLine} />}
+              <View style={styles.timelineContent}>
+                <Text style={styles.timelineLabel}>PSA Signed</Text>
+                <Text style={styles.timelineDate}>{formatDate(project.psaSignedDate)}</Text>
+              </View>
+            </View>
+            
+            {project.ddExpirationDate && (
+              <View style={[styles.timelineItem, project.closingDate ? {} : styles.timelineLastItem]}>
+                <View style={styles.timelineDot} />
+                {project.closingDate && <View style={styles.timelineLine} />}
+                <View style={styles.timelineContent}>
+                  <Text style={styles.timelineLabel}>Due Diligence Expiration</Text>
+                  <Text style={styles.timelineDate}>{formatDate(project.ddExpirationDate)}</Text>
+                </View>
+              </View>
+            )}
+            
+            {project.closingDate && (
+              <View style={[styles.timelineItem, styles.timelineLastItem]}>
+                <View style={styles.timelineDot} />
+                <View style={styles.timelineContent}>
+                  <Text style={styles.timelineLabel}>Target Closing Date</Text>
+                  <Text style={styles.timelineDate}>{formatDate(project.closingDate)}</Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
 
         <Text style={styles.footer}>
