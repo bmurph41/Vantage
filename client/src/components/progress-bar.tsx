@@ -60,10 +60,22 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   const taskDeadlinePosition = percentOfRange(taskDeadline, timelineStart, timelineEnd);
   const todayPosition = percentOfRange(today, timelineStart, timelineEnd);
   
-  // Progress bar spans from task start to task deadline
+  // Progress bar positioning - clamp to today for in-progress tasks
   const barStartPosition = taskStartPosition;
-  const barEndPosition = taskDeadlinePosition;
-  const barWidth = Math.max(1, barEndPosition - barStartPosition); // Task duration span
+  let barEndPosition: number;
+  
+  if (isCompleted || isOverdue) {
+    // For completed/overdue tasks, span full duration to deadline
+    barEndPosition = taskDeadlinePosition;
+  } else if (isNotStarted) {
+    // For not-started tasks, span full duration to deadline
+    barEndPosition = taskDeadlinePosition;
+  } else {
+    // For in-progress tasks, only span from start to today (not past today)
+    barEndPosition = Math.min(todayPosition, taskDeadlinePosition);
+  }
+  
+  const barWidth = Math.max(1, barEndPosition - barStartPosition);
   
   // Calculate elapsed time within the task timeline
   // CRITICAL FIX: Only show elapsed progress if task has actually started
