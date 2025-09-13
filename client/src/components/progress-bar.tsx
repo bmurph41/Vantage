@@ -55,13 +55,13 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   const isOverdue = !isCompleted && isAfter(today, taskDeadline);
   const isNotStarted = isBefore(today, taskStart);
   
-  // TASK-SPECIFIC SYSTEM: Progress bars span from task start to task deadline
-  const taskStartPosition = percentOfRange(taskStart, timelineStart, timelineEnd);
+  // ALL BARS START FROM PSA: Progress bars span from PSA start to task deadline
+  const psaStartPosition = percentOfRange(timelineStart, timelineStart, timelineEnd); // PSA start is 0%
   const taskDeadlinePosition = percentOfRange(taskDeadline, timelineStart, timelineEnd);
   const todayPosition = percentOfRange(today, timelineStart, timelineEnd);
   
   // Progress bar spans from PSA start to task deadline (full duration)
-  const barStartPosition = taskStartPosition;
+  const barStartPosition = psaStartPosition; // Always start at PSA
   const barEndPosition = taskDeadlinePosition;
   const barWidth = Math.max(1, barEndPosition - barStartPosition);
   
@@ -72,24 +72,24 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   let remainingWidth: number;
   
   if (isCompleted) {
-    // For completed tasks, show full bar as elapsed
-    elapsedEndPosition = taskDeadlinePosition;
-    elapsedWidth = Math.max(0, taskDeadlinePosition - taskStartPosition);
-    remainingWidth = 0;
-  } else if (isNotStarted) {
-    // For tasks that haven't started, show NO elapsed progress
-    elapsedEndPosition = taskStartPosition; // No progress beyond task start
-    elapsedWidth = 0; // No elapsed width for unstarted tasks
-    remainingWidth = Math.max(0, taskDeadlinePosition - taskStartPosition); // Full task width as remaining
-  } else if (isOverdue) {
-    // For overdue tasks, elapsed goes from task start to deadline
-    elapsedEndPosition = taskDeadlinePosition;
-    elapsedWidth = Math.max(0, taskDeadlinePosition - taskStartPosition);
-    remainingWidth = 0; // No remaining time for overdue tasks
-  } else {
-    // For in-progress tasks, elapsed goes from task start to today (never past deadline)
+    // For completed tasks, elapsed goes from PSA to today (or deadline if past today)
     elapsedEndPosition = Math.min(todayPosition, taskDeadlinePosition);
-    elapsedWidth = Math.max(0, Math.min(todayPosition, taskDeadlinePosition) - taskStartPosition);
+    elapsedWidth = Math.max(0, Math.min(todayPosition, taskDeadlinePosition) - psaStartPosition);
+    remainingWidth = Math.max(0, taskDeadlinePosition - Math.min(todayPosition, taskDeadlinePosition));
+  } else if (isNotStarted) {
+    // For tasks that haven't started, elapsed goes from PSA to today
+    elapsedEndPosition = todayPosition;
+    elapsedWidth = Math.max(0, todayPosition - psaStartPosition);
+    remainingWidth = Math.max(0, taskDeadlinePosition - todayPosition);
+  } else if (isOverdue) {
+    // For overdue tasks, elapsed goes from PSA to today
+    elapsedEndPosition = todayPosition;
+    elapsedWidth = Math.max(0, todayPosition - psaStartPosition);
+    remainingWidth = Math.max(0, taskDeadlinePosition - todayPosition);
+  } else {
+    // For in-progress tasks, elapsed goes from PSA to today (never past deadline)
+    elapsedEndPosition = Math.min(todayPosition, taskDeadlinePosition);
+    elapsedWidth = Math.max(0, Math.min(todayPosition, taskDeadlinePosition) - psaStartPosition);
     remainingWidth = Math.max(0, taskDeadlinePosition - Math.min(todayPosition, taskDeadlinePosition));
   }
   
@@ -138,7 +138,7 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
       <div 
         className="absolute -top-6 z-10"
         style={{
-          left: `${taskStartPosition + (taskDeadlinePosition - taskStartPosition)/2}%`,
+          left: `${percentOfRange(taskStart, timelineStart, timelineEnd) + (taskDeadlinePosition - percentOfRange(taskStart, timelineStart, timelineEnd))/2}%`,
           transform: 'translateX(-50%)'
         }}
       >
