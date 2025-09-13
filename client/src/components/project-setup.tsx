@@ -103,15 +103,15 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
       useBusinessDays: settings?.useBusinessDays || false,
       holidayCalendar: settings?.holidayCalendar || "us_federal",
       tz: project.tz,
-      psaSignedDate: project.psaSignedDate || "",
-      ddExpirationDate: project.ddExpirationDate || "",
-      closingDate: project.closingDate || "",
+      psaSignedDate: project.psaSignedDate || "2025-08-29",
+      ddExpirationDate: project.ddExpirationDate || "2025-10-28",
+      closingDate: project.closingDate || "2025-11-12",
       // DD Timeline fields
-      ddPeriodDays: project.ddPeriodDays || undefined,
+      ddPeriodDays: project.ddPeriodDays || 60,
       hasExtensions: project.hasExtensions || false,
       extensionCount: project.extensionCount || 0,
       extensionDays: project.extensionDays || [],
-      daysToClosing: project.daysToClosing || undefined,
+      daysToClosing: project.daysToClosing || 15,
     },
   });
 
@@ -363,7 +363,7 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
               
               {/* Extensions */}
               <div className="mt-3 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
                   <Label htmlFor="hasExtensions" className="text-sm">Extensions?</Label>
                   <Switch
                     id="hasExtensions"
