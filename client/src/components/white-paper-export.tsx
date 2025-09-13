@@ -722,10 +722,7 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
       <Page size="A4" style={styles.page}>
         <View style={styles.coverPage}>
           <Text style={styles.coverTitle}>Due Diligence Report</Text>
-          <Text style={styles.coverSubtitle}>{project.name}</Text>
-          {project.description && (
-            <Text style={styles.text}>{project.description}</Text>
-          )}
+          <Text style={styles.coverSubtitle}>{project.name.replace(/\s*DD\s*$/i, '').trim()}</Text>
           <Text style={styles.coverDate}>{currentDate}</Text>
         </View>
         <Text style={styles.footer}>
