@@ -402,11 +402,11 @@ const calculateProjectKPIs = (project: Project, tasks: Task[]) => {
     }
   });
   
-  // Calculate overall project risk
+  // Calculate overall project risk with improved logic
   let overallRisk = 'low';
-  if (overdueTasks.length > 0 || expirationRisk === 'high' || completionRate < 50) {
+  if (overdueTasks.length > 3 || (daysToExpiration !== null && daysToExpiration >= 0 && daysToExpiration < 3) || completionRate < 25) {
     overallRisk = 'high';
-  } else if (upcomingDeadlines.length > 3 || expirationRisk === 'medium' || completionRate < 75) {
+  } else if (overdueTasks.length >= 1 || (daysToExpiration !== null && daysToExpiration >= 3 && daysToExpiration <= 7) || (completionRate >= 25 && completionRate < 75)) {
     overallRisk = 'medium';
   }
   
@@ -542,11 +542,135 @@ const groupTasksByCategory = (tasks: Task[]) => {
   return categories;
 };
 
+// Extract unique companies hired from tasks
+const getUniqueCompaniesHired = (tasks: Task[]): string[] => {
+  const companies = new Set<string>();
+  tasks.forEach(task => {
+    if (task.companyHired && task.companyHired.trim()) {
+      companies.add(task.companyHired.trim());
+    }
+  });
+  return Array.from(companies).sort();
+};
+
+// Extract detailed company contact information
+const getCompanyContacts = (tasks: Task[]) => {
+  const companyMap = new Map<string, {
+    name: string;
+    representatives: {
+      name?: string;
+      email?: string;
+      phone?: string;
+    }[];
+    address?: {
+      street?: string;
+      suite?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+    };
+    assignees: Set<string>;
+  }>();
+
+  tasks.forEach(task => {
+    if (task.companyHired && task.companyHired.trim()) {
+      const companyName = task.companyHired.trim();
+      
+      if (!companyMap.has(companyName)) {
+        companyMap.set(companyName, {
+          name: companyName,
+          representatives: [],
+          assignees: new Set()
+        });
+      }
+      
+      const company = companyMap.get(companyName)!;
+      
+      // Add representative if available
+      if (task.repName || task.repEmail || task.repPhone) {
+        const existingRep = company.representatives.find(rep => 
+          rep.name === task.repName || rep.email === task.repEmail
+        );
+        
+        if (!existingRep) {
+          company.representatives.push({
+            name: task.repName || undefined,
+            email: task.repEmail || undefined,
+            phone: task.repPhone || undefined
+          });
+        }
+      }
+      
+      // Add address if available
+      if (task.companyAddress || task.companyCity || task.companyState) {
+        company.address = {
+          street: task.companyAddress || undefined,
+          suite: task.companySuite || undefined,
+          city: task.companyCity || undefined,
+          state: task.companyState || undefined,
+          zip: task.companyZip || undefined
+        };
+      }
+      
+      // Add assignee if available
+      if (task.assignee && task.assignee.trim()) {
+        company.assignees.add(task.assignee.trim());
+      }
+    }
+  });
+
+  return Array.from(companyMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+};
+
+// Get tasks that need to be completed by DD expiration
+const getTasksByDDExpiration = (tasks: Task[], ddExpirationDate: string | null): Task[] => {
+  if (!ddExpirationDate) return [];
+  
+  try {
+    const ddDate = parseISO(ddExpirationDate);
+    if (!isValid(ddDate)) return [];
+    
+    return tasks.filter(task => {
+      // Only include incomplete tasks
+      if (task.status === 'completed') return false;
+      
+      // For this enhanced filter, only include tasks that have valid deadlines
+      if (!task.deadline || task.deadline.trim() === '') return false;
+      
+      try {
+        const taskDeadline = parseISO(task.deadline);
+        if (!isValid(taskDeadline)) return false; // Exclude tasks with invalid deadlines
+        
+        // Only include tasks with deadlines on or before DD expiration
+        return differenceInDays(ddDate, taskDeadline) >= 0;
+      } catch {
+        return false; // Exclude tasks with deadline parsing errors
+      }
+    })
+    .sort((a, b) => {
+      // Sort by deadline (earliest first)
+      try {
+        const dateA = parseISO(a.deadline!);
+        const dateB = parseISO(b.deadline!);
+        return dateA.getTime() - dateB.getTime();
+      } catch {
+        return 0;
+      }
+    })
+    .slice(0, 10); // Limit to first 10 tasks
+  } catch {
+    return [];
+  }
+};
+
 export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps) => {
   // Calculate comprehensive KPIs and metrics
   const kpis = calculateProjectKPIs(project, tasks);
   const timelineHealth = calculateTimelineHealth(project);
   const categorizedTasks = groupTasksByCategory(tasks);
+  const companiesHired = getUniqueCompaniesHired(tasks);
+  const companyContacts = getCompanyContacts(tasks);
+  const ddTasks = getTasksByDDExpiration(tasks, project.ddExpirationDate);
   const currentDate = format(new Date(), 'MMMM d, yyyy');
   const overallRiskIndicator = getRiskIndicator(kpis.overallRisk);
   
@@ -560,7 +684,7 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
           {project.description && (
             <Text style={styles.text}>{project.description}</Text>
           )}
-          <Text style={styles.coverDate}>Generated on {currentDate}</Text>
+          <Text style={styles.coverDate}>{currentDate}</Text>
         </View>
         <Text style={styles.footer}>
           Confidential Due Diligence Report - {project.name}
@@ -641,26 +765,26 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
           </View>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { marginBottom: 15 }]}>
           <Text style={styles.sectionTitle}>Task Status Breakdown</Text>
           <View style={styles.kpiGrid}>
-            <View style={styles.kpiCard}>
-              <Text style={styles.kpiNumber}>{kpis.completedTasks}</Text>
+            <View style={[styles.kpiCard, { padding: 12, marginBottom: 10 }]}>
+              <Text style={[styles.kpiNumber, { fontSize: 24, marginBottom: 4 }]}>{kpis.completedTasks}</Text>
               <Text style={styles.kpiLabel}>Completed</Text>
             </View>
             
-            <View style={styles.kpiCard}>
-              <Text style={styles.kpiNumber}>{kpis.inProgressTasks}</Text>
+            <View style={[styles.kpiCard, { padding: 12, marginBottom: 10 }]}>
+              <Text style={[styles.kpiNumber, { fontSize: 24, marginBottom: 4 }]}>{kpis.inProgressTasks}</Text>
               <Text style={styles.kpiLabel}>In Progress</Text>
             </View>
             
-            <View style={styles.kpiCard}>
-              <Text style={styles.kpiNumber}>{kpis.notStartedTasks}</Text>
+            <View style={[styles.kpiCard, { padding: 12, marginBottom: 10 }]}>
+              <Text style={[styles.kpiNumber, { fontSize: 24, marginBottom: 4 }]}>{kpis.notStartedTasks}</Text>
               <Text style={styles.kpiLabel}>Not Started</Text>
             </View>
             
-            <View style={styles.kpiCard}>
-              <Text style={styles.kpiNumber}>{kpis.totalTasks}</Text>
+            <View style={[styles.kpiCard, { padding: 12, marginBottom: 10 }]}>
+              <Text style={[styles.kpiNumber, { fontSize: 24, marginBottom: 4 }]}>{kpis.totalTasks}</Text>
               <Text style={styles.kpiLabel}>Total Tasks</Text>
             </View>
           </View>
@@ -715,6 +839,25 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
           
           {timelineHealth.length === 0 && (
             <Text style={styles.text}>No project milestones defined.</Text>
+          )}
+          
+          {/* Add Task Summary for DD Expiration */}
+          {project.ddExpirationDate && ddTasks.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.subsectionTitle}>Tasks Due by DD Expiration</Text>
+              <Text style={styles.text}>
+                <Text style={styles.bold}>{ddTasks.length}</Text> tasks need to be completed by {formatDate(project.ddExpirationDate)}:
+              </Text>
+              {ddTasks.map((task) => (
+                <View key={task.id} style={[styles.taskRow, { marginLeft: 20, backgroundColor: '#fef5e7' }]}>
+                  <Text style={styles.taskTitle}>{task.title}</Text>
+                  <Text style={styles.taskDetail}>{task.assignee || 'Unassigned'}</Text>
+                  <View style={getStatusStyle(task.status)}>
+                    <Text>{formatStatus(task.status)}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
           )}
         </View>
 
@@ -807,56 +950,64 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
               <Text style={styles.contactDetail}>{project.lender}</Text>
             </View>
           )}
+          
+          {companyContacts.length > 0 && (
+            <View style={styles.contactItem}>
+              <Text style={styles.contactTitle}>Third-Party Companies</Text>
+              {companyContacts.map((company, index) => (
+                <View key={index} style={{ marginBottom: 8, paddingLeft: 10 }}>
+                  <Text style={[styles.contactDetail, { fontWeight: 'bold', marginBottom: 2 }]}>
+                    {company.name}
+                  </Text>
+                  
+                  {company.representatives.length > 0 && (
+                    <View style={{ marginLeft: 10 }}>
+                      {company.representatives.map((rep, repIndex) => (
+                        <View key={repIndex} style={{ marginBottom: 4 }}>
+                          {rep.name && (
+                            <Text style={styles.contactDetail}>Contact: {rep.name}</Text>
+                          )}
+                          {rep.email && (
+                            <Text style={styles.contactDetail}>Email: {rep.email}</Text>
+                          )}
+                          {rep.phone && (
+                            <Text style={styles.contactDetail}>Phone: {rep.phone}</Text>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  
+                  {company.address && (company.address.street || company.address.city || company.address.state) && (
+                    <View style={{ marginLeft: 10 }}>
+                      <Text style={styles.contactDetail}>
+                        Address: {[
+                          company.address.street && company.address.suite 
+                            ? `${company.address.street}, ${company.address.suite}`
+                            : company.address.street,
+                          company.address.city,
+                          company.address.state,
+                          company.address.zip
+                        ].filter(Boolean).join(', ')}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {company.assignees.size > 0 && (
+                    <View style={{ marginLeft: 10 }}>
+                      <Text style={styles.contactDetail}>
+                        Assignees: {Array.from(company.assignees).join(', ')}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <Text style={styles.footer}>
-          Confidential Due Diligence Report - {project.name} | Page 3
-        </Text>
-      </Page>
-
-      {/* Task Summary by Category */}
-      <Page size="A4" style={styles.page}>
-        <Text style={styles.header}>Task Summary by Category</Text>
-        
-        {Object.entries(categorizedTasks).map(([category, categoryTasks]) => (
-          <View key={category} style={styles.section}>
-            <Text style={styles.sectionTitle}>{category}</Text>
-            <Text style={styles.text}>
-              <Text style={styles.bold}>Tasks:</Text> {categoryTasks.length} | 
-              <Text style={styles.bold}> Completed:</Text> {categoryTasks.filter(t => t.status === 'completed').length} | 
-              <Text style={styles.bold}> Total Cost:</Text> {formatCurrency(
-                categoryTasks.reduce((sum, task) => {
-                  if (task.cost) {
-                    const cleanCost = task.cost.replace(/[$,]/g, '').trim();
-                    const numericCost = parseFloat(cleanCost);
-                    return sum + (isNaN(numericCost) ? 0 : numericCost);
-                  }
-                  return sum;
-                }, 0).toString()
-              )}
-            </Text>
-            
-            {categoryTasks.slice(0, 5).map((task) => (
-              <View key={task.id} style={styles.taskRow}>
-                <Text style={styles.taskTitle}>{task.title}</Text>
-                <Text style={styles.taskDetail}>{task.assignee || 'Unassigned'}</Text>
-                <Text style={styles.taskDetail}>{formatCurrency(task.cost || '')}</Text>
-                <View style={getStatusStyle(task.status)}>
-                  <Text>{formatStatus(task.status)}</Text>
-                </View>
-              </View>
-            ))}
-            
-            {categoryTasks.length > 5 && (
-              <Text style={styles.text}>
-                ... and {categoryTasks.length - 5} more tasks in this category
-              </Text>
-            )}
-          </View>
-        ))}
-
-        <Text style={styles.footer}>
-          Confidential Due Diligence Report - {project.name} | Page 4
+          Confidential Due Diligence Report - {project.name} | Page 5
         </Text>
       </Page>
 
@@ -888,7 +1039,7 @@ export const WhitePaperDocument = ({ project, tasks, settings }: WhitePaperProps
         </View>
 
         <Text style={styles.footer}>
-          Confidential Due Diligence Report - {project.name} | Page 5
+          Confidential Due Diligence Report - {project.name} | Page 6
         </Text>
       </Page>
     </Document>
