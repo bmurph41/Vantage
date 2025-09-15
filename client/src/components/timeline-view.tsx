@@ -554,11 +554,25 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                 const isCritical = showCriticalPath && criticalPathResult ? isTaskCritical(task.id, criticalPathResult) : false;
                 const criticalInfo = showCriticalPath && criticalPathResult ? criticalPathResult.nodes.get(task.id) : null;
                 
+                // Check if task is nearing deadline (within 5 days and not completed)
+                const isNearingDeadline = (() => {
+                  if (task.status === 'completed') return false;
+                  if (!task.deadline) return false;
+                  
+                  const today = startOfDay(tzNow('America/New_York'));
+                  const deadline = startOfDay(parseISO(task.deadline));
+                  const daysUntilDeadline = differenceInCalendarDays(deadline, today);
+                  
+                  return daysUntilDeadline >= 0 && daysUntilDeadline <= 5;
+                })();
+                
                 return (
                   <div key={task.id} className={`rounded-lg p-3 border transition-all duration-200 ${
                     isCritical 
                       ? 'bg-red-50 border-red-200 shadow-md' 
-                      : 'bg-gray-50 border-gray-200'
+                      : isNearingDeadline
+                        ? 'bg-amber-50 border-amber-200 shadow-sm'
+                        : 'bg-gray-50 border-gray-200'
                   }`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-2">
@@ -580,6 +594,16 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                         {showCriticalPath && criticalInfo && criticalInfo.float > 0 && criticalInfo.float <= 2 && (
                           <Badge variant="outline" className="text-xs px-2 py-0.5 text-amber-700 border-amber-300">
                             Near Critical ({Math.round(criticalInfo.float)}d float)
+                          </Badge>
+                        )}
+                        {isNearingDeadline && !isCritical && (
+                          <Badge variant="outline" className="text-xs px-2 py-0.5 text-amber-700 border-amber-300 bg-amber-50">
+                            Due Soon ({(() => {
+                              const today = startOfDay(tzNow('America/New_York'));
+                              const deadline = startOfDay(parseISO(task.deadline!));
+                              const days = differenceInCalendarDays(deadline, today);
+                              return days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days}d`;
+                            })()})
                           </Badge>
                         )}
                       </div>

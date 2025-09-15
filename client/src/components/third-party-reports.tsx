@@ -573,8 +573,27 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               {activeTasks.length > 0 && (
                 <>
                   <h3>Active Tasks ({activeTasks.length})</h3>
-                  {activeTasks.map((task) => (
-                    <div key={task.id} className={`bg-white border ${getTaskBorderColor(task)} border-l-4 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow`}>
+                  {activeTasks.map((task) => {
+                    // Check if task is nearing deadline (within 5 days and not completed)
+                    const isNearingDeadline = (() => {
+                      if (task.status === 'completed') return false;
+                      if (!task.deadline) return false;
+                      
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const deadline = new Date(task.deadline);
+                      deadline.setHours(0, 0, 0, 0);
+                      const daysUntilDeadline = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      
+                      return daysUntilDeadline >= 0 && daysUntilDeadline <= 5;
+                    })();
+                    
+                    return (
+                    <div key={task.id} className={`border border-l-4 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow ${
+                      isNearingDeadline 
+                        ? 'bg-amber-50 border-amber-200 shadow-md' 
+                        : 'bg-white'
+                    } ${getTaskBorderColor(task)}`}>
                       {/* Header Section */}
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
@@ -899,7 +918,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </>
               )}
 
