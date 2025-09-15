@@ -24,8 +24,8 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
   
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
-  const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
-  const notStartedTasks = tasks.filter(t => t.status === 'not_started' || t.status === 'scheduled').length;
+  const inProgressTasks = tasks.filter(t => t.status === 'engaged' || t.status === 'scheduled' || t.status === 'in_progress').length;
+  const notStartedTasks = tasks.filter(t => t.status === 'not_started').length;
   const overdueTasks = tasks.filter(t => {
     // This would need proper overdue calculation in a real implementation
     return t.status !== 'completed' && new Date() > new Date(); // Simplified
