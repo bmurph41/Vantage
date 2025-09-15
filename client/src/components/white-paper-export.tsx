@@ -1035,15 +1035,32 @@ export const generateWhitePaperPDF = async (
   tasks: Task[],
   settings?: ProjectSettings | null
 ): Promise<void> => {
-  const doc = <WhitePaperDocument project={project} tasks={tasks} settings={settings} />;
-  const asPdf = pdf(doc);
-  const blob = await asPdf.toBlob();
-  
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${project.name}-Due-Diligence-Report.pdf`;
-  link.click();
-  
-  URL.revokeObjectURL(url);
+  try {
+    console.log('Starting PDF generation for project:', project.name);
+    console.log('Number of tasks:', tasks.length);
+    
+    const doc = <WhitePaperDocument project={project} tasks={tasks} settings={settings} />;
+    console.log('PDF document created');
+    
+    const asPdf = pdf(doc);
+    console.log('PDF instance created');
+    
+    const blob = await asPdf.toBlob();
+    console.log('PDF blob generated:', blob.size, 'bytes');
+    
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${project.name}-Due-Diligence-Report.pdf`;
+    link.click();
+    
+    URL.revokeObjectURL(url);
+    console.log('PDF download initiated successfully');
+  } catch (error) {
+    console.error('Detailed PDF generation error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
+    console.error('Project data:', { name: project.name, id: project.id });
+    console.error('Tasks count:', tasks.length);
+    throw error; // Re-throw to trigger the toast error message
+  }
 };
