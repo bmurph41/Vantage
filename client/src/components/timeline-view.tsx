@@ -519,6 +519,68 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                           className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-green-600"
                           style={{ left: `${endPos}%` }}
                         />
+
+                        {/* Milestone Markers with Hover Labels */}
+                        {project.psaSignedDate && (
+                          <div 
+                            className="absolute top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer"
+                            style={{ left: "0%" }}
+                            data-testid="milestone-psa"
+                          >
+                            <div className="w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-sm hover:scale-125 transition-transform" />
+                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30">
+                              <div className="text-xs font-medium text-blue-600">PSA Signed</div>
+                              <div className="text-xs text-gray-600">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
+                            </div>
+                          </div>
+                        )}
+                        {project.ddExpirationDate && (
+                          <div 
+                            className="absolute top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer"
+                            style={{ left: `${getMilestonePosition(project.ddExpirationDate)}%` }}
+                            data-testid="milestone-dd-expiration"
+                          >
+                            <div className="w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-sm hover:scale-125 transition-transform" />
+                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30">
+                              <div className="text-xs font-medium text-amber-600">DD Expiration</div>
+                              <div className="text-xs text-gray-600">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
+                            </div>
+                          </div>
+                        )}
+                        {project.closingDate && (
+                          <div 
+                            className="absolute top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer"
+                            style={{ left: "100%" }}
+                            data-testid="milestone-closing"
+                          >
+                            <div className="w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm hover:scale-125 transition-transform" />
+                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30">
+                              <div className="text-xs font-medium text-green-600">Closing</div>
+                              <div className="text-xs text-gray-600">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Task Dots */}
+                        {tasks.filter(t => t.showOnTimeline && t.deadline).map((task) => (
+                          <div
+                            key={task.id}
+                            className="absolute top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer"
+                            style={{ left: `${getMilestonePosition(task.deadline!)}%` }}
+                            data-testid={`task-dot-${task.id}`}
+                          >
+                            <div className={`w-2 h-2 rounded-full border border-white shadow-sm hover:scale-150 transition-transform ${
+                              task.status === 'completed' ? 'bg-green-500' :
+                              task.status === 'in_progress' ? 'bg-blue-500' :
+                              task.status === 'scheduled' ? 'bg-blue-600' :
+                              'bg-gray-400'
+                            }`} />
+                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30">
+                              <div className="text-xs font-medium text-gray-900">{task.title}</div>
+                              <div className="text-xs text-gray-600">{format(parseISO(task.deadline!), 'MMM d, yyyy')}</div>
+                            </div>
+                          </div>
+                        ))}
                       </>
                     );
                   })()}
@@ -526,73 +588,6 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
               </div>
             </div>
           )}
-
-          {/* Simple Timeline Track */}
-          <div className="relative mb-6">
-            <div className="h-2 bg-gray-200 rounded-full relative overflow-hidden">
-              {/* Milestone Markers with Hover Labels */}
-              {project.psaSignedDate && (
-                <div 
-                  className="absolute top-0 transform -translate-x-1/2 z-10 group cursor-pointer"
-                  style={{ left: "0%" }}
-                  data-testid="milestone-psa"
-                >
-                  <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-sm -mt-1 hover:scale-110 transition-transform" />
-                  <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                    <div className="text-xs font-medium text-blue-600">PSA Signed</div>
-                    <div className="text-xs text-gray-600">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
-                  </div>
-                </div>
-              )}
-              {project.ddExpirationDate && (
-                <div 
-                  className="absolute top-0 transform -translate-x-1/2 z-10 group cursor-pointer"
-                  style={{ left: `${getMilestonePosition(project.ddExpirationDate)}%` }}
-                  data-testid="milestone-dd-expiration"
-                >
-                  <div className="w-4 h-4 bg-amber-500 rounded-full border-2 border-white shadow-sm -mt-1 hover:scale-110 transition-transform" />
-                  <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                    <div className="text-xs font-medium text-amber-600">DD Expiration</div>
-                    <div className="text-xs text-gray-600">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
-                  </div>
-                </div>
-              )}
-              {project.closingDate && (
-                <div 
-                  className="absolute top-0 transform -translate-x-1/2 z-10 group cursor-pointer"
-                  style={{ left: "100%" }}
-                  data-testid="milestone-closing"
-                >
-                  <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-sm -mt-1 hover:scale-110 transition-transform" />
-                  <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                    <div className="text-xs font-medium text-green-600">Closing</div>
-                    <div className="text-xs text-gray-600">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Task Dots */}
-              {tasks.filter(t => t.showOnTimeline && t.deadline).map((task) => (
-                <div
-                  key={task.id}
-                  className="absolute top-0 transform -translate-x-1/2 z-10 group cursor-pointer"
-                  style={{ left: `${getMilestonePosition(task.deadline!)}%` }}
-                  data-testid={`task-dot-${task.id}`}
-                >
-                  <div className={`w-3 h-3 rounded-full border-2 border-white shadow-sm -mt-0.5 hover:scale-110 transition-transform ${
-                    task.status === 'completed' ? 'bg-green-500' :
-                    task.status === 'in_progress' ? 'bg-blue-500' :
-                    task.status === 'scheduled' ? 'bg-blue-600' :
-                    'bg-gray-400'
-                  }`} />
-                  <div className="absolute top-5 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                    <div className="text-xs font-medium text-gray-900">{task.title}</div>
-                    <div className="text-xs text-gray-600">{format(parseISO(task.deadline!), 'MMM d, yyyy')}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Critical Path Summary */}
           {showCriticalPath && criticalPathResult && (
