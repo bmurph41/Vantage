@@ -169,13 +169,13 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
           width: `${barWidth}%`
         }}
       >
-        {/* Elapsed time section (task start to today) - blue solid fill */}
+        {/* Elapsed time section (task start to today) - solid color fill */}
         {elapsedWidth > 0 && (
           <div 
             className={`h-full absolute ${
               isCompleted ? 'bg-green-600' : 
               isOverdue ? 'bg-red-600' : 
-              'bg-blue-500'
+              'bg-blue-600'
             }`}
             style={{
               left: '0%',
@@ -185,18 +185,34 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
           />
         )}
         
-        {/* Remaining time section (today to task deadline) - distinct styling */}
+        {/* Remaining time section (today to task deadline) - striped pattern */}
         {remainingWidth > 0 && !isCompleted && (
           <div 
-            className={`h-full absolute ${
-              isOverdue ? 'bg-red-300' : 'bg-blue-200 opacity-60'
+            className={`h-full absolute relative overflow-hidden ${
+              isOverdue ? 'bg-red-100' : 'bg-gray-50'
             }`}
             style={{
               left: `${(elapsedWidth / barWidth) * 100}%`,
               width: `${(remainingWidth / barWidth) * 100}%`
             }}
             data-testid="progress-remaining"
-          />
+          >
+            {/* Diagonal striped pattern for remaining time */}
+            <div 
+              className={`absolute inset-0 ${
+                isOverdue ? 'bg-red-200' : 'bg-blue-200'
+              }`}
+              style={{
+                backgroundImage: `repeating-linear-gradient(
+                  45deg,
+                  transparent,
+                  transparent 4px,
+                  rgba(255,255,255,0.3) 4px,
+                  rgba(255,255,255,0.3) 8px
+                )`
+              }}
+            />
+          </div>
         )}
         
         {/* Task start marker - shows where the task actually begins */}

@@ -496,15 +496,29 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                             />
                           )}
                           
-                          {/* Remaining time section (today to closing) - lighter green */}
+                          {/* Remaining time section (today to closing) - striped pattern */}
                           {remainingWidth > 0 && !isCompleted && (
                             <div 
-                              className="h-full bg-green-200 opacity-60 absolute"
+                              className="h-full bg-green-50 absolute relative overflow-hidden"
                               style={{
                                 left: `${(elapsedWidth / barWidth) * 100}%`,
                                 width: `${(remainingWidth / barWidth) * 100}%`
                               }}
-                            />
+                            >
+                              {/* Diagonal striped pattern for remaining time */}
+                              <div 
+                                className="absolute inset-0 bg-green-200"
+                                style={{
+                                  backgroundImage: `repeating-linear-gradient(
+                                    45deg,
+                                    transparent,
+                                    transparent 4px,
+                                    rgba(255,255,255,0.4) 4px,
+                                    rgba(255,255,255,0.4) 8px
+                                  )`
+                                }}
+                              />
+                            </div>
                           )}
                         </div>
                         
