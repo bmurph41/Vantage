@@ -550,7 +550,16 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
           {/* Task Progress Bars */}
           {tasks.filter(t => t.showOnTimeline).length > 0 && (
             <div className="mb-6 space-y-6" data-timeline-section>
-              {tasks.filter(t => t.showOnTimeline).map((task) => {
+              {tasks.filter(t => t.showOnTimeline)
+                .sort((a, b) => {
+                  // Sort by deadline - closest due dates first
+                  if (!a.deadline && !b.deadline) return 0;
+                  if (!a.deadline) return 1; // Tasks without deadlines go to the end
+                  if (!b.deadline) return -1; // Tasks without deadlines go to the end
+                  
+                  return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+                })
+                .map((task) => {
                 const isCritical = showCriticalPath && criticalPathResult ? isTaskCritical(task.id, criticalPathResult) : false;
                 const criticalInfo = showCriticalPath && criticalPathResult ? criticalPathResult.nodes.get(task.id) : null;
                 
