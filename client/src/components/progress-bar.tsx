@@ -133,7 +133,7 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
   };
 
   return (
-    <div className={cn("h-8 bg-gray-100 rounded-lg overflow-hidden relative shadow-inner", className)} data-testid="progress-bar">
+    <div className={cn("h-8 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg overflow-hidden relative shadow-inner border border-gray-200/50", className)} data-testid="progress-bar">
       {/* Text labels above progress bars - positioned at center of task timeline */}
       <div 
         className="absolute -top-6 z-10"
@@ -143,19 +143,19 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
         }}
       >
         {isCompleted ? (
-          <span className="text-black text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle">
+          <span className="text-gray-900 text-xs font-semibold px-3 py-1 bg-white/90 backdrop-blur-sm rounded-md border border-gray-200/80 shadow-sm text-center whitespace-nowrap leader-obstacle">
             Completed ({getTimeLabel(taskDurationDays)})
           </span>
         ) : isOverdue ? (
-          <span className={`${getTextColorClass()} text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle`}>
+          <span className={`${getTextColorClass()} text-xs font-semibold px-3 py-1 bg-white/90 backdrop-blur-sm rounded-md border border-red-200/80 shadow-sm text-center whitespace-nowrap leader-obstacle`}>
             Overdue ({getTimeLabel(elapsed)} elapsed)
           </span>
         ) : isNotStarted ? (
-          <span className={`${getTextColorClass()} text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle`}>
+          <span className={`${getTextColorClass()} text-xs font-semibold px-3 py-1 bg-white/90 backdrop-blur-sm rounded-md border border-gray-200/80 shadow-sm text-center whitespace-nowrap leader-obstacle`}>
             {getTimeLabel(taskDurationDays)} remaining
           </span>
         ) : (
-          <span className={`${getTextColorClass()} text-xs font-medium px-2 text-center whitespace-nowrap leader-obstacle`}>
+          <span className={`${getTextColorClass()} text-xs font-semibold px-3 py-1 bg-white/90 backdrop-blur-sm rounded-md border border-blue-200/80 shadow-sm text-center whitespace-nowrap leader-obstacle`}>
             {getTimeLabel(elapsed)} elapsed, {getTimeLabel(remaining)} left
           </span>
         )}
@@ -163,7 +163,7 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
       
       {/* Progress bar spanning from task start to task deadline */}
       <div 
-        className="h-full bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 absolute"
+        className="h-full bg-white rounded-lg overflow-hidden shadow-md border border-gray-300/60 absolute ring-1 ring-gray-200/40"
         style={{
           left: `${barStartPosition}%`,
           width: `${barWidth}%`
