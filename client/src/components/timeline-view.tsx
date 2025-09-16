@@ -13,7 +13,7 @@ import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, each
 import { StickyNote, GripVertical, FileText, Shield } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
-import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate } from "@/lib/date-utils";
+import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate, setDeadlineTo5PM } from "@/lib/date-utils";
 import { calculateCriticalPath, isTaskCritical, getNearCriticalTasks, type CriticalPathResult } from "@/lib/critical-path";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -347,7 +347,7 @@ function SortableTaskItem({
             <Badge variant="outline" className="text-xs px-2 py-0.5 text-amber-700 border-amber-300 bg-amber-50">
               Due Soon ({(() => {
                 const today = startOfDay(tzNow('America/New_York'));
-                const deadline = startOfDay(parseISO(task.deadline!));
+                const deadline = setDeadlineTo5PM(task.deadline!);
                 const days = differenceInCalendarDays(deadline, today);
                 return days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days}d`;
               })()})
@@ -1079,7 +1079,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                         if (!task.deadline) return false;
                         
                         const today = startOfDay(tzNow('America/New_York'));
-                        const deadline = startOfDay(parseISO(task.deadline));
+                        const deadline = setDeadlineTo5PM(task.deadline);
                         const daysUntilDeadline = differenceInCalendarDays(deadline, today);
                         
                         return daysUntilDeadline >= 0 && daysUntilDeadline <= 5;

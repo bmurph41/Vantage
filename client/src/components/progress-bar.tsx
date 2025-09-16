@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { effectiveStart, effectiveDue, daysBetween, tzNow, getProjectBounds, percentOfRange, clampDate } from "@/lib/date-utils";
+import { effectiveStart, effectiveDue, daysBetween, tzNow, getProjectBounds, percentOfRange, clampDate, setDeadlineTo5PM } from "@/lib/date-utils";
 import { startOfDay, isAfter, isBefore, parseISO, addDays } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 
@@ -48,7 +48,7 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
     }
   };
   
-  const taskDeadline = startOfDay(calculateTaskDeadline(task));
+  const taskDeadline = setDeadlineTo5PM(calculateTaskDeadline(task));
   
   // Calculate task status variables first - these are used throughout the component
   const isCompleted = task.status === 'completed';

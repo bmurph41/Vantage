@@ -3,8 +3,22 @@ import { notificationService } from './notification-service';
 import { resolveRecipient } from '@shared/recipient-utils';
 import { db } from './db';
 import { type Task, type Project } from '@shared/schema';
-import { differenceInCalendarDays, startOfDay, parseISO } from 'date-fns';
+import { differenceInCalendarDays, startOfDay, parseISO, setHours, setMinutes, setSeconds } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
+
+/**
+ * Set any date to 5:00 PM in the specified timezone (defaults to America/New_York)
+ * This ensures all deadlines are consistently at 5:00 PM EST instead of midnight
+ */
+function setDeadlineTo5PM(date: Date | string, timezone: string = 'America/New_York'): Date {
+  const dateObj = typeof date === 'string' ? parseISO(date) : date;
+  
+  // Set to 5:00 PM (17:00) with 0 minutes and 0 seconds
+  const timeSet = setSeconds(setMinutes(setHours(dateObj, 17), 0), 0);
+  
+  // Ensure it's in the correct timezone
+  return toZonedTime(timeSet, timezone);
+}
 
 interface DeadlineAlert {
   task: Task;
@@ -143,7 +157,7 @@ export class DeadlineMonitor {
         // Parse deadline and convert to project timezone
         const deadlineDate = typeof task.deadline === 'string' ? parseISO(task.deadline) : new Date(task.deadline);
         const deadlineInTz = toZonedTime(deadlineDate, timezone);
-        const deadlineDayInTz = startOfDay(deadlineInTz);
+        const deadlineDayInTz = setDeadlineTo5PM(deadlineInTz, timezone);
         
         // Calculate calendar days difference (positive = future, negative = past, 0 = today)
         const daysUntilDeadline = differenceInCalendarDays(deadlineDayInTz, todayInTz);
@@ -388,7 +402,7 @@ export class DeadlineMonitor {
           // Parse deadline and convert to project timezone
           const deadlineDate = typeof task.deadline === 'string' ? parseISO(task.deadline) : new Date(task.deadline);
           const deadlineInTz = toZonedTime(deadlineDate, timezone);
-          const deadlineDayInTz = startOfDay(deadlineInTz);
+          const deadlineDayInTz = setDeadlineTo5PM(deadlineInTz, timezone);
           
           // Calculate calendar days difference using timezone-aware dates
           const daysUntilDeadline = differenceInCalendarDays(deadlineDayInTz, todayInTz);

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { daysBetween, tzNow, getProjectBounds, percentOfRange } from "@/lib/date-utils";
+import { daysBetween, tzNow, getProjectBounds, percentOfRange, setDeadlineTo5PM } from "@/lib/date-utils";
 import { startOfDay, isAfter, isBefore, parseISO, addDays, format } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -57,7 +57,7 @@ export function CompactProgressIndicator({
     }
   };
   
-  const taskDeadline = startOfDay(calculateTaskDeadline(task));
+  const taskDeadline = setDeadlineTo5PM(calculateTaskDeadline(task));
   
   // Calculate task status variables first - these are used throughout the component
   const isCompleted = task.status === 'completed';

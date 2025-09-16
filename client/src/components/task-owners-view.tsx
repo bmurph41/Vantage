@@ -3,6 +3,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { User, CheckCircle, Clock, PlayCircle, Calendar, AlertTriangle } from "lucide-react";
 import { parseISO, isBefore, startOfDay } from "date-fns";
+import { setDeadlineTo5PM } from "@/lib/date-utils";
 import type { Task } from "@shared/schema";
 
 interface TaskOwnersViewProps {
@@ -58,7 +59,7 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
       // Check if task is overdue (has deadline and is past due, not completed)
       const isOverdue = task.deadline && 
         task.status !== 'completed' && 
-        isBefore(parseISO(task.deadline), today);
+        isBefore(setDeadlineTo5PM(task.deadline), today);
 
       if (isOverdue) {
         stats.overdue++;

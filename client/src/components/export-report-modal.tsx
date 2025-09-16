@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Download, Mail, Eye, FileText, Calendar } from "lucide-react";
 import type { Task, Project } from "@shared/schema";
 import { format, parseISO, addDays, differenceInDays, isValid } from "date-fns";
-import { tzNow } from "@/lib/date-utils";
+import { tzNow, setDeadlineTo5PM } from "@/lib/date-utils";
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, pdf } from '@react-pdf/renderer';
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -201,9 +201,9 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
     
     // First priority: Use direct deadline field if set
     if (task.deadline) {
-      deadlineDate = parseISO(task.deadline);
+      deadlineDate = setDeadlineTo5PM(task.deadline);
     } else if (task.deadlineType === 'dd_expiration' && project?.ddExpirationDate) {
-      deadlineDate = parseISO(project.ddExpirationDate);
+      deadlineDate = setDeadlineTo5PM(project.ddExpirationDate);
     } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project?.psaSignedDate) {
       const psaDate = parseISO(project.psaSignedDate);
       deadlineDate = addDays(psaDate, task.deadlineDays);

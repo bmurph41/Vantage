@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
 import { format, parseISO, isValid, differenceInDays } from 'date-fns';
+import { setDeadlineTo5PM } from '@/lib/date-utils';
 import type { Project, Task, ProjectSettings, Risk } from '@shared/schema';
 
 interface WhitePaperProps {
@@ -904,7 +905,7 @@ const calculateProjectKPIs = (project: Project, tasks: Task[]) => {
   const overdueTasks = tasks.filter(task => {
     if (!task.deadline) return false;
     try {
-      const deadline = parseISO(task.deadline);
+      const deadline = setDeadlineTo5PM(task.deadline);
       return isValid(deadline) && differenceInDays(today, deadline) > 0 && task.status !== 'completed';
     } catch {
       return false;
@@ -915,7 +916,7 @@ const calculateProjectKPIs = (project: Project, tasks: Task[]) => {
   const upcomingDeadlines = tasks.filter(task => {
     if (!task.deadline || task.status === 'completed') return false;
     try {
-      const deadline = parseISO(task.deadline);
+      const deadline = setDeadlineTo5PM(task.deadline);
       if (!isValid(deadline)) return false;
       const daysUntilDeadline = differenceInDays(deadline, today);
       return daysUntilDeadline >= 0 && daysUntilDeadline <= 7;
@@ -1167,7 +1168,7 @@ const getTasksByDDExpiration = (tasks: Task[], ddExpirationDate: string | null):
       if (!task.deadline || task.deadline.trim() === '') return false;
       
       try {
-        const taskDeadline = parseISO(task.deadline);
+        const taskDeadline = setDeadlineTo5PM(task.deadline);
         if (!isValid(taskDeadline)) return false; // Exclude tasks with invalid deadlines
         
         // Only include tasks with deadlines on or before DD expiration
@@ -1179,8 +1180,8 @@ const getTasksByDDExpiration = (tasks: Task[], ddExpirationDate: string | null):
     .sort((a, b) => {
       // Sort by deadline (earliest first)
       try {
-        const dateA = parseISO(a.deadline!);
-        const dateB = parseISO(b.deadline!);
+        const dateA = setDeadlineTo5PM(a.deadline!);
+        const dateB = setDeadlineTo5PM(b.deadline!);
         return dateA.getTime() - dateB.getTime();
       } catch {
         return 0;
@@ -1354,7 +1355,7 @@ const analyzeTimelineRisks = (project: Project, tasks: Task[], today: Date): Ris
   const overdueTasks = tasks.filter(task => {
     if (!task.deadline || task.status === 'completed') return false;
     try {
-      const deadline = parseISO(task.deadline);
+      const deadline = setDeadlineTo5PM(task.deadline);
       return isValid(deadline) && differenceInDays(today, deadline) > 0;
     } catch {
       return false;

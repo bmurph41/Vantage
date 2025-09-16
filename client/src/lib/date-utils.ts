@@ -10,12 +10,29 @@ import {
   differenceInCalendarDays, 
   isAfter, 
   isBefore,
-  parseISO 
+  parseISO,
+  setHours,
+  setMinutes,
+  setSeconds 
 } from 'date-fns';
 import { toZonedTime, format as formatTz } from 'date-fns-tz';
 
 export function tzNow(timezone: string = 'America/New_York'): Date {
   return toZonedTime(new Date(), timezone);
+}
+
+/**
+ * Set any date to 5:00 PM in the specified timezone (defaults to America/New_York)
+ * This ensures all deadlines are consistently at 5:00 PM EST instead of midnight
+ */
+export function setDeadlineTo5PM(date: Date | string, timezone: string = 'America/New_York'): Date {
+  const dateObj = typeof date === 'string' ? parseISO(date) : date;
+  
+  // Set to 5:00 PM (17:00) with 0 minutes and 0 seconds
+  const timeSet = setSeconds(setMinutes(setHours(dateObj, 17), 0), 0);
+  
+  // Ensure it's in the correct timezone
+  return toZonedTime(timeSet, timezone);
 }
 
 export function formatDateInTz(date: Date | string, timezone: string = 'America/New_York', formatStr: string = 'yyyy-MM-dd'): string {

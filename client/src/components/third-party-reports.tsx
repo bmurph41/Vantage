@@ -18,7 +18,7 @@ import { TimelineNotes } from "@/components/timeline-notes";
 import { ExportReportModal } from "@/components/export-report-modal";
 import { CompanyDetailsModal } from "@/components/company-details-modal";
 import { differenceInDays, parseISO, format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, isToday, isPast, isFuture } from "date-fns";
-import { tzNow } from "@/lib/date-utils";
+import { tzNow, setDeadlineTo5PM } from "@/lib/date-utils";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 
@@ -100,9 +100,9 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     
     // First priority: Use direct deadline field if set
     if (task.deadline) {
-      deadlineDate = parseISO(task.deadline);
+      deadlineDate = setDeadlineTo5PM(task.deadline);
     } else if (task.deadlineType === 'dd_expiration' && project?.ddExpirationDate) {
-      deadlineDate = parseISO(project.ddExpirationDate);
+      deadlineDate = setDeadlineTo5PM(project.ddExpirationDate);
     } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project?.psaSignedDate) {
       const psaDate = parseISO(project.psaSignedDate);
       deadlineDate = addDays(psaDate, task.deadlineDays);
