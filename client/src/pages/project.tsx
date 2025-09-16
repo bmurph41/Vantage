@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { ProjectHeader } from "@/components/project-header";
@@ -8,11 +8,13 @@ import { ProjectSetup } from "@/components/project-setup";
 import { TemplatesView } from "@/components/templates-view";
 import { TimelineView } from "@/components/timeline-view";
 import { TaskOwnersView } from "@/components/task-owners-view";
+import NotificationSettingsPage from "@/pages/notification-settings";
 import { useProject } from "@/hooks/use-project";
 import { cn } from "@/lib/utils";
 
 export default function ProjectPage() {
   const { id } = useParams();
+  const [location] = useLocation();
   const [activeTab, setActiveTab] = useState("reports");
   
   const { data, isLoading, error } = useProject(id!);
@@ -50,6 +52,7 @@ export default function ProjectPage() {
     { id: "setup", label: "Deal Details" },
     { id: "owners", label: "Task Owners" },
     { id: "templates", label: "Templates" },
+    { id: "notifications", label: "Notifications" },
   ];
 
   return (
@@ -119,6 +122,9 @@ export default function ProjectPage() {
           )}
           {activeTab === "templates" && (
             <TemplatesView projectId={project.id} />
+          )}
+          {activeTab === "notifications" && (
+            <NotificationSettingsPage projectId={project.id} />
           )}
         </div>
       </div>
