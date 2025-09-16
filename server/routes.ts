@@ -275,6 +275,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk update task sort orders
+  app.patch("/api/dd/projects/:projectId/tasks/bulk-sort-order", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      
+      const taskSortUpdates = z.array(z.object({
+        id: z.string(),
+        sortOrder: z.number()
+      })).parse(req.body);
+
+      // Update sort orders in bulk
+      const results = await Promise.all(
+        taskSortUpdates.map(update => 
+          storage.updateTask(update.id, { sortOrder: update.sortOrder })
+        )
+      );
+
+      // Create audit log for bulk update
+      await storage.createAuditLog({
+        projectId: req.params.projectId,
+        userId: req.user.id,
+        entityType: "task",
+        entityId: "bulk-sort-order",
+        action: "bulk_sort_order_update",
+        before: null,
+        after: { updates: taskSortUpdates }
+      });
+
+      res.json(results);
+    } catch (error) {
+      console.error("Error updating task sort orders:", error);
+      res.status(500).json({ error: "Failed to update sort orders" });
+    }
+  });
+
   // Tasks
   app.get("/api/dd/projects/:projectId/tasks", async (req: any, res) => {
     try {

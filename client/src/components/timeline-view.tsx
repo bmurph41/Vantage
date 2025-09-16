@@ -7,12 +7,33 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { TimelineNotes } from "./timeline-notes";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
-import { StickyNote } from "lucide-react";
+import { StickyNote, GripVertical } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate } from "@/lib/date-utils";
 import { calculateCriticalPath, isTaskCritical, getNearCriticalTasks, type CriticalPathResult } from "@/lib/critical-path";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -197,13 +218,185 @@ function LinesLayer({ headerRef, contentRef }: LinesLayerProps) {
   );
 }
 
+// Sortable Task Item Component
+interface SortableTaskItemProps {
+  task: Task;
+  project: Project;
+  settings?: ProjectSettings | null;
+  isCritical: boolean;
+  criticalInfo: any;
+  isNearingDeadline: boolean;
+  showCriticalPath: boolean;
+  onOpenNotes: (taskId: string) => void;
+  getTaskNoteCount: (taskId: string) => number;
+}
+
+function SortableTaskItem({
+  task,
+  project,
+  settings,
+  isCritical,
+  criticalInfo,
+  isNearingDeadline,
+  showCriticalPath,
+  onOpenNotes,
+  getTaskNoteCount
+}: SortableTaskItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`rounded-lg p-3 border transition-all duration-200 ${
+        isCritical 
+          ? 'bg-red-50 border-red-200 shadow-md' 
+          : isNearingDeadline
+            ? 'bg-amber-50 border-amber-200 shadow-sm'
+            : 'bg-gray-50 border-gray-200'
+      }`}
+      data-testid={`sortable-task-${task.id}`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center space-x-2">
+          {/* Drag Handle */}
+          <div
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-200/50 transition-colors"
+            data-testid={`drag-handle-${task.id}`}
+          >
+            <GripVertical className="h-4 w-4 text-gray-400" />
+          </div>
+          <span className={`w-2 h-2 rounded-full ${
+            isCritical ? 'bg-red-500' :
+            task.status === 'completed' ? 'bg-green-500' :
+            task.status === 'in_progress' ? 'bg-blue-500' :
+            task.status === 'scheduled' ? 'bg-blue-600' :
+            'bg-gray-400'
+          }`} />
+          <span className={`text-sm font-medium leader-obstacle ${
+            isCritical ? 'text-red-900' : 'text-gray-900'
+          }`}>{task.title}</span>
+          {isCritical && (
+            <Badge variant="destructive" className="text-xs px-2 py-0.5">
+              Critical
+            </Badge>
+          )}
+          {showCriticalPath && criticalInfo && criticalInfo.float > 0 && criticalInfo.float <= 2 && (
+            <Badge variant="outline" className="text-xs px-2 py-0.5 text-amber-700 border-amber-300">
+              Near Critical ({Math.round(criticalInfo.float)}d float)
+            </Badge>
+          )}
+          {isNearingDeadline && !isCritical && (
+            <Badge variant="outline" className="text-xs px-2 py-0.5 text-amber-700 border-amber-300 bg-amber-50">
+              Due Soon ({(() => {
+                const today = startOfDay(tzNow('America/New_York'));
+                const deadline = startOfDay(parseISO(task.deadline!));
+                const days = differenceInCalendarDays(deadline, today);
+                return days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days}d`;
+              })()})
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center space-x-3">
+          {showCriticalPath && criticalInfo && (
+            <div className="text-xs text-gray-600">
+              Float: <strong>{Math.round(criticalInfo.float)}d</strong>
+            </div>
+          )}
+          <div className="text-xs text-gray-600">
+            {task.assignee || 'Unassigned'}
+          </div>
+          {/* Simple Note Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors relative"
+            onClick={() => onOpenNotes(task.id)}
+            data-testid={`button-notes-${task.id}`}
+          >
+            <StickyNote className="h-3 w-3 mr-1" />
+            Notes
+            {(() => {
+              const noteCount = getTaskNoteCount(task.id);
+              if (noteCount > 0) {
+                return (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center shadow-md">
+                    {noteCount > 9 ? '9+' : noteCount}
+                  </span>
+                );
+              }
+              return null;
+            })()}
+          </Button>
+        </div>
+      </div>
+      <div className="mt-6">
+        <ProgressBar 
+          task={task} 
+          project={project} 
+          settings={settings}
+          className={`shadow-sm ${
+            isCritical ? 'ring-2 ring-red-200' : ''
+          }`}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [notesDialogTaskId, setNotesDialogTaskId] = useState<string | null>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Mutation for updating task sort orders
+  const updateSortOrderMutation = useMutation({
+    mutationFn: async (sortUpdates: Array<{ id: string; sortOrder: number }>) => {
+      const response = await apiRequest("PATCH", `/api/dd/projects/${project.id}/tasks/bulk-sort-order`, sortUpdates);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', project.id, 'tasks'] });
+      toast({
+        title: "Success",
+        description: "Task order updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update task order",
+        variant: "destructive",
+      });
+    },
+  });
 
   const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];
 
@@ -216,7 +409,50 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
 
   // Memoize timeline tasks and task IDs to stabilize dependencies
   const timelineTasks = useMemo(() => tasks.filter(t => t.showOnTimeline), [tasks]);
-  const taskIds = useMemo(() => timelineTasks.map(t => t.id), [timelineTasks]);
+  
+  // Enhanced sorting logic that considers custom sortOrder
+  const sortedTasks = useMemo(() => {
+    return [...timelineTasks].sort((a, b) => {
+      // First priority: Use custom sortOrder if both tasks have it set
+      if (a.sortOrder !== null && a.sortOrder !== undefined && 
+          b.sortOrder !== null && b.sortOrder !== undefined) {
+        return a.sortOrder - b.sortOrder;
+      }
+      
+      // Second priority: Tasks with custom sortOrder come first
+      if (a.sortOrder !== null && a.sortOrder !== undefined) return -1;
+      if (b.sortOrder !== null && b.sortOrder !== undefined) return 1;
+      
+      // Final fallback: Sort by deadline (existing logic)
+      if (!a.deadline && !b.deadline) return 0;
+      if (!a.deadline) return 1; // Tasks without deadlines go to the end
+      if (!b.deadline) return -1; // Tasks without deadlines go to the end
+      
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+    });
+  }, [timelineTasks]);
+
+  // Handle drag end event
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = sortedTasks.findIndex(task => task.id === active.id);
+      const newIndex = sortedTasks.findIndex(task => task.id === over.id);
+      
+      const reorderedTasks = arrayMove(sortedTasks, oldIndex, newIndex);
+      
+      // Create sort order updates based on new positions
+      const sortUpdates = reorderedTasks.map((task, index) => ({
+        id: task.id,
+        sortOrder: index + 1
+      }));
+      
+      updateSortOrderMutation.mutate(sortUpdates);
+    }
+  }, [sortedTasks, updateSortOrderMutation]);
+  
+  const taskIds = useMemo(() => sortedTasks.map(t => t.id), [sortedTasks]);
   
   // Create a stable query key that doesn't change when taskIds array reference changes
   const taskIdsKey = useMemo(() => taskIds.sort().join(','), [taskIds]);
@@ -531,7 +767,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                           <div className="w-4 h-12 rounded-full shadow-xl bg-gradient-to-b from-green-400 via-green-500 to-green-700 border-2 border-green-300/60 ring-2 ring-green-200/40 hover:scale-110 transition-all duration-300 hover:shadow-2xl" />
                           <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-gray-50/95 backdrop-blur-sm border-2 border-green-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ring-green-100/60">
                             <div className="text-sm font-bold text-green-700 mb-1">Project Start</div>
-                            <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.psaSignedDate || project.createdAt), 'MMM d, yyyy')}</div>
+                            <div className="text-xs text-gray-600 font-medium">{format(project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date(project.createdAt), 'MMM d, yyyy')}</div>
                             <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-gray-50/95 border-t-2 border-l-2 border-green-200/80 rotate-45"></div>
                           </div>
                         </div>
@@ -687,121 +923,50 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
             </div>
           )}
 
-          {/* Task Progress Bars */}
-          {tasks.filter(t => t.showOnTimeline).length > 0 && (
-            <div className="mb-6 space-y-6" data-timeline-section>
-              {tasks.filter(t => t.showOnTimeline)
-                .sort((a, b) => {
-                  // Sort by deadline - closest due dates first
-                  if (!a.deadline && !b.deadline) return 0;
-                  if (!a.deadline) return 1; // Tasks without deadlines go to the end
-                  if (!b.deadline) return -1; // Tasks without deadlines go to the end
-                  
-                  return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-                })
-                .map((task) => {
-                const isCritical = showCriticalPath && criticalPathResult ? isTaskCritical(task.id, criticalPathResult) : false;
-                const criticalInfo = showCriticalPath && criticalPathResult ? criticalPathResult.nodes.get(task.id) : null;
-                
-                // Check if task is nearing deadline (within 5 days and not completed)
-                const isNearingDeadline = (() => {
-                  if (task.status === 'completed') return false;
-                  if (!task.deadline) return false;
-                  
-                  const today = startOfDay(tzNow('America/New_York'));
-                  const deadline = startOfDay(parseISO(task.deadline));
-                  const daysUntilDeadline = differenceInCalendarDays(deadline, today);
-                  
-                  return daysUntilDeadline >= 0 && daysUntilDeadline <= 5;
-                })();
-                
-                return (
-                  <div key={task.id} className={`rounded-lg p-3 border transition-all duration-200 ${
-                    isCritical 
-                      ? 'bg-red-50 border-red-200 shadow-md' 
-                      : isNearingDeadline
-                        ? 'bg-amber-50 border-amber-200 shadow-sm'
-                        : 'bg-gray-50 border-gray-200'
-                  }`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <span className={`w-2 h-2 rounded-full ${
-                          isCritical ? 'bg-red-500' :
-                          task.status === 'completed' ? 'bg-green-500' :
-                          task.status === 'in_progress' ? 'bg-blue-500' :
-                          task.status === 'scheduled' ? 'bg-blue-600' :
-                          'bg-gray-400'
-                        }`} />
-                        <span className={`text-sm font-medium leader-obstacle ${
-                          isCritical ? 'text-red-900' : 'text-gray-900'
-                        }`}>{task.title}</span>
-                        {isCritical && (
-                          <Badge variant="destructive" className="text-xs px-2 py-0.5">
-                            Critical
-                          </Badge>
-                        )}
-                        {showCriticalPath && criticalInfo && criticalInfo.float > 0 && criticalInfo.float <= 2 && (
-                          <Badge variant="outline" className="text-xs px-2 py-0.5 text-amber-700 border-amber-300">
-                            Near Critical ({Math.round(criticalInfo.float)}d float)
-                          </Badge>
-                        )}
-                        {isNearingDeadline && !isCritical && (
-                          <Badge variant="outline" className="text-xs px-2 py-0.5 text-amber-700 border-amber-300 bg-amber-50">
-                            Due Soon ({(() => {
-                              const today = startOfDay(tzNow('America/New_York'));
-                              const deadline = startOfDay(parseISO(task.deadline!));
-                              const days = differenceInCalendarDays(deadline, today);
-                              return days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days}d`;
-                            })()})
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        {showCriticalPath && criticalInfo && (
-                          <div className="text-xs text-gray-600">
-                            Float: <strong>{Math.round(criticalInfo.float)}d</strong>
-                          </div>
-                        )}
-                        <div className="text-xs text-gray-600">
-                          {task.assignee || 'Unassigned'}
-                        </div>
-                        {/* Simple Note Button */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors relative"
-                          onClick={() => setNotesDialogTaskId(task.id)}
-                          data-testid={`button-notes-${task.id}`}
-                        >
-                          <StickyNote className="h-3 w-3 mr-1" />
-                          Notes
-                          {(() => {
-                            const noteCount = getTaskNoteCount(task.id);
-                            if (noteCount > 0) {
-                              return (
-                                <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center shadow-md">
-                                  {noteCount > 9 ? '9+' : noteCount}
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="mt-6">
-                      <ProgressBar 
-                        task={task} 
-                        project={project} 
-                        settings={settings}
-                        className={`shadow-sm ${
-                          isCritical ? 'ring-2 ring-red-200' : ''
-                        }`}
-                      />
-                    </div>
+          {/* Task Progress Bars with Drag and Drop */}
+          {sortedTasks.length > 0 && (
+            <div className="mb-6" data-timeline-section>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-6">
+                    {sortedTasks.map((task) => {
+                      const isCritical = showCriticalPath && criticalPathResult ? isTaskCritical(task.id, criticalPathResult) : false;
+                      const criticalInfo = showCriticalPath && criticalPathResult ? criticalPathResult.nodes.get(task.id) : null;
+                      
+                      // Check if task is nearing deadline (within 5 days and not completed)
+                      const isNearingDeadline = (() => {
+                        if (task.status === 'completed') return false;
+                        if (!task.deadline) return false;
+                        
+                        const today = startOfDay(tzNow('America/New_York'));
+                        const deadline = startOfDay(parseISO(task.deadline));
+                        const daysUntilDeadline = differenceInCalendarDays(deadline, today);
+                        
+                        return daysUntilDeadline >= 0 && daysUntilDeadline <= 5;
+                      })();
+                      
+                      return (
+                        <SortableTaskItem
+                          key={task.id}
+                          task={task}
+                          project={project}
+                          settings={settings}
+                          isCritical={isCritical}
+                          criticalInfo={criticalInfo}
+                          isNearingDeadline={isNearingDeadline}
+                          showCriticalPath={showCriticalPath}
+                          onOpenNotes={setNotesDialogTaskId}
+                          getTaskNoteCount={getTaskNoteCount}
+                        />
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </SortableContext>
+              </DndContext>
             </div>
           )}
         </CardContent>
