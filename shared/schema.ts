@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -19,6 +19,10 @@ export const riskCategoryEnum = pgEnum("risk_category", ["technical", "financial
 export const riskStatusEnum = pgEnum("risk_status", ["identified", "analyzing", "mitigating", "monitoring", "closed"]);
 export const likelihoodEnum = pgEnum("likelihood", ["1", "2", "3", "4", "5"]);
 export const impactEnum = pgEnum("impact", ["1", "2", "3", "4", "5"]);
+export const notificationChannelEnum = pgEnum("notification_channel", ["email", "sms"]);
+export const subscriptionEventEnum = pgEnum("subscription_event", ["task_status", "note_added", "deadline_upcoming", "deadline_today", "overdue"]);
+export const notificationStatusEnum = pgEnum("notification_status", ["sent", "failed", "pending"]);
+export const recipientTypeEnum = pgEnum("recipient_type", ["user", "contact"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -71,6 +75,16 @@ export const projectSettings = pgTable("project_settings", {
   holidayCalendar: holidayCalendarEnum("holiday_calendar").notNull().default("us_federal"),
   notificationsJson: jsonb("notifications_json").notNull().default(sql`'{}'`),
   ndaRequired: boolean("nda_required").notNull().default(false),
+  // Enhanced Notification Settings
+  notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
+  defaultChannels: notificationChannelEnum("default_channels").array().notNull().default(sql`'{"email"}'`),
+  defaultEvents: subscriptionEventEnum("default_events").array().notNull().default(sql`'{"deadline_upcoming","deadline_today","overdue"}'`),
+  defaultLeadTimesDays: integer("default_lead_times_days").array().notNull().default(sql`'{7,3,1,0,-1}'`),
+  emailTemplateId: varchar("email_template_id"), // For custom email templates
+  smsTemplateId: varchar("sms_template_id"), // For custom SMS templates
+  quietHoursStart: text("quiet_hours_start").default("22:00"), // 10 PM
+  quietHoursEnd: text("quiet_hours_end").default("08:00"), // 8 AM
+  weekendNotifications: boolean("weekend_notifications").notNull().default(false),
 });
 
 
@@ -223,10 +237,96 @@ export const risks = pgTable("risks", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Contacts
+export const contacts = pgTable("contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  timezone: text("timezone").notNull().default("America/New_York"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Notification Subscriptions
+export const notificationSubscriptions = pgTable("notification_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  taskId: varchar("task_id").references(() => tasks.id), // Optional: specific task subscription
+  recipientType: recipientTypeEnum("recipient_type").notNull(),
+  recipientId: varchar("recipient_id").notNull(), // References users.id OR contacts.id
+  channels: notificationChannelEnum("channels").array().notNull().default(sql`'{"email"}'`),
+  events: subscriptionEventEnum("events").array().notNull().default(sql`'{"deadline_upcoming","deadline_today","overdue"}'`),
+  leadTimesDays: integer("lead_times_days").array().notNull().default(sql`'{7,3,1,0,-1}'`), // Days before/after deadline
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    // Performance indexes for critical query paths
+    projectIdx: index("notification_subscriptions_project").on(table.projectId),
+    projectTaskIdx: index("notification_subscriptions_project_task").on(table.projectId, table.taskId),
+    recipientIdx: index("notification_subscriptions_recipient").on(table.recipientType, table.recipientId),
+    activeIdx: index("notification_subscriptions_active").on(table.active),
+  };
+});
+
+// Notifications Log
+export const notificationsLog = pgTable("notifications_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  taskId: varchar("task_id").references(() => tasks.id), // Optional: specific task notification
+  event: subscriptionEventEnum("event").notNull(),
+  channel: notificationChannelEnum("channel").notNull(),
+  
+  // Recipient identification (for cleaner resolution)
+  recipientType: recipientTypeEnum("recipient_type").notNull(),
+  recipientId: varchar("recipient_id").notNull(), // References users.id OR contacts.id
+  recipientEmail: text("recipient_email"), // Cached for delivery
+  recipientPhone: text("recipient_phone"), // Cached for delivery
+  
+  // Timing and de-duplication
+  leadOffsetDays: integer("lead_offset_days").notNull(), // Lead time used (renamed from thresholdDays)
+  scheduledFor: timestamp("scheduled_for").notNull(), // When notification should be sent
+  sentAt: timestamp("sent_at"), // When actually sent (null if not sent yet)
+  
+  // Delivery tracking
+  providerMessageId: text("provider_message_id"), // ID from email/SMS provider
+  status: notificationStatusEnum("status").notNull().default("pending"),
+  metadata: jsonb("metadata").default(sql`'{}'`), // Additional provider response data
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    // Composite unique constraint to prevent duplicate notifications
+    uniqueNotification: unique("unique_notification").on(
+      table.projectId, table.taskId, table.event, table.channel, 
+      table.recipientType, table.recipientId, table.leadOffsetDays
+    ),
+    // Performance indexes for critical query paths
+    projectTaskEventIdx: index("notifications_log_project_task_event").on(
+      table.projectId, table.taskId, table.event
+    ),
+    recipientIdx: index("notifications_log_recipient").on(
+      table.recipientType, table.recipientId
+    ),
+    scheduledAtIdx: index("notifications_log_scheduled_at").on(
+      table.scheduledFor
+    ),
+    sentAtIdx: index("notifications_log_sent_at").on(
+      table.sentAt
+    ),
+    statusIdx: index("notifications_log_status").on(
+      table.status
+    )
+  };
+});
+
 // Relations
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   users: many(users),
   projects: many(projects),
+  contacts: many(contacts),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -236,6 +336,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   createdProjects: many(projects),
   auditLogs: many(auditLogs),
+  createdContacts: many(contacts),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -252,6 +353,8 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   auditLogs: many(auditLogs),
   shares: many(projectShares),
   risks: many(risks),
+  notificationSubscriptions: many(notificationSubscriptions),
+  notificationsLog: many(notificationsLog),
 }));
 
 export const projectSettingsRelations = relations(projectSettings, ({ one }) => ({
@@ -298,6 +401,39 @@ export const risksRelations = relations(risks, ({ one }) => ({
   owner: one(users, {
     fields: [risks.ownerId],
     references: [users.id],
+  }),
+}));
+
+export const contactsRelations = relations(contacts, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [contacts.orgId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [contacts.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const notificationSubscriptionsRelations = relations(notificationSubscriptions, ({ one }) => ({
+  project: one(projects, {
+    fields: [notificationSubscriptions.projectId],
+    references: [projects.id],
+  }),
+  task: one(tasks, {
+    fields: [notificationSubscriptions.taskId],
+    references: [tasks.id],
+  }),
+}));
+
+export const notificationsLogRelations = relations(notificationsLog, ({ one }) => ({
+  project: one(projects, {
+    fields: [notificationsLog.projectId],
+    references: [projects.id],
+  }),
+  task: one(tasks, {
+    fields: [notificationsLog.taskId],
+    references: [tasks.id],
   }),
 }));
 
@@ -352,6 +488,22 @@ export const insertRiskSchema = createInsertSchema(risks).omit({
   updatedAt: true,
 });
 
+export const insertContactSchema = createInsertSchema(contacts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNotificationSubscriptionSchema = createInsertSchema(notificationSubscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertNotificationLogSchema = createInsertSchema(notificationsLog).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type Organization = typeof organizations.$inferSelect;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
@@ -383,3 +535,12 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 export type Risk = typeof risks.$inferSelect;
 export type InsertRisk = z.infer<typeof insertRiskSchema>;
+
+export type Contact = typeof contacts.$inferSelect;
+export type InsertContact = z.infer<typeof insertContactSchema>;
+
+export type NotificationSubscription = typeof notificationSubscriptions.$inferSelect;
+export type InsertNotificationSubscription = z.infer<typeof insertNotificationSubscriptionSchema>;
+
+export type NotificationLog = typeof notificationsLog.$inferSelect;
+export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
