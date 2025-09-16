@@ -215,28 +215,89 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
           </div>
         )}
         
-        {/* Task start marker - shows where the task actually begins */}
+        {/* Task start marker - Enhanced - shows where the task actually begins */}
         <div 
-          className="absolute -top-1 w-1 h-10 rounded-full shadow-sm bg-orange-500"
+          className="absolute -top-2 z-50 group cursor-pointer transform -translate-x-1/2"
           style={{ 
             left: '0%', // Always at the start of the task bar
           }}
           data-testid="task-start-marker"
-        />
+        >
+          <div className="w-3 h-12 rounded-full shadow-xl bg-gradient-to-b from-orange-400 via-orange-500 to-orange-600 border-2 border-orange-300/60 ring-2 ring-orange-200/40 hover:scale-110 transition-all duration-300 hover:shadow-2xl" />
+          <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-orange-50/95 backdrop-blur-sm border-2 border-orange-200/80 rounded-xl px-3 py-2 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ring-orange-100/60">
+            <div className="text-sm font-bold text-orange-700 mb-1 flex items-center">
+              <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
+              Task Start
+            </div>
+            <div className="text-xs text-gray-600 font-medium">{taskStart.toLocaleDateString()}</div>
+            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-orange-50/95 border-t-2 border-l-2 border-orange-200/80 rotate-45"></div>
+          </div>
+        </div>
         
-        {/* Task deadline marker - shows where the task should end */}
+        {/* Task deadline marker - Enhanced - shows where the task should end */}
         <div 
-          className="absolute -top-1 w-1 h-10 rounded-full shadow-sm"
+          className="absolute -top-2 z-50 group cursor-pointer transform -translate-x-1/2"
           style={{ 
             left: `100%`,
-            backgroundColor: isCompleted ? "#16a34a" : isOverdue ? "#dc2626" : "hsl(221 83% 35%)"
           }}
           data-testid="task-deadline-marker"
-        />
+        >
+          <div 
+            className={`w-3 h-12 rounded-full shadow-xl border-2 ring-2 hover:scale-110 transition-all duration-300 hover:shadow-2xl ${
+              isCompleted 
+                ? 'bg-gradient-to-b from-green-400 via-green-500 to-green-600 border-green-300/60 ring-green-200/40' 
+                : isOverdue 
+                  ? 'bg-gradient-to-b from-red-400 via-red-500 to-red-600 border-red-300/60 ring-red-200/40'
+                  : 'bg-gradient-to-b from-blue-400 via-blue-500 to-blue-600 border-blue-300/60 ring-blue-200/40'
+            }`} 
+          />
+          <div 
+            className={`absolute top-14 left-1/2 transform -translate-x-1/2 backdrop-blur-sm border-2 rounded-xl px-3 py-2 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ${
+              isCompleted 
+                ? 'bg-gradient-to-br from-white to-green-50/95 border-green-200/80 ring-green-100/60' 
+                : isOverdue 
+                  ? 'bg-gradient-to-br from-white to-red-50/95 border-red-200/80 ring-red-100/60'
+                  : 'bg-gradient-to-br from-white to-blue-50/95 border-blue-200/80 ring-blue-100/60'
+            }`}
+          >
+            <div 
+              className={`text-sm font-bold mb-1 flex items-center ${
+                isCompleted 
+                  ? 'text-green-700' 
+                  : isOverdue 
+                    ? 'text-red-700'
+                    : 'text-blue-700'
+              }`}
+            >
+              <div 
+                className={`w-2 h-2 rounded-full mr-2 ${
+                  isCompleted 
+                    ? 'bg-green-500' 
+                    : isOverdue 
+                      ? 'bg-red-500'
+                      : 'bg-blue-500'
+                }`}
+              ></div>
+              {isCompleted ? 'Completed' : isOverdue ? 'Deadline (Overdue)' : 'Deadline'}
+            </div>
+            <div className="text-xs text-gray-600 font-medium">{taskDeadline.toLocaleDateString()}</div>
+            <div 
+              className={`absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 border-t-2 border-l-2 rotate-45 ${
+                isCompleted 
+                  ? 'bg-gradient-to-br from-white to-green-50/95 border-green-200/80' 
+                  : isOverdue 
+                    ? 'bg-gradient-to-br from-white to-red-50/95 border-red-200/80'
+                    : 'bg-gradient-to-br from-white to-blue-50/95 border-blue-200/80'
+              }`}
+            ></div>
+          </div>
+        </div>
         
-        {/* Duration label on hover */}
-        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-          {taskDurationDays} days ({taskStart.toLocaleDateString()} - {taskDeadline.toLocaleDateString()})
+        {/* Duration label on hover - Enhanced */}
+        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap z-40 shadow-xl ring-1 ring-white/20">
+          <div className="font-semibold">{taskDurationDays} days duration</div>
+          <div className="text-xs text-gray-300 mt-1">{taskStart.toLocaleDateString()} - {taskDeadline.toLocaleDateString()}</div>
+          <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
         </div>
       </div>
     </div>

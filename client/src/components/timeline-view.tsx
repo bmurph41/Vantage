@@ -522,17 +522,33 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                           )}
                         </div>
                         
-                        {/* Start marker */}
+                        {/* Start marker - Enhanced */}
                         <div 
-                          className="absolute -top-1 w-1 h-10 rounded-full shadow-md bg-gradient-to-b from-green-500 to-green-700 border border-green-400/50"
+                          className="absolute -top-2 z-40 group cursor-pointer transform -translate-x-1/2"
                           style={{ left: `${startPos}%` }}
-                        />
+                          data-testid="progress-start-marker"
+                        >
+                          <div className="w-4 h-12 rounded-full shadow-xl bg-gradient-to-b from-green-400 via-green-500 to-green-700 border-2 border-green-300/60 ring-2 ring-green-200/40 hover:scale-110 transition-all duration-300 hover:shadow-2xl" />
+                          <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-gray-50/95 backdrop-blur-sm border-2 border-green-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ring-green-100/60">
+                            <div className="text-sm font-bold text-green-700 mb-1">Project Start</div>
+                            <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.psaSignedDate || project.createdAt), 'MMM d, yyyy')}</div>
+                            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-gray-50/95 border-t-2 border-l-2 border-green-200/80 rotate-45"></div>
+                          </div>
+                        </div>
                         
-                        {/* End marker */}
+                        {/* End marker - Enhanced */}
                         <div 
-                          className="absolute -top-1 w-1 h-10 rounded-full shadow-md bg-gradient-to-b from-green-500 to-green-700 border border-green-400/50"
+                          className="absolute -top-2 z-40 group cursor-pointer transform -translate-x-1/2"
                           style={{ left: `${endPos}%` }}
-                        />
+                          data-testid="progress-end-marker"
+                        >
+                          <div className="w-4 h-12 rounded-full shadow-xl bg-gradient-to-b from-red-400 via-red-500 to-red-700 border-2 border-red-300/60 ring-2 ring-red-200/40 hover:scale-110 transition-all duration-300 hover:shadow-2xl" />
+                          <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-gray-50/95 backdrop-blur-sm border-2 border-red-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ring-red-100/60">
+                            <div className="text-sm font-bold text-red-700 mb-1">Closing Date</div>
+                            <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
+                            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-gray-50/95 border-t-2 border-l-2 border-red-200/80 rotate-45"></div>
+                          </div>
+                        </div>
 
                         {/* Milestone Markers with Hover Labels */}
                         {project.psaSignedDate && (
@@ -541,10 +557,14 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                             style={{ left: "0%" }}
                             data-testid="milestone-psa"
                           >
-                            <div className="w-3 h-3 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full border-2 border-white shadow-md hover:scale-125 transition-all duration-200 hover:shadow-lg ring-1 ring-blue-200/50" />
-                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-sm border border-gray-300/60 rounded-lg px-3 py-2 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30 ring-1 ring-gray-200/40">
-                              <div className="text-xs font-medium text-blue-600">PSA Signed</div>
-                              <div className="text-xs text-gray-600">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
+                            <div className="w-4 h-4 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 rounded-full border-3 border-white shadow-xl hover:scale-150 transition-all duration-300 hover:shadow-2xl ring-2 ring-blue-200/60 hover:ring-blue-300/80" />
+                            <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-blue-50/95 backdrop-blur-sm border-2 border-blue-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ring-blue-100/60">
+                              <div className="text-sm font-bold text-blue-700 mb-1 flex items-center">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                                PSA Signed
+                              </div>
+                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
+                              <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-blue-50/95 border-t-2 border-l-2 border-blue-200/80 rotate-45"></div>
                             </div>
                           </div>
                         )}
@@ -554,10 +574,14 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                             style={{ left: `${getMilestonePosition(project.ddExpirationDate)}%` }}
                             data-testid="milestone-dd-expiration"
                           >
-                            <div className="w-3 h-3 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full border-2 border-white shadow-md hover:scale-125 transition-all duration-200 hover:shadow-lg ring-1 ring-amber-200/50" />
-                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-sm border border-gray-300/60 rounded-lg px-3 py-2 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30 ring-1 ring-gray-200/40">
-                              <div className="text-xs font-medium text-amber-600">DD Expiration</div>
-                              <div className="text-xs text-gray-600">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
+                            <div className="w-4 h-4 bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 rounded-full border-3 border-white shadow-xl hover:scale-150 transition-all duration-300 hover:shadow-2xl ring-2 ring-amber-200/60 hover:ring-amber-300/80" />
+                            <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-amber-50/95 backdrop-blur-sm border-2 border-amber-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ring-amber-100/60">
+                              <div className="text-sm font-bold text-amber-700 mb-1 flex items-center">
+                                <div className="w-2 h-2 bg-amber-500 rounded-full mr-2"></div>
+                                DD Expiration
+                              </div>
+                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
+                              <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-amber-50/95 border-t-2 border-l-2 border-amber-200/80 rotate-45"></div>
                             </div>
                           </div>
                         )}
@@ -567,10 +591,14 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                             style={{ left: "100%" }}
                             data-testid="milestone-closing"
                           >
-                            <div className="w-3 h-3 bg-gradient-to-br from-green-400 to-green-600 rounded-full border-2 border-white shadow-md hover:scale-125 transition-all duration-200 hover:shadow-lg ring-1 ring-green-200/50" />
-                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-sm border border-gray-300/60 rounded-lg px-3 py-2 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30 ring-1 ring-gray-200/40">
-                              <div className="text-xs font-medium text-green-600">Closing</div>
-                              <div className="text-xs text-gray-600">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
+                            <div className="w-4 h-4 bg-gradient-to-br from-green-400 via-green-500 to-green-600 rounded-full border-3 border-white shadow-xl hover:scale-150 transition-all duration-300 hover:shadow-2xl ring-2 ring-green-200/60 hover:ring-green-300/80" />
+                            <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-green-50/95 backdrop-blur-sm border-2 border-green-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ring-green-100/60">
+                              <div className="text-sm font-bold text-green-700 mb-1 flex items-center">
+                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                Closing
+                              </div>
+                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
+                              <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-green-50/95 border-t-2 border-l-2 border-green-200/80 rotate-45"></div>
                             </div>
                           </div>
                         )}
@@ -583,15 +611,51 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                             style={{ left: `${getMilestonePosition(task.deadline!)}%` }}
                             data-testid={`task-dot-${task.id}`}
                           >
-                            <div className={`w-2 h-2 rounded-full border-2 border-white shadow-md hover:scale-150 transition-all duration-200 hover:shadow-lg ring-1 ${
-                              task.status === 'completed' ? 'bg-gradient-to-br from-green-400 to-green-600 ring-green-200/50' :
-                              task.status === 'in_progress' ? 'bg-gradient-to-br from-blue-400 to-blue-600 ring-blue-200/50' :
-                              task.status === 'scheduled' ? 'bg-gradient-to-br from-indigo-400 to-indigo-600 ring-indigo-200/50' :
-                              'bg-gradient-to-br from-gray-300 to-gray-500 ring-gray-200/50'
+                            <div className={`w-3 h-3 rounded-full border-3 border-white shadow-xl hover:scale-175 transition-all duration-300 hover:shadow-2xl ring-2 ${
+                              task.status === 'completed' ? 'bg-gradient-to-br from-green-400 via-green-500 to-green-600 ring-green-200/60 hover:ring-green-300/80' :
+                              task.status === 'in_progress' ? 'bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 ring-blue-200/60 hover:ring-blue-300/80' :
+                              task.status === 'scheduled' ? 'bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 ring-indigo-200/60 hover:ring-indigo-300/80' :
+                              'bg-gradient-to-br from-gray-400 via-gray-500 to-gray-600 ring-gray-200/60 hover:ring-gray-300/80'
                             }`} />
-                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-sm border border-gray-300/60 rounded-lg px-3 py-2 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-30 ring-1 ring-gray-200/40">
-                              <div className="text-xs font-semibold text-gray-900">{task.title}</div>
-                              <div className="text-xs text-gray-600">{format(parseISO(task.deadline!), 'MMM d, yyyy')}</div>
+                            <div className={`absolute top-8 left-1/2 transform -translate-x-1/2 backdrop-blur-sm border-2 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ${
+                              task.status === 'completed' ? 'bg-gradient-to-br from-white to-green-50/95 border-green-200/80 ring-green-100/60' :
+                              task.status === 'in_progress' ? 'bg-gradient-to-br from-white to-blue-50/95 border-blue-200/80 ring-blue-100/60' :
+                              task.status === 'scheduled' ? 'bg-gradient-to-br from-white to-indigo-50/95 border-indigo-200/80 ring-indigo-100/60' :
+                              'bg-gradient-to-br from-white to-gray-50/95 border-gray-200/80 ring-gray-100/60'
+                            }`}>
+                              <div className={`text-sm font-bold mb-1 flex items-center ${
+                                task.status === 'completed' ? 'text-green-700' :
+                                task.status === 'in_progress' ? 'text-blue-700' :
+                                task.status === 'scheduled' ? 'text-indigo-700' :
+                                'text-gray-700'
+                              }`}>
+                                <div className={`w-2 h-2 rounded-full mr-2 ${
+                                  task.status === 'completed' ? 'bg-green-500' :
+                                  task.status === 'in_progress' ? 'bg-blue-500' :
+                                  task.status === 'scheduled' ? 'bg-indigo-500' :
+                                  'bg-gray-500'
+                                }`}></div>
+                                {task.title}
+                              </div>
+                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(task.deadline!), 'MMM d, yyyy')}</div>
+                              <div className={`text-xs font-medium mt-1 ${
+                                task.status === 'completed' ? 'text-green-600' :
+                                task.status === 'in_progress' ? 'text-blue-600' :
+                                task.status === 'scheduled' ? 'text-indigo-600' :
+                                'text-gray-600'
+                              }`}>
+                                {task.status === 'completed' ? '✓ Completed' :
+                                 task.status === 'in_progress' ? '⟳ In Progress' :
+                                 task.status === 'scheduled' ? '📅 Scheduled' :
+                                 '⏸️ Not Started'
+                                }
+                              </div>
+                              <div className={`absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 border-t-2 border-l-2 rotate-45 ${
+                                task.status === 'completed' ? 'bg-gradient-to-br from-white to-green-50/95 border-green-200/80' :
+                                task.status === 'in_progress' ? 'bg-gradient-to-br from-white to-blue-50/95 border-blue-200/80' :
+                                task.status === 'scheduled' ? 'bg-gradient-to-br from-white to-indigo-50/95 border-indigo-200/80' :
+                                'bg-gradient-to-br from-white to-gray-50/95 border-gray-200/80'
+                              }`}></div>
                             </div>
                           </div>
                         ))}
