@@ -476,25 +476,81 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
     })
   );
 
-  // Mutation for updating task sort orders
+  // Mutation for updating task sort orders with optimistic updates
   const updateSortOrderMutation = useMutation({
     mutationFn: async (sortUpdates: Array<{ id: string; sortOrder: number }>) => {
       const response = await apiRequest("PATCH", `/api/dd/projects/${project.id}/tasks/bulk-sort-order`, sortUpdates);
       return response.json();
     },
+    onMutate: async (sortUpdates: Array<{ id: string; sortOrder: number }>) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: ['/api/dd/projects', project.id, 'tasks'] });
+
+      // Snapshot the previous value for rollback
+      const previousTasks = queryClient.getQueryData(['/api/dd/projects', project.id, 'tasks']);
+
+      // Optimistically update the tasks with new sort orders
+      queryClient.setQueryData(['/api/dd/projects', project.id, 'tasks'], (oldTasks: Task[] | undefined) => {
+        if (!oldTasks) return oldTasks;
+
+        // Create a map of sort updates for quick lookup
+        const sortMap = new Map(sortUpdates.map(update => [update.id, update.sortOrder]));
+
+        // Apply the sort updates to tasks
+        const updatedTasks = oldTasks.map(task => ({
+          ...task,
+          sortOrder: sortMap.has(task.id) ? sortMap.get(task.id)! : task.sortOrder
+        }));
+
+        // Sort tasks by their new sortOrder, maintaining the same logic as in the component
+        return [...updatedTasks].sort((a, b) => {
+          // First priority: Use custom sortOrder if both tasks have it set
+          if (a.sortOrder !== null && a.sortOrder !== undefined && 
+              b.sortOrder !== null && b.sortOrder !== undefined) {
+            return a.sortOrder - b.sortOrder;
+          }
+          
+          // Second priority: Tasks with custom sortOrder come first
+          if (a.sortOrder !== null && a.sortOrder !== undefined) return -1;
+          if (b.sortOrder !== null && b.sortOrder !== undefined) return 1;
+          
+          // Final fallback: Sort by deadline (existing logic)
+          if (!a.deadline && !b.deadline) return 0;
+          if (!a.deadline) return 1; // Tasks without deadlines go to the end
+          if (!b.deadline) return -1; // Tasks without deadlines go to the end
+          
+          return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+        });
+      });
+
+      // Return context object with the previous value for potential rollback
+      return { previousTasks };
+    },
+    onError: (err, sortUpdates, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousTasks) {
+        queryClient.setQueryData(['/api/dd/projects', project.id, 'tasks'], context.previousTasks);
+      }
+
+      toast({
+        title: "Error",
+        description: "Failed to update task order. Changes have been reverted.",
+        variant: "destructive",
+      });
+    },
     onSuccess: () => {
+      // Since we're doing optimistic updates, we don't need to invalidate unless we want to ensure 
+      // server state synchronization. We can keep a lightweight invalidation just to be safe.
       queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', project.id, 'tasks'] });
+      
       toast({
         title: "Success",
         description: "Task order updated successfully",
       });
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update task order",
-        variant: "destructive",
-      });
+    onSettled: () => {
+      // Ensure any dependent queries are refetched on completion (success or error)
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', project.id, 'tasks'] });
     },
   });
 
