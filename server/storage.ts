@@ -275,7 +275,6 @@ export class DatabaseStorage implements IStorage {
     // Delete related data first (cascade delete)
     await db.delete(auditLogs).where(eq(auditLogs.projectId, id));
     await db.delete(projectShares).where(eq(projectShares.projectId, id));
-    await db.delete(risks).where(eq(risks.projectId, id));
     await db.delete(calendarEvents).where(eq(calendarEvents.projectId, id));
     await db.delete(documentRequirements).where(eq(documentRequirements.projectId, id));
     await db.delete(projectIntegrations).where(eq(projectIntegrations.projectId, id));
