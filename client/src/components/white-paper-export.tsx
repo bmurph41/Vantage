@@ -61,7 +61,8 @@ const styles = StyleSheet.create({
     padding: 12,
     borderLeft: '4 solid #3b82f6',
     paddingLeft: 16,
-    borderRadius: '0 6 6 0',
+    borderTopRightRadius: 6,
+    borderBottomRightRadius: 6,
   },
   subsectionTitle: {
     fontSize: 14,
