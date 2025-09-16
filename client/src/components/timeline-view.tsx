@@ -539,18 +539,23 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
       });
     },
     onSuccess: () => {
-      // Since we're doing optimistic updates, we don't need to invalidate unless we want to ensure 
-      // server state synchronization. We can keep a lightweight invalidation just to be safe.
-      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', project.id, 'tasks'] });
-      
+      // Success! The optimistic update is already in place and working correctly.
+      // No need to invalidate queries since we want to preserve the optimistic update.
       toast({
         title: "Success",
         description: "Task order updated successfully",
       });
     },
     onSettled: () => {
-      // Ensure any dependent queries are refetched on completion (success or error)
-      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', project.id, 'tasks'] });
+      // Only invalidate queries to sync with server state after a short delay
+      // This ensures the server has processed the update before we refetch
+      setTimeout(() => {
+        queryClient.invalidateQueries({ 
+          queryKey: ['/api/dd/projects', project.id, 'tasks'],
+          exact: false,
+          refetchType: 'none' // Don't refetch immediately, just mark as stale
+        });
+      }, 100);
     },
   });
 
