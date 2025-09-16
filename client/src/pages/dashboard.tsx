@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useProjects, useCreateProject } from "@/hooks/use-project";
+import { useCreateTask } from "@/hooks/use-tasks";
 import { format, differenceInDays, isPast, isToday, parseISO } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,10 +19,53 @@ import { z } from "zod";
 const createProjectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   description: z.string().optional(),
+  quickAddTasks: z.object({
+    pca: z.boolean().default(false),
+    environmental: z.boolean().default(false),
+    survey: z.boolean().default(false),
+    title: z.boolean().default(false),
+  }).default({}),
 });
+
+// Pre-defined DD task templates
+const DD_TASK_TEMPLATES = {
+  pca: {
+    title: "PCA",
+    description: "Phase I Environmental Site Assessment and Property Condition Assessment",
+    priority: "high" as const,
+    deadlineType: "days_after_psa" as const,
+    deadlineDays: 30,
+    showOnTimeline: true,
+  },
+  environmental: {
+    title: "Environmental",
+    description: "Environmental Due Diligence and Assessment",
+    priority: "high" as const,
+    deadlineType: "days_after_psa" as const,
+    deadlineDays: 45,
+    showOnTimeline: true,
+  },
+  survey: {
+    title: "Survey",
+    description: "Property Survey and Boundary Assessment",
+    priority: "med" as const,
+    deadlineType: "days_after_psa" as const,
+    deadlineDays: 60,
+    showOnTimeline: true,
+  },
+  title: {
+    title: "Title",
+    description: "Title Search and Insurance Commitment",
+    priority: "high" as const,
+    deadlineType: "days_after_psa" as const,
+    deadlineDays: 30,
+    showOnTimeline: true,
+  },
+};
 
 function CreateProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const createProject = useCreateProject();
+  const createTask = useCreateTask();
   const [, navigate] = useLocation();
   
   const form = useForm({
@@ -28,17 +73,46 @@ function CreateProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     defaultValues: {
       name: "",
       description: "",
+      quickAddTasks: {
+        pca: false,
+        environmental: false,
+        survey: false,
+        title: false,
+      },
     },
   });
 
   const onSubmit = async (data: z.infer<typeof createProjectSchema>) => {
     try {
+      // Create the project first
       const project = await createProject.mutateAsync({
         name: data.name,
         description: data.description,
         anchorType: "psa",
         tz: "America/New_York",
       });
+      
+      // Create selected DD tasks
+      const selectedTasks = Object.entries(data.quickAddTasks || {})
+        .filter(([_, isSelected]) => isSelected)
+        .map(([taskKey]) => taskKey as keyof typeof DD_TASK_TEMPLATES);
+
+      // Create tasks in parallel if any are selected
+      if (selectedTasks.length > 0) {
+        await Promise.all(
+          selectedTasks.map(async (taskKey, index) => {
+            const template = DD_TASK_TEMPLATES[taskKey];
+            return createTask.mutateAsync({
+              projectId: project.id,
+              task: {
+                ...template,
+                sortOrder: index + 1, // Set sort order based on selection order
+              },
+            });
+          })
+        );
+      }
+
       onOpenChange(false);
       form.reset();
       navigate(`/project/${project.id}`);
@@ -76,6 +150,42 @@ function CreateProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChan
               rows={3}
               data-testid="textarea-create-project-description"
             />
+          </div>
+
+          {/* Quick Add DD Tasks */}
+          <div className="space-y-4">
+            <div>
+              <Label className="text-base font-medium">Quick Add Common DD Tasks</Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Select common due diligence tasks to automatically add to your new project
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              {Object.entries(DD_TASK_TEMPLATES).map(([key, template]) => (
+                <div key={key} className="flex items-center space-x-3">
+                  <Checkbox
+                    id={`task-${key}`}
+                    checked={form.watch(`quickAddTasks.${key as keyof typeof DD_TASK_TEMPLATES}`)}
+                    onCheckedChange={(checked) => {
+                      form.setValue(`quickAddTasks.${key as keyof typeof DD_TASK_TEMPLATES}`, !!checked);
+                    }}
+                    data-testid={`checkbox-task-${key}`}
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <Label 
+                      htmlFor={`task-${key}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {template.title}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {template.deadlineDays} days after PSA • {template.priority} priority
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
