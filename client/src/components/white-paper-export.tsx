@@ -1768,7 +1768,13 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
   
   // Ensure risks is an array, provide empty array as fallback
   const safeRisks = Array.isArray(risks) ? risks : [];
-  const safeRiskAnalytics = riskAnalytics || {};
+  const safeRiskAnalytics = riskAnalytics || {
+    categoryDistribution: [],
+    categoryStats: [],
+    heatMapData: [],
+    topRisks: [],
+    mitigationStrategies: []
+  };
   
   // Get Top 3 risks by highest risk score (data-driven)
   const top3Risks = safeRisks
@@ -1875,7 +1881,10 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
   
   // Define other missing variables with safe defaults
   const heatMapData = heatMap;
-  const riskAnalysis = safeRiskAnalytics.categoryDistribution ? safeRiskAnalytics : { categoryDistribution: [] };
+  const riskAnalysis = {
+    categoryDistribution: Array.isArray(safeRiskAnalytics.categoryDistribution) ? safeRiskAnalytics.categoryDistribution : [],
+    categoryStats: Array.isArray(safeRiskAnalytics.categoryStats) ? safeRiskAnalytics.categoryStats : []
+  };
   const top5Risks = safeRisks.sort((a, b) => (b.riskScore || 0) - (a.riskScore || 0)).slice(0, 5);
   const companyContacts = [{
     name: project.seller || 'Seller Company',
@@ -1951,7 +1960,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
           </Text>
           
           <View style={styles.topRisksContainer}>
-            {top3Risks.map((risk, index) => (
+            {top3Risks.length > 0 ? top3Risks.map((risk, index) => (
               <View key={risk.id} style={styles.topRiskCard}>
                 <View style={styles.riskRankBadge}>
                   <Text style={{ color: 'white', fontSize: 14, fontWeight: 'bold' }}>
@@ -1998,7 +2007,14 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
                   </Text>
                 )}
               </View>
-            ))}
+            )) : (
+              <View style={styles.keyInsight}>
+                <Text style={styles.keyInsightTitle}>No Critical Risks Identified</Text>
+                <Text style={styles.keyInsightText}>
+                  Risk assessment is pending or no high-severity risks have been identified at this time.
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -2027,7 +2043,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
             <Text style={styles.actionBullet}>•</Text>
             <Text style={styles.keyInsightText}>
               <Text style={styles.bold}>Resource Allocation: </Text>
-              Approve additional expertise for {riskAnalytics?.categoryDistribution?.length || 0} 
+              Approve additional expertise for {riskAnalysis.categoryDistribution.length || 0} 
               high-impact risk categories
             </Text>
           </View>
@@ -2157,7 +2173,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
         {/* Executive Risk Summary - Top 3 Critical Risks */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Top 3 Critical Risks Requiring Board Attention</Text>
-          {top3ExecutiveRisks.map((risk, index) => (
+          {top3ExecutiveRisks.length > 0 ? top3ExecutiveRisks.map((risk, index) => (
             <View key={risk.id} style={styles.executiveRiskCard}>
               <View style={styles.executiveRiskHeader}>
                 <View style={styles.executiveRiskIcon} />
@@ -2176,7 +2192,14 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
                 → Recommended Action: {risk.mitigation.strategy}
               </Text>
             </View>
-          ))}
+          )) : (
+            <View style={styles.keyInsight}>
+              <Text style={styles.keyInsightTitle}>Risk Assessment Pending</Text>
+              <Text style={styles.keyInsightText}>
+                Critical risk analysis is in progress. No high-severity risks have been identified at this time.
+              </Text>
+            </View>
+          )}
           
           <View style={[styles.kpiCard, { backgroundColor: '#fef3c7', border: '2 solid #f59e0b' }]}>
             <Text style={[styles.kpiLabel, { color: '#92400e' }]}>Board Approval Required</Text>
@@ -2576,7 +2599,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
         <Text style={styles.header}>Top-5 Risk Register</Text>
         
         <View style={styles.riskRegisterContainer}>
-          {top5Risks.map((risk, index) => (
+          {top5Risks.length > 0 ? top5Risks.map((risk, index) => (
             <View key={risk.id} style={styles.riskCard}>
               <View style={styles.riskHeader}>
                 <Text style={styles.riskTitle}>#{index + 1}: {risk.name}</Text>
@@ -2618,7 +2641,14 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
                 </View>
               </View>
             </View>
-          ))}
+          )) : (
+            <View style={styles.keyInsight}>
+              <Text style={styles.keyInsightTitle}>No Risks in Register</Text>
+              <Text style={styles.keyInsightText}>
+                Risk assessment is pending or no risks have been identified requiring detailed analysis at this time.
+              </Text>
+            </View>
+          )}
         </View>
 
         <Text style={styles.footer}>
@@ -2631,7 +2661,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
         <Text style={styles.header}>Risk Mitigation Strategies</Text>
         
         <View style={styles.section}>
-          {top5Risks.map((risk, index) => (
+          {top5Risks.length > 0 ? top5Risks.map((risk, index) => (
             <View key={risk.id} style={styles.mitigationContainer}>
               <View style={styles.mitigationHeader}>
                 <Text style={styles.mitigationTitle}>#{index + 1}: {risk.name}</Text>
@@ -2674,7 +2704,14 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
                 <Text style={styles.bold}>Key Triggers: </Text>Market conditions, regulatory changes
               </Text>
             </View>
-          ))}
+          )) : (
+            <View style={styles.keyInsight}>
+              <Text style={styles.keyInsightTitle}>No Mitigation Strategies Required</Text>
+              <Text style={styles.keyInsightText}>
+                No risks have been identified that require specific mitigation strategies at this time.
+              </Text>
+            </View>
+          )}
         </View>
         
         <View style={[styles.kpiCard, { backgroundColor: '#ecfdf5', border: '1 solid #10b981' }]}>
