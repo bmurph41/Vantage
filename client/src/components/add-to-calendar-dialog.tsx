@@ -1,353 +1,580 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, Clock, MapPin, ExternalLink, CheckCircle, AlertCircle } from "lucide-react";
-import { format, parseISO, addDays } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { 
+  Calendar, 
+  Clock, 
+  MapPin, 
+  Download, 
+  CheckCircle, 
+  AlertCircle, 
+  Filter,
+  SortAsc,
+  Users,
+  FileText,
+  Milestone,
+  Target,
+  CheckCircle2,
+  Circle,
+  Loader2,
+  RefreshCw
+} from "lucide-react";
+import { format, parseISO, isAfter, isBefore, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import type { Project, Task, ProjectSettings } from "@shared/schema";
-import { effectiveStart, effectiveDue } from "@/lib/date-utils";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import type { Project, ProjectSettings, CalendarEvent } from "@shared/schema";
 
 interface AddToCalendarDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: Project;
-  tasks: Task[];
   settings?: ProjectSettings | null;
 }
 
-interface CalendarEvent {
-  title: string;
-  description: string;
-  startDate: Date;
-  endDate?: Date;
-  location?: string;
-  type: 'project-milestone' | 'task-start' | 'task-due';
-}
+type FilterType = 'all' | 'dd_expiration' | 'closing' | 'task_deadline' | 'milestone' | 'custom';
+type FilterStatus = 'all' | 'not_started' | 'in_progress' | 'completed';
+type FilterDate = 'all' | 'upcoming' | 'this_week' | 'this_month';
+type SortOption = 'date_asc' | 'date_desc' | 'type' | 'priority' | 'status';
 
-export function AddToCalendarDialog({ open, onOpenChange, project, tasks, settings }: AddToCalendarDialogProps) {
+export function AddToCalendarDialog({ open, onOpenChange, project, settings }: AddToCalendarDialogProps) {
   const { toast } = useToast();
-  const [selectedProvider, setSelectedProvider] = useState<"google" | "outlook" | "">(""); 
-  const [loading, setLoading] = useState(false);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const queryClient = useQueryClient();
+  
+  // State for selections and filters
+  const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
+  const [filterType, setFilterType] = useState<FilterType>('all');
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+  const [filterDate, setFilterDate] = useState<FilterDate>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('date_asc');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Generate all calendar events from project and tasks
-  const generateCalendarEvents = (): CalendarEvent[] => {
-    const allEvents: CalendarEvent[] = [];
+  // Fetch calendar events
+  const { 
+    data: events = [], 
+    isLoading: eventsLoading, 
+    error: eventsError,
+    refetch: refetchEvents
+  } = useQuery<CalendarEvent[]>({
+    queryKey: ['/api/dd/projects', project.id, 'calendar-events'],
+    enabled: open && !!project.id,
+  });
 
-    // Project milestone events
-    if (project.psaSignedDate) {
-      allEvents.push({
-        title: `${project.name} - PSA Signed`,
-        description: `Purchase and Sale Agreement signed for ${project.name}`,
-        startDate: parseISO(project.psaSignedDate),
-        type: 'project-milestone'
-      });
-    }
-
-    if (project.ddExpirationDate) {
-      allEvents.push({
-        title: `${project.name} - Due Diligence Deadline`,
-        description: `Due diligence period expires for ${project.name}`,
-        startDate: parseISO(project.ddExpirationDate),
-        type: 'project-milestone'
-      });
-    }
-
-    if (project.closingDate) {
-      allEvents.push({
-        title: `${project.name} - Closing Date`,
-        description: `Target closing date for ${project.name}`,
-        startDate: parseISO(project.closingDate),
-        type: 'project-milestone'
-      });
-    }
-
-    // Task events
-    tasks.forEach(task => {
-      const projectWithSettings = { ...project, settings };
-      const taskStart = effectiveStart(task, projectWithSettings);
-      const taskDue = effectiveDue(task, projectWithSettings);
-
-      // Task start event
-      if (taskStart) {
-        allEvents.push({
-          title: `Start: ${task.title}`,
-          description: `Begin work on ${task.title}${task.description ? `\n\nDescription: ${task.description}` : ''}${task.assignee ? `\nAssigned to: ${task.assignee}` : ''}${task.companyHired ? `\nCompany: ${task.companyHired}` : ''}`,
-          startDate: taskStart,
-          location: task.companyHired || undefined,
-          type: 'task-start'
-        });
-      }
-
-      // Task due event
-      if (taskDue) {
-        allEvents.push({
-          title: `Due: ${task.title}`,
-          description: `Due date for ${task.title}${task.description ? `\n\nDescription: ${task.description}` : ''}${task.assignee ? `\nAssigned to: ${task.assignee}` : ''}${task.companyHired ? `\nCompany: ${task.companyHired}` : ''}`,
-          startDate: taskDue,
-          endDate: addDays(taskDue, 1), // All-day event
-          location: task.companyHired || undefined,
-          type: 'task-due'
-        });
-      }
-    });
-
-    return allEvents.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-  };
-
-  // Initialize events when dialog opens
-  const handleOpenChange = (newOpen: boolean) => {
-    onOpenChange(newOpen);
-    if (newOpen) {
-      setEvents(generateCalendarEvents());
-    }
-  };
-
-  // Generate Google Calendar URL
-  const generateGoogleCalendarUrl = (event: CalendarEvent): string => {
-    const formatDate = (date: Date) => {
-      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-    };
-
-    const params = new URLSearchParams({
-      action: 'TEMPLATE',
-      text: event.title,
-      details: event.description,
-      dates: event.endDate 
-        ? `${formatDate(event.startDate)}/${formatDate(event.endDate)}`
-        : `${formatDate(event.startDate)}/${formatDate(addDays(event.startDate, 0))}`,
-    });
-
-    if (event.location) {
-      params.append('location', event.location);
-    }
-
-    return `https://calendar.google.com/calendar/render?${params.toString()}`;
-  };
-
-  // Generate Outlook Calendar URL  
-  const generateOutlookCalendarUrl = (event: CalendarEvent): string => {
-    const formatDate = (date: Date) => {
-      return date.toISOString();
-    };
-
-    const params = new URLSearchParams({
-      subject: event.title,
-      body: event.description,
-      startdt: formatDate(event.startDate),
-      enddt: formatDate(event.endDate || addDays(event.startDate, 0)),
-      allday: event.endDate ? 'true' : 'false',
-    });
-
-    if (event.location) {
-      params.append('location', event.location);
-    }
-
-    return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
-  };
-
-  const addAllToCalendar = async () => {
-    if (!selectedProvider) {
+  // Sync project events mutation
+  const syncEventsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/dd/projects/${project.id}/calendar-events/sync`);
+      // Handle response if needed, or just return success
+      return response.ok;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', project.id, 'calendar-events'] });
       toast({
-        title: "Select a calendar provider",
-        description: "Please choose Google Calendar or Outlook before adding events.",
+        title: "Events Synced",
+        description: "Calendar events have been synchronized successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error('Sync failed:', error);
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync calendar events. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Download ICS mutation
+  const downloadICSMutation = useMutation({
+    mutationFn: async (eventIds: string[]) => {
+      try {
+        const response = await apiRequest('POST', '/api/dd/calendar/generate-ics', {
+          eventIds,
+          projectId: project.id
+        });
+        
+        // Ensure we have a valid response before calling blob()
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        
+        // Validate blob content type
+        if (!blob.type.includes('calendar') && !blob.type.includes('text')) {
+          console.warn('Unexpected blob type:', blob.type);
+        }
+        
+        return blob;
+      } catch (error) {
+        console.error('ICS download error:', error);
+        throw error;
+      }
+    },
+    onSuccess: (blob) => {
+      try {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${project.name}-calendar-events.ics`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: "Download Complete",
+          description: "Calendar events have been downloaded as an ICS file.",
+        });
+      } catch (error) {
+        console.error('File download error:', error);
+        toast({
+          title: "Download Failed",
+          description: "Failed to save the calendar file. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Download mutation error:', error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download calendar events. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Filter and sort events
+  const filteredAndSortedEvents = useMemo(() => {
+    let filtered = [...events];
+
+    // Apply type filter
+    if (filterType !== 'all') {
+      filtered = filtered.filter(event => event.eventType === filterType);
+    }
+
+    // Apply status filter
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(event => event.status === filterStatus);
+    }
+
+    // Apply date filter
+    if (filterDate !== 'all') {
+      const now = new Date();
+      filtered = filtered.filter(event => {
+        const eventDate = new Date(event.startDate);
+        switch (filterDate) {
+          case 'upcoming':
+            return isAfter(eventDate, now);
+          case 'this_week':
+            return eventDate >= startOfWeek(now) && eventDate <= endOfWeek(now);
+          case 'this_month':
+            return eventDate >= startOfMonth(now) && eventDate <= endOfMonth(now);
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(event => 
+        event.title.toLowerCase().includes(query) ||
+        event.description?.toLowerCase().includes(query) ||
+        event.location?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'date_asc':
+          return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+        case 'date_desc':
+          return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+        case 'type':
+          return a.eventType.localeCompare(b.eventType);
+        case 'priority':
+          const priorityOrder: Record<string, number> = { high: 3, med: 2, low: 1 };
+          return (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
+        case 'status':
+          return a.status.localeCompare(b.status);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [events, filterType, filterStatus, filterDate, searchQuery, sortBy]);
+
+  // Reset selections when dialog opens/closes
+  useEffect(() => {
+    if (!open) {
+      setSelectedEventIds(new Set());
+      setSearchQuery('');
+    }
+  }, [open]);
+
+  // Event handlers
+  const handleSelectAll = () => {
+    if (selectedEventIds.size === filteredAndSortedEvents.length) {
+      setSelectedEventIds(new Set());
+    } else {
+      setSelectedEventIds(new Set(filteredAndSortedEvents.map((event: CalendarEvent) => event.id)));
+    }
+  };
+
+  const handleEventToggle = (eventId: string) => {
+    const newSelection = new Set(selectedEventIds);
+    if (newSelection.has(eventId)) {
+      newSelection.delete(eventId);
+    } else {
+      newSelection.add(eventId);
+    }
+    setSelectedEventIds(newSelection);
+  };
+
+  const handleDownloadSelected = () => {
+    if (selectedEventIds.size === 0) {
+      toast({
+        title: "No Events Selected",
+        description: "Please select at least one event to download.",
         variant: "destructive",
       });
       return;
     }
-
-    setLoading(true);
-    
-    try {
-      // Open calendar URLs for each event
-      events.forEach((event, index) => {
-        setTimeout(() => {
-          const url = selectedProvider === "google" 
-            ? generateGoogleCalendarUrl(event)
-            : generateOutlookCalendarUrl(event);
-          
-          window.open(url, '_blank');
-        }, index * 500); // Stagger the window opens to avoid popup blocking
-      });
-
-      toast({
-        title: "Calendar events opened",
-        description: `${events.length} calendar events have been opened in new tabs. You may need to allow popups.`,
-      });
-
-      // Close dialog after a short delay
-      setTimeout(() => {
-        onOpenChange(false);
-      }, 2000);
-
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to open calendar events. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    downloadICSMutation.mutate(Array.from(selectedEventIds));
   };
 
-  const addSingleEvent = (event: CalendarEvent) => {
-    if (!selectedProvider) {
+  const handleDownloadAll = () => {
+    if (events.length === 0) {
       toast({
-        title: "Select a calendar provider",
-        description: "Please choose Google Calendar or Outlook before adding events.",
+        title: "No Events Available",
+        description: "There are no calendar events to download.",
         variant: "destructive",
       });
       return;
     }
-
-    const url = selectedProvider === "google" 
-      ? generateGoogleCalendarUrl(event)
-      : generateOutlookCalendarUrl(event);
-    
-    window.open(url, '_blank');
+    downloadICSMutation.mutate(events.map((event: CalendarEvent) => event.id));
   };
 
+  const handleSyncEvents = () => {
+    syncEventsMutation.mutate();
+  };
+
+  // Helper functions
   const getEventIcon = (type: string) => {
     switch (type) {
-      case 'project-milestone': return <CheckCircle className="h-4 w-4 text-blue-600" />;
-      case 'task-start': return <Clock className="h-4 w-4 text-green-600" />;
-      case 'task-due': return <AlertCircle className="h-4 w-4 text-orange-600" />;
+      case 'dd_expiration': return <AlertCircle className="h-4 w-4 text-red-600" />;
+      case 'closing': return <Target className="h-4 w-4 text-green-600" />;
+      case 'task_deadline': return <Clock className="h-4 w-4 text-orange-600" />;
+      case 'milestone': return <Milestone className="h-4 w-4 text-blue-600" />;
+      case 'custom': return <Calendar className="h-4 w-4 text-purple-600" />;
       default: return <Calendar className="h-4 w-4" />;
     }
   };
 
   const getEventBadge = (type: string) => {
     switch (type) {
-      case 'project-milestone': return <Badge variant="default" className="bg-blue-100 text-blue-800">Milestone</Badge>;
-      case 'task-start': return <Badge variant="default" className="bg-green-100 text-green-800">Start</Badge>;
-      case 'task-due': return <Badge variant="default" className="bg-orange-100 text-orange-800">Due</Badge>;
+      case 'dd_expiration': return <Badge variant="destructive">DD Expiration</Badge>;
+      case 'closing': return <Badge variant="default" className="bg-green-100 text-green-800">Closing</Badge>;
+      case 'task_deadline': return <Badge variant="default" className="bg-orange-100 text-orange-800">Task Deadline</Badge>;
+      case 'milestone': return <Badge variant="default" className="bg-blue-100 text-blue-800">Milestone</Badge>;
+      case 'custom': return <Badge variant="default" className="bg-purple-100 text-purple-800">Custom</Badge>;
       default: return <Badge variant="secondary">Event</Badge>;
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed': return <Badge variant="default" className="bg-green-100 text-green-800">Completed</Badge>;
+      case 'in_progress': return <Badge variant="default" className="bg-blue-100 text-blue-800">In Progress</Badge>;
+      case 'not_started': return <Badge variant="outline">Not Started</Badge>;
+      default: return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'border-l-red-500';
+      case 'med': return 'border-l-yellow-500';
+      case 'low': return 'border-l-green-500';
+      default: return 'border-l-gray-500';
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto" data-testid="dialog-add-to-calendar">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden" data-testid="dialog-enhanced-add-to-calendar">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Add to Calendar: {project.name}
+            Calendar Events: {project.name}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Calendar Provider Selection */}
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold">Choose Calendar Provider</h3>
-            <Select value={selectedProvider} onValueChange={(value: "google" | "outlook") => setSelectedProvider(value)}>
-              <SelectTrigger className="w-full" data-testid="select-calendar-provider">
-                <SelectValue placeholder="Select your calendar provider" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="google">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-                    Google Calendar
-                  </div>
-                </SelectItem>
-                <SelectItem value="outlook">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-blue-600 rounded-full"></div>
-                    Outlook Calendar
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="flex flex-col h-[80vh]">
+          {/* Controls Section */}
+          <div className="space-y-4 pb-4">
+            {/* Search and Sync */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <Input
+                  placeholder="Search events..."
+                  value={searchQuery}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                  className="w-full"
+                  data-testid="input-search-events"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSyncEvents}
+                disabled={syncEventsMutation.isPending}
+                data-testid="button-sync-events"
+              >
+                {syncEventsMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Sync
+              </Button>
+            </div>
+
+            {/* Filters and Sorting */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Select value={filterType} onValueChange={(value: FilterType) => setFilterType(value)}>
+                <SelectTrigger data-testid="select-filter-type">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="dd_expiration">DD Expiration</SelectItem>
+                  <SelectItem value="closing">Closing</SelectItem>
+                  <SelectItem value="task_deadline">Task Deadline</SelectItem>
+                  <SelectItem value="milestone">Milestone</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={filterStatus} onValueChange={(value: FilterStatus) => setFilterStatus(value)}>
+                <SelectTrigger data-testid="select-filter-status">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="not_started">Not Started</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={filterDate} onValueChange={(value: FilterDate) => setFilterDate(value)}>
+                <SelectTrigger data-testid="select-filter-date">
+                  <SelectValue placeholder="All Dates" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Dates</SelectItem>
+                  <SelectItem value="upcoming">Upcoming</SelectItem>
+                  <SelectItem value="this_week">This Week</SelectItem>
+                  <SelectItem value="this_month">This Month</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
+                <SelectTrigger data-testid="select-sort-by">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date_asc">Date (Earliest First)</SelectItem>
+                  <SelectItem value="date_desc">Date (Latest First)</SelectItem>
+                  <SelectItem value="type">Event Type</SelectItem>
+                  <SelectItem value="priority">Priority</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  disabled={filteredAndSortedEvents.length === 0}
+                  data-testid="button-select-all"
+                >
+                  {selectedEventIds.size === filteredAndSortedEvents.length && filteredAndSortedEvents.length > 0 ? (
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Circle className="h-4 w-4 mr-2" />
+                  )}
+                  {selectedEventIds.size === filteredAndSortedEvents.length && filteredAndSortedEvents.length > 0 ? 'Deselect All' : 'Select All'}
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {selectedEventIds.size} of {filteredAndSortedEvents.length} selected
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadSelected}
+                  disabled={selectedEventIds.size === 0 || downloadICSMutation.isPending}
+                  data-testid="button-download-selected"
+                >
+                  {downloadICSMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Download Selected
+                </Button>
+                <Button
+                  onClick={handleDownloadAll}
+                  disabled={events.length === 0 || downloadICSMutation.isPending}
+                  data-testid="button-download-all"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download All
+                </Button>
+              </div>
+            </div>
           </div>
 
           <Separator />
 
-          {/* Events Summary */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Events to Add ({events.length})</h3>
-              <Button 
-                onClick={addAllToCalendar} 
-                disabled={loading || !selectedProvider}
-                data-testid="button-add-all-events"
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                {loading ? "Adding..." : "Add All Events"}
-              </Button>
-            </div>
-
-            {events.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                No calendar events found. Make sure your project has dates and tasks configured.
-              </p>
-            ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {events.map((event, index) => (
-                  <div 
-                    key={index}
-                    className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
-                    data-testid={`event-item-${index}`}
-                  >
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        {getEventIcon(event.type)}
-                        <h4 className="font-medium">{event.title}</h4>
-                        {getEventBadge(event.type)}
-                      </div>
-                      
-                      <div className="text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {format(event.startDate, 'MMM d, yyyy')}
-                          {event.endDate && event.endDate.getTime() !== event.startDate.getTime() && 
-                            ` - ${format(event.endDate, 'MMM d, yyyy')}`
-                          }
+          {/* Events List */}
+          <div className="flex-1 overflow-y-auto mt-4">
+            {eventsLoading ? (
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <Card key={i}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-4">
+                        <Skeleton className="h-4 w-4" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-3/4" />
+                          <Skeleton className="h-3 w-1/2" />
                         </div>
-                        {event.location && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <MapPin className="h-3 w-3" />
-                            {event.location}
-                          </div>
-                        )}
+                        <div className="flex gap-2">
+                          <Skeleton className="h-6 w-16" />
+                          <Skeleton className="h-6 w-16" />
+                        </div>
                       </div>
-
-                      {event.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {event.description}
-                        </p>
-                      )}
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addSingleEvent(event)}
-                      disabled={!selectedProvider}
-                      data-testid={`button-add-single-${index}`}
-                    >
-                      <ExternalLink className="h-4 w-4 mr-1" />
-                      Add
-                    </Button>
-                  </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : eventsError ? (
+              <div className="text-center py-8">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Failed to Load Events</h3>
+                <p className="text-muted-foreground mb-4">There was an error loading calendar events.</p>
+                <Button onClick={() => refetchEvents()} variant="outline">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+              </div>
+            ) : filteredAndSortedEvents.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Events Found</h3>
+                <p className="text-muted-foreground">
+                  {events.length === 0 
+                    ? "No calendar events are available for this project."
+                    : "No events match your current filters."
+                  }
+                </p>
+                {events.length === 0 && (
+                  <Button onClick={handleSyncEvents} variant="outline" className="mt-4">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Sync Events
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredAndSortedEvents.map((event) => (
+                  <Card 
+                    key={event.id} 
+                    className={`cursor-pointer transition-all hover:shadow-md border-l-4 ${getPriorityColor(event.priority)} ${
+                      selectedEventIds.has(event.id) ? 'ring-2 ring-blue-500 bg-blue-50/50' : ''
+                    }`}
+                    onClick={() => handleEventToggle(event.id)}
+                    data-testid={`event-card-${event.id}`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start space-x-4">
+                        <Checkbox
+                          checked={selectedEventIds.has(event.id)}
+                          onCheckedChange={() => handleEventToggle(event.id)}
+                          className="mt-1"
+                          data-testid={`checkbox-event-${event.id}`}
+                        />
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            {getEventIcon(event.eventType)}
+                            <h4 className="font-medium text-foreground truncate">{event.title}</h4>
+                            {getEventBadge(event.eventType)}
+                            {getStatusBadge(event.status)}
+                          </div>
+                          
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>
+                                {format(new Date(event.startDate), 'MMM d, yyyy h:mm a')}
+                                {event.endDate && event.endDate !== event.startDate && 
+                                  ` - ${format(new Date(event.endDate), event.isAllDay ? 'MMM d, yyyy' : 'h:mm a')}`
+                                }
+                                {event.isAllDay && ' (All Day)'}
+                              </span>
+                            </div>
+                            
+                            {event.location && (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                <span className="truncate">{event.location}</span>
+                              </div>
+                            )}
+                            
+                            {event.description && (
+                              <p className="text-xs line-clamp-2 mt-2">{event.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge 
+                            variant={event.priority === 'high' ? 'destructive' : event.priority === 'med' ? 'default' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {event.priority.toUpperCase()}
+                          </Badge>
+                          {event.timezone && event.timezone !== 'America/New_York' && (
+                            <span className="text-xs text-muted-foreground">{event.timezone}</span>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Instructions */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-semibold text-blue-900 mb-2">How it works:</h4>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Select your calendar provider (Google Calendar or Outlook)</li>
-              <li>• Click "Add All Events" to open all calendar events at once</li>
-              <li>• Or click "Add" next to individual events to add them one by one</li>
-              <li>• Your browser will open new tabs for each calendar event</li>
-              <li>• You may need to allow popups in your browser</li>
-            </ul>
           </div>
         </div>
       </DialogContent>

@@ -191,7 +191,6 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
         open={isCalendarDialogOpen}
         onOpenChange={setIsCalendarDialogOpen}
         project={project}
-        tasks={tasks}
         settings={settings}
       />
     </div>
