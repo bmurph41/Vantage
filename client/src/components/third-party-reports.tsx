@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle, FileDown, Edit, StickyNote } from "lucide-react";
+import { TaskDocumentStatus } from "./task-document-status";
+import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle, FileDown, Edit, StickyNote, FileText } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
 import { useQuery } from "@tanstack/react-query";
@@ -45,6 +46,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
+  const [docRequirementsTaskId, setDocRequirementsTaskId] = useState<string | null>(null);
   const [companyModalData, setCompanyModalData] = useState<{
     isOpen: boolean;
     companyName: string;

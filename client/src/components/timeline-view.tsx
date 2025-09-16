@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { TimelineNotes } from "./timeline-notes";
+import { DocumentRequirementsManagement } from "./document-requirements-management";
+import { useTaskDocumentCompletionStatus } from "@/hooks/use-document-requirements";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
-import { StickyNote, GripVertical } from "lucide-react";
+import { StickyNote, GripVertical, FileText, Shield } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate } from "@/lib/date-utils";
@@ -242,6 +244,8 @@ function SortableTaskItem({
   onOpenNotes,
   getTaskNoteCount
 }: SortableTaskItemProps) {
+  const [docRequirementsDialogOpen, setDocRequirementsDialogOpen] = useState(false);
+  
   const {
     attributes,
     listeners,
@@ -250,6 +254,13 @@ function SortableTaskItem({
     transition,
     isDragging,
   } = useSortable({ id: task.id });
+
+  const {
+    totalRequirements,
+    verifiedCount,
+    hasBlockingIssues,
+    canComplete
+  } = useTaskDocumentCompletionStatus(task.id);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -311,6 +322,24 @@ function SortableTaskItem({
               })()})
             </Badge>
           )}
+          {/* Document Status Indicator */}
+          {totalRequirements > 0 && (
+            <div className="flex items-center space-x-1">
+              {hasBlockingIssues && (
+                <Shield className="h-3 w-3 text-red-500" />
+              )}
+              <Badge variant="outline" className={`text-xs px-2 py-0.5 ${
+                hasBlockingIssues 
+                  ? 'text-red-700 border-red-300 bg-red-50' 
+                  : canComplete 
+                    ? 'text-green-700 border-green-300 bg-green-50'
+                    : 'text-orange-700 border-orange-300 bg-orange-50'
+              }`}>
+                <FileText className="h-3 w-3 mr-1" />
+                {verifiedCount}/{totalRequirements} Docs
+              </Badge>
+            </div>
+          )}
         </div>
         <div className="flex items-center space-x-3">
           {showCriticalPath && criticalInfo && (
@@ -321,6 +350,19 @@ function SortableTaskItem({
           <div className="text-xs text-gray-600">
             {task.assignee || 'Unassigned'}
           </div>
+          {/* Document Requirements Button */}
+          {totalRequirements > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors"
+              onClick={() => setDocRequirementsDialogOpen(true)}
+              data-testid={`button-documents-${task.id}`}
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              Documents
+            </Button>
+          )}
           {/* Simple Note Button */}
           <Button
             variant="outline"
@@ -344,6 +386,25 @@ function SortableTaskItem({
             })()}
           </Button>
         </div>
+        
+        {/* Document Requirements Dialog */}
+        <Dialog open={docRequirementsDialogOpen} onOpenChange={setDocRequirementsDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden" data-testid={`dialog-documents-${task.id}`}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Document Requirements - {task.title}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+              <DocumentRequirementsManagement 
+                taskId={task.id} 
+                showHeader={false}
+                compact={true}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
       <div className="mt-6">
         <ProgressBar 
