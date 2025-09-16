@@ -172,6 +172,11 @@ export interface IStorage {
   // Query methods
   getRequirementsByStatus(projectId: string, status: string): Promise<DocumentRequirement[]>;
   checkTaskCompletionGating(taskId: string): Promise<{ canComplete: boolean; unverifiedRequirements: DocumentRequirement[] }>;
+
+  // Automatic Calendar Event Management
+  syncTaskCalendarEvent(task: Task): Promise<CalendarEvent | null>;
+  deleteTaskCalendarEvent(taskId: string): Promise<void>;
+  updateTaskCalendarEvent(task: Task): Promise<CalendarEvent | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -921,93 +926,153 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
 
-    const events: InsertCalendarEvent[] = [];
+    // Get all existing calendar events for this project
+    const existingEvents = await db.select().from(calendarEvents)
+      .where(eq(calendarEvents.projectId, projectId));
+
+    const createdOrUpdatedEvents: CalendarEvent[] = [];
+    const processedTaskIds: Set<string> = new Set();
     
-    // Generate events from tasks with deadlines
+    // Process tasks with deadlines - create or update events
     for (const task of tasks) {
       if (task.deadline) {
-        const existingEvent = await db.select().from(calendarEvents)
-          .where(and(
-            eq(calendarEvents.projectId, projectId),
-            eq(calendarEvents.taskId, task.id),
-            eq(calendarEvents.eventType, "task_deadline")
-          ))
-          .limit(1);
+        processedTaskIds.add(task.id);
+        
+        const existingTaskEvent = existingEvents.find(e => 
+          e.taskId === task.id && e.eventType === "task_deadline"
+        );
 
-        if (existingEvent.length === 0) {
-          events.push({
-            projectId,
-            taskId: task.id,
-            eventType: "task_deadline",
-            title: `${task.title} - Due`,
-            description: task.description || '',
-            startDate: new Date(`${task.deadline}T09:00:00`),
-            isAllDay: true,
-            timezone: project.tz,
-            priority: task.priority,
-            status: task.status,
-          });
+        const eventData = {
+          projectId,
+          taskId: task.id,
+          eventType: "task_deadline" as const,
+          title: `${task.title} - Due`,
+          description: task.description || '',
+          startDate: new Date(`${task.deadline}T09:00:00`),
+          isAllDay: true,
+          timezone: project.tz,
+          priority: task.priority,
+          status: task.status,
+        };
+
+        if (existingTaskEvent) {
+          // Update existing event if details have changed
+          const needsUpdate = 
+            existingTaskEvent.title !== eventData.title ||
+            existingTaskEvent.description !== eventData.description ||
+            new Date(existingTaskEvent.startDate).getTime() !== eventData.startDate.getTime() ||
+            existingTaskEvent.priority !== eventData.priority ||
+            existingTaskEvent.status !== eventData.status ||
+            existingTaskEvent.timezone !== eventData.timezone;
+
+          if (needsUpdate) {
+            const updated = await this.updateCalendarEvent(existingTaskEvent.id, eventData);
+            createdOrUpdatedEvents.push(updated);
+          } else {
+            createdOrUpdatedEvents.push(existingTaskEvent);
+          }
+        } else {
+          // Create new event
+          const created = await this.createCalendarEvent(eventData);
+          createdOrUpdatedEvents.push(created);
         }
       }
     }
+
+    // Clean up task events for tasks that no longer have deadlines
+    const orphanedTaskEvents = existingEvents.filter(e => 
+      e.eventType === "task_deadline" && 
+      e.taskId && 
+      !processedTaskIds.has(e.taskId)
+    );
+
+    for (const orphanedEvent of orphanedTaskEvents) {
+      await this.deleteCalendarEvent(orphanedEvent.id);
+    }
     
-    // Generate DD expiration event
+    // Handle DD expiration event
+    const existingDdEvent = existingEvents.find(e => e.eventType === "dd_expiration");
+    
     if (project.ddExpirationDate) {
-      const existingDdEvent = await db.select().from(calendarEvents)
-        .where(and(
-          eq(calendarEvents.projectId, projectId),
-          eq(calendarEvents.eventType, "dd_expiration")
-        ))
-        .limit(1);
+      const ddEventData = {
+        projectId,
+        eventType: "dd_expiration" as const,
+        title: `${project.name} - DD Expiration`,
+        description: `Due diligence period expires for ${project.name}`,
+        startDate: new Date(`${project.ddExpirationDate}T23:59:00`),
+        isAllDay: true,
+        timezone: project.tz,
+        priority: "high" as const,
+        status: "not_started" as const,
+      };
 
-      if (existingDdEvent.length === 0) {
-        events.push({
-          projectId,
-          eventType: "dd_expiration",
-          title: `${project.name} - DD Expiration`,
-          description: `Due diligence period expires for ${project.name}`,
-          startDate: new Date(`${project.ddExpirationDate}T23:59:00`),
-          isAllDay: true,
-          timezone: project.tz,
-          priority: "high",
-          status: "not_started",
-        });
+      if (existingDdEvent) {
+        // Update existing DD event if details have changed
+        const needsUpdate = 
+          existingDdEvent.title !== ddEventData.title ||
+          existingDdEvent.description !== ddEventData.description ||
+          new Date(existingDdEvent.startDate).getTime() !== ddEventData.startDate.getTime() ||
+          existingDdEvent.timezone !== ddEventData.timezone;
+
+        if (needsUpdate) {
+          const updated = await this.updateCalendarEvent(existingDdEvent.id, ddEventData);
+          createdOrUpdatedEvents.push(updated);
+        } else {
+          createdOrUpdatedEvents.push(existingDdEvent);
+        }
+      } else {
+        // Create new DD event
+        const created = await this.createCalendarEvent(ddEventData);
+        createdOrUpdatedEvents.push(created);
       }
+    } else if (existingDdEvent) {
+      // Remove DD event if project no longer has DD expiration date
+      await this.deleteCalendarEvent(existingDdEvent.id);
     }
     
-    // Generate closing event
+    // Handle closing event
+    const existingClosingEvent = existingEvents.find(e => e.eventType === "closing");
+    
     if (project.closingDate) {
-      const existingClosingEvent = await db.select().from(calendarEvents)
-        .where(and(
-          eq(calendarEvents.projectId, projectId),
-          eq(calendarEvents.eventType, "closing")
-        ))
-        .limit(1);
+      const closingEventData = {
+        projectId,
+        eventType: "closing" as const,
+        title: `${project.name} - Closing`,
+        description: `Project closing date for ${project.name}`,
+        startDate: new Date(`${project.closingDate}T10:00:00`),
+        endDate: new Date(`${project.closingDate}T17:00:00`),
+        isAllDay: false,
+        timezone: project.tz,
+        priority: "high" as const,
+        status: "not_started" as const,
+      };
 
-      if (existingClosingEvent.length === 0) {
-        events.push({
-          projectId,
-          eventType: "closing",
-          title: `${project.name} - Closing`,
-          description: `Project closing date for ${project.name}`,
-          startDate: new Date(`${project.closingDate}T10:00:00`),
-          endDate: new Date(`${project.closingDate}T17:00:00`),
-          isAllDay: false,
-          timezone: project.tz,
-          priority: "high",
-          status: "not_started",
-        });
+      if (existingClosingEvent) {
+        // Update existing closing event if details have changed
+        const needsUpdate = 
+          existingClosingEvent.title !== closingEventData.title ||
+          existingClosingEvent.description !== closingEventData.description ||
+          new Date(existingClosingEvent.startDate).getTime() !== closingEventData.startDate.getTime() ||
+          (existingClosingEvent.endDate && new Date(existingClosingEvent.endDate).getTime() !== closingEventData.endDate!.getTime()) ||
+          existingClosingEvent.timezone !== closingEventData.timezone;
+
+        if (needsUpdate) {
+          const updated = await this.updateCalendarEvent(existingClosingEvent.id, closingEventData);
+          createdOrUpdatedEvents.push(updated);
+        } else {
+          createdOrUpdatedEvents.push(existingClosingEvent);
+        }
+      } else {
+        // Create new closing event
+        const created = await this.createCalendarEvent(closingEventData);
+        createdOrUpdatedEvents.push(created);
       }
+    } else if (existingClosingEvent) {
+      // Remove closing event if project no longer has closing date
+      await this.deleteCalendarEvent(existingClosingEvent.id);
     }
     
-    // Insert all new events
-    const createdEvents: CalendarEvent[] = [];
-    for (const eventData of events) {
-      const created = await this.createCalendarEvent(eventData);
-      createdEvents.push(created);
-    }
-    
-    return createdEvents;
+    return createdOrUpdatedEvents;
   }
 
   async validateEventSelection(eventIds: string[]): Promise<{ valid: boolean; invalidIds: string[] }> {
@@ -1375,6 +1440,78 @@ export class DatabaseStorage implements IStorage {
       console.error('Failed to check task completion gating:', error);
       throw error;
     }
+  }
+
+  // Automatic Calendar Event Management Implementation
+  async syncTaskCalendarEvent(task: Task): Promise<CalendarEvent | null> {
+    try {
+      // Only create calendar events for tasks with deadlines
+      if (!task.deadline) {
+        // If task has no deadline, delete any existing calendar event
+        await this.deleteTaskCalendarEvent(task.id);
+        return null;
+      }
+
+      const project = await this.getProject(task.projectId);
+      if (!project) {
+        console.error(`Project not found for task ${task.id}`);
+        return null;
+      }
+
+      // Check if calendar event already exists for this task
+      const existingEvents = await db.select().from(calendarEvents)
+        .where(and(
+          eq(calendarEvents.projectId, task.projectId),
+          eq(calendarEvents.taskId, task.id),
+          eq(calendarEvents.eventType, "task_deadline")
+        ));
+
+      const eventData = {
+        projectId: task.projectId,
+        taskId: task.id,
+        eventType: "task_deadline" as const,
+        title: `${task.title} - Due`,
+        description: task.description || '',
+        startDate: new Date(`${task.deadline}T09:00:00`),
+        isAllDay: true,
+        timezone: project.tz,
+        priority: task.priority,
+        status: task.status,
+      };
+
+      if (existingEvents.length > 0) {
+        // Update existing calendar event
+        const existingEvent = existingEvents[0];
+        const updated = await this.updateCalendarEvent(existingEvent.id, eventData);
+        return updated;
+      } else {
+        // Create new calendar event
+        const created = await this.createCalendarEvent(eventData);
+        return created;
+      }
+    } catch (error) {
+      console.error('Failed to sync task calendar event:', error);
+      throw error;
+    }
+  }
+
+  async deleteTaskCalendarEvent(taskId: string): Promise<void> {
+    try {
+      // Delete all calendar events associated with this task
+      await db.delete(calendarEvents)
+        .where(and(
+          eq(calendarEvents.taskId, taskId),
+          eq(calendarEvents.eventType, "task_deadline")
+        ));
+    } catch (error) {
+      console.error('Failed to delete task calendar event:', error);
+      throw error;
+    }
+  }
+
+  async updateTaskCalendarEvent(task: Task): Promise<CalendarEvent | null> {
+    // This method is an alias for syncTaskCalendarEvent for clarity
+    return this.syncTaskCalendarEvent(task);
   }
 }
 

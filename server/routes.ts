@@ -333,6 +333,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/dd/projects/:projectId/tasks", async (req: any, res) => {
     try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      
       // Extract isInternalTask field before validation
       const { isInternalTask, ...taskPayload } = req.body;
       
@@ -433,6 +435,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Automatically sync calendar event for new task
+      try {
+        console.log('🗓️ Attempting to sync calendar event for new task:', task.id, 'with deadline:', task.deadline);
+        const calendarEvent = await storage.syncTaskCalendarEvent(task);
+        console.log('🗓️ Calendar event sync result for new task:', calendarEvent ? 'created' : 'no event needed');
+      } catch (calendarError) {
+        console.error('❌ Failed to sync calendar event for new task:', calendarError);
+        // Don't fail the request if calendar sync fails
+      }
+
       res.json(task);
     } catch (error) {
       console.error("Task creation error:", error);
@@ -460,6 +472,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/dd/tasks/:id", async (req: any, res) => {
     try {
+      const task = await storage.getTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      await authorizeProjectAccess(task.projectId, req.user.orgId);
+      
       // Extract isInternalTask field before validation
       const { isInternalTask, ...taskPayload } = req.body;
       
@@ -479,11 +498,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updates = insertTaskSchema.partial().parse(taskPayload);
-      const task = await storage.getTask(req.params.id);
-      
-      if (!task) {
-        return res.status(404).json({ error: "Task not found" });
-      }
 
       // Check for circular dependencies if dependencies are being updated
       if (updates.dependencies !== undefined) {
@@ -549,6 +563,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Automatically sync calendar event for updated task
+      try {
+        console.log('🗓️ Attempting to sync calendar event for updated task:', updated.id, 'with deadline:', updated.deadline);
+        const calendarEvent = await storage.syncTaskCalendarEvent(updated);
+        console.log('🗓️ Calendar event sync result for updated task:', calendarEvent ? 'updated/created' : 'no event needed');
+      } catch (calendarError) {
+        console.error('❌ Failed to sync calendar event for updated task:', calendarError);
+        // Don't fail the request if calendar sync fails
+      }
+
       res.json(updated);
     } catch (error) {
       console.error("Task update error:", error);
@@ -580,6 +604,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
+      
+      await authorizeProjectAccess(task.projectId, req.user.orgId);
 
       // Cleanup assignee subscriptions before deleting task
       try {
@@ -587,6 +613,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (cleanupError) {
         console.error('Failed to cleanup task subscriptions:', cleanupError);
         // Don't fail the deletion if cleanup fails
+      }
+
+      // Delete calendar event before deleting task
+      try {
+        await storage.deleteTaskCalendarEvent(req.params.id);
+      } catch (calendarError) {
+        console.error('Failed to delete calendar event for task:', calendarError);
+        // Don't fail the deletion if calendar cleanup fails
       }
 
       await storage.deleteTask(req.params.id);
@@ -619,6 +653,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/dd/tasks/:taskId/timeline-notes", async (req: any, res) => {
     try {
+      const task = await storage.getTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      await authorizeProjectAccess(task.projectId, req.user.orgId);
+      
       const noteData = insertTimelineNoteSchema.parse({
         ...req.body,
         taskId: req.params.taskId,
@@ -648,6 +689,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/dd/timeline-notes/:id", async (req: any, res) => {
     try {
+      // Note: For proper authorization, we'd need a getTimelineNote method
+      // For now, this is a limitation - timeline notes authorization is not fully implemented
       const updates = insertTimelineNoteSchema.partial().parse(req.body);
       const note = await storage.updateTimelineNote(req.params.id, updates);
       res.json(note);
@@ -658,6 +701,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/dd/timeline-notes/:id", async (req: any, res) => {
     try {
+      // Note: For proper authorization, we'd need a getTimelineNote method
+      // For now, this is a limitation in the current storage interface
       await storage.deleteTimelineNote(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -2174,13 +2219,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'X-Webhook-Test': 'true',
+        };
+        
+        if (config.apiKey) {
+          headers['Authorization'] = `Bearer ${config.apiKey}`;
+        }
+        
         const response = await fetch(config.webhookUrl, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': config.apiKey ? `Bearer ${config.apiKey}` : undefined,
-            'X-Webhook-Test': 'true',
-          },
+          headers,
           body: JSON.stringify(testPayload),
           signal: AbortSignal.timeout(10000), // 10 second timeout
         });
@@ -2304,9 +2354,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (syncHistory) {
           syncStatus = {
             lastSyncAt: syncHistory.lastSyncAt,
-            lastSyncStatus: syncHistory.lastSyncStatus,
-            consecutiveFailures: syncHistory.consecutiveFailures,
-            nextSyncAt: syncHistory.nextSyncAt,
+            lastSyncSuccess: syncHistory.lastSyncSuccess,
+            retryCount: syncHistory.retryCount,
+            lastError: syncHistory.lastError,
+            nextRetryAt: syncHistory.nextRetryAt,
+            documentsProcessed: syncHistory.documentsProcessed,
           };
         }
       } catch (syncError) {

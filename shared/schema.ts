@@ -355,6 +355,11 @@ export const calendarEvents = pgTable("calendar_events", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => {
   return {
+    // Unique constraint to prevent duplicate task calendar events
+    uniqueTaskEvent: unique("calendar_events_unique_task_event").on(
+      table.projectId, table.taskId, table.eventType
+    ),
+    // Performance indexes
     projectEventTypeIdx: index("calendar_events_project_event_type").on(
       table.projectId, table.eventType
     ),
