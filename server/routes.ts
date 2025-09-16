@@ -494,7 +494,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taskPayload.companyState = "";
         taskPayload.companyZip = "";
         taskPayload.requiresOnSiteInspection = false;
-        taskPayload.dateOnSite = "";
+        taskPayload.dateOnSite = null;
+      }
+
+      // Convert empty string date fields to null for database compatibility
+      const dateFields = ['startDate', 'deadline', 'dateEngaged', 'completedAt', 'orderedAt', 'dateOnSite', 'baselineStart', 'baselineDue'];
+      for (const field of dateFields) {
+        if (taskPayload[field] === '') {
+          taskPayload[field] = null;
+        }
+      }
+
+      // Convert empty string number fields to null
+      if (taskPayload.startOffsetDays === '') {
+        taskPayload.startOffsetDays = null;
+      }
+      if (taskPayload.deadlineDays === '') {
+        taskPayload.deadlineDays = null;
       }
 
       const updates = insertTaskSchema.partial().parse(taskPayload);
