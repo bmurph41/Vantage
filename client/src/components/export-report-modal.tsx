@@ -46,17 +46,159 @@ const COLUMN_OPTIONS = [
 
 // PDF Styles
 const styles = StyleSheet.create({
-  page: { fontSize: 10, padding: 30, fontFamily: 'Helvetica' },
-  header: { fontSize: 18, fontWeight: 'bold', marginBottom: 20 },
-  subheader: { fontSize: 14, fontWeight: 'bold', marginBottom: 10 },
-  text: { fontSize: 10, marginBottom: 5 },
-  table: { width: 'auto', borderStyle: 'solid', borderWidth: 1, borderRightWidth: 0, borderBottomWidth: 0 },
-  tableRow: { flexDirection: 'row' },
-  tableColHeader: { width: 'auto', borderStyle: 'solid', borderWidth: 1, borderLeftWidth: 0, borderTopWidth: 0, padding: 4, backgroundColor: '#f3f4f6', fontWeight: 'bold' },
-  tableCol: { width: 'auto', borderStyle: 'solid', borderWidth: 1, borderLeftWidth: 0, borderTopWidth: 0, padding: 4 },
-  tableCellHeader: { fontSize: 9, fontWeight: 'bold' },
-  tableCell: { fontSize: 8 },
+  page: {
+    fontSize: 9,
+    padding: 25,
+    fontFamily: 'Helvetica',
+    backgroundColor: '#ffffff',
+    lineHeight: 1.4,
+  },
+  // Header styles
+  header: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  projectInfo: {
+    fontSize: 10,
+    color: '#6b7280',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  
+  // Summary section
+  summarySection: {
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f8fafc',
+    borderRadius: 6,
+    border: '1 solid #e5e7eb',
+  },
+  summaryTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  summaryCard: {
+    width: '22%',
+    padding: 8,
+    backgroundColor: '#ffffff',
+    borderRadius: 4,
+    border: '1 solid #d1d5db',
+    textAlign: 'center',
+  },
+  summaryNumber: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#059669',
+    marginBottom: 2,
+  },
+  summaryLabel: {
+    fontSize: 7,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+  },
+  
+  // Section styles
+  section: {
+    marginBottom: 18,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 10,
+    paddingBottom: 4,
+    borderBottom: '1 solid #e5e7eb',
+  },
+  
+  // Task card styles
+  taskCard: {
+    marginBottom: 8,
+    padding: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 4,
+    border: '1 solid #e5e7eb',
+  },
+  taskHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  taskTitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    flex: 1,
+  },
+  statusBadge: {
+    padding: '2 6',
+    borderRadius: 3,
+    fontSize: 7,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  taskDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    fontSize: 8,
+    color: '#6b7280',
+  },
+  taskDetailItem: {
+    marginRight: 15,
+  },
+  
+  // Utility styles
+  row: {
+    flexDirection: 'row',
+  },
+  text: {
+    fontSize: 8,
+    color: '#374151',
+    marginBottom: 3,
+  },
+  bold: {
+    fontWeight: 'bold',
+  },
+  center: {
+    textAlign: 'center',
+  },
 });
+
+// Helper functions for PDF
+const getStatusBadgeStyle = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return { backgroundColor: '#10b981', color: '#ffffff' };
+    case 'in_progress':
+      return { backgroundColor: '#3b82f6', color: '#ffffff' };
+    case 'not_started':
+      return { backgroundColor: '#6b7280', color: '#ffffff' };
+    default:
+      return { backgroundColor: '#e5e7eb', color: '#374151' };
+  }
+};
+
+const calculateProjectStats = (tasks: Task[]) => {
+  const total = tasks.length;
+  const completed = tasks.filter(t => t.status === 'completed').length;
+  const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+  const totalCost = tasks.reduce((sum, task) => {
+    const cost = typeof task.cost === 'string' ? parseFloat(task.cost) || 0 : (task.cost || 0);
+    return sum + cost;
+  }, 0);
+  
+  return { total, completed, inProgress, totalCost };
+};
 
 // PDF Document Component
 const PDFReport = ({ filteredTasks, visibleColumns, project, formatCellValueForExport }: {
@@ -64,35 +206,125 @@ const PDFReport = ({ filteredTasks, visibleColumns, project, formatCellValueForE
   visibleColumns: typeof COLUMN_OPTIONS;
   project?: Project;
   formatCellValueForExport: (task: Task, columnId: string) => string;
-}) => (
-  <Document>
-    <Page size="A4" style={styles.page} orientation="landscape">
-      <Text style={styles.header}>Due Diligence Report</Text>
-      <Text style={styles.text}>Project: {project?.name || 'N/A'}</Text>
-      <Text style={styles.text}>Generated: {format(tzNow('America/New_York'), 'MMM d, yyyy h:mm a')}</Text>
-      <Text style={styles.text}>Total Tasks: {filteredTasks.length}</Text>
-      
-      <View style={[styles.table, { marginTop: 20 }]}>
-        <View style={styles.tableRow}>
-          {visibleColumns.map((col) => (
-            <View key={col.id} style={[styles.tableColHeader, { width: `${100/visibleColumns.length}%` }]}>
-              <Text style={styles.tableCellHeader}>{col.label}</Text>
+}) => {
+  const stats = calculateProjectStats(filteredTasks);
+  const activeTasks = filteredTasks.filter(t => t.status !== 'completed');
+  const completedTasks = filteredTasks.filter(t => t.status === 'completed');
+  
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        {/* Header */}
+        <Text style={styles.header}>Due Diligence Report</Text>
+        <Text style={styles.projectInfo}>
+          {project?.name || 'Project'} • Generated {format(tzNow('America/New_York'), 'MMM d, yyyy')}
+        </Text>
+        
+        {/* Summary Section */}
+        <View style={styles.summarySection}>
+          <Text style={styles.summaryTitle}>Project Summary</Text>
+          <View style={styles.summaryGrid}>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryNumber}>{stats.total}</Text>
+              <Text style={styles.summaryLabel}>Total Tasks</Text>
             </View>
-          ))}
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryNumber}>{stats.completed}</Text>
+              <Text style={styles.summaryLabel}>Completed</Text>
+            </View>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryNumber}>{stats.inProgress}</Text>
+              <Text style={styles.summaryLabel}>In Progress</Text>
+            </View>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryNumber}>${stats.totalCost.toLocaleString()}</Text>
+              <Text style={styles.summaryLabel}>Total Cost</Text>
+            </View>
+          </View>
         </View>
-        {filteredTasks.map((task) => (
-          <View style={styles.tableRow} key={task.id}>
-            {visibleColumns.map((col) => (
-              <View key={col.id} style={[styles.tableCol, { width: `${100/visibleColumns.length}%` }]}>
-                <Text style={styles.tableCell}>{formatCellValueForExport(task, col.id)}</Text>
+
+        {/* Active Tasks */}
+        {activeTasks.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Active Tasks ({activeTasks.length})</Text>
+            {activeTasks.slice(0, 12).map((task) => (
+              <View key={task.id} style={styles.taskCard}>
+                <View style={styles.taskHeader}>
+                  <Text style={styles.taskTitle}>{task.title}</Text>
+                  <Text style={[styles.statusBadge, getStatusBadgeStyle(task.status)]}>
+                    {task.status.replace('_', ' ')}
+                  </Text>
+                </View>
+                <View style={styles.taskDetails}>
+                  <Text style={styles.taskDetailItem}>
+                    Company: {task.companyHired || 'Internal'}
+                  </Text>
+                  {task.deadline && (
+                    <Text style={styles.taskDetailItem}>
+                      Deadline: {format(typeof task.deadline === 'string' ? parseISO(task.deadline) : task.deadline, 'MMM d, yyyy')}
+                    </Text>
+                  )}
+                  {task.cost && (
+                    <Text style={styles.taskDetailItem}>
+                      Cost: ${(typeof task.cost === 'string' ? parseFloat(task.cost) || 0 : (task.cost || 0)).toLocaleString()}
+                    </Text>
+                  )}
+                </View>
               </View>
             ))}
+            {activeTasks.length > 12 && (
+              <Text style={[styles.text, styles.center]}>
+                ... and {activeTasks.length - 12} more active tasks
+              </Text>
+            )}
           </View>
-        ))}
-      </View>
-    </Page>
-  </Document>
-);
+        )}
+
+        {/* Completed Tasks Summary */}
+        {completedTasks.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent Completions ({completedTasks.length})</Text>
+            {completedTasks.slice(0, 8).map((task) => (
+              <View key={task.id} style={styles.taskCard}>
+                <View style={styles.taskHeader}>
+                  <Text style={styles.taskTitle}>{task.title}</Text>
+                  <Text style={[styles.statusBadge, getStatusBadgeStyle(task.status)]}>
+                    Completed
+                  </Text>
+                </View>
+                <View style={styles.taskDetails}>
+                  <Text style={styles.taskDetailItem}>
+                    Company: {task.companyHired || 'Internal'}
+                  </Text>
+                  {task.completedAt && (
+                    <Text style={styles.taskDetailItem}>
+                      Completed: {format(typeof task.completedAt === 'string' ? parseISO(task.completedAt) : task.completedAt, 'MMM d, yyyy')}
+                    </Text>
+                  )}
+                  {task.cost && (
+                    <Text style={styles.taskDetailItem}>
+                      Cost: ${(typeof task.cost === 'string' ? parseFloat(task.cost) || 0 : (task.cost || 0)).toLocaleString()}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ))}
+            {completedTasks.length > 8 && (
+              <Text style={[styles.text, styles.center]}>
+                ... and {completedTasks.length - 8} more completed tasks
+              </Text>
+            )}
+          </View>
+        )}
+        
+        {/* Footer */}
+        <Text style={[styles.text, styles.center, { marginTop: 20, color: '#9ca3af' }]}>
+          This report contains {filteredTasks.length} tasks from the Due Diligence Tracker
+        </Text>
+      </Page>
+    </Document>
+  );
+};
 
 export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportReportModalProps) {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set(tasks.map(t => t.id)));
