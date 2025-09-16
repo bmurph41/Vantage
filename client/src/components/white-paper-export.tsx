@@ -2240,8 +2240,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
                 name: 'DD Expiration', 
                 date: project.ddExpirationDate, 
                 tasks: tasks.filter(task => 
-                  task.deadline === project.ddExpirationDate ||
-                  task.deadlineType === 'dd_expiration'
+                  task.deadline === project.ddExpirationDate
                 )
               });
             }
