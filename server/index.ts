@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { deadlineMonitor } from "./deadline-monitor";
+import { reconciliationService } from "./reconciliation-service";
 
 const app = express();
 app.use(express.json());
@@ -66,7 +67,7 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
     
     // Start deadline monitoring service after server is ready
@@ -75,6 +76,14 @@ app.use((req, res, next) => {
       log('🚀 Deadline monitoring service started');
     } catch (error) {
       log(`❌ Failed to start deadline monitoring service: ${error}`);
+    }
+
+    // Start document reconciliation service after server is ready
+    try {
+      await reconciliationService.start();
+      log('🚀 Document reconciliation service started');
+    } catch (error) {
+      log(`❌ Failed to start document reconciliation service: ${error}`);
     }
   });
 })();

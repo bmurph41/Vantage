@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { resolveRecipient } from "@shared/recipient-utils";
 import { assigneeSubscriptionManager } from "./assignee-subscription-manager";
+import { reconciliationService } from "./reconciliation-service";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
@@ -1399,6 +1400,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching deadline monitor status:", error);
       res.status(500).json({ error: "Failed to fetch deadline monitor status" });
+    }
+  });
+
+  // Reconciliation Service Monitoring Endpoints
+
+  // Get reconciliation service health status
+  app.get("/api/dd/reconciliation/health", async (req: any, res) => {
+    try {
+      const healthStatus = reconciliationService.getHealthStatus();
+      res.json(healthStatus);
+    } catch (error) {
+      console.error("Error fetching reconciliation health status:", error);
+      res.status(500).json({ error: "Failed to fetch reconciliation health status" });
+    }
+  });
+
+  // Get sync status for all integrations
+  app.get("/api/dd/reconciliation/status", async (req: any, res) => {
+    try {
+      const syncStatuses = reconciliationService.getSyncStatuses();
+      res.json(syncStatuses);
+    } catch (error) {
+      console.error("Error fetching reconciliation sync statuses:", error);
+      res.status(500).json({ error: "Failed to fetch reconciliation sync statuses" });
+    }
+  });
+
+  // Get sync history for a specific integration
+  app.get("/api/dd/reconciliation/status/:projectId/:provider", async (req: any, res) => {
+    try {
+      const { projectId, provider } = req.params;
+      
+      // Verify project ownership
+      await authorizeProjectAccess(projectId, req.user.orgId);
+      
+      const syncHistory = reconciliationService.getSyncHistory(projectId, provider);
+      if (!syncHistory) {
+        return res.status(404).json({ error: "Sync history not found for this integration" });
+      }
+      
+      res.json(syncHistory);
+    } catch (error) {
+      console.error("Error fetching reconciliation sync history:", error);
+      res.status(500).json({ error: "Failed to fetch reconciliation sync history" });
+    }
+  });
+
+  // Manually trigger sync for a specific integration
+  app.post("/api/dd/reconciliation/sync/:projectId/:provider", async (req: any, res) => {
+    try {
+      const { projectId, provider } = req.params;
+      
+      // Verify project ownership
+      await authorizeProjectAccess(projectId, req.user.orgId);
+      
+      // Verify integration exists
+      const integration = await storage.getProjectIntegrationByProvider(projectId, provider);
+      if (!integration) {
+        return res.status(404).json({ error: "Integration not found" });
+      }
+      
+      console.log(`🔧 Manual sync triggered for ${projectId}:${provider} by user ${req.user.id}`);
+      
+      // Trigger sync (this is async but we respond immediately)
+      const syncResult = await reconciliationService.triggerSync(projectId, provider);
+      
+      res.json({
+        message: "Sync triggered successfully",
+        result: syncResult
+      });
+    } catch (error) {
+      console.error("Error triggering reconciliation sync:", error);
+      res.status(500).json({ error: "Failed to trigger reconciliation sync" });
+    }
+  });
+
+  // Get reconciliation service configuration
+  app.get("/api/dd/reconciliation/config", async (req: any, res) => {
+    try {
+      const config = reconciliationService.getConfig();
+      res.json(config);
+    } catch (error) {
+      console.error("Error fetching reconciliation config:", error);
+      res.status(500).json({ error: "Failed to fetch reconciliation config" });
+    }
+  });
+
+  // Reset sync status for a specific integration (useful for recovery)
+  app.post("/api/dd/reconciliation/reset/:projectId/:provider", async (req: any, res) => {
+    try {
+      const { projectId, provider } = req.params;
+      
+      // Verify project ownership
+      await authorizeProjectAccess(projectId, req.user.orgId);
+      
+      // Verify integration exists
+      const integration = await storage.getProjectIntegrationByProvider(projectId, provider);
+      if (!integration) {
+        return res.status(404).json({ error: "Integration not found" });
+      }
+      
+      console.log(`🔄 Sync status reset for ${projectId}:${provider} by user ${req.user.id}`);
+      
+      reconciliationService.resetSyncStatus(projectId, provider);
+      
+      res.json({ message: "Sync status reset successfully" });
+    } catch (error) {
+      console.error("Error resetting reconciliation sync status:", error);
+      res.status(500).json({ error: "Failed to reset reconciliation sync status" });
+    }
+  });
+
+  // Trigger health check manually
+  app.post("/api/dd/reconciliation/health-check", async (req: any, res) => {
+    try {
+      const healthStatus = await reconciliationService.triggerHealthCheck();
+      res.json({
+        message: "Health check completed",
+        status: healthStatus
+      });
+    } catch (error) {
+      console.error("Error triggering reconciliation health check:", error);
+      res.status(500).json({ error: "Failed to trigger reconciliation health check" });
     }
   });
 
