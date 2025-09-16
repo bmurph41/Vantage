@@ -2,13 +2,16 @@ import {
   organizations, users, projects, projectSettings, tasks, 
   projectTemplates, auditLogs, timelineNotes, projectShares, risks,
   contacts, notificationSubscriptions, notificationsLog, calendarEvents,
+  documentRequirements, projectIntegrations,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type Contact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
+  type DocumentRequirement, type ProjectIntegration,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
-  type InsertContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent
+  type InsertContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
+  type InsertDocumentRequirement, type InsertProjectIntegration
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -147,6 +150,27 @@ export interface IStorage {
     startDate?: Date;
     endDate?: Date;
   }): Promise<string>;
+
+  // Document Requirements CRUD
+  createDocumentRequirement(requirement: InsertDocumentRequirement): Promise<DocumentRequirement>;
+  getDocumentRequirement(id: string): Promise<DocumentRequirement | undefined>;
+  updateDocumentRequirement(id: string, updates: Partial<InsertDocumentRequirement>): Promise<DocumentRequirement>;
+  deleteDocumentRequirement(id: string): Promise<void>;
+  getDocumentRequirementsByTask(taskId: string): Promise<DocumentRequirement[]>;
+  getDocumentRequirementsByProject(projectId: string): Promise<DocumentRequirement[]>;
+  bulkUpsertDocumentRequirements(projectId: string, taskId: string, requirements: Partial<InsertDocumentRequirement>[]): Promise<DocumentRequirement[]>;
+
+  // Project Integrations CRUD
+  createProjectIntegration(integration: InsertProjectIntegration): Promise<ProjectIntegration>;
+  getProjectIntegration(id: string): Promise<ProjectIntegration | undefined>;
+  updateProjectIntegration(id: string, updates: Partial<InsertProjectIntegration>): Promise<ProjectIntegration>;
+  deleteProjectIntegration(id: string): Promise<void>;
+  getProjectIntegrationByProvider(projectId: string, provider: string): Promise<ProjectIntegration | undefined>;
+  updateLastSyncCursor(projectId: string, provider: string, lastSyncCursor: string): Promise<ProjectIntegration>;
+
+  // Query methods
+  getRequirementsByStatus(projectId: string, status: string): Promise<DocumentRequirement[]>;
+  checkTaskCompletionGating(taskId: string): Promise<{ canComplete: boolean; unverifiedRequirements: DocumentRequirement[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1094,6 +1118,251 @@ export class DatabaseStorage implements IStorage {
     const events = await this.getProjectCalendarEvents(projectId, filters);
     
     return this.generateICSFile(events);
+  }
+
+  // Document Requirements CRUD Implementation
+  async createDocumentRequirement(requirement: InsertDocumentRequirement): Promise<DocumentRequirement> {
+    try {
+      const [created] = await db.insert(documentRequirements).values(requirement).returning();
+      return created;
+    } catch (error) {
+      console.error('Failed to create document requirement:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentRequirement(id: string): Promise<DocumentRequirement | undefined> {
+    try {
+      const [requirement] = await db.select().from(documentRequirements).where(eq(documentRequirements.id, id));
+      return requirement || undefined;
+    } catch (error) {
+      console.error('Failed to get document requirement:', error);
+      throw error;
+    }
+  }
+
+  async updateDocumentRequirement(id: string, updates: Partial<InsertDocumentRequirement>): Promise<DocumentRequirement> {
+    try {
+      const updateData = { ...updates, updatedAt: new Date() };
+      const [updated] = await db.update(documentRequirements)
+        .set(updateData)
+        .where(eq(documentRequirements.id, id))
+        .returning();
+      
+      if (!updated) {
+        throw new Error(`Document requirement with id ${id} not found`);
+      }
+      
+      return updated;
+    } catch (error) {
+      console.error('Failed to update document requirement:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocumentRequirement(id: string): Promise<void> {
+    try {
+      await db.delete(documentRequirements).where(eq(documentRequirements.id, id));
+    } catch (error) {
+      console.error('Failed to delete document requirement:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentRequirementsByTask(taskId: string): Promise<DocumentRequirement[]> {
+    try {
+      return await db.select().from(documentRequirements)
+        .where(eq(documentRequirements.taskId, taskId))
+        .orderBy(documentRequirements.createdAt);
+    } catch (error) {
+      console.error('Failed to get document requirements by task:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentRequirementsByProject(projectId: string): Promise<DocumentRequirement[]> {
+    try {
+      return await db.select().from(documentRequirements)
+        .where(eq(documentRequirements.projectId, projectId))
+        .orderBy(documentRequirements.createdAt);
+    } catch (error) {
+      console.error('Failed to get document requirements by project:', error);
+      throw error;
+    }
+  }
+
+  async bulkUpsertDocumentRequirements(
+    projectId: string, 
+    taskId: string, 
+    requirements: Partial<InsertDocumentRequirement>[]
+  ): Promise<DocumentRequirement[]> {
+    try {
+      const results: DocumentRequirement[] = [];
+      
+      for (const requirement of requirements) {
+        // Check if requirement exists by externalDocId and taskId
+        if (requirement.externalDocId) {
+          const existing = await db.select().from(documentRequirements)
+            .where(and(
+              eq(documentRequirements.taskId, taskId),
+              eq(documentRequirements.externalDocId, requirement.externalDocId)
+            ));
+          
+          if (existing.length > 0) {
+            // Update existing requirement
+            const updated = await this.updateDocumentRequirement(existing[0].id, requirement);
+            results.push(updated);
+          } else {
+            // Create new requirement
+            const created = await this.createDocumentRequirement({
+              projectId,
+              taskId,
+              requirementKey: requirement.requirementKey || '',
+              title: requirement.title || '',
+              provider: requirement.provider || '',
+              ...requirement
+            });
+            results.push(created);
+          }
+        } else {
+          // Create new requirement without externalDocId
+          const created = await this.createDocumentRequirement({
+            projectId,
+            taskId,
+            requirementKey: requirement.requirementKey || '',
+            title: requirement.title || '',
+            provider: requirement.provider || '',
+            ...requirement
+          });
+          results.push(created);
+        }
+      }
+      
+      return results;
+    } catch (error) {
+      console.error('Failed to bulk upsert document requirements:', error);
+      throw error;
+    }
+  }
+
+  // Project Integrations CRUD Implementation
+  async createProjectIntegration(integration: InsertProjectIntegration): Promise<ProjectIntegration> {
+    try {
+      const [created] = await db.insert(projectIntegrations).values(integration).returning();
+      return created;
+    } catch (error) {
+      console.error('Failed to create project integration:', error);
+      throw error;
+    }
+  }
+
+  async getProjectIntegration(id: string): Promise<ProjectIntegration | undefined> {
+    try {
+      const [integration] = await db.select().from(projectIntegrations).where(eq(projectIntegrations.id, id));
+      return integration || undefined;
+    } catch (error) {
+      console.error('Failed to get project integration:', error);
+      throw error;
+    }
+  }
+
+  async updateProjectIntegration(id: string, updates: Partial<InsertProjectIntegration>): Promise<ProjectIntegration> {
+    try {
+      const updateData = { ...updates, updatedAt: new Date() };
+      const [updated] = await db.update(projectIntegrations)
+        .set(updateData)
+        .where(eq(projectIntegrations.id, id))
+        .returning();
+      
+      if (!updated) {
+        throw new Error(`Project integration with id ${id} not found`);
+      }
+      
+      return updated;
+    } catch (error) {
+      console.error('Failed to update project integration:', error);
+      throw error;
+    }
+  }
+
+  async deleteProjectIntegration(id: string): Promise<void> {
+    try {
+      await db.delete(projectIntegrations).where(eq(projectIntegrations.id, id));
+    } catch (error) {
+      console.error('Failed to delete project integration:', error);
+      throw error;
+    }
+  }
+
+  async getProjectIntegrationByProvider(projectId: string, provider: string): Promise<ProjectIntegration | undefined> {
+    try {
+      const [integration] = await db.select().from(projectIntegrations)
+        .where(and(
+          eq(projectIntegrations.projectId, projectId),
+          eq(projectIntegrations.provider, provider)
+        ));
+      return integration || undefined;
+    } catch (error) {
+      console.error('Failed to get project integration by provider:', error);
+      throw error;
+    }
+  }
+
+  async updateLastSyncCursor(projectId: string, provider: string, lastSyncCursor: string): Promise<ProjectIntegration> {
+    try {
+      // Get existing integration
+      const existing = await this.getProjectIntegrationByProvider(projectId, provider);
+      if (!existing) {
+        throw new Error(`Project integration not found for project ${projectId} and provider ${provider}`);
+      }
+      
+      // Update config with new lastSyncCursor
+      const updatedConfig = { 
+        ...(existing.config as object), 
+        lastSyncCursor 
+      };
+      
+      return await this.updateProjectIntegration(existing.id, {
+        config: updatedConfig
+      });
+    } catch (error) {
+      console.error('Failed to update last sync cursor:', error);
+      throw error;
+    }
+  }
+
+  // Query Methods Implementation
+  async getRequirementsByStatus(projectId: string, status: string): Promise<DocumentRequirement[]> {
+    try {
+      return await db.select().from(documentRequirements)
+        .where(and(
+          eq(documentRequirements.projectId, projectId),
+          sql`${documentRequirements.status} = ${status}`
+        ))
+        .orderBy(documentRequirements.createdAt);
+    } catch (error) {
+      console.error('Failed to get requirements by status:', error);
+      throw error;
+    }
+  }
+
+  async checkTaskCompletionGating(taskId: string): Promise<{ canComplete: boolean; unverifiedRequirements: DocumentRequirement[] }> {
+    try {
+      // Get all requirements for this task that are not in verified status
+      const unverifiedRequirements = await db.select().from(documentRequirements)
+        .where(and(
+          eq(documentRequirements.taskId, taskId),
+          sql`${documentRequirements.status} != 'verified'`
+        ));
+      
+      return {
+        canComplete: unverifiedRequirements.length === 0,
+        unverifiedRequirements
+      };
+    } catch (error) {
+      console.error('Failed to check task completion gating:', error);
+      throw error;
+    }
   }
 }
 
