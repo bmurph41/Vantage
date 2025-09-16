@@ -24,6 +24,7 @@ export const subscriptionEventEnum = pgEnum("subscription_event", ["task_status"
 export const notificationStatusEnum = pgEnum("notification_status", ["sent", "failed", "pending"]);
 export const recipientTypeEnum = pgEnum("recipient_type", ["user", "contact"]);
 export const calendarEventTypeEnum = pgEnum("calendar_event_type", ["dd_expiration", "closing", "task_deadline", "milestone", "custom"]);
+export const documentRequirementStatusEnum = pgEnum("document_requirement_status", ["requested", "received", "verified", "rejected", "outdated", "external_unavailable"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -366,6 +367,62 @@ export const calendarEvents = pgTable("calendar_events", {
   };
 });
 
+// Document Requirements
+export const documentRequirements = pgTable("document_requirements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  requirementKey: text("requirement_key").notNull(), // Indexed for lookups
+  title: text("title").notNull(),
+  description: text("description"),
+  provider: text("provider").notNull(), // Third-party provider name
+  externalDocId: text("external_doc_id"), // Nullable - external document ID
+  externalVersion: text("external_version"), // Version from external system
+  status: documentRequirementStatusEnum("status").notNull().default("requested"),
+  receivedAt: timestamp("received_at"),
+  verifiedAt: timestamp("verified_at"),
+  metadata: jsonb("metadata").default(sql`'{}'`), // Additional provider-specific data
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    // Unique constraint on (taskId, requirementKey)
+    taskRequirementKey: unique("document_requirements_task_requirement_key").on(
+      table.taskId, table.requirementKey
+    ),
+    // Performance indexes
+    projectIdx: index("document_requirements_project").on(table.projectId),
+    taskIdx: index("document_requirements_task").on(table.taskId),
+    requirementKeyIdx: index("document_requirements_requirement_key").on(table.requirementKey),
+    statusIdx: index("document_requirements_status").on(table.status),
+    providerIdx: index("document_requirements_provider").on(table.provider),
+    // Additional indexes based on architect feedback
+    projectRequirementKeyIdx: index("document_requirements_project_requirement_key").on(table.projectId, table.requirementKey),
+    externalDocIdIdx: index("document_requirements_external_doc_id").on(table.externalDocId),
+  };
+});
+
+// Project Integrations
+export const projectIntegrations = pgTable("project_integrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  provider: text("provider").notNull(), // Integration provider name (e.g., "webhook", "api")
+  config: jsonb("config").notNull().default(sql`'{}'`), // Configuration data (webhookId, secret, baseUrl, lastSyncCursor, etc.)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    // Unique constraint to prevent duplicate integrations per project
+    uniqueProjectProvider: unique("project_integrations_unique_project_provider").on(
+      table.projectId, table.provider
+    ),
+    // Performance indexes
+    projectIdx: index("project_integrations_project").on(table.projectId),
+    providerIdx: index("project_integrations_provider").on(table.provider),
+    projectProviderIdx: index("project_integrations_project_provider").on(table.projectId, table.provider),
+  };
+});
+
 // Relations
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   users: many(users),
@@ -400,6 +457,8 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   notificationSubscriptions: many(notificationSubscriptions),
   notificationsLog: many(notificationsLog),
   calendarEvents: many(calendarEvents),
+  documentRequirements: many(documentRequirements),
+  projectIntegrations: many(projectIntegrations),
 }));
 
 export const projectSettingsRelations = relations(projectSettings, ({ one }) => ({
@@ -409,11 +468,12 @@ export const projectSettingsRelations = relations(projectSettings, ({ one }) => 
   }),
 }));
 
-export const tasksRelations = relations(tasks, ({ one }) => ({
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
   project: one(projects, {
     fields: [tasks.projectId],
     references: [projects.id],
   }),
+  documentRequirements: many(documentRequirements),
 }));
 
 export const projectSharesRelations = relations(projectShares, ({ one }) => ({
@@ -492,6 +552,24 @@ export const calendarEventsRelations = relations(calendarEvents, ({ one }) => ({
   task: one(tasks, {
     fields: [calendarEvents.taskId],
     references: [tasks.id],
+  }),
+}));
+
+export const documentRequirementsRelations = relations(documentRequirements, ({ one }) => ({
+  project: one(projects, {
+    fields: [documentRequirements.projectId],
+    references: [projects.id],
+  }),
+  task: one(tasks, {
+    fields: [documentRequirements.taskId],
+    references: [tasks.id],
+  }),
+}));
+
+export const projectIntegrationsRelations = relations(projectIntegrations, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectIntegrations.projectId],
+    references: [projects.id],
   }),
 }));
 
@@ -576,6 +654,18 @@ export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit
   updatedAt: true,
 });
 
+export const insertDocumentRequirementSchema = createInsertSchema(documentRequirements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProjectIntegrationSchema = createInsertSchema(projectIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type Organization = typeof organizations.$inferSelect;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
@@ -620,3 +710,9 @@ export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
 
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
+
+export type DocumentRequirement = typeof documentRequirements.$inferSelect;
+export type InsertDocumentRequirement = z.infer<typeof insertDocumentRequirementSchema>;
+
+export type ProjectIntegration = typeof projectIntegrations.$inferSelect;
+export type InsertProjectIntegration = z.infer<typeof insertProjectIntegrationSchema>;
