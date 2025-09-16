@@ -9,10 +9,11 @@ import {
   insertProjectTemplateSchema, insertAuditLogSchema,
   insertTimelineNoteSchema, insertProjectShareSchema, insertRiskSchema,
   insertContactSchema, updateContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema,
-  insertCalendarEventSchema
+  insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema
 } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
+import { WebhookSecurity, type WebhookEvent } from "./webhook-security";
 
 // Calendar validation schemas
 const calendarQuerySchema = z.object({
@@ -1748,6 +1749,430 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to delete calendar event" });
     }
   });
+
+  // =============================================================================
+  // DOCUMENT REQUIREMENTS MANAGEMENT
+  // =============================================================================
+
+  // Authorization helper for task access
+  const authorizeTaskAccess = async (taskId: string, orgId: string) => {
+    const task = await storage.getTask(taskId);
+    if (!task) {
+      throw new Error("Task not found");
+    }
+    const project = await storage.getProject(task.projectId);
+    if (!project || project.orgId !== orgId) {
+      throw new Error("Unauthorized access to task");
+    }
+    return { task, project };
+  };
+
+  // GET /api/dd/tasks/:taskId/requirements - List requirements for a task
+  app.get("/api/dd/tasks/:taskId/requirements", async (req: any, res) => {
+    try {
+      const { taskId } = req.params;
+      
+      // SECURITY: Verify task ownership before listing requirements
+      await authorizeTaskAccess(taskId, req.user.orgId);
+      
+      const requirements = await storage.getDocumentRequirementsByTask(taskId);
+      res.json(requirements);
+    } catch (error) {
+      console.error("Error fetching task requirements:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized task access" });
+        }
+      }
+      res.status(500).json({ error: "Failed to fetch document requirements" });
+    }
+  });
+
+  // POST /api/dd/tasks/:taskId/requirements - Create requirement for a task
+  app.post("/api/dd/tasks/:taskId/requirements", async (req: any, res) => {
+    try {
+      const { taskId } = req.params;
+      
+      // SECURITY: Verify task ownership before creating requirements
+      const { task, project } = await authorizeTaskAccess(taskId, req.user.orgId);
+      
+      const requirementData = insertDocumentRequirementSchema.parse({
+        ...req.body,
+        taskId,
+        projectId: task.projectId,
+      });
+      
+      const requirement = await storage.createDocumentRequirement(requirementData);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: task.projectId,
+        userId: req.user.id,
+        entityType: "document_requirement",
+        entityId: requirement.id,
+        action: "created",
+        after: requirement,
+      });
+
+      res.json(requirement);
+    } catch (error) {
+      console.error("Error creating document requirement:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized task access" });
+        }
+      }
+      res.status(400).json({ error: "Invalid document requirement data" });
+    }
+  });
+
+  // PATCH /api/dd/tasks/:taskId/requirements/:id - Update requirement with manual overrides
+  app.patch("/api/dd/tasks/:taskId/requirements/:id", async (req: any, res) => {
+    try {
+      const { taskId, id } = req.params;
+      
+      // SECURITY: Verify task ownership and requirement exists
+      const { task } = await authorizeTaskAccess(taskId, req.user.orgId);
+      
+      const existingRequirement = await storage.getDocumentRequirement(id);
+      if (!existingRequirement || existingRequirement.taskId !== taskId) {
+        return res.status(404).json({ error: "Document requirement not found" });
+      }
+      
+      const updates = insertDocumentRequirementSchema.partial().parse(req.body);
+      
+      const updated = await storage.updateDocumentRequirement(id, updates);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: task.projectId,
+        userId: req.user.id,
+        entityType: "document_requirement",
+        entityId: id,
+        action: "updated",
+        before: existingRequirement,
+        after: updated,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating document requirement:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized access" });
+        }
+      }
+      res.status(400).json({ error: "Invalid document requirement update data" });
+    }
+  });
+
+  // =============================================================================
+  // PROJECT INTEGRATION MANAGEMENT
+  // =============================================================================
+
+  // GET /api/dd/projects/:id/integrations - List project integrations
+  app.get("/api/dd/projects/:id/integrations", async (req: any, res) => {
+    try {
+      const projectId = req.params.id;
+      
+      // SECURITY: Verify project ownership before listing integrations
+      await authorizeProjectAccess(projectId, req.user.orgId);
+      
+      const integrations = await storage.getProjectIntegrationsByProject(projectId);
+      res.json(integrations);
+    } catch (error) {
+      console.error("Error fetching project integrations:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized project access" });
+        }
+      }
+      res.status(500).json({ error: "Failed to fetch project integrations" });
+    }
+  });
+
+  // PATCH /api/dd/projects/:id/integrations/:integrationId - Update integration settings
+  app.patch("/api/dd/projects/:id/integrations/:integrationId", async (req: any, res) => {
+    try {
+      const { id: projectId, integrationId } = req.params;
+      
+      // SECURITY: Verify project ownership before updating integration
+      await authorizeProjectAccess(projectId, req.user.orgId);
+      
+      const existingIntegration = await storage.getProjectIntegration(integrationId);
+      if (!existingIntegration || existingIntegration.projectId !== projectId) {
+        return res.status(404).json({ error: "Project integration not found" });
+      }
+      
+      const updates = insertProjectIntegrationSchema.partial().parse(req.body);
+      
+      const updated = await storage.updateProjectIntegration(integrationId, updates);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId,
+        userId: req.user.id,
+        entityType: "project_integration",
+        entityId: integrationId,
+        action: "updated",
+        before: existingIntegration,
+        after: updated,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating project integration:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized access" });
+        }
+      }
+      res.status(400).json({ error: "Invalid integration update data" });
+    }
+  });
+
+  // POST /api/dd/projects/:id/integrations/docs/register - Register webhook with external app
+  app.post("/api/dd/projects/:id/integrations/docs/register", async (req: any, res) => {
+    try {
+      const projectId = req.params.id;
+      
+      // SECURITY: Verify project ownership before registering integration
+      const project = await authorizeProjectAccess(projectId, req.user.orgId);
+      
+      // Validation schema for integration registration
+      const registrationSchema = z.object({
+        provider: z.string().min(1, "Provider name is required"),
+        webhookUrl: z.string().url("Invalid webhook URL"),
+        apiKey: z.string().min(1, "API key is required"),
+        config: z.record(z.any()).optional().default({}),
+        enabled: z.boolean().default(true),
+      });
+      
+      const registrationData = registrationSchema.parse(req.body);
+      
+      // Check if integration already exists for this provider
+      const existingIntegration = await storage.getProjectIntegrationByProvider(projectId, registrationData.provider);
+      
+      let integration;
+      if (existingIntegration) {
+        // Update existing integration config
+        const updatedConfig = {
+          ...(existingIntegration.config as object),
+          webhookUrl: registrationData.webhookUrl,
+          apiKey: registrationData.apiKey,
+          enabled: registrationData.enabled,
+          ...registrationData.config,
+        };
+        
+        integration = await storage.updateProjectIntegration(existingIntegration.id, {
+          config: updatedConfig,
+        });
+        
+        await storage.createAuditLog({
+          projectId,
+          userId: req.user.id,
+          entityType: "project_integration",
+          entityId: integration.id,
+          action: "updated",
+          before: existingIntegration,
+          after: integration,
+        });
+      } else {
+        // Create new integration
+        const integrationConfig = {
+          webhookUrl: registrationData.webhookUrl,
+          apiKey: registrationData.apiKey,
+          enabled: registrationData.enabled,
+          ...registrationData.config,
+        };
+        
+        const integrationData = insertProjectIntegrationSchema.parse({
+          projectId,
+          provider: registrationData.provider,
+          config: integrationConfig,
+        });
+        
+        integration = await storage.createProjectIntegration(integrationData);
+        
+        await storage.createAuditLog({
+          projectId,
+          userId: req.user.id,
+          entityType: "project_integration",
+          entityId: integration.id,
+          action: "created",
+          after: integration,
+        });
+      }
+
+      res.json({
+        integration,
+        message: existingIntegration ? "Integration updated successfully" : "Integration registered successfully",
+      });
+    } catch (error) {
+      console.error("Error registering integration:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized project access" });
+        }
+      }
+      res.status(400).json({ error: "Invalid integration registration data" });
+    }
+  });
+
+  // =============================================================================
+  // WEBHOOK ENDPOINT FOR DOCUMENT EVENTS
+  // =============================================================================
+
+  // Initialize webhook security (this would typically be configured with environment variables)
+  const webhookSecurity = new WebhookSecurity({
+    secret: process.env.WEBHOOK_SECRET || "default-webhook-secret-key",
+    timestampToleranceMinutes: 5,
+    requireIdempotencyKey: true,
+    redis: {
+      // Redis configuration - would be from environment variables in production
+      host: process.env.REDIS_HOST || "localhost",
+      port: parseInt(process.env.REDIS_PORT || "6379"),
+      password: process.env.REDIS_PASSWORD,
+    }
+  });
+
+  // Raw body parser middleware for webhook verification
+  const rawBodyParser = (req: any, res: any, buf: Buffer) => {
+    req.rawBody = buf.toString('utf8');
+  };
+
+  // POST /api/integrations/docs/webhook - Receive document events from external app
+  app.post("/api/integrations/docs/webhook", (req: any, res, next) => {
+    // Use raw body parser for this specific route
+    if (req.originalUrl === '/api/integrations/docs/webhook') {
+      req._body = true;
+      rawBodyParser(req, res, req.body);
+    }
+    next();
+  }, async (req: any, res) => {
+    try {
+      // Verify webhook security
+      const verification = await webhookSecurity.verifyWebhook(req, req.rawBody || JSON.stringify(req.body));
+      
+      if (!verification.isValid) {
+        return res.status(401).json({ 
+          error: "Webhook verification failed",
+          details: verification.error 
+        });
+      }
+
+      const webhookEvent = verification.parsedPayload as WebhookEvent;
+      
+      // Process different event types
+      switch (webhookEvent.event) {
+        case 'document.created':
+        case 'document.verified':
+        case 'document.rejected':
+        case 'document.tagged':
+        case 'document.deleted':
+          await processDocumentEvent(webhookEvent);
+          break;
+          
+        case 'task.status_changed':
+        case 'task.assigned':
+          await processTaskEvent(webhookEvent);
+          break;
+          
+        case 'project.created':
+          await processProjectEvent(webhookEvent);
+          break;
+          
+        default:
+          console.warn("Unknown webhook event type:", (webhookEvent as any).event);
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Webhook processed successfully",
+        eventType: webhookEvent.event 
+      });
+    } catch (error) {
+      console.error("Error processing webhook:", error);
+      res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // Helper function to process document events
+  async function processDocumentEvent(event: WebhookEvent) {
+    console.log("Processing document event:", event.event, event.data);
+    
+    // Here you would implement the actual document processing logic
+    // For example, updating task status, creating notifications, etc.
+    // This is a placeholder implementation
+    
+    // Type guard for document events
+    if (
+      event.event === 'document.created' ||
+      event.event === 'document.verified' ||
+      event.event === 'document.rejected' ||
+      event.event === 'document.tagged' ||
+      event.event === 'document.deleted'
+    ) {
+      const eventData = event.data as any; // Type assertion needed for union type
+      
+      if (eventData.projectId) {
+        // Create audit log for document events
+        await storage.createAuditLog({
+          projectId: eventData.projectId,
+          userId: "system", // System-generated event
+          entityType: "document",
+          entityId: eventData.documentId || "",
+          action: event.event.split('.')[1], // Extract action from event name
+          after: eventData,
+        });
+      }
+    }
+  }
+
+  // Helper function to process task events
+  async function processTaskEvent(event: WebhookEvent) {
+    console.log("Processing task event:", event.event, event.data);
+    
+    // Type guard for task events
+    if (
+      event.event === 'task.status_changed' ||
+      event.event === 'task.assigned'
+    ) {
+      const eventData = event.data as any; // Type assertion needed for union type
+      
+      if (eventData.projectId) {
+        await storage.createAuditLog({
+          projectId: eventData.projectId,
+          userId: "system",
+          entityType: "task",
+          entityId: eventData.taskId || "",
+          action: event.event.split('.')[1],
+          after: eventData,
+        });
+      }
+    }
+  }
+
+  // Helper function to process project events
+  async function processProjectEvent(event: WebhookEvent) {
+    console.log("Processing project event:", event.event, event.data);
+    
+    // Type guard for project events
+    if (event.event === 'project.created') {
+      const eventData = event.data as any; // Type assertion needed for union type
+      
+      if (eventData.projectId) {
+        await storage.createAuditLog({
+          projectId: eventData.projectId,
+          userId: eventData.createdBy || "system",
+          entityType: "project",
+          entityId: eventData.projectId || "",
+          action: "created",
+          after: eventData,
+        });
+      }
+    }
+  }
 
   const httpServer = createServer(app);
   return httpServer;

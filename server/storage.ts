@@ -163,6 +163,7 @@ export interface IStorage {
   // Project Integrations CRUD
   createProjectIntegration(integration: InsertProjectIntegration): Promise<ProjectIntegration>;
   getProjectIntegration(id: string): Promise<ProjectIntegration | undefined>;
+  getProjectIntegrationsByProject(projectId: string): Promise<ProjectIntegration[]>;
   updateProjectIntegration(id: string, updates: Partial<InsertProjectIntegration>): Promise<ProjectIntegration>;
   deleteProjectIntegration(id: string): Promise<void>;
   getProjectIntegrationByProvider(projectId: string, provider: string): Promise<ProjectIntegration | undefined>;
@@ -1262,6 +1263,17 @@ export class DatabaseStorage implements IStorage {
       return integration || undefined;
     } catch (error) {
       console.error('Failed to get project integration:', error);
+      throw error;
+    }
+  }
+
+  async getProjectIntegrationsByProject(projectId: string): Promise<ProjectIntegration[]> {
+    try {
+      const integrations = await db.select().from(projectIntegrations)
+        .where(eq(projectIntegrations.projectId, projectId));
+      return integrations;
+    } catch (error) {
+      console.error('Failed to get project integrations:', error);
       throw error;
     }
   }
