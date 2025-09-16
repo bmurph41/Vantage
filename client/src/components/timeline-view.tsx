@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
+import { CompactProgressIndicator } from "./compact-progress-indicator";
 import { TimelineNotes } from "./timeline-notes";
 import { DocumentRequirementsManagement } from "./document-requirements-management";
 import { useTaskDocumentCompletionStatus } from "@/hooks/use-document-requirements";
@@ -231,6 +232,7 @@ interface SortableTaskItemProps {
   showCriticalPath: boolean;
   onOpenNotes: (taskId: string) => void;
   getTaskNoteCount: (taskId: string) => number;
+  onTaskClick?: (taskId: string) => void;
 }
 
 function SortableTaskItem({
@@ -242,7 +244,8 @@ function SortableTaskItem({
   isNearingDeadline,
   showCriticalPath,
   onOpenNotes,
-  getTaskNoteCount
+  getTaskNoteCount,
+  onTaskClick
 }: SortableTaskItemProps) {
   const [docRequirementsDialogOpen, setDocRequirementsDialogOpen] = useState(false);
   
@@ -406,11 +409,12 @@ function SortableTaskItem({
           </DialogContent>
         </Dialog>
       </div>
-      <div className="mt-6">
-        <ProgressBar 
+      <div className="mt-3">
+        <CompactProgressIndicator 
           task={task} 
           project={project} 
           settings={settings}
+          onTaskClick={onTaskClick}
           className={`shadow-sm ${
             isCritical ? 'ring-2 ring-red-200' : ''
           }`}
@@ -426,6 +430,7 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
   const [notesDialogTaskId, setNotesDialogTaskId] = useState<string | null>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const taskCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -512,6 +517,23 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
       updateSortOrderMutation.mutate(sortUpdates);
     }
   }, [sortedTasks, updateSortOrderMutation]);
+
+  // Handle task click to scroll to task card
+  const handleTaskClick = useCallback((taskId: string) => {
+    const taskElement = taskCardRefs.current.get(taskId);
+    if (taskElement) {
+      taskElement.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center',
+        inline: 'nearest'
+      });
+      // Add a subtle highlight effect
+      taskElement.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.5)';
+      setTimeout(() => {
+        taskElement.style.boxShadow = '';
+      }, 2000);
+    }
+  }, []);
   
   const taskIds = useMemo(() => sortedTasks.map(t => t.id), [sortedTasks]);
   
@@ -1011,18 +1033,29 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                       })();
                       
                       return (
-                        <SortableTaskItem
+                        <div
                           key={task.id}
-                          task={task}
-                          project={project}
-                          settings={settings}
-                          isCritical={isCritical}
-                          criticalInfo={criticalInfo}
-                          isNearingDeadline={isNearingDeadline}
-                          showCriticalPath={showCriticalPath}
-                          onOpenNotes={setNotesDialogTaskId}
-                          getTaskNoteCount={getTaskNoteCount}
-                        />
+                          ref={(el) => {
+                            if (el) {
+                              taskCardRefs.current.set(task.id, el);
+                            } else {
+                              taskCardRefs.current.delete(task.id);
+                            }
+                          }}
+                        >
+                          <SortableTaskItem
+                            task={task}
+                            project={project}
+                            settings={settings}
+                            isCritical={isCritical}
+                            criticalInfo={criticalInfo}
+                            isNearingDeadline={isNearingDeadline}
+                            showCriticalPath={showCriticalPath}
+                            onOpenNotes={setNotesDialogTaskId}
+                            getTaskNoteCount={getTaskNoteCount}
+                            onTaskClick={handleTaskClick}
+                          />
+                        </div>
                       );
                     })}
                   </div>
