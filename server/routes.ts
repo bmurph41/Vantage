@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
-  insertTimelineNoteSchema, insertProjectShareSchema 
+  insertTimelineNoteSchema, insertProjectShareSchema, insertRiskSchema 
 } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
@@ -653,6 +653,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(logs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  // === RISK MANAGEMENT API ===
+
+  // Get all risks for a project
+  app.get("/api/dd/projects/:id/risks", async (req: any, res) => {
+    try {
+      const risks = await storage.getRisksForProject(req.params.id);
+      res.json(risks);
+    } catch (error) {
+      console.error("Error fetching risks:", error);
+      res.status(500).json({ error: "Failed to fetch risks" });
+    }
+  });
+
+  // Get risk analytics and summary
+  app.get("/api/dd/projects/:id/risks/analytics", async (req: any, res) => {
+    try {
+      const summary = await storage.getProjectRiskSummary(req.params.id);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching risk analytics:", error);
+      res.status(500).json({ error: "Failed to fetch risk analytics" });
+    }
+  });
+
+  // Get top risks by score
+  app.get("/api/dd/projects/:id/risks/top", async (req: any, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 3;
+      const topRisks = await storage.getHighestRisksByScore(req.params.id, limit);
+      res.json(topRisks);
+    } catch (error) {
+      console.error("Error fetching top risks:", error);
+      res.status(500).json({ error: "Failed to fetch top risks" });
+    }
+  });
+
+  // Get risks by category
+  app.get("/api/dd/projects/:id/risks/category/:category", async (req: any, res) => {
+    try {
+      const risks = await storage.getRisksByCategory(req.params.id, req.params.category);
+      res.json(risks);
+    } catch (error) {
+      console.error("Error fetching risks by category:", error);
+      res.status(500).json({ error: "Failed to fetch risks by category" });
+    }
+  });
+
+  // Get risks by status
+  app.get("/api/dd/projects/:id/risks/status/:status", async (req: any, res) => {
+    try {
+      const risks = await storage.getRisksByStatus(req.params.id, req.params.status);
+      res.json(risks);
+    } catch (error) {
+      console.error("Error fetching risks by status:", error);
+      res.status(500).json({ error: "Failed to fetch risks by status" });
+    }
+  });
+
+  // Create a new risk
+  app.post("/api/dd/projects/:id/risks", async (req: any, res) => {
+    try {
+      const riskData = insertRiskSchema.parse({
+        ...req.body,
+        projectId: req.params.id,
+      });
+
+      const risk = await storage.createRisk(riskData);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: req.params.id,
+        userId: req.user.id,
+        entityType: "risk",
+        entityId: risk.id,
+        action: "created",
+        after: risk,
+      });
+
+      res.json(risk);
+    } catch (error) {
+      console.error("Error creating risk:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid risk data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create risk" });
+      }
+    }
+  });
+
+  // Get a specific risk
+  app.get("/api/dd/risks/:id", async (req: any, res) => {
+    try {
+      const risk = await storage.getRisk(req.params.id);
+      if (!risk) {
+        return res.status(404).json({ error: "Risk not found" });
+      }
+      res.json(risk);
+    } catch (error) {
+      console.error("Error fetching risk:", error);
+      res.status(500).json({ error: "Failed to fetch risk" });
+    }
+  });
+
+  // Update a risk
+  app.put("/api/dd/risks/:id", async (req: any, res) => {
+    try {
+      const existingRisk = await storage.getRisk(req.params.id);
+      if (!existingRisk) {
+        return res.status(404).json({ error: "Risk not found" });
+      }
+
+      const updates = insertRiskSchema.partial().parse(req.body);
+      const updatedRisk = await storage.updateRisk(req.params.id, updates);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: existingRisk.projectId,
+        userId: req.user.id,
+        entityType: "risk",
+        entityId: req.params.id,
+        action: "updated",
+        before: existingRisk,
+        after: updatedRisk,
+      });
+
+      res.json(updatedRisk);
+    } catch (error) {
+      console.error("Error updating risk:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid risk data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to update risk" });
+      }
+    }
+  });
+
+  // Delete a risk
+  app.delete("/api/dd/risks/:id", async (req: any, res) => {
+    try {
+      const existingRisk = await storage.getRisk(req.params.id);
+      if (!existingRisk) {
+        return res.status(404).json({ error: "Risk not found" });
+      }
+
+      await storage.deleteRisk(req.params.id);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: existingRisk.projectId,
+        userId: req.user.id,
+        entityType: "risk",
+        entityId: req.params.id,
+        action: "deleted",
+        before: existingRisk,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting risk:", error);
+      res.status(500).json({ error: "Failed to delete risk" });
+    }
+  });
+
+  // Bulk update all risk scores for a project
+  app.post("/api/dd/projects/:id/risks/recalculate", async (req: any, res) => {
+    try {
+      await storage.bulkUpdateRiskScores(req.params.id);
+      
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: req.params.id,
+        userId: req.user.id,
+        entityType: "project",
+        entityId: req.params.id,
+        action: "risk_scores_recalculated",
+      });
+
+      res.json({ success: true, message: "Risk scores recalculated successfully" });
+    } catch (error) {
+      console.error("Error recalculating risk scores:", error);
+      res.status(500).json({ error: "Failed to recalculate risk scores" });
+    }
+  });
+
+  // Risk heatmap data
+  app.get("/api/dd/projects/:id/risks/heatmap", async (req: any, res) => {
+    try {
+      const risks = await storage.getRisksForProject(req.params.id);
+      
+      // Create 5x5 heatmap matrix
+      const heatmapData = Array.from({ length: 5 }, () => Array(5).fill(0));
+      const riskDetails = Array.from({ length: 5 }, () => Array(5).fill().map(() => []));
+      
+      risks.forEach(risk => {
+        const likelihood = parseInt(risk.likelihood) - 1; // Convert to 0-based index
+        const impact = parseInt(risk.impact) - 1;
+        if (likelihood >= 0 && likelihood < 5 && impact >= 0 && impact < 5) {
+          heatmapData[4 - impact][likelihood]++; // Flip impact for display (high at top)
+          riskDetails[4 - impact][likelihood].push({
+            id: risk.id,
+            name: risk.name,
+            score: risk.riskScore,
+            category: risk.category
+          });
+        }
+      });
+
+      res.json({
+        matrix: heatmapData,
+        details: riskDetails,
+        totalRisks: risks.length
+      });
+    } catch (error) {
+      console.error("Error generating heatmap data:", error);
+      res.status(500).json({ error: "Failed to generate heatmap data" });
     }
   });
 

@@ -1,11 +1,11 @@
 import { 
   organizations, users, projects, projectSettings, tasks, 
-  projectTemplates, auditLogs, timelineNotes, projectShares,
+  projectTemplates, auditLogs, timelineNotes, projectShares, risks,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type ProjectTemplate, type AuditLog,
-  type TimelineNote, type ProjectShare, type InsertOrganization, type InsertUser, type InsertProject, 
+  type TimelineNote, type ProjectShare, type Risk, type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask,
-  type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare
+  type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -61,6 +61,26 @@ export interface IStorage {
   // Audit Logs
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogsForProject(projectId: string): Promise<AuditLog[]>;
+
+  // Risk Management
+  getRisk(id: string): Promise<Risk | undefined>;
+  getRisksForProject(projectId: string): Promise<Risk[]>;
+  getHighestRisksByScore(projectId: string, limit?: number): Promise<Risk[]>;
+  getRisksByCategory(projectId: string, category: string): Promise<Risk[]>;
+  getRisksByStatus(projectId: string, status: string): Promise<Risk[]>;
+  createRisk(risk: InsertRisk): Promise<Risk>;
+  updateRisk(id: string, updates: Partial<InsertRisk>): Promise<Risk>;
+  deleteRisk(id: string): Promise<void>;
+  bulkUpdateRiskScores(projectId: string): Promise<void>;
+  
+  // Risk Analytics
+  getProjectRiskSummary(projectId: string): Promise<{
+    totalRisks: number;
+    risksBySeverity: { high: number; medium: number; low: number };
+    totalCostAtRisk: number;
+    totalScheduleAtRisk: number;
+    categoryDistribution: Array<{ category: string; count: number; avgScore: number }>;
+  }>;
 
   // Dependency Validation
   hasCircularDependency(projectId: string, taskId: string, dependencies: string[]): Promise<boolean>;
@@ -258,6 +278,160 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProjectShare(id: string): Promise<void> {
     await db.delete(projectShares).where(eq(projectShares.id, id));
+  }
+
+  // Risk Management Implementation
+  async getRisk(id: string): Promise<Risk | undefined> {
+    const [risk] = await db.select().from(risks).where(eq(risks.id, id));
+    return risk || undefined;
+  }
+
+  async getRisksForProject(projectId: string): Promise<Risk[]> {
+    return db.select().from(risks).where(eq(risks.projectId, projectId)).orderBy(desc(risks.riskScore));
+  }
+
+  async getHighestRisksByScore(projectId: string, limit: number = 3): Promise<Risk[]> {
+    return db.select().from(risks)
+      .where(eq(risks.projectId, projectId))
+      .orderBy(desc(risks.riskScore))
+      .limit(limit);
+  }
+
+  async getRisksByCategory(projectId: string, category: string): Promise<Risk[]> {
+    return db.select().from(risks)
+      .where(and(eq(risks.projectId, projectId), eq(risks.category, category)))
+      .orderBy(desc(risks.riskScore));
+  }
+
+  async getRisksByStatus(projectId: string, status: string): Promise<Risk[]> {
+    return db.select().from(risks)
+      .where(and(eq(risks.projectId, projectId), eq(risks.status, status)))
+      .orderBy(desc(risks.riskScore));
+  }
+
+  async createRisk(risk: InsertRisk): Promise<Risk> {
+    // Auto-calculate risk score before insertion
+    const likelihood = parseInt(risk.likelihood || "3");
+    const impact = parseInt(risk.impact || "3");
+    const riskScore = likelihood * impact;
+    
+    // Calculate residual score if residual values are provided
+    let residualScore = null;
+    if (risk.residualLikelihood && risk.residualImpact) {
+      const residualL = parseInt(risk.residualLikelihood);
+      const residualI = parseInt(risk.residualImpact);
+      residualScore = residualL * residualI;
+    }
+
+    const [created] = await db.insert(risks).values({
+      ...risk,
+      riskScore,
+      residualScore,
+    }).returning();
+    return created;
+  }
+
+  async updateRisk(id: string, updates: Partial<InsertRisk>): Promise<Risk> {
+    // Auto-calculate risk scores if likelihood or impact are being updated
+    const updateData: any = { ...updates, updatedAt: new Date() };
+    
+    if (updates.likelihood || updates.impact) {
+      // Get current risk to calculate new score
+      const currentRisk = await this.getRisk(id);
+      if (currentRisk) {
+        const likelihood = parseInt(updates.likelihood || currentRisk.likelihood);
+        const impact = parseInt(updates.impact || currentRisk.impact);
+        updateData.riskScore = likelihood * impact;
+      }
+    }
+    
+    if (updates.residualLikelihood || updates.residualImpact) {
+      // Get current risk for residual calculation
+      const currentRisk = await this.getRisk(id);
+      if (currentRisk) {
+        const residualL = parseInt(updates.residualLikelihood || currentRisk.residualLikelihood || "0");
+        const residualI = parseInt(updates.residualImpact || currentRisk.residualImpact || "0");
+        updateData.residualScore = residualL * residualI;
+      }
+    }
+
+    const [updated] = await db.update(risks)
+      .set(updateData)
+      .where(eq(risks.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRisk(id: string): Promise<void> {
+    await db.delete(risks).where(eq(risks.id, id));
+  }
+
+  async bulkUpdateRiskScores(projectId: string): Promise<void> {
+    // Recalculate all risk scores for a project
+    const projectRisks = await this.getRisksForProject(projectId);
+    
+    for (const risk of projectRisks) {
+      const likelihood = parseInt(risk.likelihood);
+      const impact = parseInt(risk.impact);
+      const riskScore = likelihood * impact;
+      
+      let residualScore = null;
+      if (risk.residualLikelihood && risk.residualImpact) {
+        const residualL = parseInt(risk.residualLikelihood);
+        const residualI = parseInt(risk.residualImpact);
+        residualScore = residualL * residualI;
+      }
+
+      await db.update(risks)
+        .set({ riskScore, residualScore, updatedAt: new Date() })
+        .where(eq(risks.id, risk.id));
+    }
+  }
+
+  async getProjectRiskSummary(projectId: string): Promise<{
+    totalRisks: number;
+    risksBySeverity: { high: number; medium: number; low: number };
+    totalCostAtRisk: number;
+    totalScheduleAtRisk: number;
+    categoryDistribution: Array<{ category: string; count: number; avgScore: number }>;
+  }> {
+    const projectRisks = await this.getRisksForProject(projectId);
+    
+    // Calculate risk severity distribution
+    const risksBySeverity = {
+      high: projectRisks.filter(r => r.riskScore > 15).length,
+      medium: projectRisks.filter(r => r.riskScore >= 8 && r.riskScore <= 15).length,
+      low: projectRisks.filter(r => r.riskScore < 8).length,
+    };
+    
+    // Calculate financial and schedule impact
+    const totalCostAtRisk = projectRisks.reduce((sum, risk) => sum + (risk.impactCostUSD || 0), 0);
+    const totalScheduleAtRisk = projectRisks.reduce((sum, risk) => sum + (risk.impactScheduleDays || 0), 0);
+    
+    // Calculate category distribution
+    const categoryMap = new Map<string, { count: number; totalScore: number }>();
+    projectRisks.forEach(risk => {
+      const category = risk.category;
+      const existing = categoryMap.get(category) || { count: 0, totalScore: 0 };
+      categoryMap.set(category, {
+        count: existing.count + 1,
+        totalScore: existing.totalScore + risk.riskScore
+      });
+    });
+    
+    const categoryDistribution = Array.from(categoryMap.entries()).map(([category, data]) => ({
+      category,
+      count: data.count,
+      avgScore: Math.round((data.totalScore / data.count) * 100) / 100
+    }));
+
+    return {
+      totalRisks: projectRisks.length,
+      risksBySeverity,
+      totalCostAtRisk,
+      totalScheduleAtRisk,
+      categoryDistribution,
+    };
   }
 
   async hasCircularDependency(projectId: string, taskId: string, dependencies: string[]): Promise<boolean> {

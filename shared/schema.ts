@@ -15,6 +15,10 @@ export const statusEnum = pgEnum("status", ["not_started", "engaged", "scheduled
 export const paymentStatusEnum = pgEnum("payment_status", ["not_paid", "paid", "no_cost"]);
 export const shareAccessEnum = pgEnum("share_access", ["view", "comment"]);
 export const shareTypeEnum = pgEnum("share_type", ["public", "invite", "organization"]);
+export const riskCategoryEnum = pgEnum("risk_category", ["technical", "financial", "legal", "regulatory", "operational", "market", "strategic", "environmental", "reputational", "cybersecurity"]);
+export const riskStatusEnum = pgEnum("risk_status", ["identified", "analyzing", "mitigating", "monitoring", "closed"]);
+export const likelihoodEnum = pgEnum("likelihood", ["1", "2", "3", "4", "5"]);
+export const impactEnum = pgEnum("impact", ["1", "2", "3", "4", "5"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -164,6 +168,61 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Risk Management
+export const risks = pgTable("risks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: riskCategoryEnum("category").notNull().default("operational"),
+  owner: text("owner").notNull(), // Risk owner name
+  ownerId: varchar("owner_id").references(() => users.id), // Optional: link to system user
+  
+  // Quantitative Risk Assessment
+  likelihood: likelihoodEnum("likelihood").notNull().default("3"), // 1-5 scale
+  impact: impactEnum("impact").notNull().default("3"), // 1-5 scale
+  riskScore: integer("risk_score").notNull().default(9), // Auto-calculated: likelihood × impact
+  
+  // Financial Impact Analysis
+  impactCostUSD: integer("impact_cost_usd").default(0), // Financial impact in USD
+  impactScheduleDays: integer("impact_schedule_days").default(0), // Schedule impact in days
+  
+  // Mitigation Planning
+  mitigationPlan: text("mitigation_plan"),
+  mitigationOwner: text("mitigation_owner"),
+  targetDate: date("target_date"), // Mitigation completion target
+  mitigationCostUSD: integer("mitigation_cost_usd").default(0), // Cost to mitigate
+  
+  // Residual Risk (Post-Mitigation)
+  residualLikelihood: likelihoodEnum("residual_likelihood"), // Expected likelihood after mitigation
+  residualImpact: impactEnum("residual_impact"), // Expected impact after mitigation
+  residualScore: integer("residual_score"), // Auto-calculated residual risk score
+  
+  // Status and Tracking
+  status: riskStatusEnum("status").notNull().default("identified"),
+  identifiedDate: date("identified_date").notNull().default(sql`CURRENT_DATE`),
+  lastReviewDate: date("last_review_date"),
+  nextReviewDate: date("next_review_date"),
+  
+  // Materialization Tracking
+  materialized: boolean("materialized").notNull().default(false),
+  materializedDate: date("materialized_date"),
+  actualCostUSD: integer("actual_cost_usd"), // Actual cost if materialized
+  actualScheduleDays: integer("actual_schedule_days"), // Actual schedule impact if materialized
+  
+  // Additional Analysis Fields
+  probability: integer("probability"), // Percentage probability (0-100)
+  confidenceLevel: integer("confidence_level").default(50), // Confidence in assessment (0-100)
+  riskVelocity: text("risk_velocity").default("stable"), // increasing, stable, decreasing
+  
+  // Metadata
+  tags: text("tags").array().default(sql`'{}'`), // For categorization and filtering
+  metadata: jsonb("metadata").default(sql`'{}'`), // For additional custom fields
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Relations
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   users: many(users),
@@ -192,6 +251,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   tasks: many(tasks),
   auditLogs: many(auditLogs),
   shares: many(projectShares),
+  risks: many(risks),
 }));
 
 export const projectSettingsRelations = relations(projectSettings, ({ one }) => ({
@@ -226,6 +286,17 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   }),
   user: one(users, {
     fields: [auditLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+export const risksRelations = relations(risks, ({ one }) => ({
+  project: one(projects, {
+    fields: [risks.projectId],
+    references: [projects.id],
+  }),
+  owner: one(users, {
+    fields: [risks.ownerId],
     references: [users.id],
   }),
 }));
@@ -275,6 +346,12 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   createdAt: true,
 });
 
+export const insertRiskSchema = createInsertSchema(risks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type Organization = typeof organizations.$inferSelect;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
@@ -303,3 +380,6 @@ export type InsertProjectShare = z.infer<typeof insertProjectShareSchema>;
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+export type Risk = typeof risks.$inferSelect;
+export type InsertRisk = z.infer<typeof insertRiskSchema>;
