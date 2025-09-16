@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { deadlineMonitor } from "./deadline-monitor";
 
 const app = express();
 app.use(express.json());
@@ -67,5 +68,13 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Start deadline monitoring service after server is ready
+    try {
+      deadlineMonitor.start();
+      log('🚀 Deadline monitoring service started');
+    } catch (error) {
+      log(`❌ Failed to start deadline monitoring service: ${error}`);
+    }
   });
 })();

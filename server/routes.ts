@@ -364,6 +364,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         after: task,
       });
 
+      // Trigger notifications for task creation (if task is assigned)
+      if (task.assignee && task.status !== 'not_started') {
+        try {
+          const { notificationService } = await import('./notification-service');
+          await notificationService.notifyTaskStatusChange(
+            task.id,
+            'not_started',
+            task.status,
+            req.user.id
+          );
+        } catch (notificationError) {
+          console.error('Failed to send task creation notification:', notificationError);
+          // Don't fail the request if notification fails
+        }
+      }
+
       res.json(task);
     } catch (error) {
       console.error("Task creation error:", error);
@@ -448,6 +464,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         after: updated,
       });
 
+      // Trigger notifications for status changes
+      if (task.status !== updated.status) {
+        try {
+          const { notificationService } = await import('./notification-service');
+          await notificationService.notifyTaskStatusChange(
+            updated.id,
+            task.status,
+            updated.status,
+            req.user.id
+          );
+        } catch (notificationError) {
+          console.error('Failed to send task status notification:', notificationError);
+          // Don't fail the request if notification fails
+        }
+      }
+
       res.json(updated);
     } catch (error) {
       console.error("Task update error:", error);
@@ -517,6 +549,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const note = await storage.createTimelineNote(noteData);
+      
+      // Trigger notifications for note addition
+      try {
+        const { notificationService } = await import('./notification-service');
+        await notificationService.notifyNoteAdded(
+          req.params.taskId,
+          noteData.content,
+          req.user.id
+        );
+      } catch (notificationError) {
+        console.error('Failed to send note added notification:', notificationError);
+        // Don't fail the request if notification fails
+      }
+      
       res.json(note);
     } catch (error) {
       res.status(400).json({ error: "Invalid note data" });
@@ -1232,6 +1278,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error validating notification config:", error);
       res.status(500).json({ error: "Failed to validate notification configuration" });
+    }
+  });
+
+  // Deadline monitoring endpoints
+  app.get("/api/dd/deadlines/upcoming", async (req: any, res) => {
+    try {
+      // Only allow authenticated users to view upcoming deadlines
+      const days = req.query.days ? parseInt(req.query.days as string) : 7;
+      
+      const { deadlineMonitor } = await import('./deadline-monitor');
+      const upcomingDeadlines = await deadlineMonitor.getUpcomingDeadlines(days);
+      
+      res.json(upcomingDeadlines);
+    } catch (error) {
+      console.error("Error fetching upcoming deadlines:", error);
+      res.status(500).json({ error: "Failed to fetch upcoming deadlines" });
+    }
+  });
+
+  app.post("/api/dd/deadlines/check", async (req: any, res) => {
+    try {
+      // Only allow owner users to manually trigger deadline checks
+      if (req.user.role !== "owner") {
+        return res.status(403).json({ error: "Access denied: Owner access required" });
+      }
+
+      const { deadlineMonitor } = await import('./deadline-monitor');
+      await deadlineMonitor.triggerDeadlineCheck();
+      
+      res.json({ success: true, message: "Deadline check triggered successfully" });
+    } catch (error) {
+      console.error("Error triggering deadline check:", error);
+      res.status(500).json({ error: "Failed to trigger deadline check" });
+    }
+  });
+
+  app.get("/api/dd/deadlines/monitor/status", async (req: any, res) => {
+    try {
+      const { deadlineMonitor } = await import('./deadline-monitor');
+      const status = deadlineMonitor.getStatus();
+      
+      res.json(status);
+    } catch (error) {
+      console.error("Error fetching deadline monitor status:", error);
+      res.status(500).json({ error: "Failed to fetch deadline monitor status" });
+    }
+  });
+
+  // Notification system testing endpoint
+  app.post("/api/dd/notifications/run-tests", async (req: any, res) => {
+    try {
+      // Only allow owner users to run comprehensive tests
+      if (req.user.role !== "owner") {
+        return res.status(403).json({ error: "Access denied: Owner access required" });
+      }
+
+      const { notificationTestSuite } = await import('./notification-test');
+      const testResults = await notificationTestSuite.runAllTests();
+      
+      res.json({
+        success: true,
+        summary: {
+          passed: testResults.passed,
+          failed: testResults.failed,
+          successRate: `${((testResults.passed / (testResults.passed + testResults.failed)) * 100).toFixed(1)}%`
+        },
+        results: testResults.results
+      });
+    } catch (error) {
+      console.error("Error running notification tests:", error);
+      res.status(500).json({ error: "Failed to run notification tests" });
+    }
+  });
+
+  app.get("/api/dd/notifications/test-report", async (req: any, res) => {
+    try {
+      const { notificationTestSuite } = await import('./notification-test');
+      const report = await notificationTestSuite.generateTestReport();
+      
+      res.setHeader('Content-Type', 'text/markdown');
+      res.send(report);
+    } catch (error) {
+      console.error("Error generating test report:", error);
+      res.status(500).json({ error: "Failed to generate test report" });
     }
   });
 

@@ -26,6 +26,7 @@ export interface IStorage {
   // Projects
   getProject(id: string): Promise<Project | undefined>;
   getProjectsForOrg(orgId: string): Promise<Project[]>;
+  getAllActiveProjects(): Promise<Project[]>;
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: string, updates: Partial<InsertProject>): Promise<Project>;
 
@@ -181,6 +182,48 @@ export class DatabaseStorage implements IStorage {
 
   async getProjectsForOrg(orgId: string): Promise<Project[]> {
     return db.select().from(projects).where(eq(projects.orgId, orgId));
+  }
+
+  async getAllActiveProjects(): Promise<Project[]> {
+    try {
+      // Get all projects that have tasks with deadlines (indicating active projects)
+      const activeProjects = await db
+        .selectDistinct({
+          id: projects.id,
+          orgId: projects.orgId,
+          name: projects.name,
+          description: projects.description,
+          anchorType: projects.anchorType,
+          psaSignedDate: projects.psaSignedDate,
+          ddExpirationDate: projects.ddExpirationDate,
+          closingDate: projects.closingDate,
+          ddPeriodDays: projects.ddPeriodDays,
+          hasExtensions: projects.hasExtensions,
+          extensionCount: projects.extensionCount,
+          extensionDays: projects.extensionDays,
+          daysToClosing: projects.daysToClosing,
+          seller: projects.seller,
+          ourAttorney: projects.ourAttorney,
+          titleInsuranceCompany: projects.titleInsuranceCompany,
+          lender: projects.lender,
+          tz: projects.tz,
+          createdBy: projects.createdBy,
+          createdAt: projects.createdAt,
+        })
+        .from(projects)
+        .innerJoin(tasks, eq(projects.id, tasks.projectId))
+        .where(
+          and(
+            sql`${tasks.deadline} IS NOT NULL`,
+            sql`${tasks.status} != 'completed'`
+          )
+        );
+
+      return activeProjects;
+    } catch (error) {
+      console.error('Failed to get active projects:', error);
+      return [];
+    }
   }
 
   async createProject(project: InsertProject): Promise<Project> {
@@ -718,20 +761,10 @@ export class DatabaseStorage implements IStorage {
 
   // Test Notification Support
   async sendTestNotification(recipientEmail: string, templateType: string): Promise<boolean> {
-    // This would integrate with SendGrid or other email providers
-    // For now, we'll simulate the process
+    // Use the real NotificationService for SendGrid integration
     try {
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(recipientEmail)) {
-        return false;
-      }
-      
-      // In a real implementation, this would call SendGrid API
-      // For now, we'll log the test notification
-      console.log(`Test notification sent to ${recipientEmail} with template ${templateType}`);
-      
-      return true;
+      const { notificationService } = await import('./notification-service');
+      return await notificationService.sendTestNotification(recipientEmail, templateType);
     } catch (error) {
       console.error("Failed to send test notification:", error);
       return false;
