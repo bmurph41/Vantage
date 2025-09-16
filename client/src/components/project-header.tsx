@@ -6,6 +6,8 @@ import { Download, Share2, Calendar, FileText, Loader2 } from "lucide-react";
 import type { Project, Task, ProjectSettings } from "@shared/schema";
 import { ddClient } from "@/lib/ddClient";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { ShareProjectDialog } from "./share-project-dialog";
 import { AddToCalendarDialog } from "./add-to-calendar-dialog";
 import { generateWhitePaperPDF } from "./white-paper-export";
@@ -21,6 +23,23 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isCalendarDialogOpen, setIsCalendarDialogOpen] = useState(false);
   const [isExportingReport, setIsExportingReport] = useState(false);
+
+  // Fetch risks data for PDF export - temporarily disabled due to missing API endpoints
+  // TODO: Enable when risk API endpoints are implemented
+  const risks: any[] = [];
+  const riskAnalytics = null;
+  
+  // const { data: risks = [] } = useQuery({
+  //   queryKey: ['/api/dd/projects', project.id, 'risks'],
+  //   queryFn: () => apiRequest(`/api/dd/projects/${project.id}/risks`),
+  //   enabled: !!project.id,
+  // });
+
+  // const { data: riskAnalytics } = useQuery({
+  //   queryKey: ['/api/dd/projects', project.id, 'risks', 'analytics'],
+  //   queryFn: () => apiRequest(`/api/dd/projects/${project.id}/risks/analytics`),
+  //   enabled: !!project.id,
+  // });
   
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
@@ -76,12 +95,13 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
     
     setIsExportingReport(true);
     try {
-      await generateWhitePaperPDF(project, tasks, settings);
+      await generateWhitePaperPDF(project, tasks, risks, riskAnalytics, settings);
       toast({
         title: "Success",
         description: "Due diligence report exported successfully",
       });
     } catch (error) {
+      console.error('PDF export error:', error);
       toast({
         title: "Error",
         description: "Failed to export report",

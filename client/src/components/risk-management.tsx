@@ -55,27 +55,21 @@ export function RiskManagement({ projectId }: RiskManagementProps) {
   // Fetch risks
   const { data: risks = [], isLoading } = useQuery({
     queryKey: ['/api/dd/projects', projectId, 'risks'],
-    queryFn: () => apiRequest(`/api/dd/projects/${projectId}/risks`),
   });
 
   // Fetch risk analytics
   const { data: analytics } = useQuery({
     queryKey: ['/api/dd/projects', projectId, 'risks', 'analytics'],
-    queryFn: () => apiRequest(`/api/dd/projects/${projectId}/risks/analytics`),
   });
 
   // Fetch heatmap data
   const { data: heatmapData } = useQuery({
     queryKey: ['/api/dd/projects', projectId, 'risks', 'heatmap'],
-    queryFn: () => apiRequest(`/api/dd/projects/${projectId}/risks/heatmap`),
   });
 
   // Create risk mutation
   const createRiskMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/dd/projects/${projectId}/risks`, {
-      method: 'POST',
-      body: data,
-    }),
+    mutationFn: (data: any) => apiRequest('POST', `/api/dd/projects/${projectId}/risks`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'risks'] });
       setIsAddDialogOpen(false);
@@ -89,10 +83,7 @@ export function RiskManagement({ projectId }: RiskManagementProps) {
   // Update risk mutation
   const updateRiskMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => 
-      apiRequest(`/api/dd/risks/${id}`, {
-        method: 'PUT',
-        body: data,
-      }),
+      apiRequest('PUT', `/api/dd/risks/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'risks'] });
       setEditingRisk(null);
@@ -105,7 +96,7 @@ export function RiskManagement({ projectId }: RiskManagementProps) {
 
   // Delete risk mutation
   const deleteRiskMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/dd/risks/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: string) => apiRequest('DELETE', `/api/dd/risks/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'risks'] });
       toast({ title: "Risk deleted successfully" });

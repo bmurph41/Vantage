@@ -847,17 +847,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create 5x5 heatmap matrix
       const heatmapData = Array.from({ length: 5 }, () => Array(5).fill(0));
-      const riskDetails = Array.from({ length: 5 }, () => Array(5).fill().map(() => []));
+      const riskDetails: any[][][] = Array.from({ length: 5 }, () => Array(5).fill(null).map(() => []));
       
       risks.forEach(risk => {
         const likelihood = parseInt(risk.likelihood) - 1; // Convert to 0-based index
         const impact = parseInt(risk.impact) - 1;
         if (likelihood >= 0 && likelihood < 5 && impact >= 0 && impact < 5) {
           heatmapData[4 - impact][likelihood]++; // Flip impact for display (high at top)
-          riskDetails[4 - impact][likelihood].push({
+          (riskDetails[4 - impact][likelihood] as any[]).push({
             id: risk.id,
             name: risk.name,
-            score: risk.riskScore,
+            score: risk.riskScore || 0,
             category: risk.category
           });
         }
