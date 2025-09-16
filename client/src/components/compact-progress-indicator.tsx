@@ -197,7 +197,7 @@ export function CompactProgressIndicator({
         </TooltipTrigger>
         <TooltipContent 
           side="top" 
-          className="max-w-xs p-3 bg-white border border-gray-200 shadow-lg"
+          className="max-w-xs p-3 bg-white border border-gray-200 shadow-lg z-[100]"
           data-testid={`tooltip-${task.id}`}
         >
           <div className="space-y-2">

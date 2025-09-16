@@ -8,9 +8,10 @@ interface ProgressBarProps {
   project: Project;
   settings?: ProjectSettings | null;
   className?: string;
+  onTaskClick?: (taskId: string) => void;
 }
 
-export function ProgressBar({ task, project, settings, className }: ProgressBarProps) {
+export function ProgressBar({ task, project, settings, className, onTaskClick }: ProgressBarProps) {
   const today = startOfDay(tzNow('America/New_York'));
   
   // Get fixed project timeline bounds (PSA Signed Date to Closing Date)
@@ -132,8 +133,18 @@ export function ProgressBar({ task, project, settings, className }: ProgressBarP
     return "text-black";
   };
 
+  const handleClick = () => {
+    if (onTaskClick) {
+      onTaskClick(task.id);
+    }
+  };
+
   return (
-    <div className={cn("h-8 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg overflow-hidden relative shadow-inner border border-gray-200/50", className)} data-testid="progress-bar">
+    <div 
+      className={cn("h-8 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg overflow-hidden relative shadow-inner border border-gray-200/50 cursor-pointer hover:shadow-md transition-shadow duration-200", className)} 
+      onClick={handleClick}
+      data-testid="progress-bar"
+    >
       {/* Text labels above progress bars - positioned at center of task timeline */}
       <div 
         className="absolute -top-6 z-10"
