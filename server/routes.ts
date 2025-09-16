@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { resolveRecipient } from "@shared/recipient-utils";
+import { assigneeSubscriptionManager } from "./assignee-subscription-manager";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
@@ -364,6 +365,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         after: task,
       });
 
+      // Setup automatic subscriptions for task assignee
+      if (task.assignee) {
+        try {
+          await assigneeSubscriptionManager.setupAssigneeSubscriptions(
+            task.projectId,
+            task.id,
+            task.assignee,
+            req.user.orgId
+          );
+        } catch (subscriptionError) {
+          console.error('Failed to setup assignee subscriptions:', subscriptionError);
+          // Don't fail the request if subscription setup fails
+        }
+      }
+
       // Trigger notifications for task creation (if task is assigned)
       if (task.assignee && task.status !== 'not_started') {
         try {
@@ -453,6 +469,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateTask(req.params.id, updates);
 
+      // Handle assignee changes - update subscriptions
+      if (task.assignee !== updated.assignee) {
+        try {
+          await assigneeSubscriptionManager.handleAssigneeChange(
+            updated.projectId,
+            updated.id,
+            task.assignee,
+            updated.assignee,
+            req.user.orgId
+          );
+        } catch (subscriptionError) {
+          console.error('Failed to handle assignee subscription changes:', subscriptionError);
+          // Don't fail the request if subscription management fails
+        }
+      }
+
       // Create audit log
       await storage.createAuditLog({
         projectId: updated.projectId,
@@ -510,6 +542,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const task = await storage.getTask(req.params.id);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
+      }
+
+      // Cleanup assignee subscriptions before deleting task
+      try {
+        await assigneeSubscriptionManager.cleanupTaskSubscriptions(req.params.id);
+      } catch (cleanupError) {
+        console.error('Failed to cleanup task subscriptions:', cleanupError);
+        // Don't fail the deletion if cleanup fails
       }
 
       await storage.deleteTask(req.params.id);
