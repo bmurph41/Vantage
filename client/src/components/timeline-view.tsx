@@ -25,7 +25,11 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  DragOverlay,
   type DragEndEvent,
+  type DragStartEvent,
+  type DragOverEvent,
+  type Active,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -233,6 +237,8 @@ interface SortableTaskItemProps {
   onOpenNotes: (taskId: string) => void;
   getTaskNoteCount: (taskId: string) => number;
   onTaskClick?: (taskId: string) => void;
+  isDragOver?: boolean;
+  isActive?: boolean;
 }
 
 function SortableTaskItem({
@@ -245,7 +251,9 @@ function SortableTaskItem({
   showCriticalPath,
   onOpenNotes,
   getTaskNoteCount,
-  onTaskClick
+  onTaskClick,
+  isDragOver = false,
+  isActive = false
 }: SortableTaskItemProps) {
   const [docRequirementsDialogOpen, setDocRequirementsDialogOpen] = useState(false);
   
@@ -267,8 +275,10 @@ function SortableTaskItem({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: isDragging ? 'none' : transition,
+    opacity: isDragging ? 0.6 : 1,
+    scale: isDragging ? '1.02' : '1',
+    zIndex: isDragging ? 50 : 'auto',
   };
 
   return (
@@ -276,24 +286,42 @@ function SortableTaskItem({
       ref={setNodeRef}
       style={style}
       className={`rounded-lg p-3 border transition-all duration-200 ${
-        isCritical 
-          ? 'bg-red-50 border-red-200 shadow-md' 
-          : isNearingDeadline
-            ? 'bg-amber-50 border-amber-200 shadow-sm'
-            : 'bg-gray-50 border-gray-200'
+        isDragging
+          ? 'bg-white border-blue-300 shadow-2xl ring-2 ring-blue-200 ring-opacity-50'
+          : isDragOver
+            ? 'bg-blue-50 border-blue-200 shadow-lg scale-105 transform'
+            : isCritical 
+              ? 'bg-red-50 border-red-200 shadow-md' 
+              : isNearingDeadline
+                ? 'bg-amber-50 border-amber-200 shadow-sm'
+                : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:shadow-sm'
       }`}
       data-testid={`sortable-task-${task.id}`}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-2">
-          {/* Drag Handle */}
+          {/* Enhanced Drag Handle */}
           <div
             {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-200/50 transition-colors"
+            className="cursor-grab active:cursor-grabbing p-3 -m-1 rounded-lg hover:bg-blue-100 hover:shadow-md transition-all duration-200 group border-2 border-transparent hover:border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
             data-testid={`drag-handle-${task.id}`}
+            title="Drag to reorder task"
           >
-            <GripVertical className="h-4 w-4 text-gray-400" />
+            <div className="flex flex-col space-y-0.5">
+              <div className="flex space-x-0.5">
+                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+              </div>
+              <div className="flex space-x-0.5">
+                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+              </div>
+              <div className="flex space-x-0.5">
+                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+              </div>
+            </div>
           </div>
           <span className={`w-2 h-2 rounded-full ${
             isCritical ? 'bg-red-500' :
@@ -428,15 +456,21 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [notesDialogTaskId, setNotesDialogTaskId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const taskCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Drag and drop sensors
+  // Enhanced drag and drop sensors with better sensitivity and touch support
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement to start drag
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -498,6 +532,16 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
     });
   }, [timelineTasks]);
 
+  // Handle drag start event
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  }, []);
+
+  // Handle drag over event for visual feedback
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    setDragOverId(event.over?.id as string || null);
+  }, []);
+
   // Handle drag end event
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -516,6 +560,10 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
       
       updateSortOrderMutation.mutate(sortUpdates);
     }
+
+    // Reset drag state
+    setActiveId(null);
+    setDragOverId(null);
   }, [sortedTasks, updateSortOrderMutation]);
 
   // Handle task click to scroll to task card
@@ -581,6 +629,9 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
   const getTaskNoteCount = (taskId: string) => {
     return noteCounts[taskId] || 0;
   };
+
+  // Get the currently dragged task for the overlay
+  const activeTask = activeId ? sortedTasks.find(task => task.id === activeId) : null;
 
   // Generate visible ticks between project bounds based on granularity
   const visibleTicks = useMemo(() => 
@@ -1012,6 +1063,8 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
@@ -1054,12 +1107,62 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
                             onOpenNotes={setNotesDialogTaskId}
                             getTaskNoteCount={getTaskNoteCount}
                             onTaskClick={handleTaskClick}
+                            isDragOver={dragOverId === task.id}
+                            isActive={activeId === task.id}
                           />
                         </div>
                       );
                     })}
                   </div>
                 </SortableContext>
+                
+                {/* Enhanced Drag Overlay */}
+                <DragOverlay
+                  adjustScale={false}
+                  dropAnimation={{
+                    duration: 300,
+                    easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+                  }}
+                >
+                  {activeTask && (
+                    <div className="bg-white border-2 border-blue-300 shadow-2xl rounded-lg p-3 transform rotate-3 ring-4 ring-blue-100 ring-opacity-50 backdrop-blur-sm">
+                      <div className="flex items-center space-x-2">
+                        <div className="flex flex-col space-y-0.5 opacity-50">
+                          <div className="flex space-x-0.5">
+                            <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                            <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                          </div>
+                          <div className="flex space-x-0.5">
+                            <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                            <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                          </div>
+                          <div className="flex space-x-0.5">
+                            <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                            <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                          </div>
+                        </div>
+                        <span className={`w-2 h-2 rounded-full ${
+                          activeTask.status === 'completed' ? 'bg-green-500' :
+                          activeTask.status === 'in_progress' ? 'bg-blue-500' :
+                          activeTask.status === 'scheduled' ? 'bg-blue-600' :
+                          'bg-gray-400'
+                        }`} />
+                        <span className="text-sm font-medium text-gray-900">{activeTask.title}</span>
+                        <Badge variant="outline" className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 border-blue-200">
+                          {activeTask.assignee || 'Unassigned'}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 opacity-60">
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-300"
+                            style={{ width: '75%' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </DragOverlay>
               </DndContext>
             </div>
           )}
