@@ -10,7 +10,7 @@ import { TimelineNotes } from "./timeline-notes";
 import { DocumentRequirementsManagement } from "./document-requirements-management";
 import { useTaskDocumentCompletionStatus } from "@/hooks/use-document-requirements";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
-import { StickyNote, GripVertical, FileText, Shield } from "lucide-react";
+import { StickyNote, GripVertical, FileText, Shield, ChevronUp, ChevronDown } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate, setDeadlineTo5PM } from "@/lib/date-utils";
@@ -18,6 +18,7 @@ import { calculateCriticalPath, isTaskCritical, getNearCriticalTasks, type Criti
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ChevronTaskReorder } from "./chevron-task-reorder";
 import {
   DndContext,
   closestCenter,
@@ -301,29 +302,42 @@ function SortableTaskItem({
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-2">
-          {/* Enhanced Drag Handle */}
-          <div
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing p-3 -m-1 rounded-lg hover:bg-blue-100 hover:shadow-md transition-all duration-200 group border-2 border-transparent hover:border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
-            data-testid={`drag-handle-${task.id}`}
-            title="Drag to reorder task"
-          >
-            <div className="flex flex-col space-y-0.5">
-              <div className="flex space-x-0.5">
-                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
-                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
-              </div>
-              <div className="flex space-x-0.5">
-                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
-                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
-              </div>
-              <div className="flex space-x-0.5">
-                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
-                <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+          {/* Conditional Reorder Controls */}
+          {useChevronControls ? (
+            <ChevronTaskReorder
+              taskId={task.id}
+              taskIndex={sortedTasks.findIndex(t => t.id === task.id)}
+              totalTasks={sortedTasks.length}
+              onMoveUp={handleMoveTaskUp}
+              onMoveDown={handleMoveTaskDown}
+            />
+          ) : (
+            /* Enhanced Drag Handle */
+            <div
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-3 -m-1 rounded-lg hover:bg-blue-100 hover:shadow-md transition-all duration-200 group border-2 border-transparent hover:border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 touch-none select-none"
+              data-testid={`drag-handle-${task.id}`}
+              title="Click and drag to reorder • Hold to grab"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
+              <div className="flex flex-col space-y-0.5">
+                <div className="flex space-x-0.5">
+                  <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+                  <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+                </div>
+                <div className="flex space-x-0.5">
+                  <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+                  <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+                </div>
+                <div className="flex space-x-0.5">
+                  <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+                  <div className="w-1 h-1 bg-gray-400 group-hover:bg-blue-500 rounded-full transition-colors duration-200"></div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
           <span className={`w-2 h-2 rounded-full ${
             isCritical ? 'bg-red-500' :
             task.status === 'completed' ? 'bg-green-500' :
@@ -459,6 +473,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
   const [notesDialogTaskId, setNotesDialogTaskId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [useChevronControls, setUseChevronControls] = useState(false); // Toggle for reordering UI
   const headerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const taskCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -476,6 +491,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
 
   // Mutation for updating task sort orders with optimistic updates
   const updateSortOrderMutation = useMutation({
@@ -593,6 +609,37 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
     });
   }, [timelineTasks]);
+
+  // Chevron-based reordering functions (defined after sortedTasks)
+  const handleMoveTaskUp = useCallback((taskId: string) => {
+    const currentIndex = sortedTasks.findIndex(task => task.id === taskId);
+    if (currentIndex > 0) {
+      const newTasks = [...sortedTasks];
+      [newTasks[currentIndex], newTasks[currentIndex - 1]] = [newTasks[currentIndex - 1], newTasks[currentIndex]];
+      
+      const sortOrderUpdates = newTasks.map((task, index) => ({
+        id: task.id,
+        sortOrder: index
+      }));
+      
+      updateSortOrderMutation.mutate(sortOrderUpdates);
+    }
+  }, [sortedTasks, updateSortOrderMutation]);
+
+  const handleMoveTaskDown = useCallback((taskId: string) => {
+    const currentIndex = sortedTasks.findIndex(task => task.id === taskId);
+    if (currentIndex < sortedTasks.length - 1) {
+      const newTasks = [...sortedTasks];
+      [newTasks[currentIndex], newTasks[currentIndex + 1]] = [newTasks[currentIndex + 1], newTasks[currentIndex]];
+      
+      const sortOrderUpdates = newTasks.map((task, index) => ({
+        id: task.id,
+        sortOrder: index
+      }));
+      
+      updateSortOrderMutation.mutate(sortOrderUpdates);
+    }
+  }, [sortedTasks, updateSortOrderMutation]);
 
   // Handle drag start event
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -757,6 +804,17 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                     {criticalPathResult.criticalPath.length}
                   </Badge>
                 )}
+              </Button>
+              
+              <Button
+                variant={useChevronControls ? "default" : "outline"}
+                size="sm"
+                onClick={() => setUseChevronControls(!useChevronControls)}
+                data-testid="button-reorder-mode"
+                title={useChevronControls ? "Switch to drag & drop" : "Switch to arrow controls"}
+              >
+                {useChevronControls ? <ChevronUp className="h-4 w-4 mr-1" /> : <GripVertical className="h-4 w-4 mr-1" />}
+                {useChevronControls ? "Arrow Controls" : "Drag & Drop"}
               </Button>
             </div>
           </div>
