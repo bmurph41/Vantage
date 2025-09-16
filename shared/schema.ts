@@ -23,6 +23,7 @@ export const notificationChannelEnum = pgEnum("notification_channel", ["email", 
 export const subscriptionEventEnum = pgEnum("subscription_event", ["task_status", "note_added", "deadline_upcoming", "deadline_today", "overdue"]);
 export const notificationStatusEnum = pgEnum("notification_status", ["sent", "failed", "pending"]);
 export const recipientTypeEnum = pgEnum("recipient_type", ["user", "contact"]);
+export const calendarEventTypeEnum = pgEnum("calendar_event_type", ["dd_expiration", "closing", "task_deadline", "milestone", "custom"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -322,6 +323,49 @@ export const notificationsLog = pgTable("notifications_log", {
   };
 });
 
+// Calendar Events
+export const calendarEvents = pgTable("calendar_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  taskId: varchar("task_id").references(() => tasks.id), // Optional: link to specific task
+  
+  // Event details
+  eventType: calendarEventTypeEnum("event_type").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  
+  // Date/time information
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"), // Optional for all-day events
+  isAllDay: boolean("is_all_day").notNull().default(false),
+  timezone: text("timezone").notNull().default("America/New_York"),
+  
+  // Event metadata
+  priority: priorityEnum("priority").notNull().default("med"),
+  status: statusEnum("status").notNull().default("not_started"),
+  location: text("location"),
+  
+  // Calendar integration metadata
+  icalUid: text("ical_uid"), // For ICS generation
+  lastSynced: timestamp("last_synced"),
+  isGenerated: boolean("is_generated").notNull().default(true), // Auto-generated vs manual
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    projectEventTypeIdx: index("calendar_events_project_event_type").on(
+      table.projectId, table.eventType
+    ),
+    startDateIdx: index("calendar_events_start_date").on(
+      table.startDate
+    ),
+    taskEventIdx: index("calendar_events_task").on(
+      table.taskId
+    ),
+  };
+});
+
 // Relations
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   users: many(users),
@@ -355,6 +399,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   risks: many(risks),
   notificationSubscriptions: many(notificationSubscriptions),
   notificationsLog: many(notificationsLog),
+  calendarEvents: many(calendarEvents),
 }));
 
 export const projectSettingsRelations = relations(projectSettings, ({ one }) => ({
@@ -439,6 +484,17 @@ export const notificationsLogRelations = relations(notificationsLog, ({ one }) =
   }),
 }));
 
+export const calendarEventsRelations = relations(calendarEvents, ({ one }) => ({
+  project: one(projects, {
+    fields: [calendarEvents.projectId],
+    references: [projects.id],
+  }),
+  task: one(tasks, {
+    fields: [calendarEvents.taskId],
+    references: [tasks.id],
+  }),
+}));
+
 // Insert Schemas
 export const insertOrganizationSchema = createInsertSchema(organizations).omit({
   id: true,
@@ -514,6 +570,12 @@ export const insertNotificationLogSchema = createInsertSchema(notificationsLog).
   createdAt: true,
 });
 
+export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type Organization = typeof organizations.$inferSelect;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
@@ -555,3 +617,6 @@ export type InsertNotificationSubscription = z.infer<typeof insertNotificationSu
 
 export type NotificationLog = typeof notificationsLog.$inferSelect;
 export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
+
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;

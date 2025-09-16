@@ -1,14 +1,14 @@
 import { 
   organizations, users, projects, projectSettings, tasks, 
   projectTemplates, auditLogs, timelineNotes, projectShares, risks,
-  contacts, notificationSubscriptions, notificationsLog,
+  contacts, notificationSubscriptions, notificationsLog, calendarEvents,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type ProjectTemplate, type AuditLog,
-  type TimelineNote, type ProjectShare, type Risk, type Contact, type NotificationSubscription, type NotificationLog,
+  type TimelineNote, type ProjectShare, type Risk, type Contact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
-  type InsertContact, type InsertNotificationSubscription, type InsertNotificationLog
+  type InsertContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -121,6 +121,31 @@ export interface IStorage {
   // Test Notification Support
   sendTestNotification(recipientEmail: string, templateType: string): Promise<boolean>;
   validateNotificationChannels(channels: string[]): Promise<{ valid: boolean; errors: string[] }>;
+
+  // Calendar Events Management
+  getCalendarEvent(id: string): Promise<CalendarEvent | undefined>;
+  getProjectCalendarEvents(projectId: string, filters?: {
+    eventType?: string;
+    startDate?: Date;
+    endDate?: Date;
+    status?: string;
+    isCompleted?: boolean;
+  }): Promise<CalendarEvent[]>;
+  getEventsByType(projectId: string, eventType: string): Promise<CalendarEvent[]>;
+  getEventsByDateRange(projectId: string, startDate: Date, endDate: Date): Promise<CalendarEvent[]>;
+  createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
+  updateCalendarEvent(id: string, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent>;
+  deleteCalendarEvent(id: string): Promise<void>;
+  syncProjectEvents(projectId: string): Promise<CalendarEvent[]>;
+  validateEventSelection(eventIds: string[]): Promise<{ valid: boolean; invalidIds: string[] }>;
+
+  // ICS Generation
+  generateICSFile(events: CalendarEvent[]): Promise<string>;
+  generateProjectICS(projectId: string, filters?: {
+    eventType?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -740,6 +765,302 @@ export class DatabaseStorage implements IStorage {
       valid: errors.length === 0,
       errors
     };
+  }
+
+  // Calendar Events Management
+  async getCalendarEvent(id: string): Promise<CalendarEvent | undefined> {
+    const [event] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, id));
+    return event || undefined;
+  }
+
+  async getProjectCalendarEvents(projectId: string, filters?: {
+    eventType?: string;
+    startDate?: Date;
+    endDate?: Date;
+    status?: string;
+    isCompleted?: boolean;
+  }): Promise<CalendarEvent[]> {
+    const whereConditions = [eq(calendarEvents.projectId, projectId)];
+    
+    if (filters?.eventType) {
+      whereConditions.push(eq(calendarEvents.eventType, filters.eventType as any));
+    }
+    
+    if (filters?.startDate) {
+      whereConditions.push(sql`${calendarEvents.startDate} >= ${filters.startDate}`);
+    }
+    
+    if (filters?.endDate) {
+      whereConditions.push(sql`${calendarEvents.startDate} <= ${filters.endDate}`);
+    }
+    
+    if (filters?.status) {
+      whereConditions.push(eq(calendarEvents.status, filters.status as any));
+    }
+    
+    // Filter by completion status if specified
+    if (filters?.isCompleted !== undefined) {
+      if (filters.isCompleted) {
+        whereConditions.push(eq(calendarEvents.status, "completed"));
+      } else {
+        whereConditions.push(sql`${calendarEvents.status} != 'completed'`);
+      }
+    }
+    
+    return db.select().from(calendarEvents)
+      .where(and(...whereConditions))
+      .orderBy(calendarEvents.startDate);
+  }
+
+  async getEventsByType(projectId: string, eventType: string): Promise<CalendarEvent[]> {
+    return db.select().from(calendarEvents)
+      .where(and(
+        eq(calendarEvents.projectId, projectId),
+        eq(calendarEvents.eventType, eventType as any)
+      ))
+      .orderBy(calendarEvents.startDate);
+  }
+
+  async getEventsByDateRange(projectId: string, startDate: Date, endDate: Date): Promise<CalendarEvent[]> {
+    return db.select().from(calendarEvents)
+      .where(and(
+        eq(calendarEvents.projectId, projectId),
+        sql`${calendarEvents.startDate} >= ${startDate}`,
+        sql`${calendarEvents.startDate} <= ${endDate}`
+      ))
+      .orderBy(calendarEvents.startDate);
+  }
+
+  async createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent> {
+    const eventData = {
+      ...event,
+      icalUid: event.icalUid || `${Date.now()}-${Math.random().toString(36).substring(2)}@dd.local`,
+    };
+    
+    const [created] = await db.insert(calendarEvents).values(eventData).returning();
+    return created;
+  }
+
+  async updateCalendarEvent(id: string, updates: Partial<InsertCalendarEvent>): Promise<CalendarEvent> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(calendarEvents)
+      .set(updateData)
+      .where(eq(calendarEvents.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCalendarEvent(id: string): Promise<void> {
+    await db.delete(calendarEvents).where(eq(calendarEvents.id, id));
+  }
+
+  async syncProjectEvents(projectId: string): Promise<CalendarEvent[]> {
+    // Get all tasks for the project to generate calendar events
+    const tasks = await this.getTasksForProject(projectId);
+    const project = await this.getProject(projectId);
+    
+    if (!project) {
+      return [];
+    }
+
+    const events: InsertCalendarEvent[] = [];
+    
+    // Generate events from tasks with deadlines
+    for (const task of tasks) {
+      if (task.deadline) {
+        const existingEvent = await db.select().from(calendarEvents)
+          .where(and(
+            eq(calendarEvents.projectId, projectId),
+            eq(calendarEvents.taskId, task.id),
+            eq(calendarEvents.eventType, "task_deadline")
+          ))
+          .limit(1);
+
+        if (existingEvent.length === 0) {
+          events.push({
+            projectId,
+            taskId: task.id,
+            eventType: "task_deadline",
+            title: `${task.title} - Due`,
+            description: task.description || '',
+            startDate: new Date(`${task.deadline}T09:00:00`),
+            isAllDay: true,
+            timezone: project.tz,
+            priority: task.priority,
+            status: task.status,
+          });
+        }
+      }
+    }
+    
+    // Generate DD expiration event
+    if (project.ddExpirationDate) {
+      const existingDdEvent = await db.select().from(calendarEvents)
+        .where(and(
+          eq(calendarEvents.projectId, projectId),
+          eq(calendarEvents.eventType, "dd_expiration")
+        ))
+        .limit(1);
+
+      if (existingDdEvent.length === 0) {
+        events.push({
+          projectId,
+          eventType: "dd_expiration",
+          title: `${project.name} - DD Expiration`,
+          description: `Due diligence period expires for ${project.name}`,
+          startDate: new Date(`${project.ddExpirationDate}T23:59:00`),
+          isAllDay: true,
+          timezone: project.tz,
+          priority: "high",
+          status: "not_started",
+        });
+      }
+    }
+    
+    // Generate closing event
+    if (project.closingDate) {
+      const existingClosingEvent = await db.select().from(calendarEvents)
+        .where(and(
+          eq(calendarEvents.projectId, projectId),
+          eq(calendarEvents.eventType, "closing")
+        ))
+        .limit(1);
+
+      if (existingClosingEvent.length === 0) {
+        events.push({
+          projectId,
+          eventType: "closing",
+          title: `${project.name} - Closing`,
+          description: `Project closing date for ${project.name}`,
+          startDate: new Date(`${project.closingDate}T10:00:00`),
+          endDate: new Date(`${project.closingDate}T17:00:00`),
+          isAllDay: false,
+          timezone: project.tz,
+          priority: "high",
+          status: "not_started",
+        });
+      }
+    }
+    
+    // Insert all new events
+    const createdEvents: CalendarEvent[] = [];
+    for (const eventData of events) {
+      const created = await this.createCalendarEvent(eventData);
+      createdEvents.push(created);
+    }
+    
+    return createdEvents;
+  }
+
+  async validateEventSelection(eventIds: string[]): Promise<{ valid: boolean; invalidIds: string[] }> {
+    if (eventIds.length === 0) {
+      return { valid: true, invalidIds: [] };
+    }
+    
+    const existingEvents = await db.select({ id: calendarEvents.id })
+      .from(calendarEvents)
+      .where(inArray(calendarEvents.id, eventIds));
+    
+    const existingIds = existingEvents.map(e => e.id);
+    const invalidIds = eventIds.filter(id => !existingIds.includes(id));
+    
+    return {
+      valid: invalidIds.length === 0,
+      invalidIds
+    };
+  }
+
+  // ICS Generation
+  async generateICSFile(events: CalendarEvent[]): Promise<string> {
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '');
+    
+    let icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Due Diligence App//Calendar Export//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH'
+    ];
+    
+    // Add timezone definition for America/New_York (most common)
+    icsContent.push(
+      'BEGIN:VTIMEZONE',
+      'TZID:America/New_York',
+      'BEGIN:DAYLIGHT',
+      'TZOFFSETFROM:-0500',
+      'TZOFFSETTO:-0400',
+      'TZNAME:EDT',
+      'DTSTART:20070311T020000',
+      'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU',
+      'END:DAYLIGHT',
+      'BEGIN:STANDARD',
+      'TZOFFSETFROM:-0400',
+      'TZOFFSETTO:-0500',
+      'TZNAME:EST',
+      'DTSTART:20071104T020000',
+      'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU',
+      'END:STANDARD',
+      'END:VTIMEZONE'
+    );
+    
+    // Add each event as a VEVENT
+    for (const event of events) {
+      const startDate = new Date(event.startDate);
+      const endDate = event.endDate ? new Date(event.endDate) : new Date(startDate.getTime() + 24 * 60 * 60 * 1000);
+      
+      // Format dates for ICS
+      const formatICSDate = (date: Date, isAllDay: boolean = false, timezone?: string) => {
+        if (isAllDay) {
+          return date.toISOString().substr(0, 10).replace(/-/g, '');
+        } else {
+          const isoString = date.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '');
+          return timezone ? `TZID=${timezone}:${isoString.substr(0, -1)}` : isoString;
+        }
+      };
+      
+      const dtStart = event.isAllDay ? 
+        formatICSDate(startDate, true) : 
+        formatICSDate(startDate, false, event.timezone);
+        
+      const dtEnd = event.isAllDay ?
+        formatICSDate(endDate, true) :
+        formatICSDate(endDate, false, event.timezone);
+      
+      const eventLines: string[] = [
+        'BEGIN:VEVENT',
+        `UID:${event.icalUid || event.id}`,
+        `DTSTAMP:${timestamp}`,
+        event.isAllDay ? `DTSTART;VALUE=DATE:${dtStart}` : `DTSTART;${dtStart}`,
+        event.isAllDay ? `DTEND;VALUE=DATE:${dtEnd}` : `DTEND;${dtEnd}`,
+        `SUMMARY:${event.title.replace(/[,;]/g, '\\$&')}`,
+        `DESCRIPTION:${(event.description || '').replace(/[,;]/g, '\\$&').replace(/\n/g, '\\n')}`,
+        `STATUS:${event.status === 'completed' ? 'CONFIRMED' : 'TENTATIVE'}`,
+        `PRIORITY:${event.priority === 'high' ? '1' : event.priority === 'med' ? '5' : '9'}`,
+        event.location ? `LOCATION:${event.location.replace(/[,;]/g, '\\$&')}` : '',
+        'END:VEVENT'
+      ].filter((line: string) => line !== ''); // Remove empty lines
+      
+      icsContent.push(...eventLines);
+    }
+    
+    icsContent.push('END:VCALENDAR');
+    
+    return icsContent.join('\r\n');
+  }
+
+  async generateProjectICS(projectId: string, filters?: {
+    eventType?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<string> {
+    // First sync project events to ensure we have the latest data
+    await this.syncProjectEvents(projectId);
+    
+    // Get filtered events
+    const events = await this.getProjectCalendarEvents(projectId, filters);
+    
+    return this.generateICSFile(events);
   }
 }
 

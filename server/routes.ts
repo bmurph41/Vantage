@@ -7,12 +7,60 @@ import {
   insertProjectSchema, insertProjectSettingsSchema, insertTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
   insertTimelineNoteSchema, insertProjectShareSchema, insertRiskSchema,
-  insertContactSchema, updateContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema
+  insertContactSchema, updateContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema,
+  insertCalendarEventSchema
 } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
 
+// Calendar validation schemas
+const calendarQuerySchema = z.object({
+  eventType: z.string().optional(),
+  startDate: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), {
+    message: "Invalid date format"
+  }),
+  endDate: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), {
+    message: "Invalid date format"
+  }),
+  status: z.string().optional(),
+  isCompleted: z.string().optional().refine((val) => !val || ['true', 'false'].includes(val), {
+    message: "isCompleted must be 'true' or 'false'"
+  })
+});
+
+const generateIcsSchema = z.object({
+  eventIds: z.array(z.string()).optional(),
+  projectId: z.string().optional(),
+  filters: calendarQuerySchema.optional()
+}).refine(data => data.eventIds || data.projectId, {
+  message: "Either eventIds or projectId is required"
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Authorization helper function to verify project ownership
+  const authorizeProjectAccess = async (projectId: string, orgId: string) => {
+    const project = await storage.getProject(projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+    if (project.orgId !== orgId) {
+      throw new Error("Unauthorized access to project");
+    }
+    return project;
+  };
+
+  // Authorization helper for calendar events
+  const authorizeCalendarEventAccess = async (eventId: string, orgId: string) => {
+    const event = await storage.getCalendarEvent(eventId);
+    if (!event) {
+      throw new Error("Calendar event not found");
+    }
+    const project = await storage.getProject(event.projectId);
+    if (!project || project.orgId !== orgId) {
+      throw new Error("Unauthorized access to calendar event");
+    }
+    return event;
+  };
   // Middleware for authentication (simplified for demo)
   const authenticateUser = (req: any, res: any, next: any) => {
     // In production, this would validate JWT tokens or session
@@ -1184,6 +1232,315 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error validating notification config:", error);
       res.status(500).json({ error: "Failed to validate notification configuration" });
+    }
+  });
+
+  // Calendar Events API
+  app.get("/api/dd/projects/:projectId/calendar-events", async (req: any, res) => {
+    try {
+      const { projectId } = req.params;
+      
+      // SECURITY: Verify project ownership before accessing calendar events
+      await authorizeProjectAccess(projectId, req.user.orgId);
+      
+      // SECURITY: Validate query parameters with Zod schema
+      const queryValidation = calendarQuerySchema.safeParse(req.query);
+      if (!queryValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid query parameters", 
+          details: queryValidation.error.errors 
+        });
+      }
+      
+      const { eventType, startDate, endDate, status, isCompleted } = queryValidation.data;
+
+      // Build filters object with properly validated data
+      const filters: any = {};
+      if (eventType) filters.eventType = eventType;
+      if (startDate) filters.startDate = new Date(startDate);
+      if (endDate) filters.endDate = new Date(endDate);
+      if (status) filters.status = status;
+      if (isCompleted !== undefined) filters.isCompleted = isCompleted === 'true';
+
+      const events = await storage.getProjectCalendarEvents(projectId, filters);
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching calendar events:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized project access" });
+        }
+      }
+      res.status(500).json({ error: "Failed to fetch calendar events" });
+    }
+  });
+
+  app.post("/api/dd/projects/:projectId/calendar-events/sync", async (req: any, res) => {
+    try {
+      const { projectId } = req.params;
+      
+      // SECURITY: Verify project ownership before syncing calendar events
+      await authorizeProjectAccess(projectId, req.user.orgId);
+      
+      const syncedEvents = await storage.syncProjectEvents(projectId);
+      
+      // Create audit log for sync
+      await storage.createAuditLog({
+        projectId,
+        userId: req.user.id,
+        entityType: "calendar_event",
+        entityId: projectId,
+        action: "synced",
+        after: { syncedEventsCount: syncedEvents.length },
+      });
+
+      res.json({ 
+        success: true, 
+        syncedEvents: syncedEvents.length,
+        events: syncedEvents 
+      });
+    } catch (error) {
+      console.error("Error syncing calendar events:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized project access" });
+        }
+      }
+      res.status(500).json({ error: "Failed to sync calendar events" });
+    }
+  });
+
+  app.post("/api/dd/calendar/generate-ics", async (req: any, res) => {
+    try {
+      // SECURITY: Validate request body with Zod schema
+      const bodyValidation = generateIcsSchema.safeParse(req.body);
+      if (!bodyValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data", 
+          details: bodyValidation.error.errors 
+        });
+      }
+      
+      const { eventIds, projectId, filters } = bodyValidation.data;
+
+      let icsContent: string;
+
+      if (eventIds && eventIds.length > 0) {
+        // SECURITY: Verify each event belongs to user's organization
+        for (const eventId of eventIds) {
+          await authorizeCalendarEventAccess(eventId, req.user.orgId);
+        }
+
+        // Validate event selection
+        const validation = await storage.validateEventSelection(eventIds);
+        if (!validation.valid) {
+          return res.status(400).json({ 
+            error: "Invalid event selection", 
+            invalidIds: validation.invalidIds 
+          });
+        }
+
+        // Get specific events by IDs
+        const events = await Promise.all(
+          eventIds.map((id: string) => storage.getCalendarEvent(id))
+        );
+        const validEvents = events.filter(e => e !== undefined);
+        
+        icsContent = await storage.generateICSFile(validEvents);
+      } else if (projectId) {
+        // SECURITY: Verify project ownership before generating ICS
+        await authorizeProjectAccess(projectId, req.user.orgId);
+        
+        // Convert string dates to Date objects in filters
+        const processedFilters: any = {};
+        if (filters) {
+          if (filters.eventType) processedFilters.eventType = filters.eventType;
+          if (filters.status) processedFilters.status = filters.status;
+          if (filters.isCompleted) processedFilters.isCompleted = filters.isCompleted;
+          if (filters.startDate) processedFilters.startDate = new Date(filters.startDate);
+          if (filters.endDate) processedFilters.endDate = new Date(filters.endDate);
+        }
+        
+        // Generate ICS for entire project with optional filters
+        icsContent = await storage.generateProjectICS(projectId, processedFilters);
+      } else {
+        return res.status(400).json({ error: "Either eventIds or projectId is required" });
+      }
+
+      // Set headers for ICS file download
+      res.setHeader('Content-Type', 'text/calendar');
+      res.setHeader('Content-Disposition', 'attachment; filename="calendar-events.ics"');
+      res.send(icsContent);
+    } catch (error) {
+      console.error("Error generating ICS file:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized access to calendar data" });
+        }
+      }
+      res.status(500).json({ error: "Failed to generate ICS file" });
+    }
+  });
+
+  app.get("/api/dd/projects/:projectId/calendar-events/download", async (req: any, res) => {
+    try {
+      const { projectId } = req.params;
+      
+      // SECURITY: Verify project ownership before downloading calendar
+      const project = await authorizeProjectAccess(projectId, req.user.orgId);
+      
+      // SECURITY: Validate query parameters with Zod schema
+      const queryValidation = calendarQuerySchema.safeParse(req.query);
+      if (!queryValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid query parameters", 
+          details: queryValidation.error.errors 
+        });
+      }
+      
+      const { eventType, startDate, endDate } = queryValidation.data;
+
+      // Build filters for ICS generation
+      const filters: any = {};
+      if (eventType) filters.eventType = eventType;
+      if (startDate) filters.startDate = new Date(startDate);
+      if (endDate) filters.endDate = new Date(endDate);
+
+      const icsContent = await storage.generateProjectICS(projectId, filters);
+      
+      // Create secure filename
+      const filename = `${project?.name || 'project'}-calendar.ics`.replace(/[^a-zA-Z0-9\-_\.]/g, '_');
+
+      res.setHeader('Content-Type', 'text/calendar');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(icsContent);
+    } catch (error) {
+      console.error("Error downloading project calendar:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized project access" });
+        }
+      }
+      res.status(500).json({ error: "Failed to download project calendar" });
+    }
+  });
+
+  app.get("/api/dd/calendar/event-types", async (req: any, res) => {
+    try {
+      const eventTypes = [
+        { value: "dd_expiration", label: "DD Expiration", description: "Due diligence deadline events" },
+        { value: "closing", label: "Closing", description: "Project closing/completion deadlines" },
+        { value: "task_deadline", label: "Task Deadlines", description: "Individual task due dates" },
+        { value: "milestone", label: "Milestones", description: "Project milestone markers" },
+        { value: "custom", label: "Custom Events", description: "User-defined calendar events" }
+      ];
+      
+      res.json(eventTypes);
+    } catch (error) {
+      console.error("Error fetching event types:", error);
+      res.status(500).json({ error: "Failed to fetch event types" });
+    }
+  });
+
+  app.post("/api/dd/projects/:projectId/calendar-events", async (req: any, res) => {
+    try {
+      const { projectId } = req.params;
+      
+      // SECURITY: Verify project ownership before creating calendar events
+      await authorizeProjectAccess(projectId, req.user.orgId);
+      
+      const eventData = insertCalendarEventSchema.parse({
+        ...req.body,
+        projectId,
+      });
+      
+      const event = await storage.createCalendarEvent(eventData);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId,
+        userId: req.user.id,
+        entityType: "calendar_event",
+        entityId: event.id,
+        action: "created",
+        after: event,
+      });
+
+      res.json(event);
+    } catch (error) {
+      console.error("Error creating calendar event:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized project access" });
+        }
+      }
+      res.status(400).json({ error: "Invalid calendar event data" });
+    }
+  });
+
+  app.patch("/api/dd/calendar-events/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      // SECURITY: Verify calendar event ownership before updating
+      const event = await authorizeCalendarEventAccess(id, req.user.orgId);
+      
+      const updates = insertCalendarEventSchema.partial().parse(req.body);
+      
+      const updated = await storage.updateCalendarEvent(id, updates);
+
+      // Create audit log
+      if (updated.projectId) {
+        await storage.createAuditLog({
+          projectId: updated.projectId,
+          userId: req.user.id,
+          entityType: "calendar_event",
+          entityId: id,
+          action: "updated",
+          after: updated,
+        });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating calendar event:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized calendar event access" });
+        }
+      }
+      res.status(400).json({ error: "Invalid calendar event update data" });
+    }
+  });
+
+  app.delete("/api/dd/calendar-events/:id", async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      // SECURITY: Verify calendar event ownership before deletion
+      const event = await authorizeCalendarEventAccess(id, req.user.orgId);
+
+      await storage.deleteCalendarEvent(id);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: event.projectId,
+        userId: req.user.id,
+        entityType: "calendar_event",
+        entityId: id,
+        action: "deleted",
+        before: event,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting calendar event:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
+          return res.status(403).json({ error: "Access denied: Unauthorized calendar event access" });
+        }
+      }
+      res.status(500).json({ error: "Failed to delete calendar event" });
     }
   });
 
