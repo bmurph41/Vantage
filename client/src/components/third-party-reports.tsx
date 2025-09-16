@@ -18,6 +18,7 @@ import { TimelineNotes } from "@/components/timeline-notes";
 import { ExportReportModal } from "@/components/export-report-modal";
 import { CompanyDetailsModal } from "@/components/company-details-modal";
 import { differenceInDays, parseISO, format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, isToday, isPast, isFuture } from "date-fns";
+import { tzNow } from "@/lib/date-utils";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 
@@ -94,7 +95,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   };
 
   const calculateDeadlineDate = (task: Task): Date => {
-    const today = new Date();
+    const today = tzNow('America/New_York');
     let deadlineDate: Date;
     
     // First priority: Use direct deadline field if set
@@ -125,7 +126,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const calculateDaysRemaining = (task: Task): number | string => {
     if (task.status === 'completed') return 0;
     
-    const today = new Date();
+    const today = tzNow('America/New_York');
     const deadlineDate = calculateDeadlineDate(task);
     
     // Calculate days remaining
@@ -139,7 +140,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const calculateTaskProgress = (task: Task): number => {
     if (task.status === 'completed') return 100;
     
-    const today = new Date();
+    const today = tzNow('America/New_York');
     
     // Get task's specific start date
     const taskStartDate = task.startDate 

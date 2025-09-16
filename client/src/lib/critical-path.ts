@@ -1,6 +1,6 @@
 import { parseISO, addDays, differenceInDays, startOfDay } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
-import { effectiveStart, effectiveDue, daysBetween, addBusinessDays } from "./date-utils";
+import { effectiveStart, effectiveDue, daysBetween, addBusinessDays, tzNow } from "./date-utils";
 
 export interface CriticalPathNode {
   taskId: string;
@@ -41,12 +41,13 @@ export function calculateCriticalPath(
   const validTasks = tasks.filter(task => task.showOnTimeline);
 
   if (validTasks.length === 0) {
+    const now = tzNow('America/New_York');
     return {
       nodes: new Map(),
       criticalPath: [],
       projectDuration: 0,
-      projectStart: new Date(),
-      projectEnd: new Date()
+      projectStart: now,
+      projectEnd: now
     };
   }
 

@@ -102,8 +102,8 @@ export function anchorDate(project: any): Date {
     return parseISO(project.psaSignedDate);
   }
   
-  // For custom anchor, use PSA date or current date as fallback
-  return project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date();
+  // For custom anchor, use PSA date or timezone-aware current date as fallback
+  return project.psaSignedDate ? parseISO(project.psaSignedDate) : tzNow('America/New_York');
 }
 
 export function effectiveStart(task: any, project: any): Date {
@@ -306,7 +306,7 @@ export function getTimelineTicks(granularity: string, opts?: {
  * Get fixed project timeline bounds from PSA Signed Date to Closing Date
  */
 export function getProjectBounds(project: any): { start: Date; end: Date } {
-  const start = startOfDay(project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date());
+  const start = startOfDay(project.psaSignedDate ? parseISO(project.psaSignedDate) : tzNow('America/New_York'));
   const end = startOfDay(project.closingDate ? parseISO(project.closingDate) : addDays(start, 90));
   return { start, end };
 }

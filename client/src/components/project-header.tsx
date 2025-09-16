@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isAfter, addDays } from "date-fns";
+import { tzNow } from "@/lib/date-utils";
 import { Download, Share2, Calendar, FileText, Loader2 } from "lucide-react";
 import type { Project, Task, ProjectSettings } from "@shared/schema";
 import { ddClient } from "@/lib/ddClient";
@@ -46,8 +47,20 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
   const inProgressTasks = tasks.filter(t => t.status === 'engaged' || t.status === 'scheduled' || t.status === 'in_progress').length;
   const notStartedTasks = tasks.filter(t => t.status === 'not_started').length;
   const overdueTasks = tasks.filter(t => {
-    // This would need proper overdue calculation in a real implementation
-    return t.status !== 'completed' && new Date() > new Date(); // Simplified
+    if (t.status === 'completed') return false;
+    
+    const today = tzNow('America/New_York');
+    
+    // Calculate task deadline
+    if (t.deadline) {
+      return isAfter(today, parseISO(t.deadline));
+    } else if (t.deadlineType === 'days_after_psa' && t.deadlineDays && project.psaSignedDate) {
+      const psaDate = parseISO(project.psaSignedDate);
+      const deadline = addDays(psaDate, t.deadlineDays);
+      return isAfter(today, deadline);
+    }
+    
+    return false; // Not overdue if no deadline can be determined
   }).length;
 
   // Calculate total cost from all tasks

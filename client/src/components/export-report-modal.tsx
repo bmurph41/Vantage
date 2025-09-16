@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Download, Mail, Eye, FileText, Calendar } from "lucide-react";
 import type { Task, Project } from "@shared/schema";
 import { format, parseISO, addDays, differenceInDays, isValid } from "date-fns";
+import { tzNow } from "@/lib/date-utils";
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, pdf } from '@react-pdf/renderer';
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -68,7 +69,7 @@ const PDFReport = ({ filteredTasks, visibleColumns, project, formatCellValueForE
     <Page size="A4" style={styles.page} orientation="landscape">
       <Text style={styles.header}>Due Diligence Report</Text>
       <Text style={styles.text}>Project: {project?.name || 'N/A'}</Text>
-      <Text style={styles.text}>Generated: {format(new Date(), 'MMM d, yyyy h:mm a')}</Text>
+      <Text style={styles.text}>Generated: {format(tzNow('America/New_York'), 'MMM d, yyyy h:mm a')}</Text>
       <Text style={styles.text}>Total Tasks: {filteredTasks.length}</Text>
       
       <View style={[styles.table, { marginTop: 20 }]}>

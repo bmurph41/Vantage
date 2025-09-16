@@ -12,6 +12,7 @@ import { Link, useLocation } from "wouter";
 import { useProjects, useCreateProject } from "@/hooks/use-project";
 import { useCreateTask } from "@/hooks/use-tasks";
 import { format, differenceInDays, isPast, isToday, parseISO } from "date-fns";
+import { tzNow } from "@/lib/date-utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -215,10 +216,10 @@ export default function Dashboard() {
   const { data: projects = [], isLoading } = useProjects();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  // Calculate days remaining from today to a target date
+  // Calculate days remaining from today to a target date (timezone-aware)
   const calculateDaysRemaining = (targetDate: string): number => {
-    const today = new Date();
-    const target = new Date(targetDate);
+    const today = tzNow('America/New_York');
+    const target = parseISO(targetDate);
     return differenceInDays(target, today);
   };
 
@@ -300,8 +301,8 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {projects.map((project) => {
-              // Calculate project status based on dates
-              const today = new Date();
+              // Calculate project status based on dates (timezone-aware)
+              const today = tzNow('America/New_York');
               const ddExpired = project.ddExpirationDate && isPast(parseISO(project.ddExpirationDate));
               const ddExpiringSoon = project.ddExpirationDate && !ddExpired && differenceInDays(parseISO(project.ddExpirationDate), today) <= 7;
               const closingSoon = project.closingDate && differenceInDays(parseISO(project.closingDate), today) <= 14;

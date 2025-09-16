@@ -27,6 +27,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { format, parseISO, isAfter, isBefore, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { tzNow } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -166,9 +167,9 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
       filtered = filtered.filter(event => event.status === filterStatus);
     }
 
-    // Apply date filter
+    // Apply date filter (timezone-aware)
     if (filterDate !== 'all') {
-      const now = new Date();
+      const now = tzNow('America/New_York');
       filtered = filtered.filter(event => {
         const eventDate = new Date(event.startDate);
         switch (filterDate) {
