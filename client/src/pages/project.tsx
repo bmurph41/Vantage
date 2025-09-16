@@ -53,11 +53,25 @@ export default function ProjectPage() {
   const { project, settings, tasks } = data;
 
   const handleTaskClick = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      setEditingTask(task);
-      setIsTaskModalOpen(true);
-    }
+    // Ensure we're on the Tasks & Timeline tab
+    setActiveTab('reports');
+    
+    // Use requestAnimationFrame to ensure the tab switch has been rendered
+    requestAnimationFrame(() => {
+      const taskElement = document.querySelector(`[data-testid="sortable-task-${taskId}"]`) as HTMLElement | null;
+      if (taskElement) {
+        // Scroll to the task summary card
+        taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Add highlight effect
+        taskElement.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'transition-all', 'duration-300');
+        
+        // Remove highlight effect after 1200ms
+        setTimeout(() => {
+          taskElement.classList.remove('ring-2', 'ring-primary', 'ring-offset-2', 'transition-all', 'duration-300');
+        }, 1200);
+      }
+    });
   };
 
   const tabs = [
