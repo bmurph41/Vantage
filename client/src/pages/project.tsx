@@ -8,6 +8,7 @@ import { ProjectSetup } from "@/components/project-setup";
 import { TemplatesView } from "@/components/templates-view";
 import { TimelineView } from "@/components/timeline-view";
 import { TaskOwnersView } from "@/components/task-owners-view";
+import { ProjectIntegrationSettings } from "@/components/project-integration-settings";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import { useProject } from "@/hooks/use-project";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,7 @@ export default function ProjectPage() {
     { id: "setup", label: "Deal Details" },
     { id: "owners", label: "Task Owners" },
     { id: "templates", label: "Templates" },
+    { id: "integrations", label: "Integrations" },
     { id: "notifications", label: "Notifications" },
   ];
 
@@ -122,6 +124,9 @@ export default function ProjectPage() {
           )}
           {activeTab === "templates" && (
             <TemplatesView projectId={project.id} />
+          )}
+          {activeTab === "integrations" && (
+            <ProjectIntegrationSettings projectId={project.id} />
           )}
           {activeTab === "notifications" && (
             <NotificationSettingsPage projectId={project.id} />

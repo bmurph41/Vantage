@@ -2143,6 +2143,203 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/dd/integrations/:id/test-webhook - Test webhook connectivity
+  app.post("/api/dd/integrations/:id/test-webhook", async (req: any, res) => {
+    try {
+      const integrationId = req.params.id;
+      
+      const integration = await storage.getProjectIntegration(integrationId);
+      if (!integration) {
+        return res.status(404).json({ error: "Integration not found" });
+      }
+      
+      // SECURITY: Verify project ownership before testing webhook
+      await authorizeProjectAccess(integration.projectId, req.user.orgId);
+      
+      const config = integration.config as any;
+      if (!config.webhookUrl) {
+        return res.status(400).json({ error: "Webhook URL not configured" });
+      }
+      
+      // Send test webhook to verify connectivity
+      const testPayload = {
+        event: "test.connection",
+        timestamp: new Date().toISOString(),
+        projectId: integration.projectId,
+        integrationId: integration.id,
+        data: {
+          message: "Test webhook from MarinaMatch Due Diligence Tracker",
+          testId: crypto.randomBytes(16).toString('hex'),
+        }
+      };
+      
+      try {
+        const response = await fetch(config.webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': config.apiKey ? `Bearer ${config.apiKey}` : undefined,
+            'X-Webhook-Test': 'true',
+          },
+          body: JSON.stringify(testPayload),
+          signal: AbortSignal.timeout(10000), // 10 second timeout
+        });
+        
+        const isSuccessful = response.ok;
+        const responseData = await response.text();
+        
+        // Update integration config with test results
+        const updatedConfig = {
+          ...config,
+          lastTestAt: new Date().toISOString(),
+          lastTestStatus: isSuccessful ? 'success' : 'failed',
+          lastTestResponse: {
+            status: response.status,
+            statusText: response.statusText,
+            data: responseData.slice(0, 500), // Limit response data
+          }
+        };
+        
+        await storage.updateProjectIntegration(integrationId, {
+          config: updatedConfig,
+        });
+        
+        // Create audit log
+        await storage.createAuditLog({
+          projectId: integration.projectId,
+          userId: req.user.id,
+          entityType: "project_integration",
+          entityId: integrationId,
+          action: "webhook_tested",
+          after: { testResult: isSuccessful ? 'success' : 'failed', status: response.status },
+        });
+        
+        res.json({
+          success: isSuccessful,
+          status: response.status,
+          statusText: response.statusText,
+          message: isSuccessful ? "Webhook test successful" : "Webhook test failed",
+          response: responseData.slice(0, 200), // Limit response in API
+        });
+        
+      } catch (fetchError: any) {
+        // Update config with error
+        const updatedConfig = {
+          ...config,
+          lastTestAt: new Date().toISOString(),
+          lastTestStatus: 'error',
+          lastTestError: fetchError.message,
+        };
+        
+        await storage.updateProjectIntegration(integrationId, {
+          config: updatedConfig,
+        });
+        
+        await storage.createAuditLog({
+          projectId: integration.projectId,
+          userId: req.user.id,
+          entityType: "project_integration",
+          entityId: integrationId,
+          action: "webhook_test_failed",
+          after: { error: fetchError.message },
+        });
+        
+        res.status(503).json({
+          success: false,
+          message: "Webhook connectivity test failed",
+          error: fetchError.message,
+        });
+      }
+      
+    } catch (error) {
+      console.error("Error testing webhook:", error);
+      res.status(500).json({ error: "Failed to test webhook connectivity" });
+    }
+  });
+
+  // GET /api/dd/integrations/:id/status - Get integration status and health
+  app.get("/api/dd/integrations/:id/status", async (req: any, res) => {
+    try {
+      const integrationId = req.params.id;
+      
+      const integration = await storage.getProjectIntegration(integrationId);
+      if (!integration) {
+        return res.status(404).json({ error: "Integration not found" });
+      }
+      
+      // SECURITY: Verify project ownership before getting status
+      await authorizeProjectAccess(integration.projectId, req.user.orgId);
+      
+      const config = integration.config as any;
+      
+      // Calculate health status based on various factors
+      const now = new Date();
+      const lastTestAt = config.lastTestAt ? new Date(config.lastTestAt) : null;
+      const timeSinceLastTest = lastTestAt ? now.getTime() - lastTestAt.getTime() : null;
+      const daysSinceLastTest = timeSinceLastTest ? Math.floor(timeSinceLastTest / (1000 * 60 * 60 * 24)) : null;
+      
+      let healthStatus = 'unknown';
+      let healthMessage = 'No test performed yet';
+      
+      if (config.lastTestStatus === 'success' && daysSinceLastTest !== null) {
+        if (daysSinceLastTest <= 1) {
+          healthStatus = 'healthy';
+          healthMessage = 'Recent test successful';
+        } else if (daysSinceLastTest <= 7) {
+          healthStatus = 'warning';
+          healthMessage = 'Test successful but getting old';
+        } else {
+          healthStatus = 'stale';
+          healthMessage = 'Test result is stale';
+        }
+      } else if (config.lastTestStatus === 'failed' || config.lastTestStatus === 'error') {
+        healthStatus = 'unhealthy';
+        healthMessage = config.lastTestError || 'Last test failed';
+      }
+      
+      // Get sync status from reconciliation service if available
+      let syncStatus = null;
+      try {
+        const syncHistory = reconciliationService.getSyncHistory(integration.projectId, integration.provider);
+        if (syncHistory) {
+          syncStatus = {
+            lastSyncAt: syncHistory.lastSyncAt,
+            lastSyncStatus: syncHistory.lastSyncStatus,
+            consecutiveFailures: syncHistory.consecutiveFailures,
+            nextSyncAt: syncHistory.nextSyncAt,
+          };
+        }
+      } catch (syncError) {
+        // Sync status not available
+      }
+      
+      res.json({
+        integrationId: integration.id,
+        provider: integration.provider,
+        enabled: config.enabled !== false,
+        connectionHealth: {
+          status: healthStatus,
+          message: healthMessage,
+          lastTestAt: config.lastTestAt,
+          lastTestStatus: config.lastTestStatus,
+          daysSinceLastTest,
+        },
+        webhookConfig: {
+          url: config.webhookUrl,
+          hasApiKey: !!config.apiKey,
+          lastTestResponse: config.lastTestResponse,
+        },
+        syncStatus,
+        createdAt: integration.createdAt,
+        updatedAt: integration.updatedAt,
+      });
+      
+    } catch (error) {
+      console.error("Error getting integration status:", error);
+      res.status(500).json({ error: "Failed to get integration status" });
+    }
+  });
+
   // =============================================================================
   // WEBHOOK ENDPOINT FOR DOCUMENT EVENTS
   // =============================================================================
