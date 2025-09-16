@@ -58,7 +58,7 @@ export default function ProjectPage() {
     
     // Use requestAnimationFrame to ensure the tab switch has been rendered
     requestAnimationFrame(() => {
-      const taskElement = document.querySelector(`[data-testid="sortable-task-${taskId}"]`) as HTMLElement | null;
+      const taskElement = document.querySelector(`[data-testid="task-summary-card-${taskId}"]`) as HTMLElement | null;
       if (taskElement) {
         // Scroll to the task summary card
         taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });

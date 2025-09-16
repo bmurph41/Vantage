@@ -592,7 +592,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     })();
                     
                     return (
-                    <div key={task.id} className={`border border-l-4 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow ${
+                    <div 
+                      key={task.id}
+                      data-testid={`task-summary-card-${task.id}`}
+                      className={`border border-l-4 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow ${
                       isNearingDeadline 
                         ? 'bg-amber-50 border-amber-200 shadow-md' 
                         : 'bg-white'
@@ -935,7 +938,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     </h3>
                   </div>
                   {completedTasks.map((task) => (
-                <div key={task.id} className={`bg-white border ${getTaskBorderColor(task)} border-l-4 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow`}>
+                <div 
+                  key={task.id}
+                  data-testid={`task-summary-card-${task.id}`}
+                  className={`bg-white border ${getTaskBorderColor(task)} border-l-4 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow`}>
                   {/* Header Section */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
