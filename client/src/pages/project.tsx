@@ -9,14 +9,18 @@ import { TemplatesView } from "@/components/templates-view";
 import { TimelineView } from "@/components/timeline-view";
 import { TaskOwnersView } from "@/components/task-owners-view";
 import { ProjectIntegrationSettings } from "@/components/project-integration-settings";
+import { AddTaskModal } from "@/components/add-task-modal";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import { useProject } from "@/hooks/use-project";
 import { cn } from "@/lib/utils";
+import type { Task } from "@shared/schema";
 
 export default function ProjectPage() {
   const { id } = useParams();
   const [location] = useLocation();
   const [activeTab, setActiveTab] = useState("reports");
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   
   const { data, isLoading, error } = useProject(id!);
 
@@ -47,6 +51,14 @@ export default function ProjectPage() {
   }
 
   const { project, settings, tasks } = data;
+
+  const handleTaskClick = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      setEditingTask(task);
+      setIsTaskModalOpen(true);
+    }
+  };
 
   const tabs = [
     { id: "reports", label: "Tasks & Timeline" },
@@ -111,7 +123,7 @@ export default function ProjectPage() {
             <>
               {/* Timeline - Professional View (Only on Tasks & Timeline tab) */}
               <div className="mb-8">
-                <TimelineView tasks={tasks} project={project} settings={settings} />
+                <TimelineView tasks={tasks} project={project} settings={settings} onTaskClick={handleTaskClick} />
               </div>
               <ThirdPartyReports tasks={tasks} projectId={project.id} project={project} settings={settings} />
             </>
@@ -133,6 +145,17 @@ export default function ProjectPage() {
           )}
         </div>
       </div>
+
+      {/* Task Edit Modal */}
+      <AddTaskModal
+        isOpen={isTaskModalOpen}
+        onClose={() => {
+          setIsTaskModalOpen(false);
+          setEditingTask(null);
+        }}
+        projectId={project.id}
+        editingTask={editingTask}
+      />
     </div>
   );
 }

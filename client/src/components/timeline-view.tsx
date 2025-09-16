@@ -46,6 +46,7 @@ interface TimelineViewProps {
   tasks: Task[];
   project: Project;
   settings?: ProjectSettings | null;
+  onTaskClick?: (taskId: string) => void;
 }
 
 // Smart leader lines component
@@ -452,7 +453,7 @@ function SortableTaskItem({
   );
 }
 
-export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
+export function TimelineView({ tasks, project, settings, onTaskClick }: TimelineViewProps) {
   const [granularity, setGranularity] = useState('weekly');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [notesDialogTaskId, setNotesDialogTaskId] = useState<string | null>(null);
@@ -627,22 +628,27 @@ export function TimelineView({ tasks, project, settings }: TimelineViewProps) {
     setDragOverId(null);
   }, [sortedTasks, updateSortOrderMutation]);
 
-  // Handle task click to scroll to task card
+  // Handle task click to open edit modal or scroll to task card
   const handleTaskClick = useCallback((taskId: string) => {
-    const taskElement = taskCardRefs.current.get(taskId);
-    if (taskElement) {
-      taskElement.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center',
-        inline: 'nearest'
-      });
-      // Add a subtle highlight effect
-      taskElement.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.5)';
-      setTimeout(() => {
-        taskElement.style.boxShadow = '';
-      }, 2000);
+    if (onTaskClick) {
+      onTaskClick(taskId);
+    } else {
+      // Fallback to scroll behavior if no onTaskClick handler provided
+      const taskElement = taskCardRefs.current.get(taskId);
+      if (taskElement) {
+        taskElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+        // Add a subtle highlight effect
+        taskElement.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.5)';
+        setTimeout(() => {
+          taskElement.style.boxShadow = '';
+        }, 2000);
+      }
     }
-  }, []);
+  }, [onTaskClick]);
   
   const taskIds = useMemo(() => sortedTasks.map(t => t.id), [sortedTasks]);
   
