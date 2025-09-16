@@ -32,6 +32,7 @@ export interface IStorage {
   getAllActiveProjects(): Promise<Project[]>;
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: string, updates: Partial<InsertProject>): Promise<Project>;
+  deleteProject(id: string): Promise<void>;
 
   // Project Settings
   getProjectSettings(projectId: string): Promise<ProjectSettings | undefined>;
@@ -268,6 +269,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(projects.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    // Delete related data first (cascade delete)
+    await db.delete(auditLogs).where(eq(auditLogs.projectId, id));
+    await db.delete(timelineNotes).where(eq(timelineNotes.projectId, id));
+    await db.delete(projectShares).where(eq(projectShares.projectId, id));
+    await db.delete(risks).where(eq(risks.projectId, id));
+    await db.delete(calendarEvents).where(eq(calendarEvents.projectId, id));
+    await db.delete(documentRequirements).where(eq(documentRequirements.projectId, id));
+    await db.delete(projectIntegrations).where(eq(projectIntegrations.projectId, id));
+    
+    // Delete tasks for this project
+    await db.delete(tasks).where(eq(tasks.projectId, id));
+    
+    // Delete project settings
+    await db.delete(projectSettings).where(eq(projectSettings.projectId, id));
+    
+    // Finally delete the project itself
+    await db.delete(projects).where(eq(projects.id, id));
   }
 
   async getProjectSettings(projectId: string): Promise<ProjectSettings | undefined> {

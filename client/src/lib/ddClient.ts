@@ -24,6 +24,10 @@ export const ddClient = {
     return response.json();
   },
 
+  async deleteProject(id: string): Promise<void> {
+    await apiRequest('DELETE', `/api/dd/projects/${id}`);
+  },
+
   // Project Settings
   async updateProjectSettings(projectId: string, settings: Partial<ProjectSettings>): Promise<ProjectSettings> {
     const response = await apiRequest('PATCH', `/api/dd/projects/${projectId}/settings`, settings);

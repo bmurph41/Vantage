@@ -89,3 +89,26 @@ export function useUpdateProjectSettings() {
     },
   });
 }
+
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (projectId: string) => ddClient.deleteProject(projectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects'] });
+      toast({
+        title: "Success",
+        description: "Project deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete project",
+        variant: "destructive",
+      });
+    },
+  });
+}

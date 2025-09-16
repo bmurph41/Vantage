@@ -180,6 +180,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project Settings
+  app.delete("/api/dd/projects/:id", async (req: any, res) => {
+    try {
+      const project = await authorizeProjectAccess(req.params.id, req.user.orgId);
+      
+      // Create audit log before deletion
+      await storage.createAuditLog({
+        projectId: project.id,
+        userId: req.user.id,
+        entityType: "project",
+        entityId: project.id,
+        action: "deleted",
+        before: project,
+      });
+
+      // Delete the project (this should cascade delete related tasks, settings, etc.)
+      await storage.deleteProject(req.params.id);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      res.status(500).json({ error: "Failed to delete project" });
+    }
+  });
+
   app.patch("/api/dd/projects/:id/settings", async (req: any, res) => {
     try {
       const updates = insertProjectSettingsSchema.partial().parse(req.body);

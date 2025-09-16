@@ -7,10 +7,20 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building } from "lucide-react";
+import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building, X } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { useProjects, useCreateProject } from "@/hooks/use-project";
+import { useProjects, useCreateProject, useDeleteProject } from "@/hooks/use-project";
 import { useCreateTask } from "@/hooks/use-tasks";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format, differenceInDays, isPast, isToday, parseISO } from "date-fns";
 import { tzNow } from "@/lib/date-utils";
 import { useForm } from "react-hook-form";
@@ -215,6 +225,8 @@ function CreateProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 export default function Dashboard() {
   const { data: projects = [], isLoading } = useProjects();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
+  const deleteProject = useDeleteProject();
 
   // Calculate days remaining from today to a target date (timezone-aware)
   const calculateDaysRemaining = (targetDate: string): number => {
@@ -340,12 +352,26 @@ export default function Dashboard() {
                             </p>
                           )}
                         </div>
-                        {statusBadge && (
-                          <Badge variant={statusBadge.variant} className="flex items-center gap-1 text-xs font-medium text-gray-600 border-gray-300">
-                            <statusBadge.icon className="h-3 w-3" />
-                            {statusBadge.text}
-                          </Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {statusBadge && (
+                            <Badge variant={statusBadge.variant} className="flex items-center gap-1 text-xs font-medium text-gray-600 border-gray-300">
+                              <statusBadge.icon className="h-3 w-3" />
+                              {statusBadge.text}
+                            </Badge>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDeleteProjectId(project.id);
+                            }}
+                            className="p-1 rounded-sm text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
+                            data-testid={`button-delete-project-${project.id}`}
+                            title="Delete project"
+                          >
+                            <X className="h-4 w-4 stroke-1" />
+                          </button>
+                        </div>
                       </div>
                     </CardHeader>
                     
@@ -433,6 +459,33 @@ export default function Dashboard() {
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen} 
       />
+
+      <AlertDialog open={!!deleteProjectId} onOpenChange={() => setDeleteProjectId(null)}>
+        <AlertDialogContent data-testid="dialog-delete-project-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this project? This action cannot be undone and will permanently delete all associated tasks, files, and data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-project">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (deleteProjectId) {
+                  await deleteProject.mutateAsync(deleteProjectId);
+                  setDeleteProjectId(null);
+                }
+              }}
+              disabled={deleteProject.isPending}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-confirm-delete-project"
+            >
+              {deleteProject.isPending ? "Deleting..." : "Yes, Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
