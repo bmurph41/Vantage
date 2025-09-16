@@ -172,7 +172,7 @@ export const projectShares = pgTable("project_shares", {
 // Audit Logs
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar("project_id").notNull().references(() => projects.id),
+  projectId: varchar("project_id").references(() => projects.id), // Nullable for org-level audit logs
   userId: varchar("user_id").notNull().references(() => users.id),
   entityType: text("entity_type").notNull(),
   entityId: varchar("entity_id").notNull(),
@@ -386,10 +386,12 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   project: one(projects, {
     fields: [auditLogs.projectId],
     references: [projects.id],
+    relationName: "auditProject"
   }),
   user: one(users, {
     fields: [auditLogs.userId],
     references: [users.id],
+    relationName: "auditUser"
   }),
 }));
 
@@ -493,6 +495,14 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
   createdAt: true,
 });
 
+// Security: Restricted schema for contact updates - excludes tenant isolation fields
+export const updateContactSchema = createInsertSchema(contacts).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+});
+
 export const insertNotificationSubscriptionSchema = createInsertSchema(notificationSubscriptions).omit({
   id: true,
   createdAt: true,
@@ -538,6 +548,7 @@ export type InsertRisk = z.infer<typeof insertRiskSchema>;
 
 export type Contact = typeof contacts.$inferSelect;
 export type InsertContact = z.infer<typeof insertContactSchema>;
+export type UpdateContact = z.infer<typeof updateContactSchema>;
 
 export type NotificationSubscription = typeof notificationSubscriptions.$inferSelect;
 export type InsertNotificationSubscription = z.infer<typeof insertNotificationSubscriptionSchema>;

@@ -1,14 +1,17 @@
 import { 
   organizations, users, projects, projectSettings, tasks, 
   projectTemplates, auditLogs, timelineNotes, projectShares, risks,
+  contacts, notificationSubscriptions, notificationsLog,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type ProjectTemplate, type AuditLog,
-  type TimelineNote, type ProjectShare, type Risk, type InsertOrganization, type InsertUser, type InsertProject, 
+  type TimelineNote, type ProjectShare, type Risk, type Contact, type NotificationSubscription, type NotificationLog,
+  type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask,
-  type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk
+  type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
+  type InsertContact, type InsertNotificationSubscription, type InsertNotificationLog
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Organizations
@@ -84,6 +87,40 @@ export interface IStorage {
 
   // Dependency Validation
   hasCircularDependency(projectId: string, taskId: string, dependencies: string[]): Promise<boolean>;
+
+  // Contact Management
+  createContact(contact: InsertContact): Promise<Contact>;
+  getContactsByOrg(orgId: string): Promise<Contact[]>;
+  getContactById(id: string): Promise<Contact | undefined>;
+  updateContact(id: string, updates: Partial<InsertContact>): Promise<Contact>;
+  deleteContact(id: string): Promise<void>;
+
+  // Notification Subscription Management
+  createSubscription(subscription: InsertNotificationSubscription): Promise<NotificationSubscription>;
+  getSubscriptionsByProject(projectId: string): Promise<NotificationSubscription[]>;
+  getSubscriptionsByTask(taskId: string): Promise<NotificationSubscription[]>;
+  getSubscriptionsByRecipient(recipientType: "user" | "contact", recipientId: string): Promise<NotificationSubscription[]>;
+  updateSubscription(id: string, updates: Partial<InsertNotificationSubscription>): Promise<NotificationSubscription>;
+  deleteSubscription(id: string): Promise<void>;
+
+  // Notification Logging & De-duplication
+  createNotificationLog(notification: InsertNotificationLog): Promise<NotificationLog>;
+  checkNotificationExists(
+    projectId: string, 
+    taskId: string | null, 
+    event: string, 
+    channel: string,
+    recipientType: "user" | "contact", 
+    recipientId: string, 
+    leadOffsetDays: number
+  ): Promise<boolean>;
+  getNotificationHistory(projectId: string, taskId?: string): Promise<NotificationLog[]>;
+  getScheduledNotifications(beforeDate: Date): Promise<NotificationLog[]>;
+  markNotificationSent(notificationId: string, sentAt: Date, providerMessageId?: string): Promise<NotificationLog>;
+
+  // Test Notification Support
+  sendTestNotification(recipientEmail: string, templateType: string): Promise<boolean>;
+  validateNotificationChannels(channels: string[]): Promise<{ valid: boolean; errors: string[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -127,8 +164,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateProject(id: string, updates: Partial<InsertProject>): Promise<Project> {
+    const updateData = { ...updates, updatedAt: new Date() };
     const [updated] = await db.update(projects)
-      .set({ ...updates, updatedAt: new Date() } as any)
+      .set(updateData)
       .where(eq(projects.id, id))
       .returning();
     return updated;
@@ -299,13 +337,19 @@ export class DatabaseStorage implements IStorage {
 
   async getRisksByCategory(projectId: string, category: string): Promise<Risk[]> {
     return db.select().from(risks)
-      .where(and(eq(risks.projectId, projectId), eq(risks.category, category)))
+      .where(and(
+        eq(risks.projectId, projectId), 
+        sql`${risks.category} = ${category}`
+      ))
       .orderBy(desc(risks.riskScore));
   }
 
   async getRisksByStatus(projectId: string, status: string): Promise<Risk[]> {
     return db.select().from(risks)
-      .where(and(eq(risks.projectId, projectId), eq(risks.status, status)))
+      .where(and(
+        eq(risks.projectId, projectId), 
+        sql`${risks.status} = ${status}`
+      ))
       .orderBy(desc(risks.riskScore));
   }
 
@@ -487,6 +531,215 @@ export class DatabaseStorage implements IStorage {
     
     // Check for cycles starting from the task being created/updated
     return hasCycleDFS(taskId);
+  }
+
+  // Contact Management
+  async createContact(contact: InsertContact): Promise<Contact> {
+    const [created] = await db.insert(contacts).values(contact).returning();
+    return created;
+  }
+
+  async getContactsByOrg(orgId: string): Promise<Contact[]> {
+    return db.select().from(contacts)
+      .where(eq(contacts.orgId, orgId))
+      .orderBy(contacts.name);
+  }
+
+  async getContactById(id: string): Promise<Contact | undefined> {
+    const [contact] = await db.select().from(contacts).where(eq(contacts.id, id));
+    return contact || undefined;
+  }
+
+  async updateContact(id: string, updates: Partial<InsertContact>): Promise<Contact> {
+    const [updated] = await db.update(contacts)
+      .set(updates)
+      .where(eq(contacts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteContact(id: string): Promise<void> {
+    // Check for active subscriptions first
+    const activeSubscriptions = await db.select()
+      .from(notificationSubscriptions)
+      .where(and(
+        eq(notificationSubscriptions.recipientType, "contact"),
+        eq(notificationSubscriptions.recipientId, id),
+        eq(notificationSubscriptions.active, true)
+      ));
+    
+    if (activeSubscriptions.length > 0) {
+      throw new Error(`Cannot delete contact: ${activeSubscriptions.length} active notification subscriptions exist`);
+    }
+    
+    await db.delete(contacts).where(eq(contacts.id, id));
+  }
+
+  // Notification Subscription Management
+  async createSubscription(subscription: InsertNotificationSubscription): Promise<NotificationSubscription> {
+    const [created] = await db.insert(notificationSubscriptions).values(subscription).returning();
+    return created;
+  }
+
+  async getSubscriptionsByProject(projectId: string): Promise<NotificationSubscription[]> {
+    return db.select().from(notificationSubscriptions)
+      .where(and(
+        eq(notificationSubscriptions.projectId, projectId),
+        eq(notificationSubscriptions.active, true)
+      ))
+      .orderBy(notificationSubscriptions.createdAt);
+  }
+
+  async getSubscriptionsByTask(taskId: string): Promise<NotificationSubscription[]> {
+    return db.select().from(notificationSubscriptions)
+      .where(and(
+        eq(notificationSubscriptions.taskId, taskId),
+        eq(notificationSubscriptions.active, true)
+      ))
+      .orderBy(notificationSubscriptions.createdAt);
+  }
+
+  async getSubscriptionsByRecipient(recipientType: "user" | "contact", recipientId: string): Promise<NotificationSubscription[]> {
+    return db.select().from(notificationSubscriptions)
+      .where(and(
+        eq(notificationSubscriptions.recipientType, recipientType),
+        eq(notificationSubscriptions.recipientId, recipientId),
+        eq(notificationSubscriptions.active, true)
+      ))
+      .orderBy(notificationSubscriptions.createdAt);
+  }
+
+  async updateSubscription(id: string, updates: Partial<InsertNotificationSubscription>): Promise<NotificationSubscription> {
+    const [updated] = await db.update(notificationSubscriptions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(notificationSubscriptions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSubscription(id: string): Promise<void> {
+    await db.delete(notificationSubscriptions).where(eq(notificationSubscriptions.id, id));
+  }
+
+  // Notification Logging & De-duplication
+  async createNotificationLog(notification: InsertNotificationLog): Promise<NotificationLog> {
+    const [created] = await db.insert(notificationsLog).values(notification).returning();
+    return created;
+  }
+
+  async checkNotificationExists(
+    projectId: string,
+    taskId: string | null,
+    event: string,
+    channel: string,
+    recipientType: "user" | "contact",
+    recipientId: string,
+    leadOffsetDays: number
+  ): Promise<boolean> {
+    const existing = await db.select()
+      .from(notificationsLog)
+      .where(and(
+        eq(notificationsLog.projectId, projectId),
+        taskId ? eq(notificationsLog.taskId, taskId) : sql`${notificationsLog.taskId} IS NULL`,
+        sql`${notificationsLog.event} = ${event}`,
+        sql`${notificationsLog.channel} = ${channel}`,
+        sql`${notificationsLog.recipientType} = ${recipientType}`,
+        eq(notificationsLog.recipientId, recipientId),
+        eq(notificationsLog.leadOffsetDays, leadOffsetDays)
+      ))
+      .limit(1);
+    
+    return existing.length > 0;
+  }
+
+  async getNotificationHistory(projectId: string, taskId?: string): Promise<NotificationLog[]> {
+    const whereConditions = [eq(notificationsLog.projectId, projectId)];
+    
+    if (taskId) {
+      whereConditions.push(eq(notificationsLog.taskId, taskId));
+    }
+    
+    return db.select().from(notificationsLog)
+      .where(and(...whereConditions))
+      .orderBy(desc(notificationsLog.createdAt));
+  }
+
+  async getScheduledNotifications(beforeDate: Date): Promise<NotificationLog[]> {
+    return db.select().from(notificationsLog)
+      .where(and(
+        sql`${notificationsLog.scheduledFor} <= ${beforeDate}`,
+        eq(notificationsLog.status, "pending"),
+        sql`${notificationsLog.sentAt} IS NULL`
+      ))
+      .orderBy(notificationsLog.scheduledFor);
+  }
+
+  async markNotificationSent(notificationId: string, sentAt: Date, providerMessageId?: string): Promise<NotificationLog> {
+    const updateData: any = {
+      sentAt,
+      status: "sent" as const,
+    };
+    
+    if (providerMessageId) {
+      updateData.providerMessageId = providerMessageId;
+    }
+    
+    const [updated] = await db.update(notificationsLog)
+      .set(updateData)
+      .where(eq(notificationsLog.id, notificationId))
+      .returning();
+    return updated;
+  }
+
+  // Test Notification Support
+  async sendTestNotification(recipientEmail: string, templateType: string): Promise<boolean> {
+    // This would integrate with SendGrid or other email providers
+    // For now, we'll simulate the process
+    try {
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(recipientEmail)) {
+        return false;
+      }
+      
+      // In a real implementation, this would call SendGrid API
+      // For now, we'll log the test notification
+      console.log(`Test notification sent to ${recipientEmail} with template ${templateType}`);
+      
+      return true;
+    } catch (error) {
+      console.error("Failed to send test notification:", error);
+      return false;
+    }
+  }
+
+  async validateNotificationChannels(channels: string[]): Promise<{ valid: boolean; errors: string[] }> {
+    const validChannels = ["email", "sms"];
+    const errors: string[] = [];
+    
+    for (const channel of channels) {
+      if (!validChannels.includes(channel)) {
+        errors.push(`Invalid notification channel: ${channel}`);
+      }
+    }
+    
+    // Check if email is configured (SendGrid API key exists)
+    // In a real implementation, this would check environment variables
+    const hasEmailConfig = process.env.SENDGRID_API_KEY !== undefined;
+    if (channels.includes("email") && !hasEmailConfig) {
+      errors.push("Email notifications not configured: SendGrid API key missing");
+    }
+    
+    // Check if SMS is configured
+    const hasSmsConfig = process.env.TWILIO_ACCOUNT_SID !== undefined && process.env.TWILIO_AUTH_TOKEN !== undefined;
+    if (channels.includes("sms") && !hasSmsConfig) {
+      errors.push("SMS notifications not configured: Twilio credentials missing");
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
   }
 }
 
