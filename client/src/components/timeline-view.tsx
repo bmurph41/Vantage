@@ -241,6 +241,10 @@ interface SortableTaskItemProps {
   onTaskClick?: (taskId: string) => void;
   isDragOver?: boolean;
   isActive?: boolean;
+  useChevronControls?: boolean;
+  sortedTasks?: Task[];
+  onMoveTaskUp?: (taskId: string) => void;
+  onMoveTaskDown?: (taskId: string) => void;
 }
 
 function SortableTaskItem({
@@ -255,7 +259,11 @@ function SortableTaskItem({
   getTaskNoteCount,
   onTaskClick,
   isDragOver = false,
-  isActive = false
+  isActive = false,
+  useChevronControls = false,
+  sortedTasks = [],
+  onMoveTaskUp,
+  onMoveTaskDown
 }: SortableTaskItemProps) {
   const [docRequirementsDialogOpen, setDocRequirementsDialogOpen] = useState(false);
   
@@ -303,13 +311,13 @@ function SortableTaskItem({
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-2">
           {/* Conditional Reorder Controls */}
-          {useChevronControls ? (
+          {useChevronControls && onMoveTaskUp && onMoveTaskDown ? (
             <ChevronTaskReorder
               taskId={task.id}
-              taskIndex={sortedTasks.findIndex(t => t.id === task.id)}
+              taskIndex={sortedTasks.findIndex((t: Task) => t.id === task.id)}
               totalTasks={sortedTasks.length}
-              onMoveUp={handleMoveTaskUp}
-              onMoveDown={handleMoveTaskDown}
+              onMoveUp={onMoveTaskUp}
+              onMoveDown={onMoveTaskDown}
             />
           ) : (
             /* Enhanced Drag Handle */
@@ -1234,6 +1242,10 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                             onTaskClick={handleTaskClick}
                             isDragOver={dragOverId === task.id}
                             isActive={activeId === task.id}
+                            useChevronControls={useChevronControls}
+                            sortedTasks={sortedTasks}
+                            onMoveTaskUp={handleMoveTaskUp}
+                            onMoveTaskDown={handleMoveTaskDown}
                           />
                         </div>
                       );
