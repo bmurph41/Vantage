@@ -839,6 +839,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email report endpoint
+  app.post("/api/dd/send-report-email", async (req: any, res) => {
+    try {
+      const payload = z.object({
+        to: z.string().email(),
+        subject: z.string().min(1),
+        message: z.string().optional(),
+        reportData: z.string(),
+        filename: z.string(),
+        mimeType: z.string(),
+        format: z.enum(['pdf', 'csv']),
+      }).parse(req.body);
+
+      // Use SendGrid to send email
+      const sgMail = require('@sendgrid/mail');
+      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+      const emailData = {
+        to: payload.to,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@duediligence.app',
+        subject: payload.subject,
+        text: payload.message || 'Please find the attached due diligence report.',
+        html: `<p>${(payload.message || 'Please find the attached due diligence report.').replace(/\n/g, '<br>')}</p>`,
+        attachments: [
+          {
+            content: payload.format === 'csv' ? Buffer.from(payload.reportData).toString('base64') : payload.reportData,
+            filename: payload.filename,
+            type: payload.mimeType,
+            disposition: 'attachment',
+          },
+        ],
+      };
+
+      await sgMail.send(emailData);
+
+      res.json({ success: true, message: 'Email sent successfully' });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error('Error sending email:', error);
+      res.status(500).json({ error: 'Failed to send email' });
+    }
+  });
+
   app.get("/api/dd/projects/:id/export.ics", async (req: any, res) => {
     try {
       const tasks = await storage.getTasksForProject(req.params.id);

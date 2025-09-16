@@ -13,6 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Download, Mail, Eye, FileText, Calendar } from "lucide-react";
 import type { Task, Project } from "@shared/schema";
 import { format, parseISO, addDays, differenceInDays, isValid } from "date-fns";
+import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, pdf } from '@react-pdf/renderer';
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface ExportReportModalProps {
   isOpen: boolean;
@@ -40,6 +43,56 @@ const COLUMN_OPTIONS = [
   { id: 'notes', label: 'Notes', defaultChecked: false },
 ];
 
+// PDF Styles
+const styles = StyleSheet.create({
+  page: { fontSize: 10, padding: 30, fontFamily: 'Helvetica' },
+  header: { fontSize: 18, fontWeight: 'bold', marginBottom: 20 },
+  subheader: { fontSize: 14, fontWeight: 'bold', marginBottom: 10 },
+  text: { fontSize: 10, marginBottom: 5 },
+  table: { width: 'auto', borderStyle: 'solid', borderWidth: 1, borderRightWidth: 0, borderBottomWidth: 0 },
+  tableRow: { flexDirection: 'row' },
+  tableColHeader: { width: 'auto', borderStyle: 'solid', borderWidth: 1, borderLeftWidth: 0, borderTopWidth: 0, padding: 4, backgroundColor: '#f3f4f6', fontWeight: 'bold' },
+  tableCol: { width: 'auto', borderStyle: 'solid', borderWidth: 1, borderLeftWidth: 0, borderTopWidth: 0, padding: 4 },
+  tableCellHeader: { fontSize: 9, fontWeight: 'bold' },
+  tableCell: { fontSize: 8 },
+});
+
+// PDF Document Component
+const PDFReport = ({ filteredTasks, visibleColumns, project, formatCellValueForExport }: {
+  filteredTasks: Task[];
+  visibleColumns: typeof COLUMN_OPTIONS;
+  project?: Project;
+  formatCellValueForExport: (task: Task, columnId: string) => string;
+}) => (
+  <Document>
+    <Page size="A4" style={styles.page} orientation="landscape">
+      <Text style={styles.header}>Due Diligence Report</Text>
+      <Text style={styles.text}>Project: {project?.name || 'N/A'}</Text>
+      <Text style={styles.text}>Generated: {format(new Date(), 'MMM d, yyyy h:mm a')}</Text>
+      <Text style={styles.text}>Total Tasks: {filteredTasks.length}</Text>
+      
+      <View style={[styles.table, { marginTop: 20 }]}>
+        <View style={styles.tableRow}>
+          {visibleColumns.map((col) => (
+            <View key={col.id} style={[styles.tableColHeader, { width: `${100/visibleColumns.length}%` }]}>
+              <Text style={styles.tableCellHeader}>{col.label}</Text>
+            </View>
+          ))}
+        </View>
+        {filteredTasks.map((task) => (
+          <View style={styles.tableRow} key={task.id}>
+            {visibleColumns.map((col) => (
+              <View key={col.id} style={[styles.tableCol, { width: `${100/visibleColumns.length}%` }]}>
+                <Text style={styles.tableCell}>{formatCellValueForExport(task, col.id)}</Text>
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+    </Page>
+  </Document>
+);
+
 export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportReportModalProps) {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set(tasks.map(t => t.id)));
   const [selectedColumns, setSelectedColumns] = useState<Set<string>>(
@@ -51,6 +104,9 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
   const [emailTo, setEmailTo] = useState('');
   const [emailSubject, setEmailSubject] = useState(`Due Diligence Report - ${project?.name || 'Project'}`);
   const [emailMessage, setEmailMessage] = useState('Please find the attached due diligence report.');
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isEmailing, setIsEmailing] = useState(false);
+  const { toast } = useToast();
 
   const handleTaskSelection = (taskId: string, checked: boolean) => {
     const newSelected = new Set(selectedTasks);
@@ -167,6 +223,93 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
     return deadlineDate;
   };
 
+  // Export-safe formatter that returns plain text (no React components)
+  const formatCellValueForExport = (task: Task, columnId: string): string => {
+    switch (columnId) {
+      case 'title':
+        return task.title;
+      case 'description':
+        return task.description || '-';
+      case 'assignee':
+        return task.assignee || '-';
+      case 'companyHired':
+        return task.companyHired || '-';
+      case 'status':
+        // Return plain text status labels for export
+        const statusLabels = {
+          to_do: 'To Do',
+          scheduled: 'Scheduled',
+          in_progress: 'In Progress',
+          completed: 'Completed',
+        };
+        return statusLabels[task.status as keyof typeof statusLabels] || task.status;
+      case 'priority':
+        // Format priority for better readability
+        const priorityLabels = {
+          high: 'High',
+          med: 'Medium',
+          low: 'Low',
+        };
+        return priorityLabels[task.priority as keyof typeof priorityLabels] || task.priority || '-';
+      case 'deadline':
+        try {
+          const deadlineDate = calculateDeadlineDate(task);
+          return isValid(deadlineDate) ? format(deadlineDate, 'MMM d, yyyy') : '-';
+        } catch {
+          return '-';
+        }
+      case 'orderedAt':
+        return task.orderedAt ? (() => {
+          try {
+            const date = new Date(task.orderedAt!);
+            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+          } catch {
+            return '-';
+          }
+        })() : '-';
+      case 'startDate':
+        return task.dateOnSite ? (() => {
+          try {
+            const date = new Date(task.dateOnSite!);
+            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+          } catch {
+            return '-';
+          }
+        })() : '-';
+      case 'completedAt':
+        return task.completedAt ? (() => {
+          try {
+            const date = new Date(task.completedAt!);
+            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+          } catch {
+            return '-';
+          }
+        })() : '-';
+      case 'cost':
+        return formatCurrency(task.cost || '');
+      case 'paymentStatus':
+        // Format payment status for better readability
+        const paymentStatusLabels = {
+          not_paid: 'Not Paid',
+          paid: 'Paid',
+          pending: 'Pending',
+          partial: 'Partial',
+        };
+        return paymentStatusLabels[task.paymentStatus as keyof typeof paymentStatusLabels] || task.paymentStatus || 'Not Paid';
+      case 'repName':
+        return task.repName || '-';
+      case 'repEmail':
+        return task.repEmail || '-';
+      case 'repPhone':
+        return task.repPhone || '-';
+      case 'notes':
+        return task.notes || '-';
+      default:
+        return '-';
+    }
+  };
+
+  // UI formatter that returns React components for display (original function)
   const formatCellValue = (task: Task, columnId: string) => {
     switch (columnId) {
       case 'title':
@@ -232,27 +375,142 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
     }
   };
 
-  const handleDownload = () => {
-    // TODO: Implement PDF/CSV generation and download
-    console.log('Downloading report...', {
-      format: reportFormat,
-      tasks: filteredTasks.length,
-      columns: selectedColumns.size,
-      includeTimeline
-    });
+  // CSV generation function
+  const generateCSV = () => {
+    const headers = visibleColumns.map(col => col.label);
+    const rows = filteredTasks.map(task => 
+      visibleColumns.map(col => formatCellValueForExport(task, col.id))
+    );
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => {
+        // All values from formatCellValueForExport are already strings
+        return `"${cell.replace(/"/g, '""')}"`;
+      }).join(','))
+    ].join('\n');
+    
+    return csvContent;
   };
 
-  const handleEmail = () => {
-    // TODO: Implement email functionality
-    console.log('Emailing report...', {
-      to: emailTo,
-      subject: emailSubject,
-      message: emailMessage,
-      format: reportFormat,
-      tasks: filteredTasks.length,
-      columns: selectedColumns.size,
-      includeTimeline
-    });
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      if (reportFormat === 'csv') {
+        const csvContent = generateCSV();
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${project?.name || 'due-diligence'}-report.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: "CSV Downloaded",
+          description: "Your report has been downloaded successfully.",
+        });
+      } else {
+        // Generate PDF
+        const pdfDoc = <PDFReport 
+          filteredTasks={filteredTasks}
+          visibleColumns={visibleColumns}
+          project={project}
+          formatCellValueForExport={formatCellValueForExport}
+        />;
+        
+        const blob = await pdf(pdfDoc).toBlob();
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${project?.name || 'due-diligence'}-report.pdf`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: "PDF Downloaded",
+          description: "Your report has been downloaded successfully.",
+        });
+      }
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast({
+        title: "Download Failed",
+        description: "There was an error generating your report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleEmail = async () => {
+    if (!emailTo.trim()) {
+      toast({
+        title: "Email Required",
+        description: "Please enter a recipient email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsEmailing(true);
+    try {
+      let reportData: string;
+      let filename: string;
+      let mimeType: string;
+
+      if (reportFormat === 'csv') {
+        reportData = generateCSV();
+        filename = `${project?.name || 'due-diligence'}-report.csv`;
+        mimeType = 'text/csv';
+      } else {
+        const pdfDoc = <PDFReport 
+          filteredTasks={filteredTasks}
+          visibleColumns={visibleColumns}
+          project={project}
+          formatCellValueForExport={formatCellValueForExport}
+        />;
+        const blob = await pdf(pdfDoc).toBlob();
+        const buffer = await blob.arrayBuffer();
+        const uint8Array = new Uint8Array(buffer);
+        reportData = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
+        filename = `${project?.name || 'due-diligence'}-report.pdf`;
+        mimeType = 'application/pdf';
+      }
+
+      await apiRequest('/api/dd/send-report-email', 'POST', {
+        to: emailTo,
+        subject: emailSubject,
+        message: emailMessage,
+        reportData,
+        filename,
+        mimeType,
+        format: reportFormat,
+      });
+
+      toast({
+        title: "Email Sent",
+        description: `Report has been sent to ${emailTo}`,
+      });
+      
+      onClose();
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast({
+        title: "Email Failed",
+        description: "There was an error sending your report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEmailing(false);
+    }
   };
 
   return (
@@ -503,9 +761,9 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
                       Generate a professional {reportFormat.toUpperCase()} report with your selected data and download it directly to your device.
                     </p>
                   </div>
-                  <Button onClick={handleDownload} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors">
+                  <Button onClick={handleDownload} disabled={isDownloading} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-3 rounded-lg font-medium transition-colors">
                     <Download className="h-4 w-4 mr-2" />
-                    Download {reportFormat.toUpperCase()} Report
+                    {isDownloading ? 'Generating Report...' : `Download ${reportFormat.toUpperCase()} Report`}
                   </Button>
                 </CardContent>
               </Card>
@@ -558,10 +816,10 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
                   <Button 
                     onClick={handleEmail} 
                     className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white py-3 rounded-lg font-medium transition-colors"
-                    disabled={!emailTo}
+                    disabled={!emailTo || isEmailing}
                   >
                     <Mail className="h-4 w-4 mr-2" />
-                    Send Report via Email
+                    {isEmailing ? 'Sending Email...' : 'Send Report via Email'}
                   </Button>
                 </CardContent>
               </Card>
