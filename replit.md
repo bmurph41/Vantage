@@ -56,6 +56,12 @@ Preferred communication style: Simple, everyday language.
 ### Future Integration Requirements
 - **Financial Model Integration**: Transaction costs from this Due Diligence Tracker will flow into the Transaction Costs tab of the related Financial Model app once all applications are merged into a single monorepo. This app serves as the primary driver for transaction cost details and timeline data.
 
+### Calendar Integration Implementation
+- **External Calendar Sync**: Implemented calendar export functionality using ICS file format for compatibility with Outlook, Gmail, and Apple Calendar
+- **User Choice**: User dismissed direct Outlook connector integration in favor of ICS export approach
+- **Current Method**: Users can sync project tasks to calendar events and download ICS files for import into their preferred calendar application
+- **Future Note**: If automated real-time calendar sync is needed in the future, consider using the Outlook connector integration (`connector:ccfg_outlook_01K4BBCKRJKP82N3PYQPZQ6DAK`) or exploring Google Calendar API integration
+
 ## External Dependencies
 
 ### Core Runtime Dependencies
