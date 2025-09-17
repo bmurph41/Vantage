@@ -80,16 +80,6 @@ export default function NotificationSettingsPage({ projectId: propProjectId }: N
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setLocation(`/projects/${projectId}`)}
-                data-testid="button-back"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Project
-              </Button>
-              <Separator orientation="vertical" className="h-6" />
               <div>
                 <h1 className="text-2xl font-bold text-foreground" data-testid="page-title">
                   Notification Settings
