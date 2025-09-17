@@ -57,7 +57,7 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
 
   // Fetch tasks to get company representative information
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
-    queryKey: ['/api/dd/tasks', projectId],
+    queryKey: ['/api/dd/projects', projectId, 'tasks'],
     enabled: !!projectId,
   });
 
