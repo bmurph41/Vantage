@@ -501,87 +501,74 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
   );
 
 
-  // Mutation for updating task sort orders with optimistic updates
+  // Bulletproof drag-and-drop like Trello/Linear - NO CACHE INVALIDATION CONFLICTS
   const updateSortOrderMutation = useMutation({
     mutationFn: async (sortUpdates: Array<{ id: string; sortOrder: number }>) => {
       const response = await apiRequest("PATCH", `/api/dd/projects/${project.id}/tasks/bulk-sort-order`, sortUpdates);
       return response.json();
     },
     onMutate: async (sortUpdates: Array<{ id: string; sortOrder: number }>) => {
-      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-      await queryClient.cancelQueries({ queryKey: ['/api/dd/projects', project.id, 'tasks'] });
+      // Cancel all outgoing requests to prevent race conditions
+      await queryClient.cancelQueries({ queryKey: ['/api/dd/projects', project.id] });
 
-      // Snapshot the previous value for rollback
+      // Get current data from BOTH cache keys that need updating
       const previousTasks = queryClient.getQueryData(['/api/dd/projects', project.id, 'tasks']);
+      const previousProject = queryClient.getQueryData(['/api/dd/projects', project.id]);
 
-      // Optimistically update the tasks with new sort orders
-      queryClient.setQueryData(['/api/dd/projects', project.id, 'tasks'], (oldTasks: Task[] | undefined) => {
+      // Create update map for efficient lookups
+      const sortMap = new Map(sortUpdates.map(update => [update.id, update.sortOrder]));
+
+      // Update function - apply to both caches
+      const updateTasksArray = (oldTasks: Task[] | undefined) => {
         if (!oldTasks) return oldTasks;
-
-        // Create a map of sort updates for quick lookup
-        const sortMap = new Map(sortUpdates.map(update => [update.id, update.sortOrder]));
-
-        // Apply the sort updates to tasks
+        
+        // Apply sort updates
         const updatedTasks = oldTasks.map(task => ({
           ...task,
           sortOrder: sortMap.has(task.id) ? sortMap.get(task.id)! : task.sortOrder
         }));
 
-        // Sort tasks by their new sortOrder, maintaining the same logic as in the component
+        // Simple sort by sortOrder (server now guarantees this order)
         return [...updatedTasks].sort((a, b) => {
-          // First priority: Use custom sortOrder if both tasks have it set
-          if (a.sortOrder !== null && a.sortOrder !== undefined && 
-              b.sortOrder !== null && b.sortOrder !== undefined) {
-            return a.sortOrder - b.sortOrder;
-          }
-          
-          // Second priority: Tasks with custom sortOrder come first
-          if (a.sortOrder !== null && a.sortOrder !== undefined) return -1;
-          if (b.sortOrder !== null && b.sortOrder !== undefined) return 1;
-          
-          // Final fallback: Sort by deadline (existing logic)
-          if (!a.deadline && !b.deadline) return 0;
-          if (!a.deadline) return 1; // Tasks without deadlines go to the end
-          if (!b.deadline) return -1; // Tasks without deadlines go to the end
-          
-          return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+          if (a.sortOrder === null || a.sortOrder === undefined) return 1;
+          if (b.sortOrder === null || b.sortOrder === undefined) return -1;
+          return a.sortOrder - b.sortOrder;
         });
+      };
+
+      // Update tasks cache
+      queryClient.setQueryData(['/api/dd/projects', project.id, 'tasks'], updateTasksArray);
+
+      // Update project cache (if it exists and has tasks field)
+      queryClient.setQueryData(['/api/dd/projects', project.id], (oldProject: any) => {
+        if (!oldProject || !oldProject.tasks) return oldProject;
+        return {
+          ...oldProject,
+          tasks: updateTasksArray(oldProject.tasks)
+        };
       });
 
-      // Return context object with the previous value for potential rollback
-      return { previousTasks };
+      return { previousTasks, previousProject };
     },
     onError: (err, sortUpdates, context) => {
-      // If the mutation fails, use the context returned from onMutate to roll back
+      console.error('Drag and drop failed:', err);
+      
+      // Rollback both caches
       if (context?.previousTasks) {
         queryClient.setQueryData(['/api/dd/projects', project.id, 'tasks'], context.previousTasks);
       }
+      if (context?.previousProject) {
+        queryClient.setQueryData(['/api/dd/projects', project.id], context.previousProject);
+      }
 
       toast({
-        title: "Error",
-        description: "Failed to update task order. Changes have been reverted.",
+        title: "Reorder Failed",
+        description: "Could not save new order. Please try again.",
         variant: "destructive",
       });
     },
-    onSuccess: () => {
-      // Success! The optimistic update is already in place and working correctly.
-      // No need to invalidate queries since we want to preserve the optimistic update.
-      toast({
-        title: "Success",
-        description: "Task order updated successfully",
-      });
-    },
-    onSettled: () => {
-      // Invalidate and refetch queries to sync with server state after a short delay
-      // This ensures the server has processed the update before we refetch
-      setTimeout(() => {
-        queryClient.invalidateQueries({ 
-          queryKey: ['/api/dd/projects', project.id, 'tasks'],
-          exact: false,
-          refetchType: 'active' // Refetch active queries to sync with server
-        });
-      }, 200);
-    },
+    // NO onSuccess toasts - silent like Trello/Linear
+    // NO onSettled invalidation - optimistic updates stay until explicit refresh
   });
 
   const selectedGranularity = TIMELINE_GRANULARITIES.find(g => g.value === granularity) || TIMELINE_GRANULARITIES[1];

@@ -14,7 +14,7 @@ import {
   type InsertDocumentRequirement, type InsertProjectIntegration
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Organizations
@@ -313,7 +313,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTasksForProject(projectId: string): Promise<Task[]> {
-    return db.select().from(tasks).where(eq(tasks.projectId, projectId));
+    return db.select()
+      .from(tasks)
+      .where(eq(tasks.projectId, projectId))
+      .orderBy(
+        sql`CASE WHEN ${tasks.sortOrder} IS NULL THEN 1 ELSE 0 END`, // nulls last
+        asc(tasks.sortOrder), // primary sort by sortOrder
+        asc(tasks.createdAt) // tie breaker
+      );
   }
 
   async getProjectAssignees(projectId: string): Promise<string[]> {
