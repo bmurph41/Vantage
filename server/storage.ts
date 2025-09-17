@@ -977,6 +977,18 @@ export class DatabaseStorage implements IStorage {
           e.taskId === task.id && e.eventType === "task_deadline"
         );
 
+        // Map task status to valid database calendar event status
+        const mapTaskStatusToEventStatus = (taskStatus: string) => {
+          switch (taskStatus) {
+            case 'engaged': return 'in_progress';
+            case 'not_started': return 'not_started';
+            case 'scheduled': return 'scheduled';  
+            case 'in_progress': return 'in_progress';
+            case 'completed': return 'completed';
+            default: return 'not_started';
+          }
+        };
+
         const eventData = {
           projectId,
           taskId: task.id,
@@ -987,7 +999,7 @@ export class DatabaseStorage implements IStorage {
           isAllDay: true,
           timezone: project.tz,
           priority: task.priority,
-          status: task.status,
+          status: mapTaskStatusToEventStatus(task.status) as "not_started" | "in_progress" | "completed" | "scheduled" | "blocked" | "to_do",
         };
 
         if (existingTaskEvent) {
