@@ -5,7 +5,6 @@ import { ArrowLeft, FileBarChart, Plus } from "lucide-react";
 import { ProjectHeader } from "@/components/project-header";
 import { ThirdPartyReports } from "@/components/third-party-reports";
 import { ProjectSetup } from "@/components/project-setup";
-import { TemplatesView } from "@/components/templates-view";
 import { TimelineView } from "@/components/timeline-view";
 import { TaskOwnersView } from "@/components/task-owners-view";
 import { ProjectIntegrationSettings } from "@/components/project-integration-settings";
@@ -87,7 +86,6 @@ export default function ProjectPage() {
     { id: "setup", label: "Deal Details" },
     { id: "owners", label: "Task Owners" },
     { id: "contacts", label: "Key Contacts" },
-    { id: "templates", label: "Templates" },
     { id: "integrations", label: "Integrations" },
     { id: "notifications", label: "Notifications" },
   ];
@@ -178,9 +176,6 @@ export default function ProjectPage() {
               isLoading={contactsLoading} 
               projectId={project.id} 
             />
-          )}
-          {activeTab === "templates" && (
-            <TemplatesView projectId={project.id} />
           )}
           {activeTab === "integrations" && (
             <ProjectIntegrationSettings projectId={project.id} />
