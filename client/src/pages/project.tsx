@@ -10,10 +10,12 @@ import { TimelineView } from "@/components/timeline-view";
 import { TaskOwnersView } from "@/components/task-owners-view";
 import { ProjectIntegrationSettings } from "@/components/project-integration-settings";
 import { AddTaskModal } from "@/components/add-task-modal";
+import { ContactManagement } from "@/components/contact-management";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import { useProject } from "@/hooks/use-project";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import type { Task } from "@shared/schema";
+import type { Task, Contact } from "@shared/schema";
 
 export default function ProjectPage() {
   const { id } = useParams();
@@ -23,6 +25,12 @@ export default function ProjectPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   
   const { data, isLoading, error } = useProject(id!);
+  
+  // Fetch contacts for the Key Contacts tab
+  const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
+    queryKey: ['/api/dd/contacts'],
+    enabled: !!id,
+  });
 
   if (isLoading) {
     return (
@@ -78,6 +86,7 @@ export default function ProjectPage() {
     { id: "reports", label: "Tasks & Timeline" },
     { id: "setup", label: "Deal Details" },
     { id: "owners", label: "Task Owners" },
+    { id: "contacts", label: "Key Contacts" },
     { id: "templates", label: "Templates" },
     { id: "integrations", label: "Integrations" },
     { id: "notifications", label: "Notifications" },
@@ -162,6 +171,13 @@ export default function ProjectPage() {
           )}
           {activeTab === "owners" && (
             <TaskOwnersView tasks={tasks} />
+          )}
+          {activeTab === "contacts" && (
+            <ContactManagement 
+              contacts={contacts} 
+              isLoading={contactsLoading} 
+              projectId={project.id} 
+            />
           )}
           {activeTab === "templates" && (
             <TemplatesView projectId={project.id} />
