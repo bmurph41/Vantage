@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileBarChart } from "lucide-react";
+import { ArrowLeft, FileBarChart, Plus } from "lucide-react";
 import { ProjectHeader } from "@/components/project-header";
 import { ThirdPartyReports } from "@/components/third-party-reports";
 import { ProjectSetup } from "@/components/project-setup";
@@ -136,6 +136,19 @@ export default function ProjectPage() {
                 {tab.label}
               </button>
             ))}
+            
+            {/* Add Task Button */}
+            <div className="flex-1"></div>
+            <Button
+              onClick={() => setIsTaskModalOpen(true)}
+              variant="default"
+              size="sm"
+              className="ml-auto px-4 py-2 h-auto text-sm font-medium"
+              data-testid="add-task-button-header"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Task
+            </Button>
           </nav>
         </div>
 
