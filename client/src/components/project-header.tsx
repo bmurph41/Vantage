@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format, parseISO, isAfter, addDays } from "date-fns";
 import { tzNow } from "@/lib/date-utils";
-import { Download, Share2, Calendar, FileText, Loader2 } from "lucide-react";
+import { Download, Share2, Calendar, FileText, Loader2, FileBarChart } from "lucide-react";
 import type { Project, Task, ProjectSettings } from "@shared/schema";
 import { ddClient } from "@/lib/ddClient";
 import { useToast } from "@/hooks/use-toast";
@@ -138,19 +138,12 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
           </p>
         </div>
         <div className="flex items-center space-x-3">
-          <Button 
-            variant="outline" 
-            onClick={handleExportReport} 
-            disabled={isExportingReport}
-            data-testid="button-export-report"
-          >
-            {isExportingReport ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <FileText className="h-4 w-4 mr-2" />
-            )}
-            {isExportingReport ? "Generating..." : "Export Report"}
-          </Button>
+          <a href={`/projects/${project.id}/progress-report`}>
+            <Button variant="outline" data-testid="link-progress-report">
+              <FileBarChart className="h-4 w-4 mr-2" />
+              Progress Report
+            </Button>
+          </a>
           <Button variant="outline" onClick={handleExportCSV} data-testid="button-export-csv">
             <Download className="h-4 w-4 mr-2" />
             Export CSV

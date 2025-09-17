@@ -100,12 +100,6 @@ export default function ProjectPage() {
               <span className="text-sm text-muted-foreground">MarinaMatch</span>
             </div>
             <div className="flex items-center space-x-3">
-              <Link href={`/projects/${project.id}/progress-report`}>
-                <Button variant="outline" size="sm" data-testid="link-progress-report">
-                  <FileBarChart className="h-4 w-4 mr-2" />
-                  Progress Report
-                </Button>
-              </Link>
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
                 JD
               </div>
