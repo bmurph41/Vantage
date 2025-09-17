@@ -1,5 +1,5 @@
 import { apiRequest } from "./queryClient";
-import type { Project, ProjectSettings, Task, ProjectTemplate } from "@shared/schema";
+import type { Project, ProjectSettings, Task, ProjectTemplate, TaskDependency, InsertTaskDependency } from "@shared/schema";
 import type { ProjectWithDetails } from "@/types/dd";
 
 export const ddClient = {
@@ -52,6 +52,35 @@ export const ddClient = {
 
   async deleteTask(id: string): Promise<void> {
     await apiRequest('DELETE', `/api/dd/tasks/${id}`);
+  },
+
+  // Task Dependencies
+  async getProjectTaskDependencies(projectId: string): Promise<TaskDependency[]> {
+    const response = await apiRequest('GET', `/api/dd/projects/${projectId}/task-dependencies`);
+    return response.json();
+  },
+
+  async getTaskDependencies(taskId: string): Promise<TaskDependency[]> {
+    const response = await apiRequest('GET', `/api/dd/tasks/${taskId}/dependencies`);
+    return response.json();
+  },
+
+  async createTaskDependency(projectId: string, dependency: InsertTaskDependency): Promise<TaskDependency> {
+    const response = await apiRequest('POST', `/api/dd/projects/${projectId}/task-dependencies`, dependency);
+    return response.json();
+  },
+
+  async updateTaskDependency(id: string, updates: Partial<InsertTaskDependency>): Promise<TaskDependency> {
+    const response = await apiRequest('PUT', `/api/dd/task-dependencies/${id}`, updates);
+    return response.json();
+  },
+
+  async deleteTaskDependency(id: string): Promise<void> {
+    await apiRequest('DELETE', `/api/dd/task-dependencies/${id}`);
+  },
+
+  async deleteAllTaskDependencies(taskId: string): Promise<void> {
+    await apiRequest('DELETE', `/api/dd/tasks/${taskId}/dependencies`);
   },
 
   // Templates

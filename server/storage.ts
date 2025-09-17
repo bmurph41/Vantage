@@ -2,16 +2,16 @@ import {
   organizations, users, projects, projectSettings, tasks, 
   projectTemplates, auditLogs, timelineNotes, projectShares, risks,
   contacts, notificationSubscriptions, notificationsLog, calendarEvents,
-  documentRequirements, projectIntegrations,
+  documentRequirements, projectIntegrations, taskDependencies,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type Contact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
-  type DocumentRequirement, type ProjectIntegration,
+  type DocumentRequirement, type ProjectIntegration, type TaskDependency,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
   type InsertContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
-  type InsertDocumentRequirement, type InsertProjectIntegration
+  type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -92,6 +92,15 @@ export interface IStorage {
 
   // Dependency Validation
   hasCircularDependency(projectId: string, taskId: string, dependencies: string[]): Promise<boolean>;
+
+  // Enhanced Task Dependencies (CPM Support)
+  getTaskDependency(id: string): Promise<TaskDependency | undefined>;
+  getTaskDependencies(taskId: string): Promise<TaskDependency[]>;
+  getTaskDependenciesForProject(projectId: string): Promise<TaskDependency[]>;
+  createTaskDependency(dependency: InsertTaskDependency): Promise<TaskDependency>;
+  updateTaskDependency(id: string, updates: Partial<InsertTaskDependency>): Promise<TaskDependency>;
+  deleteTaskDependency(id: string): Promise<void>;
+  deleteTaskDependencies(taskId: string): Promise<void>;
 
   // Contact Management
   createContact(contact: InsertContact): Promise<Contact>;
@@ -1538,6 +1547,63 @@ export class DatabaseStorage implements IStorage {
   async updateTaskCalendarEvent(task: Task): Promise<CalendarEvent | null> {
     // This method is an alias for syncTaskCalendarEvent for clarity
     return this.syncTaskCalendarEvent(task);
+  }
+
+  // Enhanced Task Dependencies (CPM Support)
+  async getTaskDependency(id: string): Promise<TaskDependency | undefined> {
+    const [dependency] = await db.select().from(taskDependencies).where(eq(taskDependencies.id, id));
+    return dependency || undefined;
+  }
+
+  async getTaskDependencies(taskId: string): Promise<TaskDependency[]> {
+    return db.select()
+      .from(taskDependencies)
+      .where(eq(taskDependencies.successorId, taskId))
+      .orderBy(taskDependencies.createdAt);
+  }
+
+  async getTaskDependenciesForProject(projectId: string): Promise<TaskDependency[]> {
+    // Get all task dependencies for tasks in this project
+    return db.select({
+      id: taskDependencies.id,
+      successorId: taskDependencies.successorId,
+      predecessorId: taskDependencies.predecessorId,
+      type: taskDependencies.type,
+      lagDays: taskDependencies.lagDays,
+      isActive: taskDependencies.isActive,
+      createdAt: taskDependencies.createdAt,
+      updatedAt: taskDependencies.updatedAt
+    })
+    .from(taskDependencies)
+    .innerJoin(tasks, eq(taskDependencies.successorId, tasks.id))
+    .where(eq(tasks.projectId, projectId))
+    .orderBy(taskDependencies.createdAt);
+  }
+
+  async createTaskDependency(dependency: InsertTaskDependency): Promise<TaskDependency> {
+    const [created] = await db.insert(taskDependencies).values(dependency).returning();
+    return created;
+  }
+
+  async updateTaskDependency(id: string, updates: Partial<InsertTaskDependency>): Promise<TaskDependency> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(taskDependencies)
+      .set(updateData)
+      .where(eq(taskDependencies.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTaskDependency(id: string): Promise<void> {
+    await db.delete(taskDependencies).where(eq(taskDependencies.id, id));
+  }
+
+  async deleteTaskDependencies(taskId: string): Promise<void> {
+    // Delete all dependencies where this task is a successor or predecessor
+    await db.delete(taskDependencies)
+      .where(
+        sql`${taskDependencies.successorId} = ${taskId} OR ${taskDependencies.predecessorId} = ${taskId}`
+      );
   }
 }
 

@@ -10,7 +10,8 @@ import {
   insertProjectTemplateSchema, insertAuditLogSchema,
   insertTimelineNoteSchema, insertProjectShareSchema, insertRiskSchema,
   insertContactSchema, updateContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema,
-  insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema
+  insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema,
+  insertTaskDependencySchema
 } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
@@ -678,6 +679,205 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // Task Dependencies (Enhanced CPM Support)
+  app.get("/api/dd/projects/:projectId/task-dependencies", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      const dependencies = await storage.getTaskDependenciesForProject(req.params.projectId);
+      res.json(dependencies);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch task dependencies" });
+    }
+  });
+
+  app.get("/api/dd/tasks/:taskId/dependencies", async (req: any, res) => {
+    try {
+      const task = await storage.getTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      await authorizeProjectAccess(task.projectId, req.user.orgId);
+      const dependencies = await storage.getTaskDependencies(req.params.taskId);
+      res.json(dependencies);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch task dependencies" });
+    }
+  });
+
+  app.post("/api/dd/projects/:projectId/task-dependencies", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      
+      const dependencyData = insertTaskDependencySchema.parse(req.body);
+      
+      // Validate that both tasks exist and belong to the project
+      const [successor, predecessor] = await Promise.all([
+        storage.getTask(dependencyData.successorId),
+        storage.getTask(dependencyData.predecessorId)
+      ]);
+      
+      if (!successor || !predecessor) {
+        return res.status(404).json({ error: "One or both tasks not found" });
+      }
+      
+      if (successor.projectId !== req.params.projectId || predecessor.projectId !== req.params.projectId) {
+        return res.status(400).json({ error: "Tasks must belong to the specified project" });
+      }
+      
+      // Check for circular dependencies
+      const hasCircular = await storage.hasCircularDependency(
+        req.params.projectId,
+        dependencyData.successorId,
+        [dependencyData.predecessorId]
+      );
+      
+      if (hasCircular) {
+        return res.status(400).json({ 
+          error: "Circular dependency detected",
+          message: "The specified dependency would create a circular dependency loop"
+        });
+      }
+      
+      const dependency = await storage.createTaskDependency(dependencyData);
+      
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: req.params.projectId,
+        userId: req.user.id,
+        entityType: "task_dependency",
+        entityId: dependency.id,
+        action: "created",
+        after: dependency,
+      });
+      
+      res.json(dependency);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid dependency data" });
+    }
+  });
+
+  app.put("/api/dd/task-dependencies/:id", async (req: any, res) => {
+    try {
+      // First, get the existing dependency to verify ownership
+      const dependency = await storage.getTaskDependency(req.params.id);
+      if (!dependency) {
+        return res.status(404).json({ error: "Task dependency not found" });
+      }
+
+      // Get both successor and predecessor tasks to verify project ownership
+      const [successorTask, predecessorTask] = await Promise.all([
+        storage.getTask(dependency.successorId),
+        storage.getTask(dependency.predecessorId)
+      ]);
+
+      if (!successorTask || !predecessorTask) {
+        return res.status(404).json({ error: "Associated tasks not found" });
+      }
+
+      // Verify both tasks belong to projects the user has access to
+      await Promise.all([
+        authorizeProjectAccess(successorTask.projectId, req.user.orgId),
+        authorizeProjectAccess(predecessorTask.projectId, req.user.orgId)
+      ]);
+
+      const updates = insertTaskDependencySchema.partial().parse(req.body);
+      const updated = await storage.updateTaskDependency(req.params.id, updates);
+      
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: successorTask.projectId,
+        userId: req.user.id,
+        entityType: "task_dependency", 
+        entityId: updated.id,
+        action: "updated",
+        before: dependency,
+        after: updated,
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Task dependency update error:", error);
+      if (error instanceof Error && error.message.includes("Unauthorized")) {
+        return res.status(403).json({ error: "Unauthorized access to task dependency" });
+      }
+      res.status(400).json({ error: "Invalid update data" });
+    }
+  });
+
+  app.delete("/api/dd/task-dependencies/:id", async (req: any, res) => {
+    try {
+      // First, get the existing dependency to verify ownership before deletion
+      const dependency = await storage.getTaskDependency(req.params.id);
+      if (!dependency) {
+        return res.status(404).json({ error: "Task dependency not found" });
+      }
+
+      // Get both successor and predecessor tasks to verify project ownership
+      const [successorTask, predecessorTask] = await Promise.all([
+        storage.getTask(dependency.successorId),
+        storage.getTask(dependency.predecessorId)
+      ]);
+
+      if (!successorTask || !predecessorTask) {
+        return res.status(404).json({ error: "Associated tasks not found" });
+      }
+
+      // Verify both tasks belong to projects the user has access to
+      await Promise.all([
+        authorizeProjectAccess(successorTask.projectId, req.user.orgId),
+        authorizeProjectAccess(predecessorTask.projectId, req.user.orgId)
+      ]);
+
+      // Delete the dependency
+      await storage.deleteTaskDependency(req.params.id);
+      
+      // Create proper audit log with complete dependency details
+      await storage.createAuditLog({
+        projectId: successorTask.projectId,
+        userId: req.user.id,
+        entityType: "task_dependency",
+        entityId: req.params.id,
+        action: "deleted",
+        before: dependency,
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Task dependency deletion error:", error);
+      if (error instanceof Error && error.message.includes("Unauthorized")) {
+        return res.status(403).json({ error: "Unauthorized access to task dependency" });
+      }
+      res.status(500).json({ error: "Failed to delete task dependency" });
+    }
+  });
+
+  app.delete("/api/dd/tasks/:taskId/dependencies", async (req: any, res) => {
+    try {
+      const task = await storage.getTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      await authorizeProjectAccess(task.projectId, req.user.orgId);
+      
+      await storage.deleteTaskDependencies(req.params.taskId);
+      
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: task.projectId,
+        userId: req.user.id,
+        entityType: "task",
+        entityId: task.id,
+        action: "dependencies_cleared",
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete task dependencies" });
     }
   });
 

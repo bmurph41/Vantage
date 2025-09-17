@@ -14,10 +14,11 @@ import { StickyNote, GripVertical, FileText, Shield, ChevronUp, ChevronDown } fr
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate, setDeadlineTo5PM } from "@/lib/date-utils";
-import { calculateCriticalPath, isTaskCritical, getNearCriticalTasks, type CriticalPathResult } from "@/lib/critical-path";
+import { calculateUnifiedCriticalPath, isTaskCritical, getNearCriticalTasks, type CriticalPathResult } from "@/lib/critical-path-unified";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useProjectTaskDependencies } from "@/hooks/use-task-dependencies";
 import { ChevronTaskReorder } from "./chevron-task-reorder";
 import {
   DndContext,
@@ -752,17 +753,41 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
     [project, granularity]
   );
 
-  // Calculate critical path when tasks or showCriticalPath changes
+  // Fetch enhanced task dependencies for the project
+  const { 
+    data: enhancedDependencies, 
+    isLoading: dependenciesLoading, 
+    error: dependenciesError 
+  } = useProjectTaskDependencies(project.id);
+
+  // Calculate critical path when tasks, enhanced dependencies, or showCriticalPath changes
   const criticalPathResult = useMemo(() => {
     if (!showCriticalPath) return null;
     
     try {
-      return calculateCriticalPath(tasks, project, settings);
+      // Use unified critical path with enhanced dependencies when available
+      // If enhanced dependencies fail to load, fallback to legacy mode
+      const options = {
+        enhancedDependencies: dependenciesError ? null : enhancedDependencies,
+        enableEnhancedFeatures: !dependenciesError,
+      };
+      
+      return calculateUnifiedCriticalPath(tasks, project, settings, options);
     } catch (error) {
       console.warn('Critical path calculation failed:', error);
-      return null;
+      
+      // Fallback: try legacy mode if enhanced mode fails
+      try {
+        return calculateUnifiedCriticalPath(tasks, project, settings, {
+          enhancedDependencies: null,
+          enableEnhancedFeatures: false,
+        });
+      } catch (fallbackError) {
+        console.error('Both enhanced and legacy critical path calculations failed:', fallbackError);
+        return null;
+      }
     }
-  }, [tasks, project, settings, showCriticalPath]);
+  }, [tasks, project, settings, showCriticalPath, enhancedDependencies, dependenciesError]);
 
   // Get milestone position along timeline (0-100%)
   const getMilestonePosition = (dateString: string) => {
