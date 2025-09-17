@@ -225,6 +225,13 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
     }
   }, [open]);
 
+  // Auto-select all events when dialog opens and events are available
+  useEffect(() => {
+    if (open && events.length > 0 && selectedEventIds.size === 0) {
+      setSelectedEventIds(new Set(events.map((event: CalendarEvent) => event.id)));
+    }
+  }, [open, events, selectedEventIds.size]);
+
   // Event handlers
   const handleSelectAll = () => {
     if (selectedEventIds.size === filteredAndSortedEvents.length) {
