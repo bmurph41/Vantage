@@ -395,3 +395,162 @@ export function getProjectTimelineTicks(project: any, granularity: string): Date
   
   return ticks;
 }
+
+/**
+ * GRANULARITY-AWARE POSITIONING FUNCTIONS
+ * These functions align elements with the visible date grid instead of the full project timeline
+ */
+
+/**
+ * Calculate position percentage based on visible date grid ticks from granularity
+ * This ensures milestone dots and progress bars align with the actual displayed date grid
+ */
+export function percentOfGranularityRange(date: Date, project: any, granularity: string): number {
+  const { start: timelineStart, end: timelineEnd } = getProjectBounds(project);
+  const visibleTicks = getProjectTimelineTicks(project, granularity);
+  
+  // If no visible ticks or date is outside bounds, fall back to linear positioning
+  if (visibleTicks.length === 0) {
+    return percentOfRange(date, timelineStart, timelineEnd);
+  }
+  
+  // Clamp date to timeline bounds
+  const clampedDate = clampDate(date, timelineStart, timelineEnd);
+  
+  // Find the tick interval that contains this date
+  let leftTick = visibleTicks[0];
+  let rightTick = visibleTicks[visibleTicks.length - 1];
+  let leftIndex = 0;
+  let rightIndex = visibleTicks.length - 1;
+  
+  // Find the closest tick pair that brackets this date
+  for (let i = 0; i < visibleTicks.length - 1; i++) {
+    if (clampedDate >= visibleTicks[i] && clampedDate <= visibleTicks[i + 1]) {
+      leftTick = visibleTicks[i];
+      rightTick = visibleTicks[i + 1];
+      leftIndex = i;
+      rightIndex = i + 1;
+      break;
+    }
+  }
+  
+  // If date is before first tick, use first interval
+  if (clampedDate < visibleTicks[0]) {
+    leftTick = timelineStart;
+    rightTick = visibleTicks[0];
+    leftIndex = -1; // Special case for before first tick
+    rightIndex = 0;
+  }
+  
+  // If date is after last tick, use last interval
+  if (clampedDate > visibleTicks[visibleTicks.length - 1]) {
+    leftTick = visibleTicks[visibleTicks.length - 1];
+    rightTick = timelineEnd;
+    leftIndex = visibleTicks.length - 1;
+    rightIndex = visibleTicks.length; // Special case for after last tick
+  }
+  
+  // Calculate position within the tick interval
+  const tickIntervalDays = Math.max(1, differenceInCalendarDays(rightTick, leftTick));
+  const dateOffsetDays = differenceInCalendarDays(clampedDate, leftTick);
+  const intervalProgress = Math.max(0, Math.min(1, dateOffsetDays / tickIntervalDays));
+  
+  // Calculate grid positions for the ticks
+  let leftPosition: number;
+  let rightPosition: number;
+  
+  if (leftIndex === -1) {
+    // Special case: before first tick
+    leftPosition = 0;
+    rightPosition = percentOfRange(rightTick, timelineStart, timelineEnd);
+  } else if (rightIndex === visibleTicks.length) {
+    // Special case: after last tick
+    leftPosition = percentOfRange(leftTick, timelineStart, timelineEnd);
+    rightPosition = 100;
+  } else {
+    // Normal case: between two visible ticks
+    leftPosition = percentOfRange(leftTick, timelineStart, timelineEnd);
+    rightPosition = percentOfRange(rightTick, timelineStart, timelineEnd);
+  }
+  
+  // Interpolate between the tick positions
+  const finalPosition = leftPosition + (rightPosition - leftPosition) * intervalProgress;
+  
+  return Math.max(0, Math.min(100, finalPosition));
+}
+
+/**
+ * Get milestone position aligned with granularity-based date grid
+ * This replaces the simple percentOfRange approach for milestone positioning
+ */
+export function getMilestonePositionWithGranularity(dateString: string, project: any, granularity: string): number {
+  const date = parseISO(dateString);
+  return percentOfGranularityRange(date, project, granularity);
+}
+
+/**
+ * Calculate granularity-aware progress bar positioning for tasks
+ * Returns positioning data that aligns with the visible date grid
+ */
+export function getGranularityAwareProgressPositions(
+  task: any,
+  project: any,
+  granularity: string,
+  settings?: any
+): {
+  taskStart: Date;
+  taskDeadline: Date;
+  barStartPosition: number;
+  barEndPosition: number;
+  todayPosition: number;
+  timelineStart: Date;
+  timelineEnd: Date;
+} {
+  const today = startOfDay(tzNow('America/New_York'));
+  const { start: timelineStart, end: timelineEnd } = getProjectBounds(project);
+  
+  // Calculate individual task start date
+  const taskStart = startOfDay(task.startDate 
+    ? parseISO(task.startDate) 
+    : project.psaSignedDate 
+      ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
+      : today);
+  
+  // Calculate individual task deadline using same logic as existing components
+  const calculateTaskDeadline = (task: any): Date => {
+    if (task.deadline) {
+      return parseISO(task.deadline);
+    } else if (task.deadlineType === 'dd_expiration' && project.ddExpirationDate) {
+      return parseISO(project.ddExpirationDate);
+    } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project.psaSignedDate) {
+      const psaDate = parseISO(project.psaSignedDate);
+      return addDays(psaDate, task.deadlineDays);
+    } else {
+      const startDate = task.startDate 
+        ? parseISO(task.startDate) 
+        : project.psaSignedDate 
+          ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
+          : today;
+      
+      const defaultDuration = task.priority === 'high' ? 5 : task.priority === 'med' ? 10 : 21;
+      return addDays(startDate, defaultDuration);
+    }
+  };
+  
+  const taskDeadline = setDeadlineTo5PM(calculateTaskDeadline(task));
+  
+  // Use granularity-aware positioning for all elements
+  const barStartPosition = percentOfGranularityRange(timelineStart, project, granularity); // PSA start position
+  const barEndPosition = percentOfGranularityRange(taskDeadline, project, granularity);
+  const todayPosition = percentOfGranularityRange(today, project, granularity);
+  
+  return {
+    taskStart,
+    taskDeadline,
+    barStartPosition,
+    barEndPosition,
+    todayPosition,
+    timelineStart,
+    timelineEnd
+  };
+}

@@ -13,7 +13,7 @@ import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, each
 import { StickyNote, GripVertical, FileText, Shield, ChevronUp, ChevronDown } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
-import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate, setDeadlineTo5PM } from "@/lib/date-utils";
+import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate, setDeadlineTo5PM, getMilestonePositionWithGranularity } from "@/lib/date-utils";
 import { calculateUnifiedCriticalPath, isTaskCritical, getNearCriticalTasks, type CriticalPathResult } from "@/lib/critical-path-unified";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -247,6 +247,7 @@ interface SortableTaskItemProps {
   sortedTasks?: Task[];
   onMoveTaskUp?: (taskId: string) => void;
   onMoveTaskDown?: (taskId: string) => void;
+  granularity?: string; // Add granularity prop for timeline alignment
 }
 
 function SortableTaskItem({
@@ -266,7 +267,8 @@ function SortableTaskItem({
   useChevronControls = false,
   sortedTasks = [],
   onMoveTaskUp,
-  onMoveTaskDown
+  onMoveTaskDown,
+  granularity = 'weekly' // Add granularity prop with default
 }: SortableTaskItemProps) {
   const [docRequirementsDialogOpen, setDocRequirementsDialogOpen] = useState(false);
   
@@ -471,6 +473,7 @@ function SortableTaskItem({
           project={project} 
           settings={settings}
           onTaskClick={onTaskClick}
+          granularity={granularity} // Pass granularity for timeline alignment
           className={`shadow-sm ${
             isCritical ? 'ring-2 ring-red-200' : ''
           }`}
@@ -789,11 +792,10 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
     }
   }, [tasks, project, settings, showCriticalPath, enhancedDependencies, dependenciesError]);
 
-  // Get milestone position along timeline (0-100%)
-  const getMilestonePosition = (dateString: string) => {
-    const date = parseISO(dateString);
-    return percentOfRange(date, timelineStart, timelineEnd);
-  };
+  // Get milestone position along timeline (0-100%) - now granularity-aware
+  const getMilestonePosition = useCallback((dateString: string) => {
+    return getMilestonePositionWithGranularity(dateString, project, granularity);
+  }, [project, granularity]);
 
   return (
     <div className="space-y-6" data-testid="timeline-view">
@@ -1073,7 +1075,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                         {project.psaSignedDate && (
                           <div 
                             className="absolute top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer"
-                            style={{ left: "0%" }}
+                            style={{ left: `${getMilestonePosition(project.psaSignedDate)}%` }}
                             data-testid="milestone-psa"
                           >
                             <div className="w-4 h-4 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 rounded-full border-3 border-white shadow-xl hover:scale-150 transition-all duration-300 hover:shadow-2xl ring-2 ring-blue-200/60 hover:ring-blue-300/80" />
@@ -1107,7 +1109,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                         {project.closingDate && (
                           <div 
                             className="absolute top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer"
-                            style={{ left: "100%" }}
+                            style={{ left: `${getMilestonePosition(project.closingDate)}%` }}
                             data-testid="milestone-closing"
                           >
                             <div className="w-4 h-4 bg-gradient-to-br from-green-400 via-green-500 to-green-600 rounded-full border-3 border-white shadow-xl hover:scale-150 transition-all duration-300 hover:shadow-2xl ring-2 ring-green-200/60 hover:ring-green-300/80" />
@@ -1269,6 +1271,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                             sortedTasks={sortedTasks}
                             onMoveTaskUp={handleMoveTaskUp}
                             onMoveTaskDown={handleMoveTaskDown}
+                            granularity={granularity} // Pass granularity for timeline alignment
                           />
                         </div>
                       );

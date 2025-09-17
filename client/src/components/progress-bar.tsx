@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { effectiveStart, effectiveDue, daysBetween, tzNow, getProjectBounds, percentOfRange, clampDate, setDeadlineTo5PM } from "@/lib/date-utils";
+import { effectiveStart, effectiveDue, daysBetween, tzNow, getProjectBounds, percentOfRange, clampDate, setDeadlineTo5PM, getGranularityAwareProgressPositions } from "@/lib/date-utils";
 import { startOfDay, isAfter, isBefore, parseISO, addDays } from "date-fns";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 
@@ -9,89 +9,56 @@ interface ProgressBarProps {
   settings?: ProjectSettings | null;
   className?: string;
   onTaskClick?: (taskId: string) => void;
+  granularity?: string; // Add granularity prop for timeline alignment
 }
 
-export function ProgressBar({ task, project, settings, className, onTaskClick }: ProgressBarProps) {
+export function ProgressBar({ task, project, settings, className, onTaskClick, granularity = 'weekly' }: ProgressBarProps) {
   const today = startOfDay(tzNow('America/New_York'));
   
-  // Get fixed project timeline bounds (PSA Signed Date to Closing Date)
-  const { start: timelineStart, end: timelineEnd } = getProjectBounds(project);
-  
-  // Calculate individual task start date
-  const taskStart = startOfDay(task.startDate 
-    ? parseISO(task.startDate) 
-    : project.psaSignedDate 
-      ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
-      : today);
-  
-  // Calculate individual task deadline using same logic as reports
-  const calculateTaskDeadline = (task: Task): Date => {
-    // First priority: Use direct deadline field if set
-    if (task.deadline) {
-      return parseISO(task.deadline);
-    } else if (task.deadlineType === 'dd_expiration' && project.ddExpirationDate) {
-      return parseISO(project.ddExpirationDate);
-    } else if (task.deadlineType === 'days_after_psa' && task.deadlineDays && project.psaSignedDate) {
-      const psaDate = parseISO(project.psaSignedDate);
-      return addDays(psaDate, task.deadlineDays);
-    } else {
-      // Enhanced fallback calculation for tasks without specific deadline types
-      const startDate = task.startDate 
-        ? parseISO(task.startDate) 
-        : project.psaSignedDate 
-          ? addDays(parseISO(project.psaSignedDate), task.startOffsetDays || 0)
-          : today;
-      
-      // Use smart defaults based on priority for task duration
-      const defaultDuration = task.priority === 'high' ? 5 : task.priority === 'med' ? 10 : 21;
-      
-      return addDays(startDate, defaultDuration);
-    }
-  };
-  
-  const taskDeadline = setDeadlineTo5PM(calculateTaskDeadline(task));
+  // Use granularity-aware positioning for timeline alignment
+  const {
+    taskStart,
+    taskDeadline,
+    barStartPosition,
+    barEndPosition,
+    todayPosition,
+    timelineStart,
+    timelineEnd
+  } = getGranularityAwareProgressPositions(task, project, granularity, settings);
   
   // Calculate task status variables first - these are used throughout the component
   const isCompleted = task.status === 'completed';
   const isOverdue = !isCompleted && isAfter(today, taskDeadline);
   const isNotStarted = isBefore(today, taskStart);
   
-  // ALL BARS START FROM PSA: Progress bars span from PSA start to task deadline
-  const psaStartPosition = percentOfRange(timelineStart, timelineStart, timelineEnd); // PSA start is 0%
-  const taskDeadlinePosition = percentOfRange(taskDeadline, timelineStart, timelineEnd);
-  const todayPosition = percentOfRange(today, timelineStart, timelineEnd);
-  
   // Progress bar spans from PSA start to task deadline (full duration)
-  const barStartPosition = psaStartPosition; // Always start at PSA
-  const barEndPosition = taskDeadlinePosition;
   const barWidth = Math.max(1, barEndPosition - barStartPosition);
   
   // Calculate elapsed time within the task timeline
-  // CRITICAL FIX: Only show elapsed progress if task has actually started
   let elapsedEndPosition: number;
   let elapsedWidth: number;
   let remainingWidth: number;
   
   if (isCompleted) {
     // For completed tasks, elapsed goes from PSA to today (or deadline if past today)
-    elapsedEndPosition = Math.min(todayPosition, taskDeadlinePosition);
-    elapsedWidth = Math.max(0, Math.min(todayPosition, taskDeadlinePosition) - psaStartPosition);
-    remainingWidth = Math.max(0, taskDeadlinePosition - Math.min(todayPosition, taskDeadlinePosition));
+    elapsedEndPosition = Math.min(todayPosition, barEndPosition);
+    elapsedWidth = Math.max(0, Math.min(todayPosition, barEndPosition) - barStartPosition);
+    remainingWidth = Math.max(0, barEndPosition - Math.min(todayPosition, barEndPosition));
   } else if (isNotStarted) {
     // For tasks that haven't started, elapsed goes from PSA to today
     elapsedEndPosition = todayPosition;
-    elapsedWidth = Math.max(0, todayPosition - psaStartPosition);
-    remainingWidth = Math.max(0, taskDeadlinePosition - todayPosition);
+    elapsedWidth = Math.max(0, todayPosition - barStartPosition);
+    remainingWidth = Math.max(0, barEndPosition - todayPosition);
   } else if (isOverdue) {
     // For overdue tasks, elapsed goes from PSA to today
     elapsedEndPosition = todayPosition;
-    elapsedWidth = Math.max(0, todayPosition - psaStartPosition);
-    remainingWidth = Math.max(0, taskDeadlinePosition - todayPosition);
+    elapsedWidth = Math.max(0, todayPosition - barStartPosition);
+    remainingWidth = Math.max(0, barEndPosition - todayPosition);
   } else {
     // For in-progress tasks, elapsed goes from PSA to today (never past deadline)
-    elapsedEndPosition = Math.min(todayPosition, taskDeadlinePosition);
-    elapsedWidth = Math.max(0, Math.min(todayPosition, taskDeadlinePosition) - psaStartPosition);
-    remainingWidth = Math.max(0, taskDeadlinePosition - Math.min(todayPosition, taskDeadlinePosition));
+    elapsedEndPosition = Math.min(todayPosition, barEndPosition);
+    elapsedWidth = Math.max(0, Math.min(todayPosition, barEndPosition) - barStartPosition);
+    remainingWidth = Math.max(0, barEndPosition - Math.min(todayPosition, barEndPosition));
   }
   
   // Calculate progress statistics for labels
@@ -159,7 +126,7 @@ export function ProgressBar({ task, project, settings, className, onTaskClick }:
       <div 
         className="absolute -top-6 z-10"
         style={{
-          left: `${percentOfRange(taskStart, timelineStart, timelineEnd) + (taskDeadlinePosition - percentOfRange(taskStart, timelineStart, timelineEnd))/2}%`,
+          left: `${barStartPosition + (barEndPosition - barStartPosition)/2}%`,
           transform: 'translateX(-50%)'
         }}
       >
