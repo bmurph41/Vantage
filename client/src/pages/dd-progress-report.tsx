@@ -27,7 +27,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import type { Project, Task } from "@shared/schema";
+import type { Project, Task, Risk, ProjectSettings } from "@shared/schema";
+import type { ProjectWithDetails } from "@/types/dd";
 
 // Helper function for EST start of day
 function startOfDayEST(date: Date): Date {
@@ -50,7 +51,7 @@ export default function DDProgressReportPage() {
   // Handle export PDF
   const handleExportPDF = () => {
     if (project && tasks) {
-      generateWhitePaperPDF(project, tasks);
+      generateWhitePaperPDF(project, tasks, risks, riskAnalytics, settings);
     }
   };
 
@@ -59,18 +60,30 @@ export default function DDProgressReportPage() {
     window.print();
   };
   
-  // Fetch project data
-  const { data: project, isLoading: projectLoading, error: projectError } = useQuery<Project>({
+  // Fetch project data (this returns ProjectWithDetails which includes project, settings, and tasks)
+  const { data: projectData, isLoading: projectLoading, error: projectError } = useQuery<ProjectWithDetails>({
     queryKey: ['/api/dd/projects', projectId],
     enabled: !!projectId,
   });
 
-  const { data: tasks = [], isLoading: tasksLoading, error: tasksError } = useQuery<Task[]>({
-    queryKey: ['/api/dd/projects', projectId, 'tasks'],
+  // Extract individual pieces from ProjectWithDetails
+  const project = projectData?.project;
+  const tasks = projectData?.tasks || [];
+  const settings = projectData?.settings;
+
+  // Fetch risks data for PDF export
+  const { data: risks = [] } = useQuery<Risk[]>({
+    queryKey: ['/api/dd/projects', projectId, 'risks'],
     enabled: !!projectId,
   });
 
-  if (projectLoading || tasksLoading) {
+  // Fetch risk analytics for PDF export
+  const { data: riskAnalytics = null } = useQuery({
+    queryKey: ['/api/dd/projects', projectId, 'risks', 'analytics'],
+    enabled: !!projectId,
+  });
+
+  if (projectLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -81,7 +94,7 @@ export default function DDProgressReportPage() {
     );
   }
 
-  if (projectError || tasksError || !project) {
+  if (projectError || !project) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
