@@ -235,6 +235,7 @@ interface SortableTaskItemProps {
   isCritical: boolean;
   criticalInfo: any;
   isNearingDeadline: boolean;
+  deadlineUrgency: 'completed' | 'overdue' | 'urgent' | 'warning' | 'normal';
   showCriticalPath: boolean;
   onOpenNotes: (taskId: string) => void;
   getTaskNoteCount: (taskId: string) => number;
@@ -254,6 +255,7 @@ function SortableTaskItem({
   isCritical,
   criticalInfo,
   isNearingDeadline,
+  deadlineUrgency,
   showCriticalPath,
   onOpenNotes,
   getTaskNoteCount,
@@ -302,9 +304,11 @@ function SortableTaskItem({
             ? 'bg-blue-50 border-blue-200 shadow-lg scale-105 transform'
             : isCritical 
               ? 'bg-red-50 border-red-200 shadow-md' 
-              : isNearingDeadline
-                ? 'bg-amber-50 border-amber-200 shadow-sm'
-                : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:shadow-sm'
+              : deadlineUrgency === 'overdue' || deadlineUrgency === 'urgent'
+                ? 'bg-red-50 border-red-200 shadow-sm'
+                : deadlineUrgency === 'warning'
+                  ? 'bg-orange-50 border-orange-200 shadow-sm'
+                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:shadow-sm'
       }`}
       data-testid={`sortable-task-${task.id}`}
     >
@@ -1193,17 +1197,23 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                       const isCritical = showCriticalPath && criticalPathResult ? isTaskCritical(task.id, criticalPathResult) : false;
                       const criticalInfo = showCriticalPath && criticalPathResult ? criticalPathResult.nodes.get(task.id) : null;
                       
-                      // Check if task is nearing deadline (within 5 days and not completed)
-                      const isNearingDeadline = (() => {
-                        if (task.status === 'completed') return false;
-                        if (!task.deadline) return false;
+                      // Calculate deadline urgency levels for box coloring
+                      const deadlineUrgency = (() => {
+                        if (task.status === 'completed') return 'completed';
+                        if (!task.deadline) return 'normal';
                         
                         const today = startOfDay(tzNow('America/New_York'));
                         const deadline = setDeadlineTo5PM(task.deadline);
                         const daysUntilDeadline = differenceInCalendarDays(deadline, today);
                         
-                        return daysUntilDeadline >= 0 && daysUntilDeadline <= 5;
+                        if (daysUntilDeadline < 0) return 'overdue';
+                        if (daysUntilDeadline <= 5) return 'urgent';
+                        if (daysUntilDeadline >= 6 && daysUntilDeadline <= 14) return 'warning';
+                        return 'normal';
                       })();
+                      
+                      // Legacy prop for backward compatibility
+                      const isNearingDeadline = deadlineUrgency === 'urgent' || deadlineUrgency === 'warning';
                       
                       return (
                         <div
@@ -1223,6 +1233,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                             isCritical={isCritical}
                             criticalInfo={criticalInfo}
                             isNearingDeadline={isNearingDeadline}
+                            deadlineUrgency={deadlineUrgency}
                             showCriticalPath={showCriticalPath}
                             onOpenNotes={setNotesDialogTaskId}
                             getTaskNoteCount={getTaskNoteCount}
