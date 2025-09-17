@@ -155,11 +155,17 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
-          <Button variant="outline" onClick={() => setIsCalendarDialogOpen(true)} data-testid="button-add-to-calendar">
+          {/* Prominent Calendar Export Button */}
+          <Button 
+            variant="default" 
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md"
+            onClick={() => setIsCalendarDialogOpen(true)} 
+            data-testid="button-export-calendar"
+          >
             <Calendar className="h-4 w-4 mr-2" />
-            Add to Calendar
+            Export to Calendar
           </Button>
-          <Button onClick={() => setIsShareDialogOpen(true)} data-testid="button-share">
+          <Button variant="outline" onClick={() => setIsShareDialogOpen(true)} data-testid="button-share">
             <Share2 className="h-4 w-4 mr-2" />
             Share Project
           </Button>

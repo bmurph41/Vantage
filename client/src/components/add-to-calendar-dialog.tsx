@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -321,9 +321,42 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
             <Calendar className="h-5 w-5" />
             Calendar Events: {project.name}
           </DialogTitle>
+          <DialogDescription>
+            Manage and download calendar events for your project. Sync tasks to create events, filter by type and status, and export selected events to your calendar application.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col h-[80vh]">
+        {/* Prominent Sync Section */}
+        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-full">
+                <RefreshCw className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 className="font-medium text-blue-900 dark:text-blue-100">Sync Project Tasks</h3>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Convert your project tasks with deadlines into calendar events for easy scheduling.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleSyncEvents}
+              disabled={syncEventsMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              data-testid="button-sync-events-prominent"
+            >
+              {syncEventsMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              {syncEventsMutation.isPending ? "Syncing..." : "Sync Tasks to Calendar"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-col h-[75vh]">
           {/* Controls Section */}
           <div className="space-y-4 pb-4">
             {/* Search and Sync */}
