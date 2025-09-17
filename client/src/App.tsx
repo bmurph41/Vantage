@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard";
 import ProjectPage from "@/pages/project";
 import NotificationSettingsPage from "@/pages/notification-settings";
+import DDProgressReportPage from "@/pages/dd-progress-report";
 import SortableListDemo from "@/pages/demo/SortableListDemo";
 import NotFound from "@/pages/not-found";
 
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/projects/:id" component={ProjectPage} />
       <Route path="/projects/:id/notifications" component={NotificationSettingsWrapper} />
+      <Route path="/projects/:id/progress-report" component={DDProgressReportPage} />
       <Route path="/demo/sortable" component={SortableListDemo} />
       <Route component={NotFound} />
     </Switch>
