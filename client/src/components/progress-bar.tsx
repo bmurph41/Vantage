@@ -196,11 +196,13 @@ export function ProgressBar({ task, project, settings, className, onTaskClick }:
           />
         )}
         
-        {/* Remaining time section (today to task deadline) - striped pattern */}
+        {/* Remaining time section (today to task deadline) - enhanced visual distinction */}
         {remainingWidth > 0 && !isCompleted && (
           <div 
-            className={`h-full absolute relative overflow-hidden ${
-              isOverdue ? 'bg-red-100' : 'bg-gray-50'
+            className={`h-full absolute relative overflow-hidden border-l-2 ${
+              isOverdue 
+                ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300' 
+                : 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-300'
             }`}
             style={{
               left: `${(elapsedWidth / barWidth) * 100}%`,
@@ -208,21 +210,43 @@ export function ProgressBar({ task, project, settings, className, onTaskClick }:
             }}
             data-testid="progress-remaining"
           >
-            {/* Diagonal striped pattern for remaining time */}
+            {/* Enhanced visual pattern for remaining time */}
             <div 
               className={`absolute inset-0 ${
-                isOverdue ? 'bg-red-200' : 'bg-blue-200'
+                isOverdue ? 'bg-red-200/40' : 'bg-blue-200/40'
               }`}
               style={{
                 backgroundImage: `repeating-linear-gradient(
                   45deg,
                   transparent,
-                  transparent 4px,
-                  rgba(255,255,255,0.3) 4px,
-                  rgba(255,255,255,0.3) 8px
+                  transparent 3px,
+                  rgba(255,255,255,0.6) 3px,
+                  rgba(255,255,255,0.6) 6px
+                ),
+                repeating-linear-gradient(
+                  -45deg,
+                  transparent,
+                  transparent 6px,
+                  rgba(255,255,255,0.2) 6px,
+                  rgba(255,255,255,0.2) 12px
                 )`
               }}
             />
+            
+            {/* Remaining time indicator overlay */}
+            {remaining > 0 && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className={`text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm border shadow-sm ${
+                  isOverdue 
+                    ? 'bg-red-600/20 border-red-400/30 text-red-800' 
+                    : remaining <= 5
+                      ? 'bg-orange-600/20 border-orange-400/30 text-orange-800'
+                      : 'bg-blue-600/20 border-blue-400/30 text-blue-800'
+                }`}>
+                  {getTimeLabel(remaining)} left
+                </div>
+              </div>
+            )}
           </div>
         )}
         
