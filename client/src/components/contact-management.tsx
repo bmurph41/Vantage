@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Plus, Search, Edit, Trash2, Mail, Phone, Clock, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Contact } from "@shared/schema";
+import type { Contact, Task } from "@shared/schema";
 
 const contactSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -53,6 +53,25 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch tasks to get company representative information
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
+    queryKey: ['/api/dd/tasks', projectId],
+    enabled: !!projectId,
+  });
+
+  // Extract company representatives from tasks
+  const companyRepresentatives = tasks
+    .filter(task => task.repName && task.repEmail) // Only include tasks with rep information
+    .map(task => ({
+      id: `rep-${task.id}`,
+      name: task.repName!,
+      email: task.repEmail!,
+      phone: task.repPhone || undefined,
+      company: task.companyHired || 'Unknown Company',
+      type: 'company_rep' as const,
+      taskTitle: task.title,
+    }));
 
   const form = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
@@ -180,12 +199,19 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
     URL.revokeObjectURL(url);
   };
 
-  const filteredContacts = contacts.filter(contact =>
+  // Combine user contacts and company representatives for filtering
+  const allContacts = [
+    ...contacts.map(c => ({ ...c, type: 'user_contact' as const })),
+    ...companyRepresentatives
+  ];
+
+  const filteredContacts = allContacts.filter(contact =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.email.toLowerCase().includes(searchTerm.toLowerCase())
+    contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    ('company' in contact && contact.company.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  if (isLoading) {
+  if (isLoading || tasksLoading) {
     return (
       <div className="space-y-4">
         <div className="h-10 bg-muted rounded animate-pulse"></div>
@@ -341,9 +367,14 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-foreground mb-1" data-testid={`contact-name-${contact.id}`}>
-                      {contact.name}
-                    </h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-semibold text-foreground" data-testid={`contact-name-${contact.id}`}>
+                        {contact.name}
+                      </h3>
+                      <Badge variant={contact.type === 'user_contact' ? 'default' : 'secondary'} className="text-xs">
+                        {contact.type === 'user_contact' ? 'Contact' : 'Company Rep'}
+                      </Badge>
+                    </div>
                     <div className="space-y-1">
                       <div className="flex items-center text-sm text-muted-foreground">
                         <Mail className="h-3 w-3 mr-2" />
@@ -355,16 +386,31 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                           <span data-testid={`contact-phone-${contact.id}`}>{contact.phone}</span>
                         </div>
                       )}
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Clock className="h-3 w-3 mr-2" />
-                        <span data-testid={`contact-timezone-${contact.id}`}>
-                          {timezones.find(tz => tz.value === contact.timezone)?.label || contact.timezone}
-                        </span>
-                      </div>
+                      {contact.type === 'user_contact' && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Clock className="h-3 w-3 mr-2" />
+                          <span data-testid={`contact-timezone-${contact.id}`}>
+                            {timezones.find(tz => tz.value === contact.timezone)?.label || contact.timezone}
+                          </span>
+                        </div>
+                      )}
+                      {contact.type === 'company_rep' && 'company' in contact && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <span className="font-medium mr-1">Company:</span>
+                          <span data-testid={`contact-company-${contact.id}`}>{contact.company}</span>
+                        </div>
+                      )}
+                      {contact.type === 'company_rep' && 'taskTitle' in contact && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <span className="font-medium mr-1">Task:</span>
+                          <span data-testid={`contact-task-${contact.id}`}>{contact.taskTitle}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center space-x-1 ml-2">
-                    <Dialog open={editingContact?.id === contact.id} onOpenChange={(open) => !open && setEditingContact(null)}>
+                  {contact.type === 'user_contact' && (
+                    <div className="flex items-center space-x-1 ml-2">
+                      <Dialog open={editingContact?.id === contact.id} onOpenChange={(open) => !open && setEditingContact(null)}>
                       <DialogTrigger asChild>
                         <Button 
                           variant="ghost" 
@@ -500,7 +546,8 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
-                  </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
