@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { TaskFiles } from "./task-files";
 import type { Contact, Task } from "@shared/schema";
 
 const contactSchema = z.object({
@@ -65,6 +66,7 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
     .filter(task => task.repName && task.repEmail) // Only include tasks with rep information
     .map(task => ({
       id: `rep-${task.id}`,
+      taskId: task.id, // Keep the original task ID for file queries
       name: task.repName!,
       email: task.repEmail!,
       phone: task.repPhone || undefined,
@@ -404,6 +406,18 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                         <div className="flex items-center text-sm text-muted-foreground">
                           <span className="font-medium mr-1">Task:</span>
                           <span data-testid={`contact-task-${contact.id}`}>{contact.taskTitle}</span>
+                        </div>
+                      )}
+                      
+                      {/* Show associated files for company representatives */}
+                      {contact.type === 'company_rep' && 'taskId' in contact && (
+                        <div className="mt-3 pt-2 border-t">
+                          <TaskFiles 
+                            taskId={contact.taskId} 
+                            taskTitle={contact.taskTitle}
+                            compact={true}
+                            readOnly={true}
+                          />
                         </div>
                       )}
                     </div>

@@ -24,6 +24,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { marinaDueDiligenceTaskTemplates, taskCategories, searchTasks, type TaskTemplate } from "@/data/marina-due-diligence-tasks";
 import { DocumentRequirementsManagement } from "./document-requirements-management";
 import { TaskCompletionGate } from "./task-completion-gate";
+import { TaskFiles } from "./task-files";
 import type { Task } from "@shared/schema";
 
 // Task Owner Selector Component
@@ -1920,6 +1921,17 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     data-testid="textarea-notes"
                   />
                 </div>
+
+                {/* File Attachments - Only show when editing existing task */}
+                {editingTask && (
+                  <div className="space-y-2">
+                    <TaskFiles 
+                      taskId={editingTask.id} 
+                      taskTitle={editingTask.title}
+                      compact={true}
+                    />
+                  </div>
+                )}
 
                 {/* Template Info */}
                 {selectedTemplate && selectedTemplate.typicalCompanies && (

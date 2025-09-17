@@ -2,16 +2,16 @@ import {
   organizations, users, projects, projectSettings, tasks, 
   projectTemplates, auditLogs, timelineNotes, projectShares, risks,
   contacts, notificationSubscriptions, notificationsLog, calendarEvents,
-  documentRequirements, projectIntegrations, taskDependencies,
+  documentRequirements, projectIntegrations, taskDependencies, taskFiles,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type Contact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
-  type DocumentRequirement, type ProjectIntegration, type TaskDependency,
+  type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
   type InsertContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
-  type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency
+  type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -46,6 +46,12 @@ export interface IStorage {
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, updates: Partial<InsertTask>): Promise<Task>;
   deleteTask(id: string): Promise<void>;
+
+  // Task Files
+  getTaskFile(id: string): Promise<TaskFile | undefined>;
+  getTaskFilesForTask(taskId: string): Promise<TaskFile[]>;
+  createTaskFile(file: InsertTaskFile): Promise<TaskFile>;
+  deleteTaskFile(id: string): Promise<void>;
 
   // Project Shares
   getProjectShare(shareToken: string): Promise<ProjectShare | undefined>;
@@ -1616,6 +1622,28 @@ export class DatabaseStorage implements IStorage {
       .where(
         sql`${taskDependencies.successorId} = ${taskId} OR ${taskDependencies.predecessorId} = ${taskId}`
       );
+  }
+
+  // Task File Management
+  async getTaskFile(id: string): Promise<TaskFile | undefined> {
+    const [file] = await db.select().from(taskFiles).where(eq(taskFiles.id, id));
+    return file || undefined;
+  }
+
+  async getTaskFilesForTask(taskId: string): Promise<TaskFile[]> {
+    return db.select()
+      .from(taskFiles)
+      .where(eq(taskFiles.taskId, taskId))
+      .orderBy(desc(taskFiles.createdAt));
+  }
+
+  async createTaskFile(file: InsertTaskFile): Promise<TaskFile> {
+    const [created] = await db.insert(taskFiles).values(file).returning();
+    return created;
+  }
+
+  async deleteTaskFile(id: string): Promise<void> {
+    await db.delete(taskFiles).where(eq(taskFiles.id, id));
   }
 }
 

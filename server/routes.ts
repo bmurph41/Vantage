@@ -11,11 +11,14 @@ import {
   insertTimelineNoteSchema, insertProjectShareSchema, insertRiskSchema,
   insertContactSchema, updateContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema,
   insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema,
-  insertTaskDependencySchema
+  insertTaskDependencySchema, insertTaskFileSchema
 } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
 import { WebhookSecurity, type WebhookEvent } from "./webhook-security";
+import multer from "multer";
+import path from "path";
+import fs from "fs-extra";
 
 // Calendar validation schemas
 const calendarQuerySchema = z.object({
@@ -878,6 +881,191 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete task dependencies" });
+    }
+  });
+
+  // File Upload Configuration
+  const storage_config = multer.diskStorage({
+    destination: async (req: any, file: any, cb: any) => {
+      const { taskId } = req.params;
+      const task = await storage.getTask(taskId);
+      if (!task) {
+        return cb(new Error("Task not found"), "");
+      }
+      const uploadPath = path.join("server/uploads", task.projectId, taskId);
+      await fs.ensureDir(uploadPath);
+      cb(null, uploadPath);
+    },
+    filename: (req: any, file: any, cb: any) => {
+      // Generate UUID filename to prevent conflicts and security issues
+      const uuid = crypto.randomUUID();
+      const ext = path.extname(file.originalname);
+      const filename = `${uuid}${ext}`;
+      cb(null, filename);
+    }
+  });
+
+  const upload = multer({
+    storage: storage_config,
+    limits: {
+      fileSize: 20 * 1024 * 1024, // 20MB max
+    },
+    fileFilter: (req: any, file: any, cb: any) => {
+      // Allowed mime types
+      const allowedTypes = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/png',
+        'image/jpeg',
+        'image/jpg'
+      ];
+      
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only PDF, DOCX, XLSX, PNG, JPG files are allowed.'), false);
+      }
+    }
+  });
+
+  // Task File Management
+  app.post("/api/dd/tasks/:taskId/files", upload.single('file'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const task = await storage.getTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      await authorizeProjectAccess(task.projectId, req.user.orgId);
+
+      // Create file record in database
+      const fileData = insertTaskFileSchema.parse({
+        projectId: task.projectId,
+        taskId: req.params.taskId,
+        name: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        storageProvider: "local",
+        storagePath: req.file.path,
+        uploadedBy: req.user.id,
+        visibility: "org",
+        notes: req.body.notes || null,
+      });
+
+      const file = await storage.createTaskFile(fileData);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: task.projectId,
+        userId: req.user.id,
+        entityType: "task_file",
+        entityId: file.id,
+        action: "uploaded",
+        after: file,
+      });
+
+      res.json(file);
+    } catch (error: any) {
+      // Clean up uploaded file if database operation fails
+      if (req.file && req.file.path) {
+        try {
+          await fs.unlink(req.file.path);
+        } catch (unlinkError) {
+          console.error('Failed to clean up uploaded file:', unlinkError);
+        }
+      }
+      
+      if (error.message?.includes('Invalid file type')) {
+        return res.status(400).json({ error: error.message });
+      }
+      
+      console.error("Error uploading file:", error);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
+  app.get("/api/dd/tasks/:taskId/files", async (req: any, res) => {
+    try {
+      const task = await storage.getTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      await authorizeProjectAccess(task.projectId, req.user.orgId);
+
+      const files = await storage.getTaskFilesForTask(req.params.taskId);
+      res.json(files);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch files" });
+    }
+  });
+
+  app.get("/api/dd/files/:fileId", async (req: any, res) => {
+    try {
+      const file = await storage.getTaskFile(req.params.fileId);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      await authorizeProjectAccess(file.projectId, req.user.orgId);
+
+      // Check if file exists on disk
+      const fileExists = await fs.pathExists(file.storagePath);
+      if (!fileExists) {
+        return res.status(404).json({ error: "File not found on disk" });
+      }
+
+      // Set proper headers for file download
+      res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+      res.setHeader('Content-Type', file.mimeType);
+      
+      // Stream file to response
+      const fileStream = fs.createReadStream(file.storagePath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      res.status(500).json({ error: "Failed to download file" });
+    }
+  });
+
+  app.delete("/api/dd/files/:fileId", async (req: any, res) => {
+    try {
+      const file = await storage.getTaskFile(req.params.fileId);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      await authorizeProjectAccess(file.projectId, req.user.orgId);
+
+      // Delete file from disk
+      try {
+        await fs.unlink(file.storagePath);
+      } catch (unlinkError) {
+        console.warn('File not found on disk, continuing with database deletion:', unlinkError);
+      }
+
+      // Delete file record from database
+      await storage.deleteTaskFile(req.params.fileId);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: file.projectId,
+        userId: req.user.id,
+        entityType: "task_file",
+        entityId: file.id,
+        action: "deleted",
+        before: file,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      res.status(500).json({ error: "Failed to delete file" });
     }
   });
 
