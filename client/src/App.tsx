@@ -7,6 +7,7 @@ import Dashboard from "@/pages/dashboard";
 import ProjectPage from "@/pages/project";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import ReportsPage from "@/pages/reports";
+import SortableListDemo from "@/pages/demo/SortableListDemo";
 import NotFound from "@/pages/not-found";
 
 // Wrapper component to handle router props for notification settings
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/projects/:id" component={ProjectPage} />
       <Route path="/projects/:id/notifications" component={NotificationSettingsWrapper} />
       <Route path="/reports" component={ReportsPage} />
+      <Route path="/demo/sortable" component={SortableListDemo} />
       <Route component={NotFound} />
     </Switch>
   );
