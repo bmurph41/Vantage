@@ -133,6 +133,16 @@ export function ProgressBar({ task, project, settings, className, onTaskClick }:
     return "text-black";
   };
 
+  // Get border color class based on remaining days and task status
+  const getBorderColorClass = () => {
+    if (isOverdue || remaining <= 5) {
+      return "border-red-200/80";
+    } else if (remaining >= 6 && remaining <= 14) {
+      return "border-orange-200/80";
+    }
+    return "border-gray-200/80";
+  };
+
   const handleClick = () => {
     if (onTaskClick) {
       onTaskClick(task.id);
@@ -162,11 +172,11 @@ export function ProgressBar({ task, project, settings, className, onTaskClick }:
             Overdue ({getTimeLabel(elapsed)} elapsed)
           </span>
         ) : isNotStarted ? (
-          <span className={`${getTextColorClass()} text-xs font-semibold px-3 py-1 bg-white/90 backdrop-blur-sm rounded-md border border-gray-200/80 shadow-sm text-center whitespace-nowrap leader-obstacle`}>
+          <span className={`${getTextColorClass()} text-xs font-semibold px-3 py-1 bg-white/90 backdrop-blur-sm rounded-md border ${getBorderColorClass()} shadow-sm text-center whitespace-nowrap leader-obstacle`}>
             {getTimeLabel(taskDurationDays)} remaining
           </span>
         ) : (
-          <span className={`${getTextColorClass()} text-xs font-semibold px-3 py-1 bg-white/90 backdrop-blur-sm rounded-md border border-blue-200/80 shadow-sm text-center whitespace-nowrap leader-obstacle`}>
+          <span className={`${getTextColorClass()} text-xs font-semibold px-3 py-1 bg-white/90 backdrop-blur-sm rounded-md border ${getBorderColorClass()} shadow-sm text-center whitespace-nowrap leader-obstacle`}>
             {getTimeLabel(elapsed)} elapsed, {getTimeLabel(remaining)} left
           </span>
         )}
@@ -202,7 +212,11 @@ export function ProgressBar({ task, project, settings, className, onTaskClick }:
             className={`h-full absolute relative overflow-hidden border-l-2 ${
               isOverdue 
                 ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300' 
-                : 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-300'
+                : remaining <= 5
+                  ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300'
+                  : remaining >= 6 && remaining <= 14
+                    ? 'bg-gradient-to-r from-orange-50 to-orange-100 border-orange-300'
+                    : 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-300'
             }`}
             style={{
               left: `${(elapsedWidth / barWidth) * 100}%`,
@@ -213,7 +227,13 @@ export function ProgressBar({ task, project, settings, className, onTaskClick }:
             {/* Enhanced visual pattern for remaining time */}
             <div 
               className={`absolute inset-0 ${
-                isOverdue ? 'bg-red-200/40' : 'bg-blue-200/40'
+                isOverdue 
+                  ? 'bg-red-200/40' 
+                  : remaining <= 5
+                    ? 'bg-red-200/40'
+                    : remaining >= 6 && remaining <= 14
+                      ? 'bg-orange-200/40'
+                      : 'bg-blue-200/40'
               }`}
               style={{
                 backgroundImage: `repeating-linear-gradient(

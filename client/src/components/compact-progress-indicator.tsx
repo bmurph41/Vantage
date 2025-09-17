@@ -139,7 +139,8 @@ export function CompactProgressIndicator({
   };
 
   const getRemainingColor = () => {
-    if (isOverdue) return "bg-red-100";
+    if (isOverdue || remaining <= 5) return "bg-red-100";
+    if (remaining >= 6 && remaining <= 14) return "bg-orange-100";
     return "bg-gray-100";
   };
 
