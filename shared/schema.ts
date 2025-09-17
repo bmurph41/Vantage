@@ -25,6 +25,8 @@ export const notificationStatusEnum = pgEnum("notification_status", ["sent", "fa
 export const recipientTypeEnum = pgEnum("recipient_type", ["user", "contact"]);
 export const calendarEventTypeEnum = pgEnum("calendar_event_type", ["dd_expiration", "closing", "task_deadline", "milestone", "custom"]);
 export const documentRequirementStatusEnum = pgEnum("document_requirement_status", ["requested", "received", "verified", "rejected", "outdated", "external_unavailable"]);
+export const dependencyTypeEnum = pgEnum("dependency_type", ["FS", "SS", "FF", "SF"]);
+export const ddCategoryEnum = pgEnum("dd_category", ["title", "survey", "ESA", "appraisal", "inspection", "permits", "zoning", "financial", "legal", "insurance", "other"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -140,9 +142,34 @@ export const tasks = pgTable("tasks", {
   showOnTimeline: boolean("show_on_timeline").notNull().default(false),
   sortOrder: integer("sort_order"),
   taskOwner: varchar("task_owner").references(() => users.id), // Team member who owns the task
+  // Enhanced CPM fields
+  optimisticDays: integer("optimistic_days"),
+  mostLikelyDays: integer("most_likely_days"),
+  pessimisticDays: integer("pessimistic_days"),
+  earliestStart: date("earliest_start"),
+  requiredFinish: date("required_finish"),
+  // DD-specific fields
+  isGating: boolean("is_gating").notNull().default(false),
+  isMilestone: boolean("is_milestone").notNull().default(false),
+  ddCategory: ddCategoryEnum("dd_category"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// Enhanced Task Dependencies (CPM support)
+export const taskDependencies = pgTable("task_dependencies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  successorId: varchar("successor_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  predecessorId: varchar("predecessor_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  type: dependencyTypeEnum("type").notNull().default("FS"),
+  lagDays: integer("lag_days").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Unique constraint to prevent duplicate dependencies
+  uniqueDependency: unique().on(table.successorId, table.predecessorId)
+}));
 
 // Timeline Notes
 export const timelineNotes = pgTable("timeline_notes", {
@@ -479,6 +506,26 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
     references: [projects.id],
   }),
   documentRequirements: many(documentRequirements),
+  // Enhanced dependency relations
+  dependenciesAsSuccessor: many(taskDependencies, {
+    relationName: "taskSuccessor"
+  }),
+  dependenciesAsPredecessor: many(taskDependencies, {
+    relationName: "taskPredecessor"
+  }),
+}));
+
+export const taskDependenciesRelations = relations(taskDependencies, ({ one }) => ({
+  successor: one(tasks, {
+    fields: [taskDependencies.successorId],
+    references: [tasks.id],
+    relationName: "taskSuccessor"
+  }),
+  predecessor: one(tasks, {
+    fields: [taskDependencies.predecessorId],
+    references: [tasks.id],
+    relationName: "taskPredecessor"
+  }),
 }));
 
 export const projectSharesRelations = relations(projectShares, ({ one }) => ({
@@ -607,6 +654,12 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   updatedAt: true,
 });
 
+export const insertTaskDependencySchema = createInsertSchema(taskDependencies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertTimelineNoteSchema = createInsertSchema(timelineNotes).omit({
   id: true,
   createdAt: true,
@@ -690,6 +743,9 @@ export type InsertProjectTemplate = z.infer<typeof insertProjectTemplateSchema>;
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
+
+export type TaskDependency = typeof taskDependencies.$inferSelect;
+export type InsertTaskDependency = z.infer<typeof insertTaskDependencySchema>;
 
 export type TimelineNote = typeof timelineNotes.$inferSelect;
 export type InsertTimelineNote = z.infer<typeof insertTimelineNoteSchema>;
