@@ -572,15 +572,15 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
       });
     },
     onSettled: () => {
-      // Only invalidate queries to sync with server state after a short delay
+      // Invalidate and refetch queries to sync with server state after a short delay
       // This ensures the server has processed the update before we refetch
       setTimeout(() => {
         queryClient.invalidateQueries({ 
           queryKey: ['/api/dd/projects', project.id, 'tasks'],
           exact: false,
-          refetchType: 'none' // Don't refetch immediately, just mark as stale
+          refetchType: 'active' // Refetch active queries to sync with server
         });
-      }, 100);
+      }, 200);
     },
   });
 
