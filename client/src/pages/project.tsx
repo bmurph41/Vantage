@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileBarChart } from "lucide-react";
 import { ProjectHeader } from "@/components/project-header";
 import { ThirdPartyReports } from "@/components/third-party-reports";
 import { ProjectSetup } from "@/components/project-setup";
@@ -99,8 +99,16 @@ export default function ProjectPage() {
               <h1 className="text-xl font-semibold text-primary">Due Diligence Tracker</h1>
               <span className="text-sm text-muted-foreground">MarinaMatch</span>
             </div>
-            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
-              JD
+            <div className="flex items-center space-x-3">
+              <Link href={`/projects/${project.id}/progress-report`}>
+                <Button variant="outline" size="sm" data-testid="link-progress-report">
+                  <FileBarChart className="h-4 w-4 mr-2" />
+                  Progress Report
+                </Button>
+              </Link>
+              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
+                JD
+              </div>
             </div>
           </div>
         </div>
