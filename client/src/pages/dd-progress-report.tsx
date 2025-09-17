@@ -181,33 +181,33 @@ interface ProjectMetrics {
 function generateAIInsights(project: Project, tasks: Task[], metrics: ProjectMetrics): string[] {
   const insights = [];
   
-  // Performance narrative - personal perspective
+  // Performance narrative - executive perspective
   if (metrics.completionRate >= 80) {
-    insights.push(`I'm really impressed with how this due diligence is progressing! We've knocked out ${metrics.completionRate}% of our tasks, and I can feel the momentum building toward closing. This strong execution pace gives me confidence we'll hit our target timeline and maybe even accelerate some value creation opportunities I'm seeing.`);
+    insights.push(`Our due diligence execution is performing exceptionally well at ${metrics.completionRate}% completion. I'm observing strong operational momentum across all workstreams, positioning us favorably for our targeted closing timeline. This level of performance excellence reinforces my confidence in our ability to identify and capitalize on strategic value drivers within this transaction.`);
   } else if (metrics.completionRate >= 60) {
-    insights.push(`We're making solid progress at ${metrics.completionRate}% completion, but honestly, I think we could push harder on a few key workstreams. I've been watching the timeline closely, and if we can accelerate some of these critical tasks, we'll be in much better shape for risk mitigation down the stretch.`);
+    insights.push(`Our current ${metrics.completionRate}% completion rate demonstrates solid progress, though I see opportunities for enhanced execution velocity across certain critical workstreams. My assessment indicates that strategic resource reallocation and accelerated task prioritization will substantially strengthen our risk mitigation posture for the remaining timeline.`);
   } else {
-    insights.push(`I have to be frank - our ${metrics.completionRate}% completion rate has me concerned. From what I'm seeing in the workflow, we need to reallocate resources immediately and get more aggressive with task prioritization. The acquisition timeline is at risk if we don't course-correct now.`);
+    insights.push(`The ${metrics.completionRate}% completion rate requires immediate strategic intervention. From my operational assessment, we must implement aggressive resource reallocation and enhanced project governance to mitigate transaction timeline risk. I am directing immediate corrective action to ensure acquisition objectives remain achievable.`);
   }
   
-  // Timeline analysis - personal observations
+  // Timeline analysis - strategic observations
   if (metrics.daysRemaining <= 14) {
-    insights.push(`With only ${metrics.daysRemaining} days left until closing, I'm in full sprint mode. Every day counts now, and I'm monitoring each deliverable closely. Any issue that pops up needs immediate attention - there's no room for delays at this stage.`);
+    insights.push(`With ${metrics.daysRemaining} days remaining to closing, we have entered the critical execution phase where operational precision is paramount. I am implementing enhanced oversight protocols and daily deliverable monitoring to ensure zero tolerance for schedule deviation. Every milestone requires executive-level attention at this juncture.`);
   } else if (metrics.daysRemaining <= 30) {
-    insights.push(`We've got ${metrics.daysRemaining} days to closing, which feels manageable if we maintain our current pace. I'm cautiously optimistic, but I'll be watching our velocity closely over the next couple weeks to make sure we don't lose steam.`);
+    insights.push(`Our ${metrics.daysRemaining}-day runway to closing provides adequate execution bandwidth, contingent on maintaining current velocity metrics. I am closely monitoring project cadence and stakeholder performance indicators to ensure sustained momentum through the final phase. Strategic vigilance remains essential.`);
   } else {
-    insights.push(`Having ${metrics.daysRemaining} days before closing is actually a strategic advantage from my perspective. It gives us breathing room to really dig deep into risk assessment and explore value optimization opportunities that might not be obvious under time pressure.`);
+    insights.push(`The ${metrics.daysRemaining}-day timeline to closing represents a strategic advantage, providing sufficient bandwidth for comprehensive risk assessment and value optimization analysis. This extended runway enables thorough due diligence depth without compromising transaction quality or stakeholder confidence.`);
   }
   
-  // Risk assessment - personal concern/confidence
+  // Risk assessment - executive evaluation
   if (metrics.overdueTasks > 0) {
-    insights.push(`I'm flagging ${metrics.overdueTasks} overdue deliverables that need immediate attention. From my experience, these delays can snowball quickly and derail the entire timeline. I'm recommending we escalate these right away and reallocate resources to get back on track.`);
+    insights.push(`I have identified ${metrics.overdueTasks} overdue deliverables requiring immediate executive escalation. My analysis indicates these timeline deviations pose cascading risk to overall transaction success. I am implementing immediate corrective measures and enhanced resource deployment to restore optimal project trajectory.`);
   } else {
-    insights.push(`I'm pleased to report that all our deliverables are on schedule. This tells me we have strong project governance in place and our stakeholder coordination is working well across all workstreams. It's exactly what I like to see at this stage.`);
+    insights.push(`All deliverables are performing on schedule, demonstrating robust project governance and effective stakeholder coordination across our entire organizational matrix. This operational excellence validates our systematic approach and reinforces my confidence in successful transaction completion.`);
   }
   
-  // Market context - personal assessment
-  insights.push(`Based on my analysis of current market conditions, I believe we're operating in a favorable environment for this acquisition. Financing markets are supportive, and the regulatory landscape appears stable, which gives me confidence in our transaction probability.`);
+  // Market context - strategic assessment
+  insights.push(`My analysis of prevailing market conditions indicates we are executing this acquisition within a highly favorable macroeconomic environment. Capital markets remain supportive, regulatory frameworks are stable, and industry fundamentals align with our strategic thesis, significantly enhancing transaction probability and value realization potential.`);
   
   return insights;
 }
