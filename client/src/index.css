@@ -292,3 +292,257 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* Professional Print Styles for Offering Memorandums */
+@media print {
+  /* Page Setup */
+  @page {
+    size: 8.5in 11in; /* Letter size by default */
+    margin: 0.75in 0.5in 0.75in 0.5in;
+    color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  @page :first {
+    margin: 0; /* Cover pages use full bleed */
+  }
+  
+  @page letter {
+    size: 8.5in 11in;
+    margin: 0.75in 0.5in 0.75in 0.5in;
+  }
+  
+  @page a4 {
+    size: A4;
+    margin: 19mm 12mm 19mm 12mm;
+  }
+  
+  /* Global Print Overrides */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  html {
+    font-size: 12pt !important;
+    line-height: 1.4 !important;
+  }
+  
+  body {
+    background: white !important;
+    color: #000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Hide Screen-Only Elements */
+  .print\:hidden,
+  [data-testid*="button-"],
+  [data-testid*="settings"],
+  [data-testid*="nav-"],
+  button:not(.print\:block),
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Report Container */
+  .report-container {
+    max-width: none !important;
+    width: 100% !important;
+    background: white !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Page Breaks */
+  .print\:break-before-page,
+  .print\:break-after-page {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+  
+  .print\:break-after-page {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+  
+  .print\:break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* Typography for Print */
+  h1 {
+    font-size: 24pt !important;
+    line-height: 1.2 !important;
+    color: #000 !important;
+    margin: 0 0 18pt 0 !important;
+    font-weight: 700 !important;
+  }
+  
+  h2 {
+    font-size: 18pt !important;
+    line-height: 1.3 !important;
+    color: #000 !important;
+    margin: 16pt 0 12pt 0 !important;
+    font-weight: 600 !important;
+  }
+  
+  h3 {
+    font-size: 14pt !important;
+    line-height: 1.3 !important;
+    color: #000 !important;
+    margin: 12pt 0 8pt 0 !important;
+    font-weight: 600 !important;
+  }
+  
+  h4 {
+    font-size: 12pt !important;
+    line-height: 1.4 !important;
+    color: #000 !important;
+    margin: 10pt 0 6pt 0 !important;
+    font-weight: 600 !important;
+  }
+  
+  h5, h6 {
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+    color: #000 !important;
+    margin: 8pt 0 4pt 0 !important;
+    font-weight: 600 !important;
+  }
+  
+  p {
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+    margin: 0 0 8pt 0 !important;
+    color: #333 !important;
+  }
+  
+  /* Lists */
+  ul, ol {
+    margin: 8pt 0 8pt 16pt !important;
+    padding: 0 !important;
+  }
+  
+  li {
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+    margin-bottom: 4pt !important;
+    color: #333 !important;
+  }
+  
+  /* Tables */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 12pt 0 !important;
+    font-size: 9pt !important;
+    background: white !important;
+  }
+  
+  th {
+    background: #f8f9fa !important;
+    border: 1px solid #dee2e6 !important;
+    padding: 6pt 8pt !important;
+    text-align: left !important;
+    font-weight: 600 !important;
+    color: #000 !important;
+    font-size: 9pt !important;
+  }
+  
+  td {
+    border: 1px solid #dee2e6 !important;
+    padding: 6pt 8pt !important;
+    color: #333 !important;
+    font-size: 9pt !important;
+  }
+  
+  /* Cards and Containers */
+  .bg-emerald-50,
+  .bg-blue-50,
+  .bg-neutral-50,
+  .bg-amber-50,
+  .bg-red-50 {
+    background: #f8f9fa !important;
+    border: 1px solid #dee2e6 !important;
+  }
+  
+  .rounded-lg,
+  .rounded {
+    border-radius: 4pt !important;
+  }
+  
+  /* Grid Layouts */
+  .grid {
+    display: grid !important;
+  }
+  
+  .grid-cols-1 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .grid-cols-2 {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  
+  .grid-cols-3 {
+    grid-template-columns: 1fr 1fr 1fr !important;
+  }
+  
+  /* Images */
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    margin: 0 auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* Figure elements */
+  figure {
+    margin: 12pt 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  figcaption {
+    font-size: 8pt !important;
+    color: #666 !important;
+    text-align: center !important;
+    margin-top: 4pt !important;
+    line-height: 1.3 !important;
+  }
+  
+  /* Typography Utilities */
+  .font-bold {
+    font-weight: 700 !important;
+  }
+  
+  .font-semibold {
+    font-weight: 600 !important;
+  }
+  
+  .font-medium {
+    font-weight: 500 !important;
+  }
+  
+  .text-center {
+    text-align: center !important;
+  }
+  
+  .text-right {
+    text-align: right !important;
+  }
+  
+  /* Professional shadows removed */
+  .shadow,
+  .shadow-sm,
+  .shadow-md,
+  .shadow-lg {
+    box-shadow: none !important;
+  }
+}

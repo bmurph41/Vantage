@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard";
 import ProjectPage from "@/pages/project";
 import NotificationSettingsPage from "@/pages/notification-settings";
+import ReportsPage from "@/pages/reports";
 import NotFound from "@/pages/not-found";
 
 // Wrapper component to handle router props for notification settings
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/projects/:id" component={ProjectPage} />
       <Route path="/projects/:id/notifications" component={NotificationSettingsWrapper} />
+      <Route path="/reports" component={ReportsPage} />
       <Route component={NotFound} />
     </Switch>
   );
