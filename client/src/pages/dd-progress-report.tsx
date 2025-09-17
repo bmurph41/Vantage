@@ -181,33 +181,33 @@ interface ProjectMetrics {
 function generateAIInsights(project: Project, tasks: Task[], metrics: ProjectMetrics): string[] {
   const insights = [];
   
-  // Performance narrative
+  // Performance narrative - personal perspective
   if (metrics.completionRate >= 80) {
-    insights.push(`Due diligence execution demonstrates exceptional momentum with ${metrics.completionRate}% task completion, positioning the acquisition for accelerated closing and enhanced value realization.`);
+    insights.push(`I'm really impressed with how this due diligence is progressing! We've knocked out ${metrics.completionRate}% of our tasks, and I can feel the momentum building toward closing. This strong execution pace gives me confidence we'll hit our target timeline and maybe even accelerate some value creation opportunities I'm seeing.`);
   } else if (metrics.completionRate >= 60) {
-    insights.push(`Project maintains steady progress with ${metrics.completionRate}% completion rate, though strategic acceleration of key workstreams could optimize timeline efficiency and risk mitigation.`);
+    insights.push(`We're making solid progress at ${metrics.completionRate}% completion, but honestly, I think we could push harder on a few key workstreams. I've been watching the timeline closely, and if we can accelerate some of these critical tasks, we'll be in much better shape for risk mitigation down the stretch.`);
   } else {
-    insights.push(`Current ${metrics.completionRate}% completion rate signals need for enhanced resource allocation and expedited task prioritization to maintain acquisition timeline integrity.`);
+    insights.push(`I have to be frank - our ${metrics.completionRate}% completion rate has me concerned. From what I'm seeing in the workflow, we need to reallocate resources immediately and get more aggressive with task prioritization. The acquisition timeline is at risk if we don't course-correct now.`);
   }
   
-  // Timeline analysis
+  // Timeline analysis - personal observations
   if (metrics.daysRemaining <= 14) {
-    insights.push(`With ${metrics.daysRemaining} days remaining until closing, intensive daily monitoring and rapid issue resolution protocols are essential for successful transaction completion.`);
+    insights.push(`With only ${metrics.daysRemaining} days left until closing, I'm in full sprint mode. Every day counts now, and I'm monitoring each deliverable closely. Any issue that pops up needs immediate attention - there's no room for delays at this stage.`);
   } else if (metrics.daysRemaining <= 30) {
-    insights.push(`The ${metrics.daysRemaining}-day runway to closing provides sufficient time for comprehensive due diligence completion, contingent upon maintaining current execution velocity.`);
+    insights.push(`We've got ${metrics.daysRemaining} days to closing, which feels manageable if we maintain our current pace. I'm cautiously optimistic, but I'll be watching our velocity closely over the next couple weeks to make sure we don't lose steam.`);
   } else {
-    insights.push(`Extended ${metrics.daysRemaining}-day timeline offers strategic advantage for thorough risk assessment and value optimization initiatives prior to closing.`);
+    insights.push(`Having ${metrics.daysRemaining} days before closing is actually a strategic advantage from my perspective. It gives us breathing room to really dig deep into risk assessment and explore value optimization opportunities that might not be obvious under time pressure.`);
   }
   
-  // Risk assessment
+  // Risk assessment - personal concern/confidence
   if (metrics.overdueTasks > 0) {
-    insights.push(`${metrics.overdueTasks} overdue deliverables require immediate escalation and resource reallocation to prevent timeline slippage and preserve transaction momentum.`);
+    insights.push(`I'm flagging ${metrics.overdueTasks} overdue deliverables that need immediate attention. From my experience, these delays can snowball quickly and derail the entire timeline. I'm recommending we escalate these right away and reallocate resources to get back on track.`);
   } else {
-    insights.push(`All deliverables maintain schedule adherence, reflecting robust project governance and effective stakeholder coordination across workstreams.`);
+    insights.push(`I'm pleased to report that all our deliverables are on schedule. This tells me we have strong project governance in place and our stakeholder coordination is working well across all workstreams. It's exactly what I like to see at this stage.`);
   }
   
-  // Market context
-  insights.push(`Current market conditions favor acquisition activity with supportive financing environments and regulatory framework stability enhancing transaction probability.`);
+  // Market context - personal assessment
+  insights.push(`Based on my analysis of current market conditions, I believe we're operating in a favorable environment for this acquisition. Financing markets are supportive, and the regulatory landscape appears stable, which gives me confidence in our transaction probability.`);
   
   return insights;
 }
