@@ -20,7 +20,9 @@ import {
   Shield,
   Activity,
   Zap,
-  ChevronRight
+  ChevronRight,
+  ToggleLeft,
+  ToggleRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -315,6 +317,7 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
 
 function DDProgressReport({ project, tasks }: DDProgressReportProps) {
   const currentDate = tzNow('America/New_York');
+  const [showDDDeadline, setShowDDDeadline] = useState(false);
   
   // Calculate comprehensive project metrics
   const metrics = useMemo(() => {
@@ -334,9 +337,12 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
     // Timeline calculations using EST timezone
     const projectStartDate = project.psaSignedDate ? startOfDayEST(new Date(project.psaSignedDate)) : startOfDayEST(currentDate);
     const projectEndDate = project.closingDate ? startOfDayEST(new Date(project.closingDate)) : addDays(startOfDayEST(currentDate), 60);
+    const ddEndDate = project.ddExpirationDate ? startOfDayEST(new Date(project.ddExpirationDate)) : null;
     const daysSinceStart = Math.max(0, differenceInCalendarDays(currentDate, projectStartDate));
     const totalProjectDays = Math.max(1, differenceInCalendarDays(projectEndDate, projectStartDate));
-    const daysRemaining = Math.max(0, differenceInCalendarDays(projectEndDate, currentDate));
+    const daysRemainingToClosing = Math.max(0, differenceInCalendarDays(projectEndDate, currentDate));
+    const daysRemainingToDD = ddEndDate ? Math.max(0, differenceInCalendarDays(ddEndDate, currentDate)) : null;
+    const daysRemaining = showDDDeadline && daysRemainingToDD !== null ? daysRemainingToDD : daysRemainingToClosing;
     const timelineProgress = Math.min(100, Math.round((daysSinceStart / totalProjectDays) * 100));
     
     // Risk indicators using EST timezone
@@ -357,14 +363,17 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
       completionRate,
       projectStartDate,
       projectEndDate,
+      ddEndDate,
       daysSinceStart,
       totalProjectDays,
       daysRemaining,
+      daysRemainingToClosing,
+      daysRemainingToDD,
       timelineProgress,
       highRiskTasks,
       criticalPathTasks
     };
-  }, [tasks, project, currentDate]);
+  }, [tasks, project, currentDate, showDDDeadline]);
   
   // Generate AI insights
   const aiInsights = useMemo(() => generateAIInsights(project, tasks, metrics), [project, tasks, metrics]);
@@ -459,9 +468,25 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
               <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Overdue</div>
             </div>
             
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
+            <div className="text-center p-4 bg-orange-50 rounded-lg relative">
               <div className="text-2xl font-bold text-orange-600 mb-1">{metrics.daysRemaining}</div>
               <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Days Left</div>
+              <div className="text-xs text-gray-500 mt-1">
+                {showDDDeadline && metrics.daysRemainingToDD !== null ? 'Until DD Deadline' : 'Until Closing'}
+              </div>
+              {metrics.daysRemainingToDD !== null && (
+                <button
+                  onClick={() => setShowDDDeadline(!showDDDeadline)}
+                  className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  data-testid="toggle-days-left-type"
+                >
+                  {showDDDeadline ? (
+                    <ToggleRight className="h-4 w-4" />
+                  ) : (
+                    <ToggleLeft className="h-4 w-4" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
