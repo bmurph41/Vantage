@@ -332,7 +332,13 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
       return isOverdueAt1700EST(t.deadline);
     }).length;
     
-    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    // Calculate time-weighted completion rate based on task duration
+    const totalTimeAllocated = tasks.reduce((sum, task) => sum + (task.mostLikelyDays || 1), 0);
+    const completedTimeAllocated = tasks
+      .filter(t => t.status === 'completed')
+      .reduce((sum, task) => sum + (task.mostLikelyDays || 1), 0);
+    
+    const completionRate = totalTimeAllocated > 0 ? Math.round((completedTimeAllocated / totalTimeAllocated) * 100) : 0;
     
     // Timeline calculations using EST timezone
     const projectStartDate = project.psaSignedDate ? startOfDayEST(new Date(project.psaSignedDate)) : startOfDayEST(currentDate);
