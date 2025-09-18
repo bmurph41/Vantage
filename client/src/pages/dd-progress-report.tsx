@@ -331,6 +331,57 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
       if (t.status === 'completed' || !t.deadline) return false;
       return isOverdueAt1700EST(t.deadline);
     }).length;
+
+    // Enhanced schedule risk assessment
+    const tasksNext3Days = tasks.filter(t => {
+      if (!t.deadline || t.status === 'completed') return false;
+      const deadlineAt5PM = setDeadlineTo5PM(t.deadline);
+      const daysUntil = differenceInCalendarDays(deadlineAt5PM, currentDate);
+      return daysUntil >= 0 && daysUntil <= 3;
+    }).length;
+
+    const tasksNext7Days = tasks.filter(t => {
+      if (!t.deadline || t.status === 'completed') return false;
+      const deadlineAt5PM = setDeadlineTo5PM(t.deadline);
+      const daysUntil = differenceInCalendarDays(deadlineAt5PM, currentDate);
+      return daysUntil >= 4 && daysUntil <= 7;
+    }).length;
+
+    // Calculate schedule risk level and description
+    const getScheduleRisk = () => {
+      if (overdueTasks > 0) {
+        return {
+          level: 'URGENT',
+          description: `${overdueTasks} overdue ${overdueTasks === 1 ? 'task' : 'tasks'}`,
+          color: 'red',
+          priority: 4
+        };
+      }
+      if (tasksNext3Days > 0) {
+        return {
+          level: 'HIGH',
+          description: `${tasksNext3Days} ${tasksNext3Days === 1 ? 'task' : 'tasks'} due within 3 days`,
+          color: 'red',
+          priority: 3
+        };
+      }
+      if (tasksNext7Days > 0) {
+        return {
+          level: 'MEDIUM',
+          description: `${tasksNext7Days} ${tasksNext7Days === 1 ? 'task' : 'tasks'} due within 7 days`,
+          color: 'orange',
+          priority: 2
+        };
+      }
+      return {
+        level: 'LOW',
+        description: 'No imminent deadlines',
+        color: 'green',
+        priority: 1
+      };
+    };
+
+    const scheduleRisk = getScheduleRisk();
     
     // Calculate time-weighted completion rate based on task duration
     const totalTimeAllocated = tasks.reduce((sum, task) => sum + (task.mostLikelyDays || 1), 0);
@@ -366,6 +417,7 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
       engagedTasks,
       notStartedTasks,
       overdueTasks,
+      scheduleRisk,
       completionRate,
       projectStartDate,
       projectEndDate,
@@ -562,20 +614,32 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
             Risk Assessment
           </h3>
           
-          <div className="grid md:grid-cols-3 gap-4">
-            <Card className={metrics.overdueTasks > 0 ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}>
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card className={
+              metrics.scheduleRisk.color === 'red' ? "border-red-200 bg-red-50" :
+              metrics.scheduleRisk.color === 'orange' ? "border-orange-200 bg-orange-50" :
+              "border-green-200 bg-green-50"
+            }>
               <CardHeader className="pb-3">
-                <CardTitle className={`text-sm font-medium flex items-center ${metrics.overdueTasks > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                <CardTitle className={`text-sm font-medium flex items-center ${
+                  metrics.scheduleRisk.color === 'red' ? 'text-red-700' :
+                  metrics.scheduleRisk.color === 'orange' ? 'text-orange-700' :
+                  'text-green-700'
+                }`}>
                   <Clock className="h-4 w-4 mr-2" />
                   Schedule Risk
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold mb-1 ${metrics.overdueTasks > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  {metrics.overdueTasks > 0 ? 'HIGH' : 'LOW'}
+                <div className={`text-2xl font-bold mb-1 ${
+                  metrics.scheduleRisk.color === 'red' ? 'text-red-600' :
+                  metrics.scheduleRisk.color === 'orange' ? 'text-orange-600' :
+                  'text-green-600'
+                }`}>
+                  {metrics.scheduleRisk.level}
                 </div>
                 <div className="text-xs text-gray-600">
-                  {metrics.overdueTasks} overdue tasks
+                  {metrics.scheduleRisk.description}
                 </div>
               </CardContent>
             </Card>
@@ -593,23 +657,6 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
                 </div>
                 <div className="text-xs text-gray-600">
                   {metrics.highRiskTasks} high-priority open tasks
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className={metrics.criticalPathTasks > 0 ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}>
-              <CardHeader className="pb-3">
-                <CardTitle className={`text-sm font-medium flex items-center ${metrics.criticalPathTasks > 0 ? 'text-red-700' : 'text-green-700'}`}>
-                  <Target className="h-4 w-4 mr-2" />
-                  Critical Path
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold mb-1 ${metrics.criticalPathTasks > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  {metrics.criticalPathTasks > 0 ? 'URGENT' : 'STABLE'}
-                </div>
-                <div className="text-xs text-gray-600">
-                  {metrics.criticalPathTasks} tasks due within 7 days
                 </div>
               </CardContent>
             </Card>
