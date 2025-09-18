@@ -467,26 +467,40 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
           </div>
           
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              {aiInsights.slice(0, 2).map((insight, index) => (
-                <div key={index} className="bg-blue-50 border-l-4 border-blue-400 p-4">
-                  <div className="flex items-start">
-                    <Activity className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
-                    <p className="text-gray-700 leading-relaxed text-sm">{insight}</p>
-                  </div>
-                </div>
-              ))}
+            {/* Performance Analysis */}
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
+              <div className="flex items-center mb-3">
+                <Activity className="h-5 w-5 text-blue-600 mr-2" />
+                <h3 className="font-semibold text-blue-900">Performance</h3>
+              </div>
+              <p className="text-gray-700 leading-relaxed text-sm">{aiInsights[0]}</p>
             </div>
             
-            <div className="space-y-4">
-              {aiInsights.slice(2).map((insight, index) => (
-                <div key={index + 2} className="bg-green-50 border-l-4 border-green-400 p-4">
-                  <div className="flex items-start">
-                    <Target className="h-5 w-5 text-green-600 mt-0.5 mr-2 flex-shrink-0" />
-                    <p className="text-gray-700 leading-relaxed text-sm">{insight}</p>
-                  </div>
-                </div>
-              ))}
+            {/* Timeline Assessment */}
+            <div className="bg-orange-50 border-l-4 border-orange-400 p-4">
+              <div className="flex items-center mb-3">
+                <Clock className="h-5 w-5 text-orange-600 mr-2" />
+                <h3 className="font-semibold text-orange-900">Timeline</h3>
+              </div>
+              <p className="text-gray-700 leading-relaxed text-sm">{aiInsights[1]}</p>
+            </div>
+            
+            {/* Risk Mitigation */}
+            <div className={`${metrics.overdueTasks > 0 ? 'bg-red-50 border-red-400' : 'bg-green-50 border-green-400'} border-l-4 p-4`}>
+              <div className="flex items-center mb-3">
+                <Shield className="h-5 w-5 mr-2" style={{ color: metrics.overdueTasks > 0 ? '#dc2626' : '#16a34a' }} />
+                <h3 className={`font-semibold ${metrics.overdueTasks > 0 ? 'text-red-900' : 'text-green-900'}`}>Risk Mitigation</h3>
+              </div>
+              <p className="text-gray-700 leading-relaxed text-sm">{aiInsights[2]}</p>
+            </div>
+            
+            {/* Market Outlook */}
+            <div className="bg-emerald-50 border-l-4 border-emerald-400 p-4">
+              <div className="flex items-center mb-3">
+                <TrendingUp className="h-5 w-5 text-emerald-600 mr-2" />
+                <h3 className="font-semibold text-emerald-900">Market Outlook</h3>
+              </div>
+              <p className="text-gray-700 leading-relaxed text-sm">{aiInsights[3]}</p>
             </div>
           </div>
         </div>
