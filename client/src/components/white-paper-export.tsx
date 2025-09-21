@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
 import { format, parseISO, isValid, differenceInDays } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { setDeadlineTo5PM } from '@/lib/date-utils';
 import type { Project, Task, ProjectSettings, Risk } from '@shared/schema';
 
@@ -856,7 +857,10 @@ const formatDate = (dateString: string | null | undefined): string => {
   if (!dateString) return "N/A";
   try {
     const date = parseISO(dateString);
-    return isValid(date) ? format(date, 'MMMM d, yyyy') : "N/A";
+    if (!isValid(date)) return "N/A";
+    
+    // Use EST timezone for consistent date formatting
+    return formatInTimeZone(date, 'America/New_York', 'MMMM d, yyyy');
   } catch {
     return "N/A";
   }
@@ -896,7 +900,8 @@ const formatStatus = (status: string): string => {
 
 // Calculate KPIs and metrics
 const calculateProjectKPIs = (project: Project, tasks: Task[]) => {
-  const today = new Date();
+  // Use EST timezone with 5:00 PM cutoff for consistent date calculations
+  const todayEST = setDeadlineTo5PM(new Date());
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
   const inProgressTasks = tasks.filter(t => t.status === 'in_progress' || t.status === 'engaged' || t.status === 'scheduled').length;
@@ -915,14 +920,14 @@ const calculateProjectKPIs = (project: Project, tasks: Task[]) => {
     return sum;
   }, 0);
   
-  // Calculate days to DD expiration
+  // Calculate days to DD expiration using EST timezone with 5:00 PM cutoff
   let daysToExpiration = null;
   let expirationRisk = 'low';
   if (project.ddExpirationDate) {
     try {
-      const expirationDate = parseISO(project.ddExpirationDate);
+      const expirationDate = setDeadlineTo5PM(project.ddExpirationDate);
       if (isValid(expirationDate)) {
-        daysToExpiration = differenceInDays(expirationDate, today);
+        daysToExpiration = differenceInDays(expirationDate, todayEST);
         if (daysToExpiration < 0) {
           expirationRisk = 'high';
         } else if (daysToExpiration <= 7) {
@@ -941,7 +946,7 @@ const calculateProjectKPIs = (project: Project, tasks: Task[]) => {
     if (!task.deadline) return false;
     try {
       const deadline = setDeadlineTo5PM(task.deadline);
-      return isValid(deadline) && differenceInDays(today, deadline) > 0 && task.status !== 'completed';
+      return isValid(deadline) && differenceInDays(todayEST, deadline) > 0 && task.status !== 'completed';
     } catch {
       return false;
     }
@@ -953,7 +958,7 @@ const calculateProjectKPIs = (project: Project, tasks: Task[]) => {
     try {
       const deadline = setDeadlineTo5PM(task.deadline);
       if (!isValid(deadline)) return false;
-      const daysUntilDeadline = differenceInDays(deadline, today);
+      const daysUntilDeadline = differenceInDays(deadline, todayEST);
       return daysUntilDeadline >= 0 && daysUntilDeadline <= 7;
     } catch {
       return false;
@@ -997,7 +1002,8 @@ const getRiskIndicator = (risk: string) => {
 
 // Calculate timeline health indicators
 const calculateTimelineHealth = (project: Project) => {
-  const today = new Date();
+  // Use EST timezone with 5:00 PM cutoff for consistent date calculations
+  const todayEST = setDeadlineTo5PM(new Date());
   const milestones = [];
   
   // PSA Signed Date
@@ -1010,7 +1016,7 @@ const calculateTimelineHealth = (project: Project) => {
           date: psaDate,
           dateString: project.psaSignedDate,
           status: 'completed',
-          daysFromToday: differenceInDays(today, psaDate)
+          daysFromToday: differenceInDays(todayEST, psaDate)
         });
       }
     } catch {
@@ -1021,9 +1027,9 @@ const calculateTimelineHealth = (project: Project) => {
   // DD Expiration Date
   if (project.ddExpirationDate) {
     try {
-      const ddDate = parseISO(project.ddExpirationDate);
+      const ddDate = setDeadlineTo5PM(project.ddExpirationDate);
       if (isValid(ddDate)) {
-        const daysFromToday = differenceInDays(ddDate, today);
+        const daysFromToday = differenceInDays(ddDate, todayEST);
         let status = 'upcoming';
         if (daysFromToday < 0) status = 'overdue';
         else if (daysFromToday <= 7) status = 'urgent';
@@ -1044,9 +1050,9 @@ const calculateTimelineHealth = (project: Project) => {
   // Closing Date
   if (project.closingDate) {
     try {
-      const closingDate = parseISO(project.closingDate);
+      const closingDate = setDeadlineTo5PM(project.closingDate);
       if (isValid(closingDate)) {
-        const daysFromToday = differenceInDays(closingDate, today);
+        const daysFromToday = differenceInDays(closingDate, todayEST);
         let status = 'upcoming';
         if (daysFromToday < 0) status = 'overdue';
         else if (daysFromToday <= 14) status = 'urgent';
@@ -1799,7 +1805,9 @@ const analyzeRiskCategories = (risks: RiskFactor[]) => {
 
 export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, settings }: WhitePaperProps) => {
   // Use real Risk data instead of legacy mock data, with defensive checks
-  const currentDate = format(new Date(), 'MMMM d, yyyy');
+  // Use EST timezone for consistent date formatting throughout PDF
+  const currentDate = formatInTimeZone(new Date(), 'America/New_York', 'MMMM d, yyyy');
+  const currentTimestamp = formatInTimeZone(new Date(), 'America/New_York', 'MMMM d, yyyy \'at\' h:mm a zzz');
   
   // Ensure risks is an array, provide empty array as fallback
   const safeRisks = Array.isArray(risks) ? risks : [];
@@ -1830,7 +1838,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
   
   // Calculate days to DD expiration
   const daysToExpiration = project.ddExpirationDate 
-    ? differenceInDays(parseISO(project.ddExpirationDate), new Date())
+    ? differenceInDays(setDeadlineTo5PM(project.ddExpirationDate), setDeadlineTo5PM(new Date()))
     : null;
   
   // Generate risk heatmap data from real Risk data with safety checks
@@ -2095,9 +2103,9 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
           )}
         </View>
 
-        <Text style={styles.footer}>
-          CONFIDENTIAL - Board Executive Summary | Page 1 of Risk Analysis Report
-        </Text>
+        <Text style={styles.footer} render={({ pageNumber, totalPages }) => 
+          `CONFIDENTIAL - Board Executive Summary | Page ${pageNumber} of ${totalPages} | Generated ${currentTimestamp}`
+        } />
       </Page>
 
       {/* Risk Heatmap & Analytics Page */}
