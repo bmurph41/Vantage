@@ -266,16 +266,17 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: 'absolute',
-    bottom: 35,
-    left: 45,
-    right: 45,
+    bottom: 30,
+    left: 36,
+    right: 36,
     textAlign: 'center',
     fontSize: 10,
     color: '#6b7280',
-    borderTop: '2 solid #1e3a8a',
-    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#1e3a8a',
+    borderTopStyle: 'solid',
+    paddingTop: 12,
     fontWeight: 'bold',
-    letterSpacing: 0.5,
   },
   pageBreak: {
     marginTop: 40,
@@ -1928,7 +1929,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
   return (
     <Document>
       {/* Executive Summary Page 1 - Data-Driven Board Presentation */}
-      <Page size="A4" style={styles.executivePage}>
+      <Page size="LETTER" style={styles.executivePage}>
         <View style={styles.confidentialBanner}>
           <Text>CONFIDENTIAL - BOARD EXECUTIVE SUMMARY</Text>
         </View>
@@ -2100,7 +2101,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
       </Page>
 
       {/* Risk Heatmap & Analytics Page */}
-      <Page size="A4" style={styles.page}>
+      <Page size="LETTER" style={styles.page}>
         <Text style={styles.header}>Risk Analysis & Visualization</Text>
         
         <View style={styles.section}>
@@ -2176,7 +2177,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
       </Page>
 
       {/* Timeline & Schedule Health */}
-      <Page size="A4" style={styles.page}>
+      <Page size="LETTER" style={styles.page}>
         <Text style={styles.header}>DD Timeline</Text>
 
         <View style={[styles.section, { marginBottom: 24 }]}>
@@ -2253,7 +2254,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
       </Page>
 
       {/* Timeline & Schedule Health */}
-      <Page size="A4" style={styles.page}>
+      <Page size="LETTER" style={styles.page}>
         <Text style={styles.header}>DD Timeline</Text>
         
         <View style={styles.section}>
@@ -2362,7 +2363,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
       </Page>
 
       {/* Key Contacts */}
-      <Page size="A4" style={styles.page}>
+      <Page size="LETTER" style={styles.page}>
         <Text style={styles.header}>Key Contacts</Text>
         
         <View style={styles.section}>
@@ -2458,7 +2459,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
       </Page>
 
       {/* Risk Selection Methodology */}
-      <Page size="A4" style={styles.page}>
+      <Page size="LETTER" style={styles.page}>
         <Text style={styles.header}>Risk Selection Methodology</Text>
         
         <View style={styles.methodologySection}>
@@ -2554,7 +2555,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
       </Page>
 
       {/* Risk Heat Map & Category Analysis */}
-      <Page size="A4" style={styles.page}>
+      <Page size="LETTER" style={styles.page}>
         <Text style={styles.header}>Risk Analysis Dashboard</Text>
         
         {/* Risk Heat Map */}
@@ -2628,7 +2629,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
       </Page>
 
       {/* Top-5 Risk Register */}
-      <Page size="A4" style={styles.page}>
+      <Page size="LETTER" style={styles.page}>
         <Text style={styles.header}>Top-5 Risk Register</Text>
         
         <View style={styles.riskRegisterContainer}>
@@ -2690,7 +2691,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
       </Page>
 
       {/* Risk Mitigation Strategies */}
-      <Page size="A4" style={styles.page}>
+      <Page size="LETTER" style={styles.page}>
         <Text style={styles.header}>Risk Mitigation Strategies</Text>
         
         <View style={styles.section}>
