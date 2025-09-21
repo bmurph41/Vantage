@@ -29,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Project, Task, Risk, ProjectSettings } from "@shared/schema";
 import type { ProjectWithDetails } from "@/types/dd";
 
@@ -265,24 +266,25 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
   };
   
   return (
-    <div className="space-y-6">
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <div className="flex justify-between text-xs text-gray-600 mb-2">
-          <span>{format(projectStartDate, 'MMM d')}</span>
-          <span>Today ({format(currentDate, 'MMM d')})</span>
-          <span>{format(projectEndDate, 'MMM d')}</span>
+    <TooltipProvider>
+      <div className="space-y-6">
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="flex justify-between text-xs text-gray-600 mb-2">
+            <span>{format(projectStartDate, 'MMM d')}</span>
+            <span>Today ({format(currentDate, 'MMM d')})</span>
+            <span>{format(projectEndDate, 'MMM d')}</span>
+          </div>
+          <div className="h-2 bg-gray-200 rounded-full relative">
+            <div 
+              className="h-full bg-blue-600 rounded-full absolute"
+              style={{ width: `${Math.max(0, Math.min(100, (differenceInCalendarDays(currentDate, projectStartDate) / totalDays) * 100))}%` }}
+            />
+            <div 
+              className="absolute top-0 w-0.5 h-2 bg-red-500"
+              style={{ left: `${Math.max(0, Math.min(100, (differenceInCalendarDays(currentDate, projectStartDate) / totalDays) * 100))}%` }}
+            />
+          </div>
         </div>
-        <div className="h-2 bg-gray-200 rounded-full relative">
-          <div 
-            className="h-full bg-blue-600 rounded-full absolute"
-            style={{ width: `${Math.max(0, Math.min(100, (differenceInCalendarDays(currentDate, projectStartDate) / totalDays) * 100))}%` }}
-          />
-          <div 
-            className="absolute top-0 w-0.5 h-2 bg-red-500"
-            style={{ left: `${Math.max(0, Math.min(100, (differenceInCalendarDays(currentDate, projectStartDate) / totalDays) * 100))}%` }}
-          />
-        </div>
-      </div>
       
       {tasksByCategory.map(([category, categoryTasks]) => (
         <div key={category} className="space-y-2">
@@ -298,10 +300,19 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
                 </div>
                 <div className="relative h-2 bg-gray-100 rounded-full">
                   {task.deadline && (
-                    <div 
-                      className={`absolute h-full w-3 rounded-full ${getStatusColor(task.status)}`}
-                      style={{ left: `${getTaskPosition(task.deadline)}%` }}
-                    />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div 
+                          className={`absolute h-full w-3 rounded-full cursor-pointer ${getStatusColor(task.status)}`}
+                          style={{ left: `${getTaskPosition(task.deadline)}%` }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="font-medium">{task.title}</p>
+                        <p className="text-xs opacity-90">Due: {format(setDeadlineTo5PM(task.deadline), 'MMM d, yyyy')}</p>
+                        <p className="text-xs opacity-90 capitalize">Status: {task.status.replace('_', ' ')}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
                 {task.deadline && (
@@ -314,7 +325,8 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
           </div>
         </div>
       ))}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
 
