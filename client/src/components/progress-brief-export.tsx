@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, addDays, differenceInCalendarDays, startOfDay } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { setDeadlineTo5PM, tzNow } from '@/lib/date-utils';
 import type { Project, Task } from '@shared/schema';
@@ -9,338 +9,799 @@ interface ProgressBriefProps {
   tasks: Task[];
 }
 
-// Concise styles for Progress Brief - Email-friendly design
+// Helper function for EST start of day
+function startOfDayEST(date: Date): Date {
+  const estDate = tzNow('America/New_York');
+  estDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+  estDate.setHours(0, 0, 0, 0);
+  return estDate;
+}
+
+// Helper function to check if task is overdue at 5:00 PM EST
+function isOverdueAt1700EST(deadline: Date | string): boolean {
+  const now = tzNow('America/New_York');
+  const deadlineAt5PM = setDeadlineTo5PM(deadline);
+  return now > deadlineAt5PM;
+}
+
+// AI Narration System - Define proper metrics interface (matching the page)
+interface ProjectMetrics {
+  totalTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+  engagedTasks: number;
+  notStartedTasks: number;
+  overdueTasks: number;
+  completionRate: number;
+  daysRemaining: number;
+  daysRemainingToClosing: number;
+  daysRemainingToDD: number | null;
+  timelineProgress: number;
+  highRiskTasks: number;
+  criticalPathTasks: number;
+  scheduleRisk: {
+    level: string;
+    description: string;
+    color: string;
+    priority: number;
+  };
+  projectStartDate: Date;
+  projectEndDate: Date;
+  ddEndDate: Date | null;
+  daysSinceStart: number;
+  totalProjectDays: number;
+}
+
+// Generate AI insights (matching the page logic exactly)
+function generateAIInsights(project: Project, tasks: Task[], metrics: ProjectMetrics): string[] {
+  const insights = [];
+  
+  // Performance narrative - executive perspective
+  if (metrics.completionRate >= 80) {
+    insights.push(`Our due diligence execution is performing exceptionally well at ${metrics.completionRate}% completion. I'm observing strong operational momentum across all workstreams, positioning us favorably for our targeted closing timeline. This level of performance excellence reinforces my confidence in our ability to identify and capitalize on strategic value drivers within this transaction.`);
+  } else if (metrics.completionRate >= 60) {
+    insights.push(`Our current ${metrics.completionRate}% completion rate demonstrates solid progress, though I see opportunities for enhanced execution velocity across certain critical workstreams. My assessment indicates that strategic resource reallocation and accelerated task prioritization will substantially strengthen our risk mitigation posture for the remaining timeline.`);
+  } else {
+    insights.push(`The ${metrics.completionRate}% completion rate requires immediate strategic intervention. From my operational assessment, we must implement aggressive resource reallocation and enhanced project governance to mitigate transaction timeline risk. I am directing immediate corrective action to ensure acquisition objectives remain achievable.`);
+  }
+  
+  // Timeline analysis - strategic observations
+  if (metrics.daysRemaining <= 14) {
+    insights.push(`With ${metrics.daysRemaining} days remaining to closing, we have entered the critical execution phase where operational precision is paramount. I am implementing enhanced oversight protocols and daily deliverable monitoring to ensure zero tolerance for schedule deviation. Every milestone requires executive-level attention at this juncture.`);
+  } else if (metrics.daysRemaining <= 30) {
+    insights.push(`Our ${metrics.daysRemaining}-day runway to closing provides adequate execution bandwidth, contingent on maintaining current velocity metrics. I am closely monitoring project cadence and stakeholder performance indicators to ensure sustained momentum through the final phase. Strategic vigilance remains essential.`);
+  } else {
+    insights.push(`The ${metrics.daysRemaining}-day timeline to closing represents a strategic advantage, providing sufficient bandwidth for comprehensive risk assessment and value optimization analysis. This extended runway enables thorough due diligence depth without compromising transaction quality or stakeholder confidence.`);
+  }
+  
+  // Risk assessment - executive evaluation
+  if (metrics.overdueTasks > 0) {
+    insights.push(`I have identified ${metrics.overdueTasks} overdue deliverables requiring immediate executive escalation. My analysis indicates these timeline deviations pose cascading risk to overall transaction success. I am implementing immediate corrective measures and enhanced resource deployment to restore optimal project trajectory.`);
+  } else {
+    insights.push(`All deliverables are performing on schedule, demonstrating robust project governance and effective stakeholder coordination across our entire organizational matrix. This operational excellence validates our systematic approach and reinforces my confidence in successful transaction completion.`);
+  }
+  
+  // Market context - strategic assessment
+  insights.push(`My analysis of prevailing market conditions indicates we are executing this acquisition within a highly favorable macroeconomic environment. Capital markets remain supportive, regulatory frameworks are stable, and industry fundamentals align with our strategic thesis, significantly enhancing transaction probability and value realization potential.`);
+  
+  return insights;
+}
+
+// Calculate comprehensive project metrics (matching the page logic exactly)
+const calculateComprehensiveMetrics = (project: Project, tasks: Task[]): ProjectMetrics => {
+  const currentDate = tzNow('America/New_York');
+  
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
+  const engagedTasks = tasks.filter(t => t.status === 'engaged').length;
+  const notStartedTasks = tasks.filter(t => t.status === 'not_started').length;
+  
+  const overdueTasks = tasks.filter(t => {
+    if (t.status === 'completed' || !t.deadline) return false;
+    return isOverdueAt1700EST(t.deadline);
+  }).length;
+
+  // Enhanced schedule risk assessment
+  const tasksNext3Days = tasks.filter(t => {
+    if (!t.deadline || t.status === 'completed') return false;
+    const deadlineAt5PM = setDeadlineTo5PM(t.deadline);
+    const daysUntil = differenceInCalendarDays(deadlineAt5PM, currentDate);
+    return daysUntil >= 0 && daysUntil <= 3;
+  }).length;
+
+  const tasksNext7Days = tasks.filter(t => {
+    if (!t.deadline || t.status === 'completed') return false;
+    const deadlineAt5PM = setDeadlineTo5PM(t.deadline);
+    const daysUntil = differenceInCalendarDays(deadlineAt5PM, currentDate);
+    return daysUntil >= 4 && daysUntil <= 7;
+  }).length;
+
+  // Calculate schedule risk level and description
+  const getScheduleRisk = () => {
+    if (overdueTasks > 0) {
+      return {
+        level: 'URGENT',
+        description: `${overdueTasks} overdue ${overdueTasks === 1 ? 'task' : 'tasks'}`,
+        color: 'red',
+        priority: 4
+      };
+    }
+    if (tasksNext3Days > 0) {
+      return {
+        level: 'HIGH',
+        description: `${tasksNext3Days} ${tasksNext3Days === 1 ? 'task' : 'tasks'} due within 3 days`,
+        color: 'red',
+        priority: 3
+      };
+    }
+    if (tasksNext7Days > 0) {
+      return {
+        level: 'MEDIUM',
+        description: `${tasksNext7Days} ${tasksNext7Days === 1 ? 'task' : 'tasks'} due within 7 days`,
+        color: 'orange',
+        priority: 2
+      };
+    }
+    return {
+      level: 'LOW',
+      description: 'No imminent deadlines',
+      color: 'green',
+      priority: 1
+    };
+  };
+
+  const scheduleRisk = getScheduleRisk();
+  
+  // Calculate time-weighted completion rate based on task duration
+  const totalTimeAllocated = tasks.reduce((sum, task) => sum + (task.mostLikelyDays || 1), 0);
+  const completedTimeAllocated = tasks
+    .filter(t => t.status === 'completed')
+    .reduce((sum, task) => sum + (task.mostLikelyDays || 1), 0);
+  
+  const completionRate = totalTimeAllocated > 0 ? Math.round((completedTimeAllocated / totalTimeAllocated) * 100) : 0;
+  
+  // Timeline calculations using EST timezone
+  const projectStartDate = project.psaSignedDate ? startOfDayEST(new Date(project.psaSignedDate)) : startOfDayEST(currentDate);
+  const projectEndDate = project.closingDate ? startOfDayEST(new Date(project.closingDate)) : addDays(startOfDayEST(currentDate), 60);
+  const ddEndDate = project.ddExpirationDate ? startOfDayEST(new Date(project.ddExpirationDate)) : null;
+  const daysSinceStart = Math.max(0, differenceInCalendarDays(currentDate, projectStartDate));
+  const totalProjectDays = Math.max(1, differenceInCalendarDays(projectEndDate, projectStartDate));
+  const daysRemainingToClosing = Math.max(0, differenceInCalendarDays(projectEndDate, currentDate));
+  const daysRemainingToDD = ddEndDate ? Math.max(0, differenceInCalendarDays(ddEndDate, currentDate)) : null;
+  const daysRemaining = daysRemainingToClosing; // Default to closing for PDF
+  const timelineProgress = Math.min(100, Math.round((daysSinceStart / totalProjectDays) * 100));
+  
+  // Risk indicators using EST timezone
+  const highRiskTasks = tasks.filter(t => t.priority === 'high' && t.status !== 'completed').length;
+  const criticalPathTasks = tasks.filter(t => {
+    if (!t.deadline || t.status === 'completed') return false;
+    const deadlineAt5PM = setDeadlineTo5PM(t.deadline);
+    return differenceInCalendarDays(deadlineAt5PM, currentDate) <= 7;
+  }).length;
+  
+  return {
+    totalTasks,
+    completedTasks,
+    inProgressTasks,
+    engagedTasks,
+    notStartedTasks,
+    overdueTasks,
+    scheduleRisk,
+    completionRate,
+    projectStartDate,
+    projectEndDate,
+    ddEndDate,
+    daysSinceStart,
+    totalProjectDays,
+    daysRemaining,
+    daysRemainingToClosing,
+    daysRemainingToDD,
+    timelineProgress,
+    highRiskTasks,
+    criticalPathTasks
+  };
+};
+
+// Comprehensive styles matching the page design
 const styles = StyleSheet.create({
   page: {
     backgroundColor: '#FFFFFF',
-    padding: 24,
+    paddingHorizontal: 32,
+    paddingVertical: 40,
     fontFamily: 'Helvetica',
     fontSize: 11,
     lineHeight: 1.4,
   },
+  
+  // Header Section - matching the blue gradient design
   header: {
-    backgroundColor: '#1e3a8a',
+    backgroundColor: '#1e40af', // Blue-700 equivalent
     color: '#ffffff',
-    padding: 16,
-    margin: -24,
-    marginBottom: 20,
+    paddingHorizontal: 32,
+    paddingVertical: 32,
+    marginHorizontal: -32,
+    marginTop: -40,
+    marginBottom: 32,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    textAlign: 'center',
-    opacity: 0.9,
-  },
-  headerMeta: {
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 8,
-    opacity: 0.8,
-  },
-  metricsGrid: {
+  headerContent: {
     display: 'flex',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    alignItems: 'flex-start',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerBrief: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    opacity: 0.9,
+    marginTop: 8,
+  },
+  headerRight: {
+    textAlign: 'right',
+  },
+  headerDate: {
+    fontSize: 10,
+    fontWeight: 'medium',
+    opacity: 0.9,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  headerPercent: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerComplete: {
+    fontSize: 10,
+    opacity: 0.75,
+  },
+
+  // Section Headers
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 16,
+    marginTop: 32,
+  },
+  
+  // Executive Insights Section
+  insightsGrid: {
+    display: 'flex',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  insightBox: {
+    width: '48%',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 12,
+    borderRadius: 8,
+  },
+  insightBoxPerformance: {
+    backgroundColor: '#dbeafe',
+    borderLeftWidth: 4,
+    borderLeftColor: '#3b82f6',
+    borderLeftStyle: 'solid',
+  },
+  insightBoxTimeline: {
+    backgroundColor: '#fed7aa',
+    borderLeftWidth: 4,
+    borderLeftColor: '#f97316',
+    borderLeftStyle: 'solid',
+  },
+  insightBoxRisk: {
+    backgroundColor: '#dcfce7',
+    borderLeftWidth: 4,
+    borderLeftColor: '#16a34a',
+    borderLeftStyle: 'solid',
+  },
+  insightBoxMarket: {
+    backgroundColor: '#d1fae5',
+    borderLeftWidth: 4,
+    borderLeftColor: '#059669',
+    borderLeftStyle: 'solid',
+  },
+  insightHeader: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  insightText: {
+    fontSize: 9,
+    color: '#374151',
+    lineHeight: 1.4,
+  },
+
+  // Performance Metrics Section
+  metricsGrid: {
+    display: 'flex',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
   },
   metricCard: {
+    width: '31%',
     backgroundColor: '#f8fafc',
-    padding: 12,
-    borderRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderStyle: 'solid',
-    width: '23%',
     textAlign: 'center',
+    marginBottom: 8,
   },
   metricNumber: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#1e3a8a',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   metricLabel: {
     fontSize: 9,
     color: '#64748b',
     textTransform: 'uppercase',
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
-  section: {
-    marginBottom: 16,
+  metricCompleted: { color: '#2563eb' },
+  metricInProgress: { color: '#eab308' },
+  metricEngaged: { color: '#16a34a' },
+  metricNotStarted: { color: '#64748b' },
+  metricOverdue: { color: '#dc2626' },
+  metricDaysLeft: { color: '#f97316' },
+
+  // Progress Visualization Section
+  progressSection: {
+    marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#1e3a8a',
-    marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    borderBottomStyle: 'solid',
-    paddingBottom: 4,
-  },
-  text: {
-    fontSize: 11,
-    color: '#374151',
-    marginBottom: 6,
-    lineHeight: 1.4,
-  },
-  boldText: {
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  statusBadge: {
-    padding: '2 6',
-    fontSize: 8,
-    fontWeight: 'bold',
-    borderRadius: 2,
-    textTransform: 'uppercase',
-  },
-  statusHigh: {
-    backgroundColor: '#fca5a5',
-    color: '#7f1d1d',
-  },
-  statusMedium: {
-    backgroundColor: '#fed7aa',
-    color: '#9a3412',
-  },
-  statusLow: {
-    backgroundColor: '#bbf7d0',
-    color: '#14532d',
-  },
-  taskItem: {
+  progressGrid: {
     display: 'flex',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginBottom: 2,
+  },
+  progressCard: {
+    width: '48%',
     backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e5e7eb',
     borderStyle: 'solid',
   },
-  taskTitle: {
+  progressCardTitle: {
+    fontSize: 12,
+    fontWeight: 'medium',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  progressInfo: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 10,
+    color: '#6b7280',
+  },
+  progressValue: {
+    fontSize: 10,
+    fontWeight: 'medium',
+    color: '#111827',
+  },
+  progressBarContainer: {
+    height: 12,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#3b82f6',
+  },
+  progressDetail: {
+    fontSize: 8,
+    color: '#6b7280',
+  },
+
+  // Task Timeline Section (simplified for PDF)
+  timelineSection: {
+    marginBottom: 24,
+  },
+  timelineCategory: {
+    marginBottom: 16,
+  },
+  timelineCategoryTitle: {
+    fontSize: 12,
+    fontWeight: 'medium',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  timelineTask: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderStyle: 'solid',
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  timelineTaskTitle: {
     fontSize: 10,
     color: '#374151',
     flex: 1,
   },
-  taskDeadline: {
+  timelineTaskStatus: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+    textTransform: 'uppercase',
+    marginRight: 8,
+  },
+  timelineTaskDeadline: {
     fontSize: 9,
     color: '#6b7280',
-    width: '25%',
+    width: '20%',
     textAlign: 'right',
   },
-  insightBox: {
-    backgroundColor: '#eff6ff',
-    borderLeftWidth: 3,
-    borderLeftColor: '#3b82f6',
-    borderLeftStyle: 'solid',
-    padding: 12,
+  statusCompleted: { backgroundColor: '#d1fae5', color: '#065f46' },
+  statusInProgress: { backgroundColor: '#dbeafe', color: '#1e40af' },
+  statusEngaged: { backgroundColor: '#fef3c7', color: '#92400e' },
+  statusNotStarted: { backgroundColor: '#f3f4f6', color: '#374151' },
+
+  // Risk Assessment Section
+  riskSection: {
+    marginBottom: 24,
+  },
+  riskGrid: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  riskCard: {
+    width: '48%',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'solid',
+  },
+  riskCardSchedule: {
+    backgroundColor: '#fee2e2',
+    borderColor: '#fca5a5',
+  },
+  riskCardPriority: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#fde68a',
+  },
+  riskCardTitle: {
+    fontSize: 12,
+    fontWeight: 'medium',
     marginBottom: 12,
+    color: '#374151',
   },
-  insightText: {
-    fontSize: 10,
-    color: '#1e40af',
-    lineHeight: 1.3,
-    fontStyle: 'italic',
+  riskLevel: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
   },
+  riskLevelUrgent: { color: '#dc2626' },
+  riskLevelHigh: { color: '#dc2626' },
+  riskLevelMedium: { color: '#f59e0b' },
+  riskLevelLow: { color: '#16a34a' },
+  riskDescription: {
+    fontSize: 9,
+    color: '#6b7280',
+  },
+
+  // Footer Section
   footer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 24,
-    right: 24,
-    textAlign: 'center',
-    fontSize: 8,
-    color: '#9ca3af',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
     borderTopStyle: 'solid',
-    paddingTop: 8,
+    paddingTop: 16,
+    marginTop: 32,
+  },
+  footerContent: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  footerLeft: {
+    flex: 1,
+  },
+  footerGenerated: {
+    fontSize: 9,
+    fontWeight: 'medium',
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  footerSources: {
+    fontSize: 8,
+    color: '#6b7280',
+    lineHeight: 1.3,
+  },
+  footerRight: {
+    textAlign: 'right',
+  },
+  footerNextUpdate: {
+    fontSize: 8,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  footerNextDate: {
+    fontSize: 10,
+    fontWeight: 'medium',
+    color: '#374151',
+  },
+
+  // Separators
+  separator: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    borderBottomStyle: 'solid',
+    marginVertical: 24,
   },
 });
 
-// Calculate brief metrics for Progress Brief
-const calculateBriefMetrics = (project: Project, tasks: Task[]) => {
-  const nowEST = tzNow('America/New_York');
-  const todayEST = setDeadlineTo5PM(new Date());
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
-  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  
-  // Calculate days to DD expiration
-  const daysToExpiration = project.ddExpirationDate 
-    ? differenceInDays(setDeadlineTo5PM(project.ddExpirationDate), todayEST)
-    : null;
-  
-  // Find overdue tasks - properly check if current EST time is past 5:00 PM deadline
-  const overdueTasks = tasks.filter(task => {
-    if (!task.deadline || task.status === 'completed') return false;
-    try {
-      const deadline = setDeadlineTo5PM(task.deadline);
-      return nowEST > deadline;
-    } catch {
-      return false;
-    }
-  });
-
-  // Find upcoming critical tasks (next 7 days) - exclude overdue tasks
-  const upcomingTasks = tasks.filter(task => {
-    if (!task.deadline || task.status === 'completed') return false;
-    try {
-      const deadline = setDeadlineTo5PM(task.deadline);
-      const daysUntil = differenceInDays(deadline, nowEST);
-      return deadline > nowEST && daysUntil <= 7;
-    } catch {
-      return false;
-    }
-  });
-
-  return {
-    totalTasks,
-    completedTasks,
-    completionRate,
-    daysToExpiration,
-    overdueTasks,
-    upcomingTasks,
-  };
-};
-
-// Generate executive insight for Progress Brief
-const generateBriefInsight = (project: Project, metrics: any): string => {
-  const { completionRate, daysToExpiration, overdueTasks } = metrics;
-  
-  if (overdueTasks.length > 0) {
-    return `Project requires immediate attention with ${overdueTasks.length} overdue task${overdueTasks.length > 1 ? 's' : ''}. Current ${completionRate}% completion rate${daysToExpiration ? ` with ${daysToExpiration} days to DD expiration` : ''} demands accelerated execution to maintain transaction timeline.`;
-  }
-  
-  if (completionRate >= 80) {
-    return `Project execution is performing exceptionally well at ${completionRate}% completion${daysToExpiration ? ` with ${daysToExpiration} days remaining to DD expiration` : ''}. Strong momentum positions us favorably for successful transaction closing.`;
-  }
-  
-  if (completionRate >= 60) {
-    return `Solid progress at ${completionRate}% completion${daysToExpiration ? ` with ${daysToExpiration} days to DD expiration` : ''}. Strategic focus on critical path items will strengthen our position for the remaining timeline.`;
-  }
-  
-  return `Current ${completionRate}% completion rate${daysToExpiration ? ` with ${daysToExpiration} days to DD expiration` : ''} requires immediate strategic intervention and resource reallocation to ensure transaction objectives remain achievable.`;
-};
-
-// Progress Brief Document Component
+// Progress Brief Document Component - matching the page exactly
 export const ProgressBriefDocument = ({ project, tasks }: ProgressBriefProps) => {
-  const currentTimestamp = formatInTimeZone(new Date(), 'America/New_York', 'MMMM d, yyyy \'at\' h:mm a zzz');
-  const metrics = calculateBriefMetrics(project, tasks);
-  const executiveInsight = generateBriefInsight(project, metrics);
+  const currentDate = tzNow('America/New_York');
+  const currentTimestamp = formatInTimeZone(currentDate, 'America/New_York', 'MMMM d, yyyy \'at\' h:mm a zzz');
+  const metrics = calculateComprehensiveMetrics(project, tasks);
+  const aiInsights = generateAIInsights(project, tasks, metrics);
+
+  // Group tasks by category for timeline section
+  const tasksByCategory = {
+    'Financial Review': tasks.filter(t => t.status !== 'completed' && (t.title.toLowerCase().includes('financial') || t.title.toLowerCase().includes('audit'))),
+    'Legal & Compliance': tasks.filter(t => t.status !== 'completed' && (t.title.toLowerCase().includes('legal') || t.title.toLowerCase().includes('contract'))),
+    'Operational Assessment': tasks.filter(t => t.status !== 'completed' && (t.title.toLowerCase().includes('operational') || t.title.toLowerCase().includes('business'))),
+    'Technical Evaluation': tasks.filter(t => t.status !== 'completed' && (t.title.toLowerCase().includes('technical') || t.title.toLowerCase().includes('system'))),
+    'Other': tasks.filter(t => 
+      t.status !== 'completed' &&
+      !t.title.toLowerCase().includes('financial') && 
+      !t.title.toLowerCase().includes('legal') && 
+      !t.title.toLowerCase().includes('operational') && 
+      !t.title.toLowerCase().includes('technical')
+    )
+  };
+
+  // Filter out empty categories
+  const filteredCategories = Object.entries(tasksByCategory).filter(([_, tasks]) => tasks.length > 0);
 
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
-        {/* Header */}
+        {/* Header Section - Matching page design */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>PROGRESS BRIEF</Text>
-          <Text style={styles.headerSubtitle}>{project.name}</Text>
-          <Text style={styles.headerMeta}>Generated {currentTimestamp}</Text>
+          <View style={styles.headerContent}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.headerBrief}>PROGRESS BRIEF</Text>
+              <Text style={styles.headerTitle}>DUE DILIGENCE</Text>
+              <Text style={styles.headerSubtitle}>{project.name}</Text>
+            </View>
+            <View style={styles.headerRight}>
+              <Text style={styles.headerDate}>
+                {format(currentDate, 'MMMM yyyy').toUpperCase()}
+              </Text>
+              <Text style={styles.headerPercent}>{metrics.completionRate}%</Text>
+              <Text style={styles.headerComplete}>COMPLETE</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Key Metrics */}
+        {/* Executive Insights Section */}
+        <Text style={styles.sectionTitle}>⚡ Executive Insights</Text>
+        <View style={styles.insightsGrid}>
+          <View style={[styles.insightBox, styles.insightBoxPerformance]}>
+            <Text style={[styles.insightHeader, { color: '#1e40af' }]}>Performance</Text>
+            <Text style={styles.insightText}>{aiInsights[0]}</Text>
+          </View>
+          <View style={[styles.insightBox, styles.insightBoxTimeline]}>
+            <Text style={[styles.insightHeader, { color: '#ea580c' }]}>Timeline</Text>
+            <Text style={styles.insightText}>{aiInsights[1]}</Text>
+          </View>
+          <View style={[styles.insightBox, metrics.overdueTasks > 0 ? { backgroundColor: '#fee2e2', borderLeftColor: '#dc2626' } : styles.insightBoxRisk]}>
+            <Text style={[styles.insightHeader, { color: metrics.overdueTasks > 0 ? '#7f1d1d' : '#065f46' }]}>Risk Mitigation</Text>
+            <Text style={styles.insightText}>{aiInsights[2]}</Text>
+          </View>
+          <View style={[styles.insightBox, styles.insightBoxMarket]}>
+            <Text style={[styles.insightHeader, { color: '#047857' }]}>Market Outlook</Text>
+            <Text style={styles.insightText}>{aiInsights[3]}</Text>
+          </View>
+        </View>
+
+        <View style={styles.separator} />
+
+        {/* Performance Metrics Section */}
+        <Text style={styles.sectionTitle}>📊 Performance Metrics</Text>
         <View style={styles.metricsGrid}>
           <View style={styles.metricCard}>
-            <Text style={styles.metricNumber}>{metrics.completionRate}%</Text>
-            <Text style={styles.metricLabel}>Complete</Text>
+            <Text style={[styles.metricNumber, styles.metricCompleted]}>{metrics.completedTasks}</Text>
+            <Text style={styles.metricLabel}>Completed</Text>
           </View>
           <View style={styles.metricCard}>
-            <Text style={styles.metricNumber}>{metrics.completedTasks}/{metrics.totalTasks}</Text>
-            <Text style={styles.metricLabel}>Tasks Done</Text>
+            <Text style={[styles.metricNumber, styles.metricInProgress]}>{metrics.inProgressTasks}</Text>
+            <Text style={styles.metricLabel}>In Progress</Text>
           </View>
           <View style={styles.metricCard}>
-            <Text style={styles.metricNumber}>{metrics.overdueTasks.length}</Text>
+            <Text style={[styles.metricNumber, styles.metricEngaged]}>{metrics.engagedTasks}</Text>
+            <Text style={styles.metricLabel}>Engaged</Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={[styles.metricNumber, styles.metricNotStarted]}>{metrics.notStartedTasks}</Text>
+            <Text style={styles.metricLabel}>Not Started</Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={[styles.metricNumber, styles.metricOverdue]}>{metrics.overdueTasks}</Text>
             <Text style={styles.metricLabel}>Overdue</Text>
           </View>
           <View style={styles.metricCard}>
-            <Text style={styles.metricNumber}>{metrics.daysToExpiration ?? 'N/A'}</Text>
+            <Text style={[styles.metricNumber, styles.metricDaysLeft]}>{metrics.daysRemaining}</Text>
             <Text style={styles.metricLabel}>Days Left</Text>
           </View>
         </View>
 
-        {/* Executive Insight */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Executive Summary</Text>
-          <View style={styles.insightBox}>
-            <Text style={styles.insightText}>{executiveInsight}</Text>
-          </View>
-        </View>
-
-        {/* Critical Tasks */}
-        {metrics.overdueTasks.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Overdue Tasks Requiring Immediate Action</Text>
-            {metrics.overdueTasks.slice(0, 5).map((task) => (
-              <View key={task.id} style={styles.taskItem}>
-                <Text style={styles.taskTitle}>{task.title}</Text>
-                <Text style={styles.taskDeadline}>
-                  {task.deadline ? format(setDeadlineTo5PM(task.deadline), 'MMM d') : 'No date'}
-                </Text>
+        {/* Progress Visualization Section */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressGrid}>
+            <View style={styles.progressCard}>
+              <Text style={styles.progressCardTitle}>📈 Overall Progress</Text>
+              <View style={styles.progressInfo}>
+                <Text style={styles.progressLabel}>Completion Rate</Text>
+                <Text style={styles.progressValue}>{metrics.completionRate}%</Text>
               </View>
-            ))}
-          </View>
-        )}
-
-        {/* Upcoming Tasks */}
-        {metrics.upcomingTasks.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Critical Tasks - Next 7 Days</Text>
-            {metrics.upcomingTasks.slice(0, 8).map((task) => (
-              <View key={task.id} style={styles.taskItem}>
-                <Text style={styles.taskTitle}>{task.title}</Text>
-                <Text style={styles.taskDeadline}>
-                  {task.deadline ? format(setDeadlineTo5PM(task.deadline), 'MMM d') : 'No date'}
-                </Text>
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBar, { width: `${metrics.completionRate}%` }]} />
               </View>
-            ))}
+              <Text style={styles.progressDetail}>
+                {metrics.completedTasks} of {metrics.totalTasks} tasks completed
+              </Text>
+            </View>
+            
+            <View style={styles.progressCard}>
+              <Text style={styles.progressCardTitle}>📅 Timeline Progress</Text>
+              <View style={styles.progressInfo}>
+                <Text style={styles.progressLabel}>Time Elapsed</Text>
+                <Text style={styles.progressValue}>{metrics.timelineProgress}%</Text>
+              </View>
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBar, { width: `${metrics.timelineProgress}%` }]} />
+              </View>
+              <Text style={styles.progressDetail}>
+                {metrics.daysSinceStart} of {metrics.totalProjectDays} days elapsed
+              </Text>
+            </View>
           </View>
-        )}
-
-        {/* Risk Status */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Risk Status</Text>
-          <Text style={styles.text}>
-            <Text style={styles.boldText}>Schedule Risk: </Text>
-            {metrics.overdueTasks.length > 0 ? 'HIGH - Immediate action required' : 
-             metrics.upcomingTasks.length > 3 ? 'MEDIUM - Monitor closely' : 
-             'LOW - On track'}
-          </Text>
-          <Text style={styles.text}>
-            <Text style={styles.boldText}>Completion Trend: </Text>
-            {metrics.completionRate >= 80 ? 'Excellent momentum' :
-             metrics.completionRate >= 60 ? 'Steady progress' :
-             'Needs acceleration'}
-          </Text>
         </View>
 
-        {/* Next Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Immediate Next Actions</Text>
-          {metrics.overdueTasks.length > 0 ? (
-            <Text style={styles.text}>• Prioritize and complete {metrics.overdueTasks.length} overdue task{metrics.overdueTasks.length > 1 ? 's' : ''}</Text>
-          ) : (
-            <Text style={styles.text}>• Maintain current execution velocity</Text>
-          )}
-          {metrics.upcomingTasks.length > 0 && (
-            <Text style={styles.text}>• Prepare resources for {metrics.upcomingTasks.length} upcoming task{metrics.upcomingTasks.length > 1 ? 's' : ''}</Text>
-          )}
-          {metrics.completionRate < 80 && (
-            <Text style={styles.text}>• Review resource allocation and timeline optimization</Text>
-          )}
-          {metrics.daysToExpiration && metrics.daysToExpiration < 30 && (
-            <Text style={styles.text}>• Consider DD extension if critical items remain incomplete</Text>
-          )}
+        <View style={styles.separator} />
+
+        {/* Detailed Task Timeline Section */}
+        <Text style={styles.sectionTitle}>🛡️ Detailed Task Timeline</Text>
+        <View style={styles.timelineSection}>
+          {filteredCategories.slice(0, 3).map(([category, categoryTasks]) => (
+            <View key={category} style={styles.timelineCategory}>
+              <Text style={styles.timelineCategoryTitle}>{category}</Text>
+              {categoryTasks.slice(0, 4).map(task => (
+                <View key={task.id} style={styles.timelineTask}>
+                  <Text style={styles.timelineTaskTitle}>{task.title}</Text>
+                  <Text style={[
+                    styles.timelineTaskStatus,
+                    task.status === 'completed' ? styles.statusCompleted :
+                    task.status === 'in_progress' ? styles.statusInProgress :
+                    task.status === 'engaged' ? styles.statusEngaged :
+                    styles.statusNotStarted
+                  ]}>
+                    {task.status.replace('_', ' ')}
+                  </Text>
+                  <Text style={styles.timelineTaskDeadline}>
+                    {task.deadline ? format(setDeadlineTo5PM(task.deadline), 'MMM d') : 'No date'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ))}
         </View>
 
-        <Text style={styles.footer} render={({ pageNumber, totalPages }) => 
+        <View style={styles.separator} />
+
+        {/* Risk Assessment Section */}
+        <Text style={styles.sectionTitle}>⚠️ Risk Assessment</Text>
+        <View style={styles.riskSection}>
+          <View style={styles.riskGrid}>
+            <View style={[styles.riskCard, 
+              metrics.scheduleRisk.color === 'red' ? { backgroundColor: '#fee2e2', borderColor: '#fca5a5' } : 
+              metrics.scheduleRisk.color === 'orange' ? { backgroundColor: '#fed7aa', borderColor: '#fdba74' } : 
+              { backgroundColor: '#d1fae5', borderColor: '#86efac' }
+            ]}>
+              <Text style={styles.riskCardTitle}>🕒 Schedule Risk</Text>
+              <Text style={[
+                styles.riskLevel,
+                metrics.scheduleRisk.color === 'red' ? styles.riskLevelUrgent :
+                metrics.scheduleRisk.color === 'orange' ? styles.riskLevelMedium :
+                styles.riskLevelLow
+              ]}>
+                {metrics.scheduleRisk.level}
+              </Text>
+              <Text style={styles.riskDescription}>{metrics.scheduleRisk.description}</Text>
+            </View>
+            
+            <View style={[styles.riskCard, metrics.highRiskTasks > 0 ? 
+              { backgroundColor: '#fed7aa', borderColor: '#fdba74' } : 
+              { backgroundColor: '#d1fae5', borderColor: '#86efac' }
+            ]}>
+              <Text style={styles.riskCardTitle}>⚠️ Priority Risk</Text>
+              <Text style={[
+                styles.riskLevel,
+                metrics.highRiskTasks > 0 ? styles.riskLevelMedium : styles.riskLevelLow
+              ]}>
+                {metrics.highRiskTasks > 0 ? 'MEDIUM' : 'LOW'}
+              </Text>
+              <Text style={styles.riskDescription}>
+                {metrics.highRiskTasks} high-priority open tasks
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Professional Footer */}
+        <View style={styles.footer}>
+          <View style={styles.footerContent}>
+            <View style={styles.footerLeft}>
+              <Text style={styles.footerGenerated}>
+                Report Generated: {format(currentDate, 'PPP')}
+              </Text>
+              <Text style={styles.footerSources}>
+                <Text style={{ fontWeight: 'bold' }}>Sources:</Text> Due Diligence Tracker Analytics, Project Management System, Risk Assessment Framework
+              </Text>
+            </View>
+            <View style={styles.footerRight}>
+              <Text style={styles.footerNextUpdate}>Next Update</Text>
+              <Text style={styles.footerNextDate}>
+                {format(addDays(currentDate, 7), 'MMM d, yyyy')}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <Text style={{
+          position: 'absolute',
+          bottom: 8,
+          left: 32,
+          right: 32,
+          textAlign: 'center',
+          fontSize: 8,
+          color: '#9ca3af',
+        }} render={({ pageNumber, totalPages }) => 
           `CONFIDENTIAL Progress Brief | Page ${pageNumber} of ${totalPages} | ${project.name}`
         } />
       </Page>
