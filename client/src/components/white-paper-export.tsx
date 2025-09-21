@@ -31,11 +31,13 @@ const styles = StyleSheet.create({
     padding: 60,
   },
   coverTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     color: '#1e3a8a',
     marginBottom: 20,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   coverSubtitle: {
     fontSize: 16,
@@ -55,7 +57,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   header: {
-    fontSize: 22,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#1e3a8a',
     marginBottom: 20,
@@ -75,6 +77,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e3a8a',
     padding: 12,
     paddingLeft: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   subsectionTitle: {
     fontSize: 14,
@@ -124,7 +128,7 @@ const styles = StyleSheet.create({
     lineHeight: 1.0,
   },
   kpiLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#374151',
     fontWeight: 'bold',
     marginBottom: 6,
@@ -197,7 +201,7 @@ const styles = StyleSheet.create({
     color: '#1e3a8a',
   },
   statusLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#374151',
     fontWeight: 'bold',
     textTransform: 'uppercase',
@@ -221,11 +225,11 @@ const styles = StyleSheet.create({
   },
   taskDetail: {
     flex: 1,
-    fontSize: 9,
+    fontSize: 10,
     color: '#374151',
   },
   statusBadge: {
-    fontSize: 9,
+    fontSize: 10,
     padding: 6,
     borderRadius: 4,
     textAlign: 'center',
@@ -252,12 +256,12 @@ const styles = StyleSheet.create({
     borderLeft: '4 solid #1e3a8a',
   },
   contactTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#1e3a8a',
     marginBottom: 8,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   contactDetail: {
     fontSize: 11,
@@ -345,7 +349,7 @@ const styles = StyleSheet.create({
     lineHeight: 1.6,
   },
   executiveHeader: {
-    fontSize: 38,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#1e3a8a',
     textAlign: 'center',
@@ -370,7 +374,7 @@ const styles = StyleSheet.create({
     borderBottom: '2 solid #e1e5e9',
   },
   executiveSectionTitle: {
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 25,
@@ -379,7 +383,7 @@ const styles = StyleSheet.create({
     paddingLeft: 25,
     borderRadius: 6,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   keyInsight: {
     backgroundColor: '#f0f9ff',
@@ -398,7 +402,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   keyInsightText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#374151',
     lineHeight: 1.7,
   },
@@ -566,7 +570,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   riskMetricLabel: {
-    fontSize: 9,
+    fontSize: 10,
     color: '#6b7280',
     fontWeight: 'bold',
     textTransform: 'uppercase',
@@ -616,14 +620,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   heatMapLabelRow: {
-    fontSize: 8,
+    fontSize: 10,
     color: '#6b7280',
     fontWeight: 'bold',
     textAlign: 'center',
     width: 45,
   },
   heatMapLabelCol: {
-    fontSize: 8,
+    fontSize: 10,
     color: '#6b7280',
     fontWeight: 'bold',
     textAlign: 'center',
@@ -661,7 +665,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   categorySubtext: {
-    fontSize: 9,
+    fontSize: 10,
     color: '#6b7280',
   },
   // Methodology Section Styles
@@ -680,6 +684,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     borderBottom: '2 solid #cbd5e1',
     paddingBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   methodologyStep: {
     display: 'flex',
@@ -736,7 +742,7 @@ const styles = StyleSheet.create({
     color: '#1f2937',
   },
   mitigationStatus: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: 'bold',
     padding: '4 8',
     borderRadius: 3,
@@ -771,7 +777,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   mitigationMetricLabel: {
-    fontSize: 8,
+    fontSize: 10,
     color: '#6b7280',
     fontWeight: 'bold',
     marginBottom: 2,
