@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format, differenceInDays, addDays, parseISO, isAfter, isBefore, startOfDay, differenceInCalendarDays } from "date-fns";
 import { tzNow, setDeadlineTo5PM } from "@/lib/date-utils";
 import { generateWhitePaperPDF } from "@/components/white-paper-export";
+import { generateProgressBriefPDF } from "@/components/progress-brief-export";
 import { 
   FileText, 
   Calendar, 
@@ -51,10 +52,17 @@ function isOverdueAt1700EST(deadline: Date | string): boolean {
 export default function DDProgressReportPage() {
   const { id: projectId } = useParams<{ id: string }>();
   
-  // Handle export PDF
-  const handleExportPDF = () => {
+  // Handle export DD Summary PDF
+  const handleExportDDSummary = () => {
     if (project && tasks) {
       generateWhitePaperPDF(project, tasks, risks, riskAnalytics, settings);
+    }
+  };
+
+  // Handle export Progress Brief PDF
+  const handleExportProgressBrief = () => {
+    if (project && tasks) {
+      generateProgressBriefPDF(project, tasks);
     }
   };
 
@@ -134,13 +142,22 @@ export default function DDProgressReportPage() {
           </div>
           <div className="flex space-x-3">
             <Button 
-              variant="outline" 
+              variant="default" 
               size="sm" 
-              onClick={handleExportPDF}
-              data-testid="button-export-pdf"
+              onClick={handleExportProgressBrief}
+              data-testid="button-export-progress-brief"
             >
               <Download className="h-4 w-4 mr-2" />
-              Export PDF
+              Progress Brief
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleExportDDSummary}
+              data-testid="button-export-dd-summary"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              DD Summary
             </Button>
             <Button 
               variant="outline" 

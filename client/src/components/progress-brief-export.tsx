@@ -1,7 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
 import { format, differenceInDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
-import { setDeadlineTo5PM } from '@/lib/date-utils';
+import { setDeadlineTo5PM, tzNow } from '@/lib/date-utils';
 import type { Project, Task } from '@shared/schema';
 
 interface ProgressBriefProps {
@@ -167,6 +167,7 @@ const styles = StyleSheet.create({
 
 // Calculate brief metrics for Progress Brief
 const calculateBriefMetrics = (project: Project, tasks: Task[]) => {
+  const nowEST = tzNow('America/New_York');
   const todayEST = setDeadlineTo5PM(new Date());
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
@@ -177,24 +178,24 @@ const calculateBriefMetrics = (project: Project, tasks: Task[]) => {
     ? differenceInDays(setDeadlineTo5PM(project.ddExpirationDate), todayEST)
     : null;
   
-  // Find overdue tasks
+  // Find overdue tasks - properly check if current EST time is past 5:00 PM deadline
   const overdueTasks = tasks.filter(task => {
     if (!task.deadline || task.status === 'completed') return false;
     try {
       const deadline = setDeadlineTo5PM(task.deadline);
-      return differenceInDays(todayEST, deadline) > 0;
+      return nowEST > deadline;
     } catch {
       return false;
     }
   });
 
-  // Find upcoming critical tasks (next 7 days)
+  // Find upcoming critical tasks (next 7 days) - exclude overdue tasks
   const upcomingTasks = tasks.filter(task => {
     if (!task.deadline || task.status === 'completed') return false;
     try {
       const deadline = setDeadlineTo5PM(task.deadline);
-      const daysUntil = differenceInDays(deadline, todayEST);
-      return daysUntil >= 0 && daysUntil <= 7;
+      const daysUntil = differenceInDays(deadline, nowEST);
+      return deadline > nowEST && daysUntil <= 7;
     } catch {
       return false;
     }
