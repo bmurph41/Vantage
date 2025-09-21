@@ -1945,11 +1945,12 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
           <Text style={styles.executiveSectionTitle}>Key Risk Assessment</Text>
           
           <View style={styles.keyInsight}>
-            <Text style={styles.keyInsightTitle}>Risk Portfolio Overview</Text>
+            <Text style={styles.keyInsightTitle}>Project Status & Risk Summary</Text>
             <Text style={styles.keyInsightText}>
-              Analysis of {safeRisks.length} identified risks using quantitative Likelihood × Impact methodology. 
-              {highRiskCount} high-severity risks requiring immediate board attention.
-              {safeRisks.length === 0 && " Note: Risk assessment is pending - this report contains preliminary data."}
+              • {completedTasks}/{totalTasks} due diligence tasks completed ({completionRate}% complete)
+              {daysToExpiration ? `\n• ${daysToExpiration > 0 ? daysToExpiration : 0} days until DD expiration` : ''}
+              {safeRisks.length > 0 ? `\n• ${safeRisks.length} risks identified with ${highRiskCount} high-severity requiring immediate action` : '\n• Risk assessment in progress - preliminary data shown'}
+              {totalCostAtRisk > 0 ? `\n• ${formatCurrency(totalCostAtRisk.toString())} total financial exposure identified` : ''}
             </Text>
           </View>
 
@@ -2055,41 +2056,40 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
 
         {/* Decision Asks */}
         <View style={styles.decisionBox}>
-          <Text style={styles.decisionTitle}>Board Decision Items</Text>
+          <Text style={styles.decisionTitle}>Required Board Actions</Text>
           
           <View style={styles.actionItem}>
             <Text style={styles.actionBullet}>•</Text>
             <Text style={styles.keyInsightText}>
-              <Text style={styles.bold}>Risk Mitigation Budget Approval: </Text>
-              ${(top3Risks.reduce((sum, r) => sum + (r.mitigationCostUSD || 0), 0) / 1000).toLocaleString()}K 
-              required for immediate high-risk mitigation efforts
+              <Text style={styles.bold}>APPROVE: </Text>
+              ${(top3Risks.reduce((sum, r) => sum + (r.mitigationCostUSD || 0), 0) / 1000).toLocaleString()}K mitigation budget for {highRiskCount} high-severity risks
             </Text>
           </View>
           
           <View style={styles.actionItem}>
             <Text style={styles.actionBullet}>•</Text>
             <Text style={styles.keyInsightText}>
-              <Text style={styles.bold}>Timeline Risk Decision: </Text>
-              Accept {totalScheduleAtRisk}-day exposure or authorize accelerated mitigation timeline
+              <Text style={styles.bold}>DECIDE: </Text>
+              Accept {totalScheduleAtRisk}-day schedule risk OR authorize accelerated timeline
             </Text>
           </View>
           
-          <View style={styles.actionItem}>
-            <Text style={styles.actionBullet}>•</Text>
-            <Text style={styles.keyInsightText}>
-              <Text style={styles.bold}>Resource Allocation: </Text>
-              Approve additional expertise for {riskAnalysis.categoryDistribution.length || 0} 
-              high-impact risk categories
-            </Text>
-          </View>
-          
-          {daysToExpiration !== null && daysToExpiration >= 0 && (
+          {daysToExpiration !== null && daysToExpiration >= 0 && daysToExpiration < 30 && (
             <View style={styles.actionItem}>
               <Text style={styles.actionBullet}>•</Text>
               <Text style={styles.keyInsightText}>
-                <Text style={styles.bold}>DD Extension Decision: </Text>
-                Evaluate need for due diligence extension beyond {formatDate(project.ddExpirationDate || '')} 
-                ({daysToExpiration} days remaining)
+                <Text style={styles.bold}>URGENT: </Text>
+                DD expires in {daysToExpiration} days - authorize extension OR accelerate closure
+              </Text>
+            </View>
+          )}
+          
+          {completionRate < 80 && (
+            <View style={styles.actionItem}>
+              <Text style={styles.actionBullet}>•</Text>
+              <Text style={styles.keyInsightText}>
+                <Text style={styles.bold}>RESOURCE: </Text>
+                Authorize additional resources to complete remaining {totalTasks - completedTasks} DD tasks
               </Text>
             </View>
           )}
