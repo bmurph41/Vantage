@@ -10,7 +10,7 @@ import { TimelineNotes } from "./timeline-notes";
 import { DocumentRequirementsManagement } from "./document-requirements-management";
 import { useTaskDocumentCompletionStatus } from "@/hooks/use-document-requirements";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
-import { StickyNote, GripVertical, FileText, Shield, ChevronUp, ChevronDown } from "lucide-react";
+import { StickyNote, GripVertical, FileText, Shield, ChevronUp, ChevronDown, CheckCircle } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate, setDeadlineTo5PM, getMilestonePositionWithGranularity } from "@/lib/date-utils";
@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectTaskDependencies } from "@/hooks/use-task-dependencies";
+import { useUpdateTask } from "@/hooks/use-tasks";
 import { ChevronTaskReorder } from "./chevron-task-reorder";
 import {
   DndContext,
@@ -271,6 +272,7 @@ function SortableTaskItem({
   granularity = 'weekly' // Add granularity prop with default
 }: SortableTaskItemProps) {
   const [docRequirementsDialogOpen, setDocRequirementsDialogOpen] = useState(false);
+  const { toast } = useToast();
   
   const {
     attributes,
@@ -287,6 +289,31 @@ function SortableTaskItem({
     hasBlockingIssues,
     canComplete
   } = useTaskDocumentCompletionStatus(task.id);
+
+  // Task update mutation for marking as completed
+  const updateTaskMutation = useUpdateTask();
+
+  const handleMarkCompleted = async () => {
+    try {
+      await updateTaskMutation.mutateAsync({
+        id: task.id,
+        updates: {
+          status: 'completed',
+          completedAt: new Date()
+        }
+      });
+      toast({
+        title: "Task Completed",
+        description: `"${task.title}" has been marked as completed.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to mark task as completed",
+        variant: "destructive",
+      });
+    }
+  };
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -424,6 +451,21 @@ function SortableTaskItem({
               Documents
             </Button>
           )}
+          {/* Mark as Completed Button for Overdue Tasks */}
+          {deadlineUrgency === 'overdue' && task.status !== 'completed' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 text-xs bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 transition-colors"
+              onClick={handleMarkCompleted}
+              disabled={updateTaskMutation.isPending}
+              data-testid={`button-complete-${task.id}`}
+            >
+              <CheckCircle className="h-3 w-3 mr-1" />
+              {updateTaskMutation.isPending ? 'Completing...' : 'Mark Complete'}
+            </Button>
+          )}
+          
           {/* Simple Note Button */}
           <Button
             variant="outline"

@@ -228,12 +228,15 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
   const totalDays = Math.max(1, differenceInDays(projectEndDate, projectStartDate)); // Prevent division by zero
   
   const tasksByCategory = useMemo(() => {
+    // Filter out completed tasks from the timeline view
+    const incompleteTasks = tasks.filter(t => t.status !== 'completed');
+    
     const categories = {
-      'Financial Review': tasks.filter(t => t.title.toLowerCase().includes('financial') || t.title.toLowerCase().includes('audit')),
-      'Legal & Compliance': tasks.filter(t => t.title.toLowerCase().includes('legal') || t.title.toLowerCase().includes('contract')),
-      'Operational Assessment': tasks.filter(t => t.title.toLowerCase().includes('operational') || t.title.toLowerCase().includes('business')),
-      'Technical Evaluation': tasks.filter(t => t.title.toLowerCase().includes('technical') || t.title.toLowerCase().includes('system')),
-      'Other': tasks.filter(t => 
+      'Financial Review': incompleteTasks.filter(t => t.title.toLowerCase().includes('financial') || t.title.toLowerCase().includes('audit')),
+      'Legal & Compliance': incompleteTasks.filter(t => t.title.toLowerCase().includes('legal') || t.title.toLowerCase().includes('contract')),
+      'Operational Assessment': incompleteTasks.filter(t => t.title.toLowerCase().includes('operational') || t.title.toLowerCase().includes('business')),
+      'Technical Evaluation': incompleteTasks.filter(t => t.title.toLowerCase().includes('technical') || t.title.toLowerCase().includes('system')),
+      'Other': incompleteTasks.filter(t => 
         !t.title.toLowerCase().includes('financial') && 
         !t.title.toLowerCase().includes('legal') && 
         !t.title.toLowerCase().includes('operational') && 
