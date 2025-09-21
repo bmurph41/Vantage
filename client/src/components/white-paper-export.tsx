@@ -1943,7 +1943,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
         </View>
         
         <Text style={styles.executiveHeader}>
-          Risk Analysis Executive Summary
+          Due Diligence Summary Report
         </Text>
         <Text style={styles.coverSubtitle}>{project.name.replace(/\s*DD\s*$/i, '').trim()}</Text>
         <Text style={styles.coverDate}>{currentDate}</Text>
