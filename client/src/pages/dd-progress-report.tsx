@@ -470,258 +470,659 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
 
   return (
     <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-      {/* Header Section - Matching Research Brief Style */}
-      <div className="bg-gradient-to-r from-blue-800 to-blue-900 text-white p-8">
+      {/* Header Section - Professional Dashboard Style */}
+      <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-8">
         <div className="flex justify-between items-start">
-          <div>
-            <div className="text-xs font-bold tracking-wider uppercase mb-2">PROGRESS BRIEF</div>
-            <div className="text-2xl font-bold tracking-wider uppercase">DUE DILIGENCE</div>
-            <div className="text-sm mt-2 opacity-90">{project.name}</div>
+          <div className="flex-1">
+            <h1 className="text-4xl font-bold text-white mb-2">{project.name}</h1>
+            <div className="text-lg font-medium opacity-90 mb-4">Due Diligence Progress Dashboard</div>
+            
+            {/* Status Badges */}
+            <div className="flex items-center space-x-3">
+              <Badge 
+                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  metrics.completionRate >= 80 ? 'bg-emerald-500 text-white' :
+                  metrics.completionRate >= 60 ? 'bg-amber-500 text-white' :
+                  'bg-red-500 text-white'
+                }`}
+                data-testid="badge-completion-status"
+              >
+                <CheckCircle className="h-4 w-4 mr-1" />
+                {metrics.completionRate}% Complete
+              </Badge>
+              
+              <Badge 
+                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  metrics.daysRemaining > 30 ? 'bg-emerald-500 text-white' :
+                  metrics.daysRemaining > 14 ? 'bg-amber-500 text-white' :
+                  'bg-red-500 text-white'
+                }`}
+                data-testid="badge-days-remaining"
+              >
+                <Clock className="h-4 w-4 mr-1" />
+                {metrics.daysRemaining} Days Left
+              </Badge>
+              
+              <Badge 
+                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  metrics.scheduleRisk.color === 'green' ? 'bg-emerald-500 text-white' :
+                  metrics.scheduleRisk.color === 'orange' ? 'bg-amber-500 text-white' :
+                  'bg-red-500 text-white'
+                }`}
+                data-testid="badge-risk-level"
+              >
+                <AlertTriangle className="h-4 w-4 mr-1" />
+                {metrics.scheduleRisk.level} Risk
+              </Badge>
+            </div>
           </div>
+          
+          {/* Key Dates Section */}
           <div className="text-right">
-            <div className="text-xs font-medium opacity-90 uppercase tracking-wide mb-2">
+            <div className="text-sm font-medium opacity-90 uppercase tracking-wide mb-2">
               {format(currentDate, 'MMMM yyyy').toUpperCase()}
             </div>
-            <div className="text-lg font-bold">{metrics.completionRate}%</div>
-            <div className="text-xs opacity-75">COMPLETE</div>
+            {metrics.ddEndDate && (
+              <div className="bg-white bg-opacity-20 rounded-lg p-3 mb-3">
+                <div className="text-xs uppercase tracking-wide opacity-75 mb-1">DD Expiration</div>
+                <div className="text-lg font-bold">{format(metrics.ddEndDate, 'MMM d')}</div>
+                <div className="text-xs opacity-75">{metrics.daysRemainingToDD} days</div>
+              </div>
+            )}
+            <div className="bg-white bg-opacity-20 rounded-lg p-3">
+              <div className="text-xs uppercase tracking-wide opacity-75 mb-1">Overall Progress</div>
+              <div className="text-2xl font-bold">{metrics.completionRate}%</div>
+              <div className="text-xs opacity-75">Complete</div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="p-8 space-y-8">
-        {/* AI-Generated Executive Summary */}
+        {/* Executive Summary Cards - 4-Card Grid */}
         <div className="space-y-6">
-          <div className="flex items-center space-x-2 mb-4">
-            <Zap className="h-5 w-5 text-blue-600" />
-            <h2 className="text-xl font-bold text-gray-900">Executive Insights</h2>
-            <Badge variant="secondary" className="text-xs">AI-Powered Analysis</Badge>
+          <div className="flex items-center space-x-2 mb-6">
+            <BarChart3 className="h-6 w-6 text-blue-600" />
+            <h2 className="text-2xl font-semibold text-gray-900">Executive Summary</h2>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Performance Analysis */}
-            <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
-              <div className="flex items-center mb-3">
-                <Activity className="h-5 w-5 text-blue-600 mr-2" />
-                <h3 className="font-semibold text-blue-900">Performance</h3>
-              </div>
-              <p className="text-gray-700 leading-relaxed text-sm">{aiInsights[0]}</p>
+          {/* 4-Card Executive Metrics Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {/* Card 1: Tasks Completed */}
+            <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`p-3 rounded-full ${
+                    metrics.completionRate >= 80 ? 'bg-emerald-100' :
+                    metrics.completionRate >= 60 ? 'bg-amber-100' :
+                    'bg-red-100'
+                  }`}>
+                    <CheckCircle className={`h-6 w-6 ${
+                      metrics.completionRate >= 80 ? 'text-emerald-600' :
+                      metrics.completionRate >= 60 ? 'text-amber-600' :
+                      'text-red-600'
+                    }`} />
+                  </div>
+                  <Badge className={`rounded-full text-xs ${
+                    metrics.completionRate >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                    metrics.completionRate >= 60 ? 'bg-amber-100 text-amber-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {metrics.completionRate >= 80 ? 'Excellent' :
+                     metrics.completionRate >= 60 ? 'Good' : 'Needs Attention'}
+                  </Badge>
+                </div>
+                <div className="text-3xl font-bold text-gray-900 mb-2">
+                  {metrics.completedTasks}/{metrics.totalTasks}
+                </div>
+                <div className="text-sm font-medium text-gray-600 mb-1">Tasks Completed</div>
+                <div className={`text-xs ${
+                  metrics.completionRate >= 80 ? 'text-emerald-600' :
+                  metrics.completionRate >= 60 ? 'text-amber-600' :
+                  'text-red-600'
+                }`}>
+                  {metrics.completionRate}% Complete
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 2: Days Remaining */}
+            <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`p-3 rounded-full ${
+                    metrics.daysRemaining > 30 ? 'bg-emerald-100' :
+                    metrics.daysRemaining > 14 ? 'bg-amber-100' :
+                    'bg-red-100'
+                  }`}>
+                    <Calendar className={`h-6 w-6 ${
+                      metrics.daysRemaining > 30 ? 'text-emerald-600' :
+                      metrics.daysRemaining > 14 ? 'text-amber-600' :
+                      'text-red-600'
+                    }`} />
+                  </div>
+                  <Badge className={`rounded-full text-xs ${
+                    metrics.daysRemaining > 30 ? 'bg-emerald-100 text-emerald-800' :
+                    metrics.daysRemaining > 14 ? 'bg-amber-100 text-amber-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {metrics.daysRemaining > 30 ? 'Comfortable' :
+                     metrics.daysRemaining > 14 ? 'Moderate' : 'Urgent'}
+                  </Badge>
+                </div>
+                <div className="text-3xl font-bold text-gray-900 mb-2">
+                  {metrics.daysRemaining}
+                </div>
+                <div className="text-sm font-medium text-gray-600 mb-1">Days Remaining</div>
+                <div className={`text-xs ${
+                  metrics.daysRemaining > 30 ? 'text-emerald-600' :
+                  metrics.daysRemaining > 14 ? 'text-amber-600' :
+                  'text-red-600'
+                }`}>
+                  Until Closing
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 3: Total Cost at Risk */}
+            <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 rounded-full bg-emerald-100">
+                    <Target className="h-6 w-6 text-emerald-600" />
+                  </div>
+                  <Badge className="bg-emerald-100 text-emerald-800 rounded-full text-xs">
+                    Protected
+                  </Badge>
+                </div>
+                <div className="text-3xl font-bold text-gray-900 mb-2">
+                  $0.0M
+                </div>
+                <div className="text-sm font-medium text-gray-600 mb-1">Total Cost at Risk</div>
+                <div className="text-xs text-emerald-600">
+                  Well Managed
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 4: High-Severity Risks */}
+            <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`p-3 rounded-full ${
+                    metrics.highRiskTasks === 0 ? 'bg-emerald-100' :
+                    metrics.highRiskTasks <= 2 ? 'bg-amber-100' :
+                    'bg-red-100'
+                  }`}>
+                    <AlertTriangle className={`h-6 w-6 ${
+                      metrics.highRiskTasks === 0 ? 'text-emerald-600' :
+                      metrics.highRiskTasks <= 2 ? 'text-amber-600' :
+                      'text-red-600'
+                    }`} />
+                  </div>
+                  <Badge className={`rounded-full text-xs ${
+                    metrics.highRiskTasks === 0 ? 'bg-emerald-100 text-emerald-800' :
+                    metrics.highRiskTasks <= 2 ? 'bg-amber-100 text-amber-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {metrics.highRiskTasks === 0 ? 'Clear' :
+                     metrics.highRiskTasks <= 2 ? 'Manageable' : 'Critical'}
+                  </Badge>
+                </div>
+                <div className="text-3xl font-bold text-gray-900 mb-2">
+                  {metrics.highRiskTasks}
+                </div>
+                <div className="text-sm font-medium text-gray-600 mb-1">High-Severity Risks</div>
+                <div className={`text-xs ${
+                  metrics.highRiskTasks === 0 ? 'text-emerald-600' :
+                  metrics.highRiskTasks <= 2 ? 'text-amber-600' :
+                  'text-red-600'
+                }`}>
+                  {metrics.highRiskTasks === 0 ? 'No Critical Risks' :
+                   `${metrics.highRiskTasks} Risk${metrics.highRiskTasks > 1 ? 's' : ''} Identified`}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* AI Insights Section - Moved below cards */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-center space-x-2 mb-4">
+              <Zap className="h-5 w-5 text-blue-600" />
+              <h3 className="text-lg font-semibold text-blue-900">AI-Powered Executive Insights</h3>
+              <Badge variant="secondary" className="text-xs">Analysis</Badge>
             </div>
-            
-            {/* Timeline Assessment */}
-            <div className="bg-orange-50 border-l-4 border-orange-400 p-4">
-              <div className="flex items-center mb-3">
-                <Clock className="h-5 w-5 text-orange-600 mr-2" />
-                <h3 className="font-semibold text-orange-900">Timeline</h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="flex items-start space-x-2">
+                  <Activity className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium text-blue-900 text-sm mb-1">Performance Analysis</div>
+                    <p className="text-gray-700 text-sm leading-relaxed">{aiInsights[0]}</p>
+                  </div>
+                </div>
               </div>
-              <p className="text-gray-700 leading-relaxed text-sm">{aiInsights[1]}</p>
-            </div>
-            
-            {/* Risk Mitigation */}
-            <div className={`${metrics.overdueTasks > 0 ? 'bg-red-50 border-red-400' : 'bg-green-50 border-green-400'} border-l-4 p-4`}>
-              <div className="flex items-center mb-3">
-                <Shield className="h-5 w-5 mr-2" style={{ color: metrics.overdueTasks > 0 ? '#dc2626' : '#16a34a' }} />
-                <h3 className={`font-semibold ${metrics.overdueTasks > 0 ? 'text-red-900' : 'text-green-900'}`}>Risk Mitigation</h3>
+              <div className="space-y-3">
+                <div className="flex items-start space-x-2">
+                  <Clock className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium text-amber-900 text-sm mb-1">Timeline Assessment</div>
+                    <p className="text-gray-700 text-sm leading-relaxed">{aiInsights[1]}</p>
+                  </div>
+                </div>
               </div>
-              <p className="text-gray-700 leading-relaxed text-sm">{aiInsights[2]}</p>
-            </div>
-            
-            {/* Market Outlook */}
-            <div className="bg-emerald-50 border-l-4 border-emerald-400 p-4">
-              <div className="flex items-center mb-3">
-                <TrendingUp className="h-5 w-5 text-emerald-600 mr-2" />
-                <h3 className="font-semibold text-emerald-900">Market Outlook</h3>
-              </div>
-              <p className="text-gray-700 leading-relaxed text-sm">{aiInsights[3]}</p>
             </div>
           </div>
         </div>
 
         <Separator />
 
-        {/* Enhanced Key Metrics Dashboard */}
+        {/* Progress Visualization - Enhanced Dashboard */}
         <div>
-          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-            <BarChart3 className="h-5 w-5 mr-2" />
-            Performance Metrics
-          </h3>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center">
+            <TrendingUp className="h-6 w-6 mr-3" />
+            Due Diligence Progress
+          </h2>
+
+          {/* Enhanced Progress Visualization */}
+          <div className="grid lg:grid-cols-2 gap-8 mb-8">
+            <Card className="bg-white shadow-lg border-0">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold flex items-center text-gray-900">
+                  <CheckCircle className="h-5 w-5 mr-3 text-emerald-600" />
+                  Task Completion Progress
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Overall Completion</span>
+                    <span className="text-2xl font-bold text-gray-900">{metrics.completionRate}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        metrics.completionRate >= 80 ? 'bg-emerald-500' :
+                        metrics.completionRate >= 60 ? 'bg-amber-500' :
+                        'bg-red-500'
+                      }`}
+                      style={{ width: `${metrics.completionRate}%` }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-emerald-600">{metrics.completedTasks}</div>
+                      <div className="text-xs text-gray-600 uppercase tracking-wide">Completed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">{metrics.inProgressTasks}</div>
+                      <div className="text-xs text-gray-600 uppercase tracking-wide">In Progress</div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white shadow-lg border-0">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold flex items-center text-gray-900">
+                  <Calendar className="h-5 w-5 mr-3 text-blue-600" />
+                  Timeline Progression
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Time Elapsed</span>
+                    <span className="text-2xl font-bold text-gray-900">{metrics.timelineProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                      style={{ width: `${metrics.timelineProgress}%` }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">{metrics.daysSinceStart}</div>
+                      <div className="text-xs text-gray-600 uppercase tracking-wide">Days Elapsed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-amber-600">{metrics.daysRemaining}</div>
+                      <div className="text-xs text-gray-600 uppercase tracking-wide">Days Remaining</div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600 mb-1">{metrics.completedTasks}</div>
-              <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Completed</div>
-            </div>
-            
-            <div className="text-center p-4 bg-yellow-50 rounded-lg">
-              <div className="text-2xl font-bold text-yellow-600 mb-1">{metrics.inProgressTasks}</div>
-              <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">In Progress</div>
-            </div>
-            
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600 mb-1">{metrics.engagedTasks}</div>
-              <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Engaged</div>
-            </div>
-            
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-gray-600 mb-1">{metrics.notStartedTasks}</div>
-              <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Not Started</div>
-            </div>
-            
-            <div className="text-center p-4 bg-red-50 rounded-lg">
-              <div className="text-2xl font-bold text-red-600 mb-1">{metrics.overdueTasks}</div>
-              <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Overdue</div>
-            </div>
-            
-            <div className="text-center p-4 bg-orange-50 rounded-lg relative">
-              <div className="text-2xl font-bold text-orange-600 mb-1">{metrics.daysRemaining}</div>
-              <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Days Left</div>
-              <div className="text-xs text-gray-500 mt-1">
-                {showDDDeadline && metrics.daysRemainingToDD !== null ? 'Until DD Deadline' : 'Until Closing'}
+          {/* Task Status Breakdown */}
+          <Card className="bg-white shadow-lg border-0 mb-8">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold flex items-center text-gray-900">
+                <BarChart3 className="h-5 w-5 mr-3 text-gray-600" />
+                Task Status Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="text-center p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                  <div className="text-2xl font-bold text-emerald-600 mb-1">{metrics.completedTasks}</div>
+                  <div className="text-sm font-medium text-emerald-800">Completed</div>
+                  <div className="w-3 h-3 bg-emerald-500 rounded-full mx-auto mt-2"></div>
+                </div>
+                
+                <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-2xl font-bold text-blue-600 mb-1">{metrics.inProgressTasks}</div>
+                  <div className="text-sm font-medium text-blue-800">In Progress</div>
+                  <div className="w-3 h-3 bg-blue-500 rounded-full mx-auto mt-2"></div>
+                </div>
+                
+                <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="text-2xl font-bold text-amber-600 mb-1">{metrics.engagedTasks}</div>
+                  <div className="text-sm font-medium text-amber-800">Engaged</div>
+                  <div className="w-3 h-3 bg-amber-500 rounded-full mx-auto mt-2"></div>
+                </div>
+                
+                <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-2xl font-bold text-gray-600 mb-1">{metrics.notStartedTasks}</div>
+                  <div className="text-sm font-medium text-gray-800">Not Started</div>
+                  <div className="w-3 h-3 bg-gray-400 rounded-full mx-auto mt-2"></div>
+                </div>
+                
+                <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+                  <div className="text-2xl font-bold text-red-600 mb-1">{metrics.overdueTasks}</div>
+                  <div className="text-sm font-medium text-red-800">Overdue</div>
+                  <div className="w-3 h-3 bg-red-500 rounded-full mx-auto mt-2"></div>
+                </div>
               </div>
-              {metrics.daysRemainingToDD !== null && (
-                <button
-                  onClick={() => setShowDDDeadline(!showDDDeadline)}
-                  className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  data-testid="toggle-days-left-type"
-                >
-                  {showDDDeadline ? (
-                    <ToggleRight className="h-4 w-4" />
-                  ) : (
-                    <ToggleLeft className="h-4 w-4" />
-                  )}
-                </button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Separator />
+
+        {/* Task Timeline Visualization */}
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center">
+            <Shield className="h-6 w-6 mr-3" />
+            Project Team & Timeline
+          </h2>
+          <Card className="bg-white shadow-lg border-0">
+            <CardContent className="p-6">
+              <TaskTimeline tasks={tasks} project={project} />
+            </CardContent>
+          </Card>
+        </div>
+
+        <Separator />
+
+        {/* Risk Assessment Dashboard - Professional Style */}
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center">
+            <AlertTriangle className="h-6 w-6 mr-3" />
+            Current Risk Status
+          </h2>
+          
+          {/* Risk Heat Map Header */}
+          <div className="bg-white shadow-lg rounded-lg border-0 mb-6">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Risk Heat Map</h3>
+                {metrics.overdueTasks === 0 && metrics.highRiskTasks === 0 ? (
+                  <Badge className="bg-emerald-100 text-emerald-800 rounded-full px-4 py-2">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    No Critical Risks Identified
+                  </Badge>
+                ) : (
+                  <Badge className="bg-red-100 text-red-800 rounded-full px-4 py-2">
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Risk Mitigation Required
+                  </Badge>
+                )}
+              </div>
+              
+              {/* Risk Summary Cards */}
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Schedule Risk Card */}
+                <Card className={`border-2 ${
+                  metrics.scheduleRisk.color === 'red' ? 'border-red-300 bg-red-50' :
+                  metrics.scheduleRisk.color === 'orange' ? 'border-amber-300 bg-amber-50' :
+                  'border-emerald-300 bg-emerald-50'
+                }`}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={`p-3 rounded-full ${
+                        metrics.scheduleRisk.color === 'red' ? 'bg-red-100' :
+                        metrics.scheduleRisk.color === 'orange' ? 'bg-amber-100' :
+                        'bg-emerald-100'
+                      }`}>
+                        <Clock className={`h-6 w-6 ${
+                          metrics.scheduleRisk.color === 'red' ? 'text-red-600' :
+                          metrics.scheduleRisk.color === 'orange' ? 'text-amber-600' :
+                          'text-emerald-600'
+                        }`} />
+                      </div>
+                      <Badge className={`rounded-full text-xs font-medium ${
+                        metrics.scheduleRisk.color === 'red' ? 'bg-red-200 text-red-800' :
+                        metrics.scheduleRisk.color === 'orange' ? 'bg-amber-200 text-amber-800' :
+                        'bg-emerald-200 text-emerald-800'
+                      }`}>
+                        Schedule
+                      </Badge>
+                    </div>
+                    <div className={`text-2xl font-bold mb-2 ${
+                      metrics.scheduleRisk.color === 'red' ? 'text-red-700' :
+                      metrics.scheduleRisk.color === 'orange' ? 'text-amber-700' :
+                      'text-emerald-700'
+                    }`}>
+                      {metrics.scheduleRisk.level}
+                    </div>
+                    <div className="text-sm font-medium text-gray-700 mb-1">Schedule Risk Level</div>
+                    <div className="text-xs text-gray-600">
+                      {metrics.scheduleRisk.description}
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Priority Risk Card */}
+                <Card className={`border-2 ${
+                  metrics.highRiskTasks > 0 ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50'
+                }`}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={`p-3 rounded-full ${
+                        metrics.highRiskTasks > 0 ? 'bg-amber-100' : 'bg-emerald-100'
+                      }`}>
+                        <AlertTriangle className={`h-6 w-6 ${
+                          metrics.highRiskTasks > 0 ? 'text-amber-600' : 'text-emerald-600'
+                        }`} />
+                      </div>
+                      <Badge className={`rounded-full text-xs font-medium ${
+                        metrics.highRiskTasks > 0 ? 'bg-amber-200 text-amber-800' : 'bg-emerald-200 text-emerald-800'
+                      }`}>
+                        Priority
+                      </Badge>
+                    </div>
+                    <div className={`text-2xl font-bold mb-2 ${
+                      metrics.highRiskTasks > 0 ? 'text-amber-700' : 'text-emerald-700'
+                    }`}>
+                      {metrics.highRiskTasks > 0 ? 'MEDIUM' : 'LOW'}
+                    </div>
+                    <div className="text-sm font-medium text-gray-700 mb-1">Priority Risk Level</div>
+                    <div className="text-xs text-gray-600">
+                      {metrics.highRiskTasks} high-priority open tasks
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Overdue Risk Card */}
+                <Card className={`border-2 ${
+                  metrics.overdueTasks > 0 ? 'border-red-300 bg-red-50' : 'border-emerald-300 bg-emerald-50'
+                }`}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={`p-3 rounded-full ${
+                        metrics.overdueTasks > 0 ? 'bg-red-100' : 'bg-emerald-100'
+                      }`}>
+                        <Target className={`h-6 w-6 ${
+                          metrics.overdueTasks > 0 ? 'text-red-600' : 'text-emerald-600'
+                        }`} />
+                      </div>
+                      <Badge className={`rounded-full text-xs font-medium ${
+                        metrics.overdueTasks > 0 ? 'bg-red-200 text-red-800' : 'bg-emerald-200 text-emerald-800'
+                      }`}>
+                        Deadline
+                      </Badge>
+                    </div>
+                    <div className={`text-2xl font-bold mb-2 ${
+                      metrics.overdueTasks > 0 ? 'text-red-700' : 'text-emerald-700'
+                    }`}>
+                      {metrics.overdueTasks > 0 ? 'HIGH' : 'LOW'}
+                    </div>
+                    <div className="text-sm font-medium text-gray-700 mb-1">Deadline Risk Level</div>
+                    <div className="text-xs text-gray-600">
+                      {metrics.overdueTasks > 0 ? `${metrics.overdueTasks} overdue task${metrics.overdueTasks > 1 ? 's' : ''}` : 'All tasks on schedule'}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {/* Risk Distribution */}
+              {metrics.overdueTasks === 0 && metrics.highRiskTasks === 0 ? (
+                <div className="mt-6 p-6 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-emerald-100 rounded-full">
+                      <CheckCircle className="h-5 w-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <div className="text-lg font-semibold text-emerald-900">Excellent Risk Management</div>
+                      <div className="text-sm text-emerald-700">All project deliverables are on track with no critical risks identified. Continue maintaining current execution standards.</div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-6 p-6 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-amber-100 rounded-full">
+                      <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <div className="text-lg font-semibold text-amber-900">Risk Mitigation Required</div>
+                      <div className="text-sm text-amber-700">Immediate attention needed for overdue tasks and high-priority items to maintain project timeline integrity.</div>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
+        </div>
 
-          {/* Progress Visualization */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Overall Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+        {/* Professional Footer - Call to Action Elements */}
+        <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 mt-8">
+          <CardContent className="p-8">
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Report Info */}
+              <div>
+                <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center">
+                  <FileText className="h-5 w-5 mr-2" />
+                  Report Details
+                </h3>
+                <div className="space-y-2 text-sm text-blue-800">
+                  <div><span className="font-medium">Generated:</span> {format(currentDate, 'PPP')}</div>
+                  <div><span className="font-medium">Next Update:</span> {format(addDays(currentDate, 7), 'MMM d, yyyy')}</div>
+                  <div><span className="font-medium">Sources:</span> DD Analytics, Project Management System</div>
+                </div>
+              </div>
+              
+              {/* Quick Actions */}
+              <div>
+                <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center">
+                  <Target className="h-5 w-5 mr-2" />
+                  Quick Actions
+                </h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span>Completion Rate</span>
-                    <span className="font-medium">{metrics.completionRate}%</span>
-                  </div>
-                  <Progress value={metrics.completionRate} className="h-3" />
-                  <div className="text-xs text-gray-500">
-                    {metrics.completedTasks} of {metrics.totalTasks} tasks completed
-                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full justify-start border-blue-300 text-blue-700 hover:bg-blue-50"
+                    data-testid="button-view-detailed-timeline"
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    View Detailed Timeline
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full justify-start border-blue-300 text-blue-700 hover:bg-blue-50"
+                    data-testid="button-contact-team"
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Contact Team Member
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Timeline Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+              </div>
+              
+              {/* Export Options */}
+              <div>
+                <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center">
+                  <Download className="h-5 w-5 mr-2" />
+                  Export & Share
+                </h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span>Time Elapsed</span>
-                    <span className="font-medium">{metrics.timelineProgress}%</span>
-                  </div>
-                  <Progress value={metrics.timelineProgress} className="h-3" />
-                  <div className="text-xs text-gray-500">
-                    {metrics.daysSinceStart} of {metrics.totalProjectDays} days elapsed
-                  </div>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    className="w-full justify-start bg-blue-600 hover:bg-blue-700"
+                    data-testid="button-export-comprehensive-report"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Export Report
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full justify-start border-blue-300 text-blue-700 hover:bg-blue-50"
+                    data-testid="button-schedule-review-meeting"
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Schedule Review Meeting
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Enhanced Task Timeline Visualization */}
-        <div>
-          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-            <Shield className="h-5 w-5 mr-2" />
-            Detailed Task Timeline
-          </h3>
-          <TaskTimeline tasks={tasks} project={project} />
-        </div>
-
-        <Separator />
-
-        {/* Risk Assessment Dashboard */}
-        <div>
-          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            Risk Assessment
-          </h3>
-          
-          <div className="grid md:grid-cols-2 gap-4">
-            <Card className={
-              metrics.scheduleRisk.color === 'red' ? "border-red-200 bg-red-50" :
-              metrics.scheduleRisk.color === 'orange' ? "border-orange-200 bg-orange-50" :
-              "border-green-200 bg-green-50"
-            }>
-              <CardHeader className="pb-3">
-                <CardTitle className={`text-sm font-medium flex items-center ${
-                  metrics.scheduleRisk.color === 'red' ? 'text-red-700' :
-                  metrics.scheduleRisk.color === 'orange' ? 'text-orange-700' :
-                  'text-green-700'
-                }`}>
-                  <Clock className="h-4 w-4 mr-2" />
-                  Schedule Risk
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold mb-1 ${
-                  metrics.scheduleRisk.color === 'red' ? 'text-red-600' :
-                  metrics.scheduleRisk.color === 'orange' ? 'text-orange-600' :
-                  'text-green-600'
-                }`}>
-                  {metrics.scheduleRisk.level}
-                </div>
-                <div className="text-xs text-gray-600">
-                  {metrics.scheduleRisk.description}
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
             
-            <Card className={metrics.highRiskTasks > 0 ? "border-orange-200 bg-orange-50" : "border-green-200 bg-green-50"}>
-              <CardHeader className="pb-3">
-                <CardTitle className={`text-sm font-medium flex items-center ${metrics.highRiskTasks > 0 ? 'text-orange-700' : 'text-green-700'}`}>
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  Priority Risk
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold mb-1 ${metrics.highRiskTasks > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                  {metrics.highRiskTasks > 0 ? 'MEDIUM' : 'LOW'}
+            {/* Status Summary */}
+            <div className="border-t border-blue-200 pt-6 mt-6">
+              <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-blue-700">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-emerald-500 rounded-full mr-2"></div>
+                  <span>{metrics.completedTasks} Completed</span>
                 </div>
-                <div className="text-xs text-gray-600">
-                  {metrics.highRiskTasks} high-priority open tasks
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                  <span>{metrics.inProgressTasks} In Progress</span>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Professional Footer */}
-        <div className="border-t border-gray-200 pt-6 mt-8">
-          <div className="flex justify-between items-center">
-            <div className="text-xs text-gray-500 leading-relaxed">
-              <div className="font-medium mb-1">Report Generated: {format(currentDate, 'PPP')}</div>
-              <div><strong>Sources:</strong> Due Diligence Tracker Analytics, Project Management System, Risk Assessment Framework</div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-amber-500 rounded-full mr-2"></div>
+                  <span>{metrics.engagedTasks} Engaged</span>
+                </div>
+                {metrics.overdueTasks > 0 && (
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                    <span>{metrics.overdueTasks} Overdue</span>
+                  </div>
+                )}
+                <div className="flex items-center">
+                  <Clock className="h-4 w-4 mr-1" />
+                  <span>{metrics.daysRemaining} days remaining</span>
+                </div>
+              </div>
             </div>
-            <div className="text-right">
-              <div className="text-xs text-gray-500 mb-1">Next Update</div>
-              <div className="text-sm font-medium text-gray-700">{format(addDays(currentDate, 7), 'MMM d, yyyy')}</div>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
