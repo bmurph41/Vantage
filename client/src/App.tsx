@@ -20,8 +20,11 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/projects/:id" component={ProjectPage} />
+      <Route path="/dd/projects/:id" component={ProjectPage} />
       <Route path="/projects/:id/notifications" component={NotificationSettingsWrapper} />
+      <Route path="/dd/projects/:id/notifications" component={NotificationSettingsWrapper} />
       <Route path="/projects/:id/progress-report" component={DDProgressReportPage} />
+      <Route path="/dd/projects/:id/progress-report" component={DDProgressReportPage} />
       <Route path="/demo/sortable" component={SortableListDemo} />
       <Route component={NotFound} />
     </Switch>

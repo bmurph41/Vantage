@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { User, CheckCircle, Clock, PlayCircle, Calendar, AlertTriangle } from "lucide-react";
-import { parseISO, isBefore, startOfDay } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { User, CheckCircle, Clock, PlayCircle, Calendar, AlertTriangle, X } from "lucide-react";
+import { parseISO, isBefore, startOfDay, format } from "date-fns";
 import { setDeadlineTo5PM } from "@/lib/date-utils";
 import type { Task } from "@shared/schema";
 
@@ -24,6 +28,11 @@ interface OwnerStats {
 }
 
 export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
+  const [ownerModalOpen, setOwnerModalOpen] = useState(false);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [selectedOwner, setSelectedOwner] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [selectedOwnerName, setSelectedOwnerName] = useState<string | null>(null);
   // Calculate stats by owner
   const calculateOwnerStats = (): OwnerStats[] => {
     const today = startOfDay(new Date());
@@ -145,6 +154,64 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
     }
   };
 
+  // Get tasks for selected owner
+  const getOwnerTasks = (ownerName: string): Task[] => {
+    return tasks.filter(task => {
+      const taskOwner = task.assignee || "Unassigned";
+      return taskOwner === ownerName;
+    });
+  };
+
+  // Get tasks by status for selected owner
+  const getTasksByStatus = (ownerName: string, status: string): Task[] => {
+    const today = startOfDay(new Date());
+    return tasks.filter(task => {
+      const taskOwner = task.assignee || "Unassigned";
+      if (taskOwner !== ownerName) return false;
+      
+      // Check if task is overdue
+      const isOverdue = task.deadline && 
+        task.status !== 'completed' && 
+        isBefore(setDeadlineTo5PM(task.deadline), today);
+      
+      if (status === 'overdue') {
+        return isOverdue;
+      } else if (status === 'not_started') {
+        return !isOverdue && (task.status === 'not_started' || task.status === 'scheduled');
+      } else {
+        return !isOverdue && task.status === status;
+      }
+    });
+  };
+
+  // Handle owner name click
+  const handleOwnerClick = (ownerName: string) => {
+    setSelectedOwner(ownerName);
+    setSelectedOwnerName(ownerName);
+    setOwnerModalOpen(true);
+  };
+
+  // Handle status button click
+  const handleStatusClick = (ownerName: string, status: string) => {
+    setSelectedOwner(ownerName);
+    setSelectedOwnerName(ownerName);
+    setSelectedStatus(status);
+    setStatusModalOpen(true);
+  };
+
+  // Format status name for display
+  const getStatusDisplayName = (status: string) => {
+    switch (status) {
+      case 'in_progress': return 'In Progress';
+      case 'engaged': return 'Engaged';
+      case 'not_started': return 'Not Started';
+      case 'overdue': return 'Overdue';
+      case 'completed': return 'Completed';
+      case 'scheduled': return 'Scheduled';
+      default: return status;
+    }
+  };
+
   return (
     <div className="space-y-6" data-testid="task-owners-view">
       <div className="flex items-center justify-between">
@@ -164,7 +231,11 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
                     <User className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg font-semibold">
+                    <CardTitle 
+                      className="text-lg font-semibold hover:text-primary cursor-pointer transition-colors"
+                      onClick={() => handleOwnerClick(owner.name)}
+                      data-testid={`owner-name-${owner.name}`}
+                    >
                       {owner.name}
                     </CardTitle>
                     <p className="text-sm text-gray-600">
@@ -198,7 +269,11 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
 
                 {/* Status Breakdown */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className={`flex items-center space-x-2 p-2 rounded-lg ${getStatusColor('in_progress')}`}>
+                  <div 
+                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${getStatusColor('in_progress')}`}
+                    onClick={() => handleStatusClick(owner.name, 'in_progress')}
+                    data-testid={`status-in-progress-${owner.name}`}
+                  >
                     {getStatusIcon('in_progress')}
                     <div>
                       <div className="font-semibold text-sm" data-testid={`in-progress-${owner.name}`}>
@@ -208,7 +283,11 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
                     </div>
                   </div>
 
-                  <div className={`flex items-center space-x-2 p-2 rounded-lg ${getStatusColor('engaged')}`}>
+                  <div 
+                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${getStatusColor('engaged')}`}
+                    onClick={() => handleStatusClick(owner.name, 'engaged')}
+                    data-testid={`status-engaged-${owner.name}`}
+                  >
                     {getStatusIcon('engaged')}
                     <div>
                       <div className="font-semibold text-sm" data-testid={`engaged-${owner.name}`}>
@@ -218,7 +297,11 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
                     </div>
                   </div>
 
-                  <div className={`flex items-center space-x-2 p-2 rounded-lg ${getStatusColor('not_started')}`}>
+                  <div 
+                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${getStatusColor('not_started')}`}
+                    onClick={() => handleStatusClick(owner.name, 'not_started')}
+                    data-testid={`status-not-started-${owner.name}`}
+                  >
                     {getStatusIcon('not_started')}
                     <div>
                       <div className="font-semibold text-sm" data-testid={`not-started-${owner.name}`}>
@@ -228,7 +311,11 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
                     </div>
                   </div>
 
-                  <div className={`flex items-center space-x-2 p-2 rounded-lg ${getStatusColor('overdue')}`}>
+                  <div 
+                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${getStatusColor('overdue')}`}
+                    onClick={() => handleStatusClick(owner.name, 'overdue')}
+                    data-testid={`status-overdue-${owner.name}`}
+                  >
                     {getStatusIcon('overdue')}
                     <div>
                       <div className="font-semibold text-sm" data-testid={`overdue-${owner.name}`}>
@@ -255,6 +342,124 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
           </Card>
         )}
       </div>
+
+      {/* Owner Tasks Modal */}
+      <Dialog open={ownerModalOpen} onOpenChange={setOwnerModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <User className="w-5 h-5" />
+              <span>Tasks for {selectedOwnerName}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            {selectedOwner && (
+              <div className="space-y-4">
+                {getOwnerTasks(selectedOwner).map((task) => (
+                  <Card key={task.id} className="border-l-4" style={{ borderLeftColor: task.status === 'completed' ? '#10B981' : task.status === 'overdue' ? '#EF4444' : '#3B82F6' }}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900 mb-2">{task.title}</h4>
+                          {task.description && (
+                            <p className="text-sm text-gray-600 mb-3">{task.description}</p>
+                          )}
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <Badge variant="outline" className={getStatusColor(task.status)}>
+                              {getStatusIcon(task.status)}
+                              <span className="ml-1">{getStatusDisplayName(task.status)}</span>
+                            </Badge>
+                            {task.priority && (
+                              <Badge variant="outline">
+                                Priority: {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                              </Badge>
+                            )}
+                            {task.deadline && (
+                              <Badge variant="outline">
+                                Due: {format(parseISO(task.deadline), 'MMM d, yyyy')}
+                              </Badge>
+                            )}
+                            {task.category && (
+                              <Badge variant="outline">
+                                {task.category}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {getOwnerTasks(selectedOwner).length === 0 && (
+                  <div className="text-center py-8">
+                    <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No tasks found for this owner.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Status Tasks Modal */}
+      <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              {selectedStatus && getStatusIcon(selectedStatus)}
+              <span>{selectedStatus && getStatusDisplayName(selectedStatus)} Tasks for {selectedOwnerName}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            {selectedOwner && selectedStatus && (
+              <div className="space-y-4">
+                {getTasksByStatus(selectedOwner, selectedStatus).map((task) => (
+                  <Card key={task.id} className="border-l-4" style={{ borderLeftColor: selectedStatus === 'completed' ? '#10B981' : selectedStatus === 'overdue' ? '#EF4444' : '#3B82F6' }}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900 mb-2">{task.title}</h4>
+                          {task.description && (
+                            <p className="text-sm text-gray-600 mb-3">{task.description}</p>
+                          )}
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <Badge variant="outline" className={getStatusColor(task.status)}>
+                              {getStatusIcon(task.status)}
+                              <span className="ml-1">{getStatusDisplayName(task.status)}</span>
+                            </Badge>
+                            {task.priority && (
+                              <Badge variant="outline">
+                                Priority: {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                              </Badge>
+                            )}
+                            {task.deadline && (
+                              <Badge variant="outline">
+                                Due: {format(parseISO(task.deadline), 'MMM d, yyyy')}
+                              </Badge>
+                            )}
+                            {task.category && (
+                              <Badge variant="outline">
+                                {task.category}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {getTasksByStatus(selectedOwner, selectedStatus).length === 0 && (
+                  <div className="text-center py-8">
+                    {selectedStatus && getStatusIcon(selectedStatus)}
+                    <p className="text-gray-600 mt-4">No {selectedStatus && getStatusDisplayName(selectedStatus).toLowerCase()} tasks found for this owner.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
