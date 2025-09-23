@@ -158,6 +158,21 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
   });
 
   const handleSubmit = (data: ContactFormData) => {
+    // Check for duplicate email
+    const existingContact = contacts.find(contact => 
+      contact.email.toLowerCase() === data.email.toLowerCase() && 
+      contact.id !== editingContact?.id
+    );
+    
+    if (existingContact) {
+      toast({
+        title: "Error",
+        description: "A contact with this email address already exists",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (editingContact) {
       updateContactMutation.mutate({ id: editingContact.id, data });
     } else {
