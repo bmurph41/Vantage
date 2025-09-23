@@ -11,11 +11,47 @@ import {
   isAfter, 
   isBefore,
   parseISO,
+  parse,
+  isValid,
   setHours,
   setMinutes,
   setSeconds 
 } from 'date-fns';
 import { toZonedTime, format as formatTz } from 'date-fns-tz';
+
+/**
+ * Parse date string supporting both ISO format (YYYY-MM-DD) and M/DD/YYYY format
+ */
+export function parseDate(dateString: string): Date {
+  if (!dateString) throw new Error('Date string is required');
+  
+  // First try ISO format (YYYY-MM-DD)
+  try {
+    const isoDate = parseISO(dateString);
+    if (isValid(isoDate)) {
+      return isoDate;
+    }
+  } catch (error) {
+    // Continue to try other formats
+  }
+  
+  // Try M/DD/YYYY formats
+  const formats = ["M/d/yyyy", "MM/dd/yyyy", "M/dd/yyyy", "MM/d/yyyy"];
+  
+  for (const formatString of formats) {
+    try {
+      const date = parse(dateString, formatString, new Date());
+      if (isValid(date)) {
+        return date;
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+  
+  // Fallback to parseISO for error handling
+  return parseISO(dateString);
+}
 
 export function tzNow(timezone: string = 'America/New_York'): Date {
   return toZonedTime(new Date(), timezone);

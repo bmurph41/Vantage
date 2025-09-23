@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -701,10 +702,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <div>
                     <Label htmlFor="deadline">Deadline Date</Label>
                     <div className="flex gap-2">
-                      <Input
+                      <DateInput
                         id="deadline"
-                        type="date"
-                        {...form.register("deadline")}
+                        value={form.watch("deadline")}
+                        onChange={(value) => form.setValue("deadline", value)}
                         data-testid="input-deadline"
                         className="flex-1"
                       />
@@ -874,10 +875,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <Label htmlFor="dateEngaged">Date Engaged *</Label>
-                      <Input
+                      <DateInput
                         id="dateEngaged"
-                        type="date"
-                        {...form.register("dateEngaged")}
+                        value={form.watch("dateEngaged")}
+                        onChange={(value) => form.setValue("dateEngaged", value)}
                         data-testid="input-date-engaged"
                       />
                       <p className="text-sm text-muted-foreground mt-1">
@@ -986,10 +987,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <div>
                     <Label htmlFor="deadline">Deadline Date</Label>
                     <div className="flex gap-2">
-                      <Input
+                      <DateInput
                         id="deadline"
-                        type="date"
-                        {...form.register("deadline")}
+                        value={form.watch("deadline")}
+                        onChange={(value) => form.setValue("deadline", value)}
                         data-testid="input-deadline"
                         className="flex-1"
                       />
@@ -1541,10 +1542,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <Label htmlFor="dateEngaged">Date Engaged *</Label>
-                      <Input
+                      <DateInput
                         id="dateEngaged"
-                        type="date"
-                        {...form.register("dateEngaged")}
+                        value={form.watch("dateEngaged")}
+                        onChange={(value) => form.setValue("dateEngaged", value)}
                         data-testid="input-date-engaged"
                       />
                       <p className="text-sm text-muted-foreground mt-1">
@@ -1653,10 +1654,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <div>
                     <Label htmlFor="deadline">Deadline Date</Label>
                     <div className="flex gap-2">
-                      <Input
+                      <DateInput
                         id="deadline"
-                        type="date"
-                        {...form.register("deadline")}
+                        value={form.watch("deadline")}
+                        onChange={(value) => form.setValue("deadline", value)}
                         data-testid="input-deadline"
                         className="flex-1"
                       />

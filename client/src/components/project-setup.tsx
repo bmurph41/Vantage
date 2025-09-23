@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -389,10 +390,10 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
           <div className="space-y-4">
             <div>
               <Label htmlFor="psaSignedDate">PSA Signed Date</Label>
-              <Input
+              <DateInput
                 id="psaSignedDate"
-                type="date"
-                {...projectForm.register("psaSignedDate")}
+                value={projectForm.watch("psaSignedDate")}
+                onChange={(value) => projectForm.setValue("psaSignedDate", value)}
                 data-testid="input-psa-date"
               />
             </div>
@@ -401,12 +402,12 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
             <div>
               <Label htmlFor="ddExpirationDate">DD Expiration Date</Label>
               <div className="grid grid-cols-2 gap-3">
-                <Input
+                <DateInput
                   id="ddExpirationDate"
-                  type="date"
-                  {...projectForm.register("ddExpirationDate")}
+                  value={projectForm.watch("ddExpirationDate")}
+                  onChange={(value) => projectForm.setValue("ddExpirationDate", value)}
                   data-testid="input-dd-expiration"
-                  placeholder="Select date manually"
+                  placeholder="Select date manually (MM/DD/YYYY)"
                 />
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-muted-foreground">or</span>
@@ -501,12 +502,12 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
             <div>
               <Label htmlFor="closingDate">Closing Date</Label>
               <div className="grid grid-cols-2 gap-3">
-                <Input
+                <DateInput
                   id="closingDate"
-                  type="date"
-                  {...projectForm.register("closingDate")}
+                  value={projectForm.watch("closingDate")}
+                  onChange={(value) => projectForm.setValue("closingDate", value)}
                   data-testid="input-closing-date"
-                  placeholder="Select date manually"
+                  placeholder="Select date manually (MM/DD/YYYY)"
                 />
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-muted-foreground">or</span>
