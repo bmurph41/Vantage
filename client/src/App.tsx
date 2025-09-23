@@ -23,6 +23,8 @@ function Router() {
       <Route path="/dd/projects/:id" component={ProjectPage} />
       <Route path="/projects/:id/notifications" component={NotificationSettingsWrapper} />
       <Route path="/dd/projects/:id/notifications" component={NotificationSettingsWrapper} />
+      <Route path="/projects/:id/settings" component={NotificationSettingsWrapper} />
+      <Route path="/dd/projects/:id/settings" component={NotificationSettingsWrapper} />
       <Route path="/projects/:id/progress-report" component={DDProgressReportPage} />
       <Route path="/dd/projects/:id/progress-report" component={DDProgressReportPage} />
       <Route path="/demo/sortable" component={SortableListDemo} />
