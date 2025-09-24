@@ -481,9 +481,9 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
             <div className="flex items-center space-x-3">
               <Badge 
                 className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  metrics.completionRate >= 80 ? 'bg-emerald-500 text-white' :
-                  metrics.completionRate >= 60 ? 'bg-amber-500 text-white' :
-                  'bg-red-500 text-white'
+                  metrics.completionRate >= 80 ? 'bg-slate-100 text-slate-700 border border-slate-200' :
+                  metrics.completionRate >= 60 ? 'bg-slate-100 text-slate-700 border border-slate-200' :
+                  'bg-red-50 text-red-700 border border-red-200'
                 }`}
                 data-testid="badge-completion-status"
               >
@@ -493,9 +493,9 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
               
               <Badge 
                 className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  metrics.daysRemaining > 30 ? 'bg-emerald-500 text-white' :
-                  metrics.daysRemaining > 14 ? 'bg-amber-500 text-white' :
-                  'bg-red-500 text-white'
+                  metrics.daysRemaining > 30 ? 'bg-slate-100 text-slate-700 border border-slate-200' :
+                  metrics.daysRemaining > 14 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                  'bg-red-50 text-red-700 border border-red-200'
                 }`}
                 data-testid="badge-days-remaining"
               >
@@ -505,9 +505,9 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
               
               <Badge 
                 className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  metrics.scheduleRisk.color === 'green' ? 'bg-emerald-500 text-white' :
-                  metrics.scheduleRisk.color === 'orange' ? 'bg-amber-500 text-white' :
-                  'bg-red-500 text-white'
+                  metrics.scheduleRisk.color === 'green' ? 'bg-slate-100 text-slate-700 border border-slate-200' :
+                  metrics.scheduleRisk.color === 'orange' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                  'bg-red-50 text-red-700 border border-red-200'
                 }`}
                 data-testid="badge-risk-level"
               >
@@ -554,20 +554,20 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className={`p-3 rounded-full ${
-                    metrics.completionRate >= 80 ? 'bg-emerald-100' :
-                    metrics.completionRate >= 60 ? 'bg-amber-100' :
-                    'bg-red-100'
+                    metrics.completionRate >= 80 ? 'bg-slate-100' :
+                    metrics.completionRate >= 60 ? 'bg-slate-100' :
+                    'bg-red-50'
                   }`}>
                     <CheckCircle className={`h-6 w-6 ${
-                      metrics.completionRate >= 80 ? 'text-emerald-600' :
-                      metrics.completionRate >= 60 ? 'text-amber-600' :
+                      metrics.completionRate >= 80 ? 'text-slate-600' :
+                      metrics.completionRate >= 60 ? 'text-slate-600' :
                       'text-red-600'
                     }`} />
                   </div>
                   <Badge className={`rounded-full text-xs ${
-                    metrics.completionRate >= 80 ? 'bg-emerald-100 text-emerald-800' :
-                    metrics.completionRate >= 60 ? 'bg-amber-100 text-amber-800' :
-                    'bg-red-100 text-red-800'
+                    metrics.completionRate >= 80 ? 'bg-slate-50 text-slate-700 border border-slate-200' :
+                    metrics.completionRate >= 60 ? 'bg-slate-50 text-slate-700 border border-slate-200' :
+                    'bg-red-50 text-red-700 border border-red-100'
                   }`}>
                     {metrics.completionRate >= 80 ? 'Excellent' :
                      metrics.completionRate >= 60 ? 'Good' : 'Needs Attention'}
@@ -578,8 +578,8 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
                 </div>
                 <div className="text-sm font-medium text-gray-600 mb-1">Tasks Completed</div>
                 <div className={`text-xs ${
-                  metrics.completionRate >= 80 ? 'text-emerald-600' :
-                  metrics.completionRate >= 60 ? 'text-amber-600' :
+                  metrics.completionRate >= 80 ? 'text-slate-600' :
+                  metrics.completionRate >= 60 ? 'text-slate-600' :
                   'text-red-600'
                 }`}>
                   {metrics.completionRate}% Complete
@@ -592,20 +592,20 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className={`p-3 rounded-full ${
-                    metrics.daysRemaining > 30 ? 'bg-emerald-100' :
-                    metrics.daysRemaining > 14 ? 'bg-amber-100' :
-                    'bg-red-100'
+                    metrics.daysRemaining > 30 ? 'bg-slate-100' :
+                    metrics.daysRemaining > 14 ? 'bg-amber-50' :
+                    'bg-red-50'
                   }`}>
                     <Calendar className={`h-6 w-6 ${
-                      metrics.daysRemaining > 30 ? 'text-emerald-600' :
+                      metrics.daysRemaining > 30 ? 'text-slate-600' :
                       metrics.daysRemaining > 14 ? 'text-amber-600' :
                       'text-red-600'
                     }`} />
                   </div>
                   <Badge className={`rounded-full text-xs ${
-                    metrics.daysRemaining > 30 ? 'bg-emerald-100 text-emerald-800' :
-                    metrics.daysRemaining > 14 ? 'bg-amber-100 text-amber-800' :
-                    'bg-red-100 text-red-800'
+                    metrics.daysRemaining > 30 ? 'bg-slate-50 text-slate-700 border border-slate-200' :
+                    metrics.daysRemaining > 14 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                    'bg-red-50 text-red-700 border border-red-100'
                   }`}>
                     {metrics.daysRemaining > 30 ? 'Comfortable' :
                      metrics.daysRemaining > 14 ? 'Moderate' : 'Urgent'}
@@ -616,7 +616,7 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
                 </div>
                 <div className="text-sm font-medium text-gray-600 mb-1">Days Remaining</div>
                 <div className={`text-xs ${
-                  metrics.daysRemaining > 30 ? 'text-emerald-600' :
+                  metrics.daysRemaining > 30 ? 'text-slate-600' :
                   metrics.daysRemaining > 14 ? 'text-amber-600' :
                   'text-red-600'
                 }`}>
@@ -629,10 +629,10 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
             <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 rounded-full bg-emerald-100">
-                    <Target className="h-6 w-6 text-emerald-600" />
+                  <div className="p-3 rounded-full bg-slate-100">
+                    <Target className="h-6 w-6 text-slate-600" />
                   </div>
-                  <Badge className="bg-emerald-100 text-emerald-800 rounded-full text-xs">
+                  <Badge className="bg-slate-50 text-slate-700 border border-slate-200 rounded-full text-xs">
                     Protected
                   </Badge>
                 </div>
@@ -640,7 +640,7 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
                   $0.0M
                 </div>
                 <div className="text-sm font-medium text-gray-600 mb-1">Total Cost at Risk</div>
-                <div className="text-xs text-emerald-600">
+                <div className="text-xs text-slate-600">
                   Well Managed
                 </div>
               </CardContent>
@@ -651,20 +651,20 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className={`p-3 rounded-full ${
-                    metrics.highRiskTasks === 0 ? 'bg-emerald-100' :
-                    metrics.highRiskTasks <= 2 ? 'bg-amber-100' :
-                    'bg-red-100'
+                    metrics.highRiskTasks === 0 ? 'bg-slate-100' :
+                    metrics.highRiskTasks <= 2 ? 'bg-amber-50' :
+                    'bg-red-50'
                   }`}>
                     <AlertTriangle className={`h-6 w-6 ${
-                      metrics.highRiskTasks === 0 ? 'text-emerald-600' :
+                      metrics.highRiskTasks === 0 ? 'text-slate-600' :
                       metrics.highRiskTasks <= 2 ? 'text-amber-600' :
                       'text-red-600'
                     }`} />
                   </div>
                   <Badge className={`rounded-full text-xs ${
-                    metrics.highRiskTasks === 0 ? 'bg-emerald-100 text-emerald-800' :
-                    metrics.highRiskTasks <= 2 ? 'bg-amber-100 text-amber-800' :
-                    'bg-red-100 text-red-800'
+                    metrics.highRiskTasks === 0 ? 'bg-slate-50 text-slate-700 border border-slate-200' :
+                    metrics.highRiskTasks <= 2 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                    'bg-red-50 text-red-700 border border-red-100'
                   }`}>
                     {metrics.highRiskTasks === 0 ? 'Clear' :
                      metrics.highRiskTasks <= 2 ? 'Manageable' : 'Critical'}
@@ -675,7 +675,7 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
                 </div>
                 <div className="text-sm font-medium text-gray-600 mb-1">High-Severity Risks</div>
                 <div className={`text-xs ${
-                  metrics.highRiskTasks === 0 ? 'text-emerald-600' :
+                  metrics.highRiskTasks === 0 ? 'text-slate-600' :
                   metrics.highRiskTasks <= 2 ? 'text-amber-600' :
                   'text-red-600'
                 }`}>
@@ -687,27 +687,27 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
           </div>
           
           {/* AI Insights Section - Moved below cards */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-6">
             <div className="flex items-center space-x-2 mb-4">
-              <Zap className="h-5 w-5 text-blue-600" />
-              <h3 className="text-lg font-semibold text-blue-900">AI-Powered Executive Insights</h3>
+              <Zap className="h-5 w-5 text-slate-600" />
+              <h3 className="text-lg font-semibold text-slate-800">AI-Powered Executive Insights</h3>
               <Badge variant="secondary" className="text-xs">Analysis</Badge>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div className="flex items-start space-x-2">
-                  <Activity className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <Activity className="h-4 w-4 text-slate-600 mt-0.5 flex-shrink-0" />
                   <div>
-                    <div className="font-medium text-blue-900 text-sm mb-1">Performance Analysis</div>
+                    <div className="font-medium text-slate-800 text-sm mb-1">Performance Analysis</div>
                     <p className="text-gray-700 text-sm leading-relaxed">{aiInsights[0]}</p>
                   </div>
                 </div>
               </div>
               <div className="space-y-3">
                 <div className="flex items-start space-x-2">
-                  <Clock className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <Clock className="h-4 w-4 text-slate-600 mt-0.5 flex-shrink-0" />
                   <div>
-                    <div className="font-medium text-amber-900 text-sm mb-1">Timeline Assessment</div>
+                    <div className="font-medium text-slate-800 text-sm mb-1">Timeline Assessment</div>
                     <p className="text-gray-700 text-sm leading-relaxed">{aiInsights[1]}</p>
                   </div>
                 </div>
