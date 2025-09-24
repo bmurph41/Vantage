@@ -89,6 +89,10 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const [secondDepositAmount, setSecondDepositAmount] = useState<string>(
     project.secondDepositAmount ? formatCurrency(project.secondDepositAmount.toString()) : ""
   );
+  
+  // Reference dates for calculation (PSA Date, DD Expiration, or manual date)
+  const [firstDepositReferenceDate, setFirstDepositReferenceDate] = useState<string>("");
+  const [secondDepositReferenceDate, setSecondDepositReferenceDate] = useState<string>("");
 
   // Helper function to calculate deposit due date from reference date + days
   const calculateDepositDueDate = (referenceDate: string, days: number, useBusinessDays: boolean, holidayCalendar: string) => {
@@ -106,14 +110,28 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
     }
   };
 
-  // Helper function to set quick date selections
+  // Helper function to set quick date selections (sets reference date for calculation)
   const setQuickDate = (depositNumber: 1 | 2, dateType: 'psa' | 'dd') => {
     const referenceDate = dateType === 'psa' ? projectForm.getValues("psaSignedDate") : projectForm.getValues("ddExpirationDate");
     if (referenceDate) {
       if (depositNumber === 1) {
-        projectForm.setValue("firstDepositDueDate", referenceDate);
+        setFirstDepositReferenceDate(referenceDate);
+        // Calculate and set the final due date immediately if we have days
+        if (firstDepositDays > 0) {
+          const calculatedDate = calculateDepositDueDate(referenceDate, firstDepositDays, firstDepositUseBusiness, holidayCalendar);
+          if (calculatedDate) {
+            projectForm.setValue("firstDepositDueDate", calculatedDate);
+          }
+        }
       } else {
-        projectForm.setValue("secondDepositDueDate", referenceDate);
+        setSecondDepositReferenceDate(referenceDate);
+        // Calculate and set the final due date immediately if we have days
+        if (secondDepositDays > 0) {
+          const calculatedDate = calculateDepositDueDate(referenceDate, secondDepositDays, secondDepositUseBusiness, holidayCalendar);
+          if (calculatedDate) {
+            projectForm.setValue("secondDepositDueDate", calculatedDate);
+          }
+        }
       }
     }
   };
@@ -206,26 +224,35 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const useBusinessDays = projectForm.watch("useBusinessDays");
   const holidayCalendar = projectForm.watch("holidayCalendar");
 
-  // Update deposit due date when days change
+  // Update deposit due date when reference date or days change
   useEffect(() => {
-    const psaDate = projectForm.getValues("psaSignedDate");
-    if (psaDate && firstDepositDays > 0) {
-      const calculatedDate = calculateDepositDueDate(psaDate, firstDepositDays, firstDepositUseBusiness, holidayCalendar);
+    if (firstDepositReferenceDate && firstDepositDays > 0) {
+      const calculatedDate = calculateDepositDueDate(firstDepositReferenceDate, firstDepositDays, firstDepositUseBusiness, holidayCalendar);
       if (calculatedDate) {
         projectForm.setValue("firstDepositDueDate", calculatedDate);
       }
     }
-  }, [firstDepositDays, firstDepositUseBusiness, psaSignedDate, holidayCalendar]);
+  }, [firstDepositReferenceDate, firstDepositDays, firstDepositUseBusiness, holidayCalendar]);
 
   useEffect(() => {
-    const psaDate = projectForm.getValues("psaSignedDate");
-    if (psaDate && secondDepositDays > 0) {
-      const calculatedDate = calculateDepositDueDate(psaDate, secondDepositDays, secondDepositUseBusiness, holidayCalendar);
+    if (secondDepositReferenceDate && secondDepositDays > 0) {
+      const calculatedDate = calculateDepositDueDate(secondDepositReferenceDate, secondDepositDays, secondDepositUseBusiness, holidayCalendar);
       if (calculatedDate) {
         projectForm.setValue("secondDepositDueDate", calculatedDate);
       }
     }
-  }, [secondDepositDays, secondDepositUseBusiness, psaSignedDate, holidayCalendar]);
+  }, [secondDepositReferenceDate, secondDepositDays, secondDepositUseBusiness, holidayCalendar]);
+
+  // Handle manual date changes - when user directly changes the due date, use it as reference date
+  const handleManualDateChange = (depositNumber: 1 | 2, newDate: string) => {
+    if (depositNumber === 1) {
+      setFirstDepositReferenceDate(newDate);
+      projectForm.setValue("firstDepositDueDate", newDate);
+    } else {
+      setSecondDepositReferenceDate(newDate);
+      projectForm.setValue("secondDepositDueDate", newDate);
+    }
+  };
 
   // Auto-calculate DD Expiration Date
   useEffect(() => {
@@ -807,7 +834,10 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                     <Input
                       id="firstDepositDueDate"
                       type="date"
-                      {...projectForm.register("firstDepositDueDate")}
+                      value={projectForm.watch("firstDepositDueDate")}
+                      onChange={(e) => {
+                        handleManualDateChange(1, e.target.value);
+                      }}
                       data-testid="input-first-deposit-due-date"
                     />
                     <div className="flex space-x-2">
@@ -913,7 +943,10 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                     <Input
                       id="secondDepositDueDate"
                       type="date"
-                      {...projectForm.register("secondDepositDueDate")}
+                      value={projectForm.watch("secondDepositDueDate")}
+                      onChange={(e) => {
+                        handleManualDateChange(2, e.target.value);
+                      }}
                       data-testid="input-second-deposit-due-date"
                     />
                     <div className="flex space-x-2">
