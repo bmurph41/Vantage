@@ -879,10 +879,11 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         id="dateEngaged"
                         value={form.watch("dateEngaged")}
                         onChange={(value) => form.setValue("dateEngaged", value)}
+                        placeholder="MM/DD/YYYY - Type or click to enter date"
                         data-testid="input-date-engaged"
                       />
                       <p className="text-sm text-muted-foreground mt-1">
-                        Date when the company was engaged for this task
+                        Type the date when the company was engaged for this task (e.g., 12/25/2024)
                       </p>
                     </div>
                   </div>
@@ -1579,10 +1580,11 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         id="dateEngaged"
                         value={form.watch("dateEngaged")}
                         onChange={(value) => form.setValue("dateEngaged", value)}
+                        placeholder="MM/DD/YYYY - Type or click to enter date"
                         data-testid="input-date-engaged"
                       />
                       <p className="text-sm text-muted-foreground mt-1">
-                        Date when the company was engaged for this task
+                        Type the date when the company was engaged for this task (e.g., 12/25/2024)
                       </p>
                     </div>
                   </div>
