@@ -21,9 +21,23 @@ import type { Contact, Task } from "@shared/schema";
 const contactSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Please enter a valid email address"),
-  phone: z.string().optional(),
+  phone: z.string().min(1, "Phone is required"),
   timezone: z.string().min(1, "Timezone is required"),
 });
+
+// Phone formatting utility
+const formatPhoneNumber = (value: string) => {
+  // Remove all non-digit characters
+  const cleaned = value.replace(/\D/g, '');
+  
+  // Apply (000) 000-0000 format
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  
+  // Return original if not 10 digits
+  return value;
+};
 
 type ContactFormData = z.infer<typeof contactSchema>;
 
@@ -309,9 +323,18 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone (Optional)</FormLabel>
+                        <FormLabel>Phone</FormLabel>
                         <FormControl>
-                          <Input placeholder="+1 (555) 123-4567" {...field} data-testid="input-contact-phone" />
+                          <Input 
+                            placeholder="(000) 000-0000" 
+                            {...field} 
+                            onBlur={(e) => {
+                              const formatted = formatPhoneNumber(e.target.value);
+                              field.onChange(formatted);
+                              field.onBlur();
+                            }}
+                            data-testid="input-contact-phone" 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -490,9 +513,18 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                               name="phone"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Phone (Optional)</FormLabel>
+                                  <FormLabel>Phone</FormLabel>
                                   <FormControl>
-                                    <Input {...field} data-testid="input-edit-phone" />
+                                    <Input 
+                                      placeholder="(000) 000-0000"
+                                      {...field} 
+                                      onBlur={(e) => {
+                                        const formatted = formatPhoneNumber(e.target.value);
+                                        field.onChange(formatted);
+                                        field.onBlur();
+                                      }}
+                                      data-testid="input-edit-phone" 
+                                    />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
