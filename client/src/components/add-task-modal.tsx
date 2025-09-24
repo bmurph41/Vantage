@@ -16,6 +16,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { formatPhoneNumber } from "@/lib/phone-utils";
 import { toStateAbbr } from "@/lib/state-utils";
+import { format, parseISO } from "date-fns";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateTask, useUpdateTask } from "@/hooks/use-tasks";
@@ -745,10 +746,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       {(project?.ddExpirationDate || project?.closingDate) && (
                         <div className="text-xs mt-1">
                           {project?.ddExpirationDate && (
-                            <span className="block">DD Expiration: {project.ddExpirationDate}</span>
+                            <span className="block">DD Expiration: {format(parseISO(project.ddExpirationDate), 'MM/dd/yyyy')}</span>
                           )}
                           {project?.closingDate && (
-                            <span className="block">Closing Date: {project.closingDate}</span>
+                            <span className="block">Closing Date: {format(parseISO(project.closingDate), 'MM/dd/yyyy')}</span>
                           )}
                         </div>
                       )}
@@ -1064,10 +1065,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       {(project?.ddExpirationDate || project?.closingDate) && (
                         <div className="text-xs mt-1">
                           {project?.ddExpirationDate && (
-                            <span className="block">DD Exp: {project.ddExpirationDate}</span>
+                            <span className="block">DD Exp: {format(parseISO(project.ddExpirationDate), 'MM/dd/yyyy')}</span>
                           )}
                           {project?.closingDate && (
-                            <span className="block">Closing: {project.closingDate}</span>
+                            <span className="block">Closing: {format(parseISO(project.closingDate), 'MM/dd/yyyy')}</span>
                           )}
                         </div>
                       )}
@@ -1765,10 +1766,10 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       {(project?.ddExpirationDate || project?.closingDate) && (
                         <div className="text-xs mt-1">
                           {project?.ddExpirationDate && (
-                            <span className="block">DD Exp: {project.ddExpirationDate}</span>
+                            <span className="block">DD Exp: {format(parseISO(project.ddExpirationDate), 'MM/dd/yyyy')}</span>
                           )}
                           {project?.closingDate && (
-                            <span className="block">Closing: {project.closingDate}</span>
+                            <span className="block">Closing: {format(parseISO(project.closingDate), 'MM/dd/yyyy')}</span>
                           )}
                         </div>
                       )}
