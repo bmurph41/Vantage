@@ -834,7 +834,7 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                     <Input
                       id="firstDepositDueDate"
                       type="date"
-                      value={projectForm.watch("firstDepositDueDate")}
+                      value={projectForm.watch("firstDepositDueDate") || ""}
                       onChange={(e) => {
                         handleManualDateChange(1, e.target.value);
                       }}
@@ -943,7 +943,7 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                     <Input
                       id="secondDepositDueDate"
                       type="date"
-                      value={projectForm.watch("secondDepositDueDate")}
+                      value={projectForm.watch("secondDepositDueDate") || ""}
                       onChange={(e) => {
                         handleManualDateChange(2, e.target.value);
                       }}
