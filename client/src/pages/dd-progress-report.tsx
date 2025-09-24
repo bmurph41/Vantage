@@ -23,7 +23,8 @@ import {
   Zap,
   ChevronRight,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  DollarSign
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -625,23 +626,87 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
               </CardContent>
             </Card>
 
-            {/* Card 3: Total Cost at Risk */}
+            {/* Card 3: Deposit Due */}
             <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 rounded-full bg-slate-100">
-                    <Target className="h-6 w-6 text-slate-600" />
+                  <div className={`p-3 rounded-full ${
+                    (() => {
+                      const ddDate = project.ddExpirationDate ? new Date(project.ddExpirationDate) : null;
+                      const today = new Date();
+                      if (!ddDate) return 'bg-slate-100';
+                      const daysUntil = Math.ceil((ddDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      return daysUntil <= 7 ? 'bg-red-50' : daysUntil <= 14 ? 'bg-amber-50' : 'bg-slate-100';
+                    })()
+                  }`}>
+                    <DollarSign className={`h-6 w-6 ${
+                      (() => {
+                        const ddDate = project.ddExpirationDate ? new Date(project.ddExpirationDate) : null;
+                        const today = new Date();
+                        if (!ddDate) return 'text-slate-600';
+                        const daysUntil = Math.ceil((ddDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                        return daysUntil <= 7 ? 'text-red-600' : daysUntil <= 14 ? 'text-amber-600' : 'text-slate-600';
+                      })()
+                    }`} />
                   </div>
-                  <Badge className="bg-slate-50 text-slate-700 border border-slate-200 rounded-full text-xs">
-                    Protected
+                  <Badge className={`rounded-full text-xs ${
+                    (() => {
+                      const ddDate = project.ddExpirationDate ? new Date(project.ddExpirationDate) : null;
+                      const today = new Date();
+                      if (!ddDate) return 'bg-slate-50 text-slate-700 border border-slate-200';
+                      const daysUntil = Math.ceil((ddDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      return daysUntil <= 7 ? 'bg-red-50 text-red-700 border border-red-100' : 
+                             daysUntil <= 14 ? 'bg-amber-50 text-amber-700 border border-amber-100' : 
+                             'bg-slate-50 text-slate-700 border border-slate-200';
+                    })()
+                  }`}>
+                    {
+                      (() => {
+                        const ddDate = project.ddExpirationDate ? new Date(project.ddExpirationDate) : null;
+                        const today = new Date();
+                        if (!ddDate) return 'Pending';
+                        const daysUntil = Math.ceil((ddDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                        return daysUntil <= 7 ? 'Urgent' : daysUntil <= 14 ? 'Soon' : 'Scheduled';
+                      })()
+                    }
                   </Badge>
                 </div>
                 <div className="text-3xl font-bold text-gray-900 mb-2">
-                  $0.0M
+                  ${
+                    (() => {
+                      // Determine which deposit is due based on DD expiration date
+                      const ddDate = project.ddExpirationDate ? new Date(project.ddExpirationDate) : null;
+                      const firstDepositDate = project.firstDepositDueDate ? new Date(project.firstDepositDueDate) : null;
+                      const secondDepositDate = project.secondDepositDueDate ? new Date(project.secondDepositDueDate) : null;
+                      
+                      // Check which deposit is closest to or matches DD expiration
+                      if (ddDate && firstDepositDate && Math.abs(ddDate.getTime() - firstDepositDate.getTime()) <= 7 * 24 * 60 * 60 * 1000) {
+                        return project.firstDepositAmount ? (project.firstDepositAmount / 1000).toFixed(0) + 'K' : '0';
+                      } else if (ddDate && secondDepositDate && Math.abs(ddDate.getTime() - secondDepositDate.getTime()) <= 7 * 24 * 60 * 60 * 1000) {
+                        return project.secondDepositAmount ? (project.secondDepositAmount / 1000).toFixed(0) + 'K' : '0';
+                      } else if (project.firstDepositAmount && (!project.secondDepositAmount || !secondDepositDate)) {
+                        return (project.firstDepositAmount / 1000).toFixed(0) + 'K';
+                      } else if (project.secondDepositAmount) {
+                        return (project.secondDepositAmount / 1000).toFixed(0) + 'K';
+                      }
+                      return '0';
+                    })()
+                  }
                 </div>
-                <div className="text-sm font-medium text-gray-600 mb-1">Total Cost at Risk</div>
+                <div className="text-sm font-medium text-gray-600 mb-1">Deposit Due</div>
                 <div className="text-xs text-slate-600">
-                  Well Managed
+                  {
+                    (() => {
+                      const ddDate = project.ddExpirationDate ? new Date(project.ddExpirationDate) : null;
+                      if (!ddDate) return 'No DD Date Set';
+                      const today = new Date();
+                      const daysUntil = Math.ceil((ddDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      if (daysUntil < 0) return 'Past Due';
+                      if (daysUntil === 0) return 'Due Today';
+                      if (daysUntil === 1) return 'Due Tomorrow';
+                      return `Due in ${daysUntil} days`;
+                    })()
+                  }
                 </div>
               </CardContent>
             </Card>
