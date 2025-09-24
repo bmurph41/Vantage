@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Calendar, Clock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -15,6 +15,20 @@ import { format, addDays, parseISO } from "date-fns";
 import { addBusinessDays } from "@/lib/business-days";
 import type { Project, ProjectSettings, Task } from "@shared/schema";
 import { useUpdateProject, useUpdateProjectSettings } from "@/hooks/use-project";
+
+// Helper function to format currency
+const formatCurrency = (value: string): string => {
+  const numericValue = value.replace(/[^0-9]/g, '');
+  if (!numericValue) return '';
+  const number = parseInt(numericValue);
+  return '$' + number.toLocaleString('en-US');
+};
+
+// Helper function to parse currency back to number
+const parseCurrency = (value: string): number => {
+  const numericValue = value.replace(/[^0-9]/g, '');
+  return numericValue ? parseInt(numericValue) : 0;
+};
 
 const projectFormSchema = z.object({
   name: z.string().min(1, "Project name is required"),
@@ -63,6 +77,67 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const [extensionDaysArray, setExtensionDaysArray] = useState<number[]>(project.extensionDays || []);
   const [sellersArray, setSellersArray] = useState<string[]>(project.seller || []);
   const [attorneysArray, setAttorneysArray] = useState<string[]>(project.ourAttorney || []);
+  
+  // Deposit Information State
+  const [firstDepositDays, setFirstDepositDays] = useState<number>(0);
+  const [secondDepositDays, setSecondDepositDays] = useState<number>(0);
+  const [firstDepositUseBusiness, setFirstDepositUseBusiness] = useState<boolean>(false);
+  const [secondDepositUseBusiness, setSecondDepositUseBusiness] = useState<boolean>(false);
+  const [firstDepositAmount, setFirstDepositAmount] = useState<string>(
+    project.firstDepositAmount ? formatCurrency(project.firstDepositAmount.toString()) : ""
+  );
+  const [secondDepositAmount, setSecondDepositAmount] = useState<string>(
+    project.secondDepositAmount ? formatCurrency(project.secondDepositAmount.toString()) : ""
+  );
+
+  // Helper function to calculate deposit due date from reference date + days
+  const calculateDepositDueDate = (referenceDate: string, days: number, useBusinessDays: boolean, holidayCalendar: string) => {
+    if (!referenceDate || !days) return "";
+    
+    try {
+      const startDate = parseISO(referenceDate);
+      const dueDate = useBusinessDays 
+        ? addBusinessDays(startDate, days, holidayCalendar)
+        : addDays(startDate, days);
+      
+      return format(dueDate, 'yyyy-MM-dd');
+    } catch {
+      return "";
+    }
+  };
+
+  // Helper function to set quick date selections
+  const setQuickDate = (depositNumber: 1 | 2, dateType: 'psa' | 'dd') => {
+    const referenceDate = dateType === 'psa' ? projectForm.getValues("psaSignedDate") : projectForm.getValues("ddExpirationDate");
+    if (referenceDate) {
+      if (depositNumber === 1) {
+        projectForm.setValue("firstDepositDueDate", referenceDate);
+      } else {
+        projectForm.setValue("secondDepositDueDate", referenceDate);
+      }
+    }
+  };
+
+  // Update deposit due date when days change
+  useEffect(() => {
+    const psaDate = projectForm.getValues("psaSignedDate");
+    if (psaDate && firstDepositDays > 0) {
+      const calculatedDate = calculateDepositDueDate(psaDate, firstDepositDays, firstDepositUseBusiness, holidayCalendar);
+      if (calculatedDate) {
+        projectForm.setValue("firstDepositDueDate", calculatedDate);
+      }
+    }
+  }, [firstDepositDays, firstDepositUseBusiness, projectForm.watch("psaSignedDate"), holidayCalendar]);
+
+  useEffect(() => {
+    const psaDate = projectForm.getValues("psaSignedDate");
+    if (psaDate && secondDepositDays > 0) {
+      const calculatedDate = calculateDepositDueDate(psaDate, secondDepositDays, secondDepositUseBusiness, holidayCalendar);
+      if (calculatedDate) {
+        projectForm.setValue("secondDepositDueDate", calculatedDate);
+      }
+    }
+  }, [secondDepositDays, secondDepositUseBusiness, projectForm.watch("psaSignedDate"), holidayCalendar]);
 
   // Helper function to calculate DD expiration date
   const calculateDDExpirationDate = (psaDate: string, ddPeriodDays: number, extensionDays: number[], useBusinessDays: boolean, holidayCalendar: string) => {
@@ -262,9 +337,9 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
         titleInsuranceCompany: data.titleInsuranceCompany || null,
         lender: data.lender || null,
         // Deposit Information
-        firstDepositAmount: data.firstDepositAmount || null,
+        firstDepositAmount: parseCurrency(firstDepositAmount) || null,
         firstDepositDueDate: data.firstDepositDueDate || null,
-        secondDepositAmount: data.secondDepositAmount || null,
+        secondDepositAmount: parseCurrency(secondDepositAmount) || null,
         secondDepositDueDate: data.secondDepositDueDate || null,
         tz: data.tz,
       },
@@ -705,48 +780,214 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
           <CardTitle>Deposit Information</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="firstDepositAmount">1st Deposit Amount ($)</Label>
-                <Input
-                  id="firstDepositAmount"
-                  type="number"
-                  {...projectForm.register("firstDepositAmount", { valueAsNumber: true })}
-                  placeholder="e.g., 50000"
-                  data-testid="input-first-deposit-amount"
-                />
+          <div className="space-y-6">
+            {/* 1st Deposit */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <h4 className="text-sm font-medium text-gray-700">1st Deposit</h4>
               </div>
-              <div>
-                <Label htmlFor="firstDepositDueDate">1st Deposit Due Date</Label>
-                <Input
-                  id="firstDepositDueDate"
-                  type="date"
-                  {...projectForm.register("firstDepositDueDate")}
-                  data-testid="input-first-deposit-due-date"
-                />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="firstDepositAmount">Amount</Label>
+                  <Input
+                    id="firstDepositAmount"
+                    value={firstDepositAmount}
+                    onChange={(e) => {
+                      const formatted = formatCurrency(e.target.value);
+                      setFirstDepositAmount(formatted);
+                    }}
+                    placeholder="$0"
+                    data-testid="input-first-deposit-amount"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="firstDepositDueDate">Due Date</Label>
+                  <div className="space-y-2">
+                    <Input
+                      id="firstDepositDueDate"
+                      type="date"
+                      {...projectForm.register("firstDepositDueDate")}
+                      data-testid="input-first-deposit-due-date"
+                    />
+                    <div className="flex space-x-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQuickDate(1, 'psa')}
+                        className="flex-1 text-xs"
+                      >
+                        <Calendar className="h-3 w-3 mr-1" />
+                        PSA Date
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQuickDate(1, 'dd')}
+                        className="flex-1 text-xs"
+                      >
+                        <Calendar className="h-3 w-3 mr-1" />
+                        DD Expiration
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="firstDepositDays">Within # of Days</Label>
+                  <Input
+                    id="firstDepositDays"
+                    type="number"
+                    value={firstDepositDays}
+                    onChange={(e) => setFirstDepositDays(Number(e.target.value))}
+                    placeholder="0"
+                    min="0"
+                    data-testid="input-first-deposit-days"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="firstDepositDayType">Day Type</Label>
+                  <Select
+                    value={firstDepositUseBusiness ? "business" : "calendar"}
+                    onValueChange={(value) => setFirstDepositUseBusiness(value === "business")}
+                  >
+                    <SelectTrigger data-testid="select-first-deposit-day-type">
+                      <SelectValue>
+                        <div className="flex items-center">
+                          {firstDepositUseBusiness ? (
+                            <><Clock className="h-4 w-4 mr-2" />Business Days</>
+                          ) : (
+                            <><Calendar className="h-4 w-4 mr-2" />Calendar Days</>
+                          )}
+                        </div>
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="calendar">
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Calendar Days
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="business">
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 mr-2" />
+                          Business Days
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="secondDepositAmount">2nd Deposit Amount ($)</Label>
-                <Input
-                  id="secondDepositAmount"
-                  type="number"
-                  {...projectForm.register("secondDepositAmount", { valueAsNumber: true })}
-                  placeholder="e.g., 100000"
-                  data-testid="input-second-deposit-amount"
-                />
+            <div className="border-t pt-4" />
+            
+            {/* 2nd Deposit */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <h4 className="text-sm font-medium text-gray-700">2nd Deposit</h4>
               </div>
-              <div>
-                <Label htmlFor="secondDepositDueDate">2nd Deposit Due Date</Label>
-                <Input
-                  id="secondDepositDueDate"
-                  type="date"
-                  {...projectForm.register("secondDepositDueDate")}
-                  data-testid="input-second-deposit-due-date"
-                />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="secondDepositAmount">Amount</Label>
+                  <Input
+                    id="secondDepositAmount"
+                    value={secondDepositAmount}
+                    onChange={(e) => {
+                      const formatted = formatCurrency(e.target.value);
+                      setSecondDepositAmount(formatted);
+                    }}
+                    placeholder="$0"
+                    data-testid="input-second-deposit-amount"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="secondDepositDueDate">Due Date</Label>
+                  <div className="space-y-2">
+                    <Input
+                      id="secondDepositDueDate"
+                      type="date"
+                      {...projectForm.register("secondDepositDueDate")}
+                      data-testid="input-second-deposit-due-date"
+                    />
+                    <div className="flex space-x-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQuickDate(2, 'psa')}
+                        className="flex-1 text-xs"
+                      >
+                        <Calendar className="h-3 w-3 mr-1" />
+                        PSA Date
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQuickDate(2, 'dd')}
+                        className="flex-1 text-xs"
+                      >
+                        <Calendar className="h-3 w-3 mr-1" />
+                        DD Expiration
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="secondDepositDays">Within # of Days</Label>
+                  <Input
+                    id="secondDepositDays"
+                    type="number"
+                    value={secondDepositDays}
+                    onChange={(e) => setSecondDepositDays(Number(e.target.value))}
+                    placeholder="0"
+                    min="0"
+                    data-testid="input-second-deposit-days"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="secondDepositDayType">Day Type</Label>
+                  <Select
+                    value={secondDepositUseBusiness ? "business" : "calendar"}
+                    onValueChange={(value) => setSecondDepositUseBusiness(value === "business")}
+                  >
+                    <SelectTrigger data-testid="select-second-deposit-day-type">
+                      <SelectValue>
+                        <div className="flex items-center">
+                          {secondDepositUseBusiness ? (
+                            <><Clock className="h-4 w-4 mr-2" />Business Days</>
+                          ) : (
+                            <><Calendar className="h-4 w-4 mr-2" />Calendar Days</>
+                          )}
+                        </div>
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="calendar">
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Calendar Days
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="business">
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 mr-2" />
+                          Business Days
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </div>
