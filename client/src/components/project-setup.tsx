@@ -79,8 +79,8 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const [attorneysArray, setAttorneysArray] = useState<string[]>(project.ourAttorney || []);
   
   // Deposit Information State
-  const [firstDepositDays, setFirstDepositDays] = useState<number>(0);
-  const [secondDepositDays, setSecondDepositDays] = useState<number>(0);
+  const [firstDepositDays, setFirstDepositDays] = useState<number | "">(0);
+  const [secondDepositDays, setSecondDepositDays] = useState<number | "">(0);
   const [firstDepositUseBusiness, setFirstDepositUseBusiness] = useState<boolean>(false);
   const [secondDepositUseBusiness, setSecondDepositUseBusiness] = useState<boolean>(false);
   const [firstDepositAmount, setFirstDepositAmount] = useState<string>(
@@ -117,8 +117,8 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
       if (depositNumber === 1) {
         setFirstDepositReferenceDate(referenceDate);
         // Calculate and set the final due date immediately if we have days
-        if (firstDepositDays > 0) {
-          const calculatedDate = calculateDepositDueDate(referenceDate, firstDepositDays, firstDepositUseBusiness, holidayCalendar);
+        if (firstDepositDays && Number(firstDepositDays) > 0) {
+          const calculatedDate = calculateDepositDueDate(referenceDate, Number(firstDepositDays), firstDepositUseBusiness, holidayCalendar);
           if (calculatedDate) {
             projectForm.setValue("firstDepositDueDate", calculatedDate);
           }
@@ -126,8 +126,8 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
       } else {
         setSecondDepositReferenceDate(referenceDate);
         // Calculate and set the final due date immediately if we have days
-        if (secondDepositDays > 0) {
-          const calculatedDate = calculateDepositDueDate(referenceDate, secondDepositDays, secondDepositUseBusiness, holidayCalendar);
+        if (secondDepositDays && Number(secondDepositDays) > 0) {
+          const calculatedDate = calculateDepositDueDate(referenceDate, Number(secondDepositDays), secondDepositUseBusiness, holidayCalendar);
           if (calculatedDate) {
             projectForm.setValue("secondDepositDueDate", calculatedDate);
           }
@@ -226,8 +226,8 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
 
   // Update deposit due date when reference date or days change
   useEffect(() => {
-    if (firstDepositReferenceDate && firstDepositDays > 0) {
-      const calculatedDate = calculateDepositDueDate(firstDepositReferenceDate, firstDepositDays, firstDepositUseBusiness, holidayCalendar);
+    if (firstDepositReferenceDate && firstDepositDays && Number(firstDepositDays) > 0) {
+      const calculatedDate = calculateDepositDueDate(firstDepositReferenceDate, Number(firstDepositDays), firstDepositUseBusiness, holidayCalendar);
       if (calculatedDate) {
         projectForm.setValue("firstDepositDueDate", calculatedDate);
       }
@@ -235,8 +235,8 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   }, [firstDepositReferenceDate, firstDepositDays, firstDepositUseBusiness, holidayCalendar]);
 
   useEffect(() => {
-    if (secondDepositReferenceDate && secondDepositDays > 0) {
-      const calculatedDate = calculateDepositDueDate(secondDepositReferenceDate, secondDepositDays, secondDepositUseBusiness, holidayCalendar);
+    if (secondDepositReferenceDate && secondDepositDays && Number(secondDepositDays) > 0) {
+      const calculatedDate = calculateDepositDueDate(secondDepositReferenceDate, Number(secondDepositDays), secondDepositUseBusiness, holidayCalendar);
       if (calculatedDate) {
         projectForm.setValue("secondDepositDueDate", calculatedDate);
       }
@@ -872,9 +872,12 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                   <Input
                     id="firstDepositDays"
                     type="number"
-                    value={firstDepositDays}
-                    onChange={(e) => setFirstDepositDays(Number(e.target.value))}
-                    placeholder="0"
+                    value={firstDepositDays === 0 ? "" : firstDepositDays}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFirstDepositDays(value === "" ? "" : Number(value));
+                    }}
+                    placeholder="Enter days"
                     min="0"
                     data-testid="input-first-deposit-days"
                   />
@@ -981,9 +984,12 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                   <Input
                     id="secondDepositDays"
                     type="number"
-                    value={secondDepositDays}
-                    onChange={(e) => setSecondDepositDays(Number(e.target.value))}
-                    placeholder="0"
+                    value={secondDepositDays === 0 ? "" : secondDepositDays}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSecondDepositDays(value === "" ? "" : Number(value));
+                    }}
+                    placeholder="Enter days"
                     min="0"
                     data-testid="input-second-deposit-days"
                   />
