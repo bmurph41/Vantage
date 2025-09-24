@@ -118,27 +118,6 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
     }
   };
 
-  // Update deposit due date when days change
-  useEffect(() => {
-    const psaDate = projectForm.getValues("psaSignedDate");
-    if (psaDate && firstDepositDays > 0) {
-      const calculatedDate = calculateDepositDueDate(psaDate, firstDepositDays, firstDepositUseBusiness, holidayCalendar);
-      if (calculatedDate) {
-        projectForm.setValue("firstDepositDueDate", calculatedDate);
-      }
-    }
-  }, [firstDepositDays, firstDepositUseBusiness, projectForm.watch("psaSignedDate"), holidayCalendar]);
-
-  useEffect(() => {
-    const psaDate = projectForm.getValues("psaSignedDate");
-    if (psaDate && secondDepositDays > 0) {
-      const calculatedDate = calculateDepositDueDate(psaDate, secondDepositDays, secondDepositUseBusiness, holidayCalendar);
-      if (calculatedDate) {
-        projectForm.setValue("secondDepositDueDate", calculatedDate);
-      }
-    }
-  }, [secondDepositDays, secondDepositUseBusiness, projectForm.watch("psaSignedDate"), holidayCalendar]);
-
   // Helper function to calculate DD expiration date
   const calculateDDExpirationDate = (psaDate: string, ddPeriodDays: number, extensionDays: number[], useBusinessDays: boolean, holidayCalendar: string) => {
     if (!psaDate || !ddPeriodDays) return "";
@@ -226,6 +205,27 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const daysToClosing = projectForm.watch("daysToClosing");
   const useBusinessDays = projectForm.watch("useBusinessDays");
   const holidayCalendar = projectForm.watch("holidayCalendar");
+
+  // Update deposit due date when days change
+  useEffect(() => {
+    const psaDate = projectForm.getValues("psaSignedDate");
+    if (psaDate && firstDepositDays > 0) {
+      const calculatedDate = calculateDepositDueDate(psaDate, firstDepositDays, firstDepositUseBusiness, holidayCalendar);
+      if (calculatedDate) {
+        projectForm.setValue("firstDepositDueDate", calculatedDate);
+      }
+    }
+  }, [firstDepositDays, firstDepositUseBusiness, psaSignedDate, holidayCalendar]);
+
+  useEffect(() => {
+    const psaDate = projectForm.getValues("psaSignedDate");
+    if (psaDate && secondDepositDays > 0) {
+      const calculatedDate = calculateDepositDueDate(psaDate, secondDepositDays, secondDepositUseBusiness, holidayCalendar);
+      if (calculatedDate) {
+        projectForm.setValue("secondDepositDueDate", calculatedDate);
+      }
+    }
+  }, [secondDepositDays, secondDepositUseBusiness, psaSignedDate, holidayCalendar]);
 
   // Auto-calculate DD Expiration Date
   useEffect(() => {
