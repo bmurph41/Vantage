@@ -37,6 +37,11 @@ const projectFormSchema = z.object({
   ourAttorney: z.array(z.string()).optional(),
   titleInsuranceCompany: z.string().optional(),
   lender: z.string().optional(),
+  // Deposit Information
+  firstDepositAmount: z.number().min(0).optional(),
+  firstDepositDueDate: z.string().optional(),
+  secondDepositAmount: z.number().min(0).optional(),
+  secondDepositDueDate: z.string().optional(),
 });
 
 const settingsFormSchema = z.object({
@@ -121,6 +126,11 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
       ourAttorney: project.ourAttorney || [],
       titleInsuranceCompany: project.titleInsuranceCompany || "",
       lender: project.lender || "",
+      // Deposit Information
+      firstDepositAmount: project.firstDepositAmount || undefined,
+      firstDepositDueDate: project.firstDepositDueDate || "",
+      secondDepositAmount: project.secondDepositAmount || undefined,
+      secondDepositDueDate: project.secondDepositDueDate || "",
     },
   });
 
@@ -251,6 +261,11 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
         ourAttorney: (data.ourAttorney || []).filter(a => a.trim() !== ""),
         titleInsuranceCompany: data.titleInsuranceCompany || null,
         lender: data.lender || null,
+        // Deposit Information
+        firstDepositAmount: data.firstDepositAmount || null,
+        firstDepositDueDate: data.firstDepositDueDate || null,
+        secondDepositAmount: data.secondDepositAmount || null,
+        secondDepositDueDate: data.secondDepositDueDate || null,
         tz: data.tz,
       },
     });
@@ -678,6 +693,60 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                     data-testid="input-lender"
                   />
                 </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Deposit Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Deposit Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="firstDepositAmount">1st Deposit Amount ($)</Label>
+                <Input
+                  id="firstDepositAmount"
+                  type="number"
+                  {...projectForm.register("firstDepositAmount", { valueAsNumber: true })}
+                  placeholder="e.g., 50000"
+                  data-testid="input-first-deposit-amount"
+                />
+              </div>
+              <div>
+                <Label htmlFor="firstDepositDueDate">1st Deposit Due Date</Label>
+                <Input
+                  id="firstDepositDueDate"
+                  type="date"
+                  {...projectForm.register("firstDepositDueDate")}
+                  data-testid="input-first-deposit-due-date"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="secondDepositAmount">2nd Deposit Amount ($)</Label>
+                <Input
+                  id="secondDepositAmount"
+                  type="number"
+                  {...projectForm.register("secondDepositAmount", { valueAsNumber: true })}
+                  placeholder="e.g., 100000"
+                  data-testid="input-second-deposit-amount"
+                />
+              </div>
+              <div>
+                <Label htmlFor="secondDepositDueDate">2nd Deposit Due Date</Label>
+                <Input
+                  id="secondDepositDueDate"
+                  type="date"
+                  {...projectForm.register("secondDepositDueDate")}
+                  data-testid="input-second-deposit-due-date"
+                />
               </div>
             </div>
           </div>

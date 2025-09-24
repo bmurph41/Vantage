@@ -67,6 +67,11 @@ export const projects = pgTable("projects", {
   ourAttorney: text("our_attorney").array().default(sql`'{}'`),
   titleInsuranceCompany: text("title_insurance_company"),
   lender: text("lender"),
+  // Deposit Information
+  firstDepositAmount: integer("first_deposit_amount"),
+  firstDepositDueDate: date("first_deposit_due_date"),
+  secondDepositAmount: integer("second_deposit_amount"),
+  secondDepositDueDate: date("second_deposit_due_date"),
   tz: text("tz").notNull().default("America/New_York"),
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
