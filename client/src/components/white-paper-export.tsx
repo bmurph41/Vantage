@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
     padding: 60,
   },
   coverTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     fontFamily: 'Helvetica-Bold',
     color: '#1e3a8a',
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   header: {
-    fontSize: 32,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#1e3a8a',
     marginBottom: 20,
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     borderStyle: 'solid',
   },
   subsectionTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#1e3a8a',
     marginBottom: 10,

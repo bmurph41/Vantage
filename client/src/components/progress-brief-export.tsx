@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 40,
     fontFamily: 'Helvetica',
-    fontSize: 11,
+    fontSize: 12,
     lineHeight: 1.4,
   },
   
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
