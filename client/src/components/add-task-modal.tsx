@@ -937,16 +937,49 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 {!form.watch("isInternalTask") && form.watch("requiresOnSiteInspection") && (
                   <div className="grid grid-cols-1 gap-4">
                     <div>
-                      <Label htmlFor="dateOnSite">Date On-Site *</Label>
+                      <div className="flex items-center justify-between mb-2">
+                        <Label htmlFor="dateOnSite">Date On-Site *</Label>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="dateOnSiteTBD"
+                            checked={form.watch("dateOnSite") === "TBD"}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                form.setValue("dateOnSite", "TBD");
+                              } else {
+                                form.setValue("dateOnSite", "");
+                              }
+                            }}
+                            data-testid="checkbox-date-on-site-tbd"
+                          />
+                          <Label 
+                            htmlFor="dateOnSiteTBD" 
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            TBD
+                          </Label>
+                        </div>
+                      </div>
                       <Input
                         id="dateOnSite"
                         type="text"
                         placeholder="MM/DD/YYYY"
+                        disabled={form.watch("dateOnSite") === "TBD"}
                         {...form.register("dateOnSite")}
+                        value={form.watch("dateOnSite") === "TBD" ? "TBD" : form.watch("dateOnSite")}
+                        onChange={(e) => {
+                          if (form.watch("dateOnSite") !== "TBD") {
+                            form.setValue("dateOnSite", e.target.value);
+                          }
+                        }}
                         data-testid="input-date-on-site"
                         pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
                         title="Please enter date in MM/DD/YYYY format"
+                        className={form.watch("dateOnSite") === "TBD" ? "bg-muted text-muted-foreground" : ""}
                       />
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Check TBD if the on-site date is to be determined
+                      </p>
                     </div>
                   </div>
                 )}
@@ -1604,16 +1637,49 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 {!form.watch("isInternalTask") && form.watch("requiresOnSiteInspection") && (
                   <div className="grid grid-cols-1 gap-4">
                     <div>
-                      <Label htmlFor="dateOnSite">Date On-Site *</Label>
+                      <div className="flex items-center justify-between mb-2">
+                        <Label htmlFor="dateOnSite">Date On-Site *</Label>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="dateOnSiteTBD"
+                            checked={form.watch("dateOnSite") === "TBD"}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                form.setValue("dateOnSite", "TBD");
+                              } else {
+                                form.setValue("dateOnSite", "");
+                              }
+                            }}
+                            data-testid="checkbox-date-on-site-tbd"
+                          />
+                          <Label 
+                            htmlFor="dateOnSiteTBD" 
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            TBD
+                          </Label>
+                        </div>
+                      </div>
                       <Input
                         id="dateOnSite"
                         type="text"
                         placeholder="MM/DD/YYYY"
+                        disabled={form.watch("dateOnSite") === "TBD"}
                         {...form.register("dateOnSite")}
+                        value={form.watch("dateOnSite") === "TBD" ? "TBD" : form.watch("dateOnSite")}
+                        onChange={(e) => {
+                          if (form.watch("dateOnSite") !== "TBD") {
+                            form.setValue("dateOnSite", e.target.value);
+                          }
+                        }}
                         data-testid="input-date-on-site"
                         pattern="^(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[0-9]{4}$"
                         title="Please enter date in MM/DD/YYYY format"
+                        className={form.watch("dateOnSite") === "TBD" ? "bg-muted text-muted-foreground" : ""}
                       />
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Check TBD if the on-site date is to be determined
+                      </p>
                     </div>
                   </div>
                 )}
