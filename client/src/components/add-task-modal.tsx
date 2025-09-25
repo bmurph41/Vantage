@@ -702,46 +702,12 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="deadline">Deadline Date</Label>
-                    <div className="flex gap-2">
-                      <DateInput
-                        id="deadline"
-                        value={form.watch("deadline")}
-                        onChange={(value) => form.setValue("deadline", value)}
-                        placeholder="MM/DD/YYYY"
-                        data-testid="input-deadline"
-                        className="flex-1"
-                      />
-                      <div className="flex gap-1">
-                        {project?.ddExpirationDate && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              form.setValue("deadline", project.ddExpirationDate!);
-                            }}
-                            className="px-2 text-xs whitespace-nowrap"
-                            data-testid="button-dd-exp"
-                          >
-                            DD Exp
-                          </Button>
-                        )}
-                        {project?.closingDate && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              form.setValue("deadline", project.closingDate!);
-                            }}
-                            className="px-2 text-xs whitespace-nowrap"
-                            data-testid="button-closing"
-                          >
-                            Closing
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+                    <Input
+                      id="deadline"
+                      type="date"
+                      {...form.register("deadline")}
+                      data-testid="input-deadline"
+                    />
                     <p className="text-sm text-muted-foreground">
                       Set a specific deadline date for this task
                       {(project?.ddExpirationDate || project?.closingDate) && (
@@ -865,7 +831,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     <Label htmlFor="completedAt">Completion Date</Label>
                     <Input
                       id="completedAt"
-                      type="datetime-local"
+                      type="date"
                       {...form.register("completedAt")}
                       data-testid="input-completion-date"
                     />
@@ -1022,46 +988,12 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="deadline">Deadline Date</Label>
-                    <div className="flex gap-2">
-                      <DateInput
-                        id="deadline"
-                        value={form.watch("deadline")}
-                        onChange={(value) => form.setValue("deadline", value)}
-                        placeholder="MM/DD/YYYY"
-                        data-testid="input-deadline"
-                        className="flex-1"
-                      />
-                      <div className="flex gap-1">
-                        {project?.ddExpirationDate && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              form.setValue("deadline", project.ddExpirationDate!);
-                            }}
-                            className="px-2 text-xs whitespace-nowrap"
-                            data-testid="button-dd-exp"
-                          >
-                            DD Exp
-                          </Button>
-                        )}
-                        {project?.closingDate && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              form.setValue("deadline", project.closingDate!);
-                            }}
-                            className="px-2 text-xs whitespace-nowrap"
-                            data-testid="button-closing"
-                          >
-                            Closing
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+                    <Input
+                      id="deadline"
+                      type="date"
+                      {...form.register("deadline")}
+                      data-testid="input-deadline"
+                    />
                     <p className="text-sm text-muted-foreground">
                       Set a specific deadline date for this task
                       {(project?.ddExpirationDate || project?.closingDate) && (
@@ -1567,7 +1499,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     <Label htmlFor="completedAt">Completion Date</Label>
                     <Input
                       id="completedAt"
-                      type="datetime-local"
+                      type="date"
                       {...form.register("completedAt")}
                       data-testid="input-completion-date"
                     />
@@ -1724,46 +1656,12 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="deadline">Deadline Date</Label>
-                    <div className="flex gap-2">
-                      <DateInput
-                        id="deadline"
-                        value={form.watch("deadline")}
-                        onChange={(value) => form.setValue("deadline", value)}
-                        placeholder="MM/DD/YYYY"
-                        data-testid="input-deadline"
-                        className="flex-1"
-                      />
-                      <div className="flex gap-1">
-                        {project?.ddExpirationDate && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              form.setValue("deadline", project.ddExpirationDate!);
-                            }}
-                            className="px-2 text-xs whitespace-nowrap"
-                            data-testid="button-dd-exp"
-                          >
-                            DD Exp
-                          </Button>
-                        )}
-                        {project?.closingDate && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              form.setValue("deadline", project.closingDate!);
-                            }}
-                            className="px-2 text-xs whitespace-nowrap"
-                            data-testid="button-closing"
-                          >
-                            Closing
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+                    <Input
+                      id="deadline"
+                      type="date"
+                      {...form.register("deadline")}
+                      data-testid="input-deadline"
+                    />
                     <p className="text-sm text-muted-foreground">
                       Set a specific deadline date for this task
                       {(project?.ddExpirationDate || project?.closingDate) && (
