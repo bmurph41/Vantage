@@ -857,7 +857,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 )}
 
-                {/* Checkboxes row - On-Site Inspection and Add to Timeline */}
+                {/* Checkboxes row - On-Site Inspection, Add to Timeline, and Internal Task */}
                 <div className="flex flex-wrap items-center gap-6">
                   {/* On-Site Inspection Checkbox - only for external tasks */}
                   {!form.watch("isInternalTask") && (
@@ -898,6 +898,38 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                     >
                       Add to Timeline
+                    </Label>
+                  </div>
+
+                  {/* Internal Task Checkbox */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isInternalTask"
+                      checked={form.watch("isInternalTask")}
+                      onCheckedChange={(checked) => {
+                        form.setValue("isInternalTask", !!checked);
+                        // Clear company fields and on-site fields when marking as internal
+                        if (checked) {
+                          form.setValue("companyHired", "");
+                          form.setValue("repName", "");
+                          form.setValue("repEmail", "");
+                          form.setValue("repPhone", "");
+                          form.setValue("companyAddress", "");
+                          form.setValue("companySuite", "");
+                          form.setValue("companyCity", "");
+                          form.setValue("companyState", "");
+                          form.setValue("companyZip", "");
+                          form.setValue("requiresOnSiteInspection", false);
+                          form.setValue("dateOnSite", "");
+                        }
+                      }}
+                      data-testid="checkbox-internal-task"
+                    />
+                    <Label 
+                      htmlFor="isInternalTask" 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Internal Task (No Company)
                     </Label>
                   </div>
                 </div>
@@ -953,37 +985,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 )}
 
-                {/* Internal Task Checkbox */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="isInternalTask"
-                    checked={form.watch("isInternalTask")}
-                    onCheckedChange={(checked) => {
-                      form.setValue("isInternalTask", !!checked);
-                      // Clear company fields and on-site fields when marking as internal
-                      if (checked) {
-                        form.setValue("companyHired", "");
-                        form.setValue("repName", "");
-                        form.setValue("repEmail", "");
-                        form.setValue("repPhone", "");
-                        form.setValue("companyAddress", "");
-                        form.setValue("companySuite", "");
-                        form.setValue("companyCity", "");
-                        form.setValue("companyState", "");
-                        form.setValue("companyZip", "");
-                        form.setValue("requiresOnSiteInspection", false);
-                        form.setValue("dateOnSite", "");
-                      }
-                    }}
-                    data-testid="checkbox-internal-task"
-                  />
-                  <Label 
-                    htmlFor="isInternalTask" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Internal Task (No Company)
-                  </Label>
-                </div>
+
 
                 <div className="grid grid-cols-1 gap-4">
                   <div>
@@ -1525,7 +1527,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 )}
 
-                {/* Checkboxes row - On-Site Inspection and Add to Timeline */}
+                {/* Checkboxes row - On-Site Inspection, Add to Timeline, and Internal Task */}
                 <div className="flex flex-wrap items-center gap-6">
                   {/* On-Site Inspection Checkbox - only for external tasks */}
                   {!form.watch("isInternalTask") && (
@@ -1566,6 +1568,38 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                     >
                       Add to Timeline
+                    </Label>
+                  </div>
+
+                  {/* Internal Task Checkbox */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isInternalTask"
+                      checked={form.watch("isInternalTask")}
+                      onCheckedChange={(checked) => {
+                        form.setValue("isInternalTask", !!checked);
+                        // Clear company fields and on-site fields when marking as internal
+                        if (checked) {
+                          form.setValue("companyHired", "");
+                          form.setValue("repName", "");
+                          form.setValue("repEmail", "");
+                          form.setValue("repPhone", "");
+                          form.setValue("companyAddress", "");
+                          form.setValue("companySuite", "");
+                          form.setValue("companyCity", "");
+                          form.setValue("companyState", "");
+                          form.setValue("companyZip", "");
+                          form.setValue("requiresOnSiteInspection", false);
+                          form.setValue("dateOnSite", "");
+                        }
+                      }}
+                      data-testid="checkbox-internal-task"
+                    />
+                    <Label 
+                      htmlFor="isInternalTask" 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Internal Task (No Company)
                     </Label>
                   </div>
                 </div>
@@ -1621,37 +1655,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 )}
 
-                {/* Internal Task Checkbox */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="isInternalTask"
-                    checked={form.watch("isInternalTask")}
-                    onCheckedChange={(checked) => {
-                      form.setValue("isInternalTask", !!checked);
-                      // Clear company fields and on-site fields when marking as internal
-                      if (checked) {
-                        form.setValue("companyHired", "");
-                        form.setValue("repName", "");
-                        form.setValue("repEmail", "");
-                        form.setValue("repPhone", "");
-                        form.setValue("companyAddress", "");
-                        form.setValue("companySuite", "");
-                        form.setValue("companyCity", "");
-                        form.setValue("companyState", "");
-                        form.setValue("companyZip", "");
-                        form.setValue("requiresOnSiteInspection", false);
-                        form.setValue("dateOnSite", "");
-                      }
-                    }}
-                    data-testid="checkbox-internal-task"
-                  />
-                  <Label 
-                    htmlFor="isInternalTask" 
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Internal Task (No Company)
-                  </Label>
-                </div>
+
 
                 <div className="grid grid-cols-1 gap-4">
                   <div>
