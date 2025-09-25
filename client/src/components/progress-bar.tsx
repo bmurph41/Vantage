@@ -151,7 +151,7 @@ export function ProgressBar({ task, project, settings, className, onTaskClick, g
       
       {/* Progress bar spanning from task start to task deadline */}
       <div 
-        className="h-full bg-white rounded-lg overflow-hidden shadow-md border border-gray-300/60 absolute ring-1 ring-gray-200/40"
+        className="h-full bg-white rounded-lg overflow-hidden shadow-lg border-2 border-gray-400/80 absolute ring-2 ring-gray-300/60"
         style={{
           left: `${barStartPosition}%`,
           width: `${barWidth}%`
@@ -160,10 +160,10 @@ export function ProgressBar({ task, project, settings, className, onTaskClick, g
         {/* Elapsed time section (task start to today) - solid color fill */}
         {elapsedWidth > 0 && (
           <div 
-            className={`h-full absolute ${
-              isCompleted ? 'bg-green-600' : 
-              isOverdue ? 'bg-red-600' : 
-              'bg-blue-600'
+            className={`h-full absolute border-r-4 ${
+              isCompleted ? 'bg-green-600 border-green-800' : 
+              isOverdue ? 'bg-red-600 border-red-800' : 
+              'bg-blue-600 border-blue-800'
             }`}
             style={{
               left: '0%',
@@ -176,14 +176,14 @@ export function ProgressBar({ task, project, settings, className, onTaskClick, g
         {/* Remaining time section (today to task deadline) - enhanced visual distinction */}
         {remainingWidth > 0 && !isCompleted && (
           <div 
-            className={`h-full absolute relative overflow-hidden border-l-2 ${
+            className={`h-full absolute relative overflow-hidden border-l-4 border-r-2 border-t-2 border-b-2 ${
               isOverdue 
-                ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300' 
+                ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-400 shadow-inner' 
                 : remaining <= 5
-                  ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300'
+                  ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-400 shadow-inner'
                   : remaining >= 6 && remaining <= 14
-                    ? 'bg-gradient-to-r from-orange-50 to-orange-100 border-orange-300'
-                    : 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-300'
+                    ? 'bg-gradient-to-r from-orange-50 to-orange-100 border-orange-400 shadow-inner'
+                    : 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-400 shadow-inner'
             }`}
             style={{
               left: `${(elapsedWidth / barWidth) * 100}%`,
