@@ -33,6 +33,42 @@ const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
     const formatISOValue = (displayDate: string): string => {
       if (!displayDate) return ""
       
+      // Handle shorthand formats like "10325" -> "10/3/25"
+      if (/^\d{5,6}$/.test(displayDate)) {
+        const digits = displayDate
+        let month, day, year
+        
+        if (digits.length === 5) {
+          // Format: MDDYY (e.g., "10325" -> "10/3/25")
+          month = digits.substring(0, 2)
+          day = digits.substring(2, 3)
+          year = digits.substring(3, 5)
+        } else if (digits.length === 6) {
+          // Format: MMDDYY (e.g., "103025" -> "10/30/25")
+          month = digits.substring(0, 2)
+          day = digits.substring(2, 4)
+          year = digits.substring(4, 6)
+        } else {
+          return ""
+        }
+        
+        // Convert 2-digit year to 4-digit year (assume 20xx for years 00-30, 19xx for 31-99)
+        const yearNum = parseInt(year)
+        const fullYear = yearNum <= 30 ? 2000 + yearNum : 1900 + yearNum
+        
+        const formattedDate = `${month}/${day}/${fullYear}`
+        
+        // Validate the constructed date
+        try {
+          const date = parse(formattedDate, "M/d/yyyy", new Date())
+          if (isValid(date)) {
+            return format(date, "yyyy-MM-dd")
+          }
+        } catch (error) {
+          // Fall through to normal parsing
+        }
+      }
+      
       // Try parsing different formats
       const formats = ["M/d/yyyy", "MM/dd/yyyy", "M/dd/yyyy", "MM/d/yyyy"]
       
