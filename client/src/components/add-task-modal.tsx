@@ -707,7 +707,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         id="deadline"
                         value={form.watch("deadline")}
                         onChange={(value) => form.setValue("deadline", value)}
-                        placeholder="MM/DD/YYYY - Type date or use buttons"
+                        placeholder="MM/DD/YYYY"
                         data-testid="input-deadline"
                         className="flex-1"
                       />
@@ -1027,7 +1027,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         id="deadline"
                         value={form.watch("deadline")}
                         onChange={(value) => form.setValue("deadline", value)}
-                        placeholder="MM/DD/YYYY - Type date or use buttons"
+                        placeholder="MM/DD/YYYY"
                         data-testid="input-deadline"
                         className="flex-1"
                       />
@@ -1729,7 +1729,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         id="deadline"
                         value={form.watch("deadline")}
                         onChange={(value) => form.setValue("deadline", value)}
-                        placeholder="MM/DD/YYYY - Type date or use buttons"
+                        placeholder="MM/DD/YYYY"
                         data-testid="input-deadline"
                         className="flex-1"
                       />

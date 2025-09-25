@@ -105,6 +105,11 @@ const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
       if (isoValue) {
         setIsValid_(true)
         onChange?.(isoValue)
+        // If it's a shorthand format (like "10325"), immediately format the display
+        if (/^\d{5,6}$/.test(inputValue)) {
+          const reformattedDisplay = formatDisplayValue(isoValue)
+          setDisplayValue(reformattedDisplay)
+        }
       } else {
         setIsValid_(false)
         // Still call onChange with the raw value so the form can handle validation
