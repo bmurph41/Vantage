@@ -2,16 +2,16 @@ import {
   organizations, users, projects, projectSettings, tasks, 
   projectTemplates, auditLogs, timelineNotes, projectShares, risks,
   contacts, notificationSubscriptions, notificationsLog, calendarEvents,
-  documentRequirements, projectIntegrations, taskDependencies, taskFiles,
+  documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type Contact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
-  type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile,
+  type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
   type InsertContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
-  type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile
+  type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -193,6 +193,20 @@ export interface IStorage {
   syncTaskCalendarEvent(task: Task): Promise<CalendarEvent | null>;
   deleteTaskCalendarEvent(taskId: string): Promise<void>;
   updateTaskCalendarEvent(task: Task): Promise<CalendarEvent | null>;
+
+  // User Email Management
+  getUserEmails(userId: string): Promise<UserEmail[]>;
+  createUserEmail(email: InsertUserEmail): Promise<UserEmail>;
+  updateUserEmail(id: string, updates: Partial<InsertUserEmail>): Promise<UserEmail>;
+  deleteUserEmail(id: string): Promise<void>;
+  setDefaultUserEmail(userId: string, emailId: string): Promise<void>;
+
+  // Calendar Guest Management
+  getProjectGuests(projectId: string): Promise<CalendarGuest[]>;
+  createCalendarGuest(guest: InsertCalendarGuest): Promise<CalendarGuest>;
+  updateCalendarGuest(id: string, updates: Partial<InsertCalendarGuest>): Promise<CalendarGuest>;
+  deleteCalendarGuest(id: string): Promise<void>;
+  updateGuestStatus(id: string, status: 'pending' | 'accepted' | 'declined'): Promise<CalendarGuest>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1574,6 +1588,70 @@ export class DatabaseStorage implements IStorage {
   async updateTaskCalendarEvent(task: Task): Promise<CalendarEvent | null> {
     // This method is an alias for syncTaskCalendarEvent for clarity
     return this.syncTaskCalendarEvent(task);
+  }
+
+  // User Email Management
+  async getUserEmails(userId: string): Promise<UserEmail[]> {
+    return db.select().from(userEmails).where(eq(userEmails.userId, userId));
+  }
+
+  async createUserEmail(email: InsertUserEmail): Promise<UserEmail> {
+    const [created] = await db.insert(userEmails).values(email).returning();
+    return created;
+  }
+
+  async updateUserEmail(id: string, updates: Partial<InsertUserEmail>): Promise<UserEmail> {
+    const [updated] = await db.update(userEmails)
+      .set(updates)
+      .where(eq(userEmails.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteUserEmail(id: string): Promise<void> {
+    await db.delete(userEmails).where(eq(userEmails.id, id));
+  }
+
+  async setDefaultUserEmail(userId: string, emailId: string): Promise<void> {
+    // First unset all defaults for this user
+    await db.update(userEmails)
+      .set({ isDefault: false })
+      .where(eq(userEmails.userId, userId));
+    
+    // Set the new default
+    await db.update(userEmails)
+      .set({ isDefault: true })
+      .where(eq(userEmails.id, emailId));
+  }
+
+  // Calendar Guest Management
+  async getProjectGuests(projectId: string): Promise<CalendarGuest[]> {
+    return db.select().from(calendarGuests).where(eq(calendarGuests.projectId, projectId));
+  }
+
+  async createCalendarGuest(guest: InsertCalendarGuest): Promise<CalendarGuest> {
+    const [created] = await db.insert(calendarGuests).values(guest).returning();
+    return created;
+  }
+
+  async updateCalendarGuest(id: string, updates: Partial<InsertCalendarGuest>): Promise<CalendarGuest> {
+    const [updated] = await db.update(calendarGuests)
+      .set(updates)
+      .where(eq(calendarGuests.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCalendarGuest(id: string): Promise<void> {
+    await db.delete(calendarGuests).where(eq(calendarGuests.id, id));
+  }
+
+  async updateGuestStatus(id: string, status: 'pending' | 'accepted' | 'declined'): Promise<CalendarGuest> {
+    const [updated] = await db.update(calendarGuests)
+      .set({ status, respondedAt: new Date() })
+      .where(eq(calendarGuests.id, id))
+      .returning();
+    return updated;
   }
 
   // Enhanced Task Dependencies (CPM Support)
