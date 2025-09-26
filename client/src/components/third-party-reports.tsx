@@ -891,10 +891,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           </div>
                         )}
                         
-                        <div>
-                          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</label>
-                          <div className="mt-1">
-                            {task.status === "completed" ? (
+                        {task.status === "completed" && (
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</label>
+                            <div className="mt-1">
                               <input 
                                 type="date" 
                                 value={task.completedAt ? new Date(task.completedAt).toISOString().split('T')[0] : ""} 
@@ -902,18 +902,9 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                                 className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 data-testid={`input-completed-${task.id}`}
                               />
-                            ) : task.completedAt ? (
-                              <input 
-                                type="date" 
-                                value={new Date(task.completedAt).toISOString().split('T')[0]} 
-                                className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
-                                readOnly
-                              />
-                            ) : (
-                              <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
-                            )}
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
 
                       {/* Task Owner and Progress Row */}
