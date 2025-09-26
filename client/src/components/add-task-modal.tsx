@@ -827,15 +827,17 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     </Select>
                   </div>
 
-                  <div>
-                    <Label htmlFor="completedAt">Completion Date</Label>
-                    <Input
-                      id="completedAt"
-                      type="date"
-                      {...form.register("completedAt")}
-                      data-testid="input-completion-date"
-                    />
-                  </div>
+                  {form.watch("status") === "completed" && (
+                    <div>
+                      <Label htmlFor="completedAt">Completion Date</Label>
+                      <Input
+                        id="completedAt"
+                        type="date"
+                        {...form.register("completedAt")}
+                        data-testid="input-completion-date"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Conditional Date Engaged field when status is 'engaged' */}
@@ -1530,15 +1532,17 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     </Select>
                   </div>
 
-                  <div>
-                    <Label htmlFor="completedAt">Completion Date</Label>
-                    <Input
-                      id="completedAt"
-                      type="date"
-                      {...form.register("completedAt")}
-                      data-testid="input-completion-date"
-                    />
-                  </div>
+                  {form.watch("status") === "completed" && (
+                    <div>
+                      <Label htmlFor="completedAt">Completion Date</Label>
+                      <Input
+                        id="completedAt"
+                        type="date"
+                        {...form.register("completedAt")}
+                        data-testid="input-completion-date"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Conditional Date Engaged field when status is 'engaged' */}

@@ -367,6 +367,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTask(id: string, updates: Partial<InsertTask>): Promise<Task> {
+    // If status is being changed to 'completed', automatically set completedAt
+    if (updates.status === 'completed' && !updates.completedAt) {
+      updates.completedAt = new Date();
+    }
+    // If status is being changed from 'completed' to something else, clear completedAt
+    if (updates.status && updates.status !== 'completed') {
+      updates.completedAt = null;
+    }
+    
     const [updated] = await db.update(tasks)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(tasks.id, id))
