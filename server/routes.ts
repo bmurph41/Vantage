@@ -13,6 +13,7 @@ import {
   insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema,
   insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema
 } from "@shared/schema";
+import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { z } from "zod";
 import crypto from "crypto";
 import { WebhookSecurity, type WebhookEvent } from "./webhook-security";
@@ -41,6 +42,12 @@ const generateIcsSchema = z.object({
   filters: calendarQuerySchema.optional()
 }).refine(data => data.eventIds || data.projectId, {
   message: "Either eventIds or projectId is required"
+});
+
+const syncToCalendarSchema = z.object({
+  eventIds: z.array(z.string()).min(1, "At least one event ID is required"),
+  emailIds: z.array(z.string()).min(1, "At least one email ID is required"),
+  projectId: z.string()
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -3103,6 +3110,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to set default email" });
+    }
+  });
+
+  // Direct Calendar Sync API
+  app.post("/api/dd/calendar/sync-direct", async (req: any, res) => {
+    try {
+      const { eventIds, emailIds, projectId } = syncToCalendarSchema.parse(req.body);
+      
+      // Authorize project access
+      await authorizeProjectAccess(projectId, req.user.orgId);
+      
+      // Check if Google Calendar is available
+      const isCalendarAvailable = await checkCalendarAvailability();
+      if (!isCalendarAvailable) {
+        return res.status(503).json({ 
+          error: "Google Calendar service is not available. Please check your connection settings." 
+        });
+      }
+      
+      // Get user emails
+      const userEmails = await storage.getUserEmails(req.user.id);
+      const selectedEmails = userEmails.filter(email => emailIds.includes(email.id));
+      
+      if (selectedEmails.length === 0) {
+        return res.status(400).json({ error: "No valid email addresses found for sync" });
+      }
+      
+      // Get calendar events
+      const events = await Promise.all(
+        eventIds.map(eventId => authorizeCalendarEventAccess(eventId, req.user.orgId))
+      );
+      
+      // Get project guests for additional attendees
+      const projectGuests = await storage.getProjectGuests(projectId);
+      const guestEmails = projectGuests.map(guest => guest.email);
+      
+      // Create calendar events for each selected event
+      const syncResults = [];
+      
+      for (const event of events) {
+        try {
+          // Prepare attendee list (user emails + project guests)
+          const attendees = [
+            ...selectedEmails.map(email => email.email),
+            ...guestEmails
+          ];
+          
+          const calendarEventData = {
+            title: event.title,
+            description: event.description || `Due Diligence Event: ${event.title}`,
+            startDate: event.startDate,
+            endDate: event.endDate || new Date(new Date(event.startDate).getTime() + 60 * 60 * 1000).toISOString(),
+            location: event.location,
+            attendees: attendees
+          };
+          
+          const googleEvent = await createCalendarEvent(calendarEventData);
+          
+          syncResults.push({
+            eventId: event.id,
+            success: true,
+            googleEventId: googleEvent.id,
+            googleEventLink: googleEvent.htmlLink,
+            attendeeCount: attendees.length
+          });
+          
+        } catch (eventError) {
+          console.error(`Failed to sync event ${event.id}:`, eventError);
+          syncResults.push({
+            eventId: event.id,
+            success: false,
+            error: eventError instanceof Error ? eventError.message : 'Unknown error'
+          });
+        }
+      }
+      
+      const successCount = syncResults.filter(r => r.success).length;
+      const failureCount = syncResults.filter(r => !r.success).length;
+      
+      res.json({
+        success: true,
+        message: `Synced ${successCount} of ${events.length} events to calendar`,
+        syncResults,
+        summary: {
+          totalEvents: events.length,
+          successful: successCount,
+          failed: failureCount,
+          emailAddresses: selectedEmails.length,
+          guestEmails: guestEmails.length
+        }
+      });
+      
+    } catch (error) {
+      console.error('Calendar sync error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to sync events to calendar"
+      });
+    }
+  });
+
+  // Calendar connection status
+  app.get("/api/dd/calendar/status", async (req: any, res) => {
+    try {
+      const isAvailable = await checkCalendarAvailability();
+      res.json({ 
+        connected: isAvailable,
+        service: 'Google Calendar'
+      });
+    } catch (error) {
+      res.json({ 
+        connected: false,
+        service: 'Google Calendar',
+        error: error instanceof Error ? error.message : 'Connection failed'
+      });
     }
   });
 

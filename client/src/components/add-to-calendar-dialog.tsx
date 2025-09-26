@@ -309,6 +309,34 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
     }
   };
 
+  // Direct sync mutation
+  const directSyncMutation = useMutation({
+    mutationFn: async ({ eventIds, emailIds }: { eventIds: string[], emailIds: string[] }) => {
+      const response = await apiRequest('POST', '/api/dd/calendar/sync-direct', {
+        eventIds,
+        emailIds,
+        projectId: project.id
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      const { summary } = data;
+      toast({
+        title: "Calendar Sync Successful",
+        description: `Synced ${summary.successful} of ${summary.totalEvents} events to ${summary.emailAddresses} email addresses.`,
+      });
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      console.error('Direct sync failed:', error);
+      toast({
+        title: "Sync Failed",
+        description: error instanceof Error ? error.message : "Failed to sync events to calendar. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleDirectSync = () => {
     if (selectedEventIds.size === 0) {
       toast({
@@ -328,11 +356,9 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
       return;
     }
     
-    // TODO: Implement direct calendar sync API call
-    toast({
-      title: "Direct Sync Coming Soon",
-      description: "Direct calendar sync will be available soon. For now, please use the download option.",
-      variant: "default",
+    directSyncMutation.mutate({
+      eventIds: Array.from(selectedEventIds),
+      emailIds: Array.from(selectedEmailIds)
     });
   };
 
@@ -665,10 +691,10 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
                 <Button
                   variant="outline"
                   onClick={handleDownloadSelected}
-                  disabled={selectedEventIds.size === 0 || downloadICSMutation.isPending}
+                  disabled={selectedEventIds.size === 0 || downloadICSMutation.isPending || directSyncMutation.isPending}
                   data-testid="button-sync-selected"
                 >
-                  {downloadICSMutation.isPending ? (
+                  {(downloadICSMutation.isPending || directSyncMutation.isPending) ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : syncMode === 'direct' ? (
                     <Calendar className="h-4 w-4 mr-2" />
@@ -687,7 +713,7 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
                       handleDirectSync();
                     }
                   }}
-                  disabled={events.length === 0 || downloadICSMutation.isPending}
+                  disabled={events.length === 0 || downloadICSMutation.isPending || directSyncMutation.isPending}
                   data-testid="button-sync-all"
                 >
                   {syncMode === 'direct' ? (
