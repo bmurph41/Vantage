@@ -168,7 +168,10 @@ function TaskDependenciesSelector({
   if (selectableTasks.length === 0) {
     return (
       <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-        No existing tasks available for dependencies. Create some tasks first to set up dependencies.
+        No existing tasks available for dependencies. {availableTasks.length > 0 ? 
+          `${availableTasks.length} task(s) exist but cannot be used as dependencies for this task.` : 
+          'Create some tasks first to set up dependencies.'
+        }
       </div>
     );
   }

@@ -112,8 +112,11 @@ const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
         }
       } else {
         setIsValid_(false)
-        // Still call onChange with the raw value so the form can handle validation
-        onChange?.(inputValue)
+        // Don't call onChange with obviously invalid values like single characters
+        // Let the form handle validation of empty/incomplete input
+        if (inputValue.length > 2) {
+          onChange?.(inputValue)
+        }
       }
     }
 
