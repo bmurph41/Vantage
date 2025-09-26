@@ -31,7 +31,7 @@ import { tzNow } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import type { Project, ProjectSettings, CalendarEvent } from "@shared/schema";
+import type { Project, ProjectSettings, CalendarEvent, UserEmail } from "@shared/schema";
 
 interface AddToCalendarDialogProps {
   open: boolean;
@@ -51,11 +51,13 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
   
   // State for selections and filters
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
+  const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterDate, setFilterDate] = useState<FilterDate>('all');
   const [sortBy, setSortBy] = useState<SortOption>('date_asc');
   const [searchQuery, setSearchQuery] = useState('');
+  const [syncMode, setSyncMode] = useState<'download' | 'direct'>('direct');
 
   // Fetch calendar events
   const { 
@@ -66,6 +68,16 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
   } = useQuery<CalendarEvent[]>({
     queryKey: ['/api/dd/projects', project.id, 'calendar-events'],
     enabled: open && !!project.id,
+  });
+
+  // Fetch user emails for calendar sync
+  const { 
+    data: userEmails = [], 
+    isLoading: emailsLoading, 
+    error: emailsError
+  } = useQuery<UserEmail[]>({
+    queryKey: ['/api/user/emails'],
+    enabled: open,
   });
 
   // Sync project events mutation
@@ -221,9 +233,20 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
   useEffect(() => {
     if (!open) {
       setSelectedEventIds(new Set());
+      setSelectedEmailIds(new Set());
       setSearchQuery('');
     }
   }, [open]);
+
+  // Auto-select primary email when emails are available
+  useEffect(() => {
+    if (open && userEmails.length > 0 && selectedEmailIds.size === 0) {
+      const primaryEmail = userEmails.find(email => email.emailType === 'primary');
+      if (primaryEmail) {
+        setSelectedEmailIds(new Set([primaryEmail.id]));
+      }
+    }
+  }, [open, userEmails, selectedEmailIds.size]);
 
   // Auto-select all events when dialog opens and events are available
   useEffect(() => {
@@ -251,6 +274,24 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
     setSelectedEventIds(newSelection);
   };
 
+  const handleEmailToggle = (emailId: string) => {
+    const newSelection = new Set(selectedEmailIds);
+    if (newSelection.has(emailId)) {
+      newSelection.delete(emailId);
+    } else {
+      newSelection.add(emailId);
+    }
+    setSelectedEmailIds(newSelection);
+  };
+
+  const handleSelectAllEmails = () => {
+    if (selectedEmailIds.size === userEmails.length) {
+      setSelectedEmailIds(new Set());
+    } else {
+      setSelectedEmailIds(new Set(userEmails.map(email => email.id)));
+    }
+  };
+
   const handleDownloadSelected = () => {
     if (selectedEventIds.size === 0) {
       toast({
@@ -260,7 +301,39 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
       });
       return;
     }
-    downloadICSMutation.mutate(Array.from(selectedEventIds));
+    
+    if (syncMode === 'download') {
+      downloadICSMutation.mutate(Array.from(selectedEventIds));
+    } else {
+      handleDirectSync();
+    }
+  };
+
+  const handleDirectSync = () => {
+    if (selectedEventIds.size === 0) {
+      toast({
+        title: "No Events Selected",
+        description: "Please select at least one event to sync.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (selectedEmailIds.size === 0) {
+      toast({
+        title: "No Emails Selected",
+        description: "Please select at least one email address to sync to.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // TODO: Implement direct calendar sync API call
+    toast({
+      title: "Direct Sync Coming Soon",
+      description: "Direct calendar sync will be available soon. For now, please use the download option.",
+      variant: "default",
+    });
   };
 
   const handleDownloadAll = () => {
@@ -360,6 +433,125 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
               )}
               {syncEventsMutation.isPending ? "Syncing..." : "Sync Tasks to Calendar"}
             </Button>
+          </div>
+        </div>
+
+        {/* Email Selection Section */}
+        <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-green-100 dark:bg-green-900 p-2 rounded-full">
+                <Users className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <h3 className="font-medium text-green-900 dark:text-green-100">Calendar Sync Options</h3>
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  Choose how to sync your calendar events and select email addresses to sync to.
+                </p>
+              </div>
+            </div>
+
+            {/* Sync Mode Selection */}
+            <div className="flex gap-4">
+              <Button
+                variant={syncMode === 'direct' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSyncMode('direct')}
+                className={syncMode === 'direct' ? 'bg-green-600 hover:bg-green-700' : ''}
+                data-testid="button-sync-mode-direct"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Direct Sync
+              </Button>
+              <Button
+                variant={syncMode === 'download' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSyncMode('download')}
+                className={syncMode === 'download' ? 'bg-green-600 hover:bg-green-700' : ''}
+                data-testid="button-sync-mode-download"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download ICS
+              </Button>
+            </div>
+
+            {/* Email Selection */}
+            {syncMode === 'direct' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-green-900 dark:text-green-100">Select Email Addresses</h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSelectAllEmails}
+                    disabled={userEmails.length === 0}
+                    data-testid="button-select-all-emails"
+                  >
+                    {selectedEmailIds.size === userEmails.length && userEmails.length > 0 ? 'Deselect All' : 'Select All'}
+                  </Button>
+                </div>
+
+                {emailsLoading ? (
+                  <div className="space-y-2">
+                    {[...Array(2)].map((_, i) => (
+                      <div key={i} className="flex items-center space-x-3">
+                        <Skeleton className="h-4 w-4" />
+                        <Skeleton className="h-4 w-48" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                    ))}
+                  </div>
+                ) : emailsError ? (
+                  <div className="text-sm text-red-600 dark:text-red-400">
+                    Failed to load email addresses. Please refresh and try again.
+                  </div>
+                ) : userEmails.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">
+                    No email addresses configured. Please add emails in your user settings.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
+                    {userEmails.map((email) => (
+                      <div
+                        key={email.id}
+                        className="flex items-center space-x-3 p-2 rounded border hover:bg-white/50 dark:hover:bg-gray-800/50"
+                        data-testid={`email-item-${email.id}`}
+                      >
+                        <Checkbox
+                          checked={selectedEmailIds.has(email.id)}
+                          onCheckedChange={() => handleEmailToggle(email.id)}
+                          data-testid={`checkbox-email-${email.id}`}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium truncate">{email.email}</span>
+                            {email.emailType === 'primary' && (
+                              <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
+                                Primary
+                              </Badge>
+                            )}
+                            {email.calendarProvider && (
+                              <Badge variant="outline" className="text-xs">
+                                {email.calendarProvider}
+                              </Badge>
+                            )}
+                          </div>
+                          {!email.isVerified && (
+                            <div className="text-xs text-yellow-600 dark:text-yellow-400">
+                              Email not verified
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="text-xs text-muted-foreground">
+                  Selected: {selectedEmailIds.size} of {userEmails.length} email addresses
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -474,22 +666,36 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
                   variant="outline"
                   onClick={handleDownloadSelected}
                   disabled={selectedEventIds.size === 0 || downloadICSMutation.isPending}
-                  data-testid="button-download-selected"
+                  data-testid="button-sync-selected"
                 >
                   {downloadICSMutation.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : syncMode === 'direct' ? (
+                    <Calendar className="h-4 w-4 mr-2" />
                   ) : (
                     <Download className="h-4 w-4 mr-2" />
                   )}
-                  Download Selected
+                  {syncMode === 'direct' ? 'Sync Selected' : 'Download Selected'}
                 </Button>
                 <Button
-                  onClick={handleDownloadAll}
+                  onClick={() => {
+                    if (syncMode === 'download') {
+                      handleDownloadAll();
+                    } else {
+                      // Select all events first, then sync
+                      setSelectedEventIds(new Set(events.map(event => event.id)));
+                      handleDirectSync();
+                    }
+                  }}
                   disabled={events.length === 0 || downloadICSMutation.isPending}
-                  data-testid="button-download-all"
+                  data-testid="button-sync-all"
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download All
+                  {syncMode === 'direct' ? (
+                    <Calendar className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  {syncMode === 'direct' ? 'Sync All' : 'Download All'}
                 </Button>
               </div>
             </div>
