@@ -1234,10 +1234,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       </div>
                     )}
                     
-                    <div>
-                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</label>
-                      <div className="mt-1">
-                        {task.status === "completed" ? (
+                    {task.status === "completed" && (
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</label>
+                        <div className="mt-1">
                           <input 
                             type="date" 
                             value={task.completedAt ? format(task.completedAt, 'yyyy-MM-dd') : ""} 
@@ -1245,29 +1245,20 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                             className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             data-testid={`input-completed-${task.id}`}
                           />
-                        ) : task.completedAt ? (
-                          <input 
-                            type="date" 
-                            value={format(task.completedAt, 'yyyy-MM-dd')} 
-                            className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
-                            readOnly
-                          />
-                        ) : (
-                          <div className="text-sm text-gray-400 italic">mm/dd/yyyy</div>
+                        </div>
+                        {task.completedAt && (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => handleArchiveTask(task.id)}
+                              className="px-3 py-1 text-xs bg-gray-100 text-gray-700 border border-gray-200 rounded hover:bg-gray-200 transition-colors"
+                              data-testid={`button-archive-${task.id}`}
+                            >
+                              Archive
+                            </button>
+                          </div>
                         )}
                       </div>
-                      {task.status === "completed" && task.completedAt && (
-                        <div className="mt-2">
-                          <button
-                            onClick={() => handleArchiveTask(task.id)}
-                            className="px-3 py-1 text-xs bg-gray-100 text-gray-700 border border-gray-200 rounded hover:bg-gray-200 transition-colors"
-                            data-testid={`button-archive-${task.id}`}
-                          >
-                            Archive
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
                   
                   {/* Task Owner and Progress */}
