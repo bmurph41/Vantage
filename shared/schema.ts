@@ -27,6 +27,9 @@ export const calendarEventTypeEnum = pgEnum("calendar_event_type", ["dd_expirati
 export const documentRequirementStatusEnum = pgEnum("document_requirement_status", ["requested", "received", "verified", "rejected", "outdated", "external_unavailable"]);
 export const dependencyTypeEnum = pgEnum("dependency_type", ["FS", "SS", "FF", "SF"]);
 export const ddCategoryEnum = pgEnum("dd_category", ["title", "survey", "ESA", "appraisal", "inspection", "permits", "zoning", "financial", "legal", "insurance", "other"]);
+export const calendarProviderEnum = pgEnum("calendar_provider", ["google", "outlook", "apple"]);
+export const emailTypeEnum = pgEnum("email_type", ["primary", "additional"]);
+export const guestStatusEnum = pgEnum("guest_status", ["pending", "accepted", "declined"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -43,6 +46,9 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   role: roleEnum("role").notNull().default("viewer"),
   tz: text("tz").notNull().default("America/New_York"),
+  // Calendar preferences
+  defaultCalendarProvider: calendarProviderEnum("default_calendar_provider"),
+  calendarSyncEnabled: boolean("calendar_sync_enabled").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -424,6 +430,47 @@ export const calendarEvents = pgTable("calendar_events", {
   };
 });
 
+// User Emails - for multiple email addresses per user
+export const userEmails = pgTable("user_emails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  emailType: emailTypeEnum("email_type").notNull().default("additional"),
+  calendarProvider: calendarProviderEnum("calendar_provider"),
+  isVerified: boolean("is_verified").notNull().default(false),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    userEmailIdx: index("user_emails_user").on(table.userId),
+    emailIdx: index("user_emails_email").on(table.email),
+    // Ensure unique emails per user
+    uniqueUserEmail: unique("user_emails_unique_user_email").on(table.userId, table.email),
+  };
+});
+
+// Calendar Guests - for guest email invitations
+export const calendarGuests = pgTable("calendar_guests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  invitedBy: varchar("invited_by").notNull().references(() => users.id),
+  email: text("email").notNull(),
+  name: text("name"),
+  calendarProvider: calendarProviderEnum("calendar_provider"),
+  status: guestStatusEnum("status").notNull().default("pending"),
+  invitedAt: timestamp("invited_at").notNull().defaultNow(),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    projectGuestIdx: index("calendar_guests_project").on(table.projectId),
+    emailIdx: index("calendar_guests_email").on(table.email),
+    invitedByIdx: index("calendar_guests_invited_by").on(table.invitedBy),
+    // Ensure unique guests per project
+    uniqueProjectGuest: unique("calendar_guests_unique_project_guest").on(table.projectId, table.email),
+  };
+});
+
 // Document Requirements
 export const documentRequirements = pgTable("document_requirements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -760,6 +807,16 @@ export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit
   updatedAt: true,
 });
 
+export const insertUserEmailSchema = createInsertSchema(userEmails).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCalendarGuestSchema = createInsertSchema(calendarGuests).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertDocumentRequirementSchema = createInsertSchema(documentRequirements).omit({
   id: true,
   createdAt: true,
@@ -822,6 +879,12 @@ export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
 
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
+
+export type UserEmail = typeof userEmails.$inferSelect;
+export type InsertUserEmail = z.infer<typeof insertUserEmailSchema>;
+
+export type CalendarGuest = typeof calendarGuests.$inferSelect;
+export type InsertCalendarGuest = z.infer<typeof insertCalendarGuestSchema>;
 
 export type DocumentRequirement = typeof documentRequirements.$inferSelect;
 export type InsertDocumentRequirement = z.infer<typeof insertDocumentRequirementSchema>;
