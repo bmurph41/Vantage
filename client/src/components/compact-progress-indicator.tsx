@@ -113,6 +113,16 @@ export function CompactProgressIndicator({
     return "bg-gray-100";
   };
 
+  // Get container urgency styling for compact indicator
+  const getCompactContainerUrgencyClass = () => {
+    if (isOverdue || remaining <= 5) {
+      return "border-red-300/60 bg-red-50/30 ring-1 ring-red-200/40";
+    } else if (remaining >= 6 && remaining <= 14) {
+      return "border-orange-300/50 bg-orange-50/20";
+    }
+    return "border-gray-200/50";
+  };
+
   const handleClick = () => {
     if (onTaskClick) {
       onTaskClick(task.id);
@@ -125,7 +135,8 @@ export function CompactProgressIndicator({
         <TooltipTrigger asChild>
           <div 
             className={cn(
-              "h-2 bg-gray-100 rounded-full overflow-hidden relative cursor-pointer hover:h-3 transition-all duration-200 shadow-sm border border-gray-200/50",
+              "h-2 rounded-full overflow-hidden relative cursor-pointer hover:h-3 transition-all duration-200 shadow-sm border",
+              getCompactContainerUrgencyClass(),
               className
             )} 
             onClick={handleClick}

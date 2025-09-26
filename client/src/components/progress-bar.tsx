@@ -110,6 +110,16 @@ export function ProgressBar({ task, project, settings, className, onTaskClick, g
     return "border-gray-200/80";
   };
 
+  // Get main container styling for urgency
+  const getContainerUrgencyClass = () => {
+    if (isOverdue || remaining <= 5) {
+      return "border-red-400/60 shadow-red-100 bg-gradient-to-r from-red-50/30 to-red-100/30 ring-2 ring-red-200/40";
+    } else if (remaining >= 6 && remaining <= 14) {
+      return "border-orange-300/50 shadow-orange-50 bg-gradient-to-r from-orange-50/20 to-orange-100/20";
+    }
+    return "border-gray-200/50";
+  };
+
   const handleClick = () => {
     if (onTaskClick) {
       onTaskClick(task.id);
@@ -118,7 +128,10 @@ export function ProgressBar({ task, project, settings, className, onTaskClick, g
 
   return (
     <div 
-      className={cn("h-8 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg overflow-hidden relative shadow-inner border border-gray-200/50 cursor-pointer hover:shadow-md transition-shadow duration-200", className)} 
+      className={cn("h-8 rounded-lg overflow-hidden relative shadow-inner border cursor-pointer hover:shadow-md transition-all duration-200", 
+        getContainerUrgencyClass(),
+        className
+      )} 
       onClick={handleClick}
       data-testid="progress-bar"
     >
@@ -151,7 +164,13 @@ export function ProgressBar({ task, project, settings, className, onTaskClick, g
       
       {/* Progress bar spanning from task start to task deadline */}
       <div 
-        className="h-full bg-white rounded-lg overflow-hidden shadow-lg border-2 border-gray-400/80 absolute ring-2 ring-gray-300/60"
+        className={`h-full bg-white rounded-lg overflow-hidden shadow-lg border-2 absolute ring-2 ${
+          isOverdue || remaining <= 5 
+            ? 'border-red-500/80 ring-red-300/60 shadow-red-200' 
+            : remaining >= 6 && remaining <= 14
+              ? 'border-orange-400/80 ring-orange-300/60 shadow-orange-200'
+              : 'border-gray-400/80 ring-gray-300/60'
+        }`}
         style={{
           left: `${barStartPosition}%`,
           width: `${barWidth}%`
