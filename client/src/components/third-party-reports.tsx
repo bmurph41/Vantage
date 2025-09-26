@@ -136,6 +136,28 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     return daysRemaining < 0 ? "Overdue" : daysRemaining;
   };
 
+  // Get color class based on days remaining for urgency
+  const getDaysRemainingColorClass = (task: Task): string => {
+    const daysRemaining = calculateDaysRemaining(task);
+    
+    if (daysRemaining === "Overdue" || (typeof daysRemaining === 'number' && daysRemaining <= 5)) {
+      return "text-red-600"; // Red for urgent tasks (overdue or ≤5 days)
+    } else if (typeof daysRemaining === 'number' && daysRemaining >= 6 && daysRemaining <= 14) {
+      return "text-orange-500"; // Orange for moderate urgency (6-14 days)
+    }
+    return "text-blue-600"; // Blue for non-urgent tasks (>14 days)
+  };
+
+  // Get urgency score for sorting (lower score = higher priority)
+  const getUrgencyScore = (task: Task): number => {
+    const daysRemaining = calculateDaysRemaining(task);
+    
+    if (daysRemaining === "Overdue") return 0; // Highest priority
+    if (typeof daysRemaining === 'number' && daysRemaining <= 5) return 1; // High priority
+    if (typeof daysRemaining === 'number' && daysRemaining <= 14) return 2; // Medium priority
+    return 3; // Low priority
+  };
+
   // Calculate progress based on task's specific start date and deadline
   const calculateTaskProgress = (task: Task): number => {
     if (task.status === 'completed') return 100;
@@ -216,7 +238,15 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     
     return task.status !== 'completed' && baseFilter && matchesStatus && matchesPayment && matchesAssignee && matchesCost && matchesCompletion;
   }).sort((a, b) => {
-    // For active tasks, maintain fixed position based on creation order
+    // First, sort by urgency (urgent tasks first)
+    const urgencyA = getUrgencyScore(a);
+    const urgencyB = getUrgencyScore(b);
+    
+    if (urgencyA !== urgencyB) {
+      return urgencyA - urgencyB; // Lower score = higher priority = appears first
+    }
+    
+    // If same urgency level, maintain creation order for stability
     const aCreated = new Date(a.createdAt).getTime();
     const bCreated = new Date(b.createdAt).getTime();
     return aCreated - bCreated; // Oldest first to maintain stable order
@@ -706,9 +736,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           {/* Days Remaining */}
                           <div className="text-center">
                             <div className="text-sm text-gray-500 mb-1">Days Remaining</div>
-                            <div className={`text-base font-bold ${
-                              calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
-                            }`}>
+                            <div className={`text-base font-bold ${getDaysRemainingColorClass(task)}`}>
                               {calculateDaysRemaining(task)}
                             </div>
                           </div>
@@ -1036,9 +1064,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       {/* Days Remaining */}
                       <div className="text-center">
                         <div className="text-sm text-gray-500 mb-1">Days Remaining</div>
-                        <div className={`text-base font-bold ${
-                          calculateDaysRemaining(task) === "Overdue" ? "text-red-600" : "text-blue-600"
-                        }`}>
+                        <div className={`text-base font-bold ${getDaysRemainingColorClass(task)}`}>
                           {calculateDaysRemaining(task)}
                         </div>
                       </div>
