@@ -7,6 +7,7 @@ import Dashboard from "@/pages/dashboard";
 import ProjectPage from "@/pages/project";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import DDProgressReportPage from "@/pages/dd-progress-report";
+import UserSettingsPage from "@/pages/user-settings";
 import SortableListDemo from "@/pages/demo/SortableListDemo";
 import NotFound from "@/pages/not-found";
 
@@ -19,6 +20,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/user/settings" component={UserSettingsPage} />
       <Route path="/projects/:id" component={ProjectPage} />
       <Route path="/dd/projects/:id" component={ProjectPage} />
       <Route path="/projects/:id/notifications" component={NotificationSettingsWrapper} />

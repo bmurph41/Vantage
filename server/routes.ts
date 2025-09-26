@@ -11,7 +11,7 @@ import {
   insertTimelineNoteSchema, insertProjectShareSchema, insertRiskSchema,
   insertContactSchema, updateContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema,
   insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema,
-  insertTaskDependencySchema, insertTaskFileSchema
+  insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema
 } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
@@ -3049,6 +3049,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   }
+
+  // User Email Management
+  app.get("/api/user/emails", async (req: any, res) => {
+    try {
+      const emails = await storage.getUserEmails(req.user.id);
+      res.json(emails);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user emails" });
+    }
+  });
+
+  app.post("/api/user/emails", async (req: any, res) => {
+    try {
+      const emailData = insertUserEmailSchema.parse({
+        ...req.body,
+        userId: req.user.id,
+      });
+      
+      const email = await storage.createUserEmail(emailData);
+      res.json(email);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid email data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create user email" });
+      }
+    }
+  });
+
+  app.patch("/api/user/emails/:id", async (req: any, res) => {
+    try {
+      const updates = req.body;
+      const email = await storage.updateUserEmail(req.params.id, updates);
+      res.json(email);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user email" });
+    }
+  });
+
+  app.delete("/api/user/emails/:id", async (req: any, res) => {
+    try {
+      await storage.deleteUserEmail(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete user email" });
+    }
+  });
+
+  app.post("/api/user/emails/:id/set-default", async (req: any, res) => {
+    try {
+      await storage.setDefaultUserEmail(req.user.id, req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to set default email" });
+    }
+  });
+
+  // Calendar Guest Management
+  app.get("/api/projects/:projectId/guests", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      const guests = await storage.getProjectGuests(req.params.projectId);
+      res.json(guests);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch project guests" });
+    }
+  });
+
+  app.post("/api/projects/:projectId/guests", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      
+      const guestData = insertCalendarGuestSchema.parse({
+        ...req.body,
+        projectId: req.params.projectId,
+        invitedBy: req.user.id,
+      });
+      
+      const guest = await storage.createCalendarGuest(guestData);
+      res.json(guest);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid guest data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create calendar guest" });
+      }
+    }
+  });
+
+  app.patch("/api/projects/:projectId/guests/:id", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      const updates = req.body;
+      const guest = await storage.updateCalendarGuest(req.params.id, updates);
+      res.json(guest);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update calendar guest" });
+    }
+  });
+
+  app.delete("/api/projects/:projectId/guests/:id", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      await storage.deleteCalendarGuest(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete calendar guest" });
+    }
+  });
+
+  app.patch("/api/projects/:projectId/guests/:id/status", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      const { status } = req.body;
+      
+      if (!['pending', 'accepted', 'declined'].includes(status)) {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+      
+      const guest = await storage.updateGuestStatus(req.params.id, status);
+      res.json(guest);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update guest status" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
