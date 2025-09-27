@@ -21,26 +21,29 @@ export default function MilestoneProgressBar({ progressPct, elapsedLabel, milest
         <span className="ml-auto text-sm text-gray-500">{elapsedLabel}</span>
       </div>
 
-      <div className="relative h-6 w-full rounded-full bg-gray-100 overflow-hidden">
-        {/* Filled section */}
-        <div
-          className="absolute left-0 top-0 h-full bg-green-600"
-          style={{ width: `${progress}%` }}
-          aria-hidden
-        />
+      <div className="relative">
+        {/* Progress bar */}
+        <div className="h-6 w-full rounded-full bg-gray-100 overflow-hidden">
+          {/* Filled section */}
+          <div
+            className="absolute left-0 top-0 h-full bg-green-600"
+            style={{ width: `${progress}%` }}
+            aria-hidden
+          />
 
-        {/* Remaining section with subtle stripes */}
-        <div
-          className="absolute right-0 top-0 h-full w-full"
-          style={{
-            left: `${progress}%`,
-            backgroundImage:
-              "repeating-linear-gradient(45deg, rgba(16,185,129,0.10) 0, rgba(16,185,129,0.10) 6px, transparent 6px, transparent 12px)",
-          }}
-          aria-hidden
-        />
+          {/* Remaining section with subtle stripes */}
+          <div
+            className="absolute right-0 top-0 h-full w-full"
+            style={{
+              left: `${progress}%`,
+              backgroundImage:
+                "repeating-linear-gradient(45deg, rgba(16,185,129,0.10) 0, rgba(16,185,129,0.10) 6px, transparent 6px, transparent 12px)",
+            }}
+            aria-hidden
+          />
+        </div>
 
-        {/* Milestone dots */}
+        {/* Milestone dots - positioned outside the progress bar container */}
         {milestones.map((m) => {
           const id = `tip-${m.id}`;
           // keep tooltip within container edges by nudging at extremes
@@ -71,19 +74,23 @@ export default function MilestoneProgressBar({ progressPct, elapsedLabel, milest
                 data-testid={`milestone-dot-${m.id}`}
               />
 
-              {/* Tooltip */}
+              {/* Tooltip - positioned outside progress bar to avoid clipping */}
               <div
                 id={id}
                 role="tooltip"
-                className={`pointer-events-none absolute -top-3 -translate-y-full transition-opacity duration-150 z-[100] ${
+                className={`pointer-events-none absolute -top-16 transition-opacity duration-150 z-[100] ${
                   isOpen ? "opacity-100" : "opacity-0"
                 }`}
-                style={{ transform: `translate(-50%, -8px) translateX(${nudge}%)` }}
+                style={{ 
+                  left: '50%',
+                  transform: `translateX(-50%) translateX(${nudge}px)`
+                }}
               >
-                <div className="relative max-w-xs rounded-lg bg-gray-900 text-white text-xs px-3 py-2 shadow-lg">
-                  <div className="font-semibold">{m.title}</div>
-                  <div className="opacity-80">Due: {formatDate(m.due)} • @{Math.round(leftPct)}%</div>
-                  <div className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-gray-900" />
+                <div className="relative max-w-xs rounded-lg bg-white border border-gray-200 shadow-xl px-3 py-2 text-xs">
+                  <div className="font-semibold text-gray-900">{m.title}</div>
+                  <div className="text-gray-600">Due: {formatDate(m.due)} • @{Math.round(leftPct)}%</div>
+                  <div className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white" />
+                  <div className="absolute left-1/2 top-full -translate-x-1/2 translate-y-[-1px] w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-gray-200" />
                 </div>
               </div>
             </div>
