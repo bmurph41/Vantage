@@ -692,6 +692,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Archive task
+  app.patch("/api/dd/tasks/:id/archive", async (req: any, res) => {
+    try {
+      const task = await storage.getTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      await authorizeProjectAccess(task.projectId, req.user.orgId);
+
+      // Check if task is already archived
+      if (task.archived) {
+        return res.status(400).json({ error: "Task is already archived" });
+      }
+
+      const updates = {
+        archived: true,
+        archivedAt: new Date(),
+      };
+
+      const updated = await storage.updateTask(req.params.id, updates);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: updated.projectId,
+        userId: req.user.id,
+        entityType: "task",
+        entityId: updated.id,
+        action: "archived",
+        before: task,
+        after: updated,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Task archive error:", error);
+      res.status(500).json({ error: "Failed to archive task" });
+    }
+  });
+
+  // Unarchive task
+  app.patch("/api/dd/tasks/:id/unarchive", async (req: any, res) => {
+    try {
+      const task = await storage.getTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      await authorizeProjectAccess(task.projectId, req.user.orgId);
+
+      // Check if task is actually archived
+      if (!task.archived) {
+        return res.status(400).json({ error: "Task is not archived" });
+      }
+
+      const updates = {
+        archived: false,
+        archivedAt: null,
+      };
+
+      const updated = await storage.updateTask(req.params.id, updates);
+
+      // Create audit log
+      await storage.createAuditLog({
+        projectId: updated.projectId,
+        userId: req.user.id,
+        entityType: "task",
+        entityId: updated.id,
+        action: "unarchived",
+        before: task,
+        after: updated,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Task unarchive error:", error);
+      res.status(500).json({ error: "Failed to unarchive task" });
+    }
+  });
+
   // Task Dependencies (Enhanced CPM Support)
   app.get("/api/dd/projects/:projectId/task-dependencies", async (req: any, res) => {
     try {
