@@ -126,7 +126,7 @@ export function ProgressBar({ task, project, settings, className, onTaskClick, g
     }
   };
 
-  // Hide progress bar completely for completed tasks
+  // Hide progress bar completely for completed tasks - no progress bar for completed status
   if (isCompleted) {
     return null;
   }
