@@ -76,15 +76,15 @@ export default function NotificationSettingsPage({ projectId: propProjectId }: N
   return (
     <div className="min-h-screen bg-background" data-testid="notification-settings-page">
       {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-6 py-4">
+      <div className="border-b bg-card/50 backdrop-blur-sm">
+        <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div>
-                <h1 className="text-2xl font-bold text-foreground" data-testid="page-title">
+                <h1 className="text-3xl font-bold text-foreground mb-1" data-testid="page-title">
                   Notification Settings
                 </h1>
-                <p className="text-muted-foreground" data-testid="project-name">
+                <p className="text-lg text-muted-foreground" data-testid="project-name">
                   {project.name}
                 </p>
               </div>
@@ -92,14 +92,19 @@ export default function NotificationSettingsPage({ projectId: propProjectId }: N
             <div className="flex items-center space-x-3">
               <Badge 
                 variant={notificationsEnabled ? "default" : "secondary"}
+                className={`px-3 py-1 text-sm font-medium ${
+                  notificationsEnabled 
+                    ? "bg-green-100 text-green-800 border-green-200" 
+                    : "bg-gray-100 text-gray-600 border-gray-200"
+                }`}
                 data-testid="badge-notification-status"
               >
-                {notificationsEnabled ? "Notifications On" : "Notifications Off"}
+                {notificationsEnabled ? "✓ Notifications On" : "○ Notifications Off"}
               </Badge>
-              <Badge variant="outline" data-testid="badge-contacts-count">
+              <Badge variant="outline" className="px-3 py-1 text-sm" data-testid="badge-contacts-count">
                 {totalContacts} Contacts
               </Badge>
-              <Badge variant="outline" data-testid="badge-subscriptions-count">
+              <Badge variant="outline" className="px-3 py-1 text-sm" data-testid="badge-subscriptions-count">
                 {activeSubscriptions} Active Subscriptions
               </Badge>
             </div>
@@ -109,104 +114,160 @@ export default function NotificationSettingsPage({ projectId: propProjectId }: N
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4" data-testid="tabs-list">
-            <TabsTrigger value="contacts" className="flex items-center space-x-2" data-testid="tab-contacts">
-              <Users className="h-4 w-4" />
-              <span>Contacts</span>
-            </TabsTrigger>
-            <TabsTrigger value="subscriptions" className="flex items-center space-x-2" data-testid="tab-subscriptions">
-              <Bell className="h-4 w-4" />
-              <span>Subscriptions</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center space-x-2" data-testid="tab-settings">
-              <Settings className="h-4 w-4" />
-              <span>Project Settings</span>
-            </TabsTrigger>
-            <TabsTrigger value="testing" className="flex items-center space-x-2" data-testid="tab-testing">
-              <TestTube className="h-4 w-4" />
-              <span>Testing</span>
-            </TabsTrigger>
-          </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+          <div className="flex justify-center">
+            <TabsList className="grid grid-cols-4 w-fit bg-muted/50 p-1 rounded-lg" data-testid="tabs-list">
+              <TabsTrigger 
+                value="contacts" 
+                className="flex items-center space-x-2 px-6 py-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" 
+                data-testid="tab-contacts"
+              >
+                <Users className="h-4 w-4" />
+                <span className="font-medium">Contacts</span>
+                <Badge variant="secondary" className="ml-2 text-xs">{totalContacts}</Badge>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="subscriptions" 
+                className="flex items-center space-x-2 px-6 py-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" 
+                data-testid="tab-subscriptions"
+              >
+                <Bell className="h-4 w-4" />
+                <span className="font-medium">Subscriptions</span>
+                <Badge variant="secondary" className="ml-2 text-xs">{activeSubscriptions}</Badge>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="settings" 
+                className="flex items-center space-x-2 px-6 py-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" 
+                data-testid="tab-settings"
+              >
+                <Settings className="h-4 w-4" />
+                <span className="font-medium">Project Settings</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="testing" 
+                className="flex items-center space-x-2 px-6 py-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" 
+                data-testid="tab-testing"
+              >
+                <TestTube className="h-4 w-4" />
+                <span className="font-medium">Testing</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Contact Management Tab */}
-          <TabsContent value="contacts" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact Management</CardTitle>
-                <CardDescription>
-                  Manage external contacts who will receive notifications about project progress.
-                  Add team members, clients, or stakeholders to keep them informed.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ContactManagement 
-                  contacts={typedContacts}
-                  isLoading={isLoadingContacts}
-                  projectId={projectId!}
-                />
-              </CardContent>
-            </Card>
+          <TabsContent value="contacts" className="space-y-6 mt-8">
+            <div className="max-w-6xl mx-auto">
+              <Card className="border-0 shadow-sm bg-card/50">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Users className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl font-semibold">Contact Management</CardTitle>
+                      <CardDescription className="text-base mt-1">
+                        Manage external contacts who will receive notifications about project progress.
+                        Add team members, clients, or stakeholders to keep them informed.
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <ContactManagement 
+                    contacts={typedContacts}
+                    isLoading={isLoadingContacts}
+                    projectId={projectId!}
+                  />
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Subscription Management Tab */}
-          <TabsContent value="subscriptions" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Subscriptions</CardTitle>
-                <CardDescription>
-                  Configure which contacts receive notifications for different types of events.
-                  Set up alerts for status changes, deadlines, and project updates.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SubscriptionManager
-                  projectId={projectId!}
-                  contacts={typedContacts}
-                  subscriptions={typedSubscriptions}
-                  isLoading={isLoadingSubscriptions}
-                />
-              </CardContent>
-            </Card>
+          <TabsContent value="subscriptions" className="space-y-6 mt-8">
+            <div className="max-w-6xl mx-auto">
+              <Card className="border-0 shadow-sm bg-card/50">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <Bell className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl font-semibold">Notification Subscriptions</CardTitle>
+                      <CardDescription className="text-base mt-1">
+                        Configure which contacts receive notifications for different types of events.
+                        Set up alerts for status changes, deadlines, and project updates.
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <SubscriptionManager
+                    projectId={projectId!}
+                    contacts={typedContacts}
+                    subscriptions={typedSubscriptions}
+                    isLoading={isLoadingSubscriptions}
+                  />
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Project Settings Tab */}
-          <TabsContent value="settings" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Notification Settings</CardTitle>
-                <CardDescription>
-                  Configure global notification preferences for this project including timing,
-                  channels, and default behaviors.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ProjectNotificationSettings
-                  projectId={projectId!}
-                  settings={settings}
-                />
-              </CardContent>
-            </Card>
+          <TabsContent value="settings" className="space-y-6 mt-8">
+            <div className="max-w-6xl mx-auto">
+              <Card className="border-0 shadow-sm bg-card/50">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <Settings className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl font-semibold">Project Notification Settings</CardTitle>
+                      <CardDescription className="text-base mt-1">
+                        Configure global notification preferences for this project including timing,
+                        channels, and default behaviors.
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <ProjectNotificationSettings
+                    projectId={projectId!}
+                    settings={settings}
+                  />
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Notification Testing Tab */}
-          <TabsContent value="testing" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Testing</CardTitle>
-                <CardDescription>
-                  Test your notification setup by sending sample notifications to verify
-                  delivery and template formatting.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <NotificationTester
-                  projectId={projectId!}
-                  contacts={typedContacts}
-                  settings={settings}
-                />
-              </CardContent>
-            </Card>
+          <TabsContent value="testing" className="space-y-6 mt-8">
+            <div className="max-w-6xl mx-auto">
+              <Card className="border-0 shadow-sm bg-card/50">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="p-2 bg-orange-100 rounded-lg">
+                      <TestTube className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl font-semibold">Notification Testing</CardTitle>
+                      <CardDescription className="text-base mt-1">
+                        Test your notification setup by sending sample notifications to verify
+                        delivery and template formatting.
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <NotificationTester
+                    projectId={projectId!}
+                    contacts={typedContacts}
+                    settings={settings}
+                  />
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

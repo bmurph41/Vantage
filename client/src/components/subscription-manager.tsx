@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, BellOff, Users, CheckCircle2, XCircle, Plus, Trash2 } from "lucide-react";
+import { Bell, BellOff, Users, CheckCircle2, XCircle, Plus, Trash2, Mail, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -191,31 +191,39 @@ export function SubscriptionManager({ projectId, contacts, subscriptions, isLoad
   }
 
   return (
-    <div className="space-y-6" data-testid="subscription-manager">
+    <div className="space-y-8" data-testid="subscription-manager">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Bell className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium">Active Subscriptions</span>
-            <Badge variant="secondary" data-testid="badge-active-count">
-              {activeSubscriptions.length}
-            </Badge>
+      <div className="flex items-center justify-between pb-4 border-b">
+        <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Bell className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <span className="text-lg font-semibold">Active Subscriptions</span>
+              <Badge variant="secondary" className="ml-3 bg-green-50 text-green-700 border-green-200" data-testid="badge-active-count">
+                {activeSubscriptions.length} active
+              </Badge>
+            </div>
           </div>
           {inactiveSubscriptions.length > 0 && (
-            <div className="flex items-center space-x-2">
-              <BellOff className="h-5 w-5 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Inactive</span>
-              <Badge variant="outline" data-testid="badge-inactive-count">
-                {inactiveSubscriptions.length}
-              </Badge>
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-gray-100 rounded-lg">
+                <BellOff className="h-5 w-5 text-gray-500" />
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground font-medium">Inactive</span>
+                <Badge variant="outline" className="ml-2 text-gray-500" data-testid="badge-inactive-count">
+                  {inactiveSubscriptions.length}
+                </Badge>
+              </div>
             </div>
           )}
         </div>
         
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-add-subscription">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 shadow-sm" data-testid="button-add-subscription">
               <Plus className="h-4 w-4 mr-2" />
               Add Subscription
             </Button>
@@ -443,54 +451,69 @@ export function SubscriptionManager({ projectId, contacts, subscriptions, isLoad
 
       {/* Active Subscriptions */}
       {activeSubscriptions.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold flex items-center space-x-2">
-            <CheckCircle2 className="h-5 w-5 text-green-600" />
-            <span>Active Subscriptions</span>
-          </h3>
-          <div className="space-y-3" data-testid="active-subscriptions-list">
+        <div className="space-y-6">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-foreground">Active Subscriptions</h3>
+          </div>
+          <div className="grid gap-4" data-testid="active-subscriptions-list">
             {activeSubscriptions.map((subscription) => (
-              <Card key={subscription.id} className="hover:shadow-sm transition-shadow" data-testid={`subscription-card-${subscription.id}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
+              <Card key={subscription.id} className="hover:shadow-md transition-all duration-200 border-l-4 border-l-green-500 bg-gradient-to-r from-green-50/30 to-white" data-testid={`subscription-card-${subscription.id}`}>
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <div className="flex items-center space-x-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium" data-testid={`subscription-recipient-${subscription.id}`}>
-                            {getContactName(subscription.recipientType, subscription.recipientId)}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            {subscription.recipientType}
-                          </Badge>
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-blue-100 rounded-lg">
+                            <Users className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <span className="font-semibold text-lg" data-testid={`subscription-recipient-${subscription.id}`}>
+                              {getContactName(subscription.recipientType, subscription.recipientId)}
+                            </span>
+                            <Badge variant="outline" className="ml-3 text-xs font-medium">
+                              {subscription.recipientType === 'contact' ? 'External Contact' : 'Team Member'}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Channels:</span>
-                          <div className="flex space-x-1 mt-1">
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-sm">
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Mail className="h-4 w-4 text-blue-500" />
+                            <span className="font-medium text-foreground">Channels</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
                             {subscription.channels.map((channel) => (
-                              <Badge key={channel} variant="secondary" className="text-xs">
-                                {channel}
+                              <Badge key={channel} variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                                {channel.toUpperCase()}
                               </Badge>
                             ))}
                           </div>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">Events:</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Bell className="h-4 w-4 text-purple-500" />
+                            <span className="font-medium text-foreground">Events</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
                             {subscription.events.map((event) => (
-                              <Badge key={event} variant="outline" className="text-xs">
+                              <Badge key={event} variant="outline" className="text-xs border-purple-200 text-purple-700">
                                 {eventTypes.find(et => et.value === event)?.label || event}
                               </Badge>
                             ))}
                           </div>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">Lead Times:</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Clock className="h-4 w-4 text-orange-500" />
+                            <span className="font-medium text-foreground">Lead Times</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
                             {subscription.leadTimesDays.map((days) => (
-                              <Badge key={days} variant="outline" className="text-xs">
+                              <Badge key={days} variant="outline" className="text-xs border-orange-200 text-orange-700">
                                 {leadTimes.find(lt => lt.value === days)?.label || `${days}d`}
                               </Badge>
                             ))}
@@ -498,17 +521,24 @@ export function SubscriptionManager({ projectId, contacts, subscriptions, isLoad
                         </div>
                       </div>
                       {getContactEmail(subscription.recipientType, subscription.recipientId) && (
-                        <div className="text-sm text-muted-foreground mt-2">
-                          {getContactEmail(subscription.recipientType, subscription.recipientId)}
+                        <div className="text-sm text-muted-foreground mt-4 p-3 bg-gray-50 rounded-lg border">
+                          <div className="flex items-center space-x-2">
+                            <Mail className="h-4 w-4" />
+                            <span className="font-medium">Email:</span>
+                            <span>{getContactEmail(subscription.recipientType, subscription.recipientId)}</span>
+                          </div>
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center space-x-2 ml-4">
-                      <Switch
-                        checked={subscription.active}
-                        onCheckedChange={() => handleToggleActive(subscription)}
-                        data-testid={`switch-active-${subscription.id}`}
-                      />
+                    <div className="flex flex-col items-end space-y-3 ml-6">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-sm font-medium text-muted-foreground">Active</span>
+                        <Switch
+                          checked={subscription.active}
+                          onCheckedChange={() => handleToggleActive(subscription)}
+                          data-testid={`switch-active-${subscription.id}`}
+                        />
+                      </div>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button 
@@ -551,39 +581,48 @@ export function SubscriptionManager({ projectId, contacts, subscriptions, isLoad
       {/* Inactive Subscriptions */}
       {inactiveSubscriptions.length > 0 && (
         <>
-          <Separator />
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold flex items-center space-x-2">
-              <XCircle className="h-5 w-5 text-muted-foreground" />
-              <span>Inactive Subscriptions</span>
-            </h3>
-            <div className="space-y-3" data-testid="inactive-subscriptions-list">
+          <Separator className="my-8" />
+          <div className="space-y-6">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-gray-100 rounded-lg">
+                <XCircle className="h-5 w-5 text-gray-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-muted-foreground">Inactive Subscriptions</h3>
+            </div>
+            <div className="grid gap-4" data-testid="inactive-subscriptions-list">
               {inactiveSubscriptions.map((subscription) => (
-                <Card key={subscription.id} className="opacity-60" data-testid={`inactive-subscription-card-${subscription.id}`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
+                <Card key={subscription.id} className="opacity-70 hover:opacity-90 transition-all duration-200 border-l-4 border-l-gray-400 bg-gradient-to-r from-gray-50/30 to-white" data-testid={`inactive-subscription-card-${subscription.id}`}>
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <div className="flex items-center space-x-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">
-                              {getContactName(subscription.recipientType, subscription.recipientId)}
-                            </span>
-                            <Badge variant="outline" className="text-xs">
-                              {subscription.recipientType}
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              Inactive
-                            </Badge>
+                        <div className="flex items-center space-x-3 mb-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 bg-gray-100 rounded-lg">
+                              <Users className="h-4 w-4 text-gray-500" />
+                            </div>
+                            <div>
+                              <span className="font-semibold text-lg text-muted-foreground">
+                                {getContactName(subscription.recipientType, subscription.recipientId)}
+                              </span>
+                              <Badge variant="outline" className="ml-3 text-xs font-medium border-gray-300">
+                                {subscription.recipientType === 'contact' ? 'External Contact' : 'Team Member'}
+                              </Badge>
+                              <Badge variant="secondary" className="ml-2 text-xs bg-gray-100 text-gray-600">
+                                Inactive
+                              </Badge>
+                            </div>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2 ml-4">
-                        <Switch
-                          checked={subscription.active}
-                          onCheckedChange={() => handleToggleActive(subscription)}
-                          data-testid={`switch-inactive-${subscription.id}`}
-                        />
+                      <div className="flex flex-col items-end space-y-3 ml-6">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-sm font-medium text-muted-foreground">Active</span>
+                          <Switch
+                            checked={subscription.active}
+                            onCheckedChange={() => handleToggleActive(subscription)}
+                            data-testid={`switch-inactive-${subscription.id}`}
+                          />
+                        </div>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button 
@@ -625,16 +664,20 @@ export function SubscriptionManager({ projectId, contacts, subscriptions, isLoad
 
       {/* Empty State */}
       {subscriptions.length === 0 && (
-        <div className="text-center py-12" data-testid="empty-subscriptions">
-          <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-            <Bell className="h-8 w-8 text-muted-foreground" />
+        <div className="text-center py-16" data-testid="empty-subscriptions">
+          <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center mb-6">
+            <Bell className="h-10 w-10 text-blue-600" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No Notification Subscriptions</h3>
-          <p className="text-muted-foreground mb-4">
-            Set up your first notification subscription to keep stakeholders informed about project progress.
+          <h3 className="text-2xl font-semibold mb-3 text-foreground">No Notification Subscriptions</h3>
+          <p className="text-muted-foreground mb-8 text-lg max-w-md mx-auto">
+            Set up your first notification subscription to keep stakeholders informed about project progress and deadlines.
           </p>
-          <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-first-subscription">
-            <Plus className="h-4 w-4 mr-2" />
+          <Button 
+            onClick={() => setIsAddDialogOpen(true)} 
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg shadow-sm"
+            data-testid="button-add-first-subscription"
+          >
+            <Plus className="h-5 w-5 mr-2" />
             Create Your First Subscription
           </Button>
         </div>
