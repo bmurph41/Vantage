@@ -207,21 +207,21 @@ const calculateComprehensiveMetrics = (project: Project, tasks: Task[]): Project
 const styles = StyleSheet.create({
   page: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 32,
-    paddingVertical: 40,
+    paddingHorizontal: 54, // 0.75 inch margins as specified in guidance
+    paddingVertical: 54,
     fontFamily: 'Helvetica',
-    fontSize: 12,
+    fontSize: 11, // Size 11 as specified in guidance
     lineHeight: 1.4,
   },
   
   // Header Section - matching the blue gradient design
   header: {
-    backgroundColor: '#1e40af', // Blue-700 equivalent
+    backgroundColor: '#003366', // Dark blue as specified in guidance
     color: '#ffffff',
-    paddingHorizontal: 32,
+    paddingHorizontal: 54,
     paddingVertical: 32,
-    marginHorizontal: -32,
-    marginTop: -40,
+    marginHorizontal: -54,
+    marginTop: -54,
     marginBottom: 32,
   },
   headerContent: {
@@ -299,25 +299,25 @@ const styles = StyleSheet.create({
   insightBoxPerformance: {
     backgroundColor: '#dbeafe',
     borderLeftWidth: 4,
-    borderLeftColor: '#3b82f6',
+    borderLeftColor: '#003366', // Dark blue as specified in guidance
     borderLeftStyle: 'solid',
   },
   insightBoxTimeline: {
     backgroundColor: '#fed7aa',
     borderLeftWidth: 4,
-    borderLeftColor: '#f97316',
+    borderLeftColor: '#003366', // Dark blue as specified in guidance
     borderLeftStyle: 'solid',
   },
   insightBoxRisk: {
     backgroundColor: '#dcfce7',
     borderLeftWidth: 4,
-    borderLeftColor: '#16a34a',
+    borderLeftColor: '#003366', // Dark blue as specified in guidance
     borderLeftStyle: 'solid',
   },
   insightBoxMarket: {
     backgroundColor: '#d1fae5',
     borderLeftWidth: 4,
-    borderLeftColor: '#059669',
+    borderLeftColor: '#003366', // Dark blue as specified in guidance
     borderLeftStyle: 'solid',
   },
   insightHeader: {
@@ -820,7 +820,7 @@ export const generateProgressBriefPDF = async (project: Project, tasks: Task[]) 
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Progress_Brief_${project.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    link.download = `${project.name} Progress Brief.pdf`; // Professional naming as specified in guidance
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
