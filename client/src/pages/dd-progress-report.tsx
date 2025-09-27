@@ -24,7 +24,11 @@ import {
   ChevronRight,
   ToggleLeft,
   ToggleRight,
-  DollarSign
+  DollarSign,
+  Mail,
+  Phone,
+  MapPin,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +36,13 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { Project, Task, Risk, ProjectSettings } from "@shared/schema";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { AddToCalendarDialog } from "@/components/add-to-calendar-dialog";
+import { useToast } from "@/hooks/use-toast";
+import type { Project, Task, Risk, ProjectSettings, Contact } from "@shared/schema";
 import type { ProjectWithDetails } from "@/types/dd";
 
 // Helper function for EST start of day
@@ -52,6 +62,11 @@ function isOverdueAt1700EST(deadline: Date | string): boolean {
 
 export default function DDProgressReportPage() {
   const { id: projectId } = useParams<{ id: string }>();
+  const { toast } = useToast();
+  
+  // State for modals
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   
   // Handle export DD Summary PDF
   const handleExportDDSummary = () => {
@@ -70,6 +85,34 @@ export default function DDProgressReportPage() {
   // Handle print
   const handlePrint = () => {
     window.print();
+  };
+  
+  // Handle View Detailed Timeline - Navigate to project page
+  const handleViewDetailedTimeline = () => {
+    // Navigate to project page which shows the detailed timeline
+    window.location.href = `/projects/${projectId}`;
+  };
+
+  // Handle Contact Team Member - Open team contact modal
+  const handleContactTeam = () => {
+    setIsContactModalOpen(true);
+  };
+
+  // Handle Export Comprehensive Report - Export detailed progress report
+  const handleExportReport = () => {
+    if (project && tasks) {
+      // Use the existing Progress Brief export functionality  
+      generateProgressBriefPDF(project, tasks);
+      toast({
+        title: "Report exported successfully",
+        description: "Your comprehensive progress report has been downloaded.",
+      });
+    }
+  };
+
+  // Handle Schedule Review Meeting - Open calendar scheduling modal
+  const handleScheduleReviewMeeting = () => {
+    setIsCalendarModalOpen(true);
   };
   
   // Fetch project data (this returns ProjectWithDetails which includes project, settings, and tasks)
@@ -92,6 +135,12 @@ export default function DDProgressReportPage() {
   // Fetch risk analytics for PDF export
   const { data: riskAnalytics = null } = useQuery({
     queryKey: ['/api/dd/projects', projectId, 'risks', 'analytics'],
+    enabled: !!projectId,
+  });
+
+  // Fetch contacts data for team contact modal
+  const { data: contacts = [] } = useQuery<Contact[]>({
+    queryKey: ['/api/dd/contacts'],
     enabled: !!projectId,
   });
 
@@ -351,6 +400,45 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
 function DDProgressReport({ project, tasks }: DDProgressReportProps) {
   const currentDate = tzNow('America/New_York');
   const [showDDDeadline, setShowDDDeadline] = useState(false);
+  const { toast } = useToast();
+  
+  // State for modals
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  
+  // Fetch contacts data for team contact modal
+  const { data: contacts = [] } = useQuery<Contact[]>({
+    queryKey: ['/api/dd/contacts'],
+    enabled: !!project?.id,
+  });
+  
+  // Handle View Detailed Timeline - Navigate to project page
+  const handleViewDetailedTimeline = () => {
+    // Navigate to project page which shows the detailed timeline
+    window.location.href = `/projects/${project.id}`;
+  };
+
+  // Handle Contact Team Member - Open team contact modal
+  const handleContactTeam = () => {
+    setIsContactModalOpen(true);
+  };
+
+  // Handle Export Comprehensive Report - Export detailed progress report
+  const handleExportReport = () => {
+    if (project && tasks) {
+      // Use the existing Progress Brief export functionality  
+      generateProgressBriefPDF(project, tasks);
+      toast({
+        title: "Report exported successfully",
+        description: "Your comprehensive progress report has been downloaded.",
+      });
+    }
+  };
+
+  // Handle Schedule Review Meeting - Open calendar scheduling modal
+  const handleScheduleReviewMeeting = () => {
+    setIsCalendarModalOpen(true);
+  };
   
   // Calculate comprehensive project metrics
   const metrics = useMemo(() => {
@@ -1113,6 +1201,7 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
                     variant="outline" 
                     size="sm" 
                     className="w-full justify-start border-blue-300 text-blue-700 hover:bg-blue-50"
+                    onClick={handleViewDetailedTimeline}
                     data-testid="button-view-detailed-timeline"
                   >
                     <Calendar className="h-4 w-4 mr-2" />
@@ -1122,6 +1211,7 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
                     variant="outline" 
                     size="sm" 
                     className="w-full justify-start border-blue-300 text-blue-700 hover:bg-blue-50"
+                    onClick={handleContactTeam}
                     data-testid="button-contact-team"
                   >
                     <Users className="h-4 w-4 mr-2" />
@@ -1141,6 +1231,7 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
                     variant="default" 
                     size="sm" 
                     className="w-full justify-start bg-blue-600 hover:bg-blue-700"
+                    onClick={handleExportReport}
                     data-testid="button-export-comprehensive-report"
                   >
                     <FileText className="h-4 w-4 mr-2" />
@@ -1150,6 +1241,7 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
                     variant="outline" 
                     size="sm" 
                     className="w-full justify-start border-blue-300 text-blue-700 hover:bg-blue-50"
+                    onClick={handleScheduleReviewMeeting}
                     data-testid="button-schedule-review-meeting"
                   >
                     <Calendar className="h-4 w-4 mr-2" />
@@ -1188,6 +1280,80 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
             </div>
           </CardContent>
         </Card>
+
+        {/* Contact Team Member Modal */}
+        <Dialog open={isContactModalOpen} onOpenChange={setIsContactModalOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Contact Team Member</DialogTitle>
+              <DialogDescription>
+                Select a team member or contact to reach out to regarding this project.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              {contacts.length > 0 ? (
+                <div className="space-y-3">
+                  {contacts.map((contact) => (
+                    <div key={contact.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <Users className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium">{contact.name}</div>
+                          <div className="text-sm text-gray-500">{contact.email}</div>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            window.location.href = `mailto:${contact.email}?subject=Regarding ${project.name} Due Diligence`;
+                            setIsContactModalOpen(false);
+                          }}
+                          data-testid={`button-email-${contact.id}`}
+                        >
+                          <Mail className="h-4 w-4 mr-1" />
+                          Email
+                        </Button>
+                        {contact.phone && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              window.location.href = `tel:${contact.phone}`;
+                              setIsContactModalOpen(false);
+                            }}
+                            data-testid={`button-call-${contact.id}`}
+                          >
+                            <Phone className="h-4 w-4 mr-1" />
+                            Call
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-sm">No team members found.</p>
+                  <p className="text-xs mt-1">Add contacts in the project settings.</p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Schedule Review Meeting - Using AddToCalendarDialog */}
+        <AddToCalendarDialog 
+          open={isCalendarModalOpen}
+          onOpenChange={setIsCalendarModalOpen}
+          project={project}
+          settings={undefined}
+        />
+
       </div>
     </div>
   );
