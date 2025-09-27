@@ -25,6 +25,14 @@ export interface TimelineGranularity {
   days: number;
 }
 
+export type Milestone = {
+  id: string;
+  title: string;         // e.g., "Buyer Due Diligence"
+  due: string;           // ISO date or display string, e.g., "2025-10-15"
+  positionPct: number;   // 0–100 position along the bar
+  color?: string;        // optional Tailwind ring/bg override
+};
+
 export const TIMELINE_GRANULARITIES: TimelineGranularity[] = [
   { value: 'daily', label: 'Daily', days: 1 },
   { value: 'weekly', label: 'Weekly', days: 7 },
