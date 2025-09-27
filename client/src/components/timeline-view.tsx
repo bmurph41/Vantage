@@ -1154,10 +1154,12 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                           data-testid="progress-end-marker"
                         >
                           <div className="w-4 h-12 rounded-full shadow-xl bg-gradient-to-b from-red-400 via-red-500 to-red-700 border-2 border-red-300/60 ring-2 ring-red-200/40 hover:scale-110 transition-all duration-300 hover:shadow-2xl" />
-                          <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-gray-50/95 backdrop-blur-sm border-2 border-red-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-[60] ring-1 ring-red-100/60">
-                            <div className="text-sm font-bold text-red-700 mb-1">Closing Date</div>
-                            <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
-                            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-gray-50/95 border-t-2 border-l-2 border-red-200/80 rotate-45"></div>
+                          <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-xl px-4 py-3 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[100] w-48">
+                            <div className="font-semibold text-gray-900 mb-1">Closing Date</div>
+                            <div className="text-gray-600 mb-1">Due: {format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
+                            <div className="text-gray-600">Project Completion</div>
+                            <div className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white" />
+                            <div className="absolute left-1/2 top-full -translate-x-1/2 translate-y-[-1px] w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-gray-200" />
                           </div>
                         </div>
 
@@ -1169,10 +1171,12 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                             data-testid="milestone-psa"
                           >
                             <div className="w-4 h-4 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 rounded-full border-3 border-white shadow-xl hover:scale-150 transition-all duration-300 hover:shadow-2xl ring-2 ring-blue-200/60 hover:ring-blue-300/80" />
-                            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap z-[60] shadow-xl ring-1 ring-white/20">
-                              <div className="font-semibold">PSA Signed</div>
-                              <div className="text-xs text-gray-300 mt-1">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
-                              <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
+                            <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white border border-gray-200 rounded-lg shadow-xl px-4 py-3 z-[100] w-48 pointer-events-none">
+                              <div className="font-semibold text-gray-900 mb-1">PSA Signed</div>
+                              <div className="text-gray-600 mb-1">Due: {format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
+                              <div className="text-gray-600">Contract Executed</div>
+                              <div className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white" />
+                              <div className="absolute left-1/2 top-full -translate-x-1/2 translate-y-[-1px] w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-gray-200" />
                             </div>
                           </div>
                         )}
@@ -1183,10 +1187,12 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                             data-testid="milestone-dd-expiration"
                           >
                             <div className="w-4 h-4 bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 rounded-full border-3 border-white shadow-xl hover:scale-150 transition-all duration-300 hover:shadow-2xl ring-2 ring-amber-200/60 hover:ring-amber-300/80" />
-                            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap z-[60] shadow-xl ring-1 ring-white/20">
-                              <div className="font-semibold">DD Expiration</div>
-                              <div className="text-xs text-gray-300 mt-1">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
-                              <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
+                            <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white border border-gray-200 rounded-lg shadow-xl px-4 py-3 z-[100] w-48 pointer-events-none">
+                              <div className="font-semibold text-gray-900 mb-1">DD Expiration</div>
+                              <div className="text-gray-600 mb-1">Due: {format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
+                              <div className="text-gray-600">Due Diligence Deadline</div>
+                              <div className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white" />
+                              <div className="absolute left-1/2 top-full -translate-x-1/2 translate-y-[-1px] w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-gray-200" />
                             </div>
                           </div>
                         )}
@@ -1197,10 +1203,12 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                             data-testid="milestone-closing"
                           >
                             <div className="w-4 h-4 bg-gradient-to-br from-green-400 via-green-500 to-green-600 rounded-full border-3 border-white shadow-xl hover:scale-150 transition-all duration-300 hover:shadow-2xl ring-2 ring-green-200/60 hover:ring-green-300/80" />
-                            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap z-[60] shadow-xl ring-1 ring-white/20">
-                              <div className="font-semibold">Closing</div>
-                              <div className="text-xs text-gray-300 mt-1">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
-                              <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
+                            <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white border border-gray-200 rounded-lg shadow-xl px-4 py-3 z-[100] w-48 pointer-events-none">
+                              <div className="font-semibold text-gray-900 mb-1">Closing</div>
+                              <div className="text-gray-600 mb-1">Due: {format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
+                              <div className="text-gray-600">Final Completion</div>
+                              <div className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white" />
+                              <div className="absolute left-1/2 top-full -translate-x-1/2 translate-y-[-1px] w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-gray-200" />
                             </div>
                           </div>
                         )}
@@ -1219,17 +1227,14 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                               task.status === 'scheduled' ? 'bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 ring-indigo-200/60 hover:ring-indigo-300/80' :
                               'bg-gradient-to-br from-gray-400 via-gray-500 to-gray-600 ring-gray-200/60 hover:ring-gray-300/80'
                             }`} />
-                            <div className={`absolute top-8 left-1/2 transform -translate-x-1/2 backdrop-blur-sm border-2 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-[60] ring-1 ${
-                              task.status === 'completed' ? 'bg-gradient-to-br from-white to-green-50/95 border-green-200/80 ring-green-100/60' :
-                              task.status === 'in_progress' ? 'bg-gradient-to-br from-white to-blue-50/95 border-blue-200/80 ring-blue-100/60' :
-                              task.status === 'scheduled' ? 'bg-gradient-to-br from-white to-indigo-50/95 border-indigo-200/80 ring-indigo-100/60' :
-                              'bg-gradient-to-br from-white to-gray-50/95 border-gray-200/80 ring-gray-100/60'
-                            }`}>
-                              <div className={`text-sm font-bold mb-1 flex items-center ${
-                                task.status === 'completed' ? 'text-green-700' :
-                                task.status === 'in_progress' ? 'text-blue-700' :
-                                task.status === 'scheduled' ? 'text-indigo-700' :
-                                'text-gray-700'
+                            <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-xl px-4 py-3 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[100] w-48">
+                              <div className="font-semibold text-gray-900 mb-1">{task.title}</div>
+                              <div className="text-gray-600 mb-1">Due: {format(parseISO(task.deadline!), 'MMM d, yyyy')}</div>
+                              <div className={`text-gray-600 flex items-center ${
+                                task.status === 'completed' ? 'text-green-600' :
+                                task.status === 'in_progress' ? 'text-blue-600' :
+                                task.status === 'scheduled' ? 'text-indigo-600' :
+                                'text-gray-600'
                               }`}>
                                 <div className={`w-2 h-2 rounded-full mr-2 ${
                                   task.status === 'completed' ? 'bg-green-500' :
@@ -1237,27 +1242,14 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                                   task.status === 'scheduled' ? 'bg-indigo-500' :
                                   'bg-gray-500'
                                 }`}></div>
-                                {task.title}
-                              </div>
-                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(task.deadline!), 'MMM d, yyyy')}</div>
-                              <div className={`text-xs font-medium mt-1 ${
-                                task.status === 'completed' ? 'text-green-600' :
-                                task.status === 'in_progress' ? 'text-blue-600' :
-                                task.status === 'scheduled' ? 'text-indigo-600' :
-                                'text-gray-600'
-                              }`}>
-                                {task.status === 'completed' ? '✓ Completed' :
-                                 task.status === 'in_progress' ? '⟳ In Progress' :
-                                 task.status === 'scheduled' ? '📅 Scheduled' :
-                                 '⏸️ Not Started'
+                                {task.status === 'completed' ? 'Completed' :
+                                 task.status === 'in_progress' ? 'In Progress' :
+                                 task.status === 'scheduled' ? 'Scheduled' :
+                                 'Not Started'
                                 }
                               </div>
-                              <div className={`absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 border-t-2 border-l-2 rotate-45 ${
-                                task.status === 'completed' ? 'bg-gradient-to-br from-white to-green-50/95 border-green-200/80' :
-                                task.status === 'in_progress' ? 'bg-gradient-to-br from-white to-blue-50/95 border-blue-200/80' :
-                                task.status === 'scheduled' ? 'bg-gradient-to-br from-white to-indigo-50/95 border-indigo-200/80' :
-                                'bg-gradient-to-br from-white to-gray-50/95 border-gray-200/80'
-                              }`}></div>
+                              <div className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white" />
+                              <div className="absolute left-1/2 top-full -translate-x-1/2 translate-y-[-1px] w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-gray-200" />
                             </div>
                           </div>
                         ))}
