@@ -23,6 +23,8 @@ const contactSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   phone: z.string().min(1, "Phone is required"),
   timezone: z.string().min(1, "Timezone is required"),
+  role: z.enum(["seller", "attorney", "lender", "title_insurance", "inspector", "surveyor", "environmental", "appraiser", "broker", "insurance_agent", "other"]).optional(),
+  company: z.string().optional(),
 });
 
 // Phone formatting utility
@@ -62,6 +64,20 @@ const timezones = [
   { value: "Australia/Sydney", label: "Australian Eastern Time (AEST)" },
 ];
 
+const contactRoles = [
+  { value: "seller", label: "Seller" },
+  { value: "attorney", label: "Attorney" },
+  { value: "lender", label: "Lender" },
+  { value: "title_insurance", label: "Title Insurance" },
+  { value: "inspector", label: "Inspector" },
+  { value: "surveyor", label: "Surveyor" },
+  { value: "environmental", label: "Environmental" },
+  { value: "appraiser", label: "Appraiser" },
+  { value: "broker", label: "Broker" },
+  { value: "insurance_agent", label: "Insurance Agent" },
+  { value: "other", label: "Other" },
+];
+
 export function ContactManagement({ contacts, isLoading, projectId }: ContactManagementProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -96,6 +112,8 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
       email: "",
       phone: "",
       timezone: "America/New_York",
+      role: undefined,
+      company: "",
     },
   });
 
@@ -201,6 +219,8 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
       email: contact.email,
       phone: contact.phone || "",
       timezone: contact.timezone,
+      role: contact.role || undefined,
+      company: contact.company || "",
     });
   };
 
@@ -209,12 +229,14 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
   };
 
   const handleExportCSV = () => {
-    const csvHeaders = ["Name", "Email", "Phone", "Timezone"];
+    const csvHeaders = ["Name", "Email", "Phone", "Timezone", "Role", "Company"];
     const csvData = contacts.map(contact => [
       contact.name,
       contact.email,
       contact.phone || "",
-      contact.timezone
+      contact.timezone,
+      contact.role || "",
+      contact.company || ""
     ]);
     
     const csvContent = [csvHeaders, ...csvData]
@@ -360,6 +382,43 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Role (Optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-contact-role">
+                              <SelectValue placeholder="Select a role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {contactRoles.map((role) => (
+                              <SelectItem key={role.value} value={role.value}>
+                                {role.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="company"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Company Name" {...field} data-testid="input-contact-company" />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -584,6 +643,43 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                                       ))}
                                     </SelectContent>
                                   </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="role"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Role (Optional)</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-edit-role">
+                                        <SelectValue placeholder="Select a role" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {contactRoles.map((role) => (
+                                        <SelectItem key={role.value} value={role.value}>
+                                          {role.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="company"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Company (Optional)</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} data-testid="input-edit-company" />
+                                  </FormControl>
                                   <FormMessage />
                                 </FormItem>
                               )}
