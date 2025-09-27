@@ -766,7 +766,7 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
 
       {/* Summary */}
       <div className="text-sm text-muted-foreground text-center pt-4" data-testid="contacts-summary">
-        Showing {filteredContacts.length} of {contacts.length} contacts
+        Showing {filteredContacts.length} of {contacts.length} Contacts
       </div>
     </div>
   );
