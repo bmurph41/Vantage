@@ -175,10 +175,6 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
           <div className="text-2xl font-bold text-foreground">{totalTasks}</div>
           <div className="text-sm text-muted-foreground">Total Tasks</div>
         </Card>
-        <Card className="p-4" data-testid="card-completed-tasks">
-          <div className="text-2xl font-bold text-green-600">{completedTasks}</div>
-          <div className="text-sm text-muted-foreground">Completed</div>
-        </Card>
         <Card className="p-4" data-testid="card-in-progress-tasks">
           <div className="text-2xl font-bold text-blue-600">{inProgressTasks}</div>
           <div className="text-sm text-muted-foreground">In Progress</div>
@@ -190,6 +186,10 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
         <Card className="p-4" data-testid="card-overdue-tasks">
           <div className="text-2xl font-bold text-red-600">{overdueTasks}</div>
           <div className="text-sm text-muted-foreground">Overdue</div>
+        </Card>
+        <Card className="p-4 bg-green-50 border-green-200" data-testid="card-completed-tasks">
+          <div className="text-2xl font-bold text-green-600">{completedTasks}</div>
+          <div className="text-sm text-green-700 font-medium">Completed</div>
         </Card>
       </div>
 
