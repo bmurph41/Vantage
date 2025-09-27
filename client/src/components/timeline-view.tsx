@@ -1138,10 +1138,12 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                           data-testid="progress-start-marker"
                         >
                           <div className="w-4 h-12 rounded-full shadow-xl bg-gradient-to-b from-green-400 via-green-500 to-green-700 border-2 border-green-300/60 ring-2 ring-green-200/40 hover:scale-110 transition-all duration-300 hover:shadow-2xl" />
-                          <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-gray-50/95 backdrop-blur-sm border-2 border-green-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-[60] ring-1 ring-green-100/60">
-                            <div className="text-sm font-bold text-green-700 mb-1">Project Start</div>
-                            <div className="text-xs text-gray-600 font-medium">{format(project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date(project.createdAt), 'MMM d, yyyy')}</div>
-                            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-gray-50/95 border-t-2 border-l-2 border-green-200/80 rotate-45"></div>
+                          <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-xl px-4 py-3 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[100] w-48">
+                            <div className="font-semibold text-gray-900 mb-1">Project Start</div>
+                            <div className="text-gray-600 mb-1">Due: {format(project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date(project.createdAt), 'MMM d, yyyy')}</div>
+                            <div className="text-gray-600">Timeline Beginning</div>
+                            <div className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white" />
+                            <div className="absolute left-1/2 top-full -translate-x-1/2 translate-y-[-1px] w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-gray-200" />
                           </div>
                         </div>
                         
