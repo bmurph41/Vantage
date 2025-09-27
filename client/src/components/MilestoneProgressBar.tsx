@@ -75,7 +75,7 @@ export default function MilestoneProgressBar({ progressPct, elapsedLabel, milest
               <div
                 id={id}
                 role="tooltip"
-                className={`pointer-events-none absolute -top-3 -translate-y-full transition-opacity duration-150 z-[60] ${
+                className={`pointer-events-none absolute -top-3 -translate-y-full transition-opacity duration-150 z-[100] ${
                   isOpen ? "opacity-100" : "opacity-0"
                 }`}
                 style={{ transform: `translate(-50%, -8px) translateX(${nudge}%)` }}
