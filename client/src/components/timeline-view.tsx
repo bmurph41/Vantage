@@ -4,13 +4,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { CompactProgressIndicator } from "./compact-progress-indicator";
 import { TimelineNotes } from "./timeline-notes";
 import { DocumentRequirementsManagement } from "./document-requirements-management";
 import { useTaskDocumentCompletionStatus } from "@/hooks/use-document-requirements";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO, isToday, isPast, isFuture, differenceInDays, startOfDay, differenceInCalendarDays } from "date-fns";
-import { StickyNote, GripVertical, FileText, Shield, ChevronUp, ChevronDown, CheckCircle } from "lucide-react";
+import { StickyNote, GripVertical, FileText, Shield, ChevronUp, ChevronDown, CheckCircle, Calendar } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
 import { tzNow, getProjectBounds, getProjectTimelineTicks, percentOfRange, clampDate, setDeadlineTo5PM, getMilestonePositionWithGranularity } from "@/lib/date-utils";
@@ -380,13 +381,56 @@ function SortableTaskItem({
               </div>
             </div>
           )}
-          <span className={`w-2 h-2 rounded-full ${
-            isCritical ? 'bg-red-500' :
-            task.status === 'completed' ? 'bg-green-500' :
-            task.status === 'in_progress' ? 'bg-blue-500' :
-            task.status === 'scheduled' ? 'bg-blue-600' :
-            'bg-gray-400'
-          }`} />
+          <TooltipProvider>
+            <Tooltip delayDuration={300}>
+              <TooltipTrigger asChild>
+                <span 
+                  className={`w-2 h-2 rounded-full cursor-help ${
+                    isCritical ? 'bg-red-500' :
+                    task.status === 'completed' ? 'bg-green-500' :
+                    task.status === 'in_progress' ? 'bg-blue-500' :
+                    task.status === 'scheduled' ? 'bg-blue-600' :
+                    'bg-gray-400'
+                  }`} 
+                  data-testid={`status-dot-${task.id}`}
+                />
+              </TooltipTrigger>
+              <TooltipContent 
+                side="top" 
+                className="max-w-xs p-3 bg-white border border-gray-200 shadow-lg z-[100]"
+                data-testid={`status-tooltip-${task.id}`}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-2 h-2 rounded-full ${
+                      isCritical ? 'bg-red-500' :
+                      task.status === 'completed' ? 'bg-green-500' :
+                      task.status === 'in_progress' ? 'bg-blue-500' :
+                      task.status === 'scheduled' ? 'bg-blue-600' :
+                      'bg-gray-400'
+                    }`}></div>
+                    <span className="font-semibold text-gray-900 text-sm">
+                      {isCritical ? 'Critical Task' :
+                       task.status === 'completed' ? 'Completed' :
+                       task.status === 'in_progress' ? 'In Progress' :
+                       task.status === 'scheduled' ? 'Scheduled' :
+                       'Not Started'
+                      }
+                    </span>
+                  </div>
+                  {task.deadline && (
+                    <div className="flex items-center space-x-2 text-xs text-gray-600">
+                      <Calendar className="h-3 w-3" />
+                      <span>Deadline: {format(parseISO(task.deadline), 'MMM dd, yyyy')}</span>
+                    </div>
+                  )}
+                  <div className="text-xs text-gray-500">
+                    Task: {task.title}
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <span className={`text-sm font-medium leader-obstacle ${
             isCritical ? 'text-red-900' : 'text-gray-900'
           }`}>{task.title}</span>
