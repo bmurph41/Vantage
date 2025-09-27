@@ -256,29 +256,29 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
   }
 
   return (
-    <div className="space-y-6" data-testid="contact-management">
+    <div className="space-y-8" data-testid="contact-management">
       {/* Header Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pb-4 border-b">
         <div className="flex items-center space-x-4 flex-1">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <div className="relative flex-1 max-w-lg">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Search contacts..."
+              placeholder="Search contacts by name, email, or company..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-12 h-12 text-base bg-white border-2 focus:border-blue-500 transition-colors"
               data-testid="input-search-contacts"
             />
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={handleExportCSV} size="sm" data-testid="button-export-csv">
+        <div className="flex items-center space-x-3">
+          <Button variant="outline" onClick={handleExportCSV} className="border-2 hover:bg-gray-50" data-testid="button-export-csv">
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-add-contact">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 shadow-sm" data-testid="button-add-contact">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Contact
               </Button>
@@ -385,65 +385,99 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
 
       {/* Contact Cards */}
       {filteredContacts.length === 0 ? (
-        <div className="text-center py-12" data-testid="empty-state">
-          <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-            <Mail className="h-8 w-8 text-muted-foreground" />
+        <div className="text-center py-16" data-testid="empty-state">
+          <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-green-100 flex items-center justify-center mb-6">
+            <Mail className="h-10 w-10 text-blue-600" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No Contacts Found</h3>
-          <p className="text-muted-foreground mb-4">
-            {searchTerm ? "No contacts match your search criteria." : "Add your first contact to start sending notifications."}
+          <h3 className="text-2xl font-semibold mb-3 text-foreground">No Contacts Found</h3>
+          <p className="text-muted-foreground mb-8 text-lg max-w-md mx-auto">
+            {searchTerm ? "No contacts match your search criteria. Try adjusting your search terms." : "Add your first contact to start sending notifications to stakeholders."}
           </p>
           {!searchTerm && (
-            <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-first-contact">
-              <Plus className="h-4 w-4 mr-2" />
+            <Button 
+              onClick={() => setIsAddDialogOpen(true)} 
+              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg shadow-sm"
+              data-testid="button-add-first-contact"
+            >
+              <Plus className="h-5 w-5 mr-2" />
               Add Your First Contact
             </Button>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="contacts-grid">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" data-testid="contacts-grid">
           {filteredContacts.map((contact) => (
-            <Card key={contact.id} className="hover:shadow-md transition-shadow" data-testid={`contact-card-${contact.id}`}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
+            <Card key={contact.id} className="hover:shadow-lg transition-all duration-200 border-0 shadow-sm bg-gradient-to-br from-white to-gray-50/50" data-testid={`contact-card-${contact.id}`}>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-foreground" data-testid={`contact-name-${contact.id}`}>
-                        {contact.name}
-                      </h3>
-                      <Badge variant={contact.type === 'user_contact' ? 'default' : 'secondary'} className="text-xs">
-                        {contact.type === 'user_contact' ? 'Contact' : 'Company Rep'}
-                      </Badge>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`p-2 rounded-lg ${
+                        contact.type === 'user_contact' 
+                          ? 'bg-blue-100' 
+                          : 'bg-purple-100'
+                      }`}>
+                        <Users className={`h-4 w-4 ${
+                          contact.type === 'user_contact' 
+                            ? 'text-blue-600' 
+                            : 'text-purple-600'
+                        }`} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-lg text-foreground" data-testid={`contact-name-${contact.id}`}>
+                          {contact.name}
+                        </h3>
+                        <Badge 
+                          variant={contact.type === 'user_contact' ? 'default' : 'secondary'} 
+                          className={`text-xs font-medium ${
+                            contact.type === 'user_contact' 
+                              ? 'bg-blue-100 text-blue-800 border-blue-200' 
+                              : 'bg-purple-100 text-purple-800 border-purple-200'
+                          }`}
+                        >
+                          {contact.type === 'user_contact' ? 'External Contact' : 'Company Representative'}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Mail className="h-3 w-3 mr-2" />
-                        <span data-testid={`contact-email-${contact.id}`}>{contact.email}</span>
+                    <div className="space-y-3">
+                      <div className="flex items-center text-sm">
+                        <div className="p-1 bg-gray-100 rounded mr-3">
+                          <Mail className="h-3 w-3 text-gray-600" />
+                        </div>
+                        <span className="font-medium text-foreground" data-testid={`contact-email-${contact.id}`}>{contact.email}</span>
                       </div>
                       {contact.phone && (
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <Phone className="h-3 w-3 mr-2" />
-                          <span data-testid={`contact-phone-${contact.id}`}>{contact.phone}</span>
+                        <div className="flex items-center text-sm">
+                          <div className="p-1 bg-gray-100 rounded mr-3">
+                            <Phone className="h-3 w-3 text-gray-600" />
+                          </div>
+                          <span className="font-medium text-foreground" data-testid={`contact-phone-${contact.id}`}>{contact.phone}</span>
                         </div>
                       )}
                       {contact.type === 'user_contact' && (
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <Clock className="h-3 w-3 mr-2" />
-                          <span data-testid={`contact-timezone-${contact.id}`}>
+                        <div className="flex items-center text-sm">
+                          <div className="p-1 bg-gray-100 rounded mr-3">
+                            <Clock className="h-3 w-3 text-gray-600" />
+                          </div>
+                          <span className="text-muted-foreground" data-testid={`contact-timezone-${contact.id}`}>
                             {timezones.find(tz => tz.value === contact.timezone)?.label || contact.timezone}
                           </span>
                         </div>
                       )}
                       {contact.type === 'company_rep' && 'company' in contact && (
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <span className="font-medium mr-1">Company:</span>
-                          <span data-testid={`contact-company-${contact.id}`}>{contact.company}</span>
+                        <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                          <div className="text-sm">
+                            <span className="font-medium text-purple-900">Company:</span>
+                            <span className="ml-2 text-purple-800" data-testid={`contact-company-${contact.id}`}>{contact.company}</span>
+                          </div>
                         </div>
                       )}
                       {contact.type === 'company_rep' && 'taskTitle' in contact && (
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <span className="font-medium mr-1">Task:</span>
-                          <span data-testid={`contact-task-${contact.id}`}>{contact.taskTitle}</span>
+                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                          <div className="text-sm">
+                            <span className="font-medium text-blue-900">Related Task:</span>
+                            <span className="ml-2 text-blue-800" data-testid={`contact-task-${contact.id}`}>{contact.taskTitle}</span>
+                          </div>
                         </div>
                       )}
                       
