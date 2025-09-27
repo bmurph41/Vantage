@@ -5,13 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, CheckCircle, Clock, PlayCircle, Calendar, AlertTriangle, X } from "lucide-react";
+import { User, CheckCircle, Clock, PlayCircle, Calendar, AlertTriangle, X, Archive } from "lucide-react";
 import { parseISO, isBefore, startOfDay, format } from "date-fns";
 import { setDeadlineTo5PM } from "@/lib/date-utils";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Task } from "@shared/schema";
 
 interface TaskOwnersViewProps {
   tasks: Task[];
+  projectId?: string;
 }
 
 interface OwnerStats {
@@ -27,12 +31,54 @@ interface OwnerStats {
   overallProgress: number;
 }
 
-export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
+export function TaskOwnersView({ tasks, projectId }: TaskOwnersViewProps) {
   const [ownerModalOpen, setOwnerModalOpen] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [selectedOwner, setSelectedOwner] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedOwnerName, setSelectedOwnerName] = useState<string | null>(null);
+  const [archivingTaskId, setArchivingTaskId] = useState<string | null>(null);
+
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Archive task mutation
+  const archiveTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      return apiRequest('PATCH', `/api/dd/tasks/${taskId}/archive`);
+    },
+    onSuccess: (_, taskId) => {
+      // Invalidate and refetch tasks if projectId is available
+      if (projectId) {
+        queryClient.invalidateQueries({
+          queryKey: ['/api/dd/projects', projectId, 'tasks'],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ['/api/dd/projects', projectId],
+        });
+      }
+      
+      setArchivingTaskId(null);
+      toast({
+        title: "Task Archived",
+        description: "The task has been moved to the archive.",
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to archive task:', error);
+      setArchivingTaskId(null);
+      toast({
+        title: "Error",
+        description: "Failed to archive task. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleArchiveTask = async (taskId: string) => {
+    setArchivingTaskId(taskId);
+    archiveTaskMutation.mutate(taskId);
+  };
   // Calculate stats by owner
   const calculateOwnerStats = (): OwnerStats[] => {
     const today = startOfDay(new Date());
@@ -355,8 +401,14 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
           <ScrollArea className="h-[60vh] pr-4">
             {selectedOwner && (
               <div className="space-y-4">
-                {getOwnerTasks(selectedOwner).map((task) => (
-                  <Card key={task.id} className="border-l-4" style={{ borderLeftColor: task.status === 'completed' ? '#10B981' : task.status === 'overdue' ? '#EF4444' : '#3B82F6' }}>
+                {getOwnerTasks(selectedOwner).map((task) => {
+                  const today = startOfDay(new Date());
+                  const isOverdue = task.deadline && 
+                    task.status !== 'completed' && 
+                    isBefore(setDeadlineTo5PM(task.deadline), today);
+                  
+                  return (
+                  <Card key={task.id} className="border-l-4" style={{ borderLeftColor: task.status === 'completed' ? '#10B981' : isOverdue ? '#EF4444' : '#3B82F6' }}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -379,17 +431,30 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
                                 Due: {format(parseISO(task.deadline), 'MMM d, yyyy')}
                               </Badge>
                             )}
-                            {task.category && (
+                            {task.ddCategory && (
                               <Badge variant="outline">
-                                {task.category}
+                                {task.ddCategory}
                               </Badge>
                             )}
                           </div>
                         </div>
+                        <div className="ml-4 flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleArchiveTask(task.id)}
+                            disabled={archivingTaskId === task.id}
+                            data-testid={`button-archive-${task.id}`}
+                          >
+                            <Archive className="h-4 w-4 mr-2" />
+                            {archivingTaskId === task.id ? 'Archiving...' : 'Archive'}
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
                 {getOwnerTasks(selectedOwner).length === 0 && (
                   <div className="text-center py-8">
                     <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -414,8 +479,14 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
           <ScrollArea className="h-[60vh] pr-4">
             {selectedOwner && selectedStatus && (
               <div className="space-y-4">
-                {getTasksByStatus(selectedOwner, selectedStatus).map((task) => (
-                  <Card key={task.id} className="border-l-4" style={{ borderLeftColor: selectedStatus === 'completed' ? '#10B981' : selectedStatus === 'overdue' ? '#EF4444' : '#3B82F6' }}>
+                {getTasksByStatus(selectedOwner, selectedStatus).map((task) => {
+                  const today = startOfDay(new Date());
+                  const isOverdue = task.deadline && 
+                    task.status !== 'completed' && 
+                    isBefore(setDeadlineTo5PM(task.deadline), today);
+                  
+                  return (
+                  <Card key={task.id} className="border-l-4" style={{ borderLeftColor: task.status === 'completed' ? '#10B981' : isOverdue ? '#EF4444' : '#3B82F6' }}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -438,17 +509,30 @@ export function TaskOwnersView({ tasks }: TaskOwnersViewProps) {
                                 Due: {format(parseISO(task.deadline), 'MMM d, yyyy')}
                               </Badge>
                             )}
-                            {task.category && (
+                            {task.ddCategory && (
                               <Badge variant="outline">
-                                {task.category}
+                                {task.ddCategory}
                               </Badge>
                             )}
                           </div>
                         </div>
+                        <div className="ml-4 flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleArchiveTask(task.id)}
+                            disabled={archivingTaskId === task.id}
+                            data-testid={`button-archive-${task.id}`}
+                          >
+                            <Archive className="h-4 w-4 mr-2" />
+                            {archivingTaskId === task.id ? 'Archiving...' : 'Archive'}
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
                 {getTasksByStatus(selectedOwner, selectedStatus).length === 0 && (
                   <div className="text-center py-8">
                     {selectedStatus && getStatusIcon(selectedStatus)}

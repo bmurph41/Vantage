@@ -170,7 +170,7 @@ export default function ProjectPage() {
             <ProjectSetup project={project} settings={settings} tasks={tasks} />
           )}
           {activeTab === "owners" && (
-            <TaskOwnersView tasks={tasks} />
+            <TaskOwnersView tasks={tasks} projectId={project.id} />
           )}
           {activeTab === "contacts" && (
             <ContactManagement 
