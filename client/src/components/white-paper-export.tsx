@@ -12,14 +12,14 @@ interface WhitePaperProps {
   settings?: ProjectSettings | null;
 }
 
-// Define styles for the PDF - Professional Marcus & Millichap / CBRE inspired design
+// Define styles for the PDF - Professional formatting as per guidance requirements
 const styles = StyleSheet.create({
   page: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 60,
-    paddingVertical: 40,
+    paddingHorizontal: 54, // 0.75 inch margins as specified
+    paddingVertical: 54,
     fontFamily: 'Helvetica',
-    fontSize: 12,
+    fontSize: 11, // Size 11 as specified in guidance
     lineHeight: 1.6,
   },
   coverPage: {
@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     fontFamily: 'Helvetica-Bold',
-    color: '#1e3a8a',
+    color: '#003366', // Dark blue as specified in guidance
     marginBottom: 20,
     textAlign: 'center',
     letterSpacing: 1,
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   header: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1e3a8a',
+    color: '#003366', // Dark blue as specified in guidance
     marginBottom: 20,
     borderBottomWidth: 3,
     borderBottomColor: '#000000',
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 15,
-    backgroundColor: '#1e3a8a',
+    backgroundColor: '#003366', // Dark blue as specified in guidance
     padding: 12,
     paddingLeft: 16,
     textTransform: 'uppercase',
@@ -87,16 +87,16 @@ const styles = StyleSheet.create({
   subsectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1e3a8a',
+    color: '#003366', // Dark blue as specified in guidance
     marginBottom: 10,
     marginTop: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#EEEEEE', // Light gray section dividers as specified
     borderBottomStyle: 'solid',
     paddingBottom: 6,
   },
   text: {
-    fontSize: 12,
+    fontSize: 11, // Size 11 as specified in guidance
     color: '#374151',
     marginBottom: 8,
     lineHeight: 1.5,
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
     borderStyle: 'solid',
     borderLeftWidth: 4,
-    borderLeftColor: '#1e3a8a',
+    borderLeftColor: '#003366', // Dark blue as specified in guidance
     borderRadius: 4,
   },
   kpiNumber: {
@@ -274,13 +274,13 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
     borderStyle: 'solid',
     borderLeftWidth: 4,
-    borderLeftColor: '#1e3a8a',
+    borderLeftColor: '#003366', // Dark blue as specified in guidance
     borderLeftStyle: 'solid',
   },
   contactTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1e3a8a',
+    color: '#003366', // Dark blue as specified in guidance
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -294,16 +294,32 @@ const styles = StyleSheet.create({
   footer: {
     position: 'absolute',
     bottom: 30,
-    left: 36,
-    right: 36,
+    left: 54, // 0.75 inch margins as specified
+    right: 54,
     textAlign: 'center',
     fontSize: 10,
     color: '#6b7280',
     borderTopWidth: 1,
-    borderTopColor: '#1e3a8a',
+    borderTopColor: '#EEEEEE', // Light gray section dividers as specified
     borderTopStyle: 'solid',
     paddingTop: 12,
     fontWeight: 'bold',
+  },
+  confidentialHeader: {
+    position: 'absolute',
+    top: 15,
+    left: 54,
+    right: 54,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#003366',
+    backgroundColor: '#f8fafc',
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   pageBreak: {
     marginTop: 40,
@@ -319,7 +335,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 20,
     borderLeftWidth: 5,
-    borderLeftColor: '#1e3a8a',
+    borderLeftColor: '#003366', // Dark blue as specified in guidance
     borderLeftStyle: 'solid',
   },
   timelineItem: {
@@ -424,7 +440,7 @@ const styles = StyleSheet.create({
     padding: 25,
     marginBottom: 25,
     borderLeftWidth: 6,
-    borderLeftColor: '#1e3a8a',
+    borderLeftColor: '#003366', // Dark blue as specified in guidance
     borderLeftStyle: 'solid',
   },
   keyInsightTitle: {
@@ -2942,7 +2958,7 @@ export const generateWhitePaperPDF = async (
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${project.name}-Risk-Analysis-Report.pdf`;
+    link.download = `${project.name} DD Summary.pdf`; // Professional naming as specified in guidance
     link.click();
     
     URL.revokeObjectURL(url);
