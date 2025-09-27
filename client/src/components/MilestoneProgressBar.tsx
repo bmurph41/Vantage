@@ -86,9 +86,10 @@ export default function MilestoneProgressBar({ progressPct, elapsedLabel, milest
                   transform: `translateX(-50%) translateX(${nudge}px)`
                 }}
               >
-                <div className="relative max-w-xs rounded-lg bg-white border border-gray-200 shadow-xl px-3 py-2 text-xs">
-                  <div className="font-semibold text-gray-900">{m.title}</div>
-                  <div className="text-gray-600">Due: {formatDate(m.due)} • @{Math.round(leftPct)}%</div>
+                <div className="relative w-48 rounded-lg bg-white border border-gray-200 shadow-xl px-4 py-3 text-xs">
+                  <div className="font-semibold text-gray-900 mb-1">{m.title}</div>
+                  <div className="text-gray-600 mb-1">Due: {formatDate(m.due)}</div>
+                  <div className="text-gray-600">{Math.round(leftPct)}% Complete</div>
                   <div className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white" />
                   <div className="absolute left-1/2 top-full -translate-x-1/2 translate-y-[-1px] w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-gray-200" />
                 </div>
