@@ -876,15 +876,15 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               {task.status !== "not_started" ? (
                                 <input 
                                   type="date" 
-                                  value={task.orderedAt || ""} 
-                                  onChange={(e) => handleDateFieldChange(task.id, 'orderedAt', e.target.value)}
+                                  value={task.dateEngaged || ""} 
+                                  onChange={(e) => handleDateFieldChange(task.id, 'dateEngaged', e.target.value)}
                                   className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                  data-testid={`input-ordered-${task.id}`}
+                                  data-testid={`input-engaged-${task.id}`}
                                 />
-                              ) : task.orderedAt ? (
+                              ) : task.dateEngaged ? (
                                 <input 
                                   type="date" 
-                                  value={task.orderedAt} 
+                                  value={task.dateEngaged} 
                                   className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
                                   readOnly
                                 />
@@ -1208,15 +1208,15 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           {task.status !== "not_started" ? (
                             <input 
                               type="date" 
-                              value={task.orderedAt || ""} 
-                              onChange={(e) => handleDateFieldChange(task.id, 'orderedAt', e.target.value)}
+                              value={task.dateEngaged || ""} 
+                              onChange={(e) => handleDateFieldChange(task.id, 'dateEngaged', e.target.value)}
                               className="w-full text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              data-testid={`input-ordered-${task.id}`}
+                              data-testid={`input-engaged-${task.id}`}
                             />
-                          ) : task.orderedAt ? (
+                          ) : task.dateEngaged ? (
                             <input 
                               type="date" 
-                              value={task.orderedAt} 
+                              value={task.dateEngaged} 
                               className="w-full text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50"
                               readOnly
                             />
