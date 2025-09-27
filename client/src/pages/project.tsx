@@ -88,6 +88,7 @@ export default function ProjectPage() {
     { id: "contacts", label: "Key Contacts" },
     { id: "integrations", label: "Integrations" },
     { id: "notifications", label: "Notifications" },
+    { id: "archive", label: "Archive" },
   ];
 
   return (
@@ -182,6 +183,14 @@ export default function ProjectPage() {
           )}
           {activeTab === "notifications" && (
             <NotificationSettingsPage projectId={project.id} />
+          )}
+          {activeTab === "archive" && (
+            <div className="space-y-6">
+              <div className="bg-card border border-border rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Archived Tasks</h3>
+                <p className="text-muted-foreground">Archived tasks will be displayed here.</p>
+              </div>
+            </div>
           )}
         </div>
       </div>
