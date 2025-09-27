@@ -13,8 +13,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, addDays, parseISO } from "date-fns";
 import { addBusinessDays } from "@/lib/business-days";
-import type { Project, ProjectSettings, Task } from "@shared/schema";
+import type { Project, ProjectSettings, Task, Contact } from "@shared/schema";
 import { useUpdateProject, useUpdateProjectSettings } from "@/hooks/use-project";
+import { useQuery } from "@tanstack/react-query";
 
 // Helper function to format currency
 const formatCurrency = (value: string): string => {
@@ -74,6 +75,11 @@ interface ProjectSetupProps {
 export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const updateProject = useUpdateProject();
   const updateSettings = useUpdateProjectSettings();
+  
+  // Fetch contacts for role-based selection
+  const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
+    queryKey: ['/api/dd/contacts'],
+  });
   const [extensionDaysArray, setExtensionDaysArray] = useState<number[]>(project.extensionDays || []);
   const [sellersArray, setSellersArray] = useState<string[]>(project.seller || []);
   const [attorneysArray, setAttorneysArray] = useState<string[]>(project.ourAttorney || []);
@@ -702,13 +708,24 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                 <div className="mt-2 space-y-2">
                   {sellersArray.map((seller, index) => (
                     <div key={index} className="flex items-center space-x-2">
-                      <Input
+                      <Select
                         value={seller}
-                        onChange={(e) => updateSeller(index, e.target.value)}
-                        placeholder="Seller name or entity"
-                        data-testid={`input-seller-${index}`}
-                        className="flex-1"
-                      />
+                        onValueChange={(value) => updateSeller(index, value)}
+                      >
+                        <SelectTrigger className="flex-1" data-testid={`select-seller-${index}`}>
+                          <SelectValue placeholder="Select seller or enter name" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contacts
+                            .filter(contact => contact.role === 'seller' || !contact.role)
+                            .map((contact) => (
+                              <SelectItem key={contact.id} value={`${contact.name} (${contact.company || contact.email})`}>
+                                {contact.name} ({contact.company || contact.email})
+                              </SelectItem>
+                            ))}
+                          <SelectItem value="custom">Enter custom name...</SelectItem>
+                        </SelectContent>
+                      </Select>
                       {sellersArray.length > 1 && (
                         <Button
                           type="button"
@@ -743,13 +760,24 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                 <div className="mt-2 space-y-2">
                   {attorneysArray.map((attorney, index) => (
                     <div key={index} className="flex items-center space-x-2">
-                      <Input
+                      <Select
                         value={attorney}
-                        onChange={(e) => updateAttorney(index, e.target.value)}
-                        placeholder="Attorney name or firm"
-                        data-testid={`input-attorney-${index}`}
-                        className="flex-1"
-                      />
+                        onValueChange={(value) => updateAttorney(index, value)}
+                      >
+                        <SelectTrigger className="flex-1" data-testid={`select-attorney-${index}`}>
+                          <SelectValue placeholder="Select attorney or enter name" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contacts
+                            .filter(contact => contact.role === 'attorney' || !contact.role)
+                            .map((contact) => (
+                              <SelectItem key={contact.id} value={`${contact.name} (${contact.company || contact.email})`}>
+                                {contact.name} ({contact.company || contact.email})
+                              </SelectItem>
+                            ))}
+                          <SelectItem value="custom">Enter custom name...</SelectItem>
+                        </SelectContent>
+                      </Select>
                       {attorneysArray.length > 1 && (
                         <Button
                           type="button"
@@ -782,22 +810,46 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="titleInsuranceCompany">Title Insurance Company</Label>
-                  <Input
-                    id="titleInsuranceCompany"
-                    {...projectForm.register("titleInsuranceCompany")}
-                    placeholder="Title insurance company"
-                    data-testid="input-title-insurance"
-                  />
+                  <Select
+                    value={projectForm.watch("titleInsuranceCompany") || ""}
+                    onValueChange={(value) => projectForm.setValue("titleInsuranceCompany", value)}
+                  >
+                    <SelectTrigger data-testid="select-title-insurance">
+                      <SelectValue placeholder="Select title insurance company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contacts
+                        .filter(contact => contact.role === 'title_insurance' || !contact.role)
+                        .map((contact) => (
+                          <SelectItem key={contact.id} value={`${contact.name} (${contact.company || contact.email})`}>
+                            {contact.name} ({contact.company || contact.email})
+                          </SelectItem>
+                        ))}
+                      <SelectItem value="custom">Enter custom name...</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div>
                   <Label htmlFor="lender">Lender</Label>
-                  <Input
-                    id="lender"
-                    {...projectForm.register("lender")}
-                    placeholder="Lending institution"
-                    data-testid="input-lender"
-                  />
+                  <Select
+                    value={projectForm.watch("lender") || ""}
+                    onValueChange={(value) => projectForm.setValue("lender", value)}
+                  >
+                    <SelectTrigger data-testid="select-lender">
+                      <SelectValue placeholder="Select lender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contacts
+                        .filter(contact => contact.role === 'lender' || !contact.role)
+                        .map((contact) => (
+                          <SelectItem key={contact.id} value={`${contact.name} (${contact.company || contact.email})`}>
+                            {contact.name} ({contact.company || contact.email})
+                          </SelectItem>
+                        ))}
+                      <SelectItem value="custom">Enter custom name...</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
