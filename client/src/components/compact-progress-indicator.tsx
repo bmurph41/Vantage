@@ -129,6 +129,11 @@ export function CompactProgressIndicator({
     }
   };
 
+  // Hide progress bar completely for completed tasks
+  if (isCompleted) {
+    return null;
+  }
+
   return (
     <TooltipProvider>
       <Tooltip delayDuration={300}>
