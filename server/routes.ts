@@ -1743,16 +1743,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updatedContact = await storage.updateContact(req.params.id, updates);
 
-      // Create audit log - use null for projectId for org-level operations
-      await storage.createAuditLog({
-        projectId: null,
-        userId: req.user.id,
-        entityType: "contact",
-        entityId: req.params.id,
-        action: "updated",
-        before: existingContact,
-        after: updatedContact,
-      });
+      // Create audit log only if there's a valid projectId
+      // Skip audit logging for org-level contacts to avoid null constraint violation
+      if (existingContact.projectId) {
+        await storage.createAuditLog({
+          projectId: existingContact.projectId,
+          userId: req.user.id,
+          entityType: "contact",
+          entityId: req.params.id,
+          action: "updated",
+          before: existingContact,
+          after: updatedContact,
+        });
+      }
 
       res.json(updatedContact);
     } catch (error) {
