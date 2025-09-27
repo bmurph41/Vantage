@@ -124,7 +124,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   };
 
   const calculateDaysRemaining = (task: Task): number | string => {
-    if (task.status === 'completed') return 0;
+    if (task.status === 'completed') return "Completed";
     
     const today = tzNow('America/New_York');
     const deadlineDate = calculateDeadlineDate(task);
@@ -140,7 +140,9 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const getDaysRemainingColorClass = (task: Task): string => {
     const daysRemaining = calculateDaysRemaining(task);
     
-    if (daysRemaining === "Overdue" || (typeof daysRemaining === 'number' && daysRemaining <= 5)) {
+    if (daysRemaining === "Completed") {
+      return "text-green-600"; // Green for completed tasks
+    } else if (daysRemaining === "Overdue" || (typeof daysRemaining === 'number' && daysRemaining <= 5)) {
       return "text-red-600"; // Red for urgent tasks (overdue or ≤5 days)
     } else if (typeof daysRemaining === 'number' && daysRemaining >= 6 && daysRemaining <= 14) {
       return "text-orange-500"; // Orange for moderate urgency (6-14 days)
@@ -152,6 +154,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const getUrgencyScore = (task: Task): number => {
     const daysRemaining = calculateDaysRemaining(task);
     
+    if (daysRemaining === "Completed") return 4; // Lowest priority (completed tasks go to bottom)
     if (daysRemaining === "Overdue") return 0; // Highest priority
     if (typeof daysRemaining === 'number' && daysRemaining <= 5) return 1; // High priority
     if (typeof daysRemaining === 'number' && daysRemaining <= 14) return 2; // Medium priority
