@@ -633,26 +633,28 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
   // Memoize timeline tasks and task IDs to stabilize dependencies
   const timelineTasks = useMemo(() => tasks.filter(t => t.showOnTimeline), [tasks]);
   
-  // Enhanced sorting logic that considers custom sortOrder
+  // Enhanced sorting logic that considers custom sortOrder and filters out completed tasks
   const sortedTasks = useMemo(() => {
-    return [...timelineTasks].sort((a, b) => {
-      // First priority: Use custom sortOrder if both tasks have it set
-      if (a.sortOrder !== null && a.sortOrder !== undefined && 
-          b.sortOrder !== null && b.sortOrder !== undefined) {
-        return a.sortOrder - b.sortOrder;
-      }
-      
-      // Second priority: Tasks with custom sortOrder come first
-      if (a.sortOrder !== null && a.sortOrder !== undefined) return -1;
-      if (b.sortOrder !== null && b.sortOrder !== undefined) return 1;
-      
-      // Final fallback: Sort by deadline (existing logic)
-      if (!a.deadline && !b.deadline) return 0;
-      if (!a.deadline) return 1; // Tasks without deadlines go to the end
-      if (!b.deadline) return -1; // Tasks without deadlines go to the end
-      
-      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-    });
+    return [...timelineTasks]
+      .filter(task => task.status !== 'completed') // Filter out completed tasks
+      .sort((a, b) => {
+        // First priority: Use custom sortOrder if both tasks have it set
+        if (a.sortOrder !== null && a.sortOrder !== undefined && 
+            b.sortOrder !== null && b.sortOrder !== undefined) {
+          return a.sortOrder - b.sortOrder;
+        }
+        
+        // Second priority: Tasks with custom sortOrder come first
+        if (a.sortOrder !== null && a.sortOrder !== undefined) return -1;
+        if (b.sortOrder !== null && b.sortOrder !== undefined) return 1;
+        
+        // Final fallback: Sort by deadline (existing logic)
+        if (!a.deadline && !b.deadline) return 0;
+        if (!a.deadline) return 1; // Tasks without deadlines go to the end
+        if (!b.deadline) return -1; // Tasks without deadlines go to the end
+        
+        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+      });
   }, [timelineTasks]);
 
   // Chevron-based reordering functions (defined after sortedTasks)
