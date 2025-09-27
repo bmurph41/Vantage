@@ -6,16 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Separator } from "@/components/ui/separator";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { TaskFiles } from "./task-files";
+import ContactModal, { type ContactPayload } from "./ContactModal";
 import type { Contact, Task } from "@shared/schema";
 
 // ========== CRM INTEGRATION PLACEHOLDER ==========
@@ -139,17 +135,7 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
       taskTitle: task.title,
     }));
 
-  const form = useForm<ContactFormData>({
-    resolver: zodResolver(contactSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
-      timezone: "America/New_York",
-      role: undefined,
-      company: "",
-    },
-  });
+  // Form handling is now done by ContactModal component
 
   // Create contact mutation
   const createContactMutation = useMutation({
@@ -248,14 +234,40 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
 
   const handleEdit = (contact: Contact) => {
     setEditingContact(contact);
-    form.reset({
-      name: contact.name,
+  };
+
+  // Convert Contact to ContactPayload for the modal
+  const convertContactToPayload = (contact: Contact): ContactPayload => {
+    const nameParts = contact.name.split(' ');
+    return {
+      id: contact.id,
+      firstName: nameParts[0] || '',
+      lastName: nameParts.slice(1).join(' ') || undefined,
       email: contact.email,
-      phone: contact.phone || "",
-      timezone: contact.timezone,
+      phone: contact.phone || undefined,
+      company: contact.company || undefined,
       role: contact.role || undefined,
-      company: contact.company || "",
-    });
+      timezone: contact.timezone,
+      // Note: address, onDealTeam, dealTeamNotes, photoDataUrl not available in current Contact type
+    };
+  };
+
+  // Convert ContactPayload to ContactFormData for the API
+  const convertPayloadToFormData = (payload: ContactPayload): ContactFormData => {
+    const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(' ');
+    return {
+      name: fullName,
+      email: payload.email || '',
+      phone: payload.phone || '',
+      timezone: payload.timezone || 'America/New_York',
+      role: payload.role as any,
+      company: payload.company || '',
+    };
+  };
+
+  const handleModalSave = (payload: ContactPayload) => {
+    const formData = convertPayloadToFormData(payload);
+    handleSubmit(formData);
   };
 
   const handleDelete = (contactId: string) => {
@@ -347,147 +359,14 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
             <Search className="h-4 w-4 mr-2" />
             Search CRM
           </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 shadow-sm" data-testid="button-add-contact">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Contact
-              </Button>
-            </DialogTrigger>
-            <DialogContent data-testid="dialog-add-contact">
-              <DialogHeader>
-                <DialogTitle>Add New Contact</DialogTitle>
-                <DialogDescription>
-                  Add a new contact who can receive notifications about this project.
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John Doe" {...field} data-testid="input-contact-name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="john@example.com" {...field} data-testid="input-contact-email" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="(000) 000-0000" 
-                            {...field} 
-                            onBlur={(e) => {
-                              const formatted = formatPhoneNumber(e.target.value);
-                              field.onChange(formatted);
-                              field.onBlur();
-                            }}
-                            data-testid="input-contact-phone" 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="timezone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Timezone</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-contact-timezone">
-                              <SelectValue placeholder="Select timezone" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {timezones.map((tz) => (
-                              <SelectItem key={tz.value} value={tz.value}>
-                                {tz.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="role"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Role (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-contact-role">
-                              <SelectValue placeholder="Select a role" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {contactRoles.map((role) => (
-                              <SelectItem key={role.value} value={role.value}>
-                                {role.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="company"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Company Name" {...field} data-testid="input-contact-company" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="flex justify-end space-x-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} data-testid="button-cancel">
-                      Cancel
-                    </Button>
-                    <Button 
-                      type="submit" 
-                      disabled={createContactMutation.isPending}
-                      data-testid="button-save-contact"
-                    >
-                      {createContactMutation.isPending ? "Adding..." : "Add Contact"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+          <Button 
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 shadow-sm" 
+            data-testid="button-add-contact"
+            onClick={() => setIsAddDialogOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Contact
+          </Button>
         </div>
       </div>
 
@@ -629,8 +508,6 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                   </div>
                   {contact.type === 'user_contact' && (
                     <div className="flex items-center space-x-1 ml-2">
-                      <Dialog open={editingContact?.id === contact.id} onOpenChange={(open) => !open && setEditingContact(null)}>
-                      <DialogTrigger asChild>
                         <Button 
                           variant="ghost" 
                           size="sm" 
@@ -639,146 +516,6 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent data-testid="dialog-edit-contact">
-                        <DialogHeader>
-                          <DialogTitle>Edit Contact</DialogTitle>
-                          <DialogDescription>
-                            Update the contact information below.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <Form {...form}>
-                          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                            <FormField
-                              control={form.control}
-                              name="name"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Name</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} data-testid="input-edit-name" />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="email"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Email</FormLabel>
-                                  <FormControl>
-                                    <Input type="email" {...field} data-testid="input-edit-email" />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="phone"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Phone</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      placeholder="(000) 000-0000"
-                                      {...field} 
-                                      onBlur={(e) => {
-                                        const formatted = formatPhoneNumber(e.target.value);
-                                        field.onChange(formatted);
-                                        field.onBlur();
-                                      }}
-                                      data-testid="input-edit-phone" 
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="timezone"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Timezone</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger data-testid="select-edit-timezone">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {timezones.map((tz) => (
-                                        <SelectItem key={tz.value} value={tz.value}>
-                                          {tz.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="role"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Role (Optional)</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger data-testid="select-edit-role">
-                                        <SelectValue placeholder="Select a role" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {contactRoles.map((role) => (
-                                        <SelectItem key={role.value} value={role.value}>
-                                          {role.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="company"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Company (Optional)</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} data-testid="input-edit-company" />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <div className="flex justify-end space-x-2 pt-4">
-                              <Button 
-                                type="button" 
-                                variant="outline" 
-                                onClick={() => setEditingContact(null)}
-                                data-testid="button-cancel-edit"
-                              >
-                                Cancel
-                              </Button>
-                              <Button 
-                                type="submit" 
-                                disabled={updateContactMutation.isPending}
-                                data-testid="button-save-edit"
-                              >
-                                {updateContactMutation.isPending ? "Saving..." : "Save Changes"}
-                              </Button>
-                            </div>
-                          </form>
-                        </Form>
-                      </DialogContent>
-                    </Dialog>
                     
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
@@ -824,6 +561,26 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
       <div className="text-sm text-muted-foreground text-center pt-4" data-testid="contacts-summary">
         Showing {filteredContacts.length} of {contacts.length} Contacts
       </div>
+
+      {/* Contact Modals */}
+      <ContactModal
+        open={isAddDialogOpen}
+        onClose={() => setIsAddDialogOpen(false)}
+        onSave={(payload) => {
+          handleModalSave(payload);
+          setIsAddDialogOpen(false);
+        }}
+      />
+
+      <ContactModal
+        open={!!editingContact}
+        onClose={() => setEditingContact(null)}
+        initialData={editingContact ? convertContactToPayload(editingContact) : undefined}
+        onSave={(payload) => {
+          handleModalSave(payload);
+          setEditingContact(null);
+        }}
+      />
     </div>
   );
 }
