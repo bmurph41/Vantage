@@ -30,6 +30,7 @@ export const ddCategoryEnum = pgEnum("dd_category", ["title", "survey", "ESA", "
 export const calendarProviderEnum = pgEnum("calendar_provider", ["google", "outlook", "apple"]);
 export const emailTypeEnum = pgEnum("email_type", ["primary", "additional"]);
 export const guestStatusEnum = pgEnum("guest_status", ["pending", "accepted", "declined"]);
+export const contactRoleEnum = pgEnum("contact_role", ["seller", "attorney", "lender", "title_insurance", "inspector", "surveyor", "environmental", "appraiser", "broker", "insurance_agent", "other"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -308,6 +309,8 @@ export const contacts = pgTable("contacts", {
   email: text("email").notNull(),
   phone: text("phone"),
   timezone: text("timezone").notNull().default("America/New_York"),
+  role: contactRoleEnum("role"), // Optional role designation
+  company: text("company"), // Company name for the contact
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
