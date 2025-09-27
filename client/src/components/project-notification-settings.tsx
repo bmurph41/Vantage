@@ -108,32 +108,40 @@ export function ProjectNotificationSettings({ projectId, settings }: ProjectNoti
   const notificationsEnabled = form.watch("notificationsEnabled");
 
   return (
-    <div className="space-y-6" data-testid="project-notification-settings">
+    <div className="space-y-8" data-testid="project-notification-settings">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} onChange={handleFormChange} className="space-y-8">
           {/* Master Toggle */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="h-5 w-5" />
-                <span>Global Settings</span>
-              </CardTitle>
-              <CardDescription>
-                Configure the overall notification behavior for this project
-              </CardDescription>
+          <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-50/50 to-white">
+            <CardHeader className="pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Settings className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-semibold">Global Settings</CardTitle>
+                  <CardDescription className="text-base mt-1">
+                    Configure the overall notification behavior for this project
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <FormField
                 control={form.control}
                 name="notificationsEnabled"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base flex items-center space-x-2">
-                        {field.value ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border-2 border-blue-200 p-6 bg-white">
+                    <div className="space-y-1">
+                      <FormLabel className="text-lg font-medium flex items-center space-x-3">
+                        <div className={`p-2 rounded-lg ${
+                          field.value ? 'bg-green-100' : 'bg-gray-100'
+                        }`}>
+                          {field.value ? <Bell className="h-5 w-5 text-green-600" /> : <BellOff className="h-5 w-5 text-gray-500" />}
+                        </div>
                         <span>Enable Notifications</span>
                       </FormLabel>
-                      <FormDescription>
+                      <FormDescription className="text-base ml-11">
                         Turn notifications on or off for this entire project
                       </FormDescription>
                     </div>
@@ -141,6 +149,7 @@ export function ProjectNotificationSettings({ projectId, settings }: ProjectNoti
                       <Switch
                         checked={field.value}
                         onCheckedChange={field.onChange}
+                        className="scale-125"
                         data-testid="switch-notifications-enabled"
                       />
                     </FormControl>
@@ -151,17 +160,23 @@ export function ProjectNotificationSettings({ projectId, settings }: ProjectNoti
           </Card>
 
           {/* Default Preferences */}
-          <Card className={!notificationsEnabled ? "opacity-50" : ""}>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Bell className="h-5 w-5" />
-                <span>Default Notification Preferences</span>
-              </CardTitle>
-              <CardDescription>
-                These settings will be used as defaults when creating new notification subscriptions
-              </CardDescription>
+          <Card className={`border-0 shadow-sm bg-gradient-to-r from-purple-50/50 to-white ${
+            !notificationsEnabled ? "opacity-50" : ""
+          }`}>
+            <CardHeader className="pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Bell className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-semibold">Default Notification Preferences</CardTitle>
+                  <CardDescription className="text-base mt-1">
+                    These settings will be used as defaults when creating new notification subscriptions
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-8">
               <FormField
                 control={form.control}
                 name="defaultChannels"

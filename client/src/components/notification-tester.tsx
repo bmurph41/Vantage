@@ -186,11 +186,13 @@ export function NotificationTester({ projectId, contacts, settings }: Notificati
   const notificationsEnabled = settings?.notificationsEnabled ?? true;
 
   return (
-    <div className="space-y-6" data-testid="notification-tester">
+    <div className="space-y-8" data-testid="notification-tester">
       {!notificationsEnabled && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
+        <Alert className="border-orange-200 bg-orange-50">
+          <div className="p-1 bg-orange-100 rounded mr-3">
+            <AlertCircle className="h-4 w-4 text-orange-600" />
+          </div>
+          <AlertDescription className="text-base text-orange-800">
             Notifications are currently disabled for this project. You can still send test notifications, 
             but regular notifications won't be sent until you enable them in Project Settings.
           </AlertDescription>
