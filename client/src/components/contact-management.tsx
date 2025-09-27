@@ -18,6 +18,40 @@ import { apiRequest } from "@/lib/queryClient";
 import { TaskFiles } from "./task-files";
 import type { Contact, Task } from "@shared/schema";
 
+// ========== CRM INTEGRATION PLACEHOLDER ==========
+// TODO: Future CRM Integration Framework
+// This section will be expanded when integrating with external CRM systems
+
+interface CRMContact {
+  crmId?: string;          // External CRM contact ID
+  crmSystem?: string;      // CRM system name (e.g., 'salesforce', 'hubspot')
+  lastSyncedAt?: Date;     // Last sync timestamp
+  syncStatus?: 'pending' | 'synced' | 'error'; // Sync status
+}
+
+// CRM Integration placeholder functions
+const CRMIntegration = {
+  // TODO: Implement these when connecting to actual CRM
+  syncContactToCRM: async (contact: Contact): Promise<void> => {
+    console.log('CRM Sync placeholder - Contact would be synced to CRM:', contact.name);
+    // Future implementation will send contact data to external CRM
+  },
+  
+  searchCRMContacts: async (searchTerm: string): Promise<Contact[]> => {
+    console.log('CRM Search placeholder - Would search CRM for:', searchTerm);
+    // Future implementation will search external CRM and return results
+    return [];
+  },
+  
+  importFromCRM: async (crmContactId: string): Promise<Contact | null> => {
+    console.log('CRM Import placeholder - Would import contact:', crmContactId);
+    // Future implementation will import contact from external CRM
+    return null;
+  }
+};
+
+// ========== END CRM INTEGRATION PLACEHOLDER ==========
+
 const contactSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Please enter a valid email address"),
@@ -297,6 +331,21 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
           <Button variant="outline" onClick={handleExportCSV} className="border-2 hover:bg-gray-50" data-testid="button-export-csv">
             <Download className="h-4 w-4 mr-2" />
             Export CSV
+          </Button>
+          {/* CRM Integration Placeholder Button */}
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              console.log('CRM Search clicked - Future CRM integration point');
+              // TODO: Implement CRM search when connecting to external CRM
+            }}
+            className="border-2 hover:bg-purple-50 border-purple-200 text-purple-700" 
+            data-testid="button-search-crm"
+            disabled={true}
+            title="CRM Integration - Coming Soon"
+          >
+            <Search className="h-4 w-4 mr-2" />
+            Search CRM
           </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
