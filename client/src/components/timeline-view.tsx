@@ -1138,7 +1138,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                           data-testid="progress-start-marker"
                         >
                           <div className="w-4 h-12 rounded-full shadow-xl bg-gradient-to-b from-green-400 via-green-500 to-green-700 border-2 border-green-300/60 ring-2 ring-green-200/40 hover:scale-110 transition-all duration-300 hover:shadow-2xl" />
-                          <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-gray-50/95 backdrop-blur-sm border-2 border-green-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ring-green-100/60">
+                          <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-gray-50/95 backdrop-blur-sm border-2 border-green-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-[60] ring-1 ring-green-100/60">
                             <div className="text-sm font-bold text-green-700 mb-1">Project Start</div>
                             <div className="text-xs text-gray-600 font-medium">{format(project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date(project.createdAt), 'MMM d, yyyy')}</div>
                             <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-gray-50/95 border-t-2 border-l-2 border-green-200/80 rotate-45"></div>
@@ -1152,7 +1152,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                           data-testid="progress-end-marker"
                         >
                           <div className="w-4 h-12 rounded-full shadow-xl bg-gradient-to-b from-red-400 via-red-500 to-red-700 border-2 border-red-300/60 ring-2 ring-red-200/40 hover:scale-110 transition-all duration-300 hover:shadow-2xl" />
-                          <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-gray-50/95 backdrop-blur-sm border-2 border-red-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ring-red-100/60">
+                          <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-gradient-to-br from-white to-gray-50/95 backdrop-blur-sm border-2 border-red-200/80 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-[60] ring-1 ring-red-100/60">
                             <div className="text-sm font-bold text-red-700 mb-1">Closing Date</div>
                             <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
                             <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-gray-50/95 border-t-2 border-l-2 border-red-200/80 rotate-45"></div>
@@ -1167,7 +1167,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                             data-testid="milestone-psa"
                           >
                             <div className="w-4 h-4 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 rounded-full border-3 border-white shadow-xl hover:scale-150 transition-all duration-300 hover:shadow-2xl ring-2 ring-blue-200/60 hover:ring-blue-300/80" />
-                            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap z-40 shadow-xl ring-1 ring-white/20">
+                            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap z-[60] shadow-xl ring-1 ring-white/20">
                               <div className="font-semibold">PSA Signed</div>
                               <div className="text-xs text-gray-300 mt-1">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
                               <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
@@ -1181,7 +1181,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                             data-testid="milestone-dd-expiration"
                           >
                             <div className="w-4 h-4 bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 rounded-full border-3 border-white shadow-xl hover:scale-150 transition-all duration-300 hover:shadow-2xl ring-2 ring-amber-200/60 hover:ring-amber-300/80" />
-                            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap z-40 shadow-xl ring-1 ring-white/20">
+                            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap z-[60] shadow-xl ring-1 ring-white/20">
                               <div className="font-semibold">DD Expiration</div>
                               <div className="text-xs text-gray-300 mt-1">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
                               <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
@@ -1195,7 +1195,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                             data-testid="milestone-closing"
                           >
                             <div className="w-4 h-4 bg-gradient-to-br from-green-400 via-green-500 to-green-600 rounded-full border-3 border-white shadow-xl hover:scale-150 transition-all duration-300 hover:shadow-2xl ring-2 ring-green-200/60 hover:ring-green-300/80" />
-                            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap z-40 shadow-xl ring-1 ring-white/20">
+                            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap z-[60] shadow-xl ring-1 ring-white/20">
                               <div className="font-semibold">Closing</div>
                               <div className="text-xs text-gray-300 mt-1">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
                               <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
@@ -1217,7 +1217,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                               task.status === 'scheduled' ? 'bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 ring-indigo-200/60 hover:ring-indigo-300/80' :
                               'bg-gradient-to-br from-gray-400 via-gray-500 to-gray-600 ring-gray-200/60 hover:ring-gray-300/80'
                             }`} />
-                            <div className={`absolute top-8 left-1/2 transform -translate-x-1/2 backdrop-blur-sm border-2 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-50 ring-1 ${
+                            <div className={`absolute top-8 left-1/2 transform -translate-x-1/2 backdrop-blur-sm border-2 rounded-xl px-4 py-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap z-[60] ring-1 ${
                               task.status === 'completed' ? 'bg-gradient-to-br from-white to-green-50/95 border-green-200/80 ring-green-100/60' :
                               task.status === 'in_progress' ? 'bg-gradient-to-br from-white to-blue-50/95 border-blue-200/80 ring-blue-100/60' :
                               task.status === 'scheduled' ? 'bg-gradient-to-br from-white to-indigo-50/95 border-indigo-200/80 ring-indigo-100/60' :
