@@ -163,6 +163,9 @@ export const tasks = pgTable("tasks", {
   isGating: boolean("is_gating").notNull().default(false),
   isMilestone: boolean("is_milestone").notNull().default(false),
   ddCategory: ddCategoryEnum("dd_category"),
+  // Archive fields
+  archived: boolean("archived").notNull().default(false),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
