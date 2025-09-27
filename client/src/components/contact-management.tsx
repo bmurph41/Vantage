@@ -466,7 +466,14 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" data-testid="contacts-grid">
           {filteredContacts.map((contact) => (
-            <Card key={contact.id} className="hover:shadow-lg transition-all duration-200 border-0 shadow-sm bg-gradient-to-br from-white to-gray-50/50" data-testid={`contact-card-${contact.id}`}>
+            <Card 
+              key={contact.id} 
+              className={`hover:shadow-lg transition-all duration-200 border-0 shadow-sm bg-gradient-to-br from-white to-gray-50/50 ${
+                contact.type === 'user_contact' ? 'cursor-pointer hover:scale-[1.02]' : ''
+              }`} 
+              data-testid={`contact-card-${contact.id}`}
+              onClick={() => contact.type === 'user_contact' && handleEdit(contact)}
+            >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
