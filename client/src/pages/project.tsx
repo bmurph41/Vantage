@@ -10,6 +10,7 @@ import { TaskOwnersView } from "@/components/task-owners-view";
 import { ProjectIntegrationSettings } from "@/components/project-integration-settings";
 import { AddTaskModal } from "@/components/add-task-modal";
 import { ContactManagement } from "@/components/contact-management";
+import { ArchiveView } from "@/components/archive-view";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import { useProject } from "@/hooks/use-project";
 import { useQuery } from "@tanstack/react-query";
@@ -185,12 +186,7 @@ export default function ProjectPage() {
             <NotificationSettingsPage projectId={project.id} />
           )}
           {activeTab === "archive" && (
-            <div className="space-y-6">
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-4">Archived Tasks</h3>
-                <p className="text-muted-foreground">Archived tasks will be displayed here.</p>
-              </div>
-            </div>
+            <ArchiveView projectId={project.id} />
           )}
         </div>
       </div>
