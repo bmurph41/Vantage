@@ -24,6 +24,7 @@ function Router() {
       <Route path="/user/settings" component={UserSettingsPage} />
       <Route path="/projects/:id" component={ProjectPage} />
       <Route path="/dd/projects/:id" component={ProjectPage} />
+      <Route path="/notifications/:id" component={NotificationSettingsWrapper} />
       <Route path="/projects/:id/notifications" component={NotificationSettingsWrapper} />
       <Route path="/dd/projects/:id/notifications" component={NotificationSettingsWrapper} />
       <Route path="/projects/:id/settings" component={NotificationSettingsWrapper} />
