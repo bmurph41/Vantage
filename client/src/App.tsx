@@ -9,6 +9,7 @@ import NotificationSettingsPage from "@/pages/notification-settings";
 import DDProgressReportPage from "@/pages/dd-progress-report";
 import UserSettingsPage from "@/pages/user-settings";
 import SortableListDemo from "@/pages/demo/SortableListDemo";
+import MilestoneDemo from "@/pages/milestone-demo";
 import NotFound from "@/pages/not-found";
 
 // Wrapper component to handle router props for notification settings
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/dd/projects/:id/progress-report" component={DDProgressReportPage} />
       <Route path="/dd/projects/:id/dd-progress-report" component={DDProgressReportPage} />
       <Route path="/demo/sortable" component={SortableListDemo} />
+      <Route path="/demo/milestone" component={MilestoneDemo} />
       <Route component={NotFound} />
     </Switch>
   );
