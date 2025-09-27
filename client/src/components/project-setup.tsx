@@ -116,7 +116,9 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
     if (referenceDate) {
       if (depositNumber === 1) {
         setFirstDepositReferenceDate(referenceDate);
-        // Calculate and set the final due date immediately if we have days
+        // Always set the due date to the reference date first
+        projectForm.setValue("firstDepositDueDate", referenceDate);
+        // If we have days, calculate and update the due date
         if (firstDepositDays && Number(firstDepositDays) > 0) {
           const calculatedDate = calculateDepositDueDate(referenceDate, Number(firstDepositDays), firstDepositUseBusiness, holidayCalendar);
           if (calculatedDate) {
@@ -125,7 +127,9 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
         }
       } else {
         setSecondDepositReferenceDate(referenceDate);
-        // Calculate and set the final due date immediately if we have days
+        // Always set the due date to the reference date first
+        projectForm.setValue("secondDepositDueDate", referenceDate);
+        // If we have days, calculate and update the due date
         if (secondDepositDays && Number(secondDepositDays) > 0) {
           const calculatedDate = calculateDepositDueDate(referenceDate, Number(secondDepositDays), secondDepositUseBusiness, holidayCalendar);
           if (calculatedDate) {
