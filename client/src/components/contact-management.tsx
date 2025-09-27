@@ -523,6 +523,24 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                           </span>
                         </div>
                       )}
+                      {contact.type === 'user_contact' && contact.role && (
+                        <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+                          <div className="text-sm">
+                            <span className="font-medium text-green-900">Role:</span>
+                            <span className="ml-2 text-green-800" data-testid={`contact-role-${contact.id}`}>
+                              {contactRoles.find(role => role.value === contact.role)?.label || contact.role}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {contact.type === 'user_contact' && contact.company && (
+                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                          <div className="text-sm">
+                            <span className="font-medium text-blue-900">Company:</span>
+                            <span className="ml-2 text-blue-800" data-testid={`contact-user-company-${contact.id}`}>{contact.company}</span>
+                          </div>
+                        </div>
+                      )}
                       {contact.type === 'company_rep' && 'company' in contact && (
                         <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
                           <div className="text-sm">
