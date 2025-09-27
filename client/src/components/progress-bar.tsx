@@ -165,11 +165,13 @@ export function ProgressBar({ task, project, settings, className, onTaskClick, g
       {/* Progress bar spanning from task start to task deadline */}
       <div 
         className={`h-full bg-white rounded-lg overflow-hidden shadow-lg border-2 absolute ring-2 ${
-          isOverdue || remaining <= 5 
-            ? 'border-red-500/80 ring-red-300/60 shadow-red-200' 
-            : remaining >= 6 && remaining <= 14
-              ? 'border-orange-400/80 ring-orange-300/60 shadow-orange-200'
-              : 'border-gray-400/80 ring-gray-300/60'
+          isCompleted 
+            ? 'border-green-600/80 ring-green-300/60 shadow-green-200'
+            : isOverdue || remaining <= 5 
+              ? 'border-red-600/80 ring-red-300/60 shadow-red-200' 
+              : remaining >= 6 && remaining <= 14
+                ? 'border-orange-500/80 ring-orange-300/60 shadow-orange-200'
+                : 'border-blue-600/80 ring-blue-300/60 shadow-blue-200'
         }`}
         style={{
           left: `${barStartPosition}%`,
@@ -180,9 +182,10 @@ export function ProgressBar({ task, project, settings, className, onTaskClick, g
         {elapsedWidth > 0 && (
           <div 
             className={`h-full absolute border-r-4 ${
-              isCompleted ? 'bg-green-600 border-green-800' : 
-              isOverdue ? 'bg-red-600 border-red-800' : 
-              'bg-blue-600 border-blue-800'
+              isCompleted ? 'bg-green-600 border-green-600' : 
+              isOverdue || remaining <= 5 ? 'bg-red-600 border-red-600' : 
+              remaining >= 6 && remaining <= 14 ? 'bg-orange-500 border-orange-500' :
+              'bg-blue-600 border-blue-600'
             }`}
             style={{
               left: '0%',
@@ -210,44 +213,67 @@ export function ProgressBar({ task, project, settings, className, onTaskClick, g
             }}
             data-testid="progress-remaining"
           >
-            {/* Enhanced visual pattern for remaining time */}
+            {/* Enhanced visual pattern for remaining time - Diagonal stripes texture */}
             <div 
-              className={`absolute inset-0 ${
-                isOverdue 
-                  ? 'bg-red-200/40' 
-                  : remaining <= 5
-                    ? 'bg-red-200/40'
-                    : remaining >= 6 && remaining <= 14
-                      ? 'bg-orange-200/40'
-                      : 'bg-blue-200/40'
-              }`}
+              className="absolute inset-0"
               style={{
                 backgroundImage: `repeating-linear-gradient(
-                  45deg,
-                  transparent,
-                  transparent 3px,
-                  rgba(255,255,255,0.6) 3px,
-                  rgba(255,255,255,0.6) 6px
-                ),
-                repeating-linear-gradient(
                   -45deg,
-                  transparent,
-                  transparent 6px,
-                  rgba(255,255,255,0.2) 6px,
-                  rgba(255,255,255,0.2) 12px
-                )`
+                  ${isOverdue 
+                    ? 'rgba(239, 68, 68, 0.8)' 
+                    : remaining <= 5
+                      ? 'rgba(239, 68, 68, 0.8)'
+                      : remaining >= 6 && remaining <= 14
+                        ? 'rgba(249, 115, 22, 0.8)'
+                        : 'rgba(59, 130, 246, 0.8)'
+                  },
+                  ${isOverdue 
+                    ? 'rgba(239, 68, 68, 0.8)' 
+                    : remaining <= 5
+                      ? 'rgba(239, 68, 68, 0.8)'
+                      : remaining >= 6 && remaining <= 14
+                        ? 'rgba(249, 115, 22, 0.8)'
+                        : 'rgba(59, 130, 246, 0.8)'
+                  } 4px,
+                  rgba(255, 255, 255, 0.9) 4px,
+                  rgba(255, 255, 255, 0.9) 8px
+                )`,
+                opacity: 0.7
               }}
             />
             
-            {/* Remaining time indicator overlay */}
+            {/* Additional dotted overlay for extra texture clarity */}
+            <div 
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `radial-gradient(
+                  circle at 25% 25%,
+                  ${isOverdue 
+                    ? 'rgba(185, 28, 28, 0.4)' 
+                    : remaining <= 5
+                      ? 'rgba(185, 28, 28, 0.4)'
+                      : remaining >= 6 && remaining <= 14
+                        ? 'rgba(194, 65, 12, 0.4)'
+                        : 'rgba(37, 99, 235, 0.4)'
+                  } 1px,
+                  transparent 1px
+                )`,
+                backgroundSize: '6px 6px',
+                opacity: 0.6
+              }}
+            />
+            
+            {/* Remaining time indicator overlay with enhanced visibility */}
             {remaining > 0 && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className={`text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm border shadow-sm ${
+                <div className={`text-xs font-bold px-2 py-1 rounded-md backdrop-blur-sm border-2 shadow-lg ${
                   isOverdue 
-                    ? 'bg-red-600/20 border-red-400/30 text-red-800' 
+                    ? 'bg-white/95 border-red-500 text-red-700 ring-2 ring-red-200' 
                     : remaining <= 5
-                      ? 'bg-orange-600/20 border-orange-400/30 text-orange-800'
-                      : 'bg-blue-600/20 border-blue-400/30 text-blue-800'
+                      ? 'bg-white/95 border-red-500 text-red-700 ring-2 ring-red-200'
+                      : remaining >= 6 && remaining <= 14
+                        ? 'bg-white/95 border-orange-500 text-orange-700 ring-2 ring-orange-200'
+                        : 'bg-white/95 border-blue-500 text-blue-700 ring-2 ring-blue-200'
                 }`}>
                   {getTimeLabel(remaining)} left
                 </div>
