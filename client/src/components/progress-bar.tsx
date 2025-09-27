@@ -126,6 +126,11 @@ export function ProgressBar({ task, project, settings, className, onTaskClick, g
     }
   };
 
+  // Hide progress bar completely for completed tasks
+  if (isCompleted) {
+    return null;
+  }
+
   return (
     <div 
       className={cn("h-8 rounded-lg overflow-hidden relative shadow-inner border cursor-pointer hover:shadow-md transition-all duration-200", 
