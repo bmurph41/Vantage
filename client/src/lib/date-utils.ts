@@ -590,3 +590,24 @@ export function getGranularityAwareProgressPositions(
     timelineEnd
   };
 }
+
+// Professional currency formatting function for large amounts
+export function formatLargeCurrency(amount: number): string {
+  if (amount >= 1000000) {
+    // For millions: $1M, $2.1M, etc.
+    const millions = amount / 1000000;
+    return millions % 1 === 0 ? `$${millions.toFixed(0)}M` : `$${millions.toFixed(1)}M`;
+  } else if (amount >= 1000) {
+    // For thousands: $1K, $1.5K, etc.
+    const thousands = amount / 1000;
+    return thousands % 1 === 0 ? `$${thousands.toFixed(0)}K` : `$${thousands.toFixed(1)}K`;
+  } else {
+    // For smaller amounts: regular currency format
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  }
+}

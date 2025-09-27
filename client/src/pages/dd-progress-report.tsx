@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format, differenceInDays, addDays, parseISO, isAfter, isBefore, startOfDay, differenceInCalendarDays } from "date-fns";
-import { tzNow, setDeadlineTo5PM } from "@/lib/date-utils";
+import { tzNow, setDeadlineTo5PM, formatLargeCurrency } from "@/lib/date-utils";
 import { generateWhitePaperPDF } from "@/components/white-paper-export";
 import { generateProgressBriefPDF } from "@/components/progress-brief-export";
 import { 
@@ -760,24 +760,27 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
                   </Badge>
                 </div>
                 <div className="text-3xl font-bold text-gray-900 mb-2">
-                  ${
+                  {
                     (() => {
                       // Determine which deposit is due based on DD expiration date
                       const ddDate = project.ddExpirationDate ? new Date(project.ddExpirationDate) : null;
                       const firstDepositDate = project.firstDepositDueDate ? new Date(project.firstDepositDueDate) : null;
                       const secondDepositDate = project.secondDepositDueDate ? new Date(project.secondDepositDueDate) : null;
                       
+                      let amount = 0;
+                      
                       // Check which deposit is closest to or matches DD expiration
                       if (ddDate && firstDepositDate && Math.abs(ddDate.getTime() - firstDepositDate.getTime()) <= 7 * 24 * 60 * 60 * 1000) {
-                        return project.firstDepositAmount ? (project.firstDepositAmount / 1000).toFixed(0) + 'K' : '0';
+                        amount = project.firstDepositAmount || 0;
                       } else if (ddDate && secondDepositDate && Math.abs(ddDate.getTime() - secondDepositDate.getTime()) <= 7 * 24 * 60 * 60 * 1000) {
-                        return project.secondDepositAmount ? (project.secondDepositAmount / 1000).toFixed(0) + 'K' : '0';
+                        amount = project.secondDepositAmount || 0;
                       } else if (project.firstDepositAmount && (!project.secondDepositAmount || !secondDepositDate)) {
-                        return (project.firstDepositAmount / 1000).toFixed(0) + 'K';
+                        amount = project.firstDepositAmount;
                       } else if (project.secondDepositAmount) {
-                        return (project.secondDepositAmount / 1000).toFixed(0) + 'K';
+                        amount = project.secondDepositAmount;
                       }
-                      return '0';
+                      
+                      return amount > 0 ? formatLargeCurrency(amount) : '$0';
                     })()
                   }
                 </div>
