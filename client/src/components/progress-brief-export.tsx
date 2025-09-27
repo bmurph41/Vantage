@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
   // Footer Section
   footer: {
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: '#EEEEEE', // Light gray section dividers as specified in guidance
     borderTopStyle: 'solid',
     paddingTop: 16,
     marginTop: 32,
@@ -566,9 +566,26 @@ const styles = StyleSheet.create({
   // Separators
   separator: {
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#EEEEEE', // Light gray section dividers as specified in guidance
     borderBottomStyle: 'solid',
     marginVertical: 24,
+  },
+  // Confidentiality Header
+  confidentialHeader: {
+    position: 'absolute',
+    top: 15,
+    left: 54,
+    right: 54,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#003366',
+    backgroundColor: '#f8fafc',
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
 });
 
