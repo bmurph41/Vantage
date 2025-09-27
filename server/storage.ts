@@ -344,7 +344,10 @@ export class DatabaseStorage implements IStorage {
   async getTasksForProject(projectId: string): Promise<Task[]> {
     return db.select()
       .from(tasks)
-      .where(eq(tasks.projectId, projectId))
+      .where(and(
+        eq(tasks.projectId, projectId),
+        eq(tasks.archived, false)
+      ))
       .orderBy(
         sql`CASE WHEN ${tasks.sortOrder} IS NULL THEN 1 ELSE 0 END`, // nulls last
         asc(tasks.sortOrder), // primary sort by sortOrder
@@ -356,7 +359,11 @@ export class DatabaseStorage implements IStorage {
     const assignees = await db
       .selectDistinct({ assignee: tasks.assignee })
       .from(tasks)
-      .where(and(eq(tasks.projectId, projectId), sql`${tasks.assignee} IS NOT NULL AND ${tasks.assignee} != ''`));
+      .where(and(
+        eq(tasks.projectId, projectId), 
+        sql`${tasks.assignee} IS NOT NULL AND ${tasks.assignee} != ''`,
+        eq(tasks.archived, false)
+      ));
 
     // Filter out null or undefined assignees and return only the assignee names
     return assignees
