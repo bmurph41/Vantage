@@ -203,26 +203,27 @@ const calculateComprehensiveMetrics = (project: Project, tasks: Task[]): Project
   };
 };
 
-// Comprehensive styles matching the page design
+// Clean, professional PDF styling
 const styles = StyleSheet.create({
   page: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 54, // 0.75 inch margins as specified in guidance
+    paddingHorizontal: 54,
     paddingVertical: 54,
     fontFamily: 'Helvetica',
-    fontSize: 11, // Size 11 as specified in guidance
-    lineHeight: 1.4,
+    fontSize: 11,
+    lineHeight: 1.5,
+    color: '#374151',
   },
   
-  // Header Section - matching the blue gradient design
+  // Clean header section
   header: {
-    backgroundColor: '#003366', // Dark blue as specified in guidance
+    backgroundColor: '#003366',
     color: '#ffffff',
     paddingHorizontal: 54,
-    paddingVertical: 32,
+    paddingVertical: 28,
     marginHorizontal: -54,
     marginTop: -54,
-    marginBottom: 32,
+    marginBottom: 24,
   },
   headerContent: {
     display: 'flex',
@@ -235,144 +236,129 @@ const styles = StyleSheet.create({
   },
   headerBrief: {
     fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 1.5,
+    fontWeight: 'medium',
+    letterSpacing: 1,
     textTransform: 'uppercase',
-    marginBottom: 8,
+    marginBottom: 6,
+    opacity: 0.8,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    marginBottom: 8,
+    letterSpacing: 0.5,
+    marginBottom: 6,
   },
   headerSubtitle: {
-    fontSize: 14,
-    opacity: 0.9,
-    marginTop: 8,
+    fontSize: 13,
+    opacity: 0.85,
+    marginTop: 6,
   },
   headerRight: {
     textAlign: 'right',
   },
   headerDate: {
     fontSize: 10,
-    fontWeight: 'medium',
-    opacity: 0.9,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 8,
+    fontWeight: 'normal',
+    opacity: 0.8,
+    marginBottom: 6,
   },
   headerPercent: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   headerComplete: {
     fontSize: 10,
-    opacity: 0.75,
+    opacity: 0.7,
   },
 
-  // Section Headers
+  // Clean section headers
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#003366',
     marginBottom: 16,
-    marginTop: 32,
+    marginTop: 28,
   },
   
-  // Executive Insights Section
+  // Clean insights section
   insightsGrid: {
     display: 'flex',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   insightBox: {
     width: '48%',
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginBottom: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    marginBottom: 10,
+    borderRadius: 4,
+    backgroundColor: '#f9fafb',
   },
   insightBoxPerformance: {
-    backgroundColor: '#dbeafe',
-    borderLeftWidth: 4,
-    borderLeftColor: '#003366', // Dark blue as specified in guidance
-    borderLeftStyle: 'solid',
+    backgroundColor: '#f0f9ff',
   },
   insightBoxTimeline: {
-    backgroundColor: '#fed7aa',
-    borderLeftWidth: 4,
-    borderLeftColor: '#003366', // Dark blue as specified in guidance
-    borderLeftStyle: 'solid',
+    backgroundColor: '#fffbeb',
   },
   insightBoxRisk: {
-    backgroundColor: '#dcfce7',
-    borderLeftWidth: 4,
-    borderLeftColor: '#003366', // Dark blue as specified in guidance
-    borderLeftStyle: 'solid',
+    backgroundColor: '#f0fdf4',
   },
   insightBoxMarket: {
-    backgroundColor: '#d1fae5',
-    borderLeftWidth: 4,
-    borderLeftColor: '#003366', // Dark blue as specified in guidance
-    borderLeftStyle: 'solid',
+    backgroundColor: '#f9fafb',
   },
   insightHeader: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 6,
+    color: '#1f2937',
   },
   insightText: {
     fontSize: 9,
-    color: '#374151',
+    color: '#4b5563',
     lineHeight: 1.4,
   },
 
-  // Performance Metrics Section
+  // Clean metrics section
   metricsGrid: {
     display: 'flex',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   metricCard: {
-    width: '31%',
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderStyle: 'solid',
+    width: '32%',
+    backgroundColor: '#f9fafb',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 4,
     textAlign: 'center',
     marginBottom: 8,
   },
   metricNumber: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   metricLabel: {
     fontSize: 9,
-    color: '#64748b',
+    color: '#6b7280',
     textTransform: 'uppercase',
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
+    fontWeight: 'normal',
+    letterSpacing: 0.3,
   },
-  metricCompleted: { color: '#2563eb' },
-  metricInProgress: { color: '#eab308' },
-  metricEngaged: { color: '#16a34a' },
-  metricNotStarted: { color: '#64748b' },
+  metricCompleted: { color: '#059669' },
+  metricInProgress: { color: '#d97706' },
+  metricEngaged: { color: '#2563eb' },
+  metricNotStarted: { color: '#6b7280' },
   metricOverdue: { color: '#dc2626' },
-  metricDaysLeft: { color: '#f97316' },
+  metricDaysLeft: { color: '#ea580c' },
 
-  // Progress Visualization Section
+  // Clean progress visualization
   progressSection: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   progressGrid: {
     display: 'flex',
@@ -381,24 +367,21 @@ const styles = StyleSheet.create({
   },
   progressCard: {
     width: '48%',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f9fafb',
     padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderStyle: 'solid',
+    borderRadius: 4,
   },
   progressCardTitle: {
     fontSize: 12,
     fontWeight: 'medium',
-    color: '#374151',
-    marginBottom: 12,
+    color: '#1f2937',
+    marginBottom: 10,
   },
   progressInfo: {
     display: 'flex',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   progressLabel: {
     fontSize: 10,
@@ -407,35 +390,35 @@ const styles = StyleSheet.create({
   progressValue: {
     fontSize: 10,
     fontWeight: 'medium',
-    color: '#111827',
+    color: '#1f2937',
   },
   progressBarContainer: {
-    height: 12,
+    height: 8,
     backgroundColor: '#e5e7eb',
-    borderRadius: 6,
+    borderRadius: 4,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#003366',
   },
   progressDetail: {
     fontSize: 8,
-    color: '#6b7280',
+    color: '#9ca3af',
   },
 
-  // Task Timeline Section (simplified for PDF)
+  // Clean timeline section
   timelineSection: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   timelineCategory: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   timelineCategoryTitle: {
     fontSize: 12,
     fontWeight: 'medium',
-    color: '#374151',
+    color: '#1f2937',
     marginBottom: 8,
   },
   timelineTask: {
@@ -445,24 +428,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
     paddingHorizontal: 12,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderStyle: 'solid',
-    borderRadius: 6,
-    marginBottom: 4,
+    backgroundColor: '#f9fafb',
+    borderRadius: 4,
+    marginBottom: 3,
   },
   timelineTaskTitle: {
     fontSize: 10,
-    color: '#374151',
+    color: '#4b5563',
     flex: 1,
   },
   timelineTaskStatus: {
     fontSize: 8,
-    fontWeight: 'bold',
+    fontWeight: 'medium',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 3,
+    borderRadius: 2,
     textTransform: 'uppercase',
     marginRight: 8,
   },
