@@ -41,7 +41,7 @@ export interface IStorage {
 
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
-  getTasksForProject(projectId: string): Promise<Task[]>;
+  getTasksForProject(projectId: string, includeArchived?: boolean): Promise<Task[]>;
   getProjectAssignees(projectId: string): Promise<string[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, updates: Partial<InsertTask>): Promise<Task>;
@@ -341,13 +341,16 @@ export class DatabaseStorage implements IStorage {
     return task || undefined;
   }
 
-  async getTasksForProject(projectId: string): Promise<Task[]> {
+  async getTasksForProject(projectId: string, includeArchived: boolean = false): Promise<Task[]> {
+    const whereConditions = [eq(tasks.projectId, projectId)];
+    
+    if (!includeArchived) {
+      whereConditions.push(eq(tasks.archived, false));
+    }
+
     return db.select()
       .from(tasks)
-      .where(and(
-        eq(tasks.projectId, projectId),
-        eq(tasks.archived, false)
-      ))
+      .where(and(...whereConditions))
       .orderBy(
         sql`CASE WHEN ${tasks.sortOrder} IS NULL THEN 1 ELSE 0 END`, // nulls last
         asc(tasks.sortOrder), // primary sort by sortOrder

@@ -22,7 +22,7 @@ export function ArchiveView({ projectId }: ArchiveViewProps) {
   const { data: archivedTasks = [], isLoading, error } = useQuery<Task[]>({
     queryKey: ['/api/dd/projects', projectId, 'tasks', 'archived'],
     queryFn: async () => {
-      const response = await fetch(`/api/dd/projects/${projectId}/tasks`);
+      const response = await fetch(`/api/dd/projects/${projectId}/tasks?includeArchived=true`);
       if (!response.ok) {
         throw new Error('Failed to fetch tasks');
       }

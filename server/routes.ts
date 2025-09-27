@@ -350,7 +350,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tasks
   app.get("/api/dd/projects/:projectId/tasks", async (req: any, res) => {
     try {
-      const tasks = await storage.getTasksForProject(req.params.projectId);
+      const includeArchived = req.query.includeArchived === 'true';
+      const tasks = await storage.getTasksForProject(req.params.projectId, includeArchived);
       res.json(tasks);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch tasks" });
