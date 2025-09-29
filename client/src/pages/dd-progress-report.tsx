@@ -611,13 +611,11 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
             <div className="text-sm font-medium opacity-90 uppercase tracking-wide mb-2">
               {format(currentDate, 'MMMM yyyy').toUpperCase()}
             </div>
-            {metrics.ddEndDate && (
-              <div className="bg-white bg-opacity-20 rounded-lg p-3 mb-3">
-                <div className="text-xs uppercase tracking-wide opacity-75 mb-1">DD Expiration</div>
-                <div className="text-lg font-bold">{format(metrics.ddEndDate, 'MMM d')}</div>
-                <div className="text-xs opacity-75">{metrics.daysRemainingToDD} days</div>
-              </div>
-            )}
+            <div className="bg-white bg-opacity-20 rounded-lg p-3 mb-3">
+              <div className="text-xs uppercase tracking-wide opacity-75 mb-1">Days Remaining</div>
+              <div className="text-lg font-bold">{metrics.daysRemaining}</div>
+              <div className="text-xs opacity-75">Until Closing</div>
+            </div>
             <div className="bg-white bg-opacity-20 rounded-lg p-3">
               <div className="text-xs uppercase tracking-wide opacity-75 mb-1">Overall Progress</div>
               <div className="text-2xl font-bold">{metrics.completionRate}%</div>
@@ -676,41 +674,63 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
               </CardContent>
             </Card>
 
-            {/* Card 2: Days Remaining */}
+            {/* Card 2: DD Expiration */}
             <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
               <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`p-3 rounded-full ${
-                    metrics.daysRemaining > 30 ? 'bg-slate-100' :
-                    metrics.daysRemaining > 14 ? 'bg-amber-50' :
-                    'bg-red-50'
-                  }`}>
-                    <Calendar className={`h-6 w-6 ${
-                      metrics.daysRemaining > 30 ? 'text-slate-600' :
-                      metrics.daysRemaining > 14 ? 'text-amber-600' :
-                      'text-red-600'
-                    }`} />
-                  </div>
-                  <Badge className={`rounded-full text-xs ${
-                    metrics.daysRemaining > 30 ? 'bg-slate-50 text-slate-700 border border-slate-200' :
-                    metrics.daysRemaining > 14 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                    'bg-red-50 text-red-700 border border-red-100'
-                  }`}>
-                    {metrics.daysRemaining > 30 ? 'Comfortable' :
-                     metrics.daysRemaining > 14 ? 'Moderate' : 'Urgent'}
-                  </Badge>
-                </div>
-                <div className="text-3xl font-bold text-gray-900 mb-2">
-                  {metrics.daysRemaining}
-                </div>
-                <div className="text-sm font-medium text-gray-600 mb-1">Days Remaining</div>
-                <div className={`text-xs ${
-                  metrics.daysRemaining > 30 ? 'text-slate-600' :
-                  metrics.daysRemaining > 14 ? 'text-amber-600' :
-                  'text-red-600'
-                }`}>
-                  Until Closing
-                </div>
+                {metrics.ddEndDate ? (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={`p-3 rounded-full ${
+                        metrics.daysRemainingToDD && metrics.daysRemainingToDD <= 7 ? 'bg-red-50' :
+                        metrics.daysRemainingToDD && metrics.daysRemainingToDD <= 14 ? 'bg-amber-50' :
+                        'bg-slate-100'
+                      }`}>
+                        <Calendar className={`h-6 w-6 ${
+                          metrics.daysRemainingToDD && metrics.daysRemainingToDD <= 7 ? 'text-red-600' :
+                          metrics.daysRemainingToDD && metrics.daysRemainingToDD <= 14 ? 'text-amber-600' :
+                          'text-slate-600'
+                        }`} />
+                      </div>
+                      <Badge className={`rounded-full text-xs ${
+                        metrics.daysRemainingToDD && metrics.daysRemainingToDD <= 7 ? 'bg-red-50 text-red-700 border border-red-100' :
+                        metrics.daysRemainingToDD && metrics.daysRemainingToDD <= 14 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                        'bg-slate-50 text-slate-700 border border-slate-200'
+                      }`}>
+                        {metrics.daysRemainingToDD && metrics.daysRemainingToDD <= 7 ? 'Urgent' :
+                         metrics.daysRemainingToDD && metrics.daysRemainingToDD <= 14 ? 'Soon' : 'Scheduled'}
+                      </Badge>
+                    </div>
+                    <div className="text-3xl font-bold text-gray-900 mb-2">
+                      {metrics.daysRemainingToDD || 0}
+                    </div>
+                    <div className="text-sm font-medium text-gray-600 mb-1">DD Expiration</div>
+                    <div className={`text-xs ${
+                      metrics.daysRemainingToDD && metrics.daysRemainingToDD <= 7 ? 'text-red-600' :
+                      metrics.daysRemainingToDD && metrics.daysRemainingToDD <= 14 ? 'text-amber-600' :
+                      'text-slate-600'
+                    }`}>
+                      {format(metrics.ddEndDate, 'MMM d, yyyy')}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="p-3 rounded-full bg-slate-100">
+                        <Calendar className="h-6 w-6 text-slate-600" />
+                      </div>
+                      <Badge className="rounded-full text-xs bg-slate-50 text-slate-700 border border-slate-200">
+                        Not Set
+                      </Badge>
+                    </div>
+                    <div className="text-3xl font-bold text-gray-900 mb-2">
+                      --
+                    </div>
+                    <div className="text-sm font-medium text-gray-600 mb-1">DD Expiration</div>
+                    <div className="text-xs text-slate-600">
+                      No Date Set
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
