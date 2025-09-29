@@ -31,10 +31,6 @@ localPort = 41917
 externalPort = 5173
 
 [[ports]]
-localPort = 42643
-externalPort = 6000
-
-[[ports]]
 localPort = 43961
 externalPort = 3002
 
@@ -71,4 +67,4 @@ args = "npm run dev"
 waitForPort = 5000
 
 [agent]
-integrations = ["javascript_database:1.0.0", "javascript_supabase:1.0.0", "javascript_mem_db:1.0.0", "javascript_sendgrid:1.0.0", "google-calendar:1.0.0"]
+integrations = ["javascript_database:1.0.0", "javascript_supabase:1.0.0", "javascript_mem_db:1.0.0", "javascript_sendgrid:1.0.0", "google-calendar:1.0.0", "javascript_openai:1.0.0"]
