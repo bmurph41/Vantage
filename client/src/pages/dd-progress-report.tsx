@@ -139,7 +139,18 @@ export default function DDProgressReportPage() {
   });
 
   // Fetch AI risk analysis
-  const { data: aiRiskAnalysis = null } = useQuery({
+  const { data: aiRiskAnalysis = null } = useQuery<{
+    overallRiskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    riskSummary: string;
+    categoryInsights: Array<{
+      category: string;
+      count: number;
+      riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      insight: string;
+    }>;
+    recommendations: string[];
+    criticalFactors: string[];
+  }>({
     queryKey: ['/api/dd/projects', projectId, 'risks', 'ai-analysis'],
     enabled: !!projectId,
   });
