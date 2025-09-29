@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { TaskFiles } from "./task-files";
 import ContactModal, { type ContactPayload } from "./ContactModal";
+import ContactDetailsModal from "./ContactDetailsModal";
 import type { Contact, Task } from "@shared/schema";
 
 // ========== CRM INTEGRATION PLACEHOLDER ==========
@@ -112,6 +113,7 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [viewingContact, setViewingContact] = useState<any | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -396,11 +398,9 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
           {filteredContacts.map((contact) => (
             <Card 
               key={contact.id} 
-              className={`hover:shadow-lg transition-all duration-200 border-0 shadow-sm bg-gradient-to-br from-white to-gray-50/50 ${
-                contact.type === 'user_contact' ? 'cursor-pointer hover:scale-[1.02]' : ''
-              }`} 
+              className="hover:shadow-lg transition-all duration-200 border-0 shadow-sm bg-gradient-to-br from-white to-gray-50/50 cursor-pointer hover:scale-[1.02]" 
               data-testid={`contact-card-${contact.id}`}
-              onClick={() => contact.type === 'user_contact' && handleEdit(contact)}
+              onClick={() => setViewingContact(contact)}
             >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
@@ -511,7 +511,10 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => handleEdit(contact)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(contact);
+                          }}
                           data-testid={`button-edit-${contact.id}`}
                         >
                           <Edit className="h-3 w-3" />
@@ -524,6 +527,7 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
                           size="sm" 
                           className="text-destructive hover:text-destructive"
                           data-testid={`button-delete-${contact.id}`}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -559,7 +563,7 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
 
       {/* Summary */}
       <div className="text-sm text-muted-foreground text-center pt-4" data-testid="contacts-summary">
-        Showing {filteredContacts.length} of {contacts.length} Contacts
+        Showing {filteredContacts.length} of {allContacts.length} Contacts
       </div>
 
       {/* Contact Modals */}
@@ -579,6 +583,19 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
         onSave={(payload) => {
           handleModalSave(payload);
           setEditingContact(null);
+        }}
+      />
+
+      {/* Contact Details Modal */}
+      <ContactDetailsModal
+        open={!!viewingContact}
+        onClose={() => setViewingContact(null)}
+        contact={viewingContact}
+        onEdit={() => {
+          if (viewingContact?.type === 'user_contact') {
+            setEditingContact(viewingContact);
+            setViewingContact(null);
+          }
         }}
       />
     </div>
