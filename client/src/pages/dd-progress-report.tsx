@@ -241,7 +241,7 @@ export default function DDProgressReportPage() {
 
       {/* Report Content */}
       <div className="max-w-5xl mx-auto p-6">
-        <DDProgressReport project={project} tasks={tasks} />
+        <DDProgressReport project={project} tasks={tasks} aiRiskAnalysis={aiRiskAnalysis} />
       </div>
     </div>
   );
@@ -250,6 +250,18 @@ export default function DDProgressReportPage() {
 interface DDProgressReportProps {
   project: Project;
   tasks: Task[];
+  aiRiskAnalysis: {
+    overallRiskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    riskSummary: string;
+    categoryInsights: Array<{
+      category: string;
+      count: number;
+      riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      insight: string;
+    }>;
+    recommendations: string[];
+    criticalFactors: string[];
+  } | null;
 }
 
 // AI Narration System - Define proper metrics interface
@@ -414,7 +426,7 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
   );
 }
 
-function DDProgressReport({ project, tasks }: DDProgressReportProps) {
+function DDProgressReport({ project, tasks, aiRiskAnalysis }: DDProgressReportProps) {
   const currentDate = tzNow('America/New_York');
   const [showDDDeadline, setShowDDDeadline] = useState(false);
   const { toast } = useToast();
