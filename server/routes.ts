@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { resolveRecipient } from "@shared/recipient-utils";
+import { AIRiskAnalyzer } from "./ai-risk-analyzer";
 import { assigneeSubscriptionManager } from "./assignee-subscription-manager";
 import { reconciliationService } from "./reconciliation-service";
 import { 
@@ -1457,6 +1458,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching risk analytics:", error);
       res.status(500).json({ error: "Failed to fetch risk analytics" });
+    }
+  });
+
+  // Get AI-powered risk analysis
+  app.get("/api/dd/projects/:id/risks/ai-analysis", async (req: any, res) => {
+    try {
+      const projectId = req.params.id;
+      
+      // Get project data
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      // Get risks and tasks
+      const [risks, tasks] = await Promise.all([
+        storage.getRisksForProject(projectId),
+        storage.getTasksForProject(projectId)
+      ]);
+
+      // Calculate metrics
+      const currentDate = new Date();
+      const closingDate = project.closingDate ? new Date(project.closingDate) : null;
+      const daysRemaining = closingDate ? Math.max(0, Math.ceil((closingDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24))) : 30;
+      
+      const completedTasks = tasks.filter(task => task.status === 'completed').length;
+      const completionRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+      
+      const overdueTasks = tasks.filter(task => {
+        if (task.status === 'completed') return false;
+        const deadline = new Date(task.deadline);
+        return deadline < currentDate;
+      }).length;
+
+      // Initialize AI analyzer
+      const aiAnalyzer = new AIRiskAnalyzer();
+      
+      // Perform AI analysis
+      const analysis = await aiAnalyzer.analyzeRisks({
+        project,
+        risks,
+        tasks,
+        daysRemaining,
+        completionRate,
+        overdueTasks
+      });
+
+      res.json(analysis);
+    } catch (error) {
+      console.error("Error performing AI risk analysis:", error);
+      res.status(500).json({ error: "Failed to perform AI risk analysis" });
     }
   });
 

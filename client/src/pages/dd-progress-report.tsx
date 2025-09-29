@@ -138,6 +138,12 @@ export default function DDProgressReportPage() {
     enabled: !!projectId,
   });
 
+  // Fetch AI risk analysis
+  const { data: aiRiskAnalysis = null } = useQuery({
+    queryKey: ['/api/dd/projects', projectId, 'risks', 'ai-analysis'],
+    enabled: !!projectId,
+  });
+
   // Fetch contacts data for team contact modal
   const { data: contacts = [] } = useQuery<Contact[]>({
     queryKey: ['/api/dd/contacts'],
@@ -1166,30 +1172,151 @@ function DDProgressReport({ project, tasks }: DDProgressReportProps) {
                 </Card>
               </div>
               
-              {/* Risk Distribution */}
-              {metrics.overdueTasks === 0 && metrics.highRiskTasks === 0 ? (
-                <div className="mt-6 p-6 bg-emerald-50 border border-emerald-200 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-emerald-100 rounded-full">
-                      <CheckCircle className="h-5 w-5 text-emerald-600" />
+              {/* AI-Powered Risk Analysis */}
+              {aiRiskAnalysis ? (
+                <div className="mt-6 space-y-4">
+                  {/* Overall Risk Assessment */}
+                  <div className={`p-6 rounded-lg border-2 ${
+                    aiRiskAnalysis.overallRiskLevel === 'CRITICAL' ? 'bg-red-50 border-red-200' :
+                    aiRiskAnalysis.overallRiskLevel === 'HIGH' ? 'bg-amber-50 border-amber-200' :
+                    aiRiskAnalysis.overallRiskLevel === 'MEDIUM' ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-emerald-50 border-emerald-200'
+                  }`}>
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className={`p-3 rounded-full ${
+                        aiRiskAnalysis.overallRiskLevel === 'CRITICAL' ? 'bg-red-100' :
+                        aiRiskAnalysis.overallRiskLevel === 'HIGH' ? 'bg-amber-100' :
+                        aiRiskAnalysis.overallRiskLevel === 'MEDIUM' ? 'bg-yellow-100' :
+                        'bg-emerald-100'
+                      }`}>
+                        <Zap className={`h-6 w-6 ${
+                          aiRiskAnalysis.overallRiskLevel === 'CRITICAL' ? 'text-red-600' :
+                          aiRiskAnalysis.overallRiskLevel === 'HIGH' ? 'text-amber-600' :
+                          aiRiskAnalysis.overallRiskLevel === 'MEDIUM' ? 'text-yellow-600' :
+                          'text-emerald-600'
+                        }`} />
+                      </div>
+                      <div>
+                        <div className={`text-lg font-semibold ${
+                          aiRiskAnalysis.overallRiskLevel === 'CRITICAL' ? 'text-red-900' :
+                          aiRiskAnalysis.overallRiskLevel === 'HIGH' ? 'text-amber-900' :
+                          aiRiskAnalysis.overallRiskLevel === 'MEDIUM' ? 'text-yellow-900' :
+                          'text-emerald-900'
+                        }`}>
+                          AI Risk Assessment: {aiRiskAnalysis.overallRiskLevel}
+                        </div>
+                        <Badge className={`${
+                          aiRiskAnalysis.overallRiskLevel === 'CRITICAL' ? 'bg-red-100 text-red-800' :
+                          aiRiskAnalysis.overallRiskLevel === 'HIGH' ? 'bg-amber-100 text-amber-800' :
+                          aiRiskAnalysis.overallRiskLevel === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          AI-Powered Analysis
+                        </Badge>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-lg font-semibold text-emerald-900">Excellent Risk Management</div>
-                      <div className="text-sm text-emerald-700">All project deliverables are on track with no critical risks identified. Continue maintaining current execution standards.</div>
-                    </div>
+                    <p className={`text-sm leading-relaxed ${
+                      aiRiskAnalysis.overallRiskLevel === 'CRITICAL' ? 'text-red-700' :
+                      aiRiskAnalysis.overallRiskLevel === 'HIGH' ? 'text-amber-700' :
+                      aiRiskAnalysis.overallRiskLevel === 'MEDIUM' ? 'text-yellow-700' :
+                      'text-emerald-700'
+                    }`}>
+                      {aiRiskAnalysis.riskSummary}
+                    </p>
                   </div>
+
+                  {/* Category Insights */}
+                  {aiRiskAnalysis.categoryInsights && aiRiskAnalysis.categoryInsights.length > 0 && (
+                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <BarChart3 className="h-5 w-5 mr-2" />
+                        Risk Category Analysis
+                      </h4>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        {aiRiskAnalysis.categoryInsights.map((insight, index) => (
+                          <div key={index} className={`p-4 rounded-lg border ${
+                            insight.riskLevel === 'CRITICAL' ? 'bg-red-50 border-red-200' :
+                            insight.riskLevel === 'HIGH' ? 'bg-amber-50 border-amber-200' :
+                            insight.riskLevel === 'MEDIUM' ? 'bg-yellow-50 border-yellow-200' :
+                            'bg-emerald-50 border-emerald-200'
+                          }`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-gray-900 capitalize">{insight.category}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {insight.count} risk{insight.count !== 1 ? 's' : ''}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-gray-700">{insight.insight}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recommendations */}
+                  {aiRiskAnalysis.recommendations && aiRiskAnalysis.recommendations.length > 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                      <h4 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+                        <Target className="h-5 w-5 mr-2" />
+                        AI Recommendations
+                      </h4>
+                      <ul className="space-y-2">
+                        {aiRiskAnalysis.recommendations.map((recommendation, index) => (
+                          <li key={index} className="flex items-start space-x-2 text-sm text-blue-800">
+                            <ChevronRight className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            <span>{recommendation}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Critical Factors */}
+                  {aiRiskAnalysis.criticalFactors && aiRiskAnalysis.criticalFactors.length > 0 && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <Shield className="h-5 w-5 mr-2" />
+                        Critical Success Factors
+                      </h4>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        {aiRiskAnalysis.criticalFactors.map((factor, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                            <span className="text-sm text-gray-700">{factor}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="mt-6 p-6 bg-amber-50 border border-amber-200 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-amber-100 rounded-full">
-                      <AlertTriangle className="h-5 w-5 text-amber-600" />
+                /* Fallback to basic risk analysis */
+                <div className="mt-6">
+                  {metrics.overdueTasks === 0 && metrics.highRiskTasks === 0 ? (
+                    <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-emerald-100 rounded-full">
+                          <CheckCircle className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-semibold text-emerald-900">Excellent Risk Management</div>
+                          <div className="text-sm text-emerald-700">All project deliverables are on track with no critical risks identified. Continue maintaining current execution standards.</div>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-lg font-semibold text-amber-900">Risk Mitigation Required</div>
-                      <div className="text-sm text-amber-700">Immediate attention needed for overdue tasks and high-priority items to maintain project timeline integrity.</div>
+                  ) : (
+                    <div className="p-6 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-amber-100 rounded-full">
+                          <AlertTriangle className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-semibold text-amber-900">Risk Mitigation Required</div>
+                          <div className="text-sm text-amber-700">Immediate attention needed for overdue tasks and high-priority items to maintain project timeline integrity.</div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
