@@ -148,7 +148,7 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/contacts'] });
       setIsAddDialogOpen(false);
-      form.reset();
+      // Form reset handled by ContactModal
       toast({
         title: "Success",
         description: "Contact added successfully",
@@ -172,7 +172,7 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/contacts'] });
       setEditingContact(null);
-      form.reset();
+      // Form reset handled by ContactModal
       toast({
         title: "Success",
         description: "Contact updated successfully",
@@ -309,7 +309,7 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
   const filteredContacts = allContacts.filter(contact =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ('company' in contact && contact.company.toLowerCase().includes(searchTerm.toLowerCase()))
+    ('company' in contact && contact.company?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   if (isLoading || tasksLoading) {
