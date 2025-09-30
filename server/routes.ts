@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { resolveRecipient } from "@shared/recipient-utils";
 import { AIRiskAnalyzer } from "./ai-risk-analyzer";
+import { AINotesEnhancer } from "./ai-notes-enhancer";
 import { assigneeSubscriptionManager } from "./assignee-subscription-manager";
 import { reconciliationService } from "./reconciliation-service";
 import { 
@@ -1509,6 +1510,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error performing AI risk analysis:", error);
       res.status(500).json({ error: "Failed to perform AI risk analysis" });
+    }
+  });
+
+  // === EXECUTIVE NOTES API ===
+  
+  // Update executive notes for a project
+  app.patch("/api/dd/projects/:id/executive-notes", async (req: any, res) => {
+    try {
+      const { executiveNotes } = req.body;
+      const projectId = req.params.id;
+      
+      // Update the project with new notes
+      const updatedProject = await storage.updateProject(projectId, { executiveNotes });
+      
+      res.json({ success: true, executiveNotes: updatedProject.executiveNotes });
+    } catch (error) {
+      console.error("Error updating executive notes:", error);
+      res.status(500).json({ error: "Failed to update executive notes" });
+    }
+  });
+
+  // Get AI-enhanced narrative from executive notes
+  app.get("/api/dd/projects/:id/executive-notes/ai-enhanced", async (req: any, res) => {
+    try {
+      const projectId = req.params.id;
+      
+      // Get project data
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      // Get tasks
+      const tasks = await storage.getTasksForProject(projectId);
+
+      // Calculate metrics
+      const currentDate = new Date();
+      const closingDate = project.closingDate ? new Date(project.closingDate) : null;
+      const daysRemaining = closingDate ? Math.max(0, Math.ceil((closingDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24))) : 30;
+      
+      const completedTasks = tasks.filter(task => task.status === 'completed').length;
+      const completionRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+      
+      const overdueTasks = tasks.filter(task => {
+        if (task.status === 'completed') return false;
+        if (!task.deadline) return false;
+        const deadline = new Date(task.deadline);
+        return deadline < currentDate;
+      }).length;
+
+      // Initialize AI enhancer
+      const aiEnhancer = new AINotesEnhancer();
+      
+      // Perform AI enhancement
+      const enhancement = await aiEnhancer.enhanceNotes({
+        project,
+        tasks,
+        userNotes: project.executiveNotes || '',
+        completionRate,
+        daysRemaining,
+        overdueTasks,
+        totalTasks: tasks.length
+      });
+
+      res.json(enhancement);
+    } catch (error) {
+      console.error("Error enhancing executive notes:", error);
+      res.status(500).json({ error: "Failed to enhance executive notes" });
     }
   });
 
