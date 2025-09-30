@@ -403,7 +403,7 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
                           style={{ left: `${getTaskPosition(task.deadline)}%` }}
                         />
                       </TooltipTrigger>
-                      <TooltipContent>
+                      <TooltipContent className="z-50">
                         <p className="font-medium">{task.title}</p>
                         <p className="text-xs opacity-90">Due: {format(setDeadlineTo5PM(task.deadline), 'MMM d, yyyy')}</p>
                         <p className="text-xs opacity-90 capitalize">Status: {task.status.replace('_', ' ')}</p>
