@@ -17,7 +17,7 @@ import { AddTaskModal } from "@/components/add-task-modal";
 import { TimelineNotes } from "@/components/timeline-notes";
 import { ExportReportModal } from "@/components/export-report-modal";
 import { CompanyDetailsModal } from "@/components/company-details-modal";
-import { differenceInDays, parseISO, format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, isToday, isPast, isFuture } from "date-fns";
+import { differenceInCalendarDays, parseISO, format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, isToday, isPast, isFuture } from "date-fns";
 import { tzNow, setDeadlineTo5PM } from "@/lib/date-utils";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
@@ -130,7 +130,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     const deadlineDate = calculateDeadlineDate(task);
     
     // Calculate days remaining
-    const daysRemaining = differenceInDays(deadlineDate, today);
+    const daysRemaining = differenceInCalendarDays(deadlineDate, today);
     
     // Return "Overdue" if negative, otherwise return the number of days
     return daysRemaining < 0 ? "Overdue" : daysRemaining;
@@ -178,10 +178,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     const taskDeadlineDate = calculateDeadlineDate(task);
     
     // Calculate total days for this task
-    const totalDays = differenceInDays(taskDeadlineDate, taskStartDate);
+    const totalDays = differenceInCalendarDays(taskDeadlineDate, taskStartDate);
     
     // Calculate elapsed days
-    const elapsedDays = differenceInDays(today, taskStartDate);
+    const elapsedDays = differenceInCalendarDays(today, taskStartDate);
     
     // Calculate progress percentage
     if (totalDays <= 0) return 0;
