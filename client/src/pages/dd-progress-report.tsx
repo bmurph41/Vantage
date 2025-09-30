@@ -463,23 +463,23 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
           <h4 className="font-medium text-gray-800 text-sm">{category}</h4>
           <div className="space-y-1">
             {categoryTasks.map(task => (
-              <div key={task.id} className="bg-white border rounded-lg p-3">
+              <div key={task.id} className="bg-white border rounded-lg p-3 overflow-visible">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-900">{task.title}</span>
                   <Badge variant={task.status === 'completed' ? 'default' : task.status === 'in_progress' ? 'secondary' : 'outline'}>
                     {task.status.replace('_', ' ')}
                   </Badge>
                 </div>
-                <div className="relative h-2 bg-gray-100 rounded-full">
+                <div className="relative h-2 bg-gray-100 rounded-full overflow-visible">
                   {task.deadline && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div 
-                          className={`absolute h-full w-3 rounded-full cursor-pointer ${getStatusColor(task.status)}`}
+                          className={`absolute h-full w-3 rounded-full cursor-pointer ${getStatusColor(task.status)} z-10`}
                           style={{ left: `${getTaskPosition(task.deadline)}%` }}
                         />
                       </TooltipTrigger>
-                      <TooltipContent className="z-50">
+                      <TooltipContent className="z-[9999]">
                         <p className="font-medium">{task.title}</p>
                         <p className="text-xs opacity-90">Due: {format(setDeadlineTo5PM(task.deadline), 'MMM d, yyyy')}</p>
                         <p className="text-xs opacity-90 capitalize">Status: {task.status.replace('_', ' ')}</p>
