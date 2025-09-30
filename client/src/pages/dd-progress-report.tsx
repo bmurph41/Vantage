@@ -322,7 +322,7 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
   const projectStartDate = project.psaSignedDate ? startOfDayEST(new Date(project.psaSignedDate)) : startOfDayEST(currentDate);
   const projectEndDate = project.closingDate ? startOfDayEST(new Date(project.closingDate)) : addDays(startOfDayEST(currentDate), 60);
   
-  const totalDays = Math.max(1, differenceInDays(projectEndDate, projectStartDate)); // Prevent division by zero
+  const totalDays = Math.max(1, differenceInCalendarDays(projectEndDate, projectStartDate)); // Prevent division by zero
   
   const tasksByCategory = useMemo(() => {
     // Filter out completed tasks from the timeline view
