@@ -80,6 +80,7 @@ export const projects = pgTable("projects", {
   secondDepositAmount: integer("second_deposit_amount"),
   secondDepositDueDate: date("second_deposit_due_date"),
   tz: text("tz").notNull().default("America/New_York"),
+  executiveNotes: text("executive_notes"), // User's notes for AI enhancement
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
