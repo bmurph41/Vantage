@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, differenceInDays, addDays, parseISO, isAfter, isBefore, startOfDay, differenceInCalendarDays } from "date-fns";
 import { tzNow, setDeadlineTo5PM, formatLargeCurrency } from "@/lib/date-utils";
 import { generateWhitePaperPDF } from "@/components/white-paper-export";
@@ -28,7 +29,9 @@ import {
   Mail,
   Phone,
   MapPin,
-  X
+  X,
+  Sparkles,
+  Save
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,6 +70,14 @@ export default function DDProgressReportPage() {
   // State for modals
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  
+  // State for executive notes
+  const [executiveNotes, setExecutiveNotes] = useState('');
+  const [aiEnhancement, setAiEnhancement] = useState<{
+    enhancedNarrative: string;
+    performanceAnalysis: string;
+    timelineAssessment: string;
+  } | null>(null);
   
   // Handle export DD Summary PDF
   const handleExportDDSummary = () => {
@@ -160,6 +171,71 @@ export default function DDProgressReportPage() {
     queryKey: ['/api/dd/contacts'],
     enabled: !!projectId,
   });
+
+  // Initialize executive notes from project data
+  useEffect(() => {
+    if (project?.executiveNotes) {
+      setExecutiveNotes(project.executiveNotes);
+    }
+  }, [project?.executiveNotes]);
+
+  // Mutation to save executive notes
+  const saveNotesMutation = useMutation({
+    mutationFn: async (notes: string) => {
+      const response = await apiRequest(`/api/dd/projects/${projectId}/executive-notes`, {
+        method: 'PATCH',
+        body: JSON.stringify({ executiveNotes: notes }),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId] });
+      toast({
+        title: "Notes saved",
+        description: "Your executive notes have been saved successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save notes. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Mutation to get AI-enhanced narrative
+  const enhanceNotesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/dd/projects/${projectId}/executive-notes/ai-enhanced`);
+      if (!response.ok) throw new Error('Failed to enhance notes');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAiEnhancement(data);
+      toast({
+        title: "AI enhancement complete",
+        description: "Your notes have been transformed into an executive narrative.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to enhance notes. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Handle save notes
+  const handleSaveNotes = () => {
+    saveNotesMutation.mutate(executiveNotes);
+  };
+
+  // Handle AI enhancement
+  const handleEnhanceNotes = () => {
+    enhanceNotesMutation.mutate();
+  };
 
   if (projectLoading) {
     return (
@@ -891,33 +967,83 @@ function DDProgressReport({ project, tasks, aiRiskAnalysis }: DDProgressReportPr
             </Card>
           </div>
           
-          {/* AI Insights Section - Moved below cards */}
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-6">
-            <div className="flex items-center space-x-2 mb-4">
-              <Zap className="h-5 w-5 text-slate-600" />
-              <h3 className="text-lg font-semibold text-slate-800">AI-Powered Executive Insights</h3>
-              <Badge variant="secondary" className="text-xs">Analysis</Badge>
+          {/* Executive Notes Section - User Editable with AI Enhancement */}
+          <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="h-5 w-5 text-slate-600" />
+                <h3 className="text-lg font-semibold text-slate-800">Executive Notes</h3>
+                <Badge variant="secondary" className="text-xs">AI-Enhanced</Badge>
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveNotes}
+                  disabled={saveNotesMutation.isPending}
+                  data-testid="button-save-notes"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saveNotesMutation.isPending ? 'Saving...' : 'Save Notes'}
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleEnhanceNotes}
+                  disabled={enhanceNotesMutation.isPending || !executiveNotes.trim()}
+                  data-testid="button-enhance-notes"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {enhanceNotesMutation.isPending ? 'Enhancing...' : 'AI Enhance'}
+                </Button>
+              </div>
             </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div className="flex items-start space-x-2">
-                  <Activity className="h-4 w-4 text-slate-600 mt-0.5 flex-shrink-0" />
+            
+            <Textarea
+              value={executiveNotes}
+              onChange={(e) => setExecutiveNotes(e.target.value)}
+              placeholder="Add your executive observations and insights here. AI will transform them into a compelling narrative for stakeholders..."
+              className="min-h-[120px] mb-4"
+              data-testid="textarea-executive-notes"
+            />
+            
+            {aiEnhancement && (
+              <div className="mt-4 pt-4 border-t border-slate-200">
+                <div className="mb-3">
+                  <Badge className="bg-purple-100 text-purple-700 border-purple-200">
+                    AI-Enhanced Narrative
+                  </Badge>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-4 space-y-4">
                   <div>
-                    <div className="font-medium text-slate-800 text-sm mb-1">Performance Analysis</div>
-                    <p className="text-gray-700 text-sm leading-relaxed">{aiInsights[0]}</p>
+                    <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap">
+                      {aiEnhancement.enhancedNarrative}
+                    </p>
+                  </div>
+                  
+                  <div className="grid md:grid-cols-2 gap-4 pt-4 border-t border-slate-200">
+                    <div className="space-y-2">
+                      <div className="flex items-start space-x-2">
+                        <Activity className="h-4 w-4 text-slate-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <div className="font-medium text-slate-800 text-sm mb-1">Performance Analysis</div>
+                          <p className="text-gray-700 text-sm leading-relaxed">{aiEnhancement.performanceAnalysis}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-start space-x-2">
+                        <Clock className="h-4 w-4 text-slate-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <div className="font-medium text-slate-800 text-sm mb-1">Timeline Assessment</div>
+                          <p className="text-gray-700 text-sm leading-relaxed">{aiEnhancement.timelineAssessment}</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div className="space-y-3">
-                <div className="flex items-start space-x-2">
-                  <Clock className="h-4 w-4 text-slate-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <div className="font-medium text-slate-800 text-sm mb-1">Timeline Assessment</div>
-                    <p className="text-gray-700 text-sm leading-relaxed">{aiInsights[1]}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
