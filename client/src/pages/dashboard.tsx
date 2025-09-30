@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { format, differenceInDays, isPast, isToday, parseISO } from "date-fns";
+import { format, differenceInCalendarDays, isPast, isToday, parseISO } from "date-fns";
 import { tzNow } from "@/lib/date-utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -232,7 +232,7 @@ export default function Dashboard() {
   const calculateDaysRemaining = (targetDate: string): number => {
     const today = tzNow('America/New_York');
     const target = parseISO(targetDate);
-    return differenceInDays(target, today);
+    return differenceInCalendarDays(target, today);
   };
 
   if (isLoading) {
@@ -316,8 +316,8 @@ export default function Dashboard() {
               // Calculate project status based on dates (timezone-aware)
               const today = tzNow('America/New_York');
               const ddExpired = project.ddExpirationDate && isPast(parseISO(project.ddExpirationDate));
-              const ddExpiringSoon = project.ddExpirationDate && !ddExpired && differenceInDays(parseISO(project.ddExpirationDate), today) <= 7;
-              const closingSoon = project.closingDate && differenceInDays(parseISO(project.closingDate), today) <= 14;
+              const ddExpiringSoon = project.ddExpirationDate && !ddExpired && differenceInCalendarDays(parseISO(project.ddExpirationDate), today) <= 7;
+              const closingSoon = project.closingDate && differenceInCalendarDays(parseISO(project.closingDate), today) <= 14;
               
               let statusBadge = null;
               let statusColor = "bg-gray-50/30 border-gray-200";
