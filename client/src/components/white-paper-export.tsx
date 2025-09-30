@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
-import { format, parseISO, isValid, differenceInDays } from 'date-fns';
+import { format, parseISO, isValid, differenceInCalendarDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { setDeadlineTo5PM } from '@/lib/date-utils';
 import type { Project, Task, ProjectSettings, Risk } from '@shared/schema';
@@ -1026,7 +1026,7 @@ const calculateProjectKPIs = (project: Project, tasks: Task[]) => {
     try {
       const expirationDate = setDeadlineTo5PM(project.ddExpirationDate);
       if (isValid(expirationDate)) {
-        daysToExpiration = differenceInDays(expirationDate, todayEST);
+        daysToExpiration = differenceInCalendarDays(expirationDate, todayEST);
         if (daysToExpiration < 0) {
           expirationRisk = 'high';
         } else if (daysToExpiration <= 7) {
@@ -1045,7 +1045,7 @@ const calculateProjectKPIs = (project: Project, tasks: Task[]) => {
     if (!task.deadline) return false;
     try {
       const deadline = setDeadlineTo5PM(task.deadline);
-      return isValid(deadline) && differenceInDays(todayEST, deadline) > 0 && task.status !== 'completed';
+      return isValid(deadline) && differenceInCalendarDays(todayEST, deadline) > 0 && task.status !== 'completed';
     } catch {
       return false;
     }
@@ -1057,7 +1057,7 @@ const calculateProjectKPIs = (project: Project, tasks: Task[]) => {
     try {
       const deadline = setDeadlineTo5PM(task.deadline);
       if (!isValid(deadline)) return false;
-      const daysUntilDeadline = differenceInDays(deadline, todayEST);
+      const daysUntilDeadline = differenceInCalendarDays(deadline, todayEST);
       return daysUntilDeadline >= 0 && daysUntilDeadline <= 7;
     } catch {
       return false;
@@ -1115,7 +1115,7 @@ const calculateTimelineHealth = (project: Project) => {
           date: psaDate,
           dateString: project.psaSignedDate,
           status: 'completed',
-          daysFromToday: differenceInDays(todayEST, psaDate)
+          daysFromToday: differenceInCalendarDays(todayEST, psaDate)
         });
       }
     } catch {
@@ -1128,7 +1128,7 @@ const calculateTimelineHealth = (project: Project) => {
     try {
       const ddDate = setDeadlineTo5PM(project.ddExpirationDate);
       if (isValid(ddDate)) {
-        const daysFromToday = differenceInDays(ddDate, todayEST);
+        const daysFromToday = differenceInCalendarDays(ddDate, todayEST);
         let status = 'upcoming';
         if (daysFromToday < 0) status = 'overdue';
         else if (daysFromToday <= 7) status = 'urgent';
@@ -1151,7 +1151,7 @@ const calculateTimelineHealth = (project: Project) => {
     try {
       const closingDate = setDeadlineTo5PM(project.closingDate);
       if (isValid(closingDate)) {
-        const daysFromToday = differenceInDays(closingDate, todayEST);
+        const daysFromToday = differenceInCalendarDays(closingDate, todayEST);
         let status = 'upcoming';
         if (daysFromToday < 0) status = 'overdue';
         else if (daysFromToday <= 14) status = 'urgent';
@@ -1312,7 +1312,7 @@ const getTasksByDDExpiration = (tasks: Task[], ddExpirationDate: string | null):
         if (!isValid(taskDeadline)) return false; // Exclude tasks with invalid deadlines
         
         // Only include tasks with deadlines on or before DD expiration
-        return differenceInDays(ddDate, taskDeadline) >= 0;
+        return differenceInCalendarDays(ddDate, taskDeadline) >= 0;
       } catch {
         return false; // Exclude tasks with deadline parsing errors
       }
@@ -1428,7 +1428,7 @@ const analyzeTimelineRisks = (project: Project, tasks: Task[], today: Date): Ris
     try {
       const ddDate = parseISO(project.ddExpirationDate);
       if (isValid(ddDate)) {
-        const daysToExpiration = differenceInDays(ddDate, today);
+        const daysToExpiration = differenceInCalendarDays(ddDate, today);
         const incompleteTasks = tasks.filter(t => t.status !== 'completed').length;
         
         let impact = 5;
@@ -1496,7 +1496,7 @@ const analyzeTimelineRisks = (project: Project, tasks: Task[], today: Date): Ris
     if (!task.deadline || task.status === 'completed') return false;
     try {
       const deadline = setDeadlineTo5PM(task.deadline);
-      return isValid(deadline) && differenceInDays(today, deadline) > 0;
+      return isValid(deadline) && differenceInCalendarDays(today, deadline) > 0;
     } catch {
       return false;
     }
@@ -1825,7 +1825,7 @@ const analyzeMarketRisks = (project: Project, tasks: Task[]): RiskFactor[] => {
     try {
       const ddDate = parseISO(project.ddExpirationDate);
       if (isValid(ddDate)) {
-        const daysToExpiration = differenceInDays(ddDate, today);
+        const daysToExpiration = differenceInCalendarDays(ddDate, today);
         if (daysToExpiration > 90) marketExposure = 3; // Longer exposure to market changes
       }
     } catch {
@@ -1937,7 +1937,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
   
   // Calculate days to DD expiration
   const daysToExpiration = project.ddExpirationDate 
-    ? differenceInDays(setDeadlineTo5PM(project.ddExpirationDate), setDeadlineTo5PM(new Date()))
+    ? differenceInCalendarDays(setDeadlineTo5PM(project.ddExpirationDate), setDeadlineTo5PM(new Date()))
     : null;
   
   // Generate risk heatmap data from real Risk data with safety checks
@@ -1973,7 +1973,7 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
     if (!t.deadline) return false;
     const dueDate = new Date(t.deadline);
     const now = new Date();
-    const daysDiff = differenceInDays(dueDate, now);
+    const daysDiff = differenceInCalendarDays(dueDate, now);
     return daysDiff >= 0 && daysDiff <= 7;
   });
   
