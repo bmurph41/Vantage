@@ -439,29 +439,29 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
   
   return (
     <TooltipProvider>
-      <div className="space-y-6">
-        <div className="bg-gray-50 p-4 rounded-lg">
+      <div className="space-y-6 overflow-visible">
+        <div className="bg-gray-50 p-4 rounded-lg overflow-visible">
           <div className="flex justify-between text-xs text-gray-600 mb-2">
             <span>{format(projectStartDate, 'MMM d')}</span>
             <span>Today ({format(currentDate, 'MMM d')})</span>
             <span>{format(projectEndDate, 'MMM d')}</span>
           </div>
-          <div className="h-2 bg-gray-200 rounded-full relative">
+          <div className="h-2 bg-gray-200 rounded-full relative overflow-visible">
             <div 
-              className="h-full bg-blue-600 rounded-full absolute"
+              className="h-full bg-blue-600 rounded-full absolute z-0"
               style={{ width: `${Math.max(0, Math.min(100, (differenceInCalendarDays(currentDate, projectStartDate) / totalDays) * 100))}%` }}
             />
             <div 
-              className="absolute top-0 w-0.5 h-2 bg-red-500"
+              className="absolute top-0 w-0.5 h-2 bg-red-500 z-10"
               style={{ left: `${Math.max(0, Math.min(100, (differenceInCalendarDays(currentDate, projectStartDate) / totalDays) * 100))}%` }}
             />
           </div>
         </div>
       
       {tasksByCategory.map(([category, categoryTasks]) => (
-        <div key={category} className="space-y-2">
+        <div key={category} className="space-y-2 overflow-visible">
           <h4 className="font-medium text-gray-800 text-sm">{category}</h4>
-          <div className="space-y-1">
+          <div className="space-y-1 overflow-visible">
             {categoryTasks.map(task => (
               <div key={task.id} className="bg-white border rounded-lg p-3 overflow-visible">
                 <div className="flex items-center justify-between mb-2">
