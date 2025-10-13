@@ -182,10 +182,12 @@ export default function DDProgressReportPage() {
   // Mutation to save executive notes
   const saveNotesMutation = useMutation({
     mutationFn: async (notes: string) => {
-      const response = await apiRequest(`/api/dd/projects/${projectId}/executive-notes`, {
+      const response = await fetch(`/api/dd/projects/${projectId}/executive-notes`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ executiveNotes: notes }),
       });
+      if (!response.ok) throw new Error('Failed to save notes');
       return response.json();
     },
     onSuccess: () => {
@@ -317,7 +319,18 @@ export default function DDProgressReportPage() {
 
       {/* Report Content */}
       <div className="max-w-5xl mx-auto p-6">
-        <DDProgressReport project={project} tasks={tasks} aiRiskAnalysis={aiRiskAnalysis} />
+        <DDProgressReport 
+          project={project} 
+          tasks={tasks} 
+          aiRiskAnalysis={aiRiskAnalysis} 
+          executiveNotes={executiveNotes}
+          setExecutiveNotes={setExecutiveNotes}
+          aiEnhancement={aiEnhancement}
+          handleSaveNotes={handleSaveNotes}
+          handleEnhanceNotes={handleEnhanceNotes}
+          saveNotesMutation={saveNotesMutation}
+          enhanceNotesMutation={enhanceNotesMutation}
+        />
       </div>
     </div>
   );
@@ -338,6 +351,17 @@ interface DDProgressReportProps {
     recommendations: string[];
     criticalFactors: string[];
   } | null;
+  executiveNotes: string;
+  setExecutiveNotes: (notes: string) => void;
+  aiEnhancement: {
+    enhancedNarrative: string;
+    performanceAnalysis: string;
+    timelineAssessment: string;
+  } | null;
+  handleSaveNotes: () => void;
+  handleEnhanceNotes: () => void;
+  saveNotesMutation: any;
+  enhanceNotesMutation: any;
 }
 
 // AI Narration System - Define proper metrics interface
@@ -502,7 +526,18 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
   );
 }
 
-function DDProgressReport({ project, tasks, aiRiskAnalysis }: DDProgressReportProps) {
+function DDProgressReport({ 
+  project, 
+  tasks, 
+  aiRiskAnalysis,
+  executiveNotes,
+  setExecutiveNotes,
+  aiEnhancement,
+  handleSaveNotes,
+  handleEnhanceNotes,
+  saveNotesMutation,
+  enhanceNotesMutation
+}: DDProgressReportProps) {
   const currentDate = tzNow('America/New_York');
   const [showDDDeadline, setShowDDDeadline] = useState(false);
   const { toast } = useToast();
