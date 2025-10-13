@@ -266,7 +266,18 @@ export class DatabaseStorage implements IStorage {
           ourAttorney: projects.ourAttorney,
           titleInsuranceCompany: projects.titleInsuranceCompany,
           lender: projects.lender,
+          firstDepositAmount: projects.firstDepositAmount,
+          firstDepositDueDate: projects.firstDepositDueDate,
+          secondDepositAmount: projects.secondDepositAmount,
+          secondDepositDueDate: projects.secondDepositDueDate,
           tz: projects.tz,
+          executiveNotes: projects.executiveNotes,
+          purchasePrice: projects.purchasePrice,
+          estimatedRenovationCost: projects.estimatedRenovationCost,
+          projectedAnnualRevenue: projects.projectedAnnualRevenue,
+          investmentThesis: projects.investmentThesis,
+          dealHealthScore: projects.dealHealthScore,
+          healthScoreUpdatedAt: projects.healthScoreUpdatedAt,
           createdBy: projects.createdBy,
           createdAt: projects.createdAt,
         })
@@ -1017,9 +1028,9 @@ export class DatabaseStorage implements IStorage {
         );
 
         // Map task status to valid database calendar event status
-        const mapTaskStatusToEventStatus = (taskStatus: string) => {
+        const mapTaskStatusToEventStatus = (taskStatus: string): "not_started" | "engaged" | "scheduled" | "in_progress" | "completed" => {
           switch (taskStatus) {
-            case 'engaged': return 'in_progress';
+            case 'engaged': return 'engaged';
             case 'not_started': return 'not_started';
             case 'scheduled': return 'scheduled';  
             case 'in_progress': return 'in_progress';
@@ -1038,7 +1049,7 @@ export class DatabaseStorage implements IStorage {
           isAllDay: true,
           timezone: project.tz,
           priority: task.priority,
-          status: mapTaskStatusToEventStatus(task.status) as "not_started" | "in_progress" | "completed" | "scheduled" | "blocked" | "to_do",
+          status: mapTaskStatusToEventStatus(task.status),
         };
 
         if (existingTaskEvent) {
