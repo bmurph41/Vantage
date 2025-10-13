@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building, X } from "lucide-react";
+import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building, X, LayoutDashboard, PieChart, Briefcase } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useProjects, useCreateProject, useDeleteProject } from "@/hooks/use-project";
 import { useCreateTask } from "@/hooks/use-tasks";
@@ -265,6 +265,27 @@ export default function Dashboard() {
               <span className="text-sm text-muted-foreground">MarinaMatch</span>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Dashboard View Selector */}
+              <div className="flex items-center gap-2 border border-border rounded-md p-1">
+                <Link href="/">
+                  <Button variant="ghost" size="sm" className="h-8" data-testid="button-default-view">
+                    <LayoutDashboard className="h-4 w-4 mr-1" />
+                    Default
+                  </Button>
+                </Link>
+                <Link href="/investor">
+                  <Button variant="ghost" size="sm" className="h-8" data-testid="button-investor-view">
+                    <PieChart className="h-4 w-4 mr-1" />
+                    Investor
+                  </Button>
+                </Link>
+                <Link href="/owner">
+                  <Button variant="ghost" size="sm" className="h-8" data-testid="button-owner-view">
+                    <Briefcase className="h-4 w-4 mr-1" />
+                    Owner
+                  </Button>
+                </Link>
+              </div>
               <Button 
                 onClick={() => setIsCreateDialogOpen(true)}
                 data-testid="button-new-project"

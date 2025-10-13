@@ -31,6 +31,7 @@ export const calendarProviderEnum = pgEnum("calendar_provider", ["google", "outl
 export const emailTypeEnum = pgEnum("email_type", ["primary", "additional"]);
 export const guestStatusEnum = pgEnum("guest_status", ["pending", "accepted", "declined"]);
 export const contactRoleEnum = pgEnum("contact_role", ["seller", "attorney", "lender", "title_insurance", "inspector", "surveyor", "environmental", "appraiser", "broker", "insurance_agent", "other"]);
+export const dashboardTypeEnum = pgEnum("dashboard_type", ["default", "investor", "owner", "attorney", "lender", "inspector", "third_party"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -50,6 +51,9 @@ export const users = pgTable("users", {
   // Calendar preferences
   defaultCalendarProvider: calendarProviderEnum("default_calendar_provider"),
   calendarSyncEnabled: boolean("calendar_sync_enabled").notNull().default(true),
+  // Dashboard preferences
+  preferredDashboard: dashboardTypeEnum("preferred_dashboard").default("default"),
+  dashboardConfig: jsonb("dashboard_config").default(sql`'{}'`), // Custom dashboard settings
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -81,6 +85,13 @@ export const projects = pgTable("projects", {
   secondDepositDueDate: date("second_deposit_due_date"),
   tz: text("tz").notNull().default("America/New_York"),
   executiveNotes: text("executive_notes"), // User's notes for AI enhancement
+  // Investment & Deal Health Metrics
+  purchasePrice: integer("purchase_price"), // Acquisition cost
+  estimatedRenovationCost: integer("estimated_renovation_cost"),
+  projectedAnnualRevenue: integer("projected_annual_revenue"),
+  investmentThesis: text("investment_thesis"), // Strategic rationale
+  dealHealthScore: integer("deal_health_score"), // 0-100 calculated score
+  healthScoreUpdatedAt: timestamp("health_score_updated_at"),
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

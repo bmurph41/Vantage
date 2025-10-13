@@ -4,12 +4,15 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { setDeadlineTo5PM } from '@/lib/date-utils';
 import type { Project, Task, ProjectSettings, Risk } from '@shared/schema';
 
+export type ReportAudience = 'internal' | 'investor' | 'lender' | 'partner' | 'attorney';
+
 interface WhitePaperProps {
   project: Project;
   tasks: Task[];
   risks: Risk[];
   riskAnalytics: any;
   settings?: ProjectSettings | null;
+  audience?: ReportAudience;
 }
 
 // Clean, professional PDF styling

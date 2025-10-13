@@ -8,6 +8,8 @@ import ProjectPage from "@/pages/project";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import DDProgressReportPage from "@/pages/dd-progress-report";
 import UserSettingsPage from "@/pages/user-settings";
+import InvestorDashboard from "@/pages/investor-dashboard";
+import OwnerDashboard from "@/pages/owner-dashboard";
 import SortableListDemo from "@/pages/demo/SortableListDemo";
 import MilestoneDemo from "@/pages/milestone-demo";
 import NotFound from "@/pages/not-found";
@@ -22,6 +24,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/projects" component={Dashboard} />
+      <Route path="/investor" component={InvestorDashboard} />
+      <Route path="/owner" component={OwnerDashboard} />
       <Route path="/user/settings" component={UserSettingsPage} />
       <Route path="/projects/:id" component={ProjectPage} />
       <Route path="/dd/projects/:id" component={ProjectPage} />
