@@ -249,13 +249,26 @@ export const projectShares = pgTable("project_shares", {
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").references(() => projects.id), // Nullable for org-level audit logs
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
   userId: varchar("user_id").notNull().references(() => users.id),
   entityType: text("entity_type").notNull(),
   entityId: varchar("entity_id").notNull(),
   action: text("action").notNull(),
   before: jsonb("before"),
   after: jsonb("after"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  metadata: jsonb("metadata").default(sql`'{}'`),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    orgIdx: index("audit_logs_org").on(table.orgId),
+    projectIdx: index("audit_logs_project").on(table.projectId),
+    userIdx: index("audit_logs_user").on(table.userId),
+    entityIdx: index("audit_logs_entity").on(table.entityType, table.entityId),
+    actionIdx: index("audit_logs_action").on(table.action),
+    createdAtIdx: index("audit_logs_created_at").on(table.createdAt),
+  };
 });
 
 // Risk Management
@@ -646,6 +659,10 @@ export const projectSharesRelations = relations(projectShares, ({ one }) => ({
 }));
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [auditLogs.orgId],
+    references: [organizations.id],
+  }),
   project: one(projects, {
     fields: [auditLogs.projectId],
     references: [projects.id],

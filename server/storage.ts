@@ -75,6 +75,14 @@ export interface IStorage {
   // Audit Logs
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogsForProject(projectId: string): Promise<AuditLog[]>;
+  getAuditLogsForOrg(orgId: string, filters?: {
+    action?: string;
+    entityType?: string;
+    userId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+  }): Promise<AuditLog[]>;
 
   // Risk Management
   getRisk(id: string): Promise<Risk | undefined>;
@@ -470,6 +478,43 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(auditLogs)
       .where(eq(auditLogs.projectId, projectId))
       .orderBy(desc(auditLogs.createdAt));
+  }
+
+  async getAuditLogsForOrg(orgId: string, filters?: {
+    action?: string;
+    entityType?: string;
+    userId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+  }): Promise<AuditLog[]> {
+    const conditions = [eq(auditLogs.orgId, orgId)];
+    
+    if (filters?.action) {
+      conditions.push(eq(auditLogs.action, filters.action));
+    }
+    if (filters?.entityType) {
+      conditions.push(eq(auditLogs.entityType, filters.entityType));
+    }
+    if (filters?.userId) {
+      conditions.push(eq(auditLogs.userId, filters.userId));
+    }
+    if (filters?.startDate) {
+      conditions.push(sql`${auditLogs.createdAt} >= ${filters.startDate}`);
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${auditLogs.createdAt} <= ${filters.endDate}`);
+    }
+
+    let query = db.select().from(auditLogs)
+      .where(and(...conditions))
+      .orderBy(desc(auditLogs.createdAt));
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+
+    return query;
   }
 
   async getProjectShare(shareToken: string): Promise<ProjectShare | undefined> {

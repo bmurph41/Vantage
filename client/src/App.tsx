@@ -10,6 +10,7 @@ import DDProgressReportPage from "@/pages/dd-progress-report";
 import UserSettingsPage from "@/pages/user-settings";
 import InvestorDashboard from "@/pages/investor-dashboard";
 import OwnerDashboard from "@/pages/owner-dashboard";
+import AuditLogsPage from "@/pages/audit-logs";
 import SortableListDemo from "@/pages/demo/SortableListDemo";
 import MilestoneDemo from "@/pages/milestone-demo";
 import NotFound from "@/pages/not-found";
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/projects" component={Dashboard} />
       <Route path="/investor" component={InvestorDashboard} />
       <Route path="/owner" component={OwnerDashboard} />
+      <Route path="/audit-logs" component={AuditLogsPage} />
       <Route path="/user/settings" component={UserSettingsPage} />
       <Route path="/projects/:id" component={ProjectPage} />
       <Route path="/dd/projects/:id" component={ProjectPage} />

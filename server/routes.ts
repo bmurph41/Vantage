@@ -3501,6 +3501,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // Organization-level Audit Logs
+  app.get("/api/audit-logs", async (req: any, res) => {
+    try {
+      const { action, entity: entityType, search, userId, startDate, endDate, limit } = req.query;
+      
+      const filters: any = {};
+      if (action && action !== 'all') filters.action = action;
+      if (entityType && entityType !== 'all') filters.entityType = entityType;
+      if (userId) filters.userId = userId;
+      if (startDate) filters.startDate = new Date(startDate);
+      if (endDate) filters.endDate = new Date(endDate);
+      if (limit) filters.limit = parseInt(limit);
+      
+      const logs = await storage.getAuditLogsForOrg(req.user.orgId, filters);
+      res.json(logs);
+    } catch (error) {
+      console.error("Failed to get audit logs:", error);
+      res.status(500).json({ error: "Failed to retrieve audit logs" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
