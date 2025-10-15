@@ -141,6 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: project.id,
         userId: req.user.id,
         entityType: "project",
@@ -178,6 +179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: updated.id,
         userId: req.user.id,
         entityType: "project",
@@ -199,6 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create audit log before deletion
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: project.id,
         userId: req.user.id,
         entityType: "project",
@@ -251,6 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: req.params.id,
         userId: req.user.id,
         entityType: "project_share",
@@ -333,6 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log for bulk update
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: req.params.projectId,
         userId: req.user.id,
         entityType: "task",
@@ -434,6 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: task.projectId,
         userId: req.user.id,
         entityType: "task",
@@ -592,6 +598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: updated.projectId,
         userId: req.user.id,
         entityType: "task",
@@ -681,6 +688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: task.projectId,
         userId: req.user.id,
         entityType: "task",
@@ -719,6 +727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: updated.projectId,
         userId: req.user.id,
         entityType: "task",
@@ -759,6 +768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: updated.projectId,
         userId: req.user.id,
         entityType: "task",
@@ -839,6 +849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: req.params.projectId,
         userId: req.user.id,
         entityType: "task_dependency",
@@ -882,6 +893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: successorTask.projectId,
         userId: req.user.id,
         entityType: "task_dependency", 
@@ -930,6 +942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create proper audit log with complete dependency details
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: successorTask.projectId,
         userId: req.user.id,
         entityType: "task_dependency",
@@ -961,6 +974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: task.projectId,
         userId: req.user.id,
         entityType: "task",
@@ -1051,6 +1065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: task.projectId,
         userId: req.user.id,
         entityType: "task_file",
@@ -1144,6 +1159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: file.projectId,
         userId: req.user.id,
         entityType: "task_file",
@@ -1306,6 +1322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             // Create audit log for each task
             await storage.createAuditLog({
+        orgId: req.user.orgId,
               projectId: task.projectId,
               userId: req.user.id,
               entityType: "task",
@@ -1319,6 +1336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log for template application
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: req.params.projectId,
         userId: req.user.id,
         entityType: "project",
@@ -1627,6 +1645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: req.params.id,
         userId: req.user.id,
         entityType: "risk",
@@ -1673,6 +1692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: existingRisk.projectId,
         userId: req.user.id,
         entityType: "risk",
@@ -1705,6 +1725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: existingRisk.projectId,
         userId: req.user.id,
         entityType: "risk",
@@ -1727,6 +1748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: req.params.id,
         userId: req.user.id,
         entityType: "project",
@@ -1813,6 +1835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Skip audit log for now due to database constraint issue
       // TODO: Fix audit_logs table to allow null projectId for org-level operations
       // await storage.createAuditLog({
+        orgId: req.user.orgId,
       //   projectId: null,
       //   userId: req.user.id,
       //   entityType: "contact",
@@ -1868,6 +1891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Skip audit logging for org-level contacts to avoid null constraint violation
       if (existingContact.projectId) {
         await storage.createAuditLog({
+        orgId: req.user.orgId,
           projectId: existingContact.projectId,
           userId: req.user.id,
           entityType: "contact",
@@ -1906,6 +1930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Skip audit log for now due to database constraint issue
       // TODO: Fix audit_logs table to allow null projectId for org-level operations
       // await storage.createAuditLog({
+        orgId: req.user.orgId,
       //   projectId: null,
       //   userId: req.user.id,
       //   entityType: "contact",
@@ -1974,6 +1999,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: subscriptionData.projectId,
         userId: req.user.id,
         entityType: "notification_subscription",
@@ -2376,6 +2402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create audit log for sync
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId,
         userId: req.user.id,
         entityType: "calendar_event",
@@ -2548,6 +2575,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId,
         userId: req.user.id,
         entityType: "calendar_event",
@@ -2582,6 +2610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create audit log
       if (updated.projectId) {
         await storage.createAuditLog({
+        orgId: req.user.orgId,
           projectId: updated.projectId,
           userId: req.user.id,
           entityType: "calendar_event",
@@ -2614,6 +2643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: event.projectId,
         userId: req.user.id,
         entityType: "calendar_event",
@@ -2690,6 +2720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: task.projectId,
         userId: req.user.id,
         entityType: "document_requirement",
@@ -2729,6 +2760,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId: task.projectId,
         userId: req.user.id,
         entityType: "document_requirement",
@@ -2794,6 +2826,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create audit log
       await storage.createAuditLog({
+        orgId: req.user.orgId,
         projectId,
         userId: req.user.id,
         entityType: "project_integration",
@@ -2853,6 +2886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         await storage.createAuditLog({
+        orgId: req.user.orgId,
           projectId,
           userId: req.user.id,
           entityType: "project_integration",
@@ -2879,6 +2913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         integration = await storage.createProjectIntegration(integrationData);
         
         await storage.createAuditLog({
+        orgId: req.user.orgId,
           projectId,
           userId: req.user.id,
           entityType: "project_integration",
@@ -2971,6 +3006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Create audit log
         await storage.createAuditLog({
+        orgId: req.user.orgId,
           projectId: integration.projectId,
           userId: req.user.id,
           entityType: "project_integration",
@@ -3001,6 +3037,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         await storage.createAuditLog({
+        orgId: req.user.orgId,
           projectId: integration.projectId,
           userId: req.user.id,
           entityType: "project_integration",
@@ -3206,6 +3243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (eventData.projectId) {
         // Create audit log for document events
         await storage.createAuditLog({
+        orgId: req.user.orgId,
           projectId: eventData.projectId,
           userId: "system", // System-generated event
           entityType: "document",
@@ -3230,6 +3268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (eventData.projectId) {
         await storage.createAuditLog({
+        orgId: req.user.orgId,
           projectId: eventData.projectId,
           userId: "system",
           entityType: "task",
@@ -3251,6 +3290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (eventData.projectId) {
         await storage.createAuditLog({
+        orgId: req.user.orgId,
           projectId: eventData.projectId,
           userId: eventData.createdBy || "system",
           entityType: "project",
