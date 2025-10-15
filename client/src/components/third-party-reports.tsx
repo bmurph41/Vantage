@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TaskDocumentStatus } from "./task-document-status";
-import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle, FileDown, Edit, StickyNote, FileText } from "lucide-react";
+import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle, FileDown, Edit, StickyNote, FileText, DollarSign } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
 import { useQuery } from "@tanstack/react-query";
@@ -603,6 +603,37 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
               </div>
             </div>
 
+            {/* Outstanding Bills Summary */}
+            {(() => {
+              const unpaidTasks = tasks.filter(t => t.paymentStatus === 'not_paid' && t.cost);
+              const totalOutstanding = unpaidTasks.reduce((sum, task) => {
+                const costValue = parseFloat(task.cost?.replace(/[^0-9.-]+/g, "") || "0");
+                return sum + costValue;
+              }, 0);
+              
+              if (unpaidTasks.length > 0) {
+                return (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4" data-testid="outstanding-bills-summary">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-red-600" />
+                        <span className="text-sm font-semibold text-red-900">Outstanding Bills</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-red-700" data-testid="text-outstanding-total">
+                          ${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-xs text-red-600" data-testid="text-outstanding-count">
+                          {unpaidTasks.length} unpaid task{unpaidTasks.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {/* Task List */}
             <div className="space-y-3">
               {/* Active Tasks Section */}
@@ -760,6 +791,26 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                                 className="w-24 text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
                                 data-testid={`input-cost-${task.id}`}
                               />
+                              <Select
+                                value={task.paymentStatus || 'not_paid'}
+                                onValueChange={(value) => handlePaymentStatusChange(task.id, value)}
+                              >
+                                <SelectTrigger 
+                                  className={`w-24 mt-1 text-xs h-7 ${
+                                    task.paymentStatus === 'paid' 
+                                      ? 'bg-green-50 text-green-700 border-green-200' 
+                                      : 'bg-red-50 text-red-700 border-red-200'
+                                  }`}
+                                  data-testid={`select-payment-status-${task.id}`}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="not_paid">Unpaid</SelectItem>
+                                  <SelectItem value="paid">Paid</SelectItem>
+                                  <SelectItem value="no_cost">No Cost</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </div>
                           )}
                         </div>
@@ -1095,6 +1146,26 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                               {formatCurrency(task.cost || '')}
                             </div>
                           )}
+                          <Select
+                            value={task.paymentStatus || 'not_paid'}
+                            onValueChange={(value) => handlePaymentStatusChange(task.id, value)}
+                          >
+                            <SelectTrigger 
+                              className={`w-24 mt-1 text-xs h-7 ${
+                                task.paymentStatus === 'paid' 
+                                  ? 'bg-green-50 text-green-700 border-green-200' 
+                                  : 'bg-red-50 text-red-700 border-red-200'
+                              }`}
+                              data-testid={`select-payment-status-${task.id}`}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="not_paid">Unpaid</SelectItem>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="no_cost">No Cost</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       )}
                     </div>
