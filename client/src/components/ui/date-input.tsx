@@ -85,10 +85,14 @@ const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
       return ""
     }
 
-    // Update display value when prop value changes
+    // Update display value when prop value changes (only if it's different from what we have)
     React.useEffect(() => {
       const newDisplayValue = formatDisplayValue(value || "")
-      setDisplayValue(newDisplayValue)
+      // Only update if the ISO values are different to avoid overwriting user input
+      const currentISO = formatISOValue(displayValue)
+      if (value !== currentISO) {
+        setDisplayValue(newDisplayValue)
+      }
     }, [value])
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,11 +116,8 @@ const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
         }
       } else {
         setIsValid_(false)
-        // Don't call onChange with obviously invalid values like single characters
-        // Let the form handle validation of empty/incomplete input
-        if (inputValue.length > 2) {
-          onChange?.(inputValue)
-        }
+        // Don't call onChange yet for incomplete input - keep it in local state
+        // This prevents the field from being cleared while typing
       }
     }
 
