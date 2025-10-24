@@ -495,8 +495,8 @@ function SortableTaskItem({
               Documents
             </Button>
           )}
-          {/* Mark as Completed Button for Overdue Tasks */}
-          {deadlineUrgency === 'overdue' && task.status !== 'completed' && (
+          {/* Mark as Completed Button */}
+          {task.status !== 'completed' && (
             <Button
               variant="outline"
               size="sm"
