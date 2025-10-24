@@ -708,24 +708,13 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                 <div className="mt-2 space-y-2">
                   {sellersArray.map((seller, index) => (
                     <div key={index} className="flex items-center space-x-2">
-                      <Select
+                      <Input
                         value={seller}
-                        onValueChange={(value) => updateSeller(index, value)}
-                      >
-                        <SelectTrigger className="flex-1" data-testid={`select-seller-${index}`}>
-                          <SelectValue placeholder="Select seller or enter name" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {contacts
-                            .filter(contact => contact.role === 'seller' || !contact.role)
-                            .map((contact) => (
-                              <SelectItem key={contact.id} value={`${contact.name} (${contact.company || contact.email})`}>
-                                {contact.name} ({contact.company || contact.email})
-                              </SelectItem>
-                            ))}
-                          <SelectItem value="custom">Enter custom name...</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        onChange={(e) => updateSeller(index, e.target.value)}
+                        placeholder="Enter seller name"
+                        className="flex-1"
+                        data-testid={`input-seller-${index}`}
+                      />
                       {sellersArray.length > 1 && (
                         <Button
                           type="button"
@@ -760,24 +749,13 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                 <div className="mt-2 space-y-2">
                   {attorneysArray.map((attorney, index) => (
                     <div key={index} className="flex items-center space-x-2">
-                      <Select
+                      <Input
                         value={attorney}
-                        onValueChange={(value) => updateAttorney(index, value)}
-                      >
-                        <SelectTrigger className="flex-1" data-testid={`select-attorney-${index}`}>
-                          <SelectValue placeholder="Select attorney or enter name" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {contacts
-                            .filter(contact => contact.role === 'attorney' || !contact.role)
-                            .map((contact) => (
-                              <SelectItem key={contact.id} value={`${contact.name} (${contact.company || contact.email})`}>
-                                {contact.name} ({contact.company || contact.email})
-                              </SelectItem>
-                            ))}
-                          <SelectItem value="custom">Enter custom name...</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        onChange={(e) => updateAttorney(index, e.target.value)}
+                        placeholder="Enter attorney name"
+                        className="flex-1"
+                        data-testid={`input-attorney-${index}`}
+                      />
                       {attorneysArray.length > 1 && (
                         <Button
                           type="button"
@@ -810,46 +788,24 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="titleInsuranceCompany">Title Insurance Company</Label>
-                  <Select
+                  <Input
+                    id="titleInsuranceCompany"
                     value={projectForm.watch("titleInsuranceCompany") || ""}
-                    onValueChange={(value) => projectForm.setValue("titleInsuranceCompany", value)}
-                  >
-                    <SelectTrigger data-testid="select-title-insurance">
-                      <SelectValue placeholder="Select title insurance company" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contacts
-                        .filter(contact => contact.role === 'title_insurance' || !contact.role)
-                        .map((contact) => (
-                          <SelectItem key={contact.id} value={`${contact.name} (${contact.company || contact.email})`}>
-                            {contact.name} ({contact.company || contact.email})
-                          </SelectItem>
-                        ))}
-                      <SelectItem value="custom">Enter custom name...</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    onChange={(e) => projectForm.setValue("titleInsuranceCompany", e.target.value)}
+                    placeholder="Enter title insurance company name"
+                    data-testid="input-title-insurance"
+                  />
                 </div>
                 
                 <div>
                   <Label htmlFor="lender">Lender</Label>
-                  <Select
+                  <Input
+                    id="lender"
                     value={projectForm.watch("lender") || ""}
-                    onValueChange={(value) => projectForm.setValue("lender", value)}
-                  >
-                    <SelectTrigger data-testid="select-lender">
-                      <SelectValue placeholder="Select lender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contacts
-                        .filter(contact => contact.role === 'lender' || !contact.role)
-                        .map((contact) => (
-                          <SelectItem key={contact.id} value={`${contact.name} (${contact.company || contact.email})`}>
-                            {contact.name} ({contact.company || contact.email})
-                          </SelectItem>
-                        ))}
-                      <SelectItem value="custom">Enter custom name...</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    onChange={(e) => projectForm.setValue("lender", e.target.value)}
+                    placeholder="Enter lender name"
+                    data-testid="input-lender"
+                  />
                 </div>
               </div>
             </div>
