@@ -126,7 +126,7 @@ function CreateProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
       onOpenChange(false);
       form.reset();
-      navigate(`/project/${project.id}`);
+      navigate(`/projects/${project.id}`);
     } catch (error) {
       console.error("Failed to create project:", error);
     }
