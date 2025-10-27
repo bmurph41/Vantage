@@ -336,6 +336,8 @@ export const contacts = pgTable("contacts", {
   timezone: text("timezone").notNull().default("America/New_York"),
   role: contactRoleEnum("role"), // Optional role designation
   company: text("company"), // Company name for the contact
+  onDealTeam: boolean("on_deal_team").notNull().default(false), // Whether contact is on the deal team
+  dealTeamNotes: text("deal_team_notes"), // Notes about this contact's role on the deal team
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

@@ -56,6 +56,8 @@ const contactSchema = z.object({
   timezone: z.string().min(1, "Timezone is required"),
   role: z.enum(["seller", "attorney", "lender", "title_insurance", "inspector", "surveyor", "environmental", "appraiser", "broker", "insurance_agent", "other"]).optional(),
   company: z.string().optional(),
+  onDealTeam: z.boolean().optional(),
+  dealTeamNotes: z.string().optional(),
 });
 
 // Phone formatting utility
@@ -250,7 +252,8 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
       company: contact.company || undefined,
       role: contact.role || undefined,
       timezone: contact.timezone,
-      // Note: address, onDealTeam, dealTeamNotes, photoDataUrl not available in current Contact type
+      onDealTeam: contact.onDealTeam || false,
+      dealTeamNotes: contact.dealTeamNotes || undefined,
     };
   };
 
@@ -264,6 +267,8 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
       timezone: payload.timezone || 'America/New_York',
       role: payload.role as any,
       company: payload.company || '',
+      onDealTeam: payload.onDealTeam,
+      dealTeamNotes: payload.dealTeamNotes,
     };
   };
 

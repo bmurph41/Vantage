@@ -38,11 +38,13 @@ function TaskOwnerSelector({ projectId, value, onChange }: {
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState(value);
 
-  // Fetch existing assignees for the project
-  const { data: assignees = [] } = useQuery<string[]>({
-    queryKey: [`/api/dd/projects/${projectId}/assignees`],
-    enabled: !!projectId,
+  // Fetch contacts on deal team
+  const { data: contacts = [] } = useQuery<Array<{ id: string; name: string; onDealTeam: boolean }>>({
+    queryKey: ['/api/dd/contacts'],
   });
+
+  // Filter for deal team members
+  const dealTeamMembers = contacts.filter(c => c.onDealTeam).map(c => c.name);
 
   const handleSelectChange = (selectedValue: string) => {
     if (selectedValue === "manual_entry") {
@@ -98,11 +100,11 @@ function TaskOwnerSelector({ projectId, value, onChange }: {
         <SelectValue placeholder="Select or enter team member" />
       </SelectTrigger>
       <SelectContent>
-        {assignees.length > 0 && (
+        {dealTeamMembers.length > 0 && (
           <>
-            {assignees.map((assignee: string) => (
-              <SelectItem key={assignee} value={assignee}>
-                {assignee}
+            {dealTeamMembers.map((member: string) => (
+              <SelectItem key={member} value={member}>
+                {member}
               </SelectItem>
             ))}
             <SelectItem value="manual_entry">
@@ -113,7 +115,7 @@ function TaskOwnerSelector({ projectId, value, onChange }: {
             </SelectItem>
           </>
         )}
-        {assignees.length === 0 && (
+        {dealTeamMembers.length === 0 && (
           <SelectItem value="manual_entry">
             <div className="flex items-center gap-2 text-blue-600">
               <Users className="h-4 w-4" />
