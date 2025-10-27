@@ -542,17 +542,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Convert empty string date fields to null for database compatibility
-      // Convert ISO string dates to Date objects
+      // Note: date fields (startDate, deadline, etc.) expect strings in YYYY-MM-DD format
+      // Only timestamp fields (completedAt) need to be converted to Date objects
       const dateFields = ['startDate', 'deadline', 'dateEngaged', 'orderedAt', 'dateOnSite', 'baselineStart', 'baselineDue'];
       for (const field of dateFields) {
         if (taskPayload[field] === '') {
           taskPayload[field] = null;
-        } else if (typeof taskPayload[field] === 'string' && taskPayload[field]) {
-          taskPayload[field] = new Date(taskPayload[field]);
         }
       }
       
-      // Handle completedAt specially as it's a timestamp field
+      // Handle completedAt specially as it's a timestamp field that needs Date objects
       if (taskPayload.completedAt === '') {
         taskPayload.completedAt = null;
       } else if (typeof taskPayload.completedAt === 'string' && taskPayload.completedAt) {
