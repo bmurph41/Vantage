@@ -2,8 +2,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, Clock, Building2, Briefcase, MapPin, FileText, Edit, X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { User, Mail, Phone, Clock, Building2, Briefcase, MapPin, FileText, Edit, X, Users } from "lucide-react";
 import { TaskFiles } from "./task-files";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface ContactDetailsModalProps {
   open: boolean;
@@ -46,6 +51,41 @@ export default function ContactDetailsModal({ open, onClose, onEdit, contact }: 
 
   const isUserContact = contact.type === 'user_contact';
   const isCompanyRep = contact.type === 'company_rep';
+  const { toast } = useToast();
+  
+  // State for deal team toggle
+  const [isOnDealTeam, setIsOnDealTeam] = useState(contact.onDealTeam || false);
+
+  // Update contact mutation
+  const updateContactMutation = useMutation({
+    mutationFn: async (onDealTeam: boolean) => {
+      const response = await apiRequest("PUT", `/api/dd/contacts/${contact.id}`, {
+        onDealTeam
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/contacts'] });
+      toast({
+        title: "Success",
+        description: isOnDealTeam ? "Added to deal team" : "Removed from deal team",
+      });
+    },
+    onError: () => {
+      // Revert the toggle on error
+      setIsOnDealTeam(!isOnDealTeam);
+      toast({
+        title: "Error",
+        description: "Failed to update contact",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDealTeamToggle = (checked: boolean) => {
+    setIsOnDealTeam(checked);
+    updateContactMutation.mutate(checked);
+  };
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -87,6 +127,28 @@ export default function ContactDetailsModal({ open, onClose, onEdit, contact }: 
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
+          {/* Deal Team Toggle - Only for External Contacts */}
+          {isUserContact && (
+            <>
+              <div className="flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Users className="h-5 w-5 text-orange-600" />
+                  <div>
+                    <p className="font-semibold text-orange-900">On Deal Team</p>
+                    <p className="text-sm text-orange-700">Include in deal team task assignments</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={isOnDealTeam}
+                  onCheckedChange={handleDealTeamToggle}
+                  disabled={updateContactMutation.isPending}
+                  data-testid="switch-deal-team"
+                />
+              </div>
+              <Separator />
+            </>
+          )}
+
           {/* Contact Information Section */}
           <div>
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
