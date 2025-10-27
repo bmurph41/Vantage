@@ -21,7 +21,7 @@ export default function MilestoneProgressBar({ progressPct, elapsedLabel, milest
         <span className="ml-auto text-sm text-gray-500">{elapsedLabel}</span>
       </div>
 
-      <div className="relative">
+      <div className="relative overflow-visible">
         {/* Progress bar */}
         <div className="h-6 w-full rounded-full bg-gray-100 overflow-hidden">
           {/* Filled section */}
@@ -54,7 +54,7 @@ export default function MilestoneProgressBar({ progressPct, elapsedLabel, milest
           return (
             <div
               key={m.id}
-              className="absolute top-1/2 -translate-y-1/2"
+              className="absolute top-1/2 -translate-y-1/2 z-50"
               style={{ left: `${leftPct}%` }}
             >
               <button
