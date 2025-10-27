@@ -706,55 +706,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
 
                 <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <Label htmlFor="deadline">Deadline Date</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="deadline"
-                        type="date"
-                        {...form.register("deadline")}
-                        data-testid="input-deadline"
-                        className="flex-1"
-                      />
-                      <div className="flex gap-1">
-                        {project?.ddExpirationDate && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              form.setValue("deadline", project.ddExpirationDate!);
-                            }}
-                            className="px-2 text-xs whitespace-nowrap"
-                            data-testid="button-dd-exp"
-                          >
-                            DD Exp
-                          </Button>
-                        )}
-                        {project?.closingDate && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              form.setValue("deadline", project.closingDate!);
-                            }}
-                            className="px-2 text-xs whitespace-nowrap"
-                            data-testid="button-closing"
-                          >
-                            Closing
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Set a specific deadline date for this task
-                    </p>
-                  </div>
-                </div>
-
-
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
                     <Label htmlFor="priority">Priority</Label>
                     <Select
                       value={form.watch("priority")}
