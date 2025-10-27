@@ -1223,6 +1223,322 @@ function DDProgressReport({
           </Card>
         </div>
 
+        <Separator />
+
+        {/* CDD Section-by-Section Completion */}
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center">
+            <BarChart3 className="h-6 w-6 mr-3" />
+            Section Completion Analysis
+          </h2>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {(() => {
+              // Group tasks by ddCategory
+              const categoryGroups = tasks.reduce((acc, task) => {
+                const category = task.ddCategory || 'other';
+                if (!acc[category]) acc[category] = [];
+                acc[category].push(task);
+                return acc;
+              }, {} as Record<string, Task[]>);
+
+              const categoryNames: Record<string, string> = {
+                title: 'Title & Ownership',
+                survey: 'Survey & Boundaries',
+                ESA: 'Environmental (ESA)',
+                appraisal: 'Valuation & Appraisal',
+                inspection: 'Physical Inspection',
+                permits: 'Permits & Compliance',
+                zoning: 'Zoning & Land Use',
+                financial: 'Financial Review',
+                legal: 'Legal Documentation',
+                insurance: 'Insurance & Risk',
+                other: 'Other Items'
+              };
+
+              return Object.entries(categoryGroups).map(([category, categoryTasks]) => {
+                const completedCount = categoryTasks.filter(t => t.status === 'completed').length;
+                const totalCount = categoryTasks.length;
+                const percentComplete = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+                const hasHighPriority = categoryTasks.some(t => t.priority === 'high' && t.status !== 'completed');
+                const overdueCount = categoryTasks.filter(t => {
+                  if (t.status === 'completed' || !t.deadline) return false;
+                  return isOverdueAt1700EST(t.deadline);
+                }).length;
+
+                return (
+                  <Card key={category} className="bg-white shadow-md border hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold text-gray-900">{categoryNames[category] || category}</h3>
+                        <Badge className={`${
+                          percentComplete >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                          percentComplete >= 50 ? 'bg-blue-100 text-blue-800' :
+                          'bg-amber-100 text-amber-800'
+                        }`}>
+                          {percentComplete}%
+                        </Badge>
+                      </div>
+                      
+                      <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+                        <div 
+                          className={`h-full rounded-full transition-all ${
+                            percentComplete >= 80 ? 'bg-emerald-500' :
+                            percentComplete >= 50 ? 'bg-blue-500' :
+                            'bg-amber-500'
+                          }`}
+                          style={{ width: `${percentComplete}%` }}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">{completedCount}/{totalCount} Complete</span>
+                        {overdueCount > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            {overdueCount} Overdue
+                          </Badge>
+                        )}
+                        {hasHighPriority && overdueCount === 0 && (
+                          <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">
+                            High Priority
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              });
+            })()}
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Scope & Methodology */}
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center">
+            <FileText className="h-6 w-6 mr-3" />
+            Scope & Methodology
+          </h2>
+          
+          <Card className="bg-white shadow-lg border-0">
+            <CardContent className="p-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3">Review Period</h3>
+                  <div className="space-y-2 text-sm text-gray-700">
+                    <div className="flex justify-between">
+                      <span className="font-medium">Start Date:</span>
+                      <span>{project.psaSignedDate ? format(new Date(project.psaSignedDate), 'MMM d, yyyy') : 'Not Set'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">DD Expiration:</span>
+                      <span>{project.ddExpirationDate ? format(new Date(project.ddExpirationDate), 'MMM d, yyyy') : 'Not Set'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Closing Date:</span>
+                      <span>{project.closingDate ? format(new Date(project.closingDate), 'MMM d, yyyy') : 'TBD'}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3">Data Sources</h3>
+                  <div className="space-y-2 text-sm text-gray-700">
+                    <div className="flex items-start">
+                      <CheckCircle className="h-4 w-4 text-emerald-600 mr-2 mt-0.5 flex-shrink-0" />
+                      <span>Project management system tracking</span>
+                    </div>
+                    <div className="flex items-start">
+                      <CheckCircle className="h-4 w-4 text-emerald-600 mr-2 mt-0.5 flex-shrink-0" />
+                      <span>Task completion records & documentation</span>
+                    </div>
+                    <div className="flex items-start">
+                      <CheckCircle className="h-4 w-4 text-emerald-600 mr-2 mt-0.5 flex-shrink-0" />
+                      <span>Third-party vendor reports</span>
+                    </div>
+                    <div className="flex items-start">
+                      <CheckCircle className="h-4 w-4 text-emerald-600 mr-2 mt-0.5 flex-shrink-0" />
+                      <span>Team interviews & field observations</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="font-semibold text-gray-900 mb-3">Coverage Score</h3>
+                <div className="flex items-center space-x-4">
+                  <div className="flex-1">
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div 
+                        className="h-full bg-blue-600 rounded-full"
+                        style={{ width: `${metrics.completionRate}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-2xl font-bold text-gray-900">{metrics.completionRate}%</span>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  Data coverage reflects completion of {metrics.completedTasks} of {metrics.totalTasks} planned due diligence items.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Separator />
+
+        {/* Recommendations & Next Steps */}
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center">
+            <Target className="h-6 w-6 mr-3" />
+            Recommendations & Next Steps
+          </h2>
+          
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
+            {/* Overall Recommendation */}
+            <Card className={`shadow-lg border-2 ${
+              metrics.completionRate >= 80 && metrics.overdueTasks === 0 ? 'border-emerald-300 bg-emerald-50' :
+              metrics.overdueTasks > 0 || metrics.completionRate < 50 ? 'border-red-300 bg-red-50' :
+              'border-amber-300 bg-amber-50'
+            }`}>
+              <CardContent className="p-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className={`p-3 rounded-full ${
+                    metrics.completionRate >= 80 && metrics.overdueTasks === 0 ? 'bg-emerald-100' :
+                    metrics.overdueTasks > 0 || metrics.completionRate < 50 ? 'bg-red-100' :
+                    'bg-amber-100'
+                  }`}>
+                    <CheckCircle className={`h-6 w-6 ${
+                      metrics.completionRate >= 80 && metrics.overdueTasks === 0 ? 'text-emerald-600' :
+                      metrics.overdueTasks > 0 || metrics.completionRate < 50 ? 'text-red-600' :
+                      'text-amber-600'
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Overall Recommendation</h3>
+                    <Badge className={`mt-1 ${
+                      metrics.completionRate >= 80 && metrics.overdueTasks === 0 ? 'bg-emerald-200 text-emerald-900' :
+                      metrics.overdueTasks > 0 || metrics.completionRate < 50 ? 'bg-red-200 text-red-900' :
+                      'bg-amber-200 text-amber-900'
+                    }`}>
+                      {metrics.completionRate >= 80 && metrics.overdueTasks === 0 ? 'PROCEED' :
+                       metrics.overdueTasks > 0 || metrics.completionRate < 50 ? 'PROCEED WITH CONDITIONS' :
+                       'ON TRACK'}
+                    </Badge>
+                  </div>
+                </div>
+                <p className={`text-sm ${
+                  metrics.completionRate >= 80 && metrics.overdueTasks === 0 ? 'text-emerald-900' :
+                  metrics.overdueTasks > 0 || metrics.completionRate < 50 ? 'text-red-900' :
+                  'text-amber-900'
+                }`}>
+                  {metrics.completionRate >= 80 && metrics.overdueTasks === 0 
+                    ? 'Due diligence is substantially complete with no critical issues identified. Recommend proceeding to closing.'
+                    : metrics.overdueTasks > 0 
+                    ? `${metrics.overdueTasks} overdue items require immediate attention before proceeding. Address critical path items to maintain transaction timeline.`
+                    : `DD is ${metrics.completionRate}% complete. Continue execution on current trajectory to meet closing timeline.`}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Data Gaps */}
+            <Card className="bg-white shadow-lg border">
+              <CardContent className="p-6">
+                <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 mr-2" />
+                  Data Gaps & Limitations
+                </h3>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  {metrics.notStartedTasks > 0 && (
+                    <li className="flex items-start">
+                      <ChevronRight className="h-4 w-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
+                      <span>{metrics.notStartedTasks} tasks not yet started</span>
+                    </li>
+                  )}
+                  {metrics.inProgressTasks > 0 && (
+                    <li className="flex items-start">
+                      <ChevronRight className="h-4 w-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
+                      <span>{metrics.inProgressTasks} tasks in progress, pending completion</span>
+                    </li>
+                  )}
+                  {metrics.highRiskTasks > 0 && (
+                    <li className="flex items-start">
+                      <ChevronRight className="h-4 w-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
+                      <span>{metrics.highRiskTasks} high-priority items requiring focus</span>
+                    </li>
+                  )}
+                  {metrics.overdueTasks === 0 && metrics.notStartedTasks === 0 && metrics.inProgressTasks === 0 && (
+                    <li className="flex items-start text-emerald-700">
+                      <CheckCircle className="h-4 w-4 text-emerald-600 mr-2 mt-0.5 flex-shrink-0" />
+                      <span>No significant data gaps identified</span>
+                    </li>
+                  )}
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Immediate Next Steps */}
+          <Card className="bg-white shadow-lg border">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-gray-900">Immediate Next Steps</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {(() => {
+                  const urgentTasks = tasks
+                    .filter(t => {
+                      if (t.status === 'completed' || !t.deadline) return false;
+                      return isOverdueAt1700EST(t.deadline) || differenceInCalendarDays(setDeadlineTo5PM(t.deadline), currentDate) <= 3;
+                    })
+                    .sort((a, b) => {
+                      if (a.deadline && b.deadline) {
+                        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+                      }
+                      return 0;
+                    })
+                    .slice(0, 5);
+
+                  if (urgentTasks.length === 0) {
+                    return (
+                      <div className="text-center py-4 text-gray-600">
+                        <CheckCircle className="h-8 w-8 text-emerald-600 mx-auto mb-2" />
+                        <p>No urgent items. Continue execution on current timeline.</p>
+                      </div>
+                    );
+                  }
+
+                  return urgentTasks.map((task, index) => (
+                    <div key={task.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-gray-900">{task.title}</span>
+                          {task.deadline && (
+                            <Badge variant={isOverdueAt1700EST(task.deadline) ? 'destructive' : 'secondary'} className="text-xs">
+                              {isOverdueAt1700EST(task.deadline) 
+                                ? 'Overdue' 
+                                : `Due ${format(setDeadlineTo5PM(task.deadline), 'MMM d')}`}
+                            </Badge>
+                          )}
+                        </div>
+                        {task.assignee && (
+                          <div className="text-xs text-gray-600 mt-1">Owner: {task.assignee}</div>
+                        )}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Separator />
+
         {/* Professional Footer - Call to Action Elements */}
         <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 mt-8">
           <CardContent className="p-8">
