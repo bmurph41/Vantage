@@ -707,24 +707,47 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="deadline">Deadline Date</Label>
-                    <Input
-                      id="deadline"
-                      type="date"
-                      {...form.register("deadline")}
-                      data-testid="input-deadline"
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="deadline"
+                        type="date"
+                        {...form.register("deadline")}
+                        data-testid="input-deadline"
+                        className="flex-1"
+                      />
+                      <div className="flex gap-1">
+                        {project?.ddExpirationDate && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              form.setValue("deadline", project.ddExpirationDate!);
+                            }}
+                            className="px-2 text-xs whitespace-nowrap"
+                            data-testid="button-dd-exp"
+                          >
+                            DD Exp
+                          </Button>
+                        )}
+                        {project?.closingDate && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              form.setValue("deadline", project.closingDate!);
+                            }}
+                            className="px-2 text-xs whitespace-nowrap"
+                            data-testid="button-closing"
+                          >
+                            Closing
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       Set a specific deadline date for this task
-                      {(project?.ddExpirationDate || project?.closingDate) && (
-                        <div className="text-xs mt-1">
-                          {project?.ddExpirationDate && (
-                            <span className="block">DD Expiration: {format(parseISO(project.ddExpirationDate), 'MM/dd/yyyy')}</span>
-                          )}
-                          {project?.closingDate && (
-                            <span className="block">Closing Date: {format(parseISO(project.closingDate), 'MM/dd/yyyy')}</span>
-                          )}
-                        </div>
-                      )}
                     </p>
                   </div>
                 </div>
@@ -1038,16 +1061,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Set a specific deadline date for this task
-                      {(project?.ddExpirationDate || project?.closingDate) && (
-                        <div className="text-xs mt-1">
-                          {project?.ddExpirationDate && (
-                            <span className="block">DD Exp: {format(parseISO(project.ddExpirationDate), 'MM/dd/yyyy')}</span>
-                          )}
-                          {project?.closingDate && (
-                            <span className="block">Closing: {format(parseISO(project.closingDate), 'MM/dd/yyyy')}</span>
-                          )}
-                        </div>
-                      )}
                     </p>
                   </div>
                 </div>
@@ -1743,16 +1756,6 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Set a specific deadline date for this task
-                      {(project?.ddExpirationDate || project?.closingDate) && (
-                        <div className="text-xs mt-1">
-                          {project?.ddExpirationDate && (
-                            <span className="block">DD Exp: {format(parseISO(project.ddExpirationDate), 'MM/dd/yyyy')}</span>
-                          )}
-                          {project?.closingDate && (
-                            <span className="block">Closing: {format(parseISO(project.closingDate), 'MM/dd/yyyy')}</span>
-                          )}
-                        </div>
-                      )}
                     </p>
                   </div>
                 </div>
