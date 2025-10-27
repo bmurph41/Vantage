@@ -335,6 +335,7 @@ export const contacts = pgTable("contacts", {
   phone: text("phone"),
   timezone: text("timezone").notNull().default("America/New_York"),
   role: contactRoleEnum("role"), // Optional role designation
+  customRole: text("custom_role"), // Custom role/position when role is "other"
   company: text("company"), // Company name for the contact
   onDealTeam: boolean("on_deal_team").notNull().default(false), // Whether contact is on the deal team
   dealTeamNotes: text("deal_team_notes"), // Notes about this contact's role on the deal team

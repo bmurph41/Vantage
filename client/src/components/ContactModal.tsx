@@ -40,6 +40,7 @@ export type ContactPayload = {
   address?: string; // multiline freeform
   company?: string;
   role?: string;
+  customRole?: string; // Custom role when role is "other"
   timezone?: string;
   onDealTeam?: boolean;
   dealTeamNotes?: string;
@@ -102,6 +103,7 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
   const [address, setAddress] = useState(initialData?.address ?? "");
   const [company, setCompany] = useState(initialData?.company ?? "");
   const [role, setRole] = useState(initialData?.role ?? "");
+  const [customRole, setCustomRole] = useState(initialData?.customRole ?? "");
   const [timezone, setTimezone] = useState(initialData?.timezone ?? "America/New_York");
   const [onDealTeam, setOnDealTeam] = useState(Boolean(initialData?.onDealTeam));
   const [dealTeamNotes, setDealTeamNotes] = useState(initialData?.dealTeamNotes ?? "");
@@ -127,6 +129,7 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
     setAddress(initialData?.address ?? "");
     setCompany(initialData?.company ?? "");
     setRole(initialData?.role ?? "");
+    setCustomRole(initialData?.customRole ?? "");
     setTimezone(initialData?.timezone ?? "America/New_York");
     setOnDealTeam(Boolean(initialData?.onDealTeam));
     setDealTeamNotes(initialData?.dealTeamNotes ?? "");
@@ -156,6 +159,7 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
       address: address.trim() || undefined,
       company: company.trim() || undefined,
       role: role || undefined,
+      customRole: (role === "other" && customRole.trim()) ? customRole.trim() : undefined,
       timezone,
       onDealTeam,
       dealTeamNotes: dealTeamNotes.trim() || undefined,
@@ -309,6 +313,21 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
                 </Select>
               </div>
             </div>
+            
+            {/* Custom Role Input - Shows when "Other" is selected */}
+            {role === "other" && (
+              <div className="space-y-2 mt-4">
+                <Label htmlFor="customRole">Position/Role</Label>
+                <Input
+                  id="customRole"
+                  value={customRole}
+                  onChange={(e) => setCustomRole(e.target.value)}
+                  placeholder="e.g., Marina Manager, Dock Master, Operations Director"
+                  data-testid={isEdit ? "input-edit-custom-role" : "input-custom-role"}
+                />
+                <p className="text-xs text-muted-foreground">Enter the specific position or role for this contact</p>
+              </div>
+            )}
           </div>
 
           {/* Address & Deal Team */}

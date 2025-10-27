@@ -217,7 +217,9 @@ export default function ContactDetailsModal({ open, onClose, onEdit, contact }: 
                         <span className="font-medium text-green-900">Role</span>
                       </div>
                       <p className="text-green-800" data-testid="detail-role">
-                        {contactRoles.find(role => role.value === contact.role)?.label || contact.role}
+                        {contact.role === 'other' && contact.customRole
+                          ? contact.customRole
+                          : contactRoles.find(role => role.value === contact.role)?.label || contact.role}
                       </p>
                     </div>
                   )}
