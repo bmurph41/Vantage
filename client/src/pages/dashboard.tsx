@@ -477,6 +477,11 @@ export default function Dashboard() {
                           <div className="text-xl font-bold text-gray-900" data-testid={`text-days-to-closing-${project.id}`}>
                             {daysToClosing !== null ? `${daysToClosing}d` : 'TBD'}
                           </div>
+                          {project.closingDate && (
+                            <div className="text-xs text-gray-500 italic mt-1">
+                              {format(parseISO(project.closingDate), 'MMM d')}
+                            </div>
+                          )}
                         </div>
                         
                         {/* Total Deposits */}
@@ -516,6 +521,9 @@ export default function Dashboard() {
                             </div>
                             <div className={`text-xl font-bold ${ddExpiringSoon ? 'text-amber-700' : 'text-gray-900'}`} data-testid={`text-dd-remaining-${project.id}`}>
                               {calculateDaysRemaining(project.ddExpirationDate)}d
+                            </div>
+                            <div className="text-xs text-gray-500 italic mt-1">
+                              {format(parseISO(project.ddExpirationDate), 'MMM d')}
                             </div>
                           </div>
                         )}
