@@ -181,8 +181,8 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden" data-testid={isEdit ? "dialog-edit-contact" : "dialog-add-contact"}>
-        <DialogHeader className="px-6 pt-6 pb-2">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" data-testid={isEdit ? "dialog-edit-contact" : "dialog-add-contact"}>
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2 text-2xl">
             <User className="h-6 w-6" />
             {isEdit ? "Edit Contact" : "Add Contact"}
@@ -192,19 +192,19 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
           </DialogDescription>
         </DialogHeader>
 
-        {/* Body */}
-        <div className="px-6 pb-2">
-          {/* Photo + Name */}
-          <div className="grid grid-cols-1 md:grid-cols-[120px_1fr] gap-6 items-start py-4">
-            <div className="flex flex-col items-center gap-3">
-              <div className="relative h-24 w-24 rounded-2xl bg-muted overflow-hidden flex items-center justify-center">
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="space-y-6">
+            {/* Photo Upload Section */}
+            <div className="flex items-center gap-4 pb-4 border-b">
+              <div className="relative h-20 w-20 rounded-xl bg-muted overflow-hidden flex items-center justify-center flex-shrink-0">
                 {photoDataUrl ? (
                   <img alt="Contact avatar" src={photoDataUrl} className="h-full w-full object-cover" />
                 ) : (
-                  <User className="h-10 w-10 opacity-60" />
+                  <User className="h-8 w-8 opacity-60" />
                 )}
               </div>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <label className="flex items-center gap-2 text-sm cursor-pointer text-primary hover:underline">
                 <Upload className="h-4 w-4" />
                 <span>Upload photo</span>
                 <input
@@ -216,87 +216,114 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
               </label>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First name *</Label>
-                <Input
-                  id="firstName"
-                  ref={firstNameRef}
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="Jane"
-                  className={classNames(touched && errors.firstName && "border-destructive focus-visible:ring-destructive")}
-                  data-testid={isEdit ? "input-edit-name" : "input-contact-name"}
-                />
-                {touched && errors.firstName && (
-                  <p className="text-xs text-destructive">{errors.firstName}</p>
-                )}
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Basic Information</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First name *</Label>
+                  <Input
+                    id="firstName"
+                    ref={firstNameRef}
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Krissy"
+                    className={classNames(touched && errors.firstName && "border-destructive focus-visible:ring-destructive")}
+                    data-testid={isEdit ? "input-edit-name" : "input-contact-name"}
+                  />
+                  {touched && errors.firstName && (
+                    <p className="text-xs text-destructive">{errors.firstName}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last name</Label>
+                  <Input 
+                    id="lastName" 
+                    value={lastName} 
+                    onChange={(e) => setLastName(e.target.value)} 
+                    placeholder="Gritz" 
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last name</Label>
-                <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    placeholder="krissy@marinamatch.com" 
+                    className={classNames(touched && errors.email && "border-destructive focus-visible:ring-destructive")}
+                    data-testid={isEdit ? "input-edit-email" : "input-contact-email"}
+                  />
+                  {touched && errors.email && (
+                    <p className="text-xs text-destructive">{errors.email}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="flex items-center gap-2">
+                    <Phone className="h-4 w-4"/> Phone *
+                  </Label>
+                  <Input
+                    id="phone"
+                    inputMode="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(formatPhone(e.target.value))}
+                    placeholder="(727) 580-0196"
+                    className={classNames(touched && errors.phone && "border-destructive focus-visible:ring-destructive")}
+                    data-testid={isEdit ? "input-edit-phone" : "input-contact-phone"}
+                  />
+                  {touched && errors.phone && (
+                    <p className="text-xs text-destructive">{errors.phone}</p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  value={email} 
-                  onChange={(e) => setEmail(e.target.value)} 
-                  placeholder="jane@example.com" 
-                  className={classNames(touched && errors.email && "border-destructive focus-visible:ring-destructive")}
-                  data-testid={isEdit ? "input-edit-email" : "input-contact-email"}
-                />
-                {touched && errors.email && (
-                  <p className="text-xs text-destructive">{errors.email}</p>
-                )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="timezone">Timezone *</Label>
+                  <Select value={timezone} onValueChange={setTimezone}>
+                    <SelectTrigger 
+                      className={classNames(touched && errors.timezone && "border-destructive focus-visible:ring-destructive")}
+                      data-testid={isEdit ? "select-edit-timezone" : "select-contact-timezone"}
+                    >
+                      <SelectValue placeholder="Select timezone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timezones.map((tz) => (
+                        <SelectItem key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {touched && errors.timezone && (
+                    <p className="text-xs text-destructive">{errors.timezone}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="company">Company</Label>
+                  <Input 
+                    id="company" 
+                    value={company} 
+                    onChange={(e) => setCompany(e.target.value)} 
+                    placeholder="Southern Marinas" 
+                    data-testid={isEdit ? "input-edit-company" : "input-contact-company"}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="flex items-center gap-2"><Phone className="h-4 w-4"/> Phone *</Label>
-                <Input
-                  id="phone"
-                  inputMode="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(formatPhone(e.target.value))}
-                  placeholder="(555) 555-1234"
-                  className={classNames(touched && errors.phone && "border-destructive focus-visible:ring-destructive")}
-                  data-testid={isEdit ? "input-edit-phone" : "input-contact-phone"}
-                />
-                {touched && errors.phone && (
-                  <p className="text-xs text-destructive">{errors.phone}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="timezone">Timezone *</Label>
-                <Select value={timezone} onValueChange={setTimezone}>
-                  <SelectTrigger 
-                    className={classNames(touched && errors.timezone && "border-destructive focus-visible:ring-destructive")}
-                    data-testid={isEdit ? "select-edit-timezone" : "select-contact-timezone"}
-                  >
-                    <SelectValue placeholder="Select timezone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timezones.map((tz) => (
-                      <SelectItem key={tz.value} value={tz.value}>
-                        {tz.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {touched && errors.timezone && (
-                  <p className="text-xs text-destructive">{errors.timezone}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="company">Company</Label>
-                <Input 
-                  id="company" 
-                  value={company} 
-                  onChange={(e) => setCompany(e.target.value)} 
-                  placeholder="Southern Marinas" 
-                  data-testid={isEdit ? "input-edit-company" : "input-contact-company"}
-                />
-              </div>
+            </div>
+
+            {/* Professional Information */}
+            <div className="space-y-4 pt-4 border-t">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Professional Information</h3>
+              
               <div className="space-y-2">
                 <Label htmlFor="role">Role/Title</Label>
                 <Select value={role} onValueChange={setRole}>
@@ -312,51 +339,74 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            
-            {/* Custom Role Input - Shows when "Other" is selected */}
-            {role === "other" && (
-              <div className="space-y-2 mt-4">
-                <Label htmlFor="customRole">Position/Role</Label>
-                <Input
-                  id="customRole"
-                  value={customRole}
-                  onChange={(e) => setCustomRole(e.target.value)}
-                  placeholder="e.g., Marina Manager, Dock Master, Operations Director"
-                  data-testid={isEdit ? "input-edit-custom-role" : "input-custom-role"}
-                />
-                <p className="text-xs text-muted-foreground">Enter the specific position or role for this contact</p>
-              </div>
-            )}
-          </div>
 
-          {/* Address & Deal Team */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Textarea id="address" rows={4} value={address} onChange={(e) => setAddress(e.target.value)} placeholder={`123 Marina Way\nKey West, FL 33040`} />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="dealTeam">Deal Team</Label>
-                <div className="flex items-center gap-2 text-sm">
-                  <Switch checked={onDealTeam} onCheckedChange={setOnDealTeam} />
-                  <span className="text-muted-foreground">On team</span>
+              {/* Custom Role Input - Shows when "Other" is selected */}
+              {role === "other" && (
+                <div className="space-y-2">
+                  <Label htmlFor="customRole">Position/Role</Label>
+                  <Input
+                    id="customRole"
+                    value={customRole}
+                    onChange={(e) => setCustomRole(e.target.value)}
+                    placeholder="CFO"
+                    data-testid={isEdit ? "input-edit-custom-role" : "input-custom-role"}
+                  />
+                  <p className="text-xs text-muted-foreground">Enter the specific position or role for this contact</p>
                 </div>
+              )}
+            </div>
+
+            {/* Location & Deal Team */}
+            <div className="space-y-4 pt-4 border-t">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Additional Details</h3>
+              
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <Textarea 
+                  id="address" 
+                  rows={3} 
+                  value={address} 
+                  onChange={(e) => setAddress(e.target.value)} 
+                  placeholder="123 Marina Way&#10;Key West, FL 33040" 
+                />
               </div>
-              <Textarea id="dealTeam" rows={4} value={dealTeamNotes} onChange={(e) => setDealTeamNotes(e.target.value)} placeholder="Notes about this person's role on the deal team, responsibilities, coverage, etc." />
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="dealTeam">Deal Team</Label>
+                  <div className="flex items-center gap-2">
+                    <Switch 
+                      checked={onDealTeam} 
+                      onCheckedChange={setOnDealTeam}
+                      id="dealTeamSwitch"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {onDealTeam ? "On team" : "Not on team"}
+                    </span>
+                  </div>
+                </div>
+                <Textarea 
+                  id="dealTeam" 
+                  rows={3} 
+                  value={dealTeamNotes} 
+                  onChange={(e) => setDealTeamNotes(e.target.value)} 
+                  placeholder="Notes about this person's role on the deal team, responsibilities, coverage, etc." 
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="px-6 py-4 bg-muted/40 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">Press <kbd className="px-1 py-0.5 border rounded">Esc</kbd> to close</p>
+        <DialogFooter className="px-6 py-4 border-t bg-muted/20 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            Press <kbd className="px-1.5 py-0.5 border rounded text-xs">Esc</kbd> to close
+          </p>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={onClose} data-testid={isEdit ? "button-cancel-edit" : "button-cancel"}>
+            <Button variant="outline" onClick={onClose} data-testid={isEdit ? "button-cancel-edit" : "button-cancel"}>
               Cancel
             </Button>
             <Button onClick={handleSave} className="min-w-24" data-testid={isEdit ? "button-save-edit" : "button-save-contact"}>
-              {isEdit ? "Save" : "Add"}
+              {isEdit ? "Save Changes" : "Add Contact"}
             </Button>
           </div>
         </DialogFooter>
