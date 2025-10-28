@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building, X, LayoutDashboard, PieChart, Briefcase } from "lucide-react";
+import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building, X, LayoutDashboard, PieChart, Briefcase, TrendingUp } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useProjects, useCreateProject, useDeleteProject } from "@/hooks/use-project";
 import { useCreateTask } from "@/hooks/use-tasks";
@@ -359,51 +360,64 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {projects.map((project) => {
-              // Calculate project status based on dates (timezone-aware)
+              // Calculate project timeline metrics
               const today = tzNow('America/New_York');
+              
+              // Calculate timeline progress (PSA to Closing)
+              let timelineProgress = 0;
+              let daysInDeal = 0;
+              let daysToClosing = null;
+              
+              if (project.psaSignedDate) {
+                daysInDeal = differenceInCalendarDays(today, parseISO(project.psaSignedDate));
+                
+                if (project.closingDate) {
+                  const totalDays = differenceInCalendarDays(parseISO(project.closingDate), parseISO(project.psaSignedDate));
+                  const elapsedDays = differenceInCalendarDays(today, parseISO(project.psaSignedDate));
+                  timelineProgress = totalDays > 0 ? Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100)) : 0;
+                  daysToClosing = differenceInCalendarDays(parseISO(project.closingDate), today);
+                }
+              }
+              
+              // Calculate total deposits
+              const totalDeposits = (project.firstDepositAmount || 0) + (project.secondDepositAmount || 0);
+              
+              // Status checks
               const ddExpired = project.ddExpirationDate && isPast(parseISO(project.ddExpirationDate));
               const ddExpiringSoon = project.ddExpirationDate && !ddExpired && differenceInCalendarDays(parseISO(project.ddExpirationDate), today) <= 7;
-              const closingSoon = project.closingDate && differenceInCalendarDays(parseISO(project.closingDate), today) <= 14;
               
               let statusBadge = null;
-              let statusColor = "bg-gray-50/30 border-gray-200";
               
               if (ddExpired) {
-                statusBadge = { text: "DD Expired", variant: "outline" as const, icon: AlertTriangle };
-                statusColor = "bg-red-50/30 border-red-200";
+                statusBadge = { text: "DD Expired", variant: "destructive" as const };
               } else if (ddExpiringSoon) {
-                statusBadge = { text: "DD Expiring Soon", variant: "outline" as const, icon: Clock };
-                statusColor = "bg-amber-50/30 border-amber-200";
-              } else if (closingSoon) {
-                statusBadge = { text: "Closing Soon", variant: "outline" as const, icon: CheckCircle };
-                statusColor = "bg-slate-50/30 border-slate-200";
+                statusBadge = { text: "DD Expiring Soon", variant: "default" as const, className: "bg-amber-100 text-amber-800 border-amber-300" };
+              } else if (daysToClosing !== null && daysToClosing <= 14 && daysToClosing > 0) {
+                statusBadge = { text: "Closing Soon", variant: "default" as const, className: "bg-blue-100 text-blue-800 border-blue-300" };
+              } else if (timelineProgress >= 50) {
+                statusBadge = { text: "In Progress", variant: "default" as const, className: "bg-green-100 text-green-800 border-green-300" };
               }
               
               return (
                 <Link key={project.id} href={`/projects/${project.id}`}>
-                  <Card className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-2 ${statusColor} hover:scale-[1.02]`} data-testid={`card-project-${project.id}`}>
-                    {/* Header with status badge */}
+                  <Card className="hover:shadow-xl transition-all duration-200 cursor-pointer border-l-4 border-l-blue-500 hover:scale-[1.01]" data-testid={`card-project-${project.id}`}>
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Building className="h-5 w-5 text-primary" />
-                            <CardTitle className="text-xl font-bold text-gray-900 leading-tight" data-testid={`text-project-name-${project.id}`}>
-                              {project.name}
-                            </CardTitle>
-                          </div>
+                          <CardTitle className="text-xl font-bold text-gray-900 mb-1" data-testid={`text-project-name-${project.id}`}>
+                            {project.name}
+                          </CardTitle>
                           {(project.city || project.state) && (
-                            <p className="text-sm text-gray-500 font-medium" data-testid={`text-project-location-${project.id}`}>
+                            <p className="text-sm text-gray-500" data-testid={`text-project-location-${project.id}`}>
                               {[project.city, project.state].filter(Boolean).join(', ')}
                             </p>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
                           {statusBadge && (
-                            <Badge variant={statusBadge.variant} className="flex items-center gap-1 text-xs font-medium text-gray-600 border-gray-300">
-                              <statusBadge.icon className="h-3 w-3" />
+                            <Badge variant={statusBadge.variant} className={statusBadge.className || ""}>
                               {statusBadge.text}
                             </Badge>
                           )}
@@ -417,83 +431,106 @@ export default function Dashboard() {
                             data-testid={`button-delete-project-${project.id}`}
                             title="Delete project"
                           >
-                            <X className="h-4 w-4 stroke-1" />
+                            <X className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
                     </CardHeader>
                     
                     <CardContent className="space-y-4">
-                      {/* Key Dates Section */}
-                      <div className="space-y-3">
-                        {project.psaSignedDate && (
-                          <div className="flex items-center justify-between py-2 px-3 bg-slate-50/50 rounded-lg" data-testid={`text-psa-date-${project.id}`}>
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-gray-500" />
-                              <span className="text-sm font-medium text-gray-700">PSA Signed</span>
-                            </div>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}
+                      {/* Timeline Progress Bar */}
+                      {project.psaSignedDate && project.closingDate && (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-600">Deal Timeline Progress</span>
+                            <span className="text-2xl font-bold text-blue-600">
+                              {Math.round(timelineProgress)}%
                             </span>
                           </div>
-                        )}
-                        
-                        {project.ddExpirationDate && (
-                          <div className={`flex items-center justify-between py-2 px-3 rounded-lg ${
-                            ddExpired ? 'bg-red-50/50' : ddExpiringSoon ? 'bg-amber-50/50' : 'bg-slate-50/50'
-                          }`} data-testid={`text-dd-expiration-${project.id}`}>
-                            <div className="flex items-center gap-2">
-                              <Clock className={`h-4 w-4 ${
-                                ddExpired ? 'text-red-500' : ddExpiringSoon ? 'text-amber-500' : 'text-gray-500'
-                              }`} />
-                              <span className="text-sm font-medium text-gray-700">DD Expiration</span>
-                            </div>
-                            <span className={`text-sm font-semibold ${
-                              ddExpired ? 'text-red-700' : ddExpiringSoon ? 'text-amber-700' : 'text-gray-900'
-                            }`}>
-                              {format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')} ({calculateDaysRemaining(project.ddExpirationDate) > 0 ? `${calculateDaysRemaining(project.ddExpirationDate)}d remaining` : calculateDaysRemaining(project.ddExpirationDate) === 0 ? 'Today' : `${Math.abs(calculateDaysRemaining(project.ddExpirationDate))}d ago`})
-                            </span>
-                          </div>
-                        )}
-                        
-                        {project.closingDate && (
-                          <div className={`flex items-center justify-between py-2 px-3 rounded-lg ${
-                            closingSoon ? 'bg-slate-50/50' : 'bg-slate-50/50'
-                          }`} data-testid={`text-closing-date-${project.id}`}>
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className={`h-4 w-4 ${
-                                closingSoon ? 'text-slate-500' : 'text-gray-500'
-                              }`} />
-                              <span className="text-sm font-medium text-gray-700">Target Closing</span>
-                            </div>
-                            <span className={`text-sm font-semibold ${
-                              closingSoon ? 'text-slate-700' : 'text-gray-900'
-                            }`}>
-                              {format(parseISO(project.closingDate), 'MMM d, yyyy')} ({calculateDaysRemaining(project.closingDate) > 0 ? `${calculateDaysRemaining(project.closingDate)}d remaining` : calculateDaysRemaining(project.closingDate) === 0 ? 'Today' : `${Math.abs(calculateDaysRemaining(project.closingDate))}d ago`})
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Total Cost Section */}
-                      {(project as any).totalCost !== undefined && (
-                        <div className="border-t border-gray-200 pt-4" data-testid={`text-total-cost-${project.id}`}>
-                          <div className="flex items-center justify-between py-3 px-4 bg-slate-50/40 rounded-lg border border-gray-200">
-                            <div className="flex items-center gap-2">
-                              <DollarSign className="h-5 w-5 text-gray-600" />
-                              <span className="text-sm font-medium text-gray-700">Total Inspection Costs</span>
-                            </div>
-                            <span className="text-lg font-bold text-gray-900">
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: 'USD',
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 0,
-                              }).format((project as any).totalCost)}
-                            </span>
+                          <Progress value={timelineProgress} className="h-3" data-testid={`progress-timeline-${project.id}`} />
+                          <div className="flex items-center justify-between mt-1 text-xs text-gray-500">
+                            <span>{format(parseISO(project.psaSignedDate), 'MMM d')}</span>
+                            <span>{format(parseISO(project.closingDate), 'MMM d')}</span>
                           </div>
                         </div>
                       )}
+                      
+                      {/* Key Metrics Grid */}
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Time in Deal */}
+                        <div className="bg-slate-50 rounded-lg p-3">
+                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                            <Clock className="h-4 w-4" />
+                            <span>Time in Deal</span>
+                          </div>
+                          <div className="text-xl font-bold text-gray-900" data-testid={`text-days-in-deal-${project.id}`}>
+                            {daysInDeal}d
+                          </div>
+                        </div>
+                        
+                        {/* Days to Closing */}
+                        <div className="bg-slate-50 rounded-lg p-3">
+                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>To Closing</span>
+                          </div>
+                          <div className="text-xl font-bold text-gray-900" data-testid={`text-days-to-closing-${project.id}`}>
+                            {daysToClosing !== null ? `${daysToClosing}d` : 'TBD'}
+                          </div>
+                        </div>
+                        
+                        {/* Total Deposits */}
+                        {totalDeposits > 0 && (
+                          <div className="bg-green-50 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                              <DollarSign className="h-4 w-4" />
+                              <span>Total Deposits</span>
+                            </div>
+                            <div className="text-xl font-bold text-gray-900" data-testid={`text-total-deposits-${project.id}`}>
+                              ${(totalDeposits / 1000).toFixed(0)}K
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Purchase Price */}
+                        {project.purchasePrice && (
+                          <div className="bg-blue-50 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                              <Building className="h-4 w-4" />
+                              <span>Purchase Price</span>
+                            </div>
+                            <div className="text-xl font-bold text-gray-900" data-testid={`text-purchase-price-${project.id}`}>
+                              ${(project.purchasePrice / 1000000).toFixed(1)}M
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* DD Days Remaining (if applicable) */}
+                        {project.ddExpirationDate && !ddExpired && (
+                          <div className={`rounded-lg p-3 ${ddExpiringSoon ? 'bg-amber-50' : 'bg-purple-50'}`}>
+                            <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                              <AlertTriangle className="h-4 w-4" />
+                              <span>DD Remaining</span>
+                            </div>
+                            <div className={`text-xl font-bold ${ddExpiringSoon ? 'text-amber-700' : 'text-gray-900'}`} data-testid={`text-dd-remaining-${project.id}`}>
+                              {calculateDaysRemaining(project.ddExpirationDate)}d
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Projected Revenue (if applicable) */}
+                        {project.projectedAnnualRevenue && (
+                          <div className="bg-indigo-50 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                              <TrendingUp className="h-4 w-4" />
+                              <span>Annual Rev.</span>
+                            </div>
+                            <div className="text-xl font-bold text-gray-900" data-testid={`text-annual-revenue-${project.id}`}>
+                              ${(project.projectedAnnualRevenue / 1000).toFixed(0)}K
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 </Link>
