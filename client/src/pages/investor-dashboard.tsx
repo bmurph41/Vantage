@@ -240,9 +240,6 @@ function DealCard({ project }: { project: Project }) {
           <div className="flex justify-between items-start">
             <div className="flex-1">
               <CardTitle className="text-xl text-gray-900 dark:text-white">{project.name}</CardTitle>
-              {project.description && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{project.description}</p>
-              )}
             </div>
             <Badge 
               variant={metrics.healthScore >= 80 ? 'default' : metrics.healthScore >= 60 ? 'secondary' : 'destructive'}

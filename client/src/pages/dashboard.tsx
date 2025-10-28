@@ -395,13 +395,8 @@ export default function Dashboard() {
                             </CardTitle>
                           </div>
                           {(project.city || project.state) && (
-                            <p className="text-sm text-gray-500 font-medium mb-1" data-testid={`text-project-location-${project.id}`}>
+                            <p className="text-sm text-gray-500 font-medium" data-testid={`text-project-location-${project.id}`}>
                               {[project.city, project.state].filter(Boolean).join(', ')}
-                            </p>
-                          )}
-                          {project.description && (
-                            <p className="text-sm text-gray-600 leading-relaxed" data-testid={`text-project-description-${project.id}`}>
-                              {project.description}
                             </p>
                           )}
                         </div>
