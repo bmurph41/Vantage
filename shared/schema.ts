@@ -96,6 +96,7 @@ export const projects = pgTable("projects", {
   investmentThesis: text("investment_thesis"), // Strategic rationale
   dealHealthScore: integer("deal_health_score"), // 0-100 calculated score
   healthScoreUpdatedAt: timestamp("health_score_updated_at"),
+  customDeadlines: jsonb("custom_deadlines").default(sql`'[]'`), // Array of {label: string, date: string}
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

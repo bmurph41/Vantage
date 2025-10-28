@@ -86,6 +86,11 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const [sellersArray, setSellersArray] = useState<string[]>(project.seller || []);
   const [attorneysArray, setAttorneysArray] = useState<string[]>(project.ourAttorney || []);
   
+  // Custom Deadlines State
+  const [customDeadlines, setCustomDeadlines] = useState<Array<{label: string, date: string}>>(
+    (project.customDeadlines as any) || []
+  );
+  
   // Deposit Information State
   const [firstDepositDays, setFirstDepositDays] = useState<number | "">(project.firstDepositDays || 0);
   const [secondDepositDays, setSecondDepositDays] = useState<number | "">(project.secondDepositDays || 0);
@@ -387,6 +392,8 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
         secondDepositDays: secondDepositDays === "" ? null : Number(secondDepositDays),
         secondDepositDueDate: data.secondDepositDueDate || null,
         tz: data.tz,
+        // Custom Deadlines - filter out empty entries
+        customDeadlines: customDeadlines.filter(d => d.label.trim() !== "" && d.date.trim() !== ""),
       },
     });
     
@@ -681,6 +688,82 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
               </div>
               {projectForm.formState.errors.daysToClosing && (
                 <p className="text-sm text-destructive mt-1">{projectForm.formState.errors.daysToClosing.message}</p>
+              )}
+            </div>
+            
+            {/* Custom Deadlines */}
+            <div className="pt-4 border-t">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-base font-semibold">Custom Deadlines</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCustomDeadlines([...customDeadlines, { label: "", date: "" }]);
+                  }}
+                  data-testid="button-add-custom-deadline"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Deadline
+                </Button>
+              </div>
+              
+              {customDeadlines.length > 0 && (
+                <div className="space-y-3">
+                  {customDeadlines.map((deadline, index) => (
+                    <div key={index} className="grid grid-cols-2 gap-3 items-start p-3 bg-muted/50 rounded-lg">
+                      <div className="space-y-2">
+                        <Label htmlFor={`custom-deadline-label-${index}`} className="text-xs">Deadline Name</Label>
+                        <Input
+                          id={`custom-deadline-label-${index}`}
+                          value={deadline.label}
+                          onChange={(e) => {
+                            const updated = [...customDeadlines];
+                            updated[index].label = e.target.value;
+                            setCustomDeadlines(updated);
+                          }}
+                          placeholder="e.g., Inspection Period, Final Walkthrough"
+                          data-testid={`input-custom-deadline-label-${index}`}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor={`custom-deadline-date-${index}`} className="text-xs">Date</Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const updated = customDeadlines.filter((_, i) => i !== index);
+                              setCustomDeadlines(updated);
+                            }}
+                            className="h-6 w-6 p-0"
+                            data-testid={`button-remove-custom-deadline-${index}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <DateInput
+                          id={`custom-deadline-date-${index}`}
+                          value={deadline.date}
+                          onChange={(value) => {
+                            const updated = [...customDeadlines];
+                            updated[index].date = value;
+                            setCustomDeadlines(updated);
+                          }}
+                          data-testid={`input-custom-deadline-date-${index}`}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {customDeadlines.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No custom deadlines added. Click "Add New Deadline" to create one.
+                </p>
               )}
             </div>
           </div>
