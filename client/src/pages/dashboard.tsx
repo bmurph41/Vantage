@@ -487,7 +487,9 @@ export default function Dashboard() {
                               <span>Total Deposits</span>
                             </div>
                             <div className="text-xl font-bold text-gray-900" data-testid={`text-total-deposits-${project.id}`}>
-                              ${(totalDeposits / 1000).toFixed(0)}K
+                              {totalDeposits > 999000 
+                                ? `$${(totalDeposits / 1000000).toFixed(1)}M` 
+                                : `$${(totalDeposits / 1000).toFixed(0)}K`}
                             </div>
                           </div>
                         )}
