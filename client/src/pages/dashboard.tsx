@@ -30,6 +30,8 @@ import { z } from "zod";
 const createProjectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   description: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
   quickAddTasks: z.object({
     pca: z.boolean().default(false),
     environmental: z.boolean().default(false),
@@ -84,6 +86,8 @@ function CreateProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     defaultValues: {
       name: "",
       description: "",
+      city: "",
+      state: "",
       quickAddTasks: {
         pca: false,
         environmental: false,
@@ -99,6 +103,8 @@ function CreateProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       const project = await createProject.mutateAsync({
         name: data.name,
         description: data.description,
+        city: data.city,
+        state: data.state,
         anchorType: "psa",
         tz: "America/New_York",
       });
@@ -161,6 +167,27 @@ function CreateProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChan
               rows={3}
               data-testid="textarea-create-project-description"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                {...form.register("city")}
+                placeholder="Key West"
+                data-testid="input-create-project-city"
+              />
+            </div>
+            <div>
+              <Label htmlFor="state">State</Label>
+              <Input
+                id="state"
+                {...form.register("state")}
+                placeholder="FL"
+                data-testid="input-create-project-state"
+              />
+            </div>
           </div>
 
           {/* Quick Add DD Tasks */}
@@ -367,6 +394,11 @@ export default function Dashboard() {
                               {project.name}
                             </CardTitle>
                           </div>
+                          {(project.city || project.state) && (
+                            <p className="text-sm text-gray-500 font-medium mb-1" data-testid={`text-project-location-${project.id}`}>
+                              {[project.city, project.state].filter(Boolean).join(', ')}
+                            </p>
+                          )}
                           {project.description && (
                             <p className="text-sm text-gray-600 leading-relaxed" data-testid={`text-project-description-${project.id}`}>
                               {project.description}

@@ -63,6 +63,8 @@ export const projects = pgTable("projects", {
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   name: text("name").notNull(),
   description: text("description"),
+  city: text("city"),
+  state: text("state"),
   anchorType: anchorTypeEnum("anchor_type").notNull().default("psa"),
   psaSignedDate: date("psa_signed_date"),
   ddExpirationDate: date("dd_expiration_date"),
