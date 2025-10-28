@@ -34,6 +34,8 @@ const parseCurrency = (value: string): number => {
 const projectFormSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   description: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
   anchorType: z.enum(["psa", "custom"]),
   useBusinessDays: z.boolean(),
   holidayCalendar: z.enum(["us_federal", "none"]),
@@ -190,6 +192,8 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
     defaultValues: {
       name: project.name,
       description: project.description || "",
+      city: project.city || "",
+      state: project.state || "",
       anchorType: project.anchorType,
       useBusinessDays: settings?.useBusinessDays || false,
       holidayCalendar: settings?.holidayCalendar || "us_federal",
@@ -358,6 +362,8 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
       updates: {
         name: data.name,
         description: data.description,
+        city: data.city,
+        state: data.state,
         anchorType: data.anchorType,
         psaSignedDate: data.psaSignedDate || null,
         ddExpirationDate: data.ddExpirationDate || null,
@@ -445,6 +451,27 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                 placeholder="Optional project description"
                 data-testid="textarea-description"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  {...projectForm.register("city")}
+                  placeholder="Key West"
+                  data-testid="input-city"
+                />
+              </div>
+              <div>
+                <Label htmlFor="state">State</Label>
+                <Input
+                  id="state"
+                  {...projectForm.register("state")}
+                  placeholder="FL"
+                  data-testid="input-state"
+                />
+              </div>
             </div>
             
             <div>
