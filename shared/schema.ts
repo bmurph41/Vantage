@@ -82,8 +82,10 @@ export const projects = pgTable("projects", {
   lender: text("lender"),
   // Deposit Information
   firstDepositAmount: integer("first_deposit_amount"),
+  firstDepositDays: integer("first_deposit_days"),
   firstDepositDueDate: date("first_deposit_due_date"),
   secondDepositAmount: integer("second_deposit_amount"),
+  secondDepositDays: integer("second_deposit_days"),
   secondDepositDueDate: date("second_deposit_due_date"),
   tz: text("tz").notNull().default("America/New_York"),
   executiveNotes: text("executive_notes"), // User's notes for AI enhancement

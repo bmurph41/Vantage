@@ -85,8 +85,8 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const [attorneysArray, setAttorneysArray] = useState<string[]>(project.ourAttorney || []);
   
   // Deposit Information State
-  const [firstDepositDays, setFirstDepositDays] = useState<number | "">(0);
-  const [secondDepositDays, setSecondDepositDays] = useState<number | "">(0);
+  const [firstDepositDays, setFirstDepositDays] = useState<number | "">(project.firstDepositDays || 0);
+  const [secondDepositDays, setSecondDepositDays] = useState<number | "">(project.secondDepositDays || 0);
   const [firstDepositUseBusiness, setFirstDepositUseBusiness] = useState<boolean>(false);
   const [secondDepositUseBusiness, setSecondDepositUseBusiness] = useState<boolean>(false);
   const [firstDepositAmount, setFirstDepositAmount] = useState<string>(
@@ -375,8 +375,10 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
         lender: data.lender || null,
         // Deposit Information
         firstDepositAmount: parseCurrency(firstDepositAmount) || null,
+        firstDepositDays: firstDepositDays === "" ? null : Number(firstDepositDays),
         firstDepositDueDate: data.firstDepositDueDate || null,
         secondDepositAmount: parseCurrency(secondDepositAmount) || null,
+        secondDepositDays: secondDepositDays === "" ? null : Number(secondDepositDays),
         secondDepositDueDate: data.secondDepositDueDate || null,
         tz: data.tz,
       },
