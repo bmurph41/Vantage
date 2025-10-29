@@ -3800,6 +3800,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate embeddings for a document
+  app.post("/api/dd/documents/:documentId/embeddings", async (req: any, res) => {
+    try {
+      const document = await storage.getCddDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      await authorizeProjectAccess(document.projectId, req.user.orgId);
+
+      // Check if document has been parsed
+      if (document.parseStatus !== 'parsed') {
+        return res.status(400).json({ 
+          error: "Document must be parsed before generating embeddings",
+          parseStatus: document.parseStatus 
+        });
+      }
+
+      // Get all pages for the document
+      const pages = await storage.getDocPagesForDocument(document.id);
+      
+      if (pages.length === 0) {
+        return res.status(400).json({ error: "No pages found for document" });
+      }
+
+      try {
+        // Import RAG service dynamically
+        const { ragService } = await import('./rag-service');
+        
+        // Process each page and collect all vector chunks (do this BEFORE deleting existing chunks)
+        const allVectorChunks = [];
+        for (const page of pages) {
+          const chunks = await ragService.processDocumentPage(page, document.projectId);
+          allVectorChunks.push(...chunks);
+        }
+
+        // Only delete existing embeddings after successful generation
+        await storage.deleteVectorChunksForDocument(document.id);
+        
+        // Store all vector chunks
+        const createdChunks = await storage.createVectorChunks(allVectorChunks);
+
+        await storage.createAuditLog({
+          orgId: req.user.orgId,
+          projectId: document.projectId,
+          userId: req.user.id,
+          entityType: "cdd_document",
+          entityId: document.id,
+          action: "embeddings_generated",
+          after: { chunksCreated: createdChunks.length, pagesProcessed: pages.length },
+        });
+
+        res.json({ 
+          success: true, 
+          chunksCreated: createdChunks.length,
+          pagesProcessed: pages.length
+        });
+      } catch (embeddingError: any) {
+        console.error("Embedding generation error:", embeddingError);
+        res.status(500).json({ error: embeddingError.message || "Failed to generate embeddings" });
+      }
+    } catch (error) {
+      console.error("Error triggering embedding generation:", error);
+      res.status(500).json({ error: "Failed to trigger embedding generation" });
+    }
+  });
+
+  // Get vector chunks for a document
+  app.get("/api/dd/documents/:documentId/chunks", async (req: any, res) => {
+    try {
+      const document = await storage.getCddDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      await authorizeProjectAccess(document.projectId, req.user.orgId);
+      
+      const chunks = await storage.getVectorChunksForDocument(req.params.documentId);
+      res.json(chunks);
+    } catch (error) {
+      console.error("Error fetching vector chunks:", error);
+      res.status(500).json({ error: "Failed to fetch vector chunks" });
+    }
+  });
+
 
   // Organization-level Audit Logs
   app.get("/api/audit-logs", async (req: any, res) => {

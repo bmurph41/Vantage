@@ -231,6 +231,12 @@ export interface IStorage {
   createDocPages(pages: InsertDocPage[]): Promise<DocPage[]>;
   deleteDocPagesForDocument(documentId: string): Promise<void>;
 
+  // Vector Chunks
+  getVectorChunksForDocument(documentId: string): Promise<VectorChunk[]>;
+  createVectorChunks(chunks: InsertVectorChunk[]): Promise<VectorChunk[]>;
+  deleteVectorChunksForDocument(documentId: string): Promise<void>;
+  searchVectorChunks(projectId: string, queryEmbedding: number[], limit?: number): Promise<any[]>;
+
   // KPIs
   getKpi(id: string): Promise<Kpi | undefined>;
   getKpisForProject(projectId: string): Promise<Kpi[]>;
@@ -1881,6 +1887,55 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDocPagesForDocument(documentId: string): Promise<void> {
     await db.delete(docPages).where(eq(docPages.documentId, documentId));
+  }
+
+  // Vector Chunks
+  async getVectorChunksForDocument(documentId: string): Promise<VectorChunk[]> {
+    return db.select()
+      .from(vectorChunks)
+      .where(
+        sql`${vectorChunks.metadata}->>'documentId' = ${documentId}`
+      )
+      .orderBy(
+        sql`(${vectorChunks.metadata}->>'pageNo')::int`,
+        sql`(${vectorChunks.metadata}->>'chunkIndex')::int`
+      );
+  }
+
+  async createVectorChunks(chunks: InsertVectorChunk[]): Promise<VectorChunk[]> {
+    if (chunks.length === 0) return [];
+    const created = await db.insert(vectorChunks).values(chunks).returning();
+    return created;
+  }
+
+  async deleteVectorChunksForDocument(documentId: string): Promise<void> {
+    await db.delete(vectorChunks).where(
+      sql`${vectorChunks.metadata}->>'documentId' = ${documentId}`
+    );
+  }
+
+  async searchVectorChunks(projectId: string, queryEmbedding: number[], limit: number = 10): Promise<any[]> {
+    // Use pgvector's <=> operator for cosine distance (lower is better)
+    // 1 - distance gives us similarity (higher is better)
+    const embeddingStr = `[${queryEmbedding.join(',')}]`;
+    
+    const results = await db.execute(sql`
+      SELECT 
+        id,
+        project_id as "projectId",
+        source_type as "sourceType",
+        source_id as "sourceId",
+        content_text as "contentText",
+        metadata,
+        1 - (embedding <=> ${embeddingStr}::vector) as similarity
+      FROM vector_chunks
+      WHERE project_id = ${projectId}
+        AND embedding IS NOT NULL
+      ORDER BY embedding <=> ${embeddingStr}::vector
+      LIMIT ${limit}
+    `);
+
+    return results.rows as any[];
   }
 
   // KPIs
