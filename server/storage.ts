@@ -226,6 +226,11 @@ export interface IStorage {
   updateCddDocument(id: string, updates: Partial<InsertCddDocument>): Promise<CddDocument>;
   deleteCddDocument(id: string): Promise<void>;
 
+  // Document Pages
+  getDocPagesForDocument(documentId: string): Promise<DocPage[]>;
+  createDocPages(pages: InsertDocPage[]): Promise<DocPage[]>;
+  deleteDocPagesForDocument(documentId: string): Promise<void>;
+
   // KPIs
   getKpi(id: string): Promise<Kpi | undefined>;
   getKpisForProject(projectId: string): Promise<Kpi[]>;
@@ -1858,6 +1863,24 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCddDocument(id: string): Promise<void> {
     await db.delete(cddDocuments).where(eq(cddDocuments.id, id));
+  }
+
+  // Document Pages
+  async getDocPagesForDocument(documentId: string): Promise<DocPage[]> {
+    return db.select()
+      .from(docPages)
+      .where(eq(docPages.documentId, documentId))
+      .orderBy(docPages.pageNo);
+  }
+
+  async createDocPages(pages: InsertDocPage[]): Promise<DocPage[]> {
+    if (pages.length === 0) return [];
+    const created = await db.insert(docPages).values(pages).returning();
+    return created;
+  }
+
+  async deleteDocPagesForDocument(documentId: string): Promise<void> {
+    await db.delete(docPages).where(eq(docPages.documentId, documentId));
   }
 
   // KPIs

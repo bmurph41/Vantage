@@ -3714,6 +3714,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Parse CDD Document
+  app.post("/api/dd/documents/:documentId/parse", async (req: any, res) => {
+    try {
+      const document = await storage.getCddDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      await authorizeProjectAccess(document.projectId, req.user.orgId);
+
+      // Update status to parsing
+      await storage.updateCddDocument(document.id, { 
+        parseStatus: 'parsing',
+        parseError: null 
+      });
+
+      try {
+        // Import parser dynamically
+        const { documentParser } = await import('./document-parser');
+        
+        // Parse the document
+        const pages = await documentParser.parseDocument(document);
+        
+        // Delete existing pages first (in case of re-parse)
+        await storage.deleteDocPagesForDocument(document.id);
+        
+        // Create doc page records
+        const docPageRecords = documentParser.createDocPageRecords(document.id, pages);
+        await storage.createDocPages(docPageRecords);
+
+        // Update status to parsed
+        const updatedDocument = await storage.updateCddDocument(document.id, { 
+          parseStatus: 'parsed',
+          parsedAt: new Date(),
+          parseError: null 
+        });
+
+        await storage.createAuditLog({
+          orgId: req.user.orgId,
+          projectId: document.projectId,
+          userId: req.user.id,
+          entityType: "cdd_document",
+          entityId: document.id,
+          action: "parsed",
+          after: { parsedPages: pages.length },
+        });
+
+        res.json({ 
+          success: true, 
+          document: updatedDocument,
+          pagesCreated: pages.length 
+        });
+      } catch (parseError: any) {
+        // Update status to failed
+        await storage.updateCddDocument(document.id, { 
+          parseStatus: 'failed',
+          parseError: parseError.message || 'Unknown parsing error'
+        });
+        
+        console.error("Document parsing error:", parseError);
+        res.status(500).json({ error: parseError.message || "Failed to parse document" });
+      }
+    } catch (error) {
+      console.error("Error triggering document parse:", error);
+      res.status(500).json({ error: "Failed to trigger document parsing" });
+    }
+  });
+
+  // Get document pages
+  app.get("/api/dd/documents/:documentId/pages", async (req: any, res) => {
+    try {
+      const document = await storage.getCddDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      await authorizeProjectAccess(document.projectId, req.user.orgId);
+      
+      const pages = await storage.getDocPagesForDocument(req.params.documentId);
+      res.json(pages);
+    } catch (error) {
+      console.error("Error fetching document pages:", error);
+      res.status(500).json({ error: "Failed to fetch document pages" });
+    }
+  });
+
 
   // Organization-level Audit Logs
   app.get("/api/audit-logs", async (req: any, res) => {
