@@ -4158,6 +4158,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === FINDINGS MANAGEMENT API ===
+
+  // Get all findings for a project
+  app.get("/api/dd/projects/:projectId/findings", async (req: any, res) => {
+    try {
+      // Authorize project access
+      try {
+        await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      } catch (authError) {
+        return res.status(403).json({ error: "Unauthorized access to project" });
+      }
+      
+      const findings = await storage.getFindingsForProject(req.params.projectId);
+      res.json(findings);
+    } catch (error) {
+      console.error("Error fetching findings:", error);
+      res.status(500).json({ error: "Failed to fetch findings" });
+    }
+  });
+
+  // Get a single finding
+  app.get("/api/dd/findings/:id", async (req: any, res) => {
+    try {
+      const finding = await storage.getFinding(req.params.id);
+      if (!finding) {
+        return res.status(404).json({ error: "Finding not found" });
+      }
+
+      // Authorize project access
+      try {
+        await authorizeProjectAccess(finding.projectId, req.user.orgId);
+      } catch (authError) {
+        return res.status(403).json({ error: "Unauthorized access to project" });
+      }
+
+      res.json(finding);
+    } catch (error) {
+      console.error("Error fetching finding:", error);
+      res.status(500).json({ error: "Failed to fetch finding" });
+    }
+  });
+
+  // Create a new finding
+  app.post("/api/dd/findings", async (req: any, res) => {
+    try {
+      // Validate request body
+      const validatedData = insertFindingSchema.parse({
+        ...req.body,
+        createdBy: req.user.id,
+      });
+
+      // Authorize project access
+      try {
+        await authorizeProjectAccess(validatedData.projectId, req.user.orgId);
+      } catch (authError) {
+        return res.status(403).json({ error: "Unauthorized access to project" });
+      }
+
+      const finding = await storage.createFinding(validatedData);
+
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: finding.projectId,
+        userId: req.user.id,
+        entityType: "finding",
+        entityId: finding.id,
+        action: "create",
+        after: { title: finding.title, severity: finding.severity },
+      });
+
+      res.json(finding);
+    } catch (error: any) {
+      console.error("Error creating finding:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid finding data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create finding" });
+    }
+  });
+
+  // Update a finding
+  app.put("/api/dd/findings/:id", async (req: any, res) => {
+    try {
+      const existing = await storage.getFinding(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Finding not found" });
+      }
+
+      // Authorize project access
+      try {
+        await authorizeProjectAccess(existing.projectId, req.user.orgId);
+      } catch (authError) {
+        return res.status(403).json({ error: "Unauthorized access to project" });
+      }
+
+      // Prepare update data - strip immutable fields
+      const { createdBy, ...updateFields } = req.body;
+      
+      // Validate update data (partial schema)
+      const validatedData = insertFindingSchema.partial().omit({ createdBy: true }).parse(updateFields);
+      
+      // Prevent projectId reassignment
+      if (validatedData.projectId && validatedData.projectId !== existing.projectId) {
+        return res.status(400).json({ error: "Cannot change project assignment of a finding" });
+      }
+
+      const updated = await storage.updateFinding(req.params.id, validatedData);
+
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: existing.projectId,
+        userId: req.user.id,
+        entityType: "finding",
+        entityId: req.params.id,
+        action: "update",
+        before: { title: existing.title, severity: existing.severity },
+        after: { title: updated.title, severity: updated.severity },
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating finding:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid finding data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update finding" });
+    }
+  });
+
+  // Delete a finding
+  app.delete("/api/dd/findings/:id", async (req: any, res) => {
+    try {
+      const existing = await storage.getFinding(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Finding not found" });
+      }
+
+      // Authorize project access
+      try {
+        await authorizeProjectAccess(existing.projectId, req.user.orgId);
+      } catch (authError) {
+        return res.status(403).json({ error: "Unauthorized access to project" });
+      }
+
+      await storage.deleteFinding(req.params.id);
+
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: existing.projectId,
+        userId: req.user.id,
+        entityType: "finding",
+        entityId: req.params.id,
+        action: "delete",
+        before: { title: existing.title },
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting finding:", error);
+      res.status(500).json({ error: "Failed to delete finding" });
+    }
+  });
+
 
   // Organization-level Audit Logs
   app.get("/api/audit-logs", async (req: any, res) => {

@@ -12,6 +12,7 @@ import { AddTaskModal } from "@/components/add-task-modal";
 import { ContactManagement } from "@/components/contact-management";
 import { ArchiveView } from "@/components/archive-view";
 import { CddAdvisor } from "@/components/cdd-advisor";
+import { FindingsManager } from "@/components/findings-manager";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import { useProject } from "@/hooks/use-project";
 import { useQuery } from "@tanstack/react-query";
@@ -169,7 +170,10 @@ export default function ProjectPage() {
             </>
           )}
           {activeTab === "advisor" && (
-            <CddAdvisor projectId={project.id} />
+            <div className="space-y-6">
+              <CddAdvisor projectId={project.id} />
+              <FindingsManager projectId={project.id} />
+            </div>
           )}
           {activeTab === "setup" && (
             <ProjectSetup project={project} settings={settings} tasks={tasks} />
