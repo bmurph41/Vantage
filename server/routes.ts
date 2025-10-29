@@ -3981,6 +3981,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // CDD Advisor Chat API - Conversational AI with function calling
+  app.post("/api/dd/projects/:projectId/chat", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      
+      const { messages } = req.body;
+      
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: "Messages array is required" });
+      }
+
+      try {
+        // Import OpenAI and advisor tools
+        const OpenAI = (await import('openai')).default;
+        const { advisorTools, executeAdvisorTool } = await import('./advisor-tools');
+        
+        const openai = new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+        });
+
+        // System prompt for CDD Advisor
+        const systemPrompt = `You are a Commercial Due Diligence (CDD) Analyst AI assistant helping private equity professionals analyze marina acquisition opportunities.
+
+Your capabilities:
+- Search documents using semantic search to find relevant information
+- Extract KPIs (Key Performance Indicators) from documents
+- Create findings with severity ratings (low, med, high, critical)
+- Create actionable recommendations with priority levels
+
+Guidelines:
+- Be concise and analytical in your responses
+- Always cite sources when referencing document content
+- Use proper financial terminology
+- When asked about specific documents, use the search_documents tool first
+- When asked to extract data, use extract_kpis_from_document
+- When identifying issues or risks, create findings with appropriate severity
+- When suggesting actions, create recommendations with priority levels
+
+Current context: Project ${req.params.projectId}`;
+
+        // Add system message at the beginning
+        const messagesWithSystem = [
+          { role: 'system', content: systemPrompt },
+          ...messages
+        ];
+
+        // Initial API call with tools
+        let response = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: messagesWithSystem,
+          tools: advisorTools,
+          tool_choice: 'auto',
+        });
+
+        let assistantMessage = response.choices[0].message;
+        const toolCalls = [];
+        const toolResults = [];
+
+        // Handle tool calls if present
+        while (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+          // Add assistant message with tool calls to conversation
+          messagesWithSystem.push(assistantMessage);
+
+          // Execute each tool call
+          for (const toolCall of assistantMessage.tool_calls) {
+            const toolName = toolCall.function.name;
+            const toolArgs = JSON.parse(toolCall.function.arguments);
+
+            console.log(`Executing tool: ${toolName}`, toolArgs);
+
+            // Execute the tool with context
+            const toolResult = await executeAdvisorTool(
+              toolName,
+              toolArgs,
+              req.params.projectId,
+              req.user.id,
+              req.user.orgId
+            );
+
+            // Store for response
+            toolCalls.push({
+              id: toolCall.id,
+              name: toolName,
+              arguments: toolArgs,
+            });
+
+            toolResults.push({
+              id: toolCall.id,
+              name: toolName,
+              result: toolResult,
+            });
+
+            // Add tool result to conversation
+            messagesWithSystem.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify(toolResult),
+            });
+          }
+
+          // Get next response from model
+          response = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: messagesWithSystem,
+            tools: advisorTools,
+            tool_choice: 'auto',
+          });
+
+          assistantMessage = response.choices[0].message;
+        }
+
+        // Log chat interaction for audit trail
+        await storage.createAuditLog({
+          orgId: req.user.orgId,
+          projectId: req.params.projectId,
+          userId: req.user.id,
+          entityType: "cdd_chat",
+          entityId: req.params.projectId,
+          action: "chat_message",
+          after: { 
+            messageCount: messages.length,
+            toolCallsExecuted: toolCalls.length,
+            toolNames: toolCalls.map(t => t.name)
+          },
+        });
+
+        res.json({
+          message: assistantMessage.content || '',
+          toolCalls,
+          toolResults,
+          usage: response.usage,
+        });
+      } catch (chatError: any) {
+        console.error("Chat error:", chatError);
+        res.status(500).json({ 
+          error: chatError.message || "Failed to process chat request",
+          details: chatError.response?.data || null
+        });
+      }
+    } catch (error) {
+      console.error("Error processing chat request:", error);
+      res.status(500).json({ error: "Failed to process chat request" });
+    }
+  });
+
   // KPI Management
   // Get all KPIs for a project
   app.get("/api/dd/projects/:projectId/kpis", async (req: any, res) => {

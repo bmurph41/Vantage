@@ -28,11 +28,24 @@ interface RagResult {
   metadata: any;
 }
 
+interface ToolCall {
+  id: string;
+  name: string;
+  arguments: any;
+}
+
+interface ToolResult {
+  id: string;
+  name: string;
+  result: any;
+}
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  results?: RagResult[];
+  toolCalls?: ToolCall[];
+  toolResults?: ToolResult[];
   timestamp: Date;
 }
 
@@ -47,17 +60,18 @@ export function CddAdvisor({ projectId }: CddAdvisorProps) {
     queryKey: ['/api/dd/projects', projectId, 'cdd-documents'],
   });
 
-  // RAG query mutation
-  const ragMutation = useMutation({
-    mutationFn: async (query: string) => {
-      const response = await fetch(`/api/dd/projects/${projectId}/rag`, {
+  // Chat mutation with function calling
+  const chatMutation = useMutation({
+    mutationFn: async (messages: { role: string; content: string }[]) => {
+      const response = await fetch(`/api/dd/projects/${projectId}/chat`, {
         method: 'POST',
-        body: JSON.stringify({ query, limit: 5 }),
+        body: JSON.stringify({ messages }),
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       });
       if (!response.ok) {
-        throw new Error(await response.text());
+        const error = await response.json().catch(() => ({ error: 'Chat request failed' }));
+        throw new Error(error.error || `Request failed with status ${response.status}`);
       }
       return response.json();
     },
@@ -66,15 +80,36 @@ export function CddAdvisor({ projectId }: CddAdvisorProps) {
       setChatMessages(prev => [...prev, {
         id: Date.now().toString() + '-assistant',
         role: 'assistant',
-        content: generateAnswerFromResults(data.results),
-        results: data.results,
+        content: data.message || 'No response',
+        toolCalls: data.toolCalls,
+        toolResults: data.toolResults,
         timestamp: new Date(),
       }]);
+      
+      // Invalidate relevant queries if tools were used
+      if (data.toolCalls && data.toolCalls.length > 0) {
+        const toolNames = data.toolCalls.map((t: ToolCall) => t.name);
+        
+        // If KPIs were extracted, refresh KPIs list
+        if (toolNames.includes('extract_kpis_from_document')) {
+          queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'kpis'] });
+        }
+        
+        // If findings were added, refresh findings list
+        if (toolNames.includes('add_finding')) {
+          queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'findings'] });
+        }
+        
+        // If recommendations were added, refresh recommendations list
+        if (toolNames.includes('add_recommendation')) {
+          queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'recommendations'] });
+        }
+      }
     },
     onError: (error: any) => {
       toast({
-        title: "Search failed",
-        description: error.message || "Failed to search documents",
+        title: "Chat failed",
+        description: error.message || "Failed to process chat request",
         variant: "destructive",
       });
     },
@@ -170,16 +205,25 @@ export function CddAdvisor({ projectId }: CddAdvisorProps) {
   const handleSendQuery = () => {
     if (!query.trim()) return;
 
-    // Add user message to chat
-    setChatMessages(prev => [...prev, {
+    // Create new user message
+    const userMessage = {
       id: Date.now().toString() + '-user',
-      role: 'user',
+      role: 'user' as const,
       content: query,
       timestamp: new Date(),
-    }]);
+    };
 
-    // Execute RAG query
-    ragMutation.mutate(query);
+    // Add user message to chat
+    setChatMessages(prev => [...prev, userMessage]);
+
+    // Build message history for API (only role and content)
+    const messageHistory = [...chatMessages, userMessage].map(msg => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
+    // Execute chat request with full conversation history
+    chatMutation.mutate(messageHistory);
     setQuery("");
   };
 
@@ -196,13 +240,14 @@ export function CddAdvisor({ projectId }: CddAdvisorProps) {
     return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
   };
 
-  const generateAnswerFromResults = (results: RagResult[]): string => {
-    if (!results || results.length === 0) {
-      return "I couldn't find any relevant information in the documents to answer your question.";
-    }
-
-    const topResult = results[0];
-    return `Based on the documents, here's what I found:\n\n${topResult.text}\n\n(Source: ${topResult.citation.documentName}${topResult.citation.pageNo ? `, page ${topResult.citation.pageNo}` : ''})`;
+  const getToolDisplayName = (toolName: string): string => {
+    const names: Record<string, string> = {
+      'search_documents': 'Searching documents',
+      'extract_kpis_from_document': 'Extracting KPIs',
+      'add_finding': 'Creating finding',
+      'add_recommendation': 'Creating recommendation',
+    };
+    return names[toolName] || toolName;
   };
 
   return (
@@ -254,21 +299,15 @@ export function CddAdvisor({ projectId }: CddAdvisorProps) {
                       >
                         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         
-                        {/* Show citations if available */}
-                        {message.results && message.results.length > 0 && (
-                          <div className="mt-3 space-y-2">
+                        {/* Show tool calls if available */}
+                        {message.toolCalls && message.toolCalls.length > 0 && (
+                          <div className="mt-3 space-y-1">
                             <Separator className="my-2" />
-                            <p className="text-xs font-semibold opacity-80">Sources:</p>
-                            {message.results.slice(0, 3).map((result, idx) => (
-                              <div key={idx} className="text-xs opacity-70 flex items-start gap-1">
-                                <span className="font-mono">{idx + 1}.</span>
-                                <span>
-                                  {result.citation.documentName}
-                                  {result.citation.pageNo && ` (p. ${result.citation.pageNo})`}
-                                  <span className="ml-2 opacity-50">
-                                    {Math.round(result.similarity * 100)}% match
-                                  </span>
-                                </span>
+                            <p className="text-xs font-semibold opacity-80">Actions performed:</p>
+                            {message.toolCalls.map((toolCall) => (
+                              <div key={toolCall.id} className="text-xs opacity-70 flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3" />
+                                <span>{getToolDisplayName(toolCall.name)}</span>
                               </div>
                             ))}
                           </div>
@@ -276,10 +315,11 @@ export function CddAdvisor({ projectId }: CddAdvisorProps) {
                       </div>
                     </div>
                   ))}
-                  {ragMutation.isPending && (
+                  {chatMutation.isPending && (
                     <div className="flex justify-start">
-                      <div className="bg-muted rounded-lg px-4 py-2">
+                      <div className="bg-muted rounded-lg px-4 py-2 flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Thinking...</span>
                       </div>
                     </div>
                   )}
@@ -294,12 +334,12 @@ export function CddAdvisor({ projectId }: CddAdvisorProps) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendQuery()}
-                disabled={ragMutation.isPending || documents.length === 0}
+                disabled={chatMutation.isPending || documents.length === 0}
                 data-testid="input-rag-query"
               />
               <Button
                 onClick={handleSendQuery}
-                disabled={!query.trim() || ragMutation.isPending || documents.length === 0}
+                disabled={!query.trim() || chatMutation.isPending || documents.length === 0}
                 data-testid="button-send-query"
               >
                 <Send className="h-4 w-4" />
