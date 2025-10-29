@@ -3981,6 +3981,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // KPI Management
+  // Get all KPIs for a project
+  app.get("/api/dd/projects/:projectId/kpis", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      
+      const kpis = await storage.getKpisForProject(req.params.projectId);
+      res.json(kpis);
+    } catch (error) {
+      console.error("Error fetching KPIs:", error);
+      res.status(500).json({ error: "Failed to fetch KPIs" });
+    }
+  });
+
+  // Create a KPI
+  app.post("/api/dd/projects/:projectId/kpis", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      
+      const kpi = await storage.createKpi({
+        ...req.body,
+        projectId: req.params.projectId,
+      });
+
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: req.params.projectId,
+        userId: req.user.id,
+        entityType: "kpi",
+        entityId: kpi.id,
+        action: "create",
+        after: { name: kpi.name, category: kpi.category },
+      });
+
+      res.json(kpi);
+    } catch (error) {
+      console.error("Error creating KPI:", error);
+      res.status(500).json({ error: "Failed to create KPI" });
+    }
+  });
+
+  // Update a KPI
+  app.put("/api/dd/kpis/:id", async (req: any, res) => {
+    try {
+      const existing = await storage.getKpi(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "KPI not found" });
+      }
+
+      await authorizeProjectAccess(existing.projectId, req.user.orgId);
+
+      const updated = await storage.updateKpi(req.params.id, req.body);
+
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: existing.projectId,
+        userId: req.user.id,
+        entityType: "kpi",
+        entityId: updated.id,
+        action: "update",
+        before: { name: existing.name, valueText: existing.valueText },
+        after: { name: updated.name, valueText: updated.valueText },
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating KPI:", error);
+      res.status(500).json({ error: "Failed to update KPI" });
+    }
+  });
+
+  // Delete a KPI
+  app.delete("/api/dd/kpis/:id", async (req: any, res) => {
+    try {
+      const existing = await storage.getKpi(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "KPI not found" });
+      }
+
+      await authorizeProjectAccess(existing.projectId, req.user.orgId);
+
+      await storage.deleteKpi(req.params.id);
+
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: existing.projectId,
+        userId: req.user.id,
+        entityType: "kpi",
+        entityId: req.params.id,
+        action: "delete",
+        before: { name: existing.name },
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting KPI:", error);
+      res.status(500).json({ error: "Failed to delete KPI" });
+    }
+  });
+
+  // Extract KPIs from a document using AI
+  app.post("/api/dd/documents/:documentId/extract-kpis", async (req: any, res) => {
+    try {
+      const document = await storage.getCddDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      await authorizeProjectAccess(document.projectId, req.user.orgId);
+
+      // Check if document has been parsed
+      if (document.parseStatus !== 'parsed') {
+        return res.status(400).json({ 
+          error: "Document must be parsed before extracting KPIs",
+          parseStatus: document.parseStatus 
+        });
+      }
+
+      try {
+        // Import KPI extractor
+        const { kpiExtractor } = await import('./kpi-extractor');
+
+        // Get all pages for the document
+        const pages = await storage.getDocPagesForDocument(document.id);
+        
+        if (pages.length === 0) {
+          return res.status(400).json({ error: "No pages found for document" });
+        }
+
+        // Extract KPIs from all pages
+        const extractedKpis = await kpiExtractor.extractKPIsFromPages(
+          pages.map(p => ({ pageNo: p.pageNo, contentText: p.contentText })),
+          document.filename
+        );
+
+        // Save extracted KPIs to database
+        const createdKpis = [];
+        for (const kpi of extractedKpis) {
+          const created = await storage.createKpi({
+            projectId: document.projectId,
+            name: kpi.name,
+            valueText: kpi.valueText || null,
+            valueNum: kpi.valueNum || null,
+            unit: kpi.unit || null,
+            category: kpi.category || null,
+            confidence: kpi.confidence,
+            sourceDocumentId: document.id,
+            pageHint: kpi.pageHint || null,
+          });
+          createdKpis.push(created);
+        }
+
+        await storage.createAuditLog({
+          orgId: req.user.orgId,
+          projectId: document.projectId,
+          userId: req.user.id,
+          entityType: "cdd_document",
+          entityId: document.id,
+          action: "kpis_extracted",
+          after: { kpisExtracted: createdKpis.length, documentName: document.filename },
+        });
+
+        res.json({ 
+          success: true, 
+          kpisExtracted: createdKpis.length,
+          kpis: createdKpis
+        });
+      } catch (extractionError: any) {
+        console.error("KPI extraction error:", extractionError);
+        res.status(500).json({ error: extractionError.message || "Failed to extract KPIs" });
+      }
+    } catch (error) {
+      console.error("Error triggering KPI extraction:", error);
+      res.status(500).json({ error: "Failed to trigger KPI extraction" });
+    }
+  });
+
 
   // Organization-level Audit Logs
   app.get("/api/audit-logs", async (req: any, res) => {
