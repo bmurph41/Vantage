@@ -3885,6 +3885,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // RAG Query API - Semantic search with citations
+  app.post("/api/dd/projects/:projectId/rag", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      
+      const { query, limit = 5 } = req.body;
+      
+      if (!query || typeof query !== 'string' || query.trim().length === 0) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+
+      try {
+        // Import RAG service dynamically
+        const { ragService } = await import('./rag-service');
+        
+        // Generate embedding for the query
+        const queryEmbedding = await ragService.generateEmbedding(query.trim());
+        
+        // Search for relevant chunks
+        const searchResults = await storage.searchVectorChunks(
+          req.params.projectId, 
+          queryEmbedding, 
+          Math.min(limit, 20) // Cap at 20 results
+        );
+
+        // Enrich results with document and page information
+        const enrichedResults = await Promise.all(
+          searchResults.map(async (result) => {
+            const metadata = result.metadata || {};
+            const documentId = metadata.documentId;
+            
+            let documentName = 'Unknown Document';
+            if (documentId) {
+              const doc = await storage.getCddDocument(documentId);
+              if (doc) {
+                documentName = doc.filename;
+              }
+            }
+
+            return {
+              text: result.contentText,
+              similarity: parseFloat(result.similarity),
+              citation: {
+                documentId: documentId || null,
+                documentName,
+                pageNo: metadata.pageNo || null,
+                sourceType: result.sourceType,
+                sourceId: result.sourceId,
+              },
+              metadata: result.metadata,
+            };
+          })
+        );
+
+        // Log RAG query for audit trail
+        await storage.createAuditLog({
+          orgId: req.user.orgId,
+          projectId: req.params.projectId,
+          userId: req.user.id,
+          entityType: "rag_query",
+          entityId: req.params.projectId,
+          action: "rag_search",
+          after: { 
+            query: query.substring(0, 200), // Truncate for logging
+            resultsCount: enrichedResults.length 
+          },
+        });
+
+        res.json({
+          query,
+          results: enrichedResults,
+          count: enrichedResults.length,
+        });
+      } catch (ragError: any) {
+        console.error("RAG query error:", ragError);
+        res.status(500).json({ error: ragError.message || "Failed to execute RAG query" });
+      }
+    } catch (error) {
+      console.error("Error processing RAG request:", error);
+      res.status(500).json({ error: "Failed to process RAG request" });
+    }
+  });
+
 
   // Organization-level Audit Logs
   app.get("/api/audit-logs", async (req: any, res) => {
