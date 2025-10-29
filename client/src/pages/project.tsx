@@ -11,6 +11,7 @@ import { ProjectIntegrationSettings } from "@/components/project-integration-set
 import { AddTaskModal } from "@/components/add-task-modal";
 import { ContactManagement } from "@/components/contact-management";
 import { ArchiveView } from "@/components/archive-view";
+import { CddAdvisor } from "@/components/cdd-advisor";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import { useProject } from "@/hooks/use-project";
 import { useQuery } from "@tanstack/react-query";
@@ -84,6 +85,7 @@ export default function ProjectPage() {
 
   const tabs = [
     { id: "reports", label: "Tasks & Timeline" },
+    { id: "advisor", label: "CDD Copilot" },
     { id: "setup", label: "Deal Details" },
     { id: "owners", label: "Task Owners" },
     { id: "contacts", label: "Key Contacts" },
@@ -165,6 +167,9 @@ export default function ProjectPage() {
               </div>
               <ThirdPartyReports tasks={tasks} projectId={project.id} project={project} settings={settings} />
             </>
+          )}
+          {activeTab === "advisor" && (
+            <CddAdvisor projectId={project.id} />
           )}
           {activeTab === "setup" && (
             <ProjectSetup project={project} settings={settings} tasks={tasks} />

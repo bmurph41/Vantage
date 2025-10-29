@@ -46,6 +46,7 @@ export const guestStatusEnum = pgEnum("guest_status", ["pending", "accepted", "d
 export const contactRoleEnum = pgEnum("contact_role", ["seller", "attorney", "lender", "title_insurance", "inspector", "surveyor", "environmental", "appraiser", "broker", "insurance_agent", "other"]);
 export const dashboardTypeEnum = pgEnum("dashboard_type", ["default", "investor", "owner", "attorney", "lender", "inspector", "third_party"]);
 export const parseStatusEnum = pgEnum("parse_status", ["pending", "parsing", "parsed", "failed"]);
+export const embeddingsStatusEnum = pgEnum("embeddings_status", ["pending", "processing", "completed", "failed"]);
 export const severityEnum = pgEnum("severity", ["low", "med", "high", "critical"]);
 export const confidenceLevelEnum = pgEnum("confidence_level", ["low", "medium", "high"]);
 
@@ -592,6 +593,8 @@ export const cddDocuments = pgTable("cdd_documents", {
   storagePath: text("storage_path").notNull(),
   parseStatus: parseStatusEnum("parse_status").notNull().default("pending"),
   parseError: text("parse_error"),
+  embeddingsStatus: embeddingsStatusEnum("embeddings_status").notNull().default("pending"),
+  embeddingsError: text("embeddings_error"),
   uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
   parsedAt: timestamp("parsed_at"),

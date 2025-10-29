@@ -3826,6 +3826,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       try {
+        // Set status to processing
+        await storage.updateCddDocument(document.id, { embeddingsStatus: 'processing' });
+
         // Import RAG service dynamically
         const { ragService } = await import('./rag-service');
         
@@ -3841,6 +3844,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Store all vector chunks
         const createdChunks = await storage.createVectorChunks(allVectorChunks);
+
+        // Set status to completed
+        await storage.updateCddDocument(document.id, { embeddingsStatus: 'completed' });
 
         await storage.createAuditLog({
           orgId: req.user.orgId,
@@ -3859,6 +3865,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (embeddingError: any) {
         console.error("Embedding generation error:", embeddingError);
+        
+        // Set status to failed
+        await storage.updateCddDocument(document.id, { 
+          embeddingsStatus: 'failed',
+          embeddingsError: embeddingError.message 
+        });
+        
         res.status(500).json({ error: embeddingError.message || "Failed to generate embeddings" });
       }
     } catch (error) {
