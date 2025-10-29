@@ -92,8 +92,8 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   );
   
   // Deposit Information State
-  const [firstDepositDays, setFirstDepositDays] = useState<number | "">(project.firstDepositDays || 0);
-  const [secondDepositDays, setSecondDepositDays] = useState<number | "">(project.secondDepositDays || 0);
+  const [firstDepositDays, setFirstDepositDays] = useState<number | "">(project.firstDepositDays ?? "");
+  const [secondDepositDays, setSecondDepositDays] = useState<number | "">(project.secondDepositDays ?? "");
   const [firstDepositUseBusiness, setFirstDepositUseBusiness] = useState<boolean>(false);
   const [secondDepositUseBusiness, setSecondDepositUseBusiness] = useState<boolean>(false);
   const [firstDepositAmount, setFirstDepositAmount] = useState<string>(
@@ -203,15 +203,15 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
       useBusinessDays: settings?.useBusinessDays || false,
       holidayCalendar: settings?.holidayCalendar || "us_federal",
       tz: project.tz,
-      psaSignedDate: project.psaSignedDate || "2025-08-29",
-      ddExpirationDate: project.ddExpirationDate || "2025-10-28",
-      closingDate: project.closingDate || "2025-11-12",
+      psaSignedDate: project.psaSignedDate || "",
+      ddExpirationDate: project.ddExpirationDate || "",
+      closingDate: project.closingDate || "",
       // DD Timeline fields
-      ddPeriodDays: project.ddPeriodDays || 60,
+      ddPeriodDays: project.ddPeriodDays ?? undefined,
       hasExtensions: project.hasExtensions || false,
       extensionCount: project.extensionCount || 0,
       extensionDays: project.extensionDays || [],
-      daysToClosing: project.daysToClosing || 15,
+      daysToClosing: project.daysToClosing ?? undefined,
       // Key Contacts
       seller: project.seller || [],
       ourAttorney: project.ourAttorney || [],
