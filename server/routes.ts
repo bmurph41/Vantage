@@ -3551,6 +3551,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ====================
+  // CDD Copilot Routes
+  // ====================
+
+  // CDD Document Upload Configuration
+  const cddStorageConfig = multer.diskStorage({
+    destination: async (req: any, file: any, cb: any) => {
+      const { projectId } = req.params;
+      const uploadPath = path.join("server/uploads/cdd", projectId);
+      await fs.ensureDir(uploadPath);
+      cb(null, uploadPath);
+    },
+    filename: (req: any, file: any, cb: any) => {
+      const uuid = crypto.randomUUID();
+      const ext = path.extname(file.originalname);
+      const filename = `${uuid}${ext}`;
+      cb(null, filename);
+    }
+  });
+
+  const cddUpload = multer({
+    storage: cddStorageConfig,
+    limits: {
+      fileSize: 100 * 1024 * 1024, // 100MB max for large OMs and reports
+    },
+    fileFilter: (req: any, file: any, cb: any) => {
+      const allowedTypes = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'text/csv'
+      ];
+      
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only PDF, DOCX, XLSX, XLS, and CSV files are allowed.'), false);
+      }
+    }
+  });
+
+  // Upload CDD Document
+  app.post("/api/dd/projects/:projectId/cdd-documents", cddUpload.single('file'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+
+      const documentData = insertCddDocumentSchema.parse({
+        projectId: req.params.projectId,
+        filename: req.file.originalname,
+        fileType: req.file.mimetype,
+        fileSize: req.file.size,
+        storagePath: req.file.path,
+        uploadedBy: req.user.id,
+        docType: req.body.docType || 'other',
+        notes: req.body.notes || null,
+      });
+
+      const document = await storage.createCddDocument(documentData);
+
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: req.params.projectId,
+        userId: req.user.id,
+        entityType: "cdd_document",
+        entityId: document.id,
+        action: "uploaded",
+        after: document,
+      });
+
+      res.json(document);
+    } catch (error: any) {
+      if (req.file && req.file.path) {
+        try {
+          await fs.unlink(req.file.path);
+        } catch (unlinkError) {
+          console.error('Failed to clean up uploaded file:', unlinkError);
+        }
+      }
+      
+      if (error.message?.includes('Invalid file type')) {
+        return res.status(400).json({ error: error.message });
+      }
+      
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid document data", details: error.errors });
+      }
+      
+      console.error("Error uploading CDD document:", error);
+      res.status(500).json({ error: "Failed to upload document" });
+    }
+  });
+
+  // Get all CDD documents for a project
+  app.get("/api/dd/projects/:projectId/cdd-documents", async (req: any, res) => {
+    try {
+      await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      const documents = await storage.getCddDocumentsForProject(req.params.projectId);
+      res.json(documents);
+    } catch (error) {
+      console.error("Error fetching CDD documents:", error);
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+
+  // Get specific CDD document
+  app.get("/api/dd/documents/:documentId", async (req: any, res) => {
+    try {
+      const document = await storage.getCddDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      await authorizeProjectAccess(document.projectId, req.user.orgId);
+      res.json(document);
+    } catch (error) {
+      console.error("Error fetching CDD document:", error);
+      res.status(500).json({ error: "Failed to fetch document" });
+    }
+  });
+
+  // Delete CDD document
+  app.delete("/api/dd/documents/:documentId", async (req: any, res) => {
+    try {
+      const document = await storage.getCddDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      await authorizeProjectAccess(document.projectId, req.user.orgId);
+
+      // Delete physical file
+      if (document.storagePath) {
+        try {
+          await fs.unlink(document.storagePath);
+        } catch (unlinkError) {
+          console.error('Failed to delete physical file:', unlinkError);
+        }
+      }
+
+      await storage.deleteCddDocument(req.params.documentId);
+
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: document.projectId,
+        userId: req.user.id,
+        entityType: "cdd_document",
+        entityId: document.id,
+        action: "deleted",
+        before: document,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting CDD document:", error);
+      res.status(500).json({ error: "Failed to delete document" });
+    }
+  });
+
 
   // Organization-level Audit Logs
   app.get("/api/audit-logs", async (req: any, res) => {
