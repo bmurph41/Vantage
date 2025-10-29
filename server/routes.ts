@@ -13,7 +13,8 @@ import {
   insertTimelineNoteSchema, insertProjectShareSchema, insertRiskSchema,
   insertContactSchema, updateContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema,
   insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema,
-  insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema
+  insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema,
+  insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { z } from "zod";

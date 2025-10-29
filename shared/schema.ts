@@ -1,8 +1,21 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index, customType } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
+
+// Custom vector type for pgvector
+const vector = customType<{ data: number[]; driverData: string }>({
+  dataType() {
+    return 'vector(1536)';
+  },
+  toDriver(value: number[]): string {
+    return `[${value.join(',')}]`;
+  },
+  fromDriver(value: string): number[] {
+    return value.replace(/^\[|\]$/g, '').split(',').map(Number);
+  },
+});
 
 // Enums
 export const roleEnum = pgEnum("role", ["owner", "editor", "viewer"]);
@@ -32,6 +45,9 @@ export const emailTypeEnum = pgEnum("email_type", ["primary", "additional"]);
 export const guestStatusEnum = pgEnum("guest_status", ["pending", "accepted", "declined"]);
 export const contactRoleEnum = pgEnum("contact_role", ["seller", "attorney", "lender", "title_insurance", "inspector", "surveyor", "environmental", "appraiser", "broker", "insurance_agent", "other"]);
 export const dashboardTypeEnum = pgEnum("dashboard_type", ["default", "investor", "owner", "attorney", "lender", "inspector", "third_party"]);
+export const parseStatusEnum = pgEnum("parse_status", ["pending", "parsing", "parsed", "failed"]);
+export const severityEnum = pgEnum("severity", ["low", "med", "high", "critical"]);
+export const confidenceLevelEnum = pgEnum("confidence_level", ["low", "medium", "high"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -566,6 +582,155 @@ export const projectIntegrations = pgTable("project_integrations", {
   };
 });
 
+// CDD Documents - Commercial Due Diligence documents
+export const cddDocuments = pgTable("cdd_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  storagePath: text("storage_path").notNull(),
+  parseStatus: parseStatusEnum("parse_status").notNull().default("pending"),
+  parseError: text("parse_error"),
+  uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  parsedAt: timestamp("parsed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("cdd_documents_project").on(table.projectId),
+  parseStatusIdx: index("cdd_documents_parse_status").on(table.parseStatus),
+}));
+
+// Document Pages - extracted text from documents
+export const docPages = pgTable("doc_pages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => cddDocuments.id, { onDelete: "cascade" }),
+  pageNo: integer("page_no").notNull(),
+  text: text("text").notNull(),
+  tokens: integer("tokens"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  documentPageIdx: index("doc_pages_document_page").on(table.documentId, table.pageNo),
+  uniqueDocumentPage: unique("doc_pages_unique_document_page").on(table.documentId, table.pageNo),
+}));
+
+// KPIs - extracted key performance indicators
+export const kpis = pgTable("kpis", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  valueText: text("value_text"),
+  valueNum: integer("value_num"),
+  unit: text("unit"),
+  sourceDocumentId: varchar("source_document_id").references(() => cddDocuments.id),
+  pageHint: text("page_hint"),
+  confidence: confidenceLevelEnum("confidence").notNull().default("medium"),
+  category: text("category"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("kpis_project").on(table.projectId),
+  sourceDocIdx: index("kpis_source_document").on(table.sourceDocumentId),
+  categoryIdx: index("kpis_category").on(table.category),
+}));
+
+// Findings - due diligence findings and issues
+export const findings = pgTable("findings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  severity: severityEnum("severity").notNull().default("low"),
+  bodyMd: text("body_md").notNull(),
+  sources: jsonb("sources").default(sql`'[]'`),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("findings_project").on(table.projectId),
+  severityIdx: index("findings_severity").on(table.severity),
+  createdByIdx: index("findings_created_by").on(table.createdBy),
+}));
+
+// Recommendations - analysis recommendations
+export const recommendations = pgTable("recommendations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  bodyMd: text("body_md").notNull(),
+  priority: priorityEnum("priority").notNull().default("med"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("recommendations_project").on(table.projectId),
+  priorityIdx: index("recommendations_priority").on(table.priority),
+}));
+
+// Vector Chunks - embeddings for RAG
+export const vectorChunks = pgTable("vector_chunks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  sourceType: text("source_type").notNull(),
+  sourceId: varchar("source_id").notNull(),
+  contentText: text("content_text").notNull(),
+  embedding: vector("embedding"),
+  metadata: jsonb("metadata").default(sql`'{}'`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("vector_chunks_project").on(table.projectId),
+  sourceIdx: index("vector_chunks_source").on(table.sourceType, table.sourceId),
+}));
+
+// CDD Reports - generated reports
+export const cddReports = pgTable("cdd_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  bodyMd: text("body_md").notNull(),
+  version: integer("version").notNull().default(1),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("cdd_reports_project").on(table.projectId),
+  versionIdx: index("cdd_reports_version").on(table.projectId, table.version),
+}));
+
+// Comps - comparable properties for analysis
+export const comps = pgTable("comps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  assetType: text("asset_type"),
+  location: text("location"),
+  slips: integer("slips"),
+  racks: integer("racks"),
+  rateNotes: text("rate_notes"),
+  source: text("source"),
+  capexNotes: text("capex_notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("comps_project").on(table.projectId),
+}));
+
+// Checklist Items - due diligence checklist
+export const checklistItems = pgTable("checklist_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  section: text("section").notNull(),
+  item: text("item").notNull(),
+  status: statusEnum("status").notNull().default("not_started"),
+  ownerUserId: varchar("owner_user_id").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("checklist_items_project").on(table.projectId),
+  sectionIdx: index("checklist_items_section").on(table.projectId, table.section),
+  statusIdx: index("checklist_items_status").on(table.status),
+}));
+
 // Relations
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   users: many(users),
@@ -602,6 +767,14 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   calendarEvents: many(calendarEvents),
   documentRequirements: many(documentRequirements),
   projectIntegrations: many(projectIntegrations),
+  cddDocuments: many(cddDocuments),
+  kpis: many(kpis),
+  findings: many(findings),
+  recommendations: many(recommendations),
+  vectorChunks: many(vectorChunks),
+  cddReports: many(cddReports),
+  comps: many(comps),
+  checklistItems: many(checklistItems),
 }));
 
 export const projectSettingsRelations = relations(projectSettings, ({ one }) => ({
@@ -753,6 +926,96 @@ export const projectIntegrationsRelations = relations(projectIntegrations, ({ on
   project: one(projects, {
     fields: [projectIntegrations.projectId],
     references: [projects.id],
+  }),
+}));
+
+export const cddDocumentsRelations = relations(cddDocuments, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [cddDocuments.projectId],
+    references: [projects.id],
+  }),
+  uploadedByUser: one(users, {
+    fields: [cddDocuments.uploadedBy],
+    references: [users.id],
+  }),
+  docPages: many(docPages),
+  kpis: many(kpis),
+  vectorChunks: many(vectorChunks),
+}));
+
+export const docPagesRelations = relations(docPages, ({ one }) => ({
+  document: one(cddDocuments, {
+    fields: [docPages.documentId],
+    references: [cddDocuments.id],
+  }),
+}));
+
+export const kpisRelations = relations(kpis, ({ one }) => ({
+  project: one(projects, {
+    fields: [kpis.projectId],
+    references: [projects.id],
+  }),
+  sourceDocument: one(cddDocuments, {
+    fields: [kpis.sourceDocumentId],
+    references: [cddDocuments.id],
+  }),
+}));
+
+export const findingsRelations = relations(findings, ({ one }) => ({
+  project: one(projects, {
+    fields: [findings.projectId],
+    references: [projects.id],
+  }),
+  creator: one(users, {
+    fields: [findings.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const recommendationsRelations = relations(recommendations, ({ one }) => ({
+  project: one(projects, {
+    fields: [recommendations.projectId],
+    references: [projects.id],
+  }),
+  creator: one(users, {
+    fields: [recommendations.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const vectorChunksRelations = relations(vectorChunks, ({ one }) => ({
+  project: one(projects, {
+    fields: [vectorChunks.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const cddReportsRelations = relations(cddReports, ({ one }) => ({
+  project: one(projects, {
+    fields: [cddReports.projectId],
+    references: [projects.id],
+  }),
+  creator: one(users, {
+    fields: [cddReports.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const compsRelations = relations(comps, ({ one }) => ({
+  project: one(projects, {
+    fields: [comps.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const checklistItemsRelations = relations(checklistItems, ({ one }) => ({
+  project: one(projects, {
+    fields: [checklistItems.projectId],
+    references: [projects.id],
+  }),
+  owner: one(users, {
+    fields: [checklistItems.ownerUserId],
+    references: [users.id],
   }),
 }));
 
@@ -934,3 +1197,81 @@ export type InsertDocumentRequirement = z.infer<typeof insertDocumentRequirement
 
 export type ProjectIntegration = typeof projectIntegrations.$inferSelect;
 export type InsertProjectIntegration = z.infer<typeof insertProjectIntegrationSchema>;
+
+export const insertCddDocumentSchema = createInsertSchema(cddDocuments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDocPageSchema = createInsertSchema(docPages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertKpiSchema = createInsertSchema(kpis).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertFindingSchema = createInsertSchema(findings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRecommendationSchema = createInsertSchema(recommendations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertVectorChunkSchema = createInsertSchema(vectorChunks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCddReportSchema = createInsertSchema(cddReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCompSchema = createInsertSchema(comps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type CddDocument = typeof cddDocuments.$inferSelect;
+export type InsertCddDocument = z.infer<typeof insertCddDocumentSchema>;
+
+export type DocPage = typeof docPages.$inferSelect;
+export type InsertDocPage = z.infer<typeof insertDocPageSchema>;
+
+export type Kpi = typeof kpis.$inferSelect;
+export type InsertKpi = z.infer<typeof insertKpiSchema>;
+
+export type Finding = typeof findings.$inferSelect;
+export type InsertFinding = z.infer<typeof insertFindingSchema>;
+
+export type Recommendation = typeof recommendations.$inferSelect;
+export type InsertRecommendation = z.infer<typeof insertRecommendationSchema>;
+
+export type VectorChunk = typeof vectorChunks.$inferSelect;
+export type InsertVectorChunk = z.infer<typeof insertVectorChunkSchema>;
+
+export type CddReport = typeof cddReports.$inferSelect;
+export type InsertCddReport = z.infer<typeof insertCddReportSchema>;
+
+export type Comp = typeof comps.$inferSelect;
+export type InsertComp = z.infer<typeof insertCompSchema>;
+
+export type ChecklistItem = typeof checklistItems.$inferSelect;
+export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;

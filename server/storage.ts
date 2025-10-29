@@ -3,15 +3,18 @@ import {
   projectTemplates, auditLogs, timelineNotes, projectShares, risks,
   contacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
+  cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type Contact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
+  type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
   type InsertContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
-  type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest
+  type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
+  type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -215,6 +218,34 @@ export interface IStorage {
   updateCalendarGuest(id: string, updates: Partial<InsertCalendarGuest>): Promise<CalendarGuest>;
   deleteCalendarGuest(id: string): Promise<void>;
   updateGuestStatus(id: string, status: 'pending' | 'accepted' | 'declined'): Promise<CalendarGuest>;
+
+  // CDD Documents
+  getCddDocument(id: string): Promise<CddDocument | undefined>;
+  getCddDocumentsForProject(projectId: string): Promise<CddDocument[]>;
+  createCddDocument(document: InsertCddDocument): Promise<CddDocument>;
+  updateCddDocument(id: string, updates: Partial<InsertCddDocument>): Promise<CddDocument>;
+  deleteCddDocument(id: string): Promise<void>;
+
+  // KPIs
+  getKpi(id: string): Promise<Kpi | undefined>;
+  getKpisForProject(projectId: string): Promise<Kpi[]>;
+  createKpi(kpi: InsertKpi): Promise<Kpi>;
+  updateKpi(id: string, updates: Partial<InsertKpi>): Promise<Kpi>;
+  deleteKpi(id: string): Promise<void>;
+
+  // Findings
+  getFinding(id: string): Promise<Finding | undefined>;
+  getFindingsForProject(projectId: string): Promise<Finding[]>;
+  createFinding(finding: InsertFinding): Promise<Finding>;
+  updateFinding(id: string, updates: Partial<InsertFinding>): Promise<Finding>;
+  deleteFinding(id: string): Promise<void>;
+
+  // Recommendations
+  getRecommendation(id: string): Promise<Recommendation | undefined>;
+  getRecommendationsForProject(projectId: string): Promise<Recommendation[]>;
+  createRecommendation(recommendation: InsertRecommendation): Promise<Recommendation>;
+  updateRecommendation(id: string, updates: Partial<InsertRecommendation>): Promise<Recommendation>;
+  deleteRecommendation(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1797,6 +1828,129 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTaskFile(id: string): Promise<void> {
     await db.delete(taskFiles).where(eq(taskFiles.id, id));
+  }
+
+  // CDD Documents
+  async getCddDocument(id: string): Promise<CddDocument | undefined> {
+    const [document] = await db.select().from(cddDocuments).where(eq(cddDocuments.id, id));
+    return document || undefined;
+  }
+
+  async getCddDocumentsForProject(projectId: string): Promise<CddDocument[]> {
+    return db.select()
+      .from(cddDocuments)
+      .where(eq(cddDocuments.projectId, projectId))
+      .orderBy(desc(cddDocuments.uploadedAt));
+  }
+
+  async createCddDocument(document: InsertCddDocument): Promise<CddDocument> {
+    const [created] = await db.insert(cddDocuments).values(document).returning();
+    return created;
+  }
+
+  async updateCddDocument(id: string, updates: Partial<InsertCddDocument>): Promise<CddDocument> {
+    const [updated] = await db.update(cddDocuments)
+      .set(updates)
+      .where(eq(cddDocuments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCddDocument(id: string): Promise<void> {
+    await db.delete(cddDocuments).where(eq(cddDocuments.id, id));
+  }
+
+  // KPIs
+  async getKpi(id: string): Promise<Kpi | undefined> {
+    const [kpi] = await db.select().from(kpis).where(eq(kpis.id, id));
+    return kpi || undefined;
+  }
+
+  async getKpisForProject(projectId: string): Promise<Kpi[]> {
+    return db.select()
+      .from(kpis)
+      .where(eq(kpis.projectId, projectId))
+      .orderBy(kpis.category, kpis.name);
+  }
+
+  async createKpi(kpi: InsertKpi): Promise<Kpi> {
+    const [created] = await db.insert(kpis).values(kpi).returning();
+    return created;
+  }
+
+  async updateKpi(id: string, updates: Partial<InsertKpi>): Promise<Kpi> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(kpis)
+      .set(updateData)
+      .where(eq(kpis.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteKpi(id: string): Promise<void> {
+    await db.delete(kpis).where(eq(kpis.id, id));
+  }
+
+  // Findings
+  async getFinding(id: string): Promise<Finding | undefined> {
+    const [finding] = await db.select().from(findings).where(eq(findings.id, id));
+    return finding || undefined;
+  }
+
+  async getFindingsForProject(projectId: string): Promise<Finding[]> {
+    return db.select()
+      .from(findings)
+      .where(eq(findings.projectId, projectId))
+      .orderBy(desc(findings.createdAt));
+  }
+
+  async createFinding(finding: InsertFinding): Promise<Finding> {
+    const [created] = await db.insert(findings).values(finding).returning();
+    return created;
+  }
+
+  async updateFinding(id: string, updates: Partial<InsertFinding>): Promise<Finding> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(findings)
+      .set(updateData)
+      .where(eq(findings.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFinding(id: string): Promise<void> {
+    await db.delete(findings).where(eq(findings.id, id));
+  }
+
+  // Recommendations
+  async getRecommendation(id: string): Promise<Recommendation | undefined> {
+    const [recommendation] = await db.select().from(recommendations).where(eq(recommendations.id, id));
+    return recommendation || undefined;
+  }
+
+  async getRecommendationsForProject(projectId: string): Promise<Recommendation[]> {
+    return db.select()
+      .from(recommendations)
+      .where(eq(recommendations.projectId, projectId))
+      .orderBy(desc(recommendations.createdAt));
+  }
+
+  async createRecommendation(recommendation: InsertRecommendation): Promise<Recommendation> {
+    const [created] = await db.insert(recommendations).values(recommendation).returning();
+    return created;
+  }
+
+  async updateRecommendation(id: string, updates: Partial<InsertRecommendation>): Promise<Recommendation> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(recommendations)
+      .set(updateData)
+      .where(eq(recommendations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRecommendation(id: string): Promise<void> {
+    await db.delete(recommendations).where(eq(recommendations.id, id));
   }
 }
 
