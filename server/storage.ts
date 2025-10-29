@@ -257,6 +257,13 @@ export interface IStorage {
   createRecommendation(recommendation: InsertRecommendation): Promise<Recommendation>;
   updateRecommendation(id: string, updates: Partial<InsertRecommendation>): Promise<Recommendation>;
   deleteRecommendation(id: string): Promise<void>;
+
+  // CDD Reports
+  getCddReport(id: string): Promise<CddReport | undefined>;
+  getCddReportsForProject(projectId: string): Promise<CddReport[]>;
+  createCddReport(report: InsertCddReport): Promise<CddReport>;
+  updateCddReport(id: string, updates: Partial<InsertCddReport>): Promise<CddReport>;
+  deleteCddReport(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2029,6 +2036,37 @@ export class DatabaseStorage implements IStorage {
 
   async deleteRecommendation(id: string): Promise<void> {
     await db.delete(recommendations).where(eq(recommendations.id, id));
+  }
+
+  // CDD Reports
+  async getCddReport(id: string): Promise<CddReport | undefined> {
+    const [report] = await db.select().from(cddReports).where(eq(cddReports.id, id));
+    return report || undefined;
+  }
+
+  async getCddReportsForProject(projectId: string): Promise<CddReport[]> {
+    return db.select()
+      .from(cddReports)
+      .where(eq(cddReports.projectId, projectId))
+      .orderBy(desc(cddReports.version), desc(cddReports.createdAt));
+  }
+
+  async createCddReport(report: InsertCddReport): Promise<CddReport> {
+    const [created] = await db.insert(cddReports).values(report).returning();
+    return created;
+  }
+
+  async updateCddReport(id: string, updates: Partial<InsertCddReport>): Promise<CddReport> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(cddReports)
+      .set(updateData)
+      .where(eq(cddReports.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCddReport(id: string): Promise<void> {
+    await db.delete(cddReports).where(eq(cddReports.id, id));
   }
 }
 

@@ -4466,6 +4466,199 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // CDD Reports Management
+  // Get all reports for a project
+  app.get("/api/dd/projects/:projectId/reports", async (req: any, res) => {
+    try {
+      try {
+        await authorizeProjectAccess(req.params.projectId, req.user.orgId);
+      } catch (authError: any) {
+        if (authError.message === "Project not found") {
+          return res.status(404).json({ error: "Project not found" });
+        }
+        return res.status(403).json({ error: "Unauthorized access to project" });
+      }
+      
+      const reports = await storage.getCddReportsForProject(req.params.projectId);
+      
+      // Audit log for read access
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: req.params.projectId,
+        userId: req.user.id,
+        entityType: "cdd_report",
+        entityId: req.params.projectId,
+        action: "list",
+        after: { count: reports.length },
+      });
+      
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      res.status(500).json({ error: "Failed to fetch reports" });
+    }
+  });
+
+  // Get a single report
+  app.get("/api/dd/reports/:id", async (req: any, res) => {
+    try {
+      const report = await storage.getCddReport(req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      
+      try {
+        await authorizeProjectAccess(report.projectId, req.user.orgId);
+      } catch (authError: any) {
+        if (authError.message === "Project not found") {
+          return res.status(404).json({ error: "Project not found" });
+        }
+        return res.status(403).json({ error: "Unauthorized access to project" });
+      }
+      
+      // Audit log for read access
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: report.projectId,
+        userId: req.user.id,
+        entityType: "cdd_report",
+        entityId: req.params.id,
+        action: "read",
+        after: { title: report.title, version: report.version },
+      });
+      
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching report:", error);
+      res.status(500).json({ error: "Failed to fetch report" });
+    }
+  });
+
+  // Create a new report
+  app.post("/api/dd/reports", async (req: any, res) => {
+    try {
+      // Validate request body
+      const validatedData = insertCddReportSchema.parse(req.body);
+      
+      // Authorize project access
+      try {
+        await authorizeProjectAccess(validatedData.projectId, req.user.orgId);
+      } catch (authError: any) {
+        if (authError.message === "Project not found") {
+          return res.status(404).json({ error: "Project not found" });
+        }
+        return res.status(403).json({ error: "Unauthorized access to project" });
+      }
+      
+      const report = await storage.createCddReport({
+        ...validatedData,
+        createdBy: req.user.id,
+      });
+
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: report.projectId,
+        userId: req.user.id,
+        entityType: "cdd_report",
+        entityId: report.id,
+        action: "create",
+        after: { title: report.title, version: report.version },
+      });
+
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error creating report:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid report data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create report" });
+    }
+  });
+
+  // Update a report
+  app.put("/api/dd/reports/:id", async (req: any, res) => {
+    try {
+      const existing = await storage.getCddReport(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+
+      // Authorize project access
+      try {
+        await authorizeProjectAccess(existing.projectId, req.user.orgId);
+      } catch (authError: any) {
+        if (authError.message === "Project not found") {
+          return res.status(404).json({ error: "Project not found" });
+        }
+        return res.status(403).json({ error: "Unauthorized access to project" });
+      }
+
+      // Validate update data (using partial schema)
+      const validatedData = insertCddReportSchema.partial().parse(req.body);
+      
+      // Prevent changing immutable fields
+      delete (validatedData as any).projectId;
+      delete (validatedData as any).createdBy;
+
+      const updated = await storage.updateCddReport(req.params.id, validatedData);
+
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: existing.projectId,
+        userId: req.user.id,
+        entityType: "cdd_report",
+        entityId: req.params.id,
+        action: "update",
+        before: { title: existing.title, version: existing.version },
+        after: { title: updated.title, version: updated.version },
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating report:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid report data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update report" });
+    }
+  });
+
+  // Delete a report
+  app.delete("/api/dd/reports/:id", async (req: any, res) => {
+    try {
+      const existing = await storage.getCddReport(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+
+      try {
+        await authorizeProjectAccess(existing.projectId, req.user.orgId);
+      } catch (authError: any) {
+        if (authError.message === "Project not found") {
+          return res.status(404).json({ error: "Project not found" });
+        }
+        return res.status(403).json({ error: "Unauthorized access to project" });
+      }
+
+      await storage.deleteCddReport(req.params.id);
+
+      await storage.createAuditLog({
+        orgId: req.user.orgId,
+        projectId: existing.projectId,
+        userId: req.user.id,
+        entityType: "cdd_report",
+        entityId: req.params.id,
+        action: "delete",
+        before: { title: existing.title },
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting report:", error);
+      res.status(500).json({ error: "Failed to delete report" });
+    }
+  });
+
 
   // Organization-level Audit Logs
   app.get("/api/audit-logs", async (req: any, res) => {
