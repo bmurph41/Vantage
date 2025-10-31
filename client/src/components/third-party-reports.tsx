@@ -659,21 +659,21 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     <div 
                       key={task.id}
                       data-testid={`task-summary-card-${task.id}`}
-                      className={`border border-l-4 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow ${
+                      className={`border border-l-4 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${
                       isNearingDeadline 
                         ? 'bg-amber-50 border-amber-200 shadow-md' 
                         : 'bg-white'
                     } ${getTaskBorderColor(task)}`}>
                       {/* Header Section */}
-                      <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-1">{task.title}</h3>
+                          <h3 className="text-base font-semibold text-gray-900 mb-1">{task.title}</h3>
                           {task.description && (
-                            <p className="text-sm text-gray-600 mb-3">{task.description}</p>
+                            <p className="text-sm text-gray-600 mb-2">{task.description}</p>
                           )}
                           
                           {/* Company Badge - Always show either company name or "Internal" */}
-                          <div className="flex items-center space-x-3 mb-3">
+                          <div className="flex items-center space-x-3 mb-2">
                             <div className="flex items-center space-x-2">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                                 task.companyHired 
@@ -766,10 +766,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         </div>
                         
                         {/* Cost and Days Remaining - Top Right */}
-                        <div className="flex flex-row items-end space-x-3 mr-4">
+                        <div className="flex flex-row items-end space-x-3 mr-3">
                           {/* Days Remaining */}
                           <div className="text-center">
-                            <div className="text-sm text-gray-500 mb-1">Days Remaining</div>
+                            <div className="text-xs text-gray-500 mb-0.5">Days Remaining</div>
                             <div className={`text-base font-bold ${getDaysRemainingColorClass(task)}`}>
                               {calculateDaysRemaining(task)}
                             </div>
@@ -778,7 +778,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           {/* Cost section - only show if paymentStatus is not "no_cost" */}
                           {task.paymentStatus !== 'no_cost' && (
                             <div className="text-center">
-                              <label className="block text-sm font-medium text-gray-500 uppercase tracking-wide mb-1">Cost</label>
+                              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">Cost</label>
                               <input 
                                 type="text" 
                                 value={task.cost || ""} 
@@ -816,12 +816,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         </div>
                         
                         {/* Action Buttons - Right side */}
-                        <div className="flex flex-col items-center space-y-2 ml-4">
+                        <div className="flex flex-col items-center space-y-1.5 ml-3">
                           {/* Edit Button */}
                           <Button
                             data-testid={`button-edit-${task.id}`}
                             onClick={() => handleEditTask(task)}
-                            className="h-8 px-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium border-0 shadow-sm"
+                            className="h-7 px-2.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium border-0 shadow-sm"
                           >
                             <Edit className="w-3 h-3 mr-1" />
                             Edit
@@ -831,7 +831,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           <Button
                             data-testid={`button-add-note-${task.id}`}
                             onClick={() => setTimelineNotesTask(task)}
-                            className="h-8 px-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium border-0 shadow-sm"
+                            className="h-7 px-2.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium border-0 shadow-sm"
                           >
                             <StickyNote className="w-3 h-3 mr-1" />
                             Note
@@ -842,7 +842,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                             <AlertDialogTrigger asChild>
                               <Button
                                 data-testid={`button-delete-${task.id}`}
-                                className="h-8 px-3 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs font-medium border-0 shadow-sm"
+                                className="h-7 px-2.5 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs font-medium border-0 shadow-sm"
                               >
                                 <Trash2 className="w-3 h-3 mr-1" />
                                 Delete
@@ -867,12 +867,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       </div>
                       
                       {/* Date Fields Section */}
-                      <div className={`grid gap-4 pt-4 border-t border-gray-100 ${
+                      <div className={`grid gap-3 pt-2.5 border-t border-gray-100 ${
                         task.companyHired ? 'grid-cols-4' : 'grid-cols-2'
                       }`}>
                         <div>
                           <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Deadline</label>
-                          <div className="mt-1">
+                          <div className="mt-0.5">
                             {task.deadline ? (
                               <input 
                                 type="date" 
@@ -990,7 +990,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       </div>
 
                       {/* Task Owner and Progress Row */}
-                      <div className="flex items-center justify-end pt-4 border-t border-gray-100 mt-4">
+                      <div className="flex items-center justify-end pt-2.5 border-t border-gray-100 mt-2.5">
                         <div className="text-right">
                           <div className="text-xs text-gray-500">Task Owner: {task.assignee || "Unassigned"}</div>
                           <div className="text-xs text-gray-500">Progress: {Math.round(calculateTaskProgress(task))}%</div>
@@ -1014,17 +1014,17 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                 <div 
                   key={task.id}
                   data-testid={`task-summary-card-${task.id}`}
-                  className={`bg-white border ${getTaskBorderColor(task)} border-l-4 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow`}>
+                  className={`bg-white border ${getTaskBorderColor(task)} border-l-4 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow`}>
                   {/* Header Section */}
-                  <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1">{task.title}</h3>
+                      <h3 className="text-base font-semibold text-gray-900 mb-1">{task.title}</h3>
                       {task.description && (
-                        <p className="text-sm text-gray-600 mb-3">{task.description}</p>
+                        <p className="text-sm text-gray-600 mb-2">{task.description}</p>
                       )}
                       
                       {/* Company Badge - Always show either company name or "Internal" */}
-                      <div className="flex items-center space-x-3 mb-3">
+                      <div className="flex items-center space-x-3 mb-2">
                         <div className="flex items-center space-x-2">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                             task.companyHired 
@@ -1114,10 +1114,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     </div>
                     
                     {/* Cost and Days Remaining - Top Right */}
-                    <div className="flex flex-row items-end space-x-3 mr-4">
+                    <div className="flex flex-row items-end space-x-3 mr-3">
                       {/* Days Remaining */}
                       <div className="text-center">
-                        <div className="text-sm text-gray-500 mb-1">Days Remaining</div>
+                        <div className="text-xs text-gray-500 mb-0.5">Days Remaining</div>
                         <div className={`text-base font-bold ${getDaysRemainingColorClass(task)}`}>
                           {calculateDaysRemaining(task)}
                         </div>
@@ -1126,7 +1126,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       {/* Cost section - only show if paymentStatus is not "no_cost" */}
                       {task.paymentStatus !== 'no_cost' && (
                         <div className="text-center">
-                          <div className="text-sm text-gray-500 mb-1">Cost</div>
+                          <div className="text-xs text-gray-500 mb-0.5">Cost</div>
                           {editingCostTaskId === task.id ? (
                             <Input
                               data-testid={`input-cost-${task.id}`}
@@ -1171,13 +1171,13 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                     </div>
                     
                     {/* Action Buttons - Right side */}
-                    <div className="flex items-center space-x-2 ml-4">
+                    <div className="flex items-center space-x-1.5 ml-3">
                       <Button
                         data-testid={`button-edit-${task.id}`}
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditTask(task)}
-                        className="h-8 w-8 p-0"
+                        className="h-7 w-7 p-0"
                       >
                         ✏️
                       </Button>
@@ -1185,7 +1185,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         data-testid={`button-duplicate-${task.id}`}
                         variant="outline"
                         size="sm"
-                        className="h-8 w-8 p-0"
+                        className="h-7 w-7 p-0"
                       >
                         📋
                       </Button>
@@ -1195,7 +1195,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                             data-testid={`button-delete-${task.id}`}
                             variant="outline"
                             size="sm"
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                            className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
                           >
                             🗑️
                           </Button>
@@ -1219,12 +1219,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   </div>
                   
                   {/* Date Fields Section */}
-                  <div className={`grid gap-4 pt-4 border-t border-gray-100 ${
+                  <div className={`grid gap-3 pt-2.5 border-t border-gray-100 ${
                     task.companyHired ? 'grid-cols-4' : 'grid-cols-2'
                   }`}>
                     <div>
                       <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Deadline</label>
-                      <div className="mt-1">
+                      <div className="mt-0.5">
                         {task.deadline ? (
                           <input 
                             type="date" 
@@ -1353,7 +1353,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                   </div>
                   
                   {/* Task Owner and Progress */}
-                  <div className="flex items-center justify-end mt-4 pt-3 border-t border-gray-100">
+                  <div className="flex items-center justify-end mt-2.5 pt-2.5 border-t border-gray-100">
                     <div className="text-right">
                       <div className="text-xs text-gray-500">Task Owner: {task.assignee || "Unassigned"}</div>
                       <div className="text-xs text-gray-500">Progress: {Math.round(calculateTaskProgress(task))}%</div>
