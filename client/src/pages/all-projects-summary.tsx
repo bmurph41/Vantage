@@ -328,7 +328,7 @@ export default function AllProjectsSummaryPage() {
                           </p>
                         )}
                       </div>
-                      <Link href={`/projects/${summary.project.id}/report`}>
+                      <Link href={`/projects/${summary.project.id}/progress-report`}>
                         <Button variant="outline" size="sm" data-testid={`button-view-report-${summary.project.id}`}>
                           View Full Report
                         </Button>
