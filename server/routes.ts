@@ -11,7 +11,7 @@ import {
   insertProjectSchema, insertProjectSettingsSchema, insertTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
   insertTimelineNoteSchema, insertProjectShareSchema, insertRiskSchema,
-  insertContactSchema, updateContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema,
+  insertContactSchema, updateContactSchema, insertProjectContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema,
   insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema,
   insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema,
   insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema
@@ -1954,6 +1954,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error deleting contact:", error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to delete contact" 
+      });
+    }
+  });
+
+  // Project-Contact Association Routes
+  app.get("/api/dd/projects/:projectId/contacts", async (req: any, res) => {
+    try {
+      // Verify project access
+      const project = await storage.getProject(req.params.projectId);
+      if (!project || project.orgId !== req.user.orgId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      const projectContacts = await storage.getProjectContacts(req.params.projectId);
+      res.json(projectContacts);
+    } catch (error) {
+      console.error("Error fetching project contacts:", error);
+      res.status(500).json({ error: "Failed to fetch project contacts" });
+    }
+  });
+
+  app.post("/api/dd/projects/:projectId/contacts", async (req: any, res) => {
+    try {
+      // Verify project access
+      const project = await storage.getProject(req.params.projectId);
+      if (!project || project.orgId !== req.user.orgId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      const projectContactData = insertProjectContactSchema.parse({
+        ...req.body,
+        projectId: req.params.projectId,
+      });
+
+      // Verify contact belongs to same org
+      const contact = await storage.getContactById(projectContactData.contactId);
+      if (!contact || contact.orgId !== req.user.orgId) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+
+      const projectContact = await storage.addContactToProject(projectContactData);
+      res.json(projectContact);
+    } catch (error) {
+      console.error("Error adding contact to project:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid project contact data", details: error.errors });
+      } else {
+        res.status(500).json({ 
+          error: error instanceof Error ? error.message : "Failed to add contact to project" 
+        });
+      }
+    }
+  });
+
+  app.delete("/api/dd/projects/:projectId/contacts/:contactId/:role", async (req: any, res) => {
+    try {
+      // Verify project access
+      const project = await storage.getProject(req.params.projectId);
+      if (!project || project.orgId !== req.user.orgId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      await storage.removeContactFromProject(
+        req.params.projectId, 
+        req.params.contactId, 
+        req.params.role
+      );
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing contact from project:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to remove contact from project" 
       });
     }
   });
