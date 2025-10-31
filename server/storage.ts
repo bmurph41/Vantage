@@ -1,18 +1,18 @@
 import { 
   organizations, users, projects, projectSettings, tasks, 
   projectTemplates, auditLogs, timelineNotes, projectShares, risks,
-  contacts, notificationSubscriptions, notificationsLog, calendarEvents,
+  contacts, projectContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type ProjectTemplate, type AuditLog,
-  type TimelineNote, type ProjectShare, type Risk, type Contact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
+  type TimelineNote, type ProjectShare, type Risk, type Contact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
-  type InsertContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
+  type InsertContact, type InsertProjectContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem
 } from "@shared/schema";
@@ -125,6 +125,11 @@ export interface IStorage {
   getContactById(id: string): Promise<Contact | undefined>;
   updateContact(id: string, updates: Partial<InsertContact>): Promise<Contact>;
   deleteContact(id: string): Promise<void>;
+  
+  // Project-Contact Associations
+  addContactToProject(projectContact: InsertProjectContact): Promise<ProjectContact>;
+  getProjectContacts(projectId: string): Promise<Array<ProjectContact & { contact: Contact }>>;
+  removeContactFromProject(projectId: string, contactId: string, role: string): Promise<void>;
 
   // Notification Subscription Management
   createSubscription(subscription: InsertNotificationSubscription): Promise<NotificationSubscription>;
@@ -850,6 +855,34 @@ export class DatabaseStorage implements IStorage {
     }
     
     await db.delete(contacts).where(eq(contacts.id, id));
+  }
+  
+  // Project-Contact Associations
+  async addContactToProject(projectContact: InsertProjectContact): Promise<ProjectContact> {
+    const [created] = await db.insert(projectContacts).values(projectContact).returning();
+    return created;
+  }
+
+  async getProjectContacts(projectId: string): Promise<Array<ProjectContact & { contact: Contact }>> {
+    const results = await db.select()
+      .from(projectContacts)
+      .leftJoin(contacts, eq(projectContacts.contactId, contacts.id))
+      .where(eq(projectContacts.projectId, projectId))
+      .orderBy(projectContacts.role);
+    
+    return results.map(result => ({
+      ...result.project_contacts,
+      contact: result.contacts!
+    }));
+  }
+
+  async removeContactFromProject(projectId: string, contactId: string, role: string): Promise<void> {
+    await db.delete(projectContacts)
+      .where(and(
+        eq(projectContacts.projectId, projectId),
+        eq(projectContacts.contactId, contactId),
+        eq(projectContacts.role, role)
+      ));
   }
 
   // Notification Subscription Management

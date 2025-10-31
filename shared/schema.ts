@@ -365,6 +365,25 @@ export const contacts = pgTable("contacts", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Project Contacts (Join table for associating contacts with projects)
+export const projectContacts = pgTable("project_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  contactId: varchar("contact_id").notNull().references(() => contacts.id),
+  role: contactRoleEnum("role").notNull(), // Role for this specific project
+  customRole: text("custom_role"), // Custom role/position when role is "other"
+  projectNotes: text("project_notes"), // Project-specific notes about this contact
+  isPrimary: boolean("is_primary").notNull().default(false), // Is this the primary contact for this role?
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    // Ensure a contact can only have one instance per project with the same role
+    uniqueProjectContactRole: unique("unique_project_contact_role").on(table.projectId, table.contactId, table.role),
+    projectIdx: index("project_contacts_project").on(table.projectId),
+    contactIdx: index("project_contacts_contact").on(table.contactId),
+  };
+});
+
 // Notification Subscriptions
 export const notificationSubscriptions = pgTable("notification_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1099,6 +1118,11 @@ export const updateContactSchema = createInsertSchema(contacts).omit({
   createdAt: true,
 });
 
+export const insertProjectContactSchema = createInsertSchema(projectContacts).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertNotificationSubscriptionSchema = createInsertSchema(notificationSubscriptions).omit({
   id: true,
   createdAt: true,
@@ -1179,6 +1203,9 @@ export type InsertRisk = z.infer<typeof insertRiskSchema>;
 export type Contact = typeof contacts.$inferSelect;
 export type InsertContact = z.infer<typeof insertContactSchema>;
 export type UpdateContact = z.infer<typeof updateContactSchema>;
+
+export type ProjectContact = typeof projectContacts.$inferSelect;
+export type InsertProjectContact = z.infer<typeof insertProjectContactSchema>;
 
 export type NotificationSubscription = typeof notificationSubscriptions.$inferSelect;
 export type InsertNotificationSubscription = z.infer<typeof insertNotificationSubscriptionSchema>;
