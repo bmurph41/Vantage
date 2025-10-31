@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Milestone } from "../types/dd";
 
 type Props = {
@@ -11,7 +11,6 @@ const clamp = (n: number, min = 0, max = 100) => Math.max(min, Math.min(max, n))
 
 export default function MilestoneProgressBar({ progressPct, elapsedLabel, milestones }: Props) {
   const progress = clamp(progressPct);
-  const [openId, setOpenId] = useState<string | null>(null);
 
   return (
     <div className="w-full rounded-2xl border p-4 shadow-sm bg-white">
@@ -44,59 +43,51 @@ export default function MilestoneProgressBar({ progressPct, elapsedLabel, milest
         </div>
 
         {/* Milestone dots - positioned outside the progress bar container */}
-        {milestones.map((m) => {
-          const id = `tip-${m.id}`;
-          // keep tooltip within container edges by nudging at extremes
-          const leftPct = clamp(m.positionPct);
-          const nudge = leftPct < 6 ? 6 : leftPct > 94 ? -6 : 0;
-          const isOpen = openId === m.id;
+        <TooltipProvider>
+          {milestones.map((m) => {
+            const leftPct = clamp(m.positionPct);
 
-          return (
-            <div
-              key={m.id}
-              className="absolute top-1/2 -translate-y-1/2 z-50"
-              style={{ left: `${leftPct}%` }}
-            >
-              <button
-                type="button"
-                className={`h-4 w-4 rounded-full ring-2 ring-white shadow-md bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 ${m.color ?? ""}`}
-                aria-describedby={id}
-                onMouseEnter={() => setOpenId(m.id)}
-                onMouseLeave={() => setOpenId((cur) => (cur === m.id ? null : cur))}
-                onFocus={() => setOpenId(m.id)}
-                onBlur={() => setOpenId((cur) => (cur === m.id ? null : cur))}
-                onKeyDown={(e) => e.key === "Escape" && setOpenId(null)}
-                onClick={(e) => {
-                  // mobile toggle
-                  e.stopPropagation();
-                  setOpenId((cur) => (cur === m.id ? null : m.id));
-                }}
-                data-testid={`milestone-dot-${m.id}`}
-              />
-
-              {/* Tooltip - positioned outside progress bar to avoid clipping */}
+            return (
               <div
-                id={id}
-                role="tooltip"
-                className={`pointer-events-none absolute -top-16 transition-opacity duration-150 z-[9999] ${
-                  isOpen ? "opacity-100" : "opacity-0"
-                }`}
-                style={{ 
-                  left: '50%',
-                  transform: `translateX(-50%) translateX(${nudge}px)`
-                }}
+                key={m.id}
+                className="absolute top-1/2 -translate-y-1/2 z-50"
+                style={{ left: `${leftPct}%` }}
               >
-                <div className="relative w-48 rounded-lg bg-white border border-gray-200 shadow-xl px-4 py-3 text-xs">
-                  <div className="font-semibold text-gray-900 mb-1">{m.title}</div>
-                  <div className="text-gray-600 mb-1">Due: {formatDate(m.due)}</div>
-                  <div className="text-gray-600">{Math.round(leftPct)}% Complete</div>
-                  <div className="absolute left-1/2 top-full -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white" />
-                  <div className="absolute left-1/2 top-full -translate-x-1/2 translate-y-[-1px] w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-gray-200" />
-                </div>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className={`h-4 w-4 rounded-full ring-2 ring-white shadow-md bg-blue-600 hover:ring-4 hover:ring-blue-200 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all cursor-help ${m.color ?? ""}`}
+                      data-testid={`milestone-dot-${m.id}`}
+                    >
+                      <span className="sr-only">{m.title}</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent 
+                    side="top" 
+                    className="max-w-sm p-4 bg-white border border-gray-200 shadow-xl z-[100]"
+                    data-testid={`milestone-tooltip-${m.id}`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-3 h-3 rounded-full ${m.color ?? 'bg-blue-600'}`}></div>
+                        <div className="font-semibold text-gray-900">{m.title}</div>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Due Date:</span>
+                        <span className="font-medium text-gray-900">{formatDate(m.due)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Progress:</span>
+                        <span className="font-medium text-gray-900">{Math.round(leftPct)}%</span>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </TooltipProvider>
       </div>
     </div>
   );
