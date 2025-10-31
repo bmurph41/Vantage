@@ -70,6 +70,8 @@ export default function DDProgressReportPage() {
   // State for modals
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
+  const [isRisksModalOpen, setIsRisksModalOpen] = useState(false);
   
   // State for executive notes
   const [executiveNotes, setExecutiveNotes] = useState('');
@@ -545,10 +547,18 @@ function DDProgressReport({
   // State for modals
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
+  const [isRisksModalOpen, setIsRisksModalOpen] = useState(false);
   
   // Fetch contacts data for team contact modal
   const { data: contacts = [] } = useQuery<Contact[]>({
     queryKey: ['/api/dd/contacts'],
+    enabled: !!project?.id,
+  });
+  
+  // Fetch risks data for risks modal
+  const { data: risks = [] } = useQuery<Risk[]>({
+    queryKey: ['/api/dd/projects', project?.id, 'risks'],
     enabled: !!project?.id,
   });
   
@@ -777,7 +787,11 @@ function DDProgressReport({
           {/* 4-Card Executive Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {/* Card 1: Tasks Completed */}
-            <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+            <Card 
+              className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow cursor-pointer"
+              onClick={() => setIsTasksModalOpen(true)}
+              data-testid="card-tasks-completed"
+            >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className={`p-3 rounded-full ${
@@ -841,7 +855,7 @@ function DDProgressReport({
                       </Badge>
                     </div>
                     <div className="text-3xl font-bold text-gray-900 mb-2">
-                      {metrics.daysRemainingToDD || 0}
+                      {metrics.daysRemainingToDD || 0} <span className="text-lg font-medium text-gray-600">Days</span>
                     </div>
                     <div className="text-sm font-medium text-gray-600 mb-1">DD Expiration</div>
                     <div className={`text-xs ${
@@ -963,7 +977,11 @@ function DDProgressReport({
             </Card>
 
             {/* Card 4: High-Severity Risks */}
-            <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
+            <Card 
+              className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow cursor-pointer"
+              onClick={() => setIsRisksModalOpen(true)}
+              data-testid="card-high-severity-risks"
+            >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className={`p-3 rounded-full ${
@@ -1719,6 +1737,315 @@ function DDProgressReport({
           project={project}
           settings={undefined}
         />
+
+        {/* Tasks List Modal */}
+        <Dialog open={isTasksModalOpen} onOpenChange={setIsTasksModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <CheckCircle className="h-6 w-6 text-blue-600" />
+                <span>All Tasks - {project.name}</span>
+              </DialogTitle>
+              <DialogDescription>
+                Complete list of due diligence tasks for this project ({metrics.completedTasks} of {metrics.totalTasks} completed)
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              {tasks && tasks.length > 0 ? (
+                <>
+                  {/* Completed Tasks */}
+                  {tasks.filter(t => t.status === 'completed').length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-green-700 mb-3 flex items-center">
+                        <CheckCircle className="h-5 w-5 mr-2" />
+                        Completed ({tasks.filter(t => t.status === 'completed').length})
+                      </h3>
+                      <div className="space-y-2">
+                        {tasks.filter(t => t.status === 'completed').map((task) => (
+                          <div key={task.id} className="p-4 border border-green-200 bg-green-50 rounded-lg">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">{task.title}</div>
+                                {task.description && (
+                                  <div className="text-sm text-gray-600 mt-1">{task.description}</div>
+                                )}
+                                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                  {task.deadline && (
+                                    <div className="flex items-center">
+                                      <Calendar className="h-3 w-3 mr-1" />
+                                      Due: {format(parseISO(task.deadline), 'MMM dd, yyyy')}
+                                    </div>
+                                  )}
+                                  {task.assignee && (
+                                    <div className="flex items-center">
+                                      <Users className="h-3 w-3 mr-1" />
+                                      {task.assignee}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge className="bg-green-100 text-green-800 border-green-200">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Completed
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* In Progress Tasks */}
+                  {tasks.filter(t => t.status === 'in_progress').length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-blue-700 mb-3 flex items-center">
+                        <Activity className="h-5 w-5 mr-2" />
+                        In Progress ({tasks.filter(t => t.status === 'in_progress').length})
+                      </h3>
+                      <div className="space-y-2">
+                        {tasks.filter(t => t.status === 'in_progress').map((task) => (
+                          <div key={task.id} className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">{task.title}</div>
+                                {task.description && (
+                                  <div className="text-sm text-gray-600 mt-1">{task.description}</div>
+                                )}
+                                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                  {task.deadline && (
+                                    <div className="flex items-center">
+                                      <Calendar className="h-3 w-3 mr-1" />
+                                      Due: {format(parseISO(task.deadline), 'MMM dd, yyyy')}
+                                    </div>
+                                  )}
+                                  {task.assignee && (
+                                    <div className="flex items-center">
+                                      <Users className="h-3 w-3 mr-1" />
+                                      {task.assignee}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                In Progress
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pending/Not Started Tasks */}
+                  {tasks.filter(t => t.status !== 'completed' && t.status !== 'in_progress').length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
+                        <Clock className="h-5 w-5 mr-2" />
+                        Not Started ({tasks.filter(t => t.status !== 'completed' && t.status !== 'in_progress').length})
+                      </h3>
+                      <div className="space-y-2">
+                        {tasks.filter(t => t.status !== 'completed' && t.status !== 'in_progress').map((task) => (
+                          <div key={task.id} className="p-4 border border-gray-200 bg-gray-50 rounded-lg">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">{task.title}</div>
+                                {task.description && (
+                                  <div className="text-sm text-gray-600 mt-1">{task.description}</div>
+                                )}
+                                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                  {task.deadline && (
+                                    <div className="flex items-center">
+                                      <Calendar className="h-3 w-3 mr-1" />
+                                      Due: {format(parseISO(task.deadline), 'MMM dd, yyyy')}
+                                      {task.deadline && isOverdueAt1700EST(task.deadline) && (
+                                        <Badge className="ml-2 bg-red-100 text-red-800 border-red-200 text-xs">
+                                          Overdue
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  )}
+                                  {task.assignee && (
+                                    <div className="flex items-center">
+                                      <Users className="h-3 w-3 mr-1" />
+                                      {task.assignee}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge variant="outline">
+                                {task.status === 'engaged' ? 'Engaged' : 'Not Started'}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <CheckCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-sm">No tasks found for this project.</p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Risks Modal */}
+        <Dialog open={isRisksModalOpen} onOpenChange={setIsRisksModalOpen}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <AlertTriangle className="h-6 w-6 text-amber-600" />
+                <span>Risk Assessment - {project.name}</span>
+              </DialogTitle>
+              <DialogDescription>
+                Identified risks and mitigation strategies for this project
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              {risks && risks.length > 0 ? (
+                <>
+                  {/* High Severity Risks */}
+                  {risks.filter(r => r.severity === 'high').length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-red-700 mb-3 flex items-center">
+                        <AlertTriangle className="h-5 w-5 mr-2" />
+                        High Severity ({risks.filter(r => r.severity === 'high').length})
+                      </h3>
+                      <div className="space-y-3">
+                        {risks.filter(r => r.severity === 'high').map((risk) => (
+                          <div key={risk.id} className="p-4 border-2 border-red-200 bg-red-50 rounded-lg">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="font-semibold text-gray-900">{risk.title}</div>
+                              <Badge className="bg-red-100 text-red-800 border-red-300">
+                                High Risk
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-gray-700 mb-3">{risk.description}</div>
+                            {risk.mitigation && (
+                              <div className="bg-white border border-red-100 rounded p-3">
+                                <div className="text-xs font-medium text-red-700 mb-1">Mitigation Strategy:</div>
+                                <div className="text-sm text-gray-700">{risk.mitigation}</div>
+                              </div>
+                            )}
+                            <div className="flex items-center space-x-4 mt-3 text-xs text-gray-600">
+                              {risk.category && (
+                                <div className="flex items-center">
+                                  <Badge variant="outline" className="text-xs">
+                                    {risk.category}
+                                  </Badge>
+                                </div>
+                              )}
+                              {risk.status && (
+                                <div className="capitalize">
+                                  Status: {risk.status.replace('_', ' ')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Medium Severity Risks */}
+                  {risks.filter(r => r.severity === 'medium').length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-amber-700 mb-3 flex items-center">
+                        <AlertTriangle className="h-5 w-5 mr-2" />
+                        Medium Severity ({risks.filter(r => r.severity === 'medium').length})
+                      </h3>
+                      <div className="space-y-3">
+                        {risks.filter(r => r.severity === 'medium').map((risk) => (
+                          <div key={risk.id} className="p-4 border border-amber-200 bg-amber-50 rounded-lg">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="font-semibold text-gray-900">{risk.title}</div>
+                              <Badge className="bg-amber-100 text-amber-800 border-amber-300">
+                                Medium Risk
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-gray-700 mb-3">{risk.description}</div>
+                            {risk.mitigation && (
+                              <div className="bg-white border border-amber-100 rounded p-3">
+                                <div className="text-xs font-medium text-amber-700 mb-1">Mitigation Strategy:</div>
+                                <div className="text-sm text-gray-700">{risk.mitigation}</div>
+                              </div>
+                            )}
+                            <div className="flex items-center space-x-4 mt-3 text-xs text-gray-600">
+                              {risk.category && (
+                                <div className="flex items-center">
+                                  <Badge variant="outline" className="text-xs">
+                                    {risk.category}
+                                  </Badge>
+                                </div>
+                              )}
+                              {risk.status && (
+                                <div className="capitalize">
+                                  Status: {risk.status.replace('_', ' ')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Low Severity Risks */}
+                  {risks.filter(r => r.severity === 'low').length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-blue-700 mb-3 flex items-center">
+                        <Shield className="h-5 w-5 mr-2" />
+                        Low Severity ({risks.filter(r => r.severity === 'low').length})
+                      </h3>
+                      <div className="space-y-3">
+                        {risks.filter(r => r.severity === 'low').map((risk) => (
+                          <div key={risk.id} className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="font-semibold text-gray-900">{risk.title}</div>
+                              <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                                Low Risk
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-gray-700 mb-3">{risk.description}</div>
+                            {risk.mitigation && (
+                              <div className="bg-white border border-blue-100 rounded p-3">
+                                <div className="text-xs font-medium text-blue-700 mb-1">Mitigation Strategy:</div>
+                                <div className="text-sm text-gray-700">{risk.mitigation}</div>
+                              </div>
+                            )}
+                            <div className="flex items-center space-x-4 mt-3 text-xs text-gray-600">
+                              {risk.category && (
+                                <div className="flex items-center">
+                                  <Badge variant="outline" className="text-xs">
+                                    {risk.category}
+                                  </Badge>
+                                </div>
+                              )}
+                              {risk.status && (
+                                <div className="capitalize">
+                                  Status: {risk.status.replace('_', ' ')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <Shield className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-sm font-medium">No risks identified</p>
+                  <p className="text-xs mt-1">This project currently has no documented risks.</p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </div>
