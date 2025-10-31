@@ -87,7 +87,7 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const [attorneysArray, setAttorneysArray] = useState<string[]>(project.ourAttorney || []);
   
   // Custom Deadlines State
-  const [customDeadlines, setCustomDeadlines] = useState<Array<{label: string, date: string}>>(
+  const [customDeadlines, setCustomDeadlines] = useState<Array<{label: string, date: string, showOnTimeline?: boolean}>>(
     (project.customDeadlines as any) || []
   );
   
@@ -700,7 +700,7 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setCustomDeadlines([...customDeadlines, { label: "", date: "" }]);
+                    setCustomDeadlines([...customDeadlines, { label: "", date: "", showOnTimeline: false }]);
                   }}
                   data-testid="button-add-custom-deadline"
                 >
@@ -712,48 +712,67 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
               {customDeadlines.length > 0 && (
                 <div className="space-y-3">
                   {customDeadlines.map((deadline, index) => (
-                    <div key={index} className="grid grid-cols-2 gap-3 items-start p-3 bg-muted/50 rounded-lg">
-                      <div className="space-y-2">
-                        <Label htmlFor={`custom-deadline-label-${index}`} className="text-xs">Deadline Name</Label>
-                        <Input
-                          id={`custom-deadline-label-${index}`}
-                          value={deadline.label}
-                          onChange={(e) => {
-                            const updated = [...customDeadlines];
-                            updated[index].label = e.target.value;
-                            setCustomDeadlines(updated);
-                          }}
-                          placeholder="e.g., Inspection Period, Final Walkthrough"
-                          data-testid={`input-custom-deadline-label-${index}`}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor={`custom-deadline-date-${index}`} className="text-xs">Date</Label>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const updated = customDeadlines.filter((_, i) => i !== index);
+                    <div key={index} className="p-3 bg-muted/50 rounded-lg space-y-3">
+                      <div className="grid grid-cols-2 gap-3 items-start">
+                        <div className="space-y-2">
+                          <Label htmlFor={`custom-deadline-label-${index}`} className="text-xs">Deadline Name</Label>
+                          <Input
+                            id={`custom-deadline-label-${index}`}
+                            value={deadline.label}
+                            onChange={(e) => {
+                              const updated = [...customDeadlines];
+                              updated[index].label = e.target.value;
                               setCustomDeadlines(updated);
                             }}
-                            className="h-6 w-6 p-0"
-                            data-testid={`button-remove-custom-deadline-${index}`}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                            placeholder="e.g., Inspection Period, Final Walkthrough"
+                            data-testid={`input-custom-deadline-label-${index}`}
+                          />
                         </div>
-                        <DateInput
-                          id={`custom-deadline-date-${index}`}
-                          value={deadline.date}
-                          onChange={(value) => {
-                            const updated = [...customDeadlines];
-                            updated[index].date = value;
-                            setCustomDeadlines(updated);
-                          }}
-                          data-testid={`input-custom-deadline-date-${index}`}
-                        />
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor={`custom-deadline-date-${index}`} className="text-xs">Date</Label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const updated = customDeadlines.filter((_, i) => i !== index);
+                                setCustomDeadlines(updated);
+                              }}
+                              className="h-6 w-6 p-0"
+                              data-testid={`button-remove-custom-deadline-${index}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <DateInput
+                            id={`custom-deadline-date-${index}`}
+                            value={deadline.date}
+                            onChange={(value) => {
+                              const updated = [...customDeadlines];
+                              updated[index].date = value;
+                              setCustomDeadlines(updated);
+                            }}
+                            data-testid={`input-custom-deadline-date-${index}`}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id={`custom-deadline-timeline-${index}`}
+                            checked={deadline.showOnTimeline ?? false}
+                            onCheckedChange={(checked) => {
+                              const updated = [...customDeadlines];
+                              updated[index].showOnTimeline = checked;
+                              setCustomDeadlines(updated);
+                            }}
+                            data-testid={`switch-custom-deadline-timeline-${index}`}
+                          />
+                          <Label htmlFor={`custom-deadline-timeline-${index}`} className="text-xs font-normal cursor-pointer">
+                            Show on main timeline progress bar
+                          </Label>
+                        </div>
                       </div>
                     </div>
                   ))}
