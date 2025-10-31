@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building, X, LayoutDashboard, PieChart, Briefcase, TrendingUp } from "lucide-react";
+import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building, X, LayoutDashboard, PieChart, Briefcase, TrendingUp, FileText } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useProjects, useCreateProject, useDeleteProject } from "@/hooks/use-project";
 import { useCreateTask } from "@/hooks/use-tasks";
@@ -314,6 +314,15 @@ export default function Dashboard() {
                   </Button>
                 </Link>
               </div>
+              <Link href="/projects/summary">
+                <Button 
+                  variant="outline"
+                  data-testid="button-summary-report"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Summary Report
+                </Button>
+              </Link>
               <Button 
                 onClick={() => setIsCreateDialogOpen(true)}
                 data-testid="button-new-project"

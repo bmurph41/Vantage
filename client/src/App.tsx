@@ -7,6 +7,7 @@ import Dashboard from "@/pages/dashboard";
 import ProjectPage from "@/pages/project";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import DDProgressReportPage from "@/pages/dd-progress-report";
+import AllProjectsSummaryPage from "@/pages/all-projects-summary";
 import UserSettingsPage from "@/pages/user-settings";
 import InvestorDashboard from "@/pages/investor-dashboard";
 import OwnerDashboard from "@/pages/owner-dashboard";
@@ -25,6 +26,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/projects" component={Dashboard} />
+      <Route path="/projects/summary" component={AllProjectsSummaryPage} />
       <Route path="/investor" component={InvestorDashboard} />
       <Route path="/owner" component={OwnerDashboard} />
       <Route path="/audit-logs" component={AuditLogsPage} />
