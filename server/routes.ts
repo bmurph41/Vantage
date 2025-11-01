@@ -515,6 +515,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Poke task owner with email reminder
+  app.post("/api/dd/tasks/:id/poke", async (req: any, res) => {
+    try {
+      const task = await storage.getTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      // Get project details
+      const project = await storage.getProject(task.projectId);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      // Authorize access
+      await authorizeProjectAccess(task.projectId, req.user.orgId);
+
+      // Get the user who is doing the poking
+      const pokedByUser = await storage.getUser(req.user.id);
+      const pokedByName = pokedByUser?.name || 'A team member';
+
+      // Determine recipient email and name
+      let recipientEmail: string | null = null;
+      let recipientName: string = 'Team Member';
+
+      // Try to get email from task owner first
+      if (task.taskOwner) {
+        const taskOwner = await storage.getUser(task.taskOwner);
+        if (taskOwner?.email) {
+          recipientEmail = taskOwner.email;
+          recipientName = taskOwner.name;
+        }
+      }
+
+      // Fallback to task assignee email if available
+      if (!recipientEmail && task.assignee) {
+        recipientName = task.assignee;
+        // Try to find a contact with matching name
+        const contacts = await storage.getContacts();
+        const matchingContact = contacts.find(c => 
+          c.name.toLowerCase() === task.assignee?.toLowerCase()
+        );
+        if (matchingContact?.email) {
+          recipientEmail = matchingContact.email;
+        }
+      }
+
+      // Fallback to repEmail if available
+      if (!recipientEmail && task.repEmail) {
+        recipientEmail = task.repEmail;
+        recipientName = task.repName || task.assignee || 'Team Member';
+      }
+
+      if (!recipientEmail) {
+        return res.status(400).json({ 
+          error: "No email address found for task owner or assignee",
+          message: "Please ensure the task has an assigned owner with an email address."
+        });
+      }
+
+      // Send the poke email
+      const { sendTaskPokeEmail } = await import('./sendgrid-client');
+      await sendTaskPokeEmail({
+        toEmail: recipientEmail,
+        toName: recipientName,
+        taskTitle: task.title,
+        taskDeadline: task.deadline ? new Date(task.deadline).toLocaleDateString() : undefined,
+        projectName: project.name,
+        projectId: project.id,
+        taskDescription: task.description || undefined,
+        pokedBy: pokedByName
+      });
+
+      res.json({ 
+        success: true,
+        message: `Reminder sent to ${recipientName} (${recipientEmail})`
+      });
+    } catch (error) {
+      console.error("Error sending poke email:", error);
+      res.status(500).json({ 
+        error: "Failed to send reminder",
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   app.patch("/api/dd/tasks/:id", async (req: any, res) => {
     try {
       const task = await storage.getTask(req.params.id);
