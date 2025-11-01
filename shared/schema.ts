@@ -198,6 +198,7 @@ export const tasks = pgTable("tasks", {
   isGating: boolean("is_gating").notNull().default(false),
   isMilestone: boolean("is_milestone").notNull().default(false),
   ddCategory: ddCategoryEnum("dd_category"),
+  requiresDecision: boolean("requires_decision").notNull().default(false), // Task needs a decision point
   // Archive fields
   archived: boolean("archived").notNull().default(false),
   archivedAt: timestamp("archived_at"),
