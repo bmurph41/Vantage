@@ -595,6 +595,32 @@ function DDProgressReport({
     setIsCalendarModalOpen(true);
   };
   
+  // Poke task owner mutation
+  const pokeMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      return apiRequest(`/api/dd/tasks/${taskId}/poke`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Reminder sent!",
+        description: data.message || "Email notification has been sent to the task owner.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to send reminder",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handlePokeTask = (taskId: string, taskTitle: string) => {
+    pokeMutation.mutate(taskId);
+  };
+  
   // Calculate comprehensive project metrics
   const metrics = useMemo(() => {
     const totalTasks = tasks.length;
@@ -1991,10 +2017,12 @@ function DDProgressReport({
                                   size="sm" 
                                   variant="outline" 
                                   className="text-red-600 border-red-300 hover:bg-red-50"
+                                  onClick={() => handlePokeTask(task.id, task.title)}
+                                  disabled={pokeMutation.isPending}
                                   data-testid={`button-poke-${task.id}`}
                                 >
                                   <Bell className="h-3 w-3 mr-1" />
-                                  Poke
+                                  {pokeMutation.isPending ? 'Sending...' : 'Poke'}
                                 </Button>
                               </div>
                             </div>
@@ -2050,10 +2078,12 @@ function DDProgressReport({
                                   size="sm" 
                                   variant="outline" 
                                   className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                                  onClick={() => handlePokeTask(task.id, task.title)}
+                                  disabled={pokeMutation.isPending}
                                   data-testid={`button-poke-${task.id}`}
                                 >
                                   <Bell className="h-3 w-3 mr-1" />
-                                  Poke
+                                  {pokeMutation.isPending ? 'Sending...' : 'Poke'}
                                 </Button>
                               </div>
                             </div>
