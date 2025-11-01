@@ -308,6 +308,7 @@ const addTaskFormSchema = z.object({
   notes: z.string().optional(),
   showOnTimeline: z.boolean().default(false),
   isInternalTask: z.boolean().default(false),
+  requiresDecision: z.boolean().default(false),
   dependencies: z.array(z.string()).default([]),
 });
 
@@ -399,6 +400,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       notes: "",
       showOnTimeline: false,
       isInternalTask: false,
+      requiresDecision: false,
       dependencies: [],
     },
   });
@@ -913,6 +915,24 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       Internal Task (No Company)
                     </Label>
                   </div>
+
+                  {/* Requires Decision Checkbox */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="requiresDecision"
+                      checked={form.watch("requiresDecision")}
+                      onCheckedChange={(checked) => {
+                        form.setValue("requiresDecision", !!checked);
+                      }}
+                      data-testid="checkbox-requires-decision"
+                    />
+                    <Label 
+                      htmlFor="requiresDecision" 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Requires Decision
+                    </Label>
+                  </div>
                 </div>
 
                 {/* Conditional Date On-Site field when requires on-site inspection */}
@@ -1046,7 +1066,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     projectId={projectId}
                     value={form.watch("dependencies") || []}
                     onChange={(value) => form.setValue("dependencies", value)}
-                    currentTaskId={editingTask ? editingTask.id : undefined}
+                    currentTaskId={editingTask?.id}
                   />
                   <p className="text-sm text-muted-foreground">
                     Select tasks that must be completed before this task can begin
@@ -1608,6 +1628,24 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       Internal Task (No Company)
                     </Label>
                   </div>
+
+                  {/* Requires Decision Checkbox */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="requiresDecision"
+                      checked={form.watch("requiresDecision")}
+                      onCheckedChange={(checked) => {
+                        form.setValue("requiresDecision", !!checked);
+                      }}
+                      data-testid="checkbox-requires-decision"
+                    />
+                    <Label 
+                      htmlFor="requiresDecision" 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Requires Decision
+                    </Label>
+                  </div>
                 </div>
 
                 {/* Conditional Date On-Site field when requires on-site inspection */}
@@ -1741,7 +1779,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                     projectId={projectId}
                     value={form.watch("dependencies") || []}
                     onChange={(value) => form.setValue("dependencies", value)}
-                    currentTaskId={editingTask ? editingTask.id : undefined}
+                    currentTaskId={editingTask?.id}
                   />
                   <p className="text-sm text-muted-foreground">
                     Select tasks that must be completed before this task can begin
@@ -1927,11 +1965,11 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 </div>
 
                 {/* File Attachments - Only show when editing existing task */}
-                {editingTask && (
+                {editingTask && editingTask.id && (
                   <div className="space-y-2">
                     <TaskFiles 
                       taskId={editingTask.id} 
-                      taskTitle={editingTask.title}
+                      taskTitle={editingTask.title || ''}
                       compact={true}
                     />
                   </div>
