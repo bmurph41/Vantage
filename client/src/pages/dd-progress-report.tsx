@@ -377,6 +377,8 @@ interface ProjectMetrics {
   timelineProgress: number;
   highRiskTasks: number;
   criticalPathTasks: number;
+  decisionRequiredTasks: number;
+  requiresAttentionCount: number;
 }
 
 function generateAIInsights(project: Project, tasks: Task[], metrics: ProjectMetrics): string[] {
@@ -681,6 +683,12 @@ function DDProgressReport({
       return differenceInCalendarDays(deadlineAt5PM, currentDate) <= 7;
     }).length;
     
+    // Requires Attention: Overdue + Decision Required tasks
+    const decisionRequiredTasks = tasks.filter(t => 
+      t.requiresDecision && t.status !== 'completed'
+    ).length;
+    const requiresAttentionCount = overdueTasks + decisionRequiredTasks;
+    
     return {
       totalTasks,
       completedTasks,
@@ -700,7 +708,9 @@ function DDProgressReport({
       daysRemainingToDD,
       timelineProgress,
       highRiskTasks,
-      criticalPathTasks
+      criticalPathTasks,
+      decisionRequiredTasks,
+      requiresAttentionCount
     };
   }, [tasks, project, currentDate, showDDDeadline]);
   
@@ -976,45 +986,45 @@ function DDProgressReport({
               </CardContent>
             </Card>
 
-            {/* Card 4: High-Severity Risks */}
+            {/* Card 4: Requires Attention */}
             <Card 
               className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow cursor-pointer"
               onClick={() => setIsRisksModalOpen(true)}
-              data-testid="card-high-severity-risks"
+              data-testid="card-requires-attention"
             >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className={`p-3 rounded-full ${
-                    metrics.highRiskTasks === 0 ? 'bg-slate-100' :
-                    metrics.highRiskTasks <= 2 ? 'bg-amber-50' :
+                    metrics.requiresAttentionCount === 0 ? 'bg-slate-100' :
+                    metrics.requiresAttentionCount <= 2 ? 'bg-amber-50' :
                     'bg-red-50'
                   }`}>
                     <AlertTriangle className={`h-6 w-6 ${
-                      metrics.highRiskTasks === 0 ? 'text-slate-600' :
-                      metrics.highRiskTasks <= 2 ? 'text-amber-600' :
+                      metrics.requiresAttentionCount === 0 ? 'text-slate-600' :
+                      metrics.requiresAttentionCount <= 2 ? 'text-amber-600' :
                       'text-red-600'
                     }`} />
                   </div>
                   <Badge className={`rounded-full text-xs ${
-                    metrics.highRiskTasks === 0 ? 'bg-slate-50 text-slate-700 border border-slate-200' :
-                    metrics.highRiskTasks <= 2 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                    metrics.requiresAttentionCount === 0 ? 'bg-slate-50 text-slate-700 border border-slate-200' :
+                    metrics.requiresAttentionCount <= 2 ? 'bg-amber-50 text-amber-700 border border-amber-100' :
                     'bg-red-50 text-red-700 border border-red-100'
                   }`}>
-                    {metrics.highRiskTasks === 0 ? 'Clear' :
-                     metrics.highRiskTasks <= 2 ? 'Manageable' : 'Critical'}
+                    {metrics.requiresAttentionCount === 0 ? 'Clear' :
+                     metrics.requiresAttentionCount <= 2 ? 'Manageable' : 'Critical'}
                   </Badge>
                 </div>
                 <div className="text-3xl font-bold text-gray-900 mb-2">
-                  {metrics.highRiskTasks}
+                  {metrics.requiresAttentionCount}
                 </div>
-                <div className="text-sm font-medium text-gray-600 mb-1">High-Severity Risks</div>
+                <div className="text-sm font-medium text-gray-600 mb-1">Requires Attention</div>
                 <div className={`text-xs ${
-                  metrics.highRiskTasks === 0 ? 'text-slate-600' :
-                  metrics.highRiskTasks <= 2 ? 'text-amber-600' :
+                  metrics.requiresAttentionCount === 0 ? 'text-slate-600' :
+                  metrics.requiresAttentionCount <= 2 ? 'text-amber-600' :
                   'text-red-600'
                 }`}>
-                  {metrics.highRiskTasks === 0 ? 'No Critical Risks' :
-                   `${metrics.highRiskTasks} Risk${metrics.highRiskTasks > 1 ? 's' : ''} Identified`}
+                  {metrics.requiresAttentionCount === 0 ? 'All tasks on track' :
+                   `${metrics.overdueTasks} Overdue, ${metrics.decisionRequiredTasks} Decision${metrics.decisionRequiredTasks !== 1 ? 's' : ''} Needed`}
                 </div>
               </CardContent>
             </Card>
