@@ -4,17 +4,20 @@ import {
   contacts, projectContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
+  crmDeals, crmLeads, crmContacts, crmCompanies, crmPipelines, crmPipelineStages, crmActivities,
   type Organization, type User, type Project, type ProjectSettings, 
   type Task, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type Contact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
+  type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
   type InsertContact, type InsertProjectContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
-  type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem
+  type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
+  type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -269,6 +272,62 @@ export interface IStorage {
   createCddReport(report: InsertCddReport): Promise<CddReport>;
   updateCddReport(id: string, updates: Partial<InsertCddReport>): Promise<CddReport>;
   deleteCddReport(id: string): Promise<void>;
+
+  // CRM - Deals
+  getCrmDeal(id: string): Promise<CrmDeal | undefined>;
+  getCrmDealsForOrg(orgId: string): Promise<CrmDeal[]>;
+  getCrmDealsByPipeline(pipelineId: string): Promise<CrmDeal[]>;
+  getCrmDealsByStage(stageId: string): Promise<CrmDeal[]>;
+  createCrmDeal(deal: InsertCrmDeal): Promise<CrmDeal>;
+  updateCrmDeal(id: string, updates: Partial<InsertCrmDeal>): Promise<CrmDeal>;
+  deleteCrmDeal(id: string): Promise<void>;
+
+  // CRM - Leads
+  getCrmLead(id: string): Promise<CrmLead | undefined>;
+  getCrmLeadsForOrg(orgId: string): Promise<CrmLead[]>;
+  getCrmLeadsByStatus(orgId: string, status: string): Promise<CrmLead[]>;
+  createCrmLead(lead: InsertCrmLead): Promise<CrmLead>;
+  updateCrmLead(id: string, updates: Partial<InsertCrmLead>): Promise<CrmLead>;
+  deleteCrmLead(id: string): Promise<void>;
+
+  // CRM - Contacts
+  getCrmContact(id: string): Promise<CrmContact | undefined>;
+  getCrmContactsForOrg(orgId: string): Promise<CrmContact[]>;
+  getCrmContactsByCompany(companyId: string): Promise<CrmContact[]>;
+  createCrmContact(contact: InsertCrmContact): Promise<CrmContact>;
+  updateCrmContact(id: string, updates: Partial<InsertCrmContact>): Promise<CrmContact>;
+  deleteCrmContact(id: string): Promise<void>;
+
+  // CRM - Companies
+  getCrmCompany(id: string): Promise<CrmCompany | undefined>;
+  getCrmCompaniesForOrg(orgId: string): Promise<CrmCompany[]>;
+  createCrmCompany(company: InsertCrmCompany): Promise<CrmCompany>;
+  updateCrmCompany(id: string, updates: Partial<InsertCrmCompany>): Promise<CrmCompany>;
+  deleteCrmCompany(id: string): Promise<void>;
+
+  // CRM - Pipelines
+  getCrmPipeline(id: string): Promise<CrmPipeline | undefined>;
+  getCrmPipelinesForOrg(orgId: string): Promise<CrmPipeline[]>;
+  createCrmPipeline(pipeline: InsertCrmPipeline): Promise<CrmPipeline>;
+  updateCrmPipeline(id: string, updates: Partial<InsertCrmPipeline>): Promise<CrmPipeline>;
+  deleteCrmPipeline(id: string): Promise<void>;
+
+  // CRM - Pipeline Stages
+  getCrmPipelineStage(id: string): Promise<CrmPipelineStage | undefined>;
+  getCrmPipelineStagesByPipeline(pipelineId: string): Promise<CrmPipelineStage[]>;
+  createCrmPipelineStage(stage: InsertCrmPipelineStage): Promise<CrmPipelineStage>;
+  updateCrmPipelineStage(id: string, updates: Partial<InsertCrmPipelineStage>): Promise<CrmPipelineStage>;
+  deleteCrmPipelineStage(id: string): Promise<void>;
+
+  // CRM - Activities
+  getCrmActivity(id: string): Promise<CrmActivity | undefined>;
+  getCrmActivitiesForOrg(orgId: string): Promise<CrmActivity[]>;
+  getCrmActivitiesByDeal(dealId: string): Promise<CrmActivity[]>;
+  getCrmActivitiesByLead(leadId: string): Promise<CrmActivity[]>;
+  getCrmActivitiesByContact(contactId: string): Promise<CrmActivity[]>;
+  createCrmActivity(activity: InsertCrmActivity): Promise<CrmActivity>;
+  updateCrmActivity(id: string, updates: Partial<InsertCrmActivity>): Promise<CrmActivity>;
+  deleteCrmActivity(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2100,6 +2159,240 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCddReport(id: string): Promise<void> {
     await db.delete(cddReports).where(eq(cddReports.id, id));
+  }
+
+  // CRM - Deals
+  async getCrmDeal(id: string): Promise<CrmDeal | undefined> {
+    const [deal] = await db.select().from(crmDeals).where(eq(crmDeals.id, id));
+    return deal || undefined;
+  }
+
+  async getCrmDealsForOrg(orgId: string): Promise<CrmDeal[]> {
+    return db.select().from(crmDeals).where(eq(crmDeals.ownerId, orgId)).orderBy(desc(crmDeals.createdAt));
+  }
+
+  async getCrmDealsByPipeline(pipelineId: string): Promise<CrmDeal[]> {
+    return db.select().from(crmDeals).where(eq(crmDeals.pipelineId, pipelineId)).orderBy(desc(crmDeals.createdAt));
+  }
+
+  async getCrmDealsByStage(stageId: string): Promise<CrmDeal[]> {
+    return db.select().from(crmDeals).where(eq(crmDeals.stageId, stageId)).orderBy(desc(crmDeals.createdAt));
+  }
+
+  async createCrmDeal(deal: InsertCrmDeal): Promise<CrmDeal> {
+    const [created] = await db.insert(crmDeals).values(deal).returning();
+    return created;
+  }
+
+  async updateCrmDeal(id: string, updates: Partial<InsertCrmDeal>): Promise<CrmDeal> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmDeals)
+      .set(updateData)
+      .where(eq(crmDeals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCrmDeal(id: string): Promise<void> {
+    await db.delete(crmDeals).where(eq(crmDeals.id, id));
+  }
+
+  // CRM - Leads
+  async getCrmLead(id: string): Promise<CrmLead | undefined> {
+    const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
+    return lead || undefined;
+  }
+
+  async getCrmLeadsForOrg(orgId: string): Promise<CrmLead[]> {
+    return db.select().from(crmLeads).where(eq(crmLeads.assignedToId, orgId)).orderBy(desc(crmLeads.createdAt));
+  }
+
+  async getCrmLeadsByStatus(orgId: string, status: string): Promise<CrmLead[]> {
+    return db.select().from(crmLeads)
+      .where(and(eq(crmLeads.assignedToId, orgId), eq(crmLeads.leadStatus, status)))
+      .orderBy(desc(crmLeads.createdAt));
+  }
+
+  async createCrmLead(lead: InsertCrmLead): Promise<CrmLead> {
+    const [created] = await db.insert(crmLeads).values(lead).returning();
+    return created;
+  }
+
+  async updateCrmLead(id: string, updates: Partial<InsertCrmLead>): Promise<CrmLead> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmLeads)
+      .set(updateData)
+      .where(eq(crmLeads.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCrmLead(id: string): Promise<void> {
+    await db.delete(crmLeads).where(eq(crmLeads.id, id));
+  }
+
+  // CRM - Contacts
+  async getCrmContact(id: string): Promise<CrmContact | undefined> {
+    const [contact] = await db.select().from(crmContacts).where(eq(crmContacts.id, id));
+    return contact || undefined;
+  }
+
+  async getCrmContactsForOrg(orgId: string): Promise<CrmContact[]> {
+    return db.select().from(crmContacts).where(eq(crmContacts.ownerId, orgId)).orderBy(desc(crmContacts.createdAt));
+  }
+
+  async getCrmContactsByCompany(companyId: string): Promise<CrmContact[]> {
+    return db.select().from(crmContacts).where(eq(crmContacts.companyId, companyId)).orderBy(asc(crmContacts.lastName));
+  }
+
+  async createCrmContact(contact: InsertCrmContact): Promise<CrmContact> {
+    const [created] = await db.insert(crmContacts).values(contact).returning();
+    return created;
+  }
+
+  async updateCrmContact(id: string, updates: Partial<InsertCrmContact>): Promise<CrmContact> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmContacts)
+      .set(updateData)
+      .where(eq(crmContacts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCrmContact(id: string): Promise<void> {
+    await db.delete(crmContacts).where(eq(crmContacts.id, id));
+  }
+
+  // CRM - Companies
+  async getCrmCompany(id: string): Promise<CrmCompany | undefined> {
+    const [company] = await db.select().from(crmCompanies).where(eq(crmCompanies.id, id));
+    return company || undefined;
+  }
+
+  async getCrmCompaniesForOrg(orgId: string): Promise<CrmCompany[]> {
+    return db.select().from(crmCompanies).where(eq(crmCompanies.ownerId, orgId)).orderBy(asc(crmCompanies.name));
+  }
+
+  async createCrmCompany(company: InsertCrmCompany): Promise<CrmCompany> {
+    const [created] = await db.insert(crmCompanies).values(company).returning();
+    return created;
+  }
+
+  async updateCrmCompany(id: string, updates: Partial<InsertCrmCompany>): Promise<CrmCompany> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmCompanies)
+      .set(updateData)
+      .where(eq(crmCompanies.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCrmCompany(id: string): Promise<void> {
+    await db.delete(crmCompanies).where(eq(crmCompanies.id, id));
+  }
+
+  // CRM - Pipelines
+  async getCrmPipeline(id: string): Promise<CrmPipeline | undefined> {
+    const [pipeline] = await db.select().from(crmPipelines).where(eq(crmPipelines.id, id));
+    return pipeline || undefined;
+  }
+
+  async getCrmPipelinesForOrg(orgId: string): Promise<CrmPipeline[]> {
+    return db.select().from(crmPipelines).where(eq(crmPipelines.ownerId, orgId)).orderBy(asc(crmPipelines.name));
+  }
+
+  async createCrmPipeline(pipeline: InsertCrmPipeline): Promise<CrmPipeline> {
+    const [created] = await db.insert(crmPipelines).values(pipeline).returning();
+    return created;
+  }
+
+  async updateCrmPipeline(id: string, updates: Partial<InsertCrmPipeline>): Promise<CrmPipeline> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmPipelines)
+      .set(updateData)
+      .where(eq(crmPipelines.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCrmPipeline(id: string): Promise<void> {
+    await db.delete(crmPipelines).where(eq(crmPipelines.id, id));
+  }
+
+  // CRM - Pipeline Stages
+  async getCrmPipelineStage(id: string): Promise<CrmPipelineStage | undefined> {
+    const [stage] = await db.select().from(crmPipelineStages).where(eq(crmPipelineStages.id, id));
+    return stage || undefined;
+  }
+
+  async getCrmPipelineStagesByPipeline(pipelineId: string): Promise<CrmPipelineStage[]> {
+    return db.select().from(crmPipelineStages)
+      .where(eq(crmPipelineStages.pipelineId, pipelineId))
+      .orderBy(asc(crmPipelineStages.stageOrder));
+  }
+
+  async createCrmPipelineStage(stage: InsertCrmPipelineStage): Promise<CrmPipelineStage> {
+    const [created] = await db.insert(crmPipelineStages).values(stage).returning();
+    return created;
+  }
+
+  async updateCrmPipelineStage(id: string, updates: Partial<InsertCrmPipelineStage>): Promise<CrmPipelineStage> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmPipelineStages)
+      .set(updateData)
+      .where(eq(crmPipelineStages.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCrmPipelineStage(id: string): Promise<void> {
+    await db.delete(crmPipelineStages).where(eq(crmPipelineStages.id, id));
+  }
+
+  // CRM - Activities
+  async getCrmActivity(id: string): Promise<CrmActivity | undefined> {
+    const [activity] = await db.select().from(crmActivities).where(eq(crmActivities.id, id));
+    return activity || undefined;
+  }
+
+  async getCrmActivitiesForOrg(orgId: string): Promise<CrmActivity[]> {
+    return db.select().from(crmActivities).where(eq(crmActivities.userId, orgId)).orderBy(desc(crmActivities.createdAt));
+  }
+
+  async getCrmActivitiesByDeal(dealId: string): Promise<CrmActivity[]> {
+    return db.select().from(crmActivities)
+      .where(and(eq(crmActivities.entityType, 'deal'), eq(crmActivities.entityId, dealId)))
+      .orderBy(desc(crmActivities.createdAt));
+  }
+
+  async getCrmActivitiesByLead(leadId: string): Promise<CrmActivity[]> {
+    return db.select().from(crmActivities)
+      .where(and(eq(crmActivities.entityType, 'lead'), eq(crmActivities.entityId, leadId)))
+      .orderBy(desc(crmActivities.createdAt));
+  }
+
+  async getCrmActivitiesByContact(contactId: string): Promise<CrmActivity[]> {
+    return db.select().from(crmActivities)
+      .where(and(eq(crmActivities.entityType, 'contact'), eq(crmActivities.entityId, contactId)))
+      .orderBy(desc(crmActivities.createdAt));
+  }
+
+  async createCrmActivity(activity: InsertCrmActivity): Promise<CrmActivity> {
+    const [created] = await db.insert(crmActivities).values(activity).returning();
+    return created;
+  }
+
+  async updateCrmActivity(id: string, updates: Partial<InsertCrmActivity>): Promise<CrmActivity> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmActivities)
+      .set(updateData)
+      .where(eq(crmActivities.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCrmActivity(id: string): Promise<void> {
+    await db.delete(crmActivities).where(eq(crmActivities.id, id));
   }
 }
 

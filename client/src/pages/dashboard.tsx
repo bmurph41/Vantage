@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building, X, LayoutDashboard, PieChart, Briefcase, TrendingUp, FileText } from "lucide-react";
+import { Plus, Calendar, DollarSign, Clock, AlertTriangle, CheckCircle, Building, X, LayoutDashboard, PieChart, Briefcase, TrendingUp, FileText, Users } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useProjects, useCreateProject, useDeleteProject } from "@/hooks/use-project";
 import { useCreateTask } from "@/hooks/use-tasks";
@@ -311,6 +311,12 @@ export default function Dashboard() {
                   <Button variant="ghost" size="sm" className="h-8" data-testid="button-owner-view">
                     <Briefcase className="h-4 w-4 mr-1" />
                     Owner
+                  </Button>
+                </Link>
+                <Link href="/crm">
+                  <Button variant="ghost" size="sm" className="h-8" data-testid="button-crm-view">
+                    <Users className="h-4 w-4 mr-1" />
+                    CRM
                   </Button>
                 </Link>
               </div>

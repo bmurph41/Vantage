@@ -86,6 +86,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   app.use("/api/dd", authenticateUser);
+  app.use("/api/crm", authenticateUser);
 
   // Projects
   app.get("/api/dd/projects", async (req: any, res) => {
@@ -4836,6 +4837,295 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Failed to get audit logs:", error);
       res.status(500).json({ error: "Failed to retrieve audit logs" });
+    }
+  });
+
+  // ==================== CRM ROUTES ====================
+
+  // CRM Deals
+  app.get("/api/crm/deals", async (req: any, res) => {
+    try {
+      const deals = await storage.getCrmDealsForOrg(req.user.orgId);
+      res.json(deals);
+    } catch (error) {
+      console.error("Failed to get deals:", error);
+      res.status(500).json({ error: "Failed to retrieve deals" });
+    }
+  });
+
+  app.post("/api/crm/deals", async (req: any, res) => {
+    try {
+      const deal = await storage.createCrmDeal({ ...req.body, ownerId: req.user.id });
+      res.json(deal);
+    } catch (error) {
+      console.error("Failed to create deal:", error);
+      res.status(500).json({ error: "Failed to create deal" });
+    }
+  });
+
+  app.put("/api/crm/deals/:id", async (req: any, res) => {
+    try {
+      const deal = await storage.updateCrmDeal(req.params.id, req.body);
+      res.json(deal);
+    } catch (error) {
+      console.error("Failed to update deal:", error);
+      res.status(500).json({ error: "Failed to update deal" });
+    }
+  });
+
+  app.delete("/api/crm/deals/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmDeal(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete deal:", error);
+      res.status(500).json({ error: "Failed to delete deal" });
+    }
+  });
+
+  // CRM Leads
+  app.get("/api/crm/leads", async (req: any, res) => {
+    try {
+      const leads = await storage.getCrmLeadsForOrg(req.user.orgId);
+      res.json(leads);
+    } catch (error) {
+      console.error("Failed to get leads:", error);
+      res.status(500).json({ error: "Failed to retrieve leads" });
+    }
+  });
+
+  app.post("/api/crm/leads", async (req: any, res) => {
+    try {
+      const lead = await storage.createCrmLead({ ...req.body, assignedToId: req.user.id });
+      res.json(lead);
+    } catch (error) {
+      console.error("Failed to create lead:", error);
+      res.status(500).json({ error: "Failed to create lead" });
+    }
+  });
+
+  app.put("/api/crm/leads/:id", async (req: any, res) => {
+    try {
+      const lead = await storage.updateCrmLead(req.params.id, req.body);
+      res.json(lead);
+    } catch (error) {
+      console.error("Failed to update lead:", error);
+      res.status(500).json({ error: "Failed to update lead" });
+    }
+  });
+
+  app.delete("/api/crm/leads/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmLead(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete lead:", error);
+      res.status(500).json({ error: "Failed to delete lead" });
+    }
+  });
+
+  // CRM Contacts
+  app.get("/api/crm/contacts", async (req: any, res) => {
+    try {
+      const contacts = await storage.getCrmContactsForOrg(req.user.orgId);
+      res.json(contacts);
+    } catch (error) {
+      console.error("Failed to get contacts:", error);
+      res.status(500).json({ error: "Failed to retrieve contacts" });
+    }
+  });
+
+  app.post("/api/crm/contacts", async (req: any, res) => {
+    try {
+      const contact = await storage.createCrmContact({ ...req.body, ownerId: req.user.id });
+      res.json(contact);
+    } catch (error) {
+      console.error("Failed to create contact:", error);
+      res.status(500).json({ error: "Failed to create contact" });
+    }
+  });
+
+  app.put("/api/crm/contacts/:id", async (req: any, res) => {
+    try {
+      const contact = await storage.updateCrmContact(req.params.id, req.body);
+      res.json(contact);
+    } catch (error) {
+      console.error("Failed to update contact:", error);
+      res.status(500).json({ error: "Failed to update contact" });
+    }
+  });
+
+  app.delete("/api/crm/contacts/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmContact(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete contact:", error);
+      res.status(500).json({ error: "Failed to delete contact" });
+    }
+  });
+
+  // CRM Companies
+  app.get("/api/crm/companies", async (req: any, res) => {
+    try {
+      const companies = await storage.getCrmCompaniesForOrg(req.user.orgId);
+      res.json(companies);
+    } catch (error) {
+      console.error("Failed to get companies:", error);
+      res.status(500).json({ error: "Failed to retrieve companies" });
+    }
+  });
+
+  app.post("/api/crm/companies", async (req: any, res) => {
+    try {
+      const company = await storage.createCrmCompany({ ...req.body, ownerId: req.user.id });
+      res.json(company);
+    } catch (error) {
+      console.error("Failed to create company:", error);
+      res.status(500).json({ error: "Failed to create company" });
+    }
+  });
+
+  app.put("/api/crm/companies/:id", async (req: any, res) => {
+    try {
+      const company = await storage.updateCrmCompany(req.params.id, req.body);
+      res.json(company);
+    } catch (error) {
+      console.error("Failed to update company:", error);
+      res.status(500).json({ error: "Failed to update company" });
+    }
+  });
+
+  app.delete("/api/crm/companies/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmCompany(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete company:", error);
+      res.status(500).json({ error: "Failed to delete company" });
+    }
+  });
+
+  // CRM Pipelines
+  app.get("/api/crm/pipelines", async (req: any, res) => {
+    try {
+      const pipelines = await storage.getCrmPipelinesForOrg(req.user.orgId);
+      res.json(pipelines);
+    } catch (error) {
+      console.error("Failed to get pipelines:", error);
+      res.status(500).json({ error: "Failed to retrieve pipelines" });
+    }
+  });
+
+  app.post("/api/crm/pipelines", async (req: any, res) => {
+    try {
+      const pipeline = await storage.createCrmPipeline({ ...req.body, ownerId: req.user.id });
+      res.json(pipeline);
+    } catch (error) {
+      console.error("Failed to create pipeline:", error);
+      res.status(500).json({ error: "Failed to create pipeline" });
+    }
+  });
+
+  app.put("/api/crm/pipelines/:id", async (req: any, res) => {
+    try {
+      const pipeline = await storage.updateCrmPipeline(req.params.id, req.body);
+      res.json(pipeline);
+    } catch (error) {
+      console.error("Failed to update pipeline:", error);
+      res.status(500).json({ error: "Failed to update pipeline" });
+    }
+  });
+
+  app.delete("/api/crm/pipelines/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmPipeline(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete pipeline:", error);
+      res.status(500).json({ error: "Failed to delete pipeline" });
+    }
+  });
+
+  // CRM Pipeline Stages
+  app.get("/api/crm/pipelines/:pipelineId/stages", async (req: any, res) => {
+    try {
+      const stages = await storage.getCrmPipelineStagesByPipeline(req.params.pipelineId);
+      res.json(stages);
+    } catch (error) {
+      console.error("Failed to get pipeline stages:", error);
+      res.status(500).json({ error: "Failed to retrieve pipeline stages" });
+    }
+  });
+
+  app.post("/api/crm/pipeline-stages", async (req: any, res) => {
+    try {
+      const stage = await storage.createCrmPipelineStage(req.body);
+      res.json(stage);
+    } catch (error) {
+      console.error("Failed to create pipeline stage:", error);
+      res.status(500).json({ error: "Failed to create pipeline stage" });
+    }
+  });
+
+  app.put("/api/crm/pipeline-stages/:id", async (req: any, res) => {
+    try {
+      const stage = await storage.updateCrmPipelineStage(req.params.id, req.body);
+      res.json(stage);
+    } catch (error) {
+      console.error("Failed to update pipeline stage:", error);
+      res.status(500).json({ error: "Failed to update pipeline stage" });
+    }
+  });
+
+  app.delete("/api/crm/pipeline-stages/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmPipelineStage(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete pipeline stage:", error);
+      res.status(500).json({ error: "Failed to delete pipeline stage" });
+    }
+  });
+
+  // CRM Activities
+  app.get("/api/crm/activities", async (req: any, res) => {
+    try {
+      const activities = await storage.getCrmActivitiesForOrg(req.user.id);
+      res.json(activities);
+    } catch (error) {
+      console.error("Failed to get activities:", error);
+      res.status(500).json({ error: "Failed to retrieve activities" });
+    }
+  });
+
+  app.post("/api/crm/activities", async (req: any, res) => {
+    try {
+      const activity = await storage.createCrmActivity({ ...req.body, userId: req.user.id });
+      res.json(activity);
+    } catch (error) {
+      console.error("Failed to create activity:", error);
+      res.status(500).json({ error: "Failed to create activity" });
+    }
+  });
+
+  app.put("/api/crm/activities/:id", async (req: any, res) => {
+    try {
+      const activity = await storage.updateCrmActivity(req.params.id, req.body);
+      res.json(activity);
+    } catch (error) {
+      console.error("Failed to update activity:", error);
+      res.status(500).json({ error: "Failed to update activity" });
+    }
+  });
+
+  app.delete("/api/crm/activities/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmActivity(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete activity:", error);
+      res.status(500).json({ error: "Failed to delete activity" });
     }
   });
 

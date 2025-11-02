@@ -2561,4 +2561,61 @@ export const crmFormVersions = pgTable("crm_form_versions", {
   
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+});
+// CRM Type Exports
+export type CrmDeal = typeof crmDeals.$inferSelect;
+export type CrmLead = typeof crmLeads.$inferSelect;
+export type CrmContact = typeof crmContacts.$inferSelect;
+export type CrmCompany = typeof crmCompanies.$inferSelect;
+export type CrmPipeline = typeof crmPipelines.$inferSelect;
+export type CrmPipelineStage = typeof crmPipelineStages.$inferSelect;
+export type CrmActivity = typeof crmActivities.$inferSelect;
+
+// CRM Insert Schemas
+export const insertCrmDealSchema = createInsertSchema(crmDeals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmDeal = z.infer<typeof insertCrmDealSchema>;
+
+export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmLead = z.infer<typeof insertCrmLeadSchema>;
+
+export const insertCrmContactSchema = createInsertSchema(crmContacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmContact = z.infer<typeof insertCrmContactSchema>;
+
+export const insertCrmCompanySchema = createInsertSchema(crmCompanies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmCompany = z.infer<typeof insertCrmCompanySchema>;
+
+export const insertCrmPipelineSchema = createInsertSchema(crmPipelines).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmPipeline = z.infer<typeof insertCrmPipelineSchema>;
+
+export const insertCrmPipelineStageSchema = createInsertSchema(crmPipelineStages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmPipelineStage = z.infer<typeof insertCrmPipelineStageSchema>;
+
+export const insertCrmActivitySchema = createInsertSchema(crmActivities).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmActivity = z.infer<typeof insertCrmActivitySchema>;
