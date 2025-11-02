@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index, customType, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -1306,3 +1306,1259 @@ export type InsertComp = z.infer<typeof insertCompSchema>;
 
 export type ChecklistItem = typeof checklistItems.$inferSelect;
 export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
+
+// ============================================================================
+// CRM SCHEMA - Converted from UUID to VARCHAR for compatibility
+// ============================================================================
+
+
+export const crmCompanies = pgTable("crm_companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  domain: text("domain"),
+  industry: text("industry"),
+  size: text("size"),
+  address: text("address"),
+  phone: text("phone"),
+  website: text("website"),
+  description: text("description"),
+  labels: text("labels").array().default(sql`ARRAY[]::text[]`),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Contacts table
+
+export const crmContacts = pgTable("crm_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  position: text("position"),
+  address: text("address"), // Street address
+  unit: text("unit"), // Unit/Suite/Apt number
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  company: text("company"), // Free-form company name field
+  role: text("role"), // Job role/title
+  onDealTeam: boolean("on_deal_team").default(false),
+  dealTeamNotes: text("deal_team_notes"),
+  dealAssignment: varchar("deal_assignment").references(() => crmDeals.id), // Which deal this contact is assigned to
+  contactType: text("contact_type").default('prospect'), // prospect, vendor, buyer, seller, partner, client
+  photoDataUrl: text("photo_data_url"), // Base64 encoded photo
+  leadScore: text("lead_score").default('new'), // hot, warm, cold, new
+  labels: text("labels").array().default(sql`ARRAY[]::text[]`),
+  companyId: varchar("company_id").references(() => crmCompanies.id), // Legacy field for backward compatibility
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Junction table for many-to-many relationship between contacts and companies
+
+export const crmContactCompanies = pgTable("crm_contact_companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").references(() => crmContacts.id).notNull(),
+  companyId: varchar("company_id").references(() => crmCompanies.id).notNull(),
+  role: text("role"), // Optional role of contact in this company (e.g., "CEO", "Manager", "Employee")
+  isPrimary: boolean("is_primary").default(false), // Indicates if this is the primary company for the contact
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Junction table for many-to-many relationship between companies and properties
+
+export const crmCompanyProperties = pgTable("crm_company_properties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => crmCompanies.id).notNull(),
+  propertyId: varchar("property_id").references(() => crmProperties.id).notNull(),
+  relationship: text("relationship"), // Optional relationship type (e.g., "Owner", "Tenant", "Buyer", "Seller")
+  notes: text("notes"), // Optional notes about the relationship
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Junction table for many-to-many relationship between contacts and properties
+
+export const crmContactProperties = pgTable("crm_contact_properties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").references(() => crmContacts.id).notNull(),
+  propertyId: varchar("property_id").references(() => crmProperties.id).notNull(),
+  relationship: text("relationship"), // Optional relationship type (e.g., "Buyer", "Seller", "Agent", "Interested Party")
+  notes: text("notes"), // Optional notes about the relationship
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Labels table for categorizing contacts and organizations
+
+export const crmContactsLabels = pgTable("crm_contacts_labels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(), // Slug/identifier (e.g., 'owner', 'broker', 'investor')
+  name: text("name").notNull(), // Display name (e.g., 'Owner', 'Broker', 'Investor')
+  color: text("color").notNull().default('#6366f1'), // Hex color code for UI display
+  scope: text("scope").notNull().default('both'), // 'person', 'organization', 'both'
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Properties table
+
+export const crmProperties = pgTable("crm_properties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  type: text("type").notNull().default('marina'), // marina, boat, slip, dry_storage
+  status: text("status").notNull().default('available'), // available, under_contract, sold, off_market
+  listingPrice: decimal("listing_price", { precision: 12, scale: 2 }),
+  address: text("address"),
+  coordinates: jsonb("coordinates"), // { lat: number, lng: number }
+  specifications: jsonb("specifications").default({}), // marina/boat specific details
+  description: text("description"),
+  images: jsonb("images").default([]),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  listingAgentId: varchar("listing_agent_id").references(() => crmContacts.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Leads table (separate from contacts for better lead management)
+
+export const crmLeads = pgTable("crm_leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  company: text("company"),
+  jobTitle: text("job_title"),
+  website: text("website"),
+  linkedinUrl: text("linkedin_url"),
+  leadScore: integer("lead_score").default(0),
+  prospectStatus: text("prospect_status").notNull().default('active'), // active, target, referral, past_client, cold, nurture
+  leadStatus: text("lead_status").notNull().default('new'), // new, contacted, qualified, unqualified, converted
+  
+  // Enhanced Source Tracking and Attribution
+  leadSource: text("lead_source").notNull().default('unknown'), // google_ads, facebook_ads, email, direct, referral, organic_search, social, phone, website_form
+  leadSourceDetails: text("lead_source_details"),
+  originalSource: text("original_source"), // First-touch attribution source
+  lastTouchSource: text("last_touch_source"), // Last-touch attribution source
+  
+  // UTM Parameters for Campaign Tracking
+  utmSource: text("utm_source"), // utm_source parameter
+  utmMedium: text("utm_medium"), // utm_medium parameter
+  utmCampaign: text("utm_campaign"), // utm_campaign parameter
+  utmTerm: text("utm_term"), // utm_term parameter
+  utmContent: text("utm_content"), // utm_content parameter
+  
+  // Landing and Referral Tracking
+  landingPageUrl: text("landing_page_url"), // First page visited
+  referrerUrl: text("referrer_url"), // Where they came from
+  currentPageUrl: text("current_page_url"), // Page where lead was captured
+  
+  // Campaign and Channel Attribution
+  campaignId: varchar("campaign_id").references(() => crmCampaigns.id), // Associated marketing campaign
+  channelType: text("channel_type"), // organic, paid, direct, referral, social, email
+  adGroupId: text("ad_group_id"), // For paid advertising
+  keywordId: text("keyword_id"), // For search campaigns
+  
+  // Session and Interaction Tracking
+  sessionId: text("session_id"), // Unique session identifier
+  visitCount: integer("visit_count").default(1), // Number of visits before converting
+  firstVisitDate: timestamp("first_visit_date"), // First time they visited
+  lastVisitDate: timestamp("last_visit_date"), // Most recent visit
+  timeToConversion: integer("time_to_conversion"), // Minutes from first visit to lead
+  touchpoints: jsonb("touchpoints").default([]), // Array of all touchpoints before conversion
+  
+  // Geographic and Device Information
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  deviceType: text("device_type"), // desktop, mobile, tablet
+  browserInfo: text("browser_info"),
+  geolocation: jsonb("geolocation").default({}), // { country, region, city, timezone }
+  
+  tags: jsonb("tags").default([]),
+  notes: text("notes"),
+  customFields: jsonb("custom_fields").default({}),
+  lastActivityDate: timestamp("last_activity_date"),
+  convertedContactId: varchar("converted_contact_id").references(() => crmContacts.id),
+  convertedDate: timestamp("converted_date"),
+  assignedToId: varchar("assigned_to_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Marketing Campaigns table
+
+export const crmCampaigns = pgTable("crm_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull().default('email'), // email, social, advertisement, webinar, event
+  status: text("status").notNull().default('draft'), // draft, active, paused, completed
+  description: text("description"),
+  budget: decimal("budget", { precision: 12, scale: 2 }),
+  spent: decimal("spent", { precision: 12, scale: 2 }).default('0'),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  targetAudience: jsonb("target_audience").default({}),
+  metrics: jsonb("metrics").default({}), // opens, clicks, conversions, etc.
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Email Sequences/Templates
+
+export const crmEmailSequences = pgTable("crm_email_sequences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  triggerEvent: text("trigger_event").notNull(), // lead_created, lead_scored, deal_stage_changed, etc.
+  delayDays: integer("delay_days").default(0),
+  emailTemplateId: varchar("email_template_id").references(() => crmEmailTemplates.id),
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const crmEmailTemplates = pgTable("crm_email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  content: text("content").notNull(),
+  type: text("type").notNull().default('nurture'), // nurture, follow_up, welcome, promotional
+  isActive: boolean("is_active").default(true),
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Territory Management
+
+export const crmTerritories = pgTable("crm_territories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  criteria: jsonb("criteria").default({}), // geographic, industry, company size criteria
+  managerId: varchar("manager_id").references(() => users.id).notNull(),
+  members: jsonb("members").default([]), // user IDs
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Accounts (enhanced companies with hierarchy)
+
+export const crmAccounts = pgTable("crm_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  parentAccountId: varchar("parent_account_id"),
+  type: text("type").notNull().default('prospect'), // prospect, customer, partner, competitor
+  industry: text("industry"),
+  annualRevenue: decimal("annual_revenue", { precision: 15, scale: 2 }),
+  employeeCount: integer("employee_count"),
+  website: text("website"),
+  phone: text("phone"),
+  billingAddress: jsonb("billing_address").default({}),
+  shippingAddress: jsonb("shipping_address").default({}),
+  description: text("description"),
+  tags: jsonb("tags").default([]),
+  customFields: jsonb("custom_fields").default({}),
+  accountScore: integer("account_score").default(0),
+  territoryId: varchar("territory_id").references(() => crmTerritories.id),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Deal stages enum
+export const dealStageEnum = ['lead', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'] as const;
+
+// Enhanced Deals/Opportunities table
+
+export const crmDeals = pgTable("crm_deals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  value: decimal("value", { precision: 12, scale: 2 }),
+  amount: decimal("amount", { precision: 12, scale: 2 }),
+  // Pipeline & Stage Management (Pipedrive-like) - nullable for backward compatibility
+  pipelineId: varchar("pipeline_id").references(() => crmPipelines.id),
+  stageId: varchar("stage_id").references(() => crmPipelineStages.id),
+  stageOrder: integer("stage_order").default(0), // position within stage for drag & drop
+  // Legacy stage field for backward compatibility
+  stage: text("stage").notNull().default('lead'),
+  probability: integer("probability").default(10), // 0-100 percentage
+  priority: text("priority").notNull().default('medium'), // low, medium, high, critical
+  expectedCloseDate: timestamp("expected_close_date"),
+  leadSource: text("lead_source"),
+  lastActivityDate: timestamp("last_activity_date"),
+  daysInCurrentStage: integer("days_in_current_stage").default(0),
+  currentStageEnteredAt: timestamp("current_stage_entered_at").defaultNow(),
+  lostReason: text("lost_reason"),
+  competitorId: varchar("competitor_id"),
+  forecastCategory: text("forecast_category"),
+  // Commission Tracking
+  commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }), // percentage (e.g., 3.50 for 3.5%)
+  commissionType: text("commission_type").default('percentage'), // percentage, fixed, tiered
+  dealSource: text("deal_source"), // inbound, outbound, referral, partner, organic
+  sourceDetails: jsonb("source_details").default({}), // Additional source metadata
+  // Marina-specific fields
+  marinaName: text("marina_name"),
+  slipNumber: text("slip_number"),
+  dockLocation: text("dock_location"),
+  boatName: text("boat_name"),
+  boatMake: text("boat_make"),
+  boatModel: text("boat_model"),
+  boatYear: integer("boat_year"),
+  boatLength: decimal("boat_length", { precision: 6, scale: 2 }), // in feet
+  boatType: text("boat_type"), // sailboat, powerboat, yacht, etc.
+  propertyType: text("property_type"), // slip, boat, mooring, dry_storage
+  leaseTermMonths: integer("lease_term_months"),
+  // Property Details - comprehensive marina property information from OMs
+  propertyDetails: jsonb("property_details").default({}), // Structured property data including capacity, equipment, financials, location, etc.
+  // Relationships - matching actual database structure
+  leadId: varchar("lead_id"),
+  accountId: varchar("account_id"),
+  primaryContactId: varchar("primary_contact_id"),
+  campaignId: varchar("campaign_id"),
+  contactId: varchar("contact_id"), // Legacy column
+  companyId: varchar("company_id"), // Legacy column  
+  // Team members
+  referralAgentId: varchar("referral_agent_id").references(() => crmContacts.id), // External referring agent
+  transactionCoordinatorId: varchar("transaction_coordinator_id").references(() => users.id), // Internal TC
+  ownerId: varchar("owner_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Products table - for revenue tracking
+
+export const crmProducts = pgTable("crm_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code"), // product SKU or code
+  description: text("description"),
+  unit: text("unit").default('unit'), // unit, hour, month, year, etc.
+  price: decimal("price", { precision: 12, scale: 2 }).notNull().default('0'),
+  cost: decimal("cost", { precision: 12, scale: 2 }),
+  category: text("category"), // Service, Product, License, etc.
+  isActive: boolean("is_active").default(true),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Deal Products junction table - for associating products with deals and tracking recurring revenue
+
+export const crmDealProducts = pgTable("crm_deal_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => crmDeals.id).notNull(),
+  productId: varchar("product_id").references(() => crmProducts.id).notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  price: decimal("price", { precision: 12, scale: 2 }).notNull(), // price at time of deal
+  discount: decimal("discount", { precision: 5, scale: 2 }).default('0'), // percentage discount
+  totalPrice: decimal("total_price", { precision: 12, scale: 2 }).notNull(),
+  isRecurring: boolean("is_recurring").default(false),
+  billingCycle: text("billing_cycle"), // monthly, quarterly, annually
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Notes table - structured notes that can be attached to any entity
+
+export const crmNotes = pgTable("crm_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  content: text("content").notNull(),
+  isPinned: boolean("is_pinned").default(false),
+  entityType: text("entity_type").notNull(), // deal, contact, company, property, lead, etc.
+  entityId: varchar("entity_id").notNull(),
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(), // for multi-tenant access control
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Files table - file attachments that can be associated with any entity
+
+export const crmFiles = pgTable("crm_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // display name
+  fileName: text("file_name").notNull(), // actual file name with extension
+  size: integer("size").notNull(), // file size in bytes
+  mimeType: text("mime_type").notNull(), // e.g., 'application/pdf', 'image/jpeg'
+  url: text("url").notNull(), // file URL or path
+  entityType: text("entity_type").notNull(), // deal, contact, company, property, lead, etc.
+  entityId: varchar("entity_id").notNull(),
+  uploadedById: varchar("uploaded_by_id").references(() => users.id).notNull(),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(), // for multi-tenant access control
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Contact Roles table - defines relationships between contacts and deals
+
+export const crmContactRoles = pgTable("crm_contact_roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => crmDeals.id).notNull(),
+  contactId: varchar("contact_id").references(() => crmContacts.id).notNull(),
+  role: text("role").notNull().default('buyer'), // buyer, seller, listing_agent, buyer_agent, co_buyer, decision_maker
+  isPrimary: boolean("is_primary").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Tasks table
+
+export const crmActivities = pgTable("crm_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // call, email, sms, meeting, showing, note, mail, document, website_visit, social_media, form_submission
+  subject: text("subject"),
+  description: text("description").notNull(),
+  direction: text("direction"), // inbound, outbound
+  duration: integer("duration"), // minutes for calls/meetings
+  outcome: text("outcome"),
+  status: text("status").default('completed'), // scheduled, in_progress, completed, cancelled
+  entityType: text("entity_type").notNull(), // lead, contact, deal, account, property, campaign
+  entityId: varchar("entity_id"),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  campaignId: varchar("campaign_id").references(() => crmCampaigns.id),
+  scheduledAt: timestamp("scheduled_at"),
+  completedAt: timestamp("completed_at"),
+  metadata: jsonb("metadata"), // phone number, email subject, document URL, page visited, social platform, etc.
+  score: integer("score").default(0), // activity scoring for lead qualification
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Activity Templates for quick activity creation
+
+export const crmActivityTemplates = pgTable("crm_activity_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // call, email, sms, meeting, showing, note
+  subjectTemplate: text("subject_template"),
+  descriptionTemplate: text("description_template"),
+  defaultDuration: integer("default_duration"), // minutes
+  defaultDirection: text("default_direction"), // inbound, outbound
+  isGlobal: boolean("is_global").default(false), // true for system templates, false for user templates
+  userId: varchar("user_id").references(() => users.id), // null for global templates
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Prospecting entries for weekly tracking
+
+export const crmProspectingEntries = pgTable("crm_prospecting_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  year: integer("year").notNull(),
+  quarter: integer("quarter").notNull(), // 1, 2, 3, 4
+  weekNumber: integer("week_number").notNull(), // 1-13 within quarter
+  weekStartDate: timestamp("week_start_date").notNull(),
+  weekEndDate: timestamp("week_end_date").notNull(),
+  
+  // Weekly goals (up to 6 goals)
+  goals: jsonb("goals").default([]), // Array of string goals
+  
+  // Enabled days of the week for this prospecting week
+  enabledDays: jsonb("enabled_days").default(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']), // Array of enabled day IDs
+  
+  // Daily activities tracking (Monday-Friday)
+  dailyActivities: jsonb("daily_activities").default({}), // { monday: [], tuesday: [], etc. }
+  
+  // Summary metrics
+  totalLeadGeneration: integer("total_lead_generation").default(0),
+  totalCalls: integer("total_calls").default(0),
+  totalEmails: integer("total_emails").default(0),
+  totalMeetings: integer("total_meetings").default(0),
+  
+  // Reflection notes
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Prospecting Activities for detailed daily tracking
+
+export const crmProspectingActivities = pgTable("crm_prospecting_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  prospectingEntryId: varchar("prospecting_entry_id").references(() => crmProspectingEntries.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  
+  // Activity details
+  activityType: text("activity_type").notNull(), // 'call', 'voicemail', 'no_answer', 'not_interested', 'text', 'linkedin', 'email', 'meeting'
+  outcome: text("outcome").notNull(), // 'connected', 'left_voicemail', 'no_answer', 'not_interested', 'callback_requested', 'meeting_scheduled', 'sent', 'opened', 'replied'
+  
+  // Timing
+  dayOfWeek: text("day_of_week").notNull(), // 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'
+  activityDate: timestamp("activity_date").notNull(),
+  duration: integer("duration"), // in minutes for calls/meetings
+  
+  // Linking to CRM entities
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  
+  // Activity details
+  notes: text("notes"),
+  followUpRequired: boolean("follow_up_required").default(false),
+  followUpDate: timestamp("follow_up_date"),
+  
+  // Tracking metadata
+  phoneNumber: text("phone_number"), // for call activities
+  emailAddress: text("email_address"), // for email activities
+  linkedinProfile: text("linkedin_profile"), // for linkedin activities
+  subject: text("subject"), // for emails/messages
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Email Communications (for email tracking)
+
+export const crmEmailCommunications = pgTable("crm_email_communications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subject: text("subject").notNull(),
+  content: text("content").notNull(),
+  fromEmail: text("from_email").notNull(),
+  toEmail: text("to_email").notNull(),
+  ccEmails: jsonb("cc_emails").default([]),
+  bccEmails: jsonb("bcc_emails").default([]),
+  status: text("status").notNull().default('sent'), // draft, sent, delivered, opened, clicked, bounced, failed
+  isTemplateUsed: boolean("is_template_used").default(false),
+  templateId: varchar("template_id").references(() => crmEmailTemplates.id),
+  sequenceId: varchar("sequence_id").references(() => crmEmailSequences.id),
+  leadId: varchar("lead_id").references(() => crmLeads.id),
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  campaignId: varchar("campaign_id").references(() => crmCampaigns.id),
+  sentById: varchar("sent_by_id").references(() => users.id).notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  openedAt: timestamp("opened_at"),
+  clickedAt: timestamp("clicked_at"),
+  bouncedAt: timestamp("bounced_at"),
+  metadata: jsonb("metadata").default({}), // tracking pixels, links clicked, etc.
+});
+
+// Lead/Contact Scoring Rules
+
+export const crmScoringRules = pgTable("crm_scoring_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  triggerEvent: text("trigger_event").notNull(), // email_opened, form_submitted, page_visited, etc.
+  conditions: jsonb("conditions").notNull(), // criteria for scoring
+  points: integer("points").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Website Visitor Tracking
+
+export const crmWebsiteVisitors = pgTable("crm_website_visitors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  visitorId: text("visitor_id").notNull(), // anonymous tracking ID or known contact ID
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  location: jsonb("location").default({}), // country, city, etc.
+  pageUrl: text("page_url").notNull(),
+  pageTitle: text("page_title"),
+  referrerUrl: text("referrer_url"),
+  sessionDuration: integer("session_duration"), // seconds
+  leadId: varchar("lead_id").references(() => crmLeads.id),
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  campaignId: varchar("campaign_id").references(() => crmCampaigns.id),
+  visitedAt: timestamp("visited_at").defaultNow().notNull(),
+});
+
+// Lead Scoring Events - Track all behavioral events for scoring
+
+export const crmLeadScoringEvents = pgTable("crm_lead_scoring_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").references(() => crmLeads.id),
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  
+  // Event Details
+  eventType: text("event_type").notNull(), // page_visit, email_open, email_click, form_submit, call_made, meeting_attended, etc.
+  eventCategory: text("event_category").notNull(), // behavioral, engagement, demographic, marina_specific
+  eventAction: text("event_action").notNull(), // specific action taken
+  eventLabel: text("event_label"), // additional context
+  eventValue: integer("event_value"), // numeric value if applicable
+  
+  // Scoring Impact
+  pointsAwarded: integer("points_awarded").default(0),
+  scoringRuleId: varchar("scoring_rule_id").references(() => crmScoringRules.id),
+  
+  // Event Context
+  entityType: text("entity_type"), // deal, property, campaign, form, etc.
+  entityId: varchar("entity_id"),
+  sessionId: text("session_id"),
+  
+  // Event Metadata
+  metadata: jsonb("metadata").default({}), // flexible JSON for event-specific data
+  
+  // Marina/Boat Specific Context
+  boatType: text("boat_type"), // sailboat, powerboat, yacht, catamaran
+  marinaService: text("marina_service"), // slip_rental, maintenance, storage, fuel
+  priceRange: text("price_range"), // under_50k, 50k_100k, 100k_250k, 250k_500k, over_500k
+  location: text("location"), // marina or boat location
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Lead Scoring History - Track score changes over time
+
+export const crmLeadScoringHistory = pgTable("crm_lead_scoring_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").references(() => crmLeads.id),
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  
+  // Score Change Details
+  previousScore: integer("previous_score").default(0),
+  newScore: integer("new_score").notNull(),
+  scoreDelta: integer("score_delta").notNull(), // positive or negative change
+  
+  // Score Temperature Classification
+  previousTemperature: text("previous_temperature"), // hot, warm, cold
+  newTemperature: text("new_temperature").notNull(), // hot, warm, cold
+  
+  // Change Trigger
+  triggerEventId: varchar("trigger_event_id").references(() => crmLeadScoringEvents.id),
+  triggerEventType: text("trigger_event_type").notNull(),
+  changeReason: text("change_reason"), // rule_triggered, manual_adjustment, decay_applied, bulk_update
+  
+  // Scoring Context
+  scoringRuleId: varchar("scoring_rule_id").references(() => crmScoringRules.id),
+  userId: varchar("user_id").references(() => users.id), // if manual change
+  
+  // Metadata
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Lead Engagement Metrics - Calculated engagement patterns
+
+export const crmLeadEngagementMetrics = pgTable("crm_lead_engagement_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").references(() => crmLeads.id).notNull(),
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  
+  // Email Engagement
+  emailsSent: integer("emails_sent").default(0),
+  emailsOpened: integer("emails_opened").default(0),
+  emailsClicked: integer("emails_clicked").default(0),
+  emailOpenRate: decimal("email_open_rate", { precision: 5, scale: 4 }).default('0'),
+  emailClickRate: decimal("email_click_rate", { precision: 5, scale: 4 }).default('0'),
+  
+  // Website Engagement
+  pageVisits: integer("page_visits").default(0),
+  uniquePageVisits: integer("unique_page_visits").default(0),
+  totalTimeOnSite: integer("total_time_on_site").default(0), // seconds
+  averageSessionDuration: integer("average_session_duration").default(0), // seconds
+  bounceRate: decimal("bounce_rate", { precision: 5, scale: 4 }).default('0'),
+  
+  // Form Engagement
+  formsViewed: integer("forms_viewed").default(0),
+  formsStarted: integer("forms_started").default(0),
+  formsCompleted: integer("forms_completed").default(0),
+  formCompletionRate: decimal("form_completion_rate", { precision: 5, scale: 4 }).default('0'),
+  
+  // Communication Response
+  callsReceived: integer("calls_received").default(0),
+  callsAnswered: integer("calls_answered").default(0),
+  callAnswerRate: decimal("call_answer_rate", { precision: 5, scale: 4 }).default('0'),
+  averageResponseTime: integer("average_response_time").default(0), // minutes
+  
+  // Meeting Engagement
+  meetingsScheduled: integer("meetings_scheduled").default(0),
+  meetingsAttended: integer("meetings_attended").default(0),
+  meetingAttendanceRate: decimal("meeting_attendance_rate", { precision: 5, scale: 4 }).default('0'),
+  
+  // Overall Engagement Score
+  engagementScore: decimal("engagement_score", { precision: 5, scale: 2 }).default('0'), // 0-100
+  engagementTrend: text("engagement_trend").default('stable'), // increasing, decreasing, stable
+  
+  // Recency Metrics
+  lastEmailOpen: timestamp("last_email_open"),
+  lastWebsiteVisit: timestamp("last_website_visit"),
+  lastFormSubmission: timestamp("last_form_submission"),
+  lastCommunication: timestamp("last_communication"),
+  
+  // Activity Level
+  activityLevel: text("activity_level").default('low'), // high, medium, low
+  daysSinceLastActivity: integer("days_since_last_activity").default(0),
+  
+  // Calculation Metadata
+  calculatedAt: timestamp("calculated_at").defaultNow().notNull(),
+  calculationPeriod: integer("calculation_period").default(30), // days
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Marina Specific Lead Data - Industry-specific lead information
+
+export const crmMarinaLeadData = pgTable("crm_marina_lead_data", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").references(() => crmLeads.id).notNull(),
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  
+  // Boat Ownership & Interest
+  currentBoatOwner: boolean("current_boat_owner").default(false),
+  boatOwnershipExperience: text("boat_ownership_experience"), // first_time, experienced, expert
+  interestedBoatTypes: jsonb("interested_boat_types").default([]), // sailboat, powerboat, yacht, etc.
+  budgetRange: text("budget_range"), // under_50k, 50k_100k, 100k_250k, 250k_500k, over_500k
+  
+  // Marina Services Interest
+  servicesNeeded: jsonb("services_needed").default([]), // slip_rental, maintenance, storage, fuel, etc.
+  preferredMarinaSize: text("preferred_marina_size"), // small, medium, large, megayacht
+  preferredAmenities: jsonb("preferred_amenities").default([]), // restaurant, pool, security, etc.
+  
+  // Location & Geographic Preferences
+  preferredRegions: jsonb("preferred_regions").default([]), // geographic areas
+  maxDistanceFromHome: integer("max_distance_from_home"), // miles
+  seasonalUsage: text("seasonal_usage"), // year_round, seasonal, occasional
+  
+  // Purchase Timeline & Intent
+  purchaseTimeline: text("purchase_timeline"), // immediate, 3_months, 6_months, 1_year, exploring
+  purchaseType: text("purchase_type"), // buy, lease, rent, charter
+  hasFinancing: boolean("has_financing").default(false),
+  tradeInVehicle: boolean("trade_in_vehicle").default(false),
+  
+  // Industry Role & Expertise
+  industryRole: text("industry_role"), // boat_owner, marina_manager, yacht_broker, boat_dealer, service_provider
+  boatingExperience: text("boating_experience"), // beginner, intermediate, advanced, professional
+  certifications: jsonb("certifications").default([]), // captain_license, sailing_certification, etc.
+  
+  // Event & Show Attendance
+  boatShowAttendance: jsonb("boat_show_attendance").default([]), // recent boat shows attended
+  marinaEventInterest: jsonb("marina_event_interest").default([]), // types of events interested in
+  
+  // Referral & Social Proof
+  referralSource: text("referral_source"), // friend, family, broker, online, advertisement
+  socialProofFactors: jsonb("social_proof_factors").default([]), // reviews_reader, brand_conscious, etc.
+  
+  // Scoring Multipliers (Marina-specific scoring factors)
+  locationScoreMultiplier: decimal("location_score_multiplier", { precision: 3, scale: 2 }).default('1.0'),
+  seasonalityMultiplier: decimal("seasonality_multiplier", { precision: 3, scale: 2 }).default('1.0'),
+  budgetQualificationScore: integer("budget_qualification_score").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Pipelines table (Pipedrive-like pipeline management)
+
+export const crmPipelines = pgTable("crm_pipelines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  isDefault: boolean("is_default").default(false),
+  isActive: boolean("is_active").default(true),
+  color: text("color").default('#3B82F6'),
+  type: text("type").notNull().default('sales'), // sales, marketing, service, marina_sales, boat_sales
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Pipeline Stages (configurable stages with pipeline association)
+
+export const crmPipelineStages = pgTable("crm_pipeline_stages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pipelineId: varchar("pipeline_id").references(() => crmPipelines.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  stageOrder: integer("stage_order").notNull(),
+  probability: integer("probability").default(0), // default win probability %
+  isActive: boolean("is_active").default(true),
+  color: text("color").default('#3B82F6'),
+  // Legacy field for backward compatibility
+  pipelineType: text("pipeline_type").notNull().default('sales'), // sales, marketing, service
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Deal History table (audit trail for drag & drop and field changes)
+
+export const crmDealHistory = pgTable("crm_deal_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => crmDeals.id).notNull(),
+  field: text("field").notNull(), // stage, value, owner, etc.
+  oldValue: jsonb("old_value"),
+  newValue: jsonb("new_value").notNull(),
+  changeType: text("change_type").notNull(), // update, stage_move, create, delete
+  changedById: varchar("changed_by_id").references(() => users.id).notNull(),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+  metadata: jsonb("metadata").default({}), // additional context like drag & drop positions
+});
+
+// Workflows table
+
+export const crmWorkflows = pgTable("crm_workflows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  
+  // Trigger configuration - when to execute this workflow
+  // Examples: { type: 'deal_stage_changed', stageId: 'uuid', pipelineId: 'uuid' }
+  //           { type: 'label_added', labelId: 'uuid', entityType: 'contact' }
+  //           { type: 'field_updated', entityType: 'deal', field: 'value' }
+  //           { type: 'deal_created', pipelineId: 'uuid' }
+  trigger: jsonb("trigger").notNull(),
+  
+  // Conditions - when to proceed with actions (optional)
+  // Examples: [{ field: 'value', operator: 'greater_than', value: 10000 }]
+  //           [{ field: 'status', operator: 'equals', value: 'qualified' }]
+  conditions: jsonb("conditions").default([]),
+  
+  // Actions - what to execute when triggered and conditions pass
+  // Examples: [{ type: 'send_email', templateId: 'uuid', to: 'contact_email' }]
+  //           [{ type: 'create_task', title: 'Follow up', assigneeId: 'uuid' }]
+  //           [{ type: 'add_label', labelId: 'uuid' }]
+  //           [{ type: 'update_field', field: 'priority', value: 'high' }]
+  //           [{ type: 'webhook', url: 'https://...', method: 'POST' }]
+  actions: jsonb("actions").notNull(),
+  
+  isActive: boolean("is_active").default(true),
+  triggerCount: integer("trigger_count").default(0),
+  lastTriggeredAt: timestamp("last_triggered_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Webhooks table - stores webhook subscriptions
+
+export const crmWebhooks = pgTable("crm_webhooks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  url: text("url").notNull(),
+  method: text("method").notNull().default('POST'), // POST, GET, PUT, PATCH, DELETE
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  
+  // Events to subscribe to
+  // Examples: ['deal.created', 'deal.updated', 'contact.created', 'lead.converted']
+  events: jsonb("events").notNull().default([]),
+  
+  // Headers to send with the webhook (for authentication, etc.)
+  headers: jsonb("headers").default({}),
+  
+  // Secret for signature verification (optional)
+  secret: text("secret"),
+  
+  isActive: boolean("is_active").default(true),
+  
+  // Statistics
+  totalCalls: integer("total_calls").default(0),
+  successfulCalls: integer("successful_calls").default(0),
+  failedCalls: integer("failed_calls").default(0),
+  lastCalledAt: timestamp("last_called_at"),
+  lastStatus: integer("last_status"), // HTTP status code
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Webhook Logs table - stores webhook call history
+
+export const crmWebhookLogs = pgTable("crm_webhook_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  webhookId: varchar("webhook_id").references(() => crmWebhooks.id, { onDelete: 'cascade' }).notNull(),
+  
+  event: text("event").notNull(), // e.g., 'deal.created'
+  payload: jsonb("payload").notNull(), // Data sent to the webhook
+  
+  // Response data
+  statusCode: integer("status_code"), // HTTP status code
+  responseBody: text("response_body"), // Response from the webhook
+  responseTime: integer("response_time"), // Time in milliseconds
+  
+  // Error information
+  errorMessage: text("error_message"),
+  
+  success: boolean("success").notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// AI Conversations table - stores AI advisor conversation sessions
+
+export const crmAiConversations = pgTable("crm_ai_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  
+  // Conversation metadata
+  title: text("title"), // Optional title for the conversation
+  
+  // Context - what the user was viewing when they started the conversation
+  contextType: text("context_type"), // 'deal', 'contact', 'company', 'property', 'general'
+  contextId: varchar("context_id"), // ID of the entity they were viewing
+  contextData: jsonb("context_data"), // Snapshot of context data
+  
+  // Settings
+  provider: text("provider").notNull().default('openai'), // 'openai' or 'anthropic'
+  model: text("model").default('gpt-4o'), // Model used
+  
+  // Status
+  isActive: boolean("is_active").default(true),
+  lastMessageAt: timestamp("last_message_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// AI Messages table - stores individual messages in conversations
+
+export const crmAiMessages = pgTable("crm_ai_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => crmAiConversations.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Message content
+  role: text("role").notNull(), // 'user', 'assistant', 'system', 'function'
+  content: text("content"), // Message text content
+  
+  // Function calling
+  functionCall: jsonb("function_call"), // { name: string, arguments: string }
+  functionResult: jsonb("function_result"), // Result of function execution
+  toolCalls: jsonb("tool_calls"), // Array of tool calls (for multi-tool calls)
+  toolResults: jsonb("tool_results"), // Array of tool results
+  
+  // Metadata
+  tokenCount: integer("token_count"), // Approximate token count
+  model: text("model"), // Model used for this message
+  finishReason: text("finish_reason"), // 'stop', 'length', 'function_call', 'tool_calls'
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Dedupe Rules table - stores rules for detecting duplicate records
+
+export const crmDedupeRules = pgTable("crm_dedupe_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // Descriptive name for the rule
+  entityType: text("entity_type").notNull(), // 'contact', 'company', 'lead'
+  
+  // Matching configuration
+  matchFields: jsonb("match_fields").notNull(), // Array of field names to match on, e.g., ['email'] or ['firstName', 'lastName']
+  matchStrategy: text("match_strategy").notNull().default('exact'), // 'exact', 'fuzzy', 'contains'
+  caseSensitive: boolean("case_sensitive").default(false),
+  
+  // Merge behavior
+  autoMerge: boolean("auto_merge").default(false), // Whether to automatically merge or just flag for review
+  priorityField: text("priority_field"), // Field to determine which record to keep (e.g., 'createdAt', 'updatedAt', 'leadScore')
+  priorityOrder: text("priority_order").default('desc'), // 'asc' or 'desc'
+
+  // Status
+  isActive: boolean("is_active").default(true),
+
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Merge History table - tracks all merged records for audit trail
+
+export const crmMergeHistory = pgTable("crm_merge_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // 'contact', 'company', 'lead'
+  
+  // Merge details
+  primaryRecordId: varchar("primary_record_id").notNull(), // The record that was kept
+  mergedRecordIds: jsonb("merged_record_ids").notNull(), // Array of UUIDs that were merged into primary
+  
+  // Field-level merge details
+  fieldsMerged: jsonb("fields_merged"), // JSON of which fields were taken from which record
+  conflictResolutions: jsonb("conflict_resolutions"), // How conflicts were resolved
+  
+  // Merge metadata
+  mergedBy: varchar("merged_by").references(() => users.id).notNull(),
+  mergedAt: timestamp("merged_at").defaultNow().notNull(),
+  dedupeRuleId: varchar("dedupe_rule_id").references(() => crmDedupeRules.id), // Optional - if triggered by a rule
+  
+  // Undo capability
+  canUndo: boolean("can_undo").default(true),
+  undoneAt: timestamp("undone_at"),
+  undoneBy: varchar("undone_by").references(() => users.id),
+  
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+});
+
+// Forms System Tables
+
+// Forms table - stores form definitions and configuration
+
+export const crmForms = pgTable("crm_forms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default('contact'), // contact, demo, newsletter, property_inquiry, boat_inquiry, quote, download
+  status: text("status").notNull().default('draft'), // draft, active, paused, archived
+  
+  // Form Configuration
+  title: text("title"), // Display title on the form
+  subtitle: text("subtitle"), // Form description/subtitle
+  thankYouMessage: text("thank_you_message").default('Thank you for your submission!'),
+  redirectUrl: text("redirect_url"), // Redirect after submission
+  submitButtonText: text("submit_button_text").default('Submit'),
+  
+  // Form Settings
+  requiresApproval: boolean("requires_approval").default(false),
+  allowMultipleSubmissions: boolean("allow_multiple_submissions").default(true),
+  captchaEnabled: boolean("captcha_enabled").default(false),
+  progressBar: boolean("progress_bar").default(false),
+  
+  // Styling and Layout
+  theme: text("theme").default('default'), // default, marina, boat, modern, minimal
+  primaryColor: text("primary_color").default('#3B82F6'),
+  backgroundColor: text("background_color").default('#FFFFFF'),
+  fontFamily: text("font_family").default('Inter'),
+  customCss: text("custom_css"),
+  layout: text("layout").default('single_column'), // single_column, two_column, wizard
+  
+  // SEO and Meta
+  metaTitle: text("meta_title"),
+  metaDescription: text("meta_description"),
+  socialImage: text("social_image"),
+  
+  // Lead Routing and Automation
+  autoAssignUser: varchar("auto_assign_user").references(() => users.id),
+  leadScore: integer("lead_score").default(0), // Base score for form submissions
+  followUpSequenceId: varchar("follow_up_sequence_id").references(() => crmEmailSequences.id),
+  notificationEmails: jsonb("notification_emails").default([]), // Array of email addresses
+  
+  // A/B Testing
+  isTestVariant: boolean("is_test_variant").default(false),
+  parentFormId: varchar("parent_form_id"), // Reference to original form for A/B testing
+  testSplitPercentage: integer("test_split_percentage").default(50), // 0-100
+  
+  // Analytics and Performance
+  submissionCount: integer("submission_count").default(0),
+  conversionRate: decimal("conversion_rate", { precision: 5, scale: 4 }).default('0'), // Percentage as decimal
+  averageCompletionTime: integer("average_completion_time").default(0), // Seconds
+  
+  // Marina/Boat Specific Settings
+  propertyType: text("property_type"), // marina, boat, slip, dry_storage (for property inquiry forms)
+  inquiryType: text("inquiry_type"), // buy, sell, rent, service, financing
+  targetBudgetRange: jsonb("target_budget_range").default({}), // { min: number, max: number }
+  
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Form Fields table - stores individual field configurations
+
+export const crmFormFields = pgTable("crm_form_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id").references(() => crmForms.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Field Configuration
+  fieldType: text("field_type").notNull(), // text, email, phone, number, select, checkbox, radio, textarea, date, file, hidden
+  fieldName: text("field_name").notNull(), // Field identifier/key
+  label: text("label").notNull(),
+  placeholder: text("placeholder"),
+  helpText: text("help_text"),
+  defaultValue: text("default_value"),
+  
+  // Validation Rules
+  required: boolean("required").default(false),
+  minLength: integer("min_length"),
+  maxLength: integer("max_length"),
+  pattern: text("pattern"), // Regex pattern for validation
+  validationMessage: text("validation_message"),
+  
+  // Field Options (for select, radio, checkbox)
+  options: jsonb("options").default([]), // Array of {label: string, value: string, score?: number}
+  allowOther: boolean("allow_other").default(false),
+  
+  // Layout and Display
+  fieldOrder: integer("field_order").notNull(),
+  width: text("width").default('full'), // full, half, third, quarter
+  cssClasses: text("css_classes"),
+  isConditional: boolean("is_conditional").default(false),
+  conditionalLogic: jsonb("conditional_logic").default({}), // Show/hide based on other fields
+  
+  // Lead Scoring
+  scoreWeight: integer("score_weight").default(0), // Points for completion
+  optionScoring: jsonb("option_scoring").default({}), // Different scores for different options
+  
+  // Marina/Boat Specific Fields
+  boatSpecField: text("boat_spec_field"), // length, type, year, make, model, price_range
+  marinaSpecField: text("marina_spec_field"), // slip_size, amenities, location_preference
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Form Submissions table - tracks all form submissions with analytics
+
+export const crmFormSubmissions = pgTable("crm_form_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id").references(() => crmForms.id).notNull(),
+  
+  // Submission Data
+  submissionData: jsonb("submission_data").notNull(), // All form field values
+  leadId: varchar("lead_id").references(() => crmLeads.id), // Created lead (if applicable)
+  contactId: varchar("contact_id").references(() => crmContacts.id), // Existing contact (if found)
+  
+  // Session and Attribution Data
+  sessionId: text("session_id"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  deviceType: text("device_type"), // desktop, mobile, tablet
+  browserInfo: text("browser_info"),
+  
+  // UTM and Source Tracking
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  utmTerm: text("utm_term"),
+  utmContent: text("utm_content"),
+  referrerUrl: text("referrer_url"),
+  landingPageUrl: text("landing_page_url"),
+  
+  // Form Analytics
+  startedAt: timestamp("started_at"), // When user first interacted with form
+  completionTime: integer("completion_time"), // Seconds to complete
+  fieldInteractions: jsonb("field_interactions").default([]), // Array of field interaction events
+  abandonedAt: timestamp("abandoned_at"), // If form was abandoned
+  abandonedAtField: text("abandoned_at_field"), // Which field caused abandonment
+  
+  // Lead Qualification
+  calculatedScore: integer("calculated_score").default(0),
+  qualificationStatus: text("qualification_status").default('unqualified'), // unqualified, marketing_qualified, sales_qualified
+  
+  // Geographic Information
+  geolocation: jsonb("geolocation").default({}), // { country, region, city, timezone }
+  
+  // Processing Status
+  status: text("status").default('pending'), // pending, processed, error
+  processingErrors: jsonb("processing_errors").default([]),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Landing Pages table - stores landing page templates and configurations
+
+export const crmLandingPages = pgTable("crm_landing_pages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(), // URL slug for the landing page
+  title: text("title").notNull(),
+  description: text("description"),
+  
+  // Page Content
+  heroTitle: text("hero_title"),
+  heroSubtitle: text("hero_subtitle"),
+  heroImage: text("hero_image"),
+  bodyContent: text("body_content"), // HTML content
+  
+  // SEO Configuration
+  metaTitle: text("meta_title"),
+  metaDescription: text("meta_description"),
+  metaKeywords: text("meta_keywords"),
+  ogTitle: text("og_title"),
+  ogDescription: text("og_description"),
+  ogImage: text("og_image"),
+  
+  // Page Settings
+  template: text("template").notNull().default('marina'), // marina, boat, generic, minimal
+  status: text("status").notNull().default('draft'), // draft, active, archived
+  isPublished: boolean("is_published").default(false),
+  passwordProtected: boolean("password_protected").default(false),
+  password: text("password"),
+  
+  // Form Integration
+  formId: varchar("form_id").references(() => crmForms.id),
+  formPlacement: text("form_placement").default('bottom'), // top, bottom, sidebar, inline, popup
+  
+  // A/B Testing
+  isTestVariant: boolean("is_test_variant").default(false),
+  parentPageId: varchar("parent_page_id"),
+  testSplitPercentage: integer("test_split_percentage").default(50),
+  
+  // Analytics
+  viewCount: integer("view_count").default(0),
+  uniqueVisitors: integer("unique_visitors").default(0),
+  conversionRate: decimal("conversion_rate", { precision: 5, scale: 4 }).default('0'),
+  bounceRate: decimal("bounce_rate", { precision: 5, scale: 4 }).default('0'),
+  averageTimeOnPage: integer("average_time_on_page").default(0), // Seconds
+  
+  // Custom Styling
+  customCss: text("custom_css"),
+  customJs: text("custom_js"),
+  theme: jsonb("theme").default({}), // Color scheme and styling preferences
+  
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Form Analytics table - stores aggregated analytics data for forms
+
+export const crmFormAnalytics = pgTable("crm_form_analytics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id").references(() => crmForms.id).notNull(),
+  date: text("date").notNull(), // YYYY-MM-DD format for daily aggregation
+  
+  // Traffic Metrics
+  views: integer("views").default(0),
+  uniqueVisitors: integer("unique_visitors").default(0),
+  
+  // Conversion Metrics
+  submissions: integer("submissions").default(0),
+  completedSubmissions: integer("completed_submissions").default(0),
+  conversionRate: decimal("conversion_rate", { precision: 5, scale: 4 }).default('0'),
+  
+  // Engagement Metrics
+  averageTimeOnForm: integer("average_time_on_form").default(0), // Seconds
+  bounceRate: decimal("bounce_rate", { precision: 5, scale: 4 }).default('0'),
+  abandonmentRate: decimal("abandonment_rate", { precision: 5, scale: 4 }).default('0'),
+  
+  // Field-Level Analytics
+  fieldDropoffRates: jsonb("field_dropoff_rates").default({}), // { fieldName: rate }
+  fieldCompletionTimes: jsonb("field_completion_times").default({}), // Average time per field
+  fieldErrorRates: jsonb("field_error_rates").default({}), // Validation error rates per field
+  
+  // Source Analytics
+  sourceBreakdown: jsonb("source_breakdown").default({}), // Traffic by source
+  deviceBreakdown: jsonb("device_breakdown").default({}), // Desktop vs mobile
+  locationBreakdown: jsonb("location_breakdown").default({}), // Geographic data
+  
+  // Lead Quality Metrics
+  qualifiedLeads: integer("qualified_leads").default(0),
+  averageLeadScore: decimal("average_lead_score", { precision: 5, scale: 2 }).default('0'),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Form Versions table - for A/B testing and version history
+
+export const crmFormVersions = pgTable("crm_form_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id").references(() => crmForms.id).notNull(),
+  versionNumber: integer("version_number").notNull(),
+  name: text("name"), // Version name/label
+  description: text("description"),
+  
+  // Version Data (snapshot of form and fields configuration)
+  formData: jsonb("form_data").notNull(), // Complete form configuration
+  fieldsData: jsonb("fields_data").notNull(), // Complete fields configuration
+  
+  // A/B Test Results
+  testStatus: text("test_status").default('draft'), // draft, active, completed, winner
+  trafficAllocation: integer("traffic_allocation").default(50), // Percentage of traffic
+  conversionRate: decimal("conversion_rate", { precision: 5, scale: 4 }),
+  submissions: integer("submissions").default(0),
+  
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
