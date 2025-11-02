@@ -13,7 +13,7 @@ import InvestorDashboard from "@/pages/investor-dashboard";
 import OwnerDashboard from "@/pages/owner-dashboard";
 import AuditLogsPage from "@/pages/audit-logs";
 import CRMDashboard from "@/pages/crm-dashboard";
-import CRMSidebar from "@/components/crm/crm-sidebar";
+import UnifiedSidebar from "@/components/unified-sidebar";
 import Pipeline from "@/pages/pipeline";
 import Leads from "@/pages/leads";
 import Contacts from "@/pages/contacts";
@@ -36,11 +36,11 @@ import SortableListDemo from "@/pages/demo/SortableListDemo";
 import MilestoneDemo from "@/pages/milestone-demo";
 import NotFound from "@/pages/not-found";
 
-// CRM Layout wrapper with sidebar
-function CRMLayout({ children }: { children: React.ReactNode }) {
+// Unified Layout wrapper with sidebar for both DD Tracker and CRM
+function UnifiedLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-gray-50">
-      <CRMSidebar />
+      <UnifiedSidebar />
       <main className="flex-1 overflow-auto">
         {children}
       </main>
@@ -56,158 +56,243 @@ function NotificationSettingsWrapper(props: any) {
 function Router() {
   return (
     <Switch>
-      {/* Due Diligence Tracker Routes */}
-      <Route path="/" component={Dashboard} />
-      <Route path="/projects" component={Dashboard} />
-      <Route path="/projects/summary" component={AllProjectsSummaryPage} />
-      <Route path="/investor" component={InvestorDashboard} />
-      <Route path="/owner" component={OwnerDashboard} />
-      <Route path="/audit-logs" component={AuditLogsPage} />
-      <Route path="/user/settings" component={UserSettingsPage} />
-      <Route path="/projects/:id" component={ProjectPage} />
-      <Route path="/dd/projects/:id" component={ProjectPage} />
+      {/* Due Diligence Tracker Routes with Unified Layout */}
+      <Route path="/">
+        {() => (
+          <UnifiedLayout>
+            <Dashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/projects">
+        {() => (
+          <UnifiedLayout>
+            <Dashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/projects/summary">
+        {() => (
+          <UnifiedLayout>
+            <AllProjectsSummaryPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/investor">
+        {() => (
+          <UnifiedLayout>
+            <InvestorDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/owner">
+        {() => (
+          <UnifiedLayout>
+            <OwnerDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/progress-report">
+        {() => (
+          <UnifiedLayout>
+            <DDProgressReportPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/audit-logs">
+        {() => (
+          <UnifiedLayout>
+            <AuditLogsPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/user/settings">
+        {() => (
+          <UnifiedLayout>
+            <UserSettingsPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/projects/:id">
+        {(params) => (
+          <UnifiedLayout>
+            <ProjectPage {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/dd/projects/:id">
+        {(params) => (
+          <UnifiedLayout>
+            <ProjectPage {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
       <Route path="/notifications/:id" component={NotificationSettingsWrapper} />
       <Route path="/projects/:id/notifications" component={NotificationSettingsWrapper} />
       <Route path="/dd/projects/:id/notifications" component={NotificationSettingsWrapper} />
       <Route path="/projects/:id/settings" component={NotificationSettingsWrapper} />
       <Route path="/dd/projects/:id/settings" component={NotificationSettingsWrapper} />
-      <Route path="/projects/:id/progress-report" component={DDProgressReportPage} />
-      <Route path="/projects/:id/dd-progress-report" component={DDProgressReportPage} />
-      <Route path="/dd/projects/:id/progress-report" component={DDProgressReportPage} />
-      <Route path="/dd/projects/:id/dd-progress-report" component={DDProgressReportPage} />
+      <Route path="/projects/:id/progress-report">
+        {(params) => (
+          <UnifiedLayout>
+            <DDProgressReportPage {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/projects/:id/dd-progress-report">
+        {(params) => (
+          <UnifiedLayout>
+            <DDProgressReportPage {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/dd/projects/:id/progress-report">
+        {(params) => (
+          <UnifiedLayout>
+            <DDProgressReportPage {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/dd/projects/:id/dd-progress-report">
+        {(params) => (
+          <UnifiedLayout>
+            <DDProgressReportPage {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
       
-      {/* CRM Routes with CRM Layout */}
+      {/* CRM Routes with Unified Layout */}
       <Route path="/crm">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <CRMDashboard />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/pipeline">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Pipeline />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/leads">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Leads />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/contacts">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Contacts />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/companies">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Companies />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/properties">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Properties />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/deals">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Deals />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/deals/:dealId">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <DealDetail />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/activities">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Activities />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/prospecting">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Prospecting />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/analytics">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Analytics />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/forecast">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Forecast />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/forms">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Forms />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/labels">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Labels />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/products">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Products />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/workflows">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Workflows />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/webhooks">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Webhooks />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/dedupe">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Dedupe />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       <Route path="/crm/scoring">
         {() => (
-          <CRMLayout>
+          <UnifiedLayout>
             <Scoring />
-          </CRMLayout>
+          </UnifiedLayout>
         )}
       </Route>
       
