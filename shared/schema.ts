@@ -2619,3 +2619,37 @@ export const insertCrmActivitySchema = createInsertSchema(crmActivities).omit({
   createdAt: true,
 });
 export type InsertCrmActivity = z.infer<typeof insertCrmActivitySchema>;
+
+// CRM Workflow schema
+export const insertCrmWorkflowSchema = createInsertSchema(crmWorkflows).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmWorkflow = z.infer<typeof insertCrmWorkflowSchema>;
+
+// CRM Schema Aliases (for backward compatibility with original CRM code)
+export const insertDealSchema = insertCrmDealSchema;
+export type InsertDeal = InsertCrmDeal;
+export const insertLeadSchema = insertCrmLeadSchema;
+export type InsertLead = InsertCrmLead;
+export const insertCompanySchema = insertCrmCompanySchema;
+export type InsertCompany = InsertCrmCompany;
+export const insertActivitySchema = insertCrmActivitySchema;
+export type InsertActivity = InsertCrmActivity;
+export const insertWorkflowSchema = insertCrmWorkflowSchema;
+export type InsertWorkflow = InsertCrmWorkflow;
+export const insertPipelineSchema = insertCrmPipelineSchema;
+export type InsertPipeline = InsertCrmPipeline;
+export const insertPipelineStageSchema = insertCrmPipelineStageSchema;
+export type InsertPipelineStage = InsertCrmPipelineStage;
+
+// CRM Type Aliases
+export type Deal = typeof crmDeals.$inferSelect;
+export type Lead = typeof crmLeads.$inferSelect;
+export type Contact = typeof crmContacts.$inferSelect;
+export type Company = typeof crmCompanies.$inferSelect;
+export type Activity = typeof crmActivities.$inferSelect;
+export type Workflow = typeof crmWorkflows.$inferSelect;
+export type Pipeline = typeof crmPipelines.$inferSelect;
+export type PipelineStage = typeof crmPipelineStages.$inferSelect;
