@@ -28,7 +28,7 @@ const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     // Update display value when prop value changes
     useEffect(() => {
       if (!isFocused) {
-        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        const numValue = typeof value === 'string' ? parseCurrency(value) : value;
         if (numValue !== undefined && !isNaN(numValue)) {
           setDisplayValue(formatCurrency(numValue));
         } else {
@@ -40,7 +40,7 @@ const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(true);
       // Show raw number without formatting when focused
-      const numValue = typeof value === 'string' ? parseFloat(value) : value;
+      const numValue = typeof value === 'string' ? parseCurrency(value) : value;
       if (numValue !== undefined && !isNaN(numValue)) {
         setDisplayValue(numValue.toString());
       }

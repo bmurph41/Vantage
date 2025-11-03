@@ -1,8 +1,13 @@
-# Due Diligence Tracker
+# MarinaMatch Platform
 
 ## Overview
 
-A full-stack Due Diligence Tracker application for managing marina acquisition projects. The system provides comprehensive project management features including task tracking with automated progress bars, timeline visualization (Gantt-style), template management, and multi-tenant organization support. Built with modern web technologies including React 18, TypeScript, Express, and PostgreSQL.
+A unified full-stack platform combining comprehensive CRM functionality with Due Diligence Tracker capabilities for managing marina acquisition projects. The platform integrates deal pipeline management, lead tracking, contact management, and full due diligence workflow automation in a single React-based application. Built with modern web technologies including React 18, TypeScript, Express, and PostgreSQL.
+
+**Platform Components:**
+- **CRM Module**: Full-featured CRM with deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation
+- **Due Diligence Module**: Project management with task tracking, timeline visualization (Gantt-style), template management, and progress reporting
+- **Unified Interface**: Seamless navigation between CRM and DD Tracker with shared data models
 
 ## User Preferences
 
@@ -13,6 +18,19 @@ Preferred communication style: Simple, everyday language.
 - Build incrementally on the existing app - never replace what is not suggested to change
 - Make only minimal changes needed for the specific request
 - Maintain existing code structure and patterns
+
+## Recent Changes
+
+### November 2025 - CRM Integration & Currency Formatting
+- **CRM Integration Complete**: Successfully integrated standalone CRM application into MarinaMatch platform
+  - Created 46 CRM tables in PostgreSQL database (crm_deals, crm_leads, crm_contacts, crm_companies, etc.)
+  - Implemented full backend with storage layer and API routes for all CRM entities
+  - Added comprehensive frontend pages for Deals, Leads, Contacts, Companies, Pipelines, Activities
+  - Integrated email sequences, marketing automation, and prospecting features
+- **Schema Architecture**: Resolved type conflicts by using DD-prefixed types for Due Diligence entities (DDContact, DDTask, DDProject) while CRM uses non-prefixed types (Contact, Task, Deal, etc.)
+- **Currency Formatting**: Implemented CurrencyInput component with automatic comma formatting ($000,000,000) across all money input fields
+  - Updated 7 files: project-setup, deal-form-modal, property-form-modal, products, risk-management, third-party-reports
+  - Shows formatted currency with $ and commas on blur, raw numbers when focused for better UX
 
 ## System Architecture
 
