@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,9 +16,11 @@ import {
   Trash2,
   Anchor,
   MapPin,
-  FileText
+  FileText,
+  FolderOpen
 } from "lucide-react";
 import type { Deal, Contact, Company } from "@shared/schema";
+import ConvertToProjectModal from "@/components/modals/convert-to-project-modal";
 
 // Deal with relations type
 type DealWithRelations = Deal & { 
@@ -64,6 +67,7 @@ export default function DealDetail() {
   const params = useParams();
   const [, setLocation] = useLocation();
   const dealId = params.dealId;
+  const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
 
   const { data: deal, isLoading, error } = useQuery<DealWithRelations>({
     queryKey: ['/api/deals', dealId],
@@ -128,6 +132,15 @@ export default function DealDetail() {
         </div>
         
         <div className="flex items-center gap-2">
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={() => setIsConvertModalOpen(true)}
+            data-testid="button-convert-to-project"
+          >
+            <FolderOpen className="w-4 h-4 mr-2" />
+            Convert to DD Project
+          </Button>
           <Button variant="outline" size="sm" data-testid="button-edit">
             <Edit className="w-4 h-4 mr-2" />
             Edit Deal
@@ -138,6 +151,12 @@ export default function DealDetail() {
           </Button>
         </div>
       </div>
+
+      <ConvertToProjectModal
+        isOpen={isConvertModalOpen}
+        onClose={() => setIsConvertModalOpen(false)}
+        deal={deal}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Deal Information */}

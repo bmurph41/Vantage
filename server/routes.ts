@@ -4883,6 +4883,190 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Convert Deal to DD Project
+  app.post("/api/deals/convert-to-project", async (req: any, res) => {
+    try {
+      const {
+        dealId,
+        projectName,
+        includeDescription,
+        includeContacts,
+        includeFinancials,
+        includeLocation,
+        ddPeriodDays,
+        createDefaultTasks,
+        notes
+      } = req.body;
+
+      // Get the deal
+      const deal = await storage.getCrmDeal(dealId);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      // Create the DD project with mapped data
+      const projectData: any = {
+        name: projectName,
+        orgId: req.user.orgId,
+        createdBy: req.user.id,
+        anchorType: 'psa' as const,
+        ddPeriodDays: ddPeriodDays,
+        hasExtensions: false,
+        extensionCount: 0,
+        tz: 'America/New_York'
+      };
+
+      // Map description
+      if (includeDescription && deal.description) {
+        projectData.description = deal.description;
+        if (notes) {
+          projectData.description = `${deal.description}\n\n--- Conversion Notes ---\n${notes}`;
+        }
+      } else if (notes) {
+        projectData.description = notes;
+      }
+
+      // Map location
+      if (includeLocation) {
+        if (deal.city) projectData.city = deal.city;
+        if (deal.state) projectData.state = deal.state;
+        // Store marina name and dock location in executive notes or custom field
+        const locationNotes = [];
+        if (deal.marinaName) locationNotes.push(`Marina: ${deal.marinaName}`);
+        if (deal.dockLocation) locationNotes.push(`Dock: ${deal.dockLocation}`);
+        if (locationNotes.length > 0) {
+          projectData.executiveNotes = locationNotes.join('\n');
+        }
+      }
+
+      // Map financials
+      if (includeFinancials) {
+        const dealAmount = deal.amount || deal.value;
+        if (dealAmount) {
+          projectData.purchasePrice = parseInt(dealAmount.toString().replace(/[^0-9]/g, '')) || 0;
+        }
+        
+        // Map property details if available
+        if (deal.propertyDetails) {
+          const details = typeof deal.propertyDetails === 'string' 
+            ? JSON.parse(deal.propertyDetails) 
+            : deal.propertyDetails;
+          
+          if (details.grossRevenue) {
+            projectData.projectedAnnualRevenue = parseInt(details.grossRevenue.toString().replace(/[^0-9]/g, '')) || 0;
+          }
+        }
+      }
+
+      // Create the project
+      const project = await storage.createProject(projectData);
+
+      // Create default project settings
+      await storage.createOrUpdateProjectSettings({
+        projectId: project.id,
+        useBusinessDays: true,
+        holidayCalendar: 'us_federal' as const,
+        emailReminders: true,
+        slackNotifications: false,
+        ndaRequired: false
+      });
+
+      // Map contacts if requested
+      if (includeContacts && deal.primaryContactId) {
+        try {
+          const contact = await storage.getCrmContact(deal.primaryContactId);
+          if (contact) {
+            // Create a DD contact from the CRM contact
+            await storage.createDDContact({
+              projectId: project.id,
+              firstName: contact.firstName,
+              lastName: contact.lastName,
+              email: contact.email || '',
+              phone: contact.phone || undefined,
+              role: 'seller' as const,
+              company: contact.company || undefined
+            });
+          }
+        } catch (err) {
+          console.error("Failed to map contact:", err);
+          // Continue even if contact mapping fails
+        }
+      }
+
+      // Create default DD tasks if requested
+      if (createDefaultTasks) {
+        const defaultTasks = [
+          {
+            name: 'Property Condition Assessment (PCA)',
+            description: 'Comprehensive inspection of marina facilities and structures',
+            category: 'inspection' as const,
+            priority: 'high' as const,
+            durationDays: 7
+          },
+          {
+            name: 'Environmental Site Assessment (ESA Phase I)',
+            description: 'Environmental assessment for potential contamination',
+            category: 'ESA' as const,
+            priority: 'high' as const,
+            durationDays: 14
+          },
+          {
+            name: 'Boundary Survey',
+            description: 'Professional survey of property boundaries and improvements',
+            category: 'survey' as const,
+            priority: 'high' as const,
+            durationDays: 10
+          },
+          {
+            name: 'Title Search & Insurance',
+            description: 'Title examination and commitment for title insurance',
+            category: 'title' as const,
+            priority: 'high' as const,
+            durationDays: 7
+          },
+          {
+            name: 'Financial Review',
+            description: 'Review of financial statements and operating history',
+            category: 'financial' as const,
+            priority: 'med' as const,
+            durationDays: 5
+          },
+          {
+            name: 'Permits & Zoning Review',
+            description: 'Verification of permits and zoning compliance',
+            category: 'zoning' as const,
+            priority: 'med' as const,
+            durationDays: 7
+          }
+        ];
+
+        for (const task of defaultTasks) {
+          await storage.createTask({
+            projectId: project.id,
+            ...task,
+            status: 'not_started' as const,
+            assigneeType: 'internal' as const
+          });
+        }
+      }
+
+      // Update the deal to mark it as converted
+      await storage.updateCrmDeal(dealId, {
+        ...deal,
+        ddProjectId: project.id
+      });
+
+      res.json({
+        success: true,
+        projectId: project.id,
+        message: "Deal successfully converted to DD project"
+      });
+    } catch (error) {
+      console.error("Failed to convert deal to project:", error);
+      res.status(500).json({ error: "Failed to convert deal to project" });
+    }
+  });
+
   // CRM Leads
   app.get("/api/crm/leads", async (req: any, res) => {
     try {

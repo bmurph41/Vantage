@@ -1630,6 +1630,8 @@ export const crmDeals = pgTable("crm_deals", {
   referralAgentId: varchar("referral_agent_id").references(() => crmContacts.id), // External referring agent
   transactionCoordinatorId: varchar("transaction_coordinator_id").references(() => users.id), // Internal TC
   ownerId: varchar("owner_id").notNull(),
+  // DD Project Integration
+  ddProjectId: varchar("dd_project_id").references(() => projects.id), // Links to DD project if converted
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
