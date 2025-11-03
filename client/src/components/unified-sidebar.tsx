@@ -38,8 +38,6 @@ const crmToolsNav = [
 const ddNav = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "All Projects", href: "/projects/summary", icon: FileText },
-  { name: "Investor View", href: "/investor", icon: PieChart },
-  { name: "Owner View", href: "/owner", icon: Briefcase },
   { name: "Progress Report", href: "/progress-report", icon: ClipboardList },
 ];
 

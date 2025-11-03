@@ -9,8 +9,6 @@ import NotificationSettingsPage from "@/pages/notification-settings";
 import DDProgressReportPage from "@/pages/dd-progress-report";
 import AllProjectsSummaryPage from "@/pages/all-projects-summary";
 import UserSettingsPage from "@/pages/user-settings";
-import InvestorDashboard from "@/pages/investor-dashboard";
-import OwnerDashboard from "@/pages/owner-dashboard";
 import AuditLogsPage from "@/pages/audit-logs";
 import CRMDashboard from "@/pages/crm-dashboard";
 import UnifiedSidebar from "@/components/unified-sidebar";
@@ -75,20 +73,6 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <AllProjectsSummaryPage />
-          </UnifiedLayout>
-        )}
-      </Route>
-      <Route path="/investor">
-        {() => (
-          <UnifiedLayout>
-            <InvestorDashboard />
-          </UnifiedLayout>
-        )}
-      </Route>
-      <Route path="/owner">
-        {() => (
-          <UnifiedLayout>
-            <OwnerDashboard />
           </UnifiedLayout>
         )}
       </Route>

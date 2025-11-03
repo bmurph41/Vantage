@@ -88,7 +88,7 @@ export default function ConvertToProjectModal({ isOpen, onClose, deal }: Convert
 
   const handleViewProject = () => {
     if (createdProjectId) {
-      setLocation(`/dd/project/${createdProjectId}`);
+      setLocation(`/dd/projects/${createdProjectId}`);
       onClose();
     }
   };

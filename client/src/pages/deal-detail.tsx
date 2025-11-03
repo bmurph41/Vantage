@@ -136,7 +136,7 @@ export default function DealDetail() {
             <Button 
               variant="default" 
               size="sm" 
-              onClick={() => setLocation(`/dd/project/${deal.ddProjectId}`)}
+              onClick={() => setLocation(`/dd/projects/${deal.ddProjectId}`)}
               data-testid="button-view-dd-project"
             >
               <FolderOpen className="w-4 h-4 mr-2" />
