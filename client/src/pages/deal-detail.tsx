@@ -132,15 +132,27 @@ export default function DealDetail() {
         </div>
         
         <div className="flex items-center gap-2">
-          <Button 
-            variant="default" 
-            size="sm" 
-            onClick={() => setIsConvertModalOpen(true)}
-            data-testid="button-convert-to-project"
-          >
-            <FolderOpen className="w-4 h-4 mr-2" />
-            Convert to DD Project
-          </Button>
+          {deal.ddProjectId ? (
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={() => setLocation(`/dd/project/${deal.ddProjectId}`)}
+              data-testid="button-view-dd-project"
+            >
+              <FolderOpen className="w-4 h-4 mr-2" />
+              View DD Project
+            </Button>
+          ) : (
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={() => setIsConvertModalOpen(true)}
+              data-testid="button-convert-to-project"
+            >
+              <FolderOpen className="w-4 h-4 mr-2" />
+              Convert to DD Project
+            </Button>
+          )}
           <Button variant="outline" size="sm" data-testid="button-edit">
             <Edit className="w-4 h-4 mr-2" />
             Edit Deal
