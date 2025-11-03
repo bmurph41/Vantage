@@ -58,14 +58,14 @@ function Router() {
       <Route path="/">
         {() => (
           <UnifiedLayout>
-            <Dashboard />
+            <AllProjectsSummaryPage />
           </UnifiedLayout>
         )}
       </Route>
       <Route path="/projects">
         {() => (
           <UnifiedLayout>
-            <Dashboard />
+            <AllProjectsSummaryPage />
           </UnifiedLayout>
         )}
       </Route>
@@ -73,6 +73,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <AllProjectsSummaryPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/dashboard">
+        {() => (
+          <UnifiedLayout>
+            <Dashboard />
           </UnifiedLayout>
         )}
       </Route>
