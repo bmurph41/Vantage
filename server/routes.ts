@@ -4904,16 +4904,35 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: "Deal not found" });
       }
 
-      // Create the DD project with mapped data
+      // Create the DD project with mapped data from deal
       const projectData: any = {
         name: projectName,
         orgId: req.user.orgId,
         createdBy: req.user.id,
-        anchorType: 'psa' as const,
-        ddPeriodDays: ddPeriodDays,
-        hasExtensions: false,
-        extensionCount: 0,
-        tz: 'America/New_York'
+        // Map all DD Deal Details fields from deal to project
+        anchorType: deal.anchorType || 'psa',
+        ddPeriodDays: deal.ddPeriodDays || ddPeriodDays,
+        hasExtensions: deal.hasExtensions || false,
+        extensionCount: deal.extensionCount || 0,
+        extensionDays: deal.extensionDays || [],
+        daysToClosing: deal.daysToClosing || null,
+        tz: deal.tz || 'America/New_York',
+        psaSignedDate: deal.psaSignedDate || null,
+        ddExpirationDate: deal.ddExpirationDate || null,
+        closingDate: deal.closingDate || null,
+        // Key Contacts
+        seller: deal.seller || [],
+        ourAttorney: deal.ourAttorney || [],
+        titleInsuranceCompany: deal.titleInsuranceCompany || null,
+        lender: deal.lender || null,
+        // Deposit Information
+        firstDepositAmount: deal.firstDepositAmount || null,
+        firstDepositDays: deal.firstDepositDays || null,
+        firstDepositDueDate: deal.firstDepositDueDate || null,
+        secondDepositAmount: deal.secondDepositAmount || null,
+        secondDepositDays: deal.secondDepositDays || null,
+        secondDepositDueDate: deal.secondDepositDueDate || null,
+        customDeadlines: deal.customDeadlines || [],
       };
 
       // Map description
@@ -4961,11 +4980,11 @@ Current context: Project ${req.params.projectId}`;
       // Create the project
       const project = await storage.createProject(projectData);
 
-      // Create default project settings
+      // Create default project settings (map from deal if available)
       await storage.createOrUpdateProjectSettings({
         projectId: project.id,
-        useBusinessDays: true,
-        holidayCalendar: 'us_federal' as const,
+        useBusinessDays: deal.useBusinessDays !== undefined ? deal.useBusinessDays : true,
+        holidayCalendar: (deal.holidayCalendar || 'us_federal') as 'us_federal' | 'none',
         emailReminders: true,
         slackNotifications: false,
         ndaRequired: false
