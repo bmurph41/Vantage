@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -269,11 +270,10 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                 <FormItem>
                   <FormLabel>Listing Price (Optional)</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      placeholder="500000" 
-                      {...field} 
+                    <CurrencyInput
+                      value={field.value ? parseFloat(field.value) : undefined}
+                      onValueChange={(val) => field.onChange(val?.toString() || "")}
+                      onBlur={field.onBlur}
                       data-testid="input-listing-price"
                     />
                   </FormControl>

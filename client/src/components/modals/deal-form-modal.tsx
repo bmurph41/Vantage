@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -575,17 +576,12 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                           <FormItem>
                             <FormLabel>Deal Value ($) *</FormLabel>
                             <FormControl>
-                              <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <Input 
-                                  type="number" 
-                                  step="0.01"
-                                  placeholder="50000" 
-                                  className="pl-10"
-                                  {...field} 
-                                  data-testid="input-deal-value"
-                                />
-                              </div>
+                              <CurrencyInput
+                                value={field.value ? parseFloat(field.value) : undefined}
+                                onValueChange={(val) => field.onChange(val?.toString() || "")}
+                                onBlur={field.onBlur}
+                                data-testid="input-deal-value"
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1162,7 +1158,12 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                             <FormItem>
                               <FormLabel className="text-xs">Gross Revenue ($)</FormLabel>
                               <FormControl>
-                                <Input type="number" placeholder="e.g., 3670000" {...field} data-testid="input-gross-revenue" />
+                                <CurrencyInput
+                                  value={field.value ? parseFloat(field.value) : undefined}
+                                  onValueChange={(val) => field.onChange(val?.toString() || "")}
+                                  onBlur={field.onBlur}
+                                  data-testid="input-gross-revenue"
+                                />
                               </FormControl>
                             </FormItem>
                           )}
@@ -1174,7 +1175,12 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                             <FormItem>
                               <FormLabel className="text-xs">NOI ($)</FormLabel>
                               <FormControl>
-                                <Input type="number" placeholder="e.g., 1449000" {...field} data-testid="input-noi" />
+                                <CurrencyInput
+                                  value={field.value ? parseFloat(field.value) : undefined}
+                                  onValueChange={(val) => field.onChange(val?.toString() || "")}
+                                  onBlur={field.onBlur}
+                                  data-testid="input-noi"
+                                />
                               </FormControl>
                             </FormItem>
                           )}
@@ -1320,18 +1326,14 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                           <FormItem>
                             <FormLabel>Commission Amount ($)</FormLabel>
                             <FormControl>
-                              <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <Input 
-                                  type="number" 
-                                  step="0.01"
-                                  placeholder="1500" 
-                                  className={cn("pl-10", commissionType === "percentage" && "bg-gray-50")}
-                                  {...field} 
-                                  readOnly={commissionType === "percentage"}
-                                  data-testid="input-commission-amount"
-                                />
-                              </div>
+                              <CurrencyInput
+                                value={field.value ? parseFloat(field.value) : undefined}
+                                onValueChange={(val) => field.onChange(val?.toString() || "")}
+                                onBlur={field.onBlur}
+                                className={cn(commissionType === "percentage" && "bg-gray-50")}
+                                readOnly={commissionType === "percentage"}
+                                data-testid="input-commission-amount"
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { DateInput } from "@/components/ui/date-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -607,11 +608,10 @@ function RiskForm({ form, onSubmit, isSubmitting, onCancel }: any) {
               <FormItem>
                 <FormLabel>Financial Impact (USD)</FormLabel>
                 <FormControl>
-                  <Input 
-                    type="number" 
-                    placeholder="0" 
-                    {...field}
-                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  <CurrencyInput
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    onBlur={field.onBlur}
                     data-testid="input-cost-impact"
                   />
                 </FormControl>

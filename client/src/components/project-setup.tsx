@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,20 +18,6 @@ import type { Project, ProjectSettings, Task, Contact } from "@shared/schema";
 import { useUpdateProject, useUpdateProjectSettings } from "@/hooks/use-project";
 import { useQuery } from "@tanstack/react-query";
 import { KeyContactsSection } from "./key-contacts-section";
-
-// Helper function to format currency
-const formatCurrency = (value: string): string => {
-  const numericValue = value.replace(/[^0-9]/g, '');
-  if (!numericValue) return '';
-  const number = parseInt(numericValue);
-  return '$' + number.toLocaleString('en-US');
-};
-
-// Helper function to parse currency back to number
-const parseCurrency = (value: string): number => {
-  const numericValue = value.replace(/[^0-9]/g, '');
-  return numericValue ? parseInt(numericValue) : 0;
-};
 
 const projectFormSchema = z.object({
   name: z.string().min(1, "Project name is required"),
@@ -97,11 +84,11 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   const [secondDepositDays, setSecondDepositDays] = useState<number | "">(project.secondDepositDays ?? "");
   const [firstDepositUseBusiness, setFirstDepositUseBusiness] = useState<boolean>(false);
   const [secondDepositUseBusiness, setSecondDepositUseBusiness] = useState<boolean>(false);
-  const [firstDepositAmount, setFirstDepositAmount] = useState<string>(
-    project.firstDepositAmount ? formatCurrency(project.firstDepositAmount.toString()) : ""
+  const [firstDepositAmount, setFirstDepositAmount] = useState<number | undefined>(
+    project.firstDepositAmount || undefined
   );
-  const [secondDepositAmount, setSecondDepositAmount] = useState<string>(
-    project.secondDepositAmount ? formatCurrency(project.secondDepositAmount.toString()) : ""
+  const [secondDepositAmount, setSecondDepositAmount] = useState<number | undefined>(
+    project.secondDepositAmount || undefined
   );
   
   // Reference dates for calculation (PSA Date, DD Expiration, or manual date)
@@ -386,10 +373,10 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
         titleInsuranceCompany: data.titleInsuranceCompany || null,
         lender: data.lender || null,
         // Deposit Information
-        firstDepositAmount: parseCurrency(firstDepositAmount) || null,
+        firstDepositAmount: firstDepositAmount || null,
         firstDepositDays: firstDepositDays === "" ? null : Number(firstDepositDays),
         firstDepositDueDate: data.firstDepositDueDate || null,
-        secondDepositAmount: parseCurrency(secondDepositAmount) || null,
+        secondDepositAmount: secondDepositAmount || null,
         secondDepositDays: secondDepositDays === "" ? null : Number(secondDepositDays),
         secondDepositDueDate: data.secondDepositDueDate || null,
         tz: data.tz,
@@ -809,14 +796,10 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="firstDepositAmount">Amount</Label>
-                  <Input
+                  <CurrencyInput
                     id="firstDepositAmount"
                     value={firstDepositAmount}
-                    onChange={(e) => {
-                      const formatted = formatCurrency(e.target.value);
-                      setFirstDepositAmount(formatted);
-                    }}
-                    placeholder="$0"
+                    onValueChange={setFirstDepositAmount}
                     data-testid="input-first-deposit-amount"
                   />
                 </div>
@@ -921,14 +904,10 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="secondDepositAmount">Amount</Label>
-                  <Input
+                  <CurrencyInput
                     id="secondDepositAmount"
                     value={secondDepositAmount}
-                    onChange={(e) => {
-                      const formatted = formatCurrency(e.target.value);
-                      setSecondDepositAmount(formatted);
-                    }}
-                    placeholder="$0"
+                    onValueChange={setSecondDepositAmount}
                     data-testid="input-second-deposit-amount"
                   />
                 </div>

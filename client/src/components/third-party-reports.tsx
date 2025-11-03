@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -779,16 +780,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                           {task.paymentStatus !== 'no_cost' && (
                             <div className="text-center">
                               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">Cost</label>
-                              <input 
-                                type="text" 
-                                value={task.cost || ""} 
-                                onChange={(e) => handleDateFieldChange(task.id, 'cost', e.target.value)}
-                                onBlur={(e) => {
-                                  const formatted = formatCurrency(e.target.value);
-                                  handleDateFieldChange(task.id, 'cost', formatted);
-                                }}
-                                placeholder="$0.00"
-                                className="w-24 text-sm border border-gray-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
+                              <CurrencyInput
+                                value={task.cost ? (typeof task.cost === 'string' ? parseFloat(task.cost.replace(/[^0-9.-]/g, '')) : task.cost) : undefined}
+                                onValueChange={(val) => handleDateFieldChange(task.id, 'cost', val?.toString() || "")}
+                                className="w-24 text-sm text-center"
                                 data-testid={`input-cost-${task.id}`}
                               />
                               <Select
@@ -1128,13 +1123,12 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                         <div className="text-center">
                           <div className="text-xs text-gray-500 mb-0.5">Cost</div>
                           {editingCostTaskId === task.id ? (
-                            <Input
+                            <CurrencyInput
                               data-testid={`input-cost-${task.id}`}
-                              type="number"
-                              value={editingCostValue}
-                              onChange={(e) => setEditingCostValue(e.target.value)}
+                              value={editingCostValue ? parseFloat(editingCostValue) : undefined}
+                              onValueChange={(val) => setEditingCostValue(val?.toString() || '')}
                               onBlur={() => handleSaveCost(task.id)}
-                              onKeyDown={(e) => e.key === 'Enter' && handleSaveCost(task.id)}
+                              onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && handleSaveCost(task.id)}
                               className="w-24 text-sm text-center"
                               autoFocus
                             />

@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Edit2, Trash2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -338,27 +339,20 @@ function CreateProductForm({
         <div className="grid grid-cols-3 gap-4">
           <div className="grid gap-2">
             <Label htmlFor="price">Price *</Label>
-            <Input
+            <CurrencyInput
               id="price"
-              type="number"
-              step="0.01"
               data-testid="input-price"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-              placeholder="0.00"
-              required
+              value={formData.price ? parseFloat(formData.price) : undefined}
+              onValueChange={(val) => setFormData({ ...formData, price: val?.toString() || "" })}
             />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="cost">Cost</Label>
-            <Input
+            <CurrencyInput
               id="cost"
-              type="number"
-              step="0.01"
               data-testid="input-cost"
-              value={formData.cost}
-              onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-              placeholder="0.00"
+              value={formData.cost ? parseFloat(formData.cost) : undefined}
+              onValueChange={(val) => setFormData({ ...formData, cost: val?.toString() || "" })}
             />
           </div>
           <div className="grid gap-2">
@@ -490,25 +484,20 @@ function EditProductForm({
         <div className="grid grid-cols-3 gap-4">
           <div className="grid gap-2">
             <Label htmlFor="edit-price">Price *</Label>
-            <Input
+            <CurrencyInput
               id="edit-price"
-              type="number"
-              step="0.01"
               data-testid="input-edit-price"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-              required
+              value={formData.price ? parseFloat(formData.price) : undefined}
+              onValueChange={(val) => setFormData({ ...formData, price: val?.toString() || "" })}
             />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="edit-cost">Cost</Label>
-            <Input
+            <CurrencyInput
               id="edit-cost"
-              type="number"
-              step="0.01"
               data-testid="input-edit-cost"
-              value={formData.cost}
-              onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+              value={formData.cost ? parseFloat(formData.cost) : undefined}
+              onValueChange={(val) => setFormData({ ...formData, cost: val?.toString() || "" })}
             />
           </div>
           <div className="grid gap-2">
