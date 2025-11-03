@@ -22,6 +22,11 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### November 2025 - CRM-DD Integration & UI Cleanup
+- **All Projects as Default Landing Page**: Reorganized DD Tracker navigation to make All Projects the main view
+  - Updated routing: `/` and `/projects` now display All Projects Summary page with comprehensive project details
+  - Simplified DD navigation: "All Projects" replaces "Dashboard" as the primary view
+  - Original Dashboard page still accessible at `/dashboard` route for backward compatibility
+  - All Projects shows detailed metrics for each DD project: completion %, costs, deadlines, overdue tasks
 - **Deal-to-DD Project Conversion**: Implemented first major integration feature connecting CRM and DD Tracker modules
   - Created conversion modal allowing users to convert deals to DD projects with smart field mapping
   - Added backend endpoint `/api/deals/convert-to-project` with automatic task creation (PCA, ESA, Survey, Title, etc.)
@@ -32,7 +37,7 @@ Preferred communication style: Simple, everyday language.
 - **UI Cleanup**: Removed redundant Investor View and Owner View pages from DD navigation
   - Cleaned up routes in App.tsx and navigation in unified-sidebar.tsx
   - Deleted obsolete page files to reduce maintenance burden
-  - Users now use main Dashboard for all DD project overview needs
+  - Users now use All Projects for comprehensive DD project overview
 
 ### November 2025 - CRM Integration & Currency Formatting
 - **CRM Integration Complete**: Successfully integrated standalone CRM application into MarinaMatch platform
