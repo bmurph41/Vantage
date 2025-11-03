@@ -303,37 +303,45 @@ export default function AllProjectsSummaryPage() {
                 </div>
               ) : (
                 projectSummaries.map((summary) => (
-                  <div key={summary.project.id} className="border border-gray-200 rounded-lg p-6 hover:border-blue-300 transition-colors">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="text-lg font-semibold text-gray-900">{summary.project.name}</h3>
-                          {summary.completionPct === 100 ? (
-                            <Badge className="bg-green-100 text-green-800 border-green-200">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Completed
-                            </Badge>
-                          ) : summary.daysRemaining !== null && summary.daysRemaining < 5 ? (
-                            <Badge className="bg-amber-100 text-amber-800 border-amber-200">
-                              DD Expiring Soon
-                            </Badge>
-                          ) : null}
+                  <Link key={summary.project.id} href={`/dd/projects/${summary.project.id}`}>
+                    <div className="border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-lg transition-all cursor-pointer">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <h3 className="text-lg font-semibold text-gray-900">{summary.project.name}</h3>
+                            {summary.completionPct === 100 ? (
+                              <Badge className="bg-green-100 text-green-800 border-green-200">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Completed
+                              </Badge>
+                            ) : summary.daysRemaining !== null && summary.daysRemaining < 5 ? (
+                              <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                                DD Expiring Soon
+                              </Badge>
+                            ) : null}
+                          </div>
+                          {summary.project.description && (
+                            <p className="text-sm text-gray-600 mb-2">{summary.project.description}</p>
+                          )}
+                          {(summary.project.city || summary.project.state) && (
+                            <p className="text-sm text-gray-500">
+                              {[summary.project.city, summary.project.state].filter(Boolean).join(', ')}
+                            </p>
+                          )}
                         </div>
-                        {summary.project.description && (
-                          <p className="text-sm text-gray-600 mb-2">{summary.project.description}</p>
-                        )}
-                        {(summary.project.city || summary.project.state) && (
-                          <p className="text-sm text-gray-500">
-                            {[summary.project.city, summary.project.state].filter(Boolean).join(', ')}
-                          </p>
-                        )}
-                      </div>
-                      <Link href={`/projects/${summary.project.id}/progress-report`}>
-                        <Button variant="outline" size="sm" data-testid={`button-view-report-${summary.project.id}`}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          data-testid={`button-view-report-${summary.project.id}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.location.href = `/projects/${summary.project.id}/progress-report`;
+                          }}
+                        >
                           View Full Report
                         </Button>
-                      </Link>
-                    </div>
+                      </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                       <div>
@@ -407,7 +415,8 @@ export default function AllProjectsSummaryPage() {
                         )}
                       </div>
                     )}
-                  </div>
+                    </div>
+                  </Link>
                 ))
               )}
             </div>
