@@ -87,6 +87,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api/dd", authenticateUser);
   app.use("/api/crm", authenticateUser);
+  // Apply authentication to CRM route aliases
+  app.use("/api/leads", authenticateUser);
+  app.use("/api/deals", authenticateUser);
+  app.use("/api/contacts", authenticateUser);
+  app.use("/api/companies", authenticateUser);
+  app.use("/api/pipelines", authenticateUser);
+  app.use("/api/stages", authenticateUser);
+  app.use("/api/pipeline-stages", authenticateUser);
+  app.use("/api/activities", authenticateUser);
 
   // Projects
   app.get("/api/dd/projects", async (req: any, res) => {
