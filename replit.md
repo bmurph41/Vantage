@@ -21,6 +21,19 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### November 2025 - CRM-DD Integration & UI Cleanup
+- **Deal-to-DD Project Conversion**: Implemented first major integration feature connecting CRM and DD Tracker modules
+  - Created conversion modal allowing users to convert deals to DD projects with smart field mapping
+  - Added backend endpoint `/api/deals/convert-to-project` with automatic task creation (PCA, ESA, Survey, Title, etc.)
+  - Implemented ddProjectId tracking in crm_deals table to prevent duplicate conversions
+  - Conditional UI: "Convert to DD Project" button changes to "View DD Project" after conversion
+  - Contact mapping: Automatically converts deal contacts to DD project roles
+  - Note: ddProjectId column added via SQL for this session; production requires proper Drizzle migration
+- **UI Cleanup**: Removed redundant Investor View and Owner View pages from DD navigation
+  - Cleaned up routes in App.tsx and navigation in unified-sidebar.tsx
+  - Deleted obsolete page files to reduce maintenance burden
+  - Users now use main Dashboard for all DD project overview needs
+
 ### November 2025 - CRM Integration & Currency Formatting
 - **CRM Integration Complete**: Successfully integrated standalone CRM application into MarinaMatch platform
   - Created 46 CRM tables in PostgreSQL database (crm_deals, crm_leads, crm_contacts, crm_companies, etc.)
