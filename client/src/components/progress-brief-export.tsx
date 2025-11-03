@@ -2,11 +2,11 @@ import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer
 import { format, differenceInDays, addDays, differenceInCalendarDays, startOfDay } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { setDeadlineTo5PM, tzNow } from '@/lib/date-utils';
-import type { Project, Task } from '@shared/schema';
+import type { Project, DDTask } from '@shared/schema';
 
 interface ProgressBriefProps {
   project: Project;
-  tasks: Task[];
+  tasks: DDTask[];
 }
 
 // Helper function for EST start of day

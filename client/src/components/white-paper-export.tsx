@@ -2,13 +2,13 @@ import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer
 import { format, parseISO, isValid, differenceInCalendarDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { setDeadlineTo5PM } from '@/lib/date-utils';
-import type { Project, Task, ProjectSettings, Risk } from '@shared/schema';
+import type { Project, DDTask, ProjectSettings, Risk } from '@shared/schema';
 
 export type ReportAudience = 'internal' | 'investor' | 'lender' | 'partner' | 'attorney';
 
 interface WhitePaperProps {
   project: Project;
-  tasks: Task[];
+  tasks: DDTask[];
   risks: Risk[];
   riskAnalytics: any;
   settings?: ProjectSettings | null;

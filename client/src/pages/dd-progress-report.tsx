@@ -48,7 +48,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AddToCalendarDialog } from "@/components/add-to-calendar-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { Project, Task, Risk, ProjectSettings, Contact } from "@shared/schema";
+import type { Project, DDTask, Risk, ProjectSettings, DDContact } from "@shared/schema";
 import type { ProjectWithDetails } from "@/types/dd";
 
 // Helper function for EST start of day

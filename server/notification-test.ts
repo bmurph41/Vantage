@@ -6,7 +6,7 @@
 import { notificationService } from './notification-service';
 import { deadlineMonitor } from './deadline-monitor';
 import { storage } from './storage';
-import { type Project, type Task, type User } from '@shared/schema';
+import { type Project, type DDTask, type User } from '@shared/schema';
 
 interface TestScenario {
   name: string;

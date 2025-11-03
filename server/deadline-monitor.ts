@@ -2,7 +2,7 @@ import { storage } from './storage';
 import { notificationService } from './notification-service';
 import { resolveRecipient } from '@shared/recipient-utils';
 import { db } from './db';
-import { type Task, type Project } from '@shared/schema';
+import { type DDTask, type Project } from '@shared/schema';
 import { differenceInCalendarDays, startOfDay, parseISO, setHours, setMinutes, setSeconds } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
@@ -21,7 +21,7 @@ function setDeadlineTo5PM(date: Date | string, timezone: string = 'America/New_Y
 }
 
 interface DeadlineAlert {
-  task: Task;
+  task: DDTask;
   project: Project;
   daysUntilDeadline: number;
   alertType: 'upcoming' | 'today' | 'overdue';

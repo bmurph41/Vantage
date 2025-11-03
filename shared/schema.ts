@@ -1065,7 +1065,7 @@ export const insertProjectTemplateSchema = createInsertSchema(projectTemplates).
   id: true,
 });
 
-export const insertTaskSchema = createInsertSchema(tasks).omit({
+export const insertDDTaskSchema = createInsertSchema(tasks).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -1106,13 +1106,13 @@ export const insertRiskSchema = createInsertSchema(risks).omit({
   updatedAt: true,
 });
 
-export const insertContactSchema = createInsertSchema(contacts).omit({
+export const insertDDContactSchema = createInsertSchema(contacts).omit({
   id: true,
   createdAt: true,
 });
 
 // Security: Restricted schema for contact updates - excludes tenant isolation fields
-export const updateContactSchema = createInsertSchema(contacts).omit({
+export const updateDDContactSchema = createInsertSchema(contacts).omit({
   id: true,
   orgId: true,
   createdBy: true,
@@ -1180,8 +1180,8 @@ export type InsertProjectSettings = z.infer<typeof insertProjectSettingsSchema>;
 export type ProjectTemplate = typeof projectTemplates.$inferSelect;
 export type InsertProjectTemplate = z.infer<typeof insertProjectTemplateSchema>;
 
-export type Task = typeof tasks.$inferSelect;
-export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type DDTask = typeof tasks.$inferSelect;
+export type InsertDDTask = z.infer<typeof insertDDTaskSchema>;
 
 export type TaskDependency = typeof taskDependencies.$inferSelect;
 export type InsertTaskDependency = z.infer<typeof insertTaskDependencySchema>;
@@ -1201,9 +1201,9 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type Risk = typeof risks.$inferSelect;
 export type InsertRisk = z.infer<typeof insertRiskSchema>;
 
-export type Contact = typeof contacts.$inferSelect;
-export type InsertContact = z.infer<typeof insertContactSchema>;
-export type UpdateContact = z.infer<typeof updateContactSchema>;
+export type DDContact = typeof contacts.$inferSelect;
+export type InsertDDContact = z.infer<typeof insertDDContactSchema>;
+export type UpdateDDContact = z.infer<typeof updateDDContactSchema>;
 
 export type ProjectContact = typeof projectContacts.$inferSelect;
 export type InsertProjectContact = z.infer<typeof insertProjectContactSchema>;
@@ -1711,6 +1711,28 @@ export const crmContactRoles = pgTable("crm_contact_roles", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+
+// Tasks table - action items and to-dos
+
+export const crmTasks = pgTable("crm_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default('task'), // task, follow_up, call, email, meeting
+  priority: text("priority").notNull().default('medium'), // low, medium, high, urgent
+  status: text("status").notNull().default('pending'), // pending, in_progress, completed, cancelled
+  dueDate: timestamp("due_date"),
+  completed: boolean("completed").notNull().default(false),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  companyId: varchar("company_id").references(() => crmCompanies.id),
+  propertyId: varchar("property_id").references(() => crmProperties.id),
+  assigneeId: varchar("assignee_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Activities table
 // Tasks table
 
 export const crmActivities = pgTable("crm_activities", {
@@ -2628,6 +2650,22 @@ export const insertCrmWorkflowSchema = createInsertSchema(crmWorkflows).omit({
 });
 export type InsertCrmWorkflow = z.infer<typeof insertCrmWorkflowSchema>;
 
+// CRM Task schema
+export const insertCrmTaskSchema = createInsertSchema(crmTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmTask = z.infer<typeof insertCrmTaskSchema>;
+
+// CRM Property schema
+export const insertCrmPropertySchema = createInsertSchema(crmProperties).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmProperty = z.infer<typeof insertCrmPropertySchema>;
+
 // CRM Schema Aliases (for backward compatibility with original CRM code)
 export const insertDealSchema = insertCrmDealSchema;
 export type InsertDeal = InsertCrmDeal;
@@ -2635,6 +2673,12 @@ export const insertLeadSchema = insertCrmLeadSchema;
 export type InsertLead = InsertCrmLead;
 export const insertCompanySchema = insertCrmCompanySchema;
 export type InsertCompany = InsertCrmCompany;
+export const insertContactSchema = insertCrmContactSchema;
+export type InsertContact = InsertCrmContact;
+export const insertTaskSchema = insertCrmTaskSchema;
+export type InsertTask = InsertCrmTask;
+export const insertPropertySchema = insertCrmPropertySchema;
+export type InsertProperty = InsertCrmProperty;
 export const insertActivitySchema = insertCrmActivitySchema;
 export type InsertActivity = InsertCrmActivity;
 export const insertWorkflowSchema = insertCrmWorkflowSchema;
@@ -2653,3 +2697,9 @@ export type Activity = typeof crmActivities.$inferSelect;
 export type Workflow = typeof crmWorkflows.$inferSelect;
 export type Pipeline = typeof crmPipelines.$inferSelect;
 export type PipelineStage = typeof crmPipelineStages.$inferSelect;
+
+// Additional CRM Type Aliases for backward compatibility
+export type Task = typeof crmTasks.$inferSelect;
+export type Property = typeof crmProperties.$inferSelect;
+export type ContactCompany = typeof crmContactCompanies.$inferSelect;
+export type CompanyProperty = typeof crmCompanyProperties.$inferSelect;

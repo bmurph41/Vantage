@@ -8,10 +8,10 @@ import { AINotesEnhancer } from "./ai-notes-enhancer";
 import { assigneeSubscriptionManager } from "./assignee-subscription-manager";
 import { reconciliationService } from "./reconciliation-service";
 import { 
-  insertProjectSchema, insertProjectSettingsSchema, insertTaskSchema, 
+  insertProjectSchema, insertProjectSettingsSchema, insertDDTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
   insertTimelineNoteSchema, insertProjectShareSchema, insertRiskSchema,
-  insertContactSchema, updateContactSchema, insertProjectContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema,
+  insertDDContactSchema, updateDDContactSchema, insertProjectContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema,
   insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema,
   insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema,
   insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema
@@ -414,7 +414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taskPayload.deadlineDays = null;
       }
 
-      const taskData = insertTaskSchema.parse({
+      const taskData = insertDDTaskSchema.parse({
         ...taskPayload,
         projectId: req.params.projectId,
       });
@@ -1909,7 +1909,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/dd/contacts", async (req: any, res) => {
     try {
-      const contactData = insertContactSchema.parse({
+      const contactData = insertDDContactSchema.parse({
         ...req.body,
         orgId: req.user.orgId,
         createdBy: req.user.id,
@@ -1965,7 +1965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Security: Use restricted schema that excludes orgId/createdBy/id fields
-      const updates = updateContactSchema.parse(req.body);
+      const updates = updateDDContactSchema.parse(req.body);
       
       // Check for duplicate email within the same organization (excluding current contact)
       if (updates.email) {

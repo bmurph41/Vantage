@@ -23,7 +23,7 @@ import { useProjects } from "@/hooks/use-project";
 import { useQuery } from "@tanstack/react-query";
 import { format, differenceInCalendarDays } from "date-fns";
 import { tzNow } from "@/lib/date-utils";
-import type { Project, Task, Risk } from "@shared/schema";
+import type { Project, DDTask, Risk } from "@shared/schema";
 
 interface PortfolioMetrics {
   totalDeals: number;
@@ -36,7 +36,7 @@ interface PortfolioMetrics {
   highRiskCount: number;
 }
 
-function calculatePortfolioMetrics(projects: Project[], tasksMap: Map<string, Task[]>, risksMap: Map<string, Risk[]>): PortfolioMetrics {
+function calculatePortfolioMetrics(projects: Project[], tasksMap: Map<string, DDTask[]>, risksMap: Map<string, Risk[]>): PortfolioMetrics {
   const activeDeals = projects.filter(p => {
     if (!p.closingDate) return true;
     return differenceInCalendarDays(new Date(p.closingDate), tzNow('America/New_York')) >= 0;

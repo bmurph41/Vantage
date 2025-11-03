@@ -6,15 +6,15 @@ import {
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
   crmDeals, crmLeads, crmContacts, crmCompanies, crmPipelines, crmPipelineStages, crmActivities,
   type Organization, type User, type Project, type ProjectSettings, 
-  type Task, type ProjectTemplate, type AuditLog,
-  type TimelineNote, type ProjectShare, type Risk, type Contact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
+  type DDTask, type ProjectTemplate, type AuditLog,
+  type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
   type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
   type InsertOrganization, type InsertUser, type InsertProject, 
-  type InsertProjectSettings, type InsertTask,
+  type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
-  type InsertContact, type InsertProjectContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
+  type InsertDDContact, type UpdateDDContact, type InsertProjectContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
   type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity
@@ -46,11 +46,11 @@ export interface IStorage {
   updateProjectSettings(projectId: string, updates: Partial<InsertProjectSettings>): Promise<ProjectSettings>;
 
   // Tasks
-  getTask(id: string): Promise<Task | undefined>;
-  getTasksForProject(projectId: string, includeArchived?: boolean): Promise<Task[]>;
+  getTask(id: string): Promise<DDTask | undefined>;
+  getTasksForProject(projectId: string, includeArchived?: boolean): Promise<DDTask[]>;
   getProjectAssignees(projectId: string): Promise<string[]>;
-  createTask(task: InsertTask): Promise<Task>;
-  updateTask(id: string, updates: Partial<InsertTask>): Promise<Task>;
+  createTask(task: InsertDDTask): Promise<DDTask>;
+  updateTask(id: string, updates: Partial<InsertDDTask>): Promise<DDTask>;
   deleteTask(id: string): Promise<void>;
 
   // Task Files
@@ -123,15 +123,15 @@ export interface IStorage {
   deleteTaskDependencies(taskId: string): Promise<void>;
 
   // Contact Management
-  createContact(contact: InsertContact): Promise<Contact>;
-  getContactsByOrg(orgId: string): Promise<Contact[]>;
-  getContactById(id: string): Promise<Contact | undefined>;
-  updateContact(id: string, updates: Partial<InsertContact>): Promise<Contact>;
+  createContact(contact: InsertDDContact): Promise<DDContact>;
+  getContactsByOrg(orgId: string): Promise<DDContact[]>;
+  getContactById(id: string): Promise<DDContact | undefined>;
+  updateContact(id: string, updates: UpdateDDContact): Promise<DDContact>;
   deleteContact(id: string): Promise<void>;
   
   // Project-Contact Associations
   addContactToProject(projectContact: InsertProjectContact): Promise<ProjectContact>;
-  getProjectContacts(projectId: string): Promise<Array<ProjectContact & { contact: Contact }>>;
+  getProjectContacts(projectId: string): Promise<Array<ProjectContact & { contact: DDContact }>>;
   removeContactFromProject(projectId: string, contactId: string, role: string): Promise<void>;
 
   // Notification Subscription Management
@@ -875,23 +875,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Contact Management
-  async createContact(contact: InsertContact): Promise<Contact> {
+  async createContact(contact: InsertDDContact): Promise<DDContact> {
     const [created] = await db.insert(contacts).values(contact).returning();
     return created;
   }
 
-  async getContactsByOrg(orgId: string): Promise<Contact[]> {
+  async getContactsByOrg(orgId: string): Promise<DDContact[]> {
     return db.select().from(contacts)
       .where(eq(contacts.orgId, orgId))
       .orderBy(contacts.name);
   }
 
-  async getContactById(id: string): Promise<Contact | undefined> {
+  async getContactById(id: string): Promise<DDContact | undefined> {
     const [contact] = await db.select().from(contacts).where(eq(contacts.id, id));
     return contact || undefined;
   }
 
-  async updateContact(id: string, updates: Partial<InsertContact>): Promise<Contact> {
+  async updateContact(id: string, updates: UpdateDDContact): Promise<DDContact> {
     const [updated] = await db.update(contacts)
       .set(updates)
       .where(eq(contacts.id, id))
@@ -922,7 +922,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getProjectContacts(projectId: string): Promise<Array<ProjectContact & { contact: Contact }>> {
+  async getProjectContacts(projectId: string): Promise<Array<ProjectContact & { contact: DDContact }>> {
     const results = await db.select()
       .from(projectContacts)
       .leftJoin(contacts, eq(projectContacts.contactId, contacts.id))

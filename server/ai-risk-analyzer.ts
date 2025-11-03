@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { Risk, Task, Project } from "@shared/schema";
+import type { Risk, DDTask, Project } from "@shared/schema";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -20,7 +20,7 @@ interface RiskAnalysisResult {
 interface RiskContext {
   project: Project;
   risks: Risk[];
-  tasks: Task[];
+  tasks: DDTask[];
   daysRemaining: number;
   completionRate: number;
   overdueTasks: number;

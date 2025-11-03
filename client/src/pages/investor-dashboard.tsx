@@ -24,7 +24,7 @@ import { useProjects } from "@/hooks/use-project";
 import { useQuery } from "@tanstack/react-query";
 import { format, differenceInCalendarDays, parseISO } from "date-fns";
 import { tzNow, setDeadlineTo5PM } from "@/lib/date-utils";
-import type { Project, Task, Risk } from "@shared/schema";
+import type { Project, DDTask, Risk } from "@shared/schema";
 
 interface DealHealthMetrics {
   healthScore: number;
@@ -34,7 +34,7 @@ interface DealHealthMetrics {
   budgetVariance: number;
 }
 
-function calculateDealHealth(project: Project, tasks: Task[], risks: Risk[]): DealHealthMetrics {
+function calculateDealHealth(project: Project, tasks: DDTask[], risks: Risk[]): DealHealthMetrics {
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
   const totalTasks = tasks.length;
   const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;

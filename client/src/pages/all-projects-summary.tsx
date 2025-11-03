@@ -23,11 +23,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import type { Project, Task } from "@shared/schema";
+import type { Project, DDTask } from "@shared/schema";
 
 interface ProjectSummary {
   project: Project;
-  tasks: Task[];
+  tasks: DDTask[];
   completionPct: number;
   totalTasks: number;
   completedTasks: number;
@@ -51,7 +51,7 @@ export default function AllProjectsSummaryPage() {
     queryKey: [`/api/dd/projects/${projectId}/tasks`],
   }));
 
-  const { data: allTasksData = [] } = useQuery<Task[][]>({
+  const { data: allTasksData = [] } = useQuery<DDTask[][]>({
     queryKey: ["all-projects-tasks", ...projectIds],
     queryFn: async () => {
       const responses = await Promise.all(

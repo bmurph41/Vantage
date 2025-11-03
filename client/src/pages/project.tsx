@@ -18,19 +18,19 @@ import NotificationSettingsPage from "@/pages/notification-settings";
 import { useProject } from "@/hooks/use-project";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import type { Task, Contact } from "@shared/schema";
+import type { DDTask, DDContact } from "@shared/schema";
 
 export default function ProjectPage() {
   const { id } = useParams();
   const [location] = useLocation();
   const [activeTab, setActiveTab] = useState("reports");
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<DDTask | null>(null);
   
   const { data, isLoading, error } = useProject(id!);
   
   // Fetch contacts for the Key Contacts tab
-  const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
+  const { data: contacts = [], isLoading: contactsLoading } = useQuery<DDContact[]>({
     queryKey: ['/api/dd/contacts'],
     enabled: !!id,
   });

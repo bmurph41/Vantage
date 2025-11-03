@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { Project, Task } from "@shared/schema";
+import type { Project, DDTask } from "@shared/schema";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -11,7 +11,7 @@ interface NotesEnhancementResult {
 
 interface NotesContext {
   project: Project;
-  tasks: Task[];
+  tasks: DDTask[];
   userNotes: string;
   completionRate: number;
   daysRemaining: number;
