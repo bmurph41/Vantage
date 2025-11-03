@@ -5344,6 +5344,334 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ===================================================================
+  // CRM Route Aliases - Frontend Integration
+  // Map /api/* routes to /api/crm/* for frontend compatibility
+  // ===================================================================
+  
+  // Leads aliases
+  app.get("/api/leads", async (req: any, res) => {
+    try {
+      const leads = await storage.getCrmLeadsForOrg(req.user.orgId);
+      res.json(leads);
+    } catch (error) {
+      console.error("Failed to get leads:", error);
+      res.status(500).json({ error: "Failed to retrieve leads" });
+    }
+  });
+  app.post("/api/leads", async (req: any, res) => {
+    try {
+      const lead = await storage.createCrmLead({ ...req.body, assignedToId: req.user.id });
+      res.json(lead);
+    } catch (error) {
+      console.error("Failed to create lead:", error);
+      res.status(500).json({ error: "Failed to create lead" });
+    }
+  });
+  app.put("/api/leads/:id", async (req: any, res) => {
+    try {
+      const lead = await storage.updateCrmLead(req.params.id, req.body);
+      res.json(lead);
+    } catch (error) {
+      console.error("Failed to update lead:", error);
+      res.status(500).json({ error: "Failed to update lead" });
+    }
+  });
+  app.delete("/api/leads/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmLead(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete lead:", error);
+      res.status(500).json({ error: "Failed to delete lead" });
+    }
+  });
+  
+  // Deals aliases
+  app.get("/api/deals", async (req: any, res) => {
+    try {
+      const deals = await storage.getCrmDealsForOrg(req.user.orgId);
+      res.json(deals);
+    } catch (error) {
+      console.error("Failed to get deals:", error);
+      res.status(500).json({ error: "Failed to retrieve deals" });
+    }
+  });
+  app.post("/api/deals", async (req: any, res) => {
+    try {
+      const deal = await storage.createCrmDeal({ ...req.body, ownerId: req.user.id });
+      res.json(deal);
+    } catch (error) {
+      console.error("Failed to create deal:", error);
+      res.status(500).json({ error: "Failed to create deal" });
+    }
+  });
+  app.get("/api/deals/:id", async (req: any, res) => {
+    try {
+      const deal = await storage.getCrmDeal(req.params.id);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      res.json(deal);
+    } catch (error) {
+      console.error("Failed to get deal:", error);
+      res.status(500).json({ error: "Failed to retrieve deal" });
+    }
+  });
+  app.put("/api/deals/:id", async (req: any, res) => {
+    try {
+      const deal = await storage.updateCrmDeal(req.params.id, req.body);
+      res.json(deal);
+    } catch (error) {
+      console.error("Failed to update deal:", error);
+      res.status(500).json({ error: "Failed to update deal" });
+    }
+  });
+  app.delete("/api/deals/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmDeal(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete deal:", error);
+      res.status(500).json({ error: "Failed to delete deal" });
+    }
+  });
+  
+  // Contacts aliases  
+  app.get("/api/contacts", async (req: any, res) => {
+    try {
+      const contacts = await storage.getCrmContactsForOrg(req.user.orgId);
+      res.json(contacts);
+    } catch (error) {
+      console.error("Failed to get contacts:", error);
+      res.status(500).json({ error: "Failed to retrieve contacts" });
+    }
+  });
+  app.post("/api/contacts", async (req: any, res) => {
+    try {
+      const contact = await storage.createCrmContact({ ...req.body, ownerId: req.user.id });
+      res.json(contact);
+    } catch (error) {
+      console.error("Failed to create contact:", error);
+      res.status(500).json({ error: "Failed to create contact" });
+    }
+  });
+  app.put("/api/contacts/:id", async (req: any, res) => {
+    try {
+      const contact = await storage.updateCrmContact(req.params.id, req.body);
+      res.json(contact);
+    } catch (error) {
+      console.error("Failed to update contact:", error);
+      res.status(500).json({ error: "Failed to update contact" });
+    }
+  });
+  app.delete("/api/contacts/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmContact(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete contact:", error);
+      res.status(500).json({ error: "Failed to delete contact" });
+    }
+  });
+  
+  // Companies aliases
+  app.get("/api/companies", async (req: any, res) => {
+    try {
+      const companies = await storage.getCrmCompaniesForOrg(req.user.orgId);
+      res.json(companies);
+    } catch (error) {
+      console.error("Failed to get companies:", error);
+      res.status(500).json({ error: "Failed to retrieve companies" });
+    }
+  });
+  app.post("/api/companies", async (req: any, res) => {
+    try {
+      const company = await storage.createCrmCompany({ ...req.body, ownerId: req.user.id });
+      res.json(company);
+    } catch (error) {
+      console.error("Failed to create company:", error);
+      res.status(500).json({ error: "Failed to create company" });
+    }
+  });
+  app.put("/api/companies/:id", async (req: any, res) => {
+    try {
+      const company = await storage.updateCrmCompany(req.params.id, req.body);
+      res.json(company);
+    } catch (error) {
+      console.error("Failed to update company:", error);
+      res.status(500).json({ error: "Failed to update company" });
+    }
+  });
+  app.delete("/api/companies/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmCompany(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete company:", error);
+      res.status(500).json({ error: "Failed to delete company" });
+    }
+  });
+  
+  // Pipelines aliases
+  app.get("/api/pipelines", async (req: any, res) => {
+    try {
+      const pipelines = await storage.getCrmPipelinesForOrg(req.user.orgId);
+      res.json(pipelines);
+    } catch (error) {
+      console.error("Failed to get pipelines:", error);
+      res.status(500).json({ error: "Failed to retrieve pipelines" });
+    }
+  });
+  app.post("/api/pipelines", async (req: any, res) => {
+    try {
+      const pipeline = await storage.createCrmPipeline({ ...req.body, orgId: req.user.orgId });
+      res.json(pipeline);
+    } catch (error) {
+      console.error("Failed to create pipeline:", error);
+      res.status(500).json({ error: "Failed to create pipeline" });
+    }
+  });
+  app.put("/api/pipelines/:id", async (req: any, res) => {
+    try {
+      const pipeline = await storage.updateCrmPipeline(req.params.id, req.body);
+      res.json(pipeline);
+    } catch (error) {
+      console.error("Failed to update pipeline:", error);
+      res.status(500).json({ error: "Failed to update pipeline" });
+    }
+  });
+  app.delete("/api/pipelines/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmPipeline(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete pipeline:", error);
+      res.status(500).json({ error: "Failed to delete pipeline" });
+    }
+  });
+  app.get("/api/pipelines/:pipelineId/stages", async (req: any, res) => {
+    try {
+      const stages = await storage.getCrmStagesForPipeline(req.params.pipelineId);
+      res.json(stages);
+    } catch (error) {
+      console.error("Failed to get pipeline stages:", error);
+      res.status(500).json({ error: "Failed to retrieve pipeline stages" });
+    }
+  });
+  
+  // Pipeline Stages aliases (both /api/stages and /api/pipeline-stages)
+  app.get("/api/stages", async (req: any, res) => {
+    try {
+      const stages = await storage.getCrmStagesForOrg(req.user.orgId);
+      res.json(stages);
+    } catch (error) {
+      console.error("Failed to get stages:", error);
+      res.status(500).json({ error: "Failed to retrieve stages" });
+    }
+  });
+  app.post("/api/stages", async (req: any, res) => {
+    try {
+      const stage = await storage.createCrmStage(req.body);
+      res.json(stage);
+    } catch (error) {
+      console.error("Failed to create stage:", error);
+      res.status(500).json({ error: "Failed to create stage" });
+    }
+  });
+  app.put("/api/stages/:id", async (req: any, res) => {
+    try {
+      const stage = await storage.updateCrmStage(req.params.id, req.body);
+      res.json(stage);
+    } catch (error) {
+      console.error("Failed to update stage:", error);
+      res.status(500).json({ error: "Failed to update stage" });
+    }
+  });
+  app.delete("/api/stages/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmStage(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete stage:", error);
+      res.status(500).json({ error: "Failed to delete stage" });
+    }
+  });
+  app.get("/api/pipeline-stages", async (req: any, res) => {
+    try {
+      const stages = await storage.getCrmStagesForOrg(req.user.orgId);
+      res.json(stages);
+    } catch (error) {
+      console.error("Failed to get stages:", error);
+      res.status(500).json({ error: "Failed to retrieve stages" });
+    }
+  });
+  app.post("/api/pipeline-stages", async (req: any, res) => {
+    try {
+      const stage = await storage.createCrmStage(req.body);
+      res.json(stage);
+    } catch (error) {
+      console.error("Failed to create stage:", error);
+      res.status(500).json({ error: "Failed to create stage" });
+    }
+  });
+  app.put("/api/pipeline-stages/:id", async (req: any, res) => {
+    try {
+      const stage = await storage.updateCrmStage(req.params.id, req.body);
+      res.json(stage);
+    } catch (error) {
+      console.error("Failed to update stage:", error);
+      res.status(500).json({ error: "Failed to update stage" });
+    }
+  });
+  app.delete("/api/pipeline-stages/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmStage(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete stage:", error);
+      res.status(500).json({ error: "Failed to delete stage" });
+    }
+  });
+  
+  // Activities aliases
+  app.get("/api/activities", async (req: any, res) => {
+    try {
+      const activities = await storage.getCrmActivitiesForOrg(req.user.id);
+      res.json(activities);
+    } catch (error) {
+      console.error("Failed to get activities:", error);
+      res.status(500).json({ error: "Failed to retrieve activities" });
+    }
+  });
+  app.post("/api/activities", async (req: any, res) => {
+    try {
+      const activity = await storage.createCrmActivity({ ...req.body, userId: req.user.id });
+      res.json(activity);
+    } catch (error) {
+      console.error("Failed to create activity:", error);
+      res.status(500).json({ error: "Failed to create activity" });
+    }
+  });
+  app.put("/api/activities/:id", async (req: any, res) => {
+    try {
+      const activity = await storage.updateCrmActivity(req.params.id, req.body);
+      res.json(activity);
+    } catch (error) {
+      console.error("Failed to update activity:", error);
+      res.status(500).json({ error: "Failed to update activity" });
+    }
+  });
+  app.delete("/api/activities/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmActivity(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete activity:", error);
+      res.status(500).json({ error: "Failed to delete activity" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
