@@ -4933,6 +4933,8 @@ Current context: Project ${req.params.projectId}`;
         secondDepositDays: deal.secondDepositDays || null,
         secondDepositDueDate: deal.secondDepositDueDate || null,
         customDeadlines: deal.customDeadlines || [],
+        // Lease Information
+        leases: deal.leases || [],
       };
 
       // Map description
