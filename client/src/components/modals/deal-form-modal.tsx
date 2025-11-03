@@ -61,6 +61,111 @@ const propertyTypes = [
   { value: "waterfront_property", label: "Waterfront Property" },
 ];
 
+// Stage Combobox Component
+function StageCombobox({ value, onChange, stages, onCreateStage }: {
+  value: string;
+  onChange: (value: string) => void;
+  stages: PipelineStage[];
+  onCreateStage: (stageName: string) => Promise<any>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+
+  const filteredStages = stages.filter(stage =>
+    stage.name.toLowerCase().includes(searchValue.toLowerCase())
+  );
+
+  const handleCreateStage = async () => {
+    if (!searchValue.trim()) return;
+    
+    setIsCreating(true);
+    try {
+      await onCreateStage(searchValue.trim());
+      onChange(searchValue.trim());
+      setSearchValue("");
+      setOpen(false);
+    } catch (error) {
+      console.error("Failed to create stage:", error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const selectedStage = stages.find(s => s.name === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+          data-testid="select-stage"
+        >
+          {selectedStage 
+            ? selectedStage.name.charAt(0).toUpperCase() + selectedStage.name.slice(1).replace('_', ' ')
+            : value
+            ? value.charAt(0).toUpperCase() + value.slice(1).replace('_', ' ')
+            : "Select or create stage..."}
+          <CalendarIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0">
+        <div className="flex items-center border-b px-3">
+          <Input
+            placeholder="Search or type new stage..."
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            className="border-0 focus-visible:ring-0"
+          />
+        </div>
+        <div className="max-h-[300px] overflow-y-auto">
+          {filteredStages.length > 0 ? (
+            filteredStages.map((stage) => (
+              <div
+                key={stage.id}
+                className="cursor-pointer px-3 py-2 hover:bg-gray-100 flex items-center justify-between"
+                onClick={() => {
+                  onChange(stage.name);
+                  setOpen(false);
+                  setSearchValue("");
+                }}
+              >
+                <div className="flex items-center">
+                  <div 
+                    className="w-3 h-3 rounded-full mr-2"
+                    style={{ backgroundColor: stage.color || '#6b7280' }}
+                  />
+                  <span>{stage.name.charAt(0).toUpperCase() + stage.name.slice(1).replace('_', ' ')}</span>
+                </div>
+              </div>
+            ))
+          ) : searchValue.trim() ? (
+            <div className="p-4">
+              <p className="text-sm text-gray-600 mb-2">No matching stages found.</p>
+              <Button
+                onClick={handleCreateStage}
+                disabled={isCreating}
+                variant="outline"
+                size="sm"
+                className="w-full"
+              >
+                {isCreating ? "Creating..." : `Create "${searchValue}"`}
+              </Button>
+            </div>
+          ) : (
+            <div className="p-4 text-sm text-gray-500">
+              Type to search or create a new stage
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: DealFormModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -620,20 +725,29 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Deal Stage *</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-stage">
-                                <SelectValue placeholder="Select stage" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {pipelineStages.map((stage) => (
-                                <SelectItem key={stage.id} value={stage.name}>
-                                  {stage.name.charAt(0).toUpperCase() + stage.name.slice(1).replace('_', ' ')}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <StageCombobox 
+                              value={field.value}
+                              onChange={field.onChange}
+                              stages={pipelineStages}
+                              onCreateStage={async (stageName) => {
+                                // Create a new stage for the default pipeline
+                                const pipelines = await apiRequest('/api/crm/pipelines', 'GET');
+                                if (pipelines && pipelines.length > 0) {
+                                  const defaultPipeline = pipelines[0];
+                                  const maxOrder = pipelineStages.reduce((max, s) => Math.max(max, s.stageOrder || 0), 0);
+                                  const newStage = await apiRequest('/api/crm/pipeline-stages', 'POST', {
+                                    pipelineId: defaultPipeline.id,
+                                    name: stageName,
+                                    color: '#6b7280',
+                                    stageOrder: maxOrder + 1,
+                                  });
+                                  queryClient.invalidateQueries({ queryKey: ['/api/pipeline-stages'] });
+                                  return newStage;
+                                }
+                              }}
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

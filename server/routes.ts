@@ -5232,6 +5232,16 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // CRM Pipeline Stages
+  app.get("/api/pipeline-stages", async (req: any, res) => {
+    try {
+      const stages = await storage.getAllCrmPipelineStages(req.user.orgId);
+      res.json(stages);
+    } catch (error) {
+      console.error("Failed to get all pipeline stages:", error);
+      res.status(500).json({ error: "Failed to retrieve pipeline stages" });
+    }
+  });
+
   app.get("/api/crm/pipelines/:pipelineId/stages", async (req: any, res) => {
     try {
       const stages = await storage.getCrmPipelineStagesByPipeline(req.params.pipelineId);

@@ -314,6 +314,7 @@ export interface IStorage {
 
   // CRM - Pipeline Stages
   getCrmPipelineStage(id: string): Promise<CrmPipelineStage | undefined>;
+  getAllCrmPipelineStages(orgId: string): Promise<CrmPipelineStage[]>;
   getCrmPipelineStagesByPipeline(pipelineId: string): Promise<CrmPipelineStage[]>;
   createCrmPipelineStage(stage: InsertCrmPipelineStage): Promise<CrmPipelineStage>;
   updateCrmPipelineStage(id: string, updates: Partial<InsertCrmPipelineStage>): Promise<CrmPipelineStage>;
@@ -2323,6 +2324,19 @@ export class DatabaseStorage implements IStorage {
   async getCrmPipelineStage(id: string): Promise<CrmPipelineStage | undefined> {
     const [stage] = await db.select().from(crmPipelineStages).where(eq(crmPipelineStages.id, id));
     return stage || undefined;
+  }
+
+  async getAllCrmPipelineStages(orgId: string): Promise<CrmPipelineStage[]> {
+    // Get all pipelines for the org first
+    const pipelines = await db.select().from(crmPipelines).where(eq(crmPipelines.ownerId, orgId));
+    const pipelineIds = pipelines.map(p => p.id);
+    
+    if (pipelineIds.length === 0) return [];
+    
+    // Get all stages for those pipelines
+    return db.select().from(crmPipelineStages)
+      .where(sql`${crmPipelineStages.pipelineId} IN ${pipelineIds}`)
+      .orderBy(asc(crmPipelineStages.stageOrder));
   }
 
   async getCrmPipelineStagesByPipeline(pipelineId: string): Promise<CrmPipelineStage[]> {
