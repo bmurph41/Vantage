@@ -17,9 +17,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { 
   CalendarIcon, Percent, DollarSign, Anchor, MapPin, 
-  FileText, Users, TrendingUp, Calendar as CalendarClock, Clock, Plus, X
+  FileText, Users, TrendingUp, Calendar as CalendarClock, Clock, Plus, X, Trash2
 } from "lucide-react";
 import { format, addDays, parseISO } from "date-fns";
 import { addBusinessDays } from "@/lib/business-days";
@@ -269,6 +270,15 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       secondDepositAmount: z.string().refine((val) => val === "" || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0), "Must be a valid positive number").optional(),
       secondDepositDays: z.string().refine((val) => val === "" || (!isNaN(parseInt(val)) && parseInt(val) >= 0), "Must be a positive number").optional(),
       secondDepositDueDate: z.string().optional(),
+      leases: z.array(z.object({
+        id: z.string().optional(),
+        type: z.string(),
+        lessor: z.string(),
+        startDate: z.string().nullable(),
+        endDate: z.string().nullable(),
+        extensionEnabled: z.boolean(),
+        extensionNotes: z.string().optional(),
+      })).optional(),
     })),
     defaultValues: {
       name: "",
@@ -337,6 +347,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       secondDepositAmount: "",
       secondDepositDays: "",
       secondDepositDueDate: "",
+      leases: [],
     },
   });
 
@@ -344,6 +355,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
   const [extensionDaysArray, setExtensionDaysArray] = useState<string[]>([]);
   const [sellersArray, setSellersArray] = useState<string[]>([]);
   const [attorneysArray, setAttorneysArray] = useState<string[]>([]);
+  const [leases, setLeases] = useState<any[]>([]);
 
   const dealAmount = form.watch("amount");
   const dealSource = form.watch("dealSource");
@@ -492,12 +504,14 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         secondDepositAmount: (deal as any).secondDepositAmount?.toString() || "",
         secondDepositDays: (deal as any).secondDepositDays?.toString() || "",
         secondDepositDueDate: (deal as any).secondDepositDueDate || "",
+        leases: (deal as any).leases || [],
       });
       
       // Initialize state arrays
       setExtensionDaysArray((deal as any).extensionDays || []);
       setSellersArray((deal as any).sellers || []);
       setAttorneysArray((deal as any).ourAttorneys || []);
+      setLeases((deal as any).leases || []);
     } else {
       form.reset({
         name: "",
@@ -564,12 +578,14 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         secondDepositAmount: "",
         secondDepositDays: "",
         secondDepositDueDate: "",
+        leases: [],
       });
       
       // Reset state arrays
       setExtensionDaysArray([]);
       setSellersArray([]);
       setAttorneysArray([]);
+      setLeases([]);
     }
   }, [deal, defaultStage, form]);
 
@@ -615,6 +631,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         commissionRate: parseNumber(data.commissionRate, parseFloat),
         commissionAmount: parseNumber(data.commissionAmount, parseFloat),
         leaseTermMonths: parseNumber(data.leaseTermMonths, parseInt),
+        leases: data.leases && data.leases.length > 0 ? data.leases : undefined,
         propertyDetails: Object.keys(propertyDetails).length > 0 ? propertyDetails : undefined,
         ddPeriodDays: parseNumber(data.ddPeriodDays, parseInt),
         extensionCount: parseNumber(data.extensionCount, parseInt),
@@ -712,6 +729,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         commissionRate: parseNumber(data.commissionRate, parseFloat),
         commissionAmount: parseNumber(data.commissionAmount, parseFloat),
         leaseTermMonths: parseNumber(data.leaseTermMonths, parseInt),
+        leases: data.leases && data.leases.length > 0 ? data.leases : undefined,
         propertyDetails: Object.keys(propertyDetails).length > 0 ? propertyDetails : undefined,
         ddPeriodDays: parseNumber(data.ddPeriodDays, parseInt),
         extensionCount: parseNumber(data.extensionCount, parseInt),
@@ -1724,24 +1742,188 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       />
                     </div>
 
-                    <FormField
-                      control={form.control}
-                      name="leaseTermMonths"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lease Term (Months)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              placeholder="e.g., 12" 
-                              {...field} 
-                              data-testid="input-lease-term"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                    {/* Leases Section */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Leases</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newLease = {
+                              id: `lease-${Date.now()}`,
+                              type: 'ground_lease',
+                              lessor: '',
+                              startDate: null,
+                              endDate: null,
+                              extensionEnabled: false,
+                              extensionNotes: ''
+                            };
+                            const updatedLeases = [...leases, newLease];
+                            setLeases(updatedLeases);
+                            form.setValue('leases', updatedLeases);
+                          }}
+                          data-testid="button-add-lease"
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Lease
+                        </Button>
+                      </div>
+
+                      {leases.length > 0 && (
+                        <Accordion type="multiple" className="w-full">
+                          {leases.map((lease, index) => (
+                            <AccordionItem key={lease.id || index} value={`lease-${index}`}>
+                              <AccordionTrigger className="hover:no-underline">
+                                <div className="flex items-center justify-between w-full pr-2">
+                                  <span className="text-sm font-medium">
+                                    {lease.type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                                    {lease.lessor && ` - ${lease.lessor}`}
+                                    {lease.startDate && lease.endDate && (
+                                      <span className="text-xs text-muted-foreground ml-2">
+                                        ({format(new Date(lease.startDate), 'MM/dd/yyyy')} - {format(new Date(lease.endDate), 'MM/dd/yyyy')})
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="space-y-4 pt-4">
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <Label className="text-xs">Lease Type</Label>
+                                      <Select
+                                        value={lease.type}
+                                        onValueChange={(value) => {
+                                          const updated = [...leases];
+                                          updated[index] = { ...updated[index], type: value };
+                                          setLeases(updated);
+                                          form.setValue('leases', updated);
+                                        }}
+                                      >
+                                        <SelectTrigger data-testid={`select-lease-type-${index}`}>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="ground_lease">Ground Lease</SelectItem>
+                                          <SelectItem value="submerged_land_lease">Submerged Land Lease</SelectItem>
+                                          <SelectItem value="dock_lease">Dock Lease</SelectItem>
+                                          <SelectItem value="slip_lease">Slip Lease</SelectItem>
+                                          <SelectItem value="mooring_lease">Mooring Lease</SelectItem>
+                                          <SelectItem value="facility_lease">Facility Lease</SelectItem>
+                                          <SelectItem value="other">Other</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    <div>
+                                      <Label className="text-xs">Lessor</Label>
+                                      <Input
+                                        placeholder="Who it's with"
+                                        value={lease.lessor}
+                                        onChange={(e) => {
+                                          const updated = [...leases];
+                                          updated[index] = { ...updated[index], lessor: e.target.value };
+                                          setLeases(updated);
+                                          form.setValue('leases', updated);
+                                        }}
+                                        data-testid={`input-lessor-${index}`}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <Label className="text-xs">Start Date</Label>
+                                      <DateInput
+                                        value={lease.startDate || ''}
+                                        onChange={(value) => {
+                                          const updated = [...leases];
+                                          updated[index] = { ...updated[index], startDate: value };
+                                          setLeases(updated);
+                                          form.setValue('leases', updated);
+                                        }}
+                                        placeholder="Select start date"
+                                        data-testid={`input-start-date-${index}`}
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <Label className="text-xs">End Date</Label>
+                                      <DateInput
+                                        value={lease.endDate || ''}
+                                        onChange={(value) => {
+                                          const updated = [...leases];
+                                          updated[index] = { ...updated[index], endDate: value };
+                                          setLeases(updated);
+                                          form.setValue('leases', updated);
+                                        }}
+                                        placeholder="Select end date"
+                                        data-testid={`input-end-date-${index}`}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center space-x-2">
+                                    <Switch
+                                      checked={lease.extensionEnabled}
+                                      onCheckedChange={(checked) => {
+                                        const updated = [...leases];
+                                        updated[index] = { ...updated[index], extensionEnabled: checked };
+                                        setLeases(updated);
+                                        form.setValue('leases', updated);
+                                      }}
+                                      data-testid={`switch-extension-${index}`}
+                                    />
+                                    <Label className="text-xs">Extension Options Available</Label>
+                                  </div>
+
+                                  {lease.extensionEnabled && (
+                                    <div>
+                                      <Label className="text-xs">Extension Notes</Label>
+                                      <Textarea
+                                        placeholder="Details about extension options..."
+                                        value={lease.extensionNotes || ''}
+                                        onChange={(e) => {
+                                          const updated = [...leases];
+                                          updated[index] = { ...updated[index], extensionNotes: e.target.value };
+                                          setLeases(updated);
+                                          form.setValue('leases', updated);
+                                        }}
+                                        rows={2}
+                                        data-testid={`textarea-extension-notes-${index}`}
+                                      />
+                                    </div>
+                                  )}
+
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => {
+                                      const updated = leases.filter((_, i) => i !== index);
+                                      setLeases(updated);
+                                      form.setValue('leases', updated);
+                                    }}
+                                    data-testid={`button-remove-lease-${index}`}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-1" />
+                                    Remove Lease
+                                  </Button>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          ))}
+                        </Accordion>
                       )}
-                    />
+
+                      {leases.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No leases added yet. Click "Add Lease" to get started.
+                        </p>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
 

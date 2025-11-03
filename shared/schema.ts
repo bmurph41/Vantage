@@ -1575,6 +1575,29 @@ export const crmAccounts = pgTable("crm_accounts", {
 // Deal stages enum
 export const dealStageEnum = ['lead', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'] as const;
 
+// Lease types for marina properties
+export const leaseTypeOptions = [
+  'ground_lease',
+  'submerged_land_lease',
+  'dock_lease',
+  'slip_lease',
+  'mooring_lease',
+  'facility_lease',
+  'other'
+] as const;
+
+export type LeaseType = typeof leaseTypeOptions[number];
+
+export interface Lease {
+  id?: string;
+  type: string; // ground_lease, submerged_land_lease, etc.
+  lessor: string; // Who it's with (landlord/lessor name)
+  startDate: string | null; // ISO date string
+  endDate: string | null; // ISO date string  
+  extensionEnabled: boolean;
+  extensionNotes?: string; // Details about extension options
+}
+
 // Enhanced Deals/Opportunities table
 
 export const crmDeals = pgTable("crm_deals", {
@@ -1617,6 +1640,7 @@ export const crmDeals = pgTable("crm_deals", {
   boatType: text("boat_type"), // sailboat, powerboat, yacht, etc.
   propertyType: text("property_type"), // slip, boat, mooring, dry_storage
   leaseTermMonths: integer("lease_term_months"),
+  leases: jsonb("leases").default([]), // Array of {type, lessor, startDate, endDate, extensionEnabled, extensionNotes}
   // Property Details - comprehensive marina property information from OMs
   propertyDetails: jsonb("property_details").default({}), // Structured property data including capacity, equipment, financials, location, etc.
   // DD Deal Details fields - mirror DD project setup fields
