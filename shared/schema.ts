@@ -1619,6 +1619,34 @@ export const crmDeals = pgTable("crm_deals", {
   leaseTermMonths: integer("lease_term_months"),
   // Property Details - comprehensive marina property information from OMs
   propertyDetails: jsonb("property_details").default({}), // Structured property data including capacity, equipment, financials, location, etc.
+  // DD Deal Details fields - mirror DD project setup fields
+  city: text("city"),
+  state: text("state"),
+  anchorType: text("anchor_type").default('psa'), // psa or custom
+  useBusinessDays: boolean("use_business_days").default(false),
+  holidayCalendar: text("holiday_calendar").default('us_federal'), // us_federal or none
+  tz: text("tz").default('America/New_York'),
+  psaSignedDate: timestamp("psa_signed_date"),
+  ddExpirationDate: timestamp("dd_expiration_date"),
+  closingDate: timestamp("closing_date"),
+  ddPeriodDays: integer("dd_period_days"),
+  hasExtensions: boolean("has_extensions").default(false),
+  extensionCount: integer("extension_count").default(0),
+  extensionDays: integer("extension_days").array(),
+  daysToClosing: integer("days_to_closing"),
+  // Key Contacts (arrays of contact IDs or names)
+  seller: text("seller").array(),
+  ourAttorney: text("our_attorney").array(),
+  titleInsuranceCompany: text("title_insurance_company"),
+  lender: text("lender"),
+  // Deposit Information
+  firstDepositAmount: decimal("first_deposit_amount", { precision: 12, scale: 2 }),
+  firstDepositDays: integer("first_deposit_days"),
+  firstDepositDueDate: timestamp("first_deposit_due_date"),
+  secondDepositAmount: decimal("second_deposit_amount", { precision: 12, scale: 2 }),
+  secondDepositDays: integer("second_deposit_days"),
+  secondDepositDueDate: timestamp("second_deposit_due_date"),
+  customDeadlines: jsonb("custom_deadlines").default([]), // Array of {label, date, showOnTimeline}
   // Relationships - matching actual database structure
   leadId: varchar("lead_id"),
   accountId: varchar("account_id"),
