@@ -4,11 +4,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { DateInput } from "@/components/ui/date-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,9 +19,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   CalendarIcon, Percent, DollarSign, Anchor, MapPin, 
-  FileText, Users, TrendingUp, Calendar as CalendarClock
+  FileText, Users, TrendingUp, Calendar as CalendarClock, Clock, Plus, X
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, addDays, parseISO } from "date-fns";
+import { addBusinessDays } from "@/lib/business-days";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -241,6 +245,30 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         revenueBreakdown: z.string().optional(),
         additionalNotes: z.string().optional(),
       }).optional(),
+      ddCity: z.string().optional(),
+      ddState: z.string().optional(),
+      anchorType: z.enum(["psa", "custom"]).optional(),
+      useBusinessDays: z.boolean().optional(),
+      holidayCalendar: z.enum(["us_federal", "none"]).optional(),
+      projectTimezone: z.string().optional(),
+      psaSignedDate: z.string().optional(),
+      ddExpirationDate: z.string().optional(),
+      closingDate: z.string().optional(),
+      ddPeriodDays: z.string().refine((val) => val === "" || (!isNaN(parseInt(val)) && parseInt(val) > 0), "Must be a positive number").optional(),
+      hasExtensions: z.boolean().optional(),
+      extensionCount: z.string().refine((val) => val === "" || (!isNaN(parseInt(val)) && parseInt(val) >= 0 && parseInt(val) <= 10), "Must be between 0 and 10").optional(),
+      extensionDays: z.array(z.string()).optional(),
+      daysToClosing: z.string().refine((val) => val === "" || (!isNaN(parseInt(val)) && parseInt(val) > 0), "Must be a positive number").optional(),
+      sellers: z.array(z.string()).optional(),
+      ourAttorneys: z.array(z.string()).optional(),
+      titleInsuranceCompany: z.string().optional(),
+      lender: z.string().optional(),
+      firstDepositAmount: z.string().refine((val) => val === "" || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0), "Must be a valid positive number").optional(),
+      firstDepositDays: z.string().refine((val) => val === "" || (!isNaN(parseInt(val)) && parseInt(val) >= 0), "Must be a positive number").optional(),
+      firstDepositDueDate: z.string().optional(),
+      secondDepositAmount: z.string().refine((val) => val === "" || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0), "Must be a valid positive number").optional(),
+      secondDepositDays: z.string().refine((val) => val === "" || (!isNaN(parseInt(val)) && parseInt(val) >= 0), "Must be a positive number").optional(),
+      secondDepositDueDate: z.string().optional(),
     })),
     defaultValues: {
       name: "",
@@ -285,13 +313,50 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         revenueBreakdown: "",
         additionalNotes: "",
       },
+      ddCity: "",
+      ddState: "",
+      anchorType: "psa",
+      useBusinessDays: false,
+      holidayCalendar: "us_federal",
+      projectTimezone: "Eastern",
+      psaSignedDate: "",
+      ddExpirationDate: "",
+      closingDate: "",
+      ddPeriodDays: "",
+      hasExtensions: false,
+      extensionCount: "",
+      extensionDays: [],
+      daysToClosing: "",
+      sellers: [],
+      ourAttorneys: [],
+      titleInsuranceCompany: "",
+      lender: "",
+      firstDepositAmount: "",
+      firstDepositDays: "",
+      firstDepositDueDate: "",
+      secondDepositAmount: "",
+      secondDepositDays: "",
+      secondDepositDueDate: "",
     },
   });
+
+  // State for DD Deal Details
+  const [extensionDaysArray, setExtensionDaysArray] = useState<string[]>([]);
+  const [sellersArray, setSellersArray] = useState<string[]>([]);
+  const [attorneysArray, setAttorneysArray] = useState<string[]>([]);
 
   const dealAmount = form.watch("amount");
   const dealSource = form.watch("dealSource");
   const commissionType = form.watch("commissionType");
   const commissionRate = form.watch("commissionRate");
+  
+  // Watch DD fields for auto-calculation
+  const psaSignedDate = form.watch("psaSignedDate");
+  const ddPeriodDays = form.watch("ddPeriodDays");
+  const hasExtensions = form.watch("hasExtensions");
+  const daysToClosing = form.watch("daysToClosing");
+  const useBusinessDays = form.watch("useBusinessDays");
+  const holidayCalendar = form.watch("holidayCalendar");
 
   useEffect(() => {
     if (commissionType === "percentage" && dealAmount && commissionRate) {
@@ -310,6 +375,54 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       }
     }
   }, [dealSource, commissionType, form]);
+
+  // Auto-calculate DD Expiration Date
+  useEffect(() => {
+    if (psaSignedDate && ddPeriodDays) {
+      try {
+        const startDate = parseISO(psaSignedDate);
+        let totalDays = parseInt(ddPeriodDays) || 0;
+        
+        // Add extension days
+        if (hasExtensions && extensionDaysArray.length > 0) {
+          totalDays += extensionDaysArray.reduce((sum, days) => sum + (parseInt(days) || 0), 0);
+        }
+        
+        const expirationDate = useBusinessDays 
+          ? addBusinessDays(startDate, totalDays, holidayCalendar || "us_federal")
+          : addDays(startDate, totalDays);
+        
+        const formattedDate = format(expirationDate, 'yyyy-MM-dd');
+        if (formattedDate !== form.getValues("ddExpirationDate")) {
+          form.setValue("ddExpirationDate", formattedDate);
+        }
+      } catch (error) {
+        // Invalid date, don't update
+      }
+    }
+  }, [psaSignedDate, ddPeriodDays, hasExtensions, extensionDaysArray, useBusinessDays, holidayCalendar, form]);
+
+  // Auto-calculate Closing Date
+  useEffect(() => {
+    const ddExpirationDate = form.watch("ddExpirationDate");
+    if (ddExpirationDate && daysToClosing) {
+      try {
+        const expirationDate = parseISO(ddExpirationDate);
+        const closingDaysNum = parseInt(daysToClosing) || 0;
+        
+        const closingDate = useBusinessDays 
+          ? addBusinessDays(expirationDate, closingDaysNum, holidayCalendar || "us_federal")
+          : addDays(expirationDate, closingDaysNum);
+        
+        const formattedDate = format(closingDate, 'yyyy-MM-dd');
+        if (formattedDate !== form.getValues("closingDate")) {
+          form.setValue("closingDate", formattedDate);
+        }
+      } catch (error) {
+        // Invalid date, don't update
+      }
+    }
+  }, [form.watch("ddExpirationDate"), daysToClosing, useBusinessDays, holidayCalendar, form]);
 
   useEffect(() => {
     if (deal) {
@@ -355,7 +468,36 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
           revenueBreakdown: propDetails.revenueBreakdown || "",
           additionalNotes: propDetails.additionalNotes || "",
         },
+        ddCity: (deal as any).ddCity || "",
+        ddState: (deal as any).ddState || "",
+        anchorType: (deal as any).anchorType || "psa",
+        useBusinessDays: (deal as any).useBusinessDays || false,
+        holidayCalendar: (deal as any).holidayCalendar || "us_federal",
+        projectTimezone: (deal as any).projectTimezone || "Eastern",
+        psaSignedDate: (deal as any).psaSignedDate || "",
+        ddExpirationDate: (deal as any).ddExpirationDate || "",
+        closingDate: (deal as any).closingDate || "",
+        ddPeriodDays: (deal as any).ddPeriodDays?.toString() || "",
+        hasExtensions: (deal as any).hasExtensions || false,
+        extensionCount: (deal as any).extensionCount?.toString() || "",
+        extensionDays: (deal as any).extensionDays || [],
+        daysToClosing: (deal as any).daysToClosing?.toString() || "",
+        sellers: (deal as any).sellers || [],
+        ourAttorneys: (deal as any).ourAttorneys || [],
+        titleInsuranceCompany: (deal as any).titleInsuranceCompany || "",
+        lender: (deal as any).lender || "",
+        firstDepositAmount: (deal as any).firstDepositAmount?.toString() || "",
+        firstDepositDays: (deal as any).firstDepositDays?.toString() || "",
+        firstDepositDueDate: (deal as any).firstDepositDueDate || "",
+        secondDepositAmount: (deal as any).secondDepositAmount?.toString() || "",
+        secondDepositDays: (deal as any).secondDepositDays?.toString() || "",
+        secondDepositDueDate: (deal as any).secondDepositDueDate || "",
       });
+      
+      // Initialize state arrays
+      setExtensionDaysArray((deal as any).extensionDays || []);
+      setSellersArray((deal as any).sellers || []);
+      setAttorneysArray((deal as any).ourAttorneys || []);
     } else {
       form.reset({
         name: "",
@@ -398,7 +540,36 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
           revenueBreakdown: "",
           additionalNotes: "",
         },
+        ddCity: "",
+        ddState: "",
+        anchorType: "psa",
+        useBusinessDays: false,
+        holidayCalendar: "us_federal",
+        projectTimezone: "Eastern",
+        psaSignedDate: "",
+        ddExpirationDate: "",
+        closingDate: "",
+        ddPeriodDays: "",
+        hasExtensions: false,
+        extensionCount: "",
+        extensionDays: [],
+        daysToClosing: "",
+        sellers: [],
+        ourAttorneys: [],
+        titleInsuranceCompany: "",
+        lender: "",
+        firstDepositAmount: "",
+        firstDepositDays: "",
+        firstDepositDueDate: "",
+        secondDepositAmount: "",
+        secondDepositDays: "",
+        secondDepositDueDate: "",
       });
+      
+      // Reset state arrays
+      setExtensionDaysArray([]);
+      setSellersArray([]);
+      setAttorneysArray([]);
     }
   }, [deal, defaultStage, form]);
 
@@ -445,6 +616,14 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         commissionAmount: parseNumber(data.commissionAmount, parseFloat),
         leaseTermMonths: parseNumber(data.leaseTermMonths, parseInt),
         propertyDetails: Object.keys(propertyDetails).length > 0 ? propertyDetails : undefined,
+        ddPeriodDays: parseNumber(data.ddPeriodDays, parseInt),
+        extensionCount: parseNumber(data.extensionCount, parseInt),
+        extensionDays: data.extensionDays && data.extensionDays.length > 0 ? data.extensionDays.map((d: string) => parseInt(d) || 0).filter((d: number) => d > 0) : undefined,
+        daysToClosing: parseNumber(data.daysToClosing, parseInt),
+        firstDepositAmount: parseNumber(data.firstDepositAmount, parseFloat),
+        firstDepositDays: parseNumber(data.firstDepositDays, parseInt),
+        secondDepositAmount: parseNumber(data.secondDepositAmount, parseFloat),
+        secondDepositDays: parseNumber(data.secondDepositDays, parseInt),
       };
       
       Object.keys(cleanData).forEach(key => {
@@ -534,6 +713,14 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         commissionAmount: parseNumber(data.commissionAmount, parseFloat),
         leaseTermMonths: parseNumber(data.leaseTermMonths, parseInt),
         propertyDetails: Object.keys(propertyDetails).length > 0 ? propertyDetails : undefined,
+        ddPeriodDays: parseNumber(data.ddPeriodDays, parseInt),
+        extensionCount: parseNumber(data.extensionCount, parseInt),
+        extensionDays: data.extensionDays && data.extensionDays.length > 0 ? data.extensionDays.map((d: string) => parseInt(d) || 0).filter((d: number) => d > 0) : undefined,
+        daysToClosing: parseNumber(data.daysToClosing, parseInt),
+        firstDepositAmount: parseNumber(data.firstDepositAmount, parseFloat),
+        firstDepositDays: parseNumber(data.firstDepositDays, parseInt),
+        secondDepositAmount: parseNumber(data.secondDepositAmount, parseFloat),
+        secondDepositDays: parseNumber(data.secondDepositDays, parseInt),
       };
       
       Object.keys(cleanData).forEach(key => {
@@ -868,6 +1055,592 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                         </FormItem>
                       )}
                     />
+                  </CardContent>
+                </Card>
+
+                {/* DD Deal Details Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Clock className="w-5 h-5" />
+                      DD Deal Details
+                    </CardTitle>
+                    <CardDescription>Due diligence timeline, contacts, and deposit information</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Location */}
+                    <div>
+                      <h4 className="font-semibold text-sm mb-3">Location</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="ddCity"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>City</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., Boston" {...field} data-testid="input-dd-city" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="ddState"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>State</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., MA" {...field} data-testid="input-dd-state" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Timeline Configuration */}
+                    <div className="pt-4 border-t">
+                      <h4 className="font-semibold text-sm mb-3">Timeline Configuration</h4>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="anchorType"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Anchor Type</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-anchor-type">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="psa">PSA Signed Date</SelectItem>
+                                    <SelectItem value="custom">Custom Date</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="projectTimezone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Project Timezone</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-timezone">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="Eastern">Eastern</SelectItem>
+                                    <SelectItem value="Central">Central</SelectItem>
+                                    <SelectItem value="Mountain">Mountain</SelectItem>
+                                    <SelectItem value="Pacific">Pacific</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="useBusinessDays"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                <div className="space-y-0.5">
+                                  <FormLabel>Use Business Days</FormLabel>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    data-testid="switch-business-days"
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="holidayCalendar"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Holiday Calendar</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-holiday-calendar">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="us_federal">US Federal</SelectItem>
+                                    <SelectItem value="none">None</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Key Dates */}
+                    <div className="pt-4 border-t">
+                      <h4 className="font-semibold text-sm mb-3">Key Dates</h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="psaSignedDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>PSA Signed Date</FormLabel>
+                              <FormControl>
+                                <DateInput
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  placeholder="MM/DD/YYYY"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="ddExpirationDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>DD Expiration Date</FormLabel>
+                              <FormControl>
+                                <DateInput
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  placeholder="MM/DD/YYYY"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="closingDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Closing Date</FormLabel>
+                              <FormControl>
+                                <DateInput
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  placeholder="MM/DD/YYYY"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {/* DD Period Configuration */}
+                    <div className="pt-4 border-t">
+                      <h4 className="font-semibold text-sm mb-3">DD Period Configuration</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="ddPeriodDays"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>DD Period (Days)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  placeholder="e.g., 30" 
+                                  {...field}
+                                  data-testid="input-dd-period-days"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="daysToClosing"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Days to Closing</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  placeholder="e.g., 60" 
+                                  {...field}
+                                  data-testid="input-days-to-closing"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="mt-4">
+                        <FormField
+                          control={form.control}
+                          name="hasExtensions"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                              <div className="space-y-0.5">
+                                <FormLabel>Has Extensions</FormLabel>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="switch-has-extensions"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      {hasExtensions && (
+                        <div className="mt-4 space-y-3">
+                          <FormField
+                            control={form.control}
+                            name="extensionCount"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Number of Extensions</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    min="0"
+                                    max="10"
+                                    placeholder="e.g., 2" 
+                                    {...field}
+                                    data-testid="input-extension-count"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <div>
+                            <Label className="text-sm mb-2 block">Extension Days</Label>
+                            {extensionDaysArray.map((days, index) => (
+                              <div key={index} className="flex items-center gap-2 mb-2">
+                                <Input
+                                  type="number"
+                                  placeholder="Days"
+                                  value={days}
+                                  onChange={(e) => {
+                                    const newArray = [...extensionDaysArray];
+                                    newArray[index] = e.target.value;
+                                    setExtensionDaysArray(newArray);
+                                    form.setValue("extensionDays", newArray);
+                                  }}
+                                  data-testid={`input-extension-days-${index}`}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => {
+                                    const newArray = extensionDaysArray.filter((_, i) => i !== index);
+                                    setExtensionDaysArray(newArray);
+                                    form.setValue("extensionDays", newArray);
+                                  }}
+                                  data-testid={`button-remove-extension-${index}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newArray = [...extensionDaysArray, ""];
+                                setExtensionDaysArray(newArray);
+                                form.setValue("extensionDays", newArray);
+                              }}
+                              data-testid="button-add-extension"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Extension
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Key Contacts */}
+                    <div className="pt-4 border-t">
+                      <h4 className="font-semibold text-sm mb-3">Key Contacts</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <Label className="text-sm mb-2 block">Seller(s)</Label>
+                          {sellersArray.map((seller, index) => (
+                            <div key={index} className="flex items-center gap-2 mb-2">
+                              <Input
+                                placeholder="Seller name"
+                                value={seller}
+                                onChange={(e) => {
+                                  const newArray = [...sellersArray];
+                                  newArray[index] = e.target.value;
+                                  setSellersArray(newArray);
+                                  form.setValue("sellers", newArray);
+                                }}
+                                data-testid={`input-seller-${index}`}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => {
+                                  const newArray = sellersArray.filter((_, i) => i !== index);
+                                  setSellersArray(newArray);
+                                  form.setValue("sellers", newArray);
+                                }}
+                                data-testid={`button-remove-seller-${index}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newArray = [...sellersArray, ""];
+                              setSellersArray(newArray);
+                              form.setValue("sellers", newArray);
+                            }}
+                            data-testid="button-add-seller"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Seller
+                          </Button>
+                        </div>
+
+                        <div>
+                          <Label className="text-sm mb-2 block">Our Attorney(s)</Label>
+                          {attorneysArray.map((attorney, index) => (
+                            <div key={index} className="flex items-center gap-2 mb-2">
+                              <Input
+                                placeholder="Attorney name"
+                                value={attorney}
+                                onChange={(e) => {
+                                  const newArray = [...attorneysArray];
+                                  newArray[index] = e.target.value;
+                                  setAttorneysArray(newArray);
+                                  form.setValue("ourAttorneys", newArray);
+                                }}
+                                data-testid={`input-attorney-${index}`}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => {
+                                  const newArray = attorneysArray.filter((_, i) => i !== index);
+                                  setAttorneysArray(newArray);
+                                  form.setValue("ourAttorneys", newArray);
+                                }}
+                                data-testid={`button-remove-attorney-${index}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newArray = [...attorneysArray, ""];
+                              setAttorneysArray(newArray);
+                              form.setValue("ourAttorneys", newArray);
+                            }}
+                            data-testid="button-add-attorney"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Attorney
+                          </Button>
+                        </div>
+
+                        <FormField
+                          control={form.control}
+                          name="titleInsuranceCompany"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Title Insurance Company</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., First American Title" {...field} data-testid="input-title-insurance" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="lender"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Lender</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., Bank of America" {...field} data-testid="input-lender" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Deposit Information */}
+                    <div className="pt-4 border-t">
+                      <h4 className="font-semibold text-sm mb-3">Deposit Information</h4>
+                      <div className="space-y-4">
+                        {/* First Deposit */}
+                        <div>
+                          <Label className="text-sm font-semibold mb-2 block">First Deposit</Label>
+                          <div className="grid grid-cols-3 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="firstDepositAmount"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Amount</FormLabel>
+                                  <FormControl>
+                                    <CurrencyInput
+                                      value={field.value ? parseFloat(field.value) : undefined}
+                                      onValueChange={(val) => field.onChange(val?.toString() || "")}
+                                      onBlur={field.onBlur}
+                                      data-testid="input-first-deposit-amount"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="firstDepositDays"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Days</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      type="number" 
+                                      placeholder="e.g., 3" 
+                                      {...field}
+                                      data-testid="input-first-deposit-days"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="firstDepositDueDate"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Due Date</FormLabel>
+                                  <FormControl>
+                                    <DateInput
+                                      value={field.value}
+                                      onChange={field.onChange}
+                                      placeholder="MM/DD/YYYY"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Second Deposit */}
+                        <div>
+                          <Label className="text-sm font-semibold mb-2 block">Second Deposit</Label>
+                          <div className="grid grid-cols-3 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="secondDepositAmount"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Amount</FormLabel>
+                                  <FormControl>
+                                    <CurrencyInput
+                                      value={field.value ? parseFloat(field.value) : undefined}
+                                      onValueChange={(val) => field.onChange(val?.toString() || "")}
+                                      onBlur={field.onBlur}
+                                      data-testid="input-second-deposit-amount"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="secondDepositDays"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Days</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      type="number" 
+                                      placeholder="e.g., 10" 
+                                      {...field}
+                                      data-testid="input-second-deposit-days"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="secondDepositDueDate"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Due Date</FormLabel>
+                                  <FormControl>
+                                    <DateInput
+                                      value={field.value}
+                                      onChange={field.onChange}
+                                      placeholder="MM/DD/YYYY"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
