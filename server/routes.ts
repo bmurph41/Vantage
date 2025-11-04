@@ -5792,6 +5792,137 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ===================================================================
+  // CRM Prospecting - Weekly Activity Tracking
+  // ===================================================================
+
+  // Get all prospecting entries for a user (optionally filtered by year)
+  app.get("/api/prospecting/entries", async (req: any, res) => {
+    try {
+      const year = req.query.year ? parseInt(req.query.year) : undefined;
+      const entries = await storage.getProspectingEntriesForUser(req.user.id, year);
+      res.json(entries);
+    } catch (error) {
+      console.error("Failed to get prospecting entries:", error);
+      res.status(500).json({ error: "Failed to retrieve prospecting entries" });
+    }
+  });
+
+  // Get a specific prospecting entry by week
+  app.get("/api/prospecting/entries/:year/:quarter/:weekNumber", async (req: any, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const quarter = parseInt(req.params.quarter);
+      const weekNumber = parseInt(req.params.weekNumber);
+      
+      const entry = await storage.getProspectingEntryByWeek(req.user.id, year, quarter, weekNumber);
+      
+      if (!entry) {
+        return res.status(404).json({ error: "Prospecting entry not found" });
+      }
+      
+      res.json(entry);
+    } catch (error) {
+      console.error("Failed to get prospecting entry:", error);
+      res.status(500).json({ error: "Failed to retrieve prospecting entry" });
+    }
+  });
+
+  // Create or update a prospecting entry
+  app.post("/api/prospecting/entries", async (req: any, res) => {
+    try {
+      // Import schema for validation
+      const { insertProspectingEntrySchema } = await import("@shared/schema");
+      
+      // Validate request body
+      const validated = insertProspectingEntrySchema.parse(req.body);
+      const { year, quarter, weekNumber, userId, ...entryData } = validated;
+      
+      // Check if entry already exists for this week
+      const existing = await storage.getProspectingEntryByWeek(req.user.id, year, quarter, weekNumber);
+      
+      let entry;
+      if (existing) {
+        // Update existing entry (never allow userId to be changed)
+        entry = await storage.updateProspectingEntry(existing.id, entryData);
+      } else {
+        // Create new entry (always use authenticated user's ID)
+        entry = await storage.createProspectingEntry({
+          ...entryData,
+          userId: req.user.id,
+          year,
+          quarter,
+          weekNumber,
+        });
+      }
+      
+      res.json(entry);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid prospecting entry data", details: error.errors });
+      }
+      console.error("Failed to save prospecting entry:", error);
+      res.status(500).json({ error: "Failed to save prospecting entry" });
+    }
+  });
+
+  // Update a prospecting entry
+  app.put("/api/prospecting/entries/:year/:quarter/:weekNumber", async (req: any, res) => {
+    try {
+      // Import schema for validation
+      const { insertProspectingEntrySchema } = await import("@shared/schema");
+      
+      const year = parseInt(req.params.year);
+      const quarter = parseInt(req.params.quarter);
+      const weekNumber = parseInt(req.params.weekNumber);
+      
+      // Verify entry belongs to user
+      const entry = await storage.getProspectingEntryByWeek(req.user.id, year, quarter, weekNumber);
+      
+      if (!entry) {
+        return res.status(404).json({ error: "Prospecting entry not found" });
+      }
+      
+      // Validate request body (allow partial updates)
+      const validated = insertProspectingEntrySchema.partial().parse(req.body);
+      
+      // Strip userId to prevent reassignment attacks
+      const { userId, ...updateData } = validated;
+      
+      const updated = await storage.updateProspectingEntry(entry.id, updateData);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid prospecting entry data", details: error.errors });
+      }
+      console.error("Failed to update prospecting entry:", error);
+      res.status(500).json({ error: "Failed to update prospecting entry" });
+    }
+  });
+
+  // Delete a prospecting entry
+  app.delete("/api/prospecting/entries/:id", async (req: any, res) => {
+    try {
+      // First verify the entry exists and belongs to the user
+      const entry = await storage.getProspectingEntry(req.params.id);
+      
+      if (!entry) {
+        return res.status(404).json({ error: "Prospecting entry not found" });
+      }
+      
+      // Verify entry belongs to authenticated user
+      if (entry.userId !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized to delete this prospecting entry" });
+      }
+      
+      await storage.deleteProspectingEntry(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete prospecting entry:", error);
+      res.status(500).json({ error: "Failed to delete prospecting entry" });
+    }
+  });
+
+  // ===================================================================
   // CRM Route Aliases - Frontend Integration
   // Map /api/* routes to /api/crm/* for frontend compatibility
   // ===================================================================

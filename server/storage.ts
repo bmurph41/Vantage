@@ -5,14 +5,14 @@ import {
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
   crmDeals, crmLeads, crmContacts, crmCompanies, crmPipelines, crmPipelineStages, crmActivities,
-  crmImportJobs, crmImportedRecords,
+  crmImportJobs, crmImportedRecords, crmProspectingEntries,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
   type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
-  type CrmImportJob, type CrmImportedRecord,
+  type CrmImportJob, type CrmImportedRecord, type ProspectingEntry,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
@@ -20,7 +20,7 @@ import {
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
   type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
-  type InsertCrmImportJob, type InsertCrmImportedRecord
+  type InsertCrmImportJob, type InsertCrmImportedRecord, type InsertProspectingEntry
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -340,6 +340,14 @@ export interface IStorage {
   updateImportJob(id: string, updates: Partial<InsertCrmImportJob>): Promise<CrmImportJob>;
   createImportedRecord(record: InsertCrmImportedRecord): Promise<CrmImportedRecord>;
   getImportedRecordsByJob(importJobId: string): Promise<CrmImportedRecord[]>;
+
+  // CRM - Prospecting
+  getProspectingEntry(id: string): Promise<ProspectingEntry | undefined>;
+  getProspectingEntryByWeek(userId: string, year: number, quarter: number, weekNumber: number): Promise<ProspectingEntry | undefined>;
+  getProspectingEntriesForUser(userId: string, year?: number): Promise<ProspectingEntry[]>;
+  createProspectingEntry(entry: InsertProspectingEntry): Promise<ProspectingEntry>;
+  updateProspectingEntry(id: string, updates: Partial<InsertProspectingEntry>): Promise<ProspectingEntry>;
+  deleteProspectingEntry(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2454,6 +2462,56 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(crmImportedRecords)
       .where(eq(crmImportedRecords.importJobId, importJobId))
       .orderBy(asc(crmImportedRecords.rowNumber));
+  }
+
+  // CRM - Prospecting
+  async getProspectingEntry(id: string): Promise<ProspectingEntry | undefined> {
+    const [entry] = await db.select().from(crmProspectingEntries).where(eq(crmProspectingEntries.id, id));
+    return entry || undefined;
+  }
+
+  async getProspectingEntryByWeek(userId: string, year: number, quarter: number, weekNumber: number): Promise<ProspectingEntry | undefined> {
+    const [entry] = await db.select().from(crmProspectingEntries)
+      .where(and(
+        eq(crmProspectingEntries.userId, userId),
+        eq(crmProspectingEntries.year, year),
+        eq(crmProspectingEntries.quarter, quarter),
+        eq(crmProspectingEntries.weekNumber, weekNumber)
+      ));
+    return entry || undefined;
+  }
+
+  async getProspectingEntriesForUser(userId: string, year?: number): Promise<ProspectingEntry[]> {
+    if (year) {
+      return db.select().from(crmProspectingEntries)
+        .where(and(
+          eq(crmProspectingEntries.userId, userId),
+          eq(crmProspectingEntries.year, year)
+        ))
+        .orderBy(asc(crmProspectingEntries.quarter), asc(crmProspectingEntries.weekNumber));
+    } else {
+      return db.select().from(crmProspectingEntries)
+        .where(eq(crmProspectingEntries.userId, userId))
+        .orderBy(desc(crmProspectingEntries.year), asc(crmProspectingEntries.quarter), asc(crmProspectingEntries.weekNumber));
+    }
+  }
+
+  async createProspectingEntry(entry: InsertProspectingEntry): Promise<ProspectingEntry> {
+    const [created] = await db.insert(crmProspectingEntries).values(entry).returning();
+    return created;
+  }
+
+  async updateProspectingEntry(id: string, updates: Partial<InsertProspectingEntry>): Promise<ProspectingEntry> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmProspectingEntries)
+      .set(updateData)
+      .where(eq(crmProspectingEntries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteProspectingEntry(id: string): Promise<void> {
+    await db.delete(crmProspectingEntries).where(eq(crmProspectingEntries.id, id));
   }
 }
 

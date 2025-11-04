@@ -2834,3 +2834,17 @@ export const insertCrmImportedRecordSchema = createInsertSchema(crmImportedRecor
   createdAt: true,
 });
 export type InsertCrmImportedRecord = z.infer<typeof insertCrmImportedRecordSchema>;
+
+// Prospecting Types
+export type CrmProspectingEntry = typeof crmProspectingEntries.$inferSelect;
+export const insertCrmProspectingEntrySchema = createInsertSchema(crmProspectingEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmProspectingEntry = z.infer<typeof insertCrmProspectingEntrySchema>;
+
+// Aliases for convenience
+export type ProspectingEntry = CrmProspectingEntry;
+export type InsertProspectingEntry = InsertCrmProspectingEntry;
+export const insertProspectingEntrySchema = insertCrmProspectingEntrySchema;
