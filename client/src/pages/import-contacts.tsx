@@ -69,6 +69,11 @@ export default function ImportContacts() {
 
   const uploadMutation = useMutation({
     mutationFn: async (fileContent: string) => {
+      console.log('🚀 Starting CSV upload...', {
+        fileName: file?.name,
+        contentLength: fileContent.length,
+        firstChars: fileContent.substring(0, 100)
+      });
       const response = await apiRequest('/api/imports', {
         method: 'POST',
         body: JSON.stringify({
@@ -76,9 +81,11 @@ export default function ImportContacts() {
           csvContent: fileContent,
         }),
       });
+      console.log('✅ Upload response:', response);
       return response;
     },
     onSuccess: (data) => {
+      console.log('✅ Upload succeeded:', data);
       setImportJobId(data.importJob.id);
       setCsvHeaders(data.preview.headers);
       setFieldMappings(data.preview.mappings);
@@ -89,9 +96,10 @@ export default function ImportContacts() {
       });
     },
     onError: (error: any) => {
+      console.error('❌ Upload failed:', error);
       toast({
         title: "Upload Failed",
-        description: error.message,
+        description: error.message || 'An error occurred while uploading the file',
         variant: "destructive",
       });
     },
@@ -151,6 +159,7 @@ export default function ImportContacts() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
+    console.log('📁 File selected:', selectedFile?.name);
     if (selectedFile) {
       if (!selectedFile.name.endsWith('.csv')) {
         toast({
@@ -161,10 +170,12 @@ export default function ImportContacts() {
         return;
       }
       setFile(selectedFile);
+      console.log('📖 Reading file...');
       // Auto-upload the file
       const reader = new FileReader();
       reader.onload = (e) => {
         const content = e.target?.result as string;
+        console.log('📄 File read complete, length:', content.length);
         uploadMutation.mutate(content);
       };
       reader.readAsText(selectedFile);
@@ -190,18 +201,22 @@ export default function ImportContacts() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log('🎯 File dropped:', e.dataTransfer.files[0]?.name);
 
     const droppedFile = e.dataTransfer.files[0];
     if (droppedFile && droppedFile.name.endsWith('.csv')) {
       setFile(droppedFile);
+      console.log('📖 Reading dropped file...');
       // Auto-upload the file
       const reader = new FileReader();
       reader.onload = (e) => {
         const content = e.target?.result as string;
+        console.log('📄 Dropped file read complete, length:', content.length);
         uploadMutation.mutate(content);
       };
       reader.readAsText(droppedFile);
     } else {
+      console.log('❌ Invalid file dropped:', droppedFile?.name);
       toast({
         title: "Invalid File",
         description: "Please drop a CSV file",
