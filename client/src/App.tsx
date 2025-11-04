@@ -35,6 +35,7 @@ import ImportHistory from "@/pages/import-history";
 import SortableListDemo from "@/pages/demo/SortableListDemo";
 import MilestoneDemo from "@/pages/milestone-demo";
 import NotFound from "@/pages/not-found";
+import CrmTasks from "@/pages/crm-tasks";
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
@@ -215,6 +216,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <Activities />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/crm/tasks">
+        {() => (
+          <UnifiedLayout>
+            <CrmTasks />
           </UnifiedLayout>
         )}
       </Route>

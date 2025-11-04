@@ -17,7 +17,8 @@ import {
   insertDDContactSchema, updateDDContactSchema, insertProjectContactSchema, insertNotificationSubscriptionSchema, insertNotificationLogSchema,
   insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema,
   insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema,
-  insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema
+  insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema,
+  insertCrmTaskSchema, crmTasks
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { z } from "zod";
@@ -5365,6 +5366,95 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Failed to delete activity:", error);
       res.status(500).json({ error: "Failed to delete activity" });
+    }
+  });
+
+  // CRM Tasks
+  app.get("/api/crm/tasks", async (req: any, res) => {
+    try {
+      const tasks = await db.query.crmTasks.findMany({
+        where: eq(crmTasks.assigneeId, req.user.id),
+        orderBy: [desc(crmTasks.createdAt)],
+      });
+      res.json(tasks);
+    } catch (error) {
+      console.error("Failed to get tasks:", error);
+      res.status(500).json({ error: "Failed to retrieve tasks" });
+    }
+  });
+
+  app.post("/api/crm/tasks", async (req: any, res) => {
+    try {
+      const taskData = insertCrmTaskSchema.parse({
+        ...req.body,
+        assigneeId: req.user.id,
+      });
+      const [task] = await db.insert(crmTasks).values(taskData).returning();
+      res.json(task);
+    } catch (error) {
+      console.error("Failed to create task:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid task data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create task" });
+    }
+  });
+
+  app.put("/api/crm/tasks/:id", async (req: any, res) => {
+    try {
+      // First, verify the task exists and belongs to the user
+      const existingTask = await db.query.crmTasks.findFirst({
+        where: eq(crmTasks.id, req.params.id),
+      });
+
+      if (!existingTask) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      if (existingTask.assigneeId !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized: You can only update your own tasks" });
+      }
+
+      // Parse and sanitize updates - prevent changing assigneeId
+      const updates = insertCrmTaskSchema.partial().parse(req.body);
+      delete (updates as any).assigneeId; // Prevent reassignment
+
+      const [task] = await db
+        .update(crmTasks)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(crmTasks.id, req.params.id))
+        .returning();
+      res.json(task);
+    } catch (error) {
+      console.error("Failed to update task:", error);
+      // Return 400 for validation errors, 500 for other errors
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid task data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update task" });
+    }
+  });
+
+  app.delete("/api/crm/tasks/:id", async (req: any, res) => {
+    try {
+      // First, verify the task exists and belongs to the user
+      const existingTask = await db.query.crmTasks.findFirst({
+        where: eq(crmTasks.id, req.params.id),
+      });
+
+      if (!existingTask) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      if (existingTask.assigneeId !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized: You can only delete your own tasks" });
+      }
+
+      await db.delete(crmTasks).where(eq(crmTasks.id, req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      res.status(500).json({ error: "Failed to delete task" });
     }
   });
 
