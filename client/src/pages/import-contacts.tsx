@@ -161,6 +161,13 @@ export default function ImportContacts() {
         return;
       }
       setFile(selectedFile);
+      // Auto-upload the file
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        uploadMutation.mutate(content);
+      };
+      reader.readAsText(selectedFile);
     }
   };
 
@@ -187,6 +194,13 @@ export default function ImportContacts() {
     const droppedFile = e.dataTransfer.files[0];
     if (droppedFile && droppedFile.name.endsWith('.csv')) {
       setFile(droppedFile);
+      // Auto-upload the file
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        uploadMutation.mutate(content);
+      };
+      reader.readAsText(droppedFile);
     } else {
       toast({
         title: "Invalid File",
@@ -214,7 +228,15 @@ export default function ImportContacts() {
           className="border-2 border-dashed rounded-lg p-12 text-center hover:border-primary transition-colors cursor-pointer"
           data-testid="upload-dropzone"
         >
-          {file ? (
+          {uploadMutation.isPending ? (
+            <div className="space-y-3">
+              <div className="animate-spin h-12 w-12 mx-auto border-4 border-primary border-t-transparent rounded-full" />
+              <div>
+                <p className="font-medium">Processing CSV file...</p>
+                <p className="text-sm text-muted-foreground">This may take a moment for large files</p>
+              </div>
+            </div>
+          ) : file ? (
             <div className="space-y-3">
               <FileText className="h-12 w-12 mx-auto text-primary" />
               <div>
@@ -255,23 +277,6 @@ export default function ImportContacts() {
               </label>
             </div>
           )}
-        </div>
-
-        <div className="flex justify-end">
-          <Button
-            onClick={handleUpload}
-            disabled={!file || uploadMutation.isPending}
-            data-testid="button-upload"
-          >
-            {uploadMutation.isPending ? (
-              "Uploading..."
-            ) : (
-              <>
-                Next: Map Fields
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </>
-            )}
-          </Button>
         </div>
       </CardContent>
     </Card>
