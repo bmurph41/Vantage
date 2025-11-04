@@ -1685,6 +1685,9 @@ export const crmDeals = pgTable("crm_deals", {
   ownerId: varchar("owner_id").notNull(),
   // DD Project Integration
   ddProjectId: varchar("dd_project_id").references(() => projects.id), // Links to DD project if converted
+  // Closed Deal Tracking
+  isClosed: boolean("is_closed").default(false),
+  closedAt: timestamp("closed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
