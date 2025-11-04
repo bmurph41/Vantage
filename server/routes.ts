@@ -5834,8 +5834,17 @@ Current context: Project ${req.params.projectId}`;
       // Import schema for validation
       const { insertProspectingEntrySchema } = await import("@shared/schema");
       
+      // Convert date strings to Date objects before validation
+      const bodyData = { ...req.body };
+      if (bodyData.weekStartDate && typeof bodyData.weekStartDate === 'string') {
+        bodyData.weekStartDate = new Date(bodyData.weekStartDate);
+      }
+      if (bodyData.weekEndDate && typeof bodyData.weekEndDate === 'string') {
+        bodyData.weekEndDate = new Date(bodyData.weekEndDate);
+      }
+      
       // Validate request body
-      const validated = insertProspectingEntrySchema.parse(req.body);
+      const validated = insertProspectingEntrySchema.parse(bodyData);
       const { year, quarter, weekNumber, userId, ...entryData } = validated;
       
       // Check if entry already exists for this week
@@ -5876,14 +5885,20 @@ Current context: Project ${req.params.projectId}`;
       const quarter = parseInt(req.params.quarter);
       const weekNumber = parseInt(req.params.weekNumber);
       
-      // Log request body for debugging
-      console.log("PUT prospecting entry - Request body:", JSON.stringify(req.body, null, 2));
-      
       // Check if entry exists
       const existingEntry = await storage.getProspectingEntryByWeek(req.user.id, year, quarter, weekNumber);
       
+      // Convert date strings to Date objects before validation
+      const bodyData = { ...req.body };
+      if (bodyData.weekStartDate && typeof bodyData.weekStartDate === 'string') {
+        bodyData.weekStartDate = new Date(bodyData.weekStartDate);
+      }
+      if (bodyData.weekEndDate && typeof bodyData.weekEndDate === 'string') {
+        bodyData.weekEndDate = new Date(bodyData.weekEndDate);
+      }
+      
       // Validate request body
-      const validated = insertProspectingEntrySchema.partial().parse(req.body);
+      const validated = insertProspectingEntrySchema.partial().parse(bodyData);
       
       // Strip userId to prevent reassignment attacks
       const { userId, ...updateData } = validated;
