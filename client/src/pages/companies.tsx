@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone } from "lucide-react";
 import CompanyFormModal from "@/components/modals/company-form-modal";
 import CompanyDetailModal from "@/components/modals/company-detail-modal";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
@@ -42,6 +43,7 @@ export default function Companies() {
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -63,6 +65,20 @@ export default function Companies() {
         description: error.message,
         variant: "destructive" 
       });
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return await apiRequest('POST', '/api/companies/bulk/delete', { ids });
+    },
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      setSelectedIds(new Set());
+      toast({ title: `${ids.length} company(ies) deleted successfully` });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete companies", variant: "destructive" });
     },
   });
 
@@ -126,6 +142,61 @@ export default function Companies() {
         variant: "destructive",
       });
     }
+  };
+
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredCompanies.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredCompanies.map(c => c.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (confirm(`Are you sure you want to delete ${selectedIds.size} company(ies)?`)) {
+      bulkDeleteMutation.mutate(Array.from(selectedIds));
+    }
+  };
+
+  const handleBulkExport = () => {
+    if (selectedIds.size === 0) return;
+    
+    const selectedCompanies = companies?.filter(c => selectedIds.has(c.id)) || [];
+    const csv = [
+      ['Name', 'Industry', 'Size', 'Website', 'Phone', 'Email', 'Address'].join(','),
+      ...selectedCompanies.map(c => [
+        c.name,
+        c.industry || '',
+        c.size || '',
+        c.website || '',
+        c.phone || '',
+        c.email || '',
+        c.address || ''
+      ].map(field => `"${field}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `companies_export_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({ title: `Exported ${selectedIds.size} company(ies)` });
   };
 
   const getIndustryCategory = (industry?: string): string => {
@@ -327,6 +398,51 @@ export default function Companies() {
           </Card>
         </div>
 
+        {/* Bulk Actions Toolbar */}
+        {selectedIds.size > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={selectedIds.size === filteredCompanies.length}
+                onCheckedChange={toggleSelectAll}
+                data-testid="checkbox-select-all-toolbar"
+              />
+              <span className="text-sm font-medium text-blue-900">
+                {selectedIds.size} company(ies) selected
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBulkExport}
+                data-testid="button-bulk-export"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBulkDelete}
+                data-testid="button-bulk-delete"
+                disabled={bulkDeleteMutation.isPending}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+                data-testid="button-clear-selection"
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="bg-white rounded-lg border border-gray-200">
             <div className="p-6">
@@ -368,6 +484,13 @@ export default function Companies() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  <th className="px-4 py-4 w-12">
+                    <Checkbox
+                      checked={selectedIds.size > 0 && selectedIds.size === filteredCompanies.length}
+                      onCheckedChange={toggleSelectAll}
+                      data-testid="checkbox-select-all"
+                    />
+                  </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Company</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Industry</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size</th>
@@ -384,12 +507,20 @@ export default function Companies() {
                   return (
                     <tr 
                       key={company.id} 
-                      onClick={() => handleRowClick(company)}
-                      className="hover:bg-gray-50 cursor-pointer transition-colors" 
+                      className="hover:bg-gray-50 transition-colors" 
                       data-testid={`row-company-${company.id}`}
                     >
+                      {/* Checkbox */}
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(company.id)}
+                          onCheckedChange={() => toggleSelection(company.id)}
+                          data-testid={`checkbox-company-${company.id}`}
+                        />
+                      </td>
+
                       {/* Company */}
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 cursor-pointer" onClick={() => handleRowClick(company)}>
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
                             <Building className="w-5 h-5 text-white" />

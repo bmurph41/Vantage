@@ -246,6 +246,75 @@ export default function Deals() {
     }
   };
 
+  const handleBulkExport = () => {
+    if (selectedDealIds.size === 0) return;
+    
+    const selectedDeals = deals?.filter(d => selectedDealIds.has(d.id)) || [];
+    
+    const headers = [
+      'Title',
+      'Company',
+      'Contact',
+      'Value',
+      'Stage',
+      'Priority',
+      'Expected Close Date',
+      'Marina Name',
+      'Property Type',
+      'Slip Number',
+      'Dock Location',
+      'Lease Term (months)',
+    ];
+
+    const rows = selectedDeals.map(deal => {
+      const stage = stages?.find(s => s.id === deal.stageId);
+      const contactName = deal.contact 
+        ? `${deal.contact.firstName || ''} ${deal.contact.lastName || ''}`.trim()
+        : '';
+      
+      return [
+        deal.title || '',
+        deal.company?.name || '',
+        contactName,
+        Number(deal.amount) || 0,
+        stage?.name.replace(/_/g, ' ') || '',
+        deal.priority || '',
+        deal.expectedCloseDate 
+          ? new Date(deal.expectedCloseDate).toLocaleDateString('en-US')
+          : '',
+        deal.marinaName || '',
+        deal.propertyType?.replace(/_/g, ' ') || '',
+        deal.slipNumber || '',
+        deal.dockLocation || '',
+        deal.leaseTermMonths || '',
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => 
+        row.map(cell => 
+          typeof cell === 'string' && (cell.includes(',') || cell.includes('"'))
+            ? `"${cell.replace(/"/g, '""')}"`
+            : cell
+        ).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `deals_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: `Exported ${selectedDealIds.size} deal(s)` });
+  };
+
   // Saved views functions
   const saveCurrentView = () => {
     if (!viewName.trim()) {
@@ -582,6 +651,16 @@ export default function Deals() {
               </Button>
             </div>
             <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleBulkExport}
+                className="h-8 text-xs bg-white"
+                data-testid="button-bulk-export"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Export
+              </Button>
               <Button 
                 variant="destructive" 
                 size="sm" 
