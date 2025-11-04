@@ -7,6 +7,8 @@ import {
   FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SmartSearch } from "@/components/crm/smart-search";
+import { DetailDrawer } from "@/components/crm/detail-drawer";
 
 // CRM Navigation
 const crmNav = [
@@ -59,6 +61,8 @@ export default function UnifiedSidebar() {
   const [ddExpanded, setDdExpanded] = useState(false);
   const [modelingExpanded, setModelingExpanded] = useState(false);
   const [compsExpanded, setCompsExpanded] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
 
   const NavLink = ({ item }: { item: { name: string; href: string; icon: any; badge?: string; disabled?: boolean } }) => {
     const isActive = location === item.href;
@@ -119,13 +123,19 @@ export default function UnifiedSidebar() {
   return (
     <div className="w-64 bg-white shadow-lg flex-shrink-0 flex flex-col h-screen" data-testid="unified-sidebar">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex-shrink-0">
+      <div className="p-4 border-b border-gray-200 flex-shrink-0 space-y-3">
         <div className="flex items-center space-x-2.5" data-testid="sidebar-logo">
           <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
             <Anchor className="w-5 h-5 text-white" />
           </div>
           <h1 className="text-lg font-bold text-gray-900 truncate">MarinaMatch</h1>
         </div>
+        <SmartSearch 
+          onResultSelect={(result) => {
+            setSelectedEntity({ type: result.type, id: result.id });
+            setDrawerOpen(true);
+          }}
+        />
       </div>
       
       {/* Scrollable Navigation */}
@@ -209,6 +219,20 @@ export default function UnifiedSidebar() {
           </button>
         </div>
       </div>
+
+      {/* Global Detail Drawer for Search Results */}
+      {selectedEntity && (
+        <DetailDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          entityType={selectedEntity.type}
+          entityId={selectedEntity.id}
+          onDelete={() => {
+            setDrawerOpen(false);
+            setSelectedEntity(null);
+          }}
+        />
+      )}
     </div>
   );
 }

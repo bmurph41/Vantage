@@ -6301,6 +6301,104 @@ Current context: Project ${req.params.projectId}`;
   app.post("/api/imports/:id/execute", (req, res) => req.app.handle(Object.assign(req, { url: `/api/crm/imports/${req.params.id}/execute` }), res));
   app.post("/api/imports/:id/rollback", (req, res) => req.app.handle(Object.assign(req, { url: `/api/crm/imports/${req.params.id}/rollback` }), res));
 
+  // ===================================================================
+  // Global Search API - Fuzzy search across all CRM entities
+  // ===================================================================
+  app.get("/api/search", async (req: any, res) => {
+    try {
+      const query = req.query.q || req.query.query || "";
+      
+      if (!query || query.trim().length < 2) {
+        return res.json({ results: [] });
+      }
+
+      const searchTerm = `%${query.trim().toLowerCase()}%`;
+      
+      // Search contacts
+      const contacts = await db
+        .select({
+          id: crmContacts.id,
+          type: sql<string>`'contact'`,
+          title: sql<string>`CONCAT(${crmContacts.firstName}, ' ', ${crmContacts.lastName})`,
+          subtitle: crmContacts.email,
+          description: crmContacts.title,
+          data: crmContacts,
+        })
+        .from(crmContacts)
+        .where(
+          and(
+            eq(crmContacts.orgId, req.user.orgId),
+            or(
+              sql`LOWER(${crmContacts.firstName}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmContacts.lastName}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmContacts.email}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmContacts.phone}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmContacts.title}) LIKE ${searchTerm}`
+            )
+          )
+        )
+        .limit(10);
+
+      // Search companies
+      const companies = await db
+        .select({
+          id: crmCompanies.id,
+          type: sql<string>`'company'`,
+          title: crmCompanies.name,
+          subtitle: crmCompanies.domain,
+          description: crmCompanies.industry,
+          data: crmCompanies,
+        })
+        .from(crmCompanies)
+        .where(
+          and(
+            eq(crmCompanies.orgId, req.user.orgId),
+            or(
+              sql`LOWER(${crmCompanies.name}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmCompanies.domain}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmCompanies.industry}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmCompanies.phone}) LIKE ${searchTerm}`
+            )
+          )
+        )
+        .limit(10);
+
+      // Search deals
+      const deals = await db
+        .select({
+          id: crmDeals.id,
+          type: sql<string>`'deal'`,
+          title: crmDeals.name,
+          subtitle: sql<string>`CONCAT('$', ${crmDeals.amount})`,
+          description: crmDeals.status,
+          data: crmDeals,
+        })
+        .from(crmDeals)
+        .where(
+          and(
+            eq(crmDeals.orgId, req.user.orgId),
+            or(
+              sql`LOWER(${crmDeals.name}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmDeals.status}) LIKE ${searchTerm}`
+            )
+          )
+        )
+        .limit(10);
+
+      // Combine and return results
+      const results = [
+        ...contacts.map(c => ({ ...c, type: 'contact' as const })),
+        ...companies.map(c => ({ ...c, type: 'company' as const })),
+        ...deals.map(d => ({ ...d, type: 'deal' as const })),
+      ];
+
+      res.json({ results, query });
+    } catch (error) {
+      console.error("Global search failed:", error);
+      res.status(500).json({ error: "Search failed", results: [] });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
