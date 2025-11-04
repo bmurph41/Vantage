@@ -76,7 +76,7 @@ export class CSVImportService {
   /**
    * Auto-detect field mappings based on column names
    */
-  static autoDetectMappings(headers: string[]): FieldMapping[] {
+  static autoDetectMappings(headers: string[], entityType: string = 'contacts'): FieldMapping[] {
     const mappings: FieldMapping[] = [];
 
     for (const header of headers) {

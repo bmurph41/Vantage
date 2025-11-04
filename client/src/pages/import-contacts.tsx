@@ -37,8 +37,9 @@ import { Label } from "@/components/ui/label";
 import { useLocation } from "wouter";
 
 type WizardStep = 'upload' | 'map' | 'preview' | 'import';
+type EntityType = 'contacts' | 'companies' | 'properties';
 
-const CRM_FIELDS = [
+const CONTACT_FIELDS = [
   { value: '', label: 'Do not import' },
   { value: 'firstName', label: 'First Name' },
   { value: 'lastName', label: 'Last Name' },
@@ -56,21 +57,68 @@ const CRM_FIELDS = [
   { value: 'notes', label: 'Notes' },
 ];
 
+const COMPANY_FIELDS = [
+  { value: '', label: 'Do not import' },
+  { value: 'name', label: 'Company Name' },
+  { value: 'industry', label: 'Industry' },
+  { value: 'website', label: 'Website' },
+  { value: 'phone', label: 'Phone' },
+  { value: 'email', label: 'Email' },
+  { value: 'address', label: 'Address' },
+  { value: 'city', label: 'City' },
+  { value: 'state', label: 'State' },
+  { value: 'zipCode', label: 'Zip Code' },
+  { value: 'country', label: 'Country' },
+  { value: 'employees', label: 'Number of Employees' },
+  { value: 'revenue', label: 'Annual Revenue' },
+  { value: 'description', label: 'Description' },
+];
+
+const PROPERTY_FIELDS = [
+  { value: '', label: 'Do not import' },
+  { value: 'name', label: 'Property Name' },
+  { value: 'address', label: 'Address' },
+  { value: 'city', label: 'City' },
+  { value: 'state', label: 'State' },
+  { value: 'zipCode', label: 'Zip Code' },
+  { value: 'country', label: 'Country' },
+  { value: 'propertyType', label: 'Property Type' },
+  { value: 'slips', label: 'Number of Slips' },
+  { value: 'askingPrice', label: 'Asking Price' },
+  { value: 'yearBuilt', label: 'Year Built' },
+  { value: 'description', label: 'Description' },
+];
+
 export default function ImportContacts() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<WizardStep>('upload');
   const [file, setFile] = useState<File | null>(null);
+  const [entityType, setEntityType] = useState<EntityType>('contacts');
   const [importJobId, setImportJobId] = useState<string | null>(null);
   const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({});
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [duplicateStrategy, setDuplicateStrategy] = useState<'skip' | 'update'>('skip');
   const [previewData, setPreviewData] = useState<any[]>([]);
 
+  const getFieldsForEntityType = () => {
+    switch (entityType) {
+      case 'contacts':
+        return CONTACT_FIELDS;
+      case 'companies':
+        return COMPANY_FIELDS;
+      case 'properties':
+        return PROPERTY_FIELDS;
+      default:
+        return CONTACT_FIELDS;
+    }
+  };
+
   const uploadMutation = useMutation({
     mutationFn: async (fileContent: string) => {
       console.log('🚀 Starting CSV upload...', {
         fileName: file?.name,
+        entityType,
         contentLength: fileContent.length,
         firstChars: fileContent.substring(0, 100)
       });
@@ -79,6 +127,7 @@ export default function ImportContacts() {
         body: JSON.stringify({
           fileName: file?.name || 'import.csv',
           csvContent: fileContent,
+          entityType,
         }),
       });
       console.log('✅ Upload response:', response);
@@ -170,15 +219,6 @@ export default function ImportContacts() {
         return;
       }
       setFile(selectedFile);
-      console.log('📖 Reading file...');
-      // Auto-upload the file
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        console.log('📄 File read complete, length:', content.length);
-        uploadMutation.mutate(content);
-      };
-      reader.readAsText(selectedFile);
     }
   };
 
@@ -206,15 +246,6 @@ export default function ImportContacts() {
     const droppedFile = e.dataTransfer.files[0];
     if (droppedFile && droppedFile.name.endsWith('.csv')) {
       setFile(droppedFile);
-      console.log('📖 Reading dropped file...');
-      // Auto-upload the file
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        console.log('📄 Dropped file read complete, length:', content.length);
-        uploadMutation.mutate(content);
-      };
-      reader.readAsText(droppedFile);
     } else {
       console.log('❌ Invalid file dropped:', droppedFile?.name);
       toast({
@@ -236,22 +267,30 @@ export default function ImportContacts() {
           Upload a CSV file exported from Pipedrive or any CRM. The file should contain contact information.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
+        {/* Entity Type Selector */}
+        <div className="space-y-2">
+          <Label htmlFor="entity-type" className="text-base font-semibold">What are you importing?</Label>
+          <Select value={entityType} onValueChange={(value) => setEntityType(value as EntityType)}>
+            <SelectTrigger id="entity-type" data-testid="select-entity-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="contacts">Contacts</SelectItem>
+              <SelectItem value="companies">Companies</SelectItem>
+              <SelectItem value="properties">Properties</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* File Upload Area */}
         <div
           onDragOver={handleDragOver}
           onDrop={handleDrop}
           className="border-2 border-dashed rounded-lg p-12 text-center hover:border-primary transition-colors cursor-pointer"
           data-testid="upload-dropzone"
         >
-          {uploadMutation.isPending ? (
-            <div className="space-y-3">
-              <div className="animate-spin h-12 w-12 mx-auto border-4 border-primary border-t-transparent rounded-full" />
-              <div>
-                <p className="font-medium">Processing CSV file...</p>
-                <p className="text-sm text-muted-foreground">This may take a moment for large files</p>
-              </div>
-            </div>
-          ) : file ? (
+          {file ? (
             <div className="space-y-3">
               <FileText className="h-12 w-12 mx-auto text-primary" />
               <div>
@@ -293,6 +332,27 @@ export default function ImportContacts() {
             </div>
           )}
         </div>
+
+        {/* Upload Button */}
+        <div className="flex justify-end">
+          <Button
+            onClick={handleUpload}
+            disabled={!file || uploadMutation.isPending}
+            data-testid="button-upload"
+          >
+            {uploadMutation.isPending ? (
+              <>
+                <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                Processing...
+              </>
+            ) : (
+              <>
+                Upload & Map Fields
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -305,7 +365,7 @@ export default function ImportContacts() {
           Step 2: Map Fields
         </CardTitle>
         <CardDescription>
-          Map CSV columns to CRM contact fields. Auto-detected mappings are pre-filled.
+          Map CSV columns to {entityType} fields. Auto-detected mappings are pre-filled.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -321,10 +381,10 @@ export default function ImportContacts() {
                   onValueChange={(value) => setFieldMappings({ ...fieldMappings, [header]: value })}
                 >
                   <SelectTrigger data-testid={`select-mapping-${header}`}>
-                    <SelectValue placeholder="Select CRM field..." />
+                    <SelectValue placeholder={`Select ${entityType} field...`} />
                   </SelectTrigger>
                   <SelectContent>
-                    {CRM_FIELDS.map((field) => (
+                    {getFieldsForEntityType().map((field) => (
                       <SelectItem key={field.value} value={field.value}>
                         {field.label}
                       </SelectItem>

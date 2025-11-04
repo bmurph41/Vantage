@@ -5374,7 +5374,7 @@ Current context: Project ${req.params.projectId}`;
   // Create import job - Upload CSV and auto-detect mappings
   app.post("/api/crm/imports", async (req: any, res) => {
     try {
-      const { fileName, csvContent } = req.body;
+      const { fileName, csvContent, entityType = 'contacts' } = req.body;
 
       if (!csvContent || !fileName) {
         return res.status(400).json({ error: "CSV content and file name are required" });
@@ -5383,8 +5383,8 @@ Current context: Project ${req.params.projectId}`;
       // Parse CSV
       const parsed = CSVImportService.parseCSV(csvContent);
       
-      // Auto-detect field mappings
-      const fieldMappingsArray = CSVImportService.autoDetectMappings(parsed.headers);
+      // Auto-detect field mappings based on entity type
+      const fieldMappingsArray = CSVImportService.autoDetectMappings(parsed.headers, entityType);
       
       // Convert array to record for frontend
       const fieldMappingsRecord: Record<string, string> = {};
@@ -5401,7 +5401,7 @@ Current context: Project ${req.params.projectId}`;
         successfulRows: 0,
         failedRows: 0,
         duplicatesFound: 0,
-        importType: 'contacts',
+        importType: entityType,
         fieldMappings: fieldMappingsArray,
         duplicateStrategy: 'skip',
         status: 'pending',
@@ -5605,38 +5605,61 @@ Current context: Project ${req.params.projectId}`;
                 // Skip duplicate
                 continue;
               } else if (duplicateStrategy === 'update') {
-                // Update existing contact
-                const existingContact = duplicateResult.matches[0].existingContact;
-                const mergedData = DuplicateDetectionService.mergeContactData(existingContact, contactData);
-                const updated = await storage.updateCrmContact(existingContact.id, mergedData);
+                // Update existing record based on entity type
+                const existingRecord = duplicateResult.matches[0].existingContact;
+                const mergedData = DuplicateDetectionService.mergeContactData(existingRecord, contactData);
+                
+                let updated;
+                if (importJob.importType === 'companies') {
+                  updated = await storage.updateCrmCompany(existingRecord.id, mergedData);
+                } else if (importJob.importType === 'properties') {
+                  updated = await storage.updateProperty(existingRecord.id, mergedData);
+                } else {
+                  updated = await storage.updateCrmContact(existingRecord.id, mergedData);
+                }
                 recordId = updated.id;
                 action = 'updated';
                 wasNew = false;
               }
             } else {
-              // Link company if provided
-              if (contactData.company) {
-                const companyResult = await CompanyLinkingService.linkCompany(
-                  contactData.company,
-                  req.user.id
-                );
-                if (companyResult.companyId) {
-                  contactData.companyId = companyResult.companyId;
+              // Create new record based on entity type
+              if (importJob.importType === 'companies') {
+                const company = await storage.createCrmCompany({
+                  ...contactData,
+                  ownerId: req.user.id,
+                });
+                recordId = company.id;
+              } else if (importJob.importType === 'properties') {
+                const property = await storage.createProperty({
+                  ...contactData,
+                  ownerId: req.user.id,
+                });
+                recordId = property.id;
+              } else {
+                // Link company if provided for contacts
+                if (contactData.company) {
+                  const companyResult = await CompanyLinkingService.linkCompany(
+                    contactData.company,
+                    req.user.id
+                  );
+                  if (companyResult.companyId) {
+                    contactData.companyId = companyResult.companyId;
+                  }
                 }
-              }
 
-              // Create new contact
-              const contact = await storage.createCrmContact({
-                ...contactData,
-                ownerId: req.user.id,
-              });
-              recordId = contact.id;
+                // Create new contact
+                const contact = await storage.createCrmContact({
+                  ...contactData,
+                  ownerId: req.user.id,
+                });
+                recordId = contact.id;
+              }
             }
 
             // Record import
             await storage.createImportedRecord({
               importJobId: req.params.id,
-              recordType: 'contact',
+              recordType: importJob.importType || 'contact',
               recordId,
               action,
               rowNumber: rowIndex + 1,
