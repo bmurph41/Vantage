@@ -872,7 +872,7 @@ export default function WeekProspectingModal({
     
     // If it's a callback, schedule it on the selected day
     if (boxActivityForm.outcome === 'call_back' && boxActivityForm.callbackDay) {
-      const scheduled = scheduleCallback(
+      scheduleCallback(
         boxActivityForm.callbackDay,
         day,
         boxId,
@@ -880,25 +880,6 @@ export default function WeekProspectingModal({
         boxActivityForm.dealId,
         boxActivityForm.notes
       );
-      
-      if (scheduled) {
-        const callbackDayName = ALL_DAYS_OF_WEEK.find(d => d.id === boxActivityForm.callbackDay)?.name;
-        toast({
-          title: "Activity & Callback Scheduled",
-          description: `Activity recorded and callback scheduled for ${callbackDayName}`,
-        });
-      } else {
-        toast({
-          title: "Activity Recorded",
-          description: "Activity saved, but no available slots for callback on selected day",
-          variant: "destructive"
-        });
-      }
-    } else {
-      toast({
-        title: "Activity Recorded",
-        description: "Outreach activity has been saved with details",
-      });
     }
     
     setActivityBoxModal({ open: false, day: '', boxId: '' });
