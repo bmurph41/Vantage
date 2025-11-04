@@ -9,10 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StateSelect } from "@/components/ui/state-select";
-import { User, Phone, Upload, Thermometer, Check, ChevronsUpDown, X } from "lucide-react";
+import { User, Phone, Upload, Thermometer, Check, ChevronsUpDown, X, Building2, MapPin } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertContactSchema, type Contact, type Deal } from "@shared/schema";
@@ -251,43 +253,56 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
 
   return (
     <Dialog open={isOpen} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden" data-testid="contact-form-modal">
-        <DialogHeader className="px-6 pt-6 pb-2">
-          <DialogTitle className="flex items-center gap-2 text-2xl">
-            <User className="h-6 w-6" />
-            {isEdit ? "Edit Contact" : "Add Contact"}
-          </DialogTitle>
-          <DialogDescription className="text-muted-foreground">
-            Business-ready contact card. Only the essentials.
-          </DialogDescription>
+      <DialogContent className="max-w-5xl max-h-[92vh] p-0 overflow-hidden" data-testid="contact-form-modal">
+        <DialogHeader className="px-8 pt-8 pb-4 border-b bg-muted/30">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <User className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <DialogTitle className="text-2xl font-semibold">
+                {isEdit ? "Edit Contact" : "Add Contact"}
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground mt-1">
+                Business-ready contact card. Only the essentials.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         {/* Body */}
-        <div className="px-6 pb-2 overflow-y-auto max-h-[calc(90vh-180px)]">
-          {/* Photo + Name */}
-          <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-6 items-start py-4">
-            <div className="flex flex-col items-center gap-3">
-              <div className="relative h-24 w-24 rounded-2xl bg-muted overflow-hidden flex items-center justify-center">
-                {photoDataUrl ? (
-                  <img alt="Contact avatar" src={photoDataUrl} className="h-full w-full object-cover" data-testid="contact-photo" />
-                ) : (
-                  <User className="h-10 w-10 opacity-60" />
-                )}
-              </div>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Upload className="h-4 w-4" />
-                <span>Upload photo</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => onPhotoSelected(e.target.files?.[0])}
-                  data-testid="input-photo-upload"
-                />
-              </label>
-            </div>
+        <div className="px-8 py-6 overflow-y-auto max-h-[calc(92vh-200px)] space-y-6">
+          {/* Photo + Basic Info Card */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-medium">Basic Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-8 items-start">
+                {/* Photo Upload */}
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative h-32 w-32 rounded-2xl bg-gradient-to-br from-muted to-muted/50 overflow-hidden flex items-center justify-center border-2 border-dashed border-muted-foreground/20 hover:border-muted-foreground/40 transition-colors">
+                    {photoDataUrl ? (
+                      <img alt="Contact avatar" src={photoDataUrl} className="h-full w-full object-cover" data-testid="contact-photo" />
+                    ) : (
+                      <User className="h-12 w-12 text-muted-foreground/40" />
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 cursor-pointer font-medium transition-colors">
+                    <Upload className="h-4 w-4" />
+                    <span>Upload photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => onPhotoSelected(e.target.files?.[0])}
+                      data-testid="input-photo-upload"
+                    />
+                  </label>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                {/* Form Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First name *</Label>
                 <Input
@@ -417,13 +432,21 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   <p className="text-xs text-destructive">{errors.leadScore}</p>
                 )}
               </div>
-            </div>
-          </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Address & Deal Team */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 items-start">
+          {/* Address Card */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg font-medium">Address</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
             <div className="space-y-4">
-              <Label className="text-base font-medium">Address</Label>
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="address" className="text-sm">Street Address</Label>
@@ -477,18 +500,28 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                 </div>
               </div>
             </div>
-            <div className="space-y-4">
+            </CardContent>
+          </Card>
+
+          {/* Deal Team Card */}
+          <Card>
+            <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor="dealTeam">Deal Team</Label>
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg font-medium">Deal Team</CardTitle>
+                </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Switch 
                     checked={onDealTeam} 
                     onCheckedChange={setOnDealTeam} 
                     data-testid="switch-deal-team"
                   />
-                  <span className="text-muted-foreground">On team</span>
+                  <span className="text-sm text-muted-foreground">On team</span>
                 </div>
               </div>
+            </CardHeader>
+            <CardContent>
               
               {onDealTeam ? (
                 <div className="space-y-2">
@@ -570,28 +603,32 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   className="resize-none"
                 />
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
-        <DialogFooter className="px-6 py-4 bg-muted/40 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">Press <kbd className="px-1 py-0.5 border rounded">Esc</kbd> to close</p>
-          <div className="flex items-center gap-2">
+        <DialogFooter className="px-8 py-5 border-t bg-muted/30 flex items-center justify-between sticky bottom-0">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            Press <kbd className="px-2 py-1 bg-muted border rounded-md text-xs font-mono">Esc</kbd> to close
+          </p>
+          <div className="flex items-center gap-3">
             <Button 
-              variant="ghost" 
+              variant="outline" 
               onClick={onClose}
               disabled={isLoading}
               data-testid="button-cancel"
+              className="min-w-24"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleSave} 
-              className="min-w-24"
+              className="min-w-32 bg-primary hover:bg-primary/90"
               disabled={isLoading}
               data-testid="button-save-contact"
+              size="lg"
             >
-              {isLoading ? "Saving..." : (isEdit ? "Save" : "Add")}
+              {isLoading ? "Saving..." : (isEdit ? "Save Changes" : "Add Contact")}
             </Button>
           </div>
         </DialogFooter>
