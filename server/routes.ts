@@ -4874,7 +4874,18 @@ Current context: Project ${req.params.projectId}`;
 
   app.put("/api/crm/deals/:id", async (req: any, res) => {
     try {
-      const deal = await storage.updateCrmDeal(req.params.id, req.body);
+      let updateData = { ...req.body };
+      
+      // Auto-close deal if stage name is "Closed"
+      if (updateData.stageId) {
+        const stage = await storage.getCrmStage(updateData.stageId);
+        if (stage && stage.name.toLowerCase() === 'closed') {
+          updateData.isClosed = true;
+          updateData.closedAt = new Date().toISOString();
+        }
+      }
+      
+      const deal = await storage.updateCrmDeal(req.params.id, updateData);
       res.json(deal);
     } catch (error) {
       console.error("Failed to update deal:", error);
@@ -5429,7 +5440,18 @@ Current context: Project ${req.params.projectId}`;
   });
   app.put("/api/deals/:id", async (req: any, res) => {
     try {
-      const deal = await storage.updateCrmDeal(req.params.id, req.body);
+      let updateData = { ...req.body };
+      
+      // Auto-close deal if stage name is "Closed"
+      if (updateData.stageId) {
+        const stage = await storage.getCrmStage(updateData.stageId);
+        if (stage && stage.name.toLowerCase() === 'closed') {
+          updateData.isClosed = true;
+          updateData.closedAt = new Date().toISOString();
+        }
+      }
+      
+      const deal = await storage.updateCrmDeal(req.params.id, updateData);
       res.json(deal);
     } catch (error) {
       console.error("Failed to update deal:", error);
