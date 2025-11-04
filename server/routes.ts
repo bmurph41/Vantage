@@ -5866,7 +5866,7 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Update a prospecting entry
+  // Update a prospecting entry (create if doesn't exist)
   app.put("/api/prospecting/entries/:year/:quarter/:weekNumber", async (req: any, res) => {
     try {
       // Import schema for validation
@@ -5876,21 +5876,33 @@ Current context: Project ${req.params.projectId}`;
       const quarter = parseInt(req.params.quarter);
       const weekNumber = parseInt(req.params.weekNumber);
       
-      // Verify entry belongs to user
-      const entry = await storage.getProspectingEntryByWeek(req.user.id, year, quarter, weekNumber);
+      // Check if entry exists
+      const existingEntry = await storage.getProspectingEntryByWeek(req.user.id, year, quarter, weekNumber);
       
-      if (!entry) {
-        return res.status(404).json({ error: "Prospecting entry not found" });
-      }
-      
-      // Validate request body (allow partial updates)
+      // Validate request body
       const validated = insertProspectingEntrySchema.partial().parse(req.body);
       
       // Strip userId to prevent reassignment attacks
       const { userId, ...updateData } = validated;
       
-      const updated = await storage.updateProspectingEntry(entry.id, updateData);
-      res.json(updated);
+      let result;
+      if (existingEntry) {
+        // Update existing entry
+        result = await storage.updateProspectingEntry(existingEntry.id, updateData);
+      } else {
+        // Create new entry with all required fields
+        result = await storage.createProspectingEntry({
+          ...updateData,
+          userId: req.user.id,
+          year,
+          quarter,
+          weekNumber,
+          weekStartDate: updateData.weekStartDate || new Date(),
+          weekEndDate: updateData.weekEndDate || new Date(),
+        });
+      }
+      
+      res.json(result);
     } catch (error: any) {
       if (error.name === 'ZodError') {
         return res.status(400).json({ error: "Invalid prospecting entry data", details: error.errors });
