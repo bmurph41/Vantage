@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Tag, UserPlus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ContactFormModal from "@/components/modals/contact-form-modal";
@@ -47,6 +48,7 @@ export default function Contacts() {
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
   const [showImportResults, setShowImportResults] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -68,6 +70,20 @@ export default function Contacts() {
     },
     onError: () => {
       toast({ title: "Failed to delete contact", variant: "destructive" });
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return await apiRequest('POST', '/api/contacts/bulk/delete', { ids });
+    },
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      setSelectedIds(new Set());
+      toast({ title: `${ids.length} contact(s) deleted successfully` });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete contacts", variant: "destructive" });
     },
   });
 
@@ -162,6 +178,61 @@ export default function Contacts() {
     // Simple logic to determine contact status
     if (contact.company) return 'customer';
     return 'prospect';
+  };
+
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredContacts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredContacts.map(c => c.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (confirm(`Are you sure you want to delete ${selectedIds.size} contact(s)?`)) {
+      bulkDeleteMutation.mutate(Array.from(selectedIds));
+    }
+  };
+
+  const handleBulkExport = () => {
+    if (selectedIds.size === 0) return;
+    
+    const selectedContacts = contacts.filter(c => selectedIds.has(c.id));
+    const csv = [
+      ['First Name', 'Last Name', 'Email', 'Phone', 'Company', 'Title', 'Type'].join(','),
+      ...selectedContacts.map(c => [
+        c.firstName,
+        c.lastName,
+        c.email || '',
+        c.phone || '',
+        c.company?.name || '',
+        c.position || c.role || '',
+        c.contactType || ''
+      ].map(field => `"${field}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `contacts_export_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({ title: `Exported ${selectedIds.size} contact(s)` });
   };
 
   // Filter contacts based on search and status
@@ -310,6 +381,51 @@ export default function Contacts() {
             </div>
           </Card>
         </div>
+
+        {/* Bulk Actions Toolbar */}
+        {selectedIds.size > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={selectedIds.size === filteredContacts.length}
+                onCheckedChange={toggleSelectAll}
+                data-testid="checkbox-select-all-toolbar"
+              />
+              <span className="text-sm font-medium text-blue-900">
+                {selectedIds.size} contact(s) selected
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBulkExport}
+                data-testid="button-bulk-export"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBulkDelete}
+                data-testid="button-bulk-delete"
+                disabled={bulkDeleteMutation.isPending}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+                data-testid="button-clear-selection"
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+        )}
         
         {isLoading ? (
           <div className="bg-white rounded-lg border border-gray-200">
@@ -352,6 +468,13 @@ export default function Contacts() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  <th className="px-4 py-4 w-12">
+                    <Checkbox
+                      checked={selectedIds.size > 0 && selectedIds.size === filteredContacts.length}
+                      onCheckedChange={toggleSelectAll}
+                      data-testid="checkbox-select-all"
+                    />
+                  </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Contact</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Phone</th>
@@ -364,12 +487,20 @@ export default function Contacts() {
                 {filteredContacts.map((contact) => (
                   <tr 
                     key={contact.id} 
-                    onClick={() => handleRowClick(contact)}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors" 
+                    className="hover:bg-gray-50 transition-colors" 
                     data-testid={`row-contact-${contact.id}`}
                   >
+                    {/* Checkbox */}
+                    <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(contact.id)}
+                        onCheckedChange={() => toggleSelection(contact.id)}
+                        data-testid={`checkbox-contact-${contact.id}`}
+                      />
+                    </td>
+                    
                     {/* Contact */}
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 cursor-pointer" onClick={() => handleRowClick(contact)}>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm flex-shrink-0">
                           {getInitials(contact.firstName, contact.lastName)}

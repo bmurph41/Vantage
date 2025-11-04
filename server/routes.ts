@@ -6058,6 +6058,22 @@ Current context: Project ${req.params.projectId}`;
     }
   });
   
+  // Bulk operations for deals
+  app.post("/api/deals/bulk/delete", async (req: any, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "Invalid ids array" });
+      }
+      
+      await Promise.all(ids.map(id => storage.deleteCrmDeal(id)));
+      res.json({ success: true, deleted: ids.length });
+    } catch (error) {
+      console.error("Failed to bulk delete deals:", error);
+      res.status(500).json({ error: "Failed to bulk delete deals" });
+    }
+  });
+  
   // Contacts aliases  
   app.get("/api/contacts", async (req: any, res) => {
     try {
@@ -6096,6 +6112,22 @@ Current context: Project ${req.params.projectId}`;
     }
   });
   
+  // Bulk operations for contacts
+  app.post("/api/contacts/bulk/delete", async (req: any, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "Invalid ids array" });
+      }
+      
+      await Promise.all(ids.map(id => storage.deleteCrmContact(id)));
+      res.json({ success: true, deleted: ids.length });
+    } catch (error) {
+      console.error("Failed to bulk delete contacts:", error);
+      res.status(500).json({ error: "Failed to bulk delete contacts" });
+    }
+  });
+  
   // Companies aliases
   app.get("/api/companies", async (req: any, res) => {
     try {
@@ -6131,6 +6163,22 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Failed to delete company:", error);
       res.status(500).json({ error: "Failed to delete company" });
+    }
+  });
+  
+  // Bulk operations for companies
+  app.post("/api/companies/bulk/delete", async (req: any, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "Invalid ids array" });
+      }
+      
+      await Promise.all(ids.map(id => storage.deleteCrmCompany(id)));
+      res.json({ success: true, deleted: ids.length });
+    } catch (error) {
+      console.error("Failed to bulk delete companies:", error);
+      res.status(500).json({ error: "Failed to bulk delete companies" });
     }
   });
   
