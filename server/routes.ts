@@ -90,6 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api/dd", authenticateUser);
   app.use("/api/crm", authenticateUser);
+  app.use("/api/prospecting", authenticateUser);
   // Apply authentication to CRM route aliases
   app.use("/api/leads", authenticateUser);
   app.use("/api/deals", authenticateUser);
