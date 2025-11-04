@@ -9,10 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { 
   Handshake, Plus, Edit, Trash2, Calendar, User, Search, 
   Filter, MoreHorizontal, List, Grid3x3, HelpCircle, Sliders,
-  DollarSign, TrendingUp, Target, Award, Bookmark, Save, X, Download
+  DollarSign, TrendingUp, Target, Award, Bookmark, Save, X, Download, CheckCircle2
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import DealFormModal from "@/components/modals/deal-form-modal";
@@ -33,6 +34,7 @@ export default function Deals() {
   const [selectedDealIds, setSelectedDealIds] = useState<Set<string>>(new Set());
   const [isSaveViewOpen, setIsSaveViewOpen] = useState(false);
   const [viewName, setViewName] = useState("");
+  const [activeTab, setActiveTab] = useState<'open' | 'closed'>('open');
   
   // Filter state
   const [filters, setFilters] = useState({
@@ -87,6 +89,13 @@ export default function Deals() {
     if (!deals) return [];
     
     return deals.filter((deal) => {
+      // Tab filter - filter by isClosed status based on active tab
+      if (activeTab === 'open') {
+        if (deal.isClosed) return false;
+      } else {
+        if (!deal.isClosed) return false;
+      }
+
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -138,7 +147,7 @@ export default function Deals() {
 
       return true;
     });
-  }, [deals, searchQuery, filters]);
+  }, [deals, searchQuery, filters, activeTab]);
 
   // Calculate analytics based on filtered deals
   const analytics = useMemo(() => {
@@ -589,6 +598,20 @@ export default function Deals() {
         </div>
       )}
 
+      {/* Tabs for Open/Closed Deals */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'open' | 'closed')}>
+          <TabsList className="bg-gray-100" data-testid="deals-tabs">
+            <TabsTrigger value="open" className="data-[state=active]:bg-white" data-testid="tab-open-deals">
+              Open Deals
+            </TabsTrigger>
+            <TabsTrigger value="closed" className="data-[state=active]:bg-white" data-testid="tab-closed-deals">
+              Closed Deals
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
       {/* Advanced Filter Panel */}
       {showFilters && (
         <div className="bg-gray-50 border-b border-gray-200 px-6 py-4" data-testid="filter-panel">
@@ -845,9 +868,17 @@ export default function Deals() {
                         className="mt-0.5"
                         data-testid={`checkbox-deal-${deal.id}`}
                       />
-                      <h4 className="font-medium text-sm text-gray-900 leading-tight line-clamp-2 pr-2" data-testid={`text-deal-title-${deal.id}`}>
-                        {deal.title}
-                      </h4>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm text-gray-900 leading-tight line-clamp-2 pr-2" data-testid={`text-deal-title-${deal.id}`}>
+                          {deal.title}
+                        </h4>
+                        {deal.isClosed && (
+                          <Badge className="mt-1 bg-green-100 text-green-800 border-green-300 text-xs" data-testid={`badge-closed-${deal.id}`}>
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Closed
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -977,8 +1008,16 @@ export default function Deals() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-col">
-                            <div className="text-sm font-medium text-gray-900" data-testid={`table-deal-title-${deal.id}`}>
-                              {deal.title}
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm font-medium text-gray-900" data-testid={`table-deal-title-${deal.id}`}>
+                                {deal.title}
+                              </div>
+                              {deal.isClosed && (
+                                <Badge className="bg-green-100 text-green-800 border-green-300 text-xs" data-testid={`table-badge-closed-${deal.id}`}>
+                                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                                  Closed
+                                </Badge>
+                              )}
                             </div>
                             {deal.contact && (
                               <div className="text-xs text-gray-500">
