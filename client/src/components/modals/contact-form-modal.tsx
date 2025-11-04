@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { StateSelect } from "@/components/ui/state-select";
 import { User, Phone, Upload, Thermometer, Check, ChevronsUpDown, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -457,12 +458,10 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   </div>
                   <div>
                     <Label htmlFor="state" className="text-sm">State</Label>
-                    <Input 
-                      id="state" 
-                      value={state} 
-                      onChange={(e) => setState(e.target.value)} 
-                      placeholder="FL" 
-                      data-testid="input-state"
+                    <StateSelect
+                      value={state}
+                      onValueChange={setState}
+                      placeholder="Select state"
                     />
                   </div>
                 </div>
