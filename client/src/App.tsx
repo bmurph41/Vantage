@@ -30,6 +30,8 @@ import Workflows from "@/pages/workflows";
 import Webhooks from "@/pages/webhooks";
 import Dedupe from "@/pages/dedupe";
 import Scoring from "@/pages/scoring";
+import ImportContacts from "@/pages/import-contacts";
+import ImportHistory from "@/pages/import-history";
 import SortableListDemo from "@/pages/demo/SortableListDemo";
 import MilestoneDemo from "@/pages/milestone-demo";
 import NotFound from "@/pages/not-found";
@@ -283,6 +285,20 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <Scoring />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/import-contacts">
+        {() => (
+          <UnifiedLayout>
+            <ImportContacts />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/import-history">
+        {() => (
+          <UnifiedLayout>
+            <ImportHistory />
           </UnifiedLayout>
         )}
       </Route>

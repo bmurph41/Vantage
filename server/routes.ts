@@ -7,6 +7,9 @@ import { AIRiskAnalyzer } from "./ai-risk-analyzer";
 import { AINotesEnhancer } from "./ai-notes-enhancer";
 import { assigneeSubscriptionManager } from "./assignee-subscription-manager";
 import { reconciliationService } from "./reconciliation-service";
+import { CSVImportService } from "./csv-import-service";
+import { DuplicateDetectionService } from "./duplicate-detection-service";
+import { CompanyLinkingService } from "./company-linking-service";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertDDTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
@@ -5365,6 +5368,407 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ===================================================================
+  // CRM Import System - CSV Import for Contacts
+  // ===================================================================
+
+  // Create import job - Upload CSV and auto-detect mappings
+  app.post("/api/crm/imports", async (req: any, res) => {
+    try {
+      const { fileName, csvContent } = req.body;
+
+      if (!csvContent || !fileName) {
+        return res.status(400).json({ error: "CSV content and file name are required" });
+      }
+
+      // Parse CSV
+      const parsed = CSVImportService.parseCSV(csvContent);
+      
+      // Auto-detect field mappings
+      const fieldMappingsArray = CSVImportService.autoDetectMappings(parsed.headers);
+      
+      // Convert array to record for frontend
+      const fieldMappingsRecord: Record<string, string> = {};
+      for (const mapping of fieldMappingsArray) {
+        fieldMappingsRecord[mapping.csvColumn] = mapping.crmField;
+      }
+
+      // Create import job
+      const importJob = await storage.createImportJob({
+        fileName,
+        fileSize: csvContent.length,
+        totalRows: parsed.totalRows,
+        processedRows: 0,
+        successfulRows: 0,
+        failedRows: 0,
+        duplicatesFound: 0,
+        importType: 'contacts',
+        fieldMappings: fieldMappingsArray,
+        duplicateStrategy: 'skip',
+        status: 'pending',
+        currentStep: 'upload_complete',
+        progress: 0,
+        errorLog: [],
+        validationWarnings: [],
+        importSummary: {},
+        csvData: parsed.rows,
+        originalHeaders: parsed.headers,
+        canRollback: true,
+        ownerId: req.user.id,
+      });
+
+      res.json({
+        importJob,
+        preview: {
+          headers: parsed.headers,
+          totalRows: parsed.totalRows,
+          mappings: fieldMappingsRecord,
+        },
+      });
+    } catch (error: any) {
+      console.error("Failed to create import job:", error);
+      res.status(500).json({ error: error.message || "Failed to create import job" });
+    }
+  });
+
+  // Get import job details
+  app.get("/api/crm/imports/:id", async (req: any, res) => {
+    try {
+      const importJob = await storage.getImportJob(req.params.id);
+      
+      if (!importJob) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+
+      if (importJob.ownerId !== req.user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(importJob);
+    } catch (error) {
+      console.error("Failed to get import job:", error);
+      res.status(500).json({ error: "Failed to retrieve import job" });
+    }
+  });
+
+  // List all import jobs for user
+  app.get("/api/crm/imports", async (req: any, res) => {
+    try {
+      const importJobs = await storage.getImportJobsForOrg(req.user.id);
+      res.json(importJobs);
+    } catch (error) {
+      console.error("Failed to get import jobs:", error);
+      res.status(500).json({ error: "Failed to retrieve import jobs" });
+    }
+  });
+
+  // Generate preview with duplicate detection
+  app.post("/api/crm/imports/:id/preview", async (req: any, res) => {
+    try {
+      const importJob = await storage.getImportJob(req.params.id);
+      
+      if (!importJob) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+
+      if (importJob.ownerId !== req.user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { fieldMappings: fieldMappingsFromReq } = req.body;
+      
+      // Convert field mappings from record to array if provided
+      let mappingsArray = importJob.fieldMappings as any[];
+      if (fieldMappingsFromReq) {
+        mappingsArray = Object.entries(fieldMappingsFromReq).map(([csvColumn, crmField]) => ({
+          csvColumn,
+          crmField,
+        }));
+        await storage.updateImportJob(req.params.id, { fieldMappings: mappingsArray });
+      }
+
+      const csvData = importJob.csvData as any[];
+      const previewRows = csvData.slice(0, 50);
+
+      // Process preview rows with duplicate detection
+      const previewResults = await Promise.all(
+        previewRows.map(async (row: any, index: number) => {
+          const transformedContact = CSVImportService.transformRow(row, mappingsArray);
+          const duplicateResult = await DuplicateDetectionService.findDuplicates(
+            transformedContact,
+            req.user.id
+          );
+
+          // Validate row
+          const validationIssues = CSVImportService.validateContact(transformedContact);
+
+          return {
+            rowNumber: index + 1,
+            data: transformedContact,
+            duplicateStatus: duplicateResult.isDuplicate
+              ? duplicateResult.matches[0].confidence >= 90
+                ? 'Exact'
+                : 'Possible'
+              : 'None',
+            duplicateMatch: duplicateResult.isDuplicate ? duplicateResult.matches[0].existingContact : null,
+            validationIssues,
+            recommendation: duplicateResult.recommendation,
+          };
+        })
+      );
+
+      // Update import job with preview results
+      const duplicatesCount = previewResults.filter(r => r.duplicateStatus !== 'None').length;
+      const warningsCount = previewResults.filter(r => r.validationIssues.length > 0).length;
+
+      await storage.updateImportJob(req.params.id, {
+        currentStep: 'preview',
+        validationWarnings: previewResults
+          .filter(r => r.validationIssues.length > 0)
+          .map(r => ({
+            row: r.rowNumber,
+            issues: r.validationIssues,
+          })),
+      });
+
+      res.json({
+        preview: previewResults,
+        summary: {
+          totalRows: previewRows.length,
+          duplicates: duplicatesCount,
+          warnings: warningsCount,
+        },
+      });
+    } catch (error: any) {
+      console.error("Failed to generate preview:", error);
+      res.status(500).json({ error: error.message || "Failed to generate preview" });
+    }
+  });
+
+  // Execute import with progress tracking
+  app.post("/api/crm/imports/:id/execute", async (req: any, res) => {
+    try {
+      const importJob = await storage.getImportJob(req.params.id);
+      
+      if (!importJob) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+
+      if (importJob.ownerId !== req.user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { duplicateStrategy } = req.body;
+
+      // Update import job status
+      await storage.updateImportJob(req.params.id, {
+        status: 'processing',
+        currentStep: 'importing',
+        progress: 0,
+        duplicateStrategy: duplicateStrategy || 'skip',
+      });
+
+      // Process import in batches
+      const csvData = importJob.csvData as any[];
+      const mappings = importJob.fieldMappings as any;
+      const batchSize = 100;
+      
+      let successfulRows = 0;
+      let failedRows = 0;
+      let duplicatesFound = 0;
+      const errors: any[] = [];
+
+      for (let i = 0; i < csvData.length; i += batchSize) {
+        const batch = csvData.slice(i, i + batchSize);
+        
+        for (let j = 0; j < batch.length; j++) {
+          const rowIndex = i + j;
+          const row = batch[j];
+          
+          try {
+            // Transform row to contact data
+            const contactData = CSVImportService.transformRow(row, mappings);
+            
+            // Check for duplicates
+            const duplicateResult = await DuplicateDetectionService.findDuplicates(
+              contactData,
+              req.user.id
+            );
+
+            let action = 'created';
+            let recordId = '';
+            let wasNew = true;
+
+            if (duplicateResult.isDuplicate) {
+              duplicatesFound++;
+              
+              if (duplicateStrategy === 'skip') {
+                // Skip duplicate
+                continue;
+              } else if (duplicateStrategy === 'update') {
+                // Update existing contact
+                const existingContact = duplicateResult.matches[0].existingContact;
+                const mergedData = DuplicateDetectionService.mergeContactData(existingContact, contactData);
+                const updated = await storage.updateCrmContact(existingContact.id, mergedData);
+                recordId = updated.id;
+                action = 'updated';
+                wasNew = false;
+              }
+            } else {
+              // Link company if provided
+              if (contactData.company) {
+                const companyResult = await CompanyLinkingService.linkCompany(
+                  contactData.company,
+                  req.user.id
+                );
+                if (companyResult.companyId) {
+                  contactData.companyId = companyResult.companyId;
+                }
+              }
+
+              // Create new contact
+              const contact = await storage.createCrmContact({
+                ...contactData,
+                ownerId: req.user.id,
+              });
+              recordId = contact.id;
+            }
+
+            // Record import
+            await storage.createImportedRecord({
+              importJobId: req.params.id,
+              recordType: 'contact',
+              recordId,
+              action,
+              rowNumber: rowIndex + 1,
+              originalData: row,
+              wasNew,
+              matchedBy: duplicateResult.isDuplicate ? duplicateResult.matches[0].matchedBy : null,
+              validationIssues: [],
+            });
+
+            successfulRows++;
+          } catch (error: any) {
+            failedRows++;
+            errors.push({
+              row: rowIndex + 1,
+              error: error.message,
+            });
+          }
+        }
+
+        // Update progress
+        const progress = Math.floor(((i + batch.length) / csvData.length) * 100);
+        await storage.updateImportJob(req.params.id, {
+          progress,
+          processedRows: i + batch.length,
+          successfulRows,
+          failedRows,
+          duplicatesFound,
+        });
+      }
+
+      // Finalize import
+      await storage.updateImportJob(req.params.id, {
+        status: failedRows === 0 ? 'completed' : 'completed_with_errors',
+        currentStep: 'complete',
+        progress: 100,
+        processedRows: csvData.length,
+        successfulRows,
+        failedRows,
+        duplicatesFound,
+        errorLog: errors,
+        completedAt: new Date(),
+        importSummary: {
+          totalRows: csvData.length,
+          successful: successfulRows,
+          failed: failedRows,
+          duplicates: duplicatesFound,
+          strategy: duplicateStrategy || 'skip',
+        },
+      });
+
+      const updatedJob = await storage.getImportJob(req.params.id);
+      
+      res.json({
+        success: true,
+        importJob: updatedJob,
+        summary: {
+          totalRows: csvData.length,
+          successful: successfulRows,
+          failed: failedRows,
+          duplicates: duplicatesFound,
+        },
+      });
+    } catch (error: any) {
+      console.error("Failed to execute import:", error);
+      
+      // Update job status to failed
+      try {
+        await storage.updateImportJob(req.params.id, {
+          status: 'failed',
+          errorLog: [{ message: error.message }],
+        });
+      } catch (updateError) {
+        console.error("Failed to update import job status:", updateError);
+      }
+      
+      res.status(500).json({ error: error.message || "Failed to execute import" });
+    }
+  });
+
+  // Rollback imported records
+  app.post("/api/crm/imports/:id/rollback", async (req: any, res) => {
+    try {
+      const importJob = await storage.getImportJob(req.params.id);
+      
+      if (!importJob) {
+        return res.status(404).json({ error: "Import job not found" });
+      }
+
+      if (importJob.ownerId !== req.user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (!importJob.canRollback) {
+        return res.status(400).json({ error: "Import cannot be rolled back" });
+      }
+
+      if (importJob.rolledBackAt) {
+        return res.status(400).json({ error: "Import has already been rolled back" });
+      }
+
+      // Get all imported records
+      const importedRecords = await storage.getImportedRecordsByJob(req.params.id);
+      
+      // Delete records that were created (not updated)
+      for (const record of importedRecords) {
+        if (record.wasNew && record.recordType === 'contact') {
+          try {
+            await storage.deleteCrmContact(record.recordId);
+          } catch (error) {
+            console.error(`Failed to delete contact ${record.recordId}:`, error);
+          }
+        }
+      }
+
+      // Mark import as rolled back
+      await storage.updateImportJob(req.params.id, {
+        rolledBackAt: new Date(),
+        rolledBackBy: req.user.id,
+        canRollback: false,
+      });
+
+      res.json({
+        success: true,
+        message: `Rolled back ${importedRecords.filter(r => r.wasNew).length} contacts`,
+      });
+    } catch (error: any) {
+      console.error("Failed to rollback import:", error);
+      res.status(500).json({ error: error.message || "Failed to rollback import" });
+    }
+  });
+
+  // ===================================================================
   // CRM Route Aliases - Frontend Integration
   // Map /api/* routes to /api/crm/* for frontend compatibility
   // ===================================================================
@@ -5702,6 +6106,14 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to delete activity" });
     }
   });
+
+  // Import aliases
+  app.post("/api/imports", (req, res) => req.app.handle(Object.assign(req, { url: '/api/crm/imports' }), res));
+  app.get("/api/imports/:id", (req, res) => req.app.handle(Object.assign(req, { url: `/api/crm/imports/${req.params.id}` }), res));
+  app.get("/api/imports", (req, res) => req.app.handle(Object.assign(req, { url: '/api/crm/imports' }), res));
+  app.post("/api/imports/:id/preview", (req, res) => req.app.handle(Object.assign(req, { url: `/api/crm/imports/${req.params.id}/preview` }), res));
+  app.post("/api/imports/:id/execute", (req, res) => req.app.handle(Object.assign(req, { url: `/api/crm/imports/${req.params.id}/execute` }), res));
+  app.post("/api/imports/:id/rollback", (req, res) => req.app.handle(Object.assign(req, { url: `/api/crm/imports/${req.params.id}/rollback` }), res));
 
   const httpServer = createServer(app);
   return httpServer;

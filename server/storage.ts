@@ -5,19 +5,22 @@ import {
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
   crmDeals, crmLeads, crmContacts, crmCompanies, crmPipelines, crmPipelineStages, crmActivities,
+  crmImportJobs, crmImportedRecords,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
   type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
+  type CrmImportJob, type CrmImportedRecord,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
   type InsertDDContact, type UpdateDDContact, type InsertProjectContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
-  type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity
+  type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
+  type InsertCrmImportJob, type InsertCrmImportedRecord
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -329,6 +332,14 @@ export interface IStorage {
   createCrmActivity(activity: InsertCrmActivity): Promise<CrmActivity>;
   updateCrmActivity(id: string, updates: Partial<InsertCrmActivity>): Promise<CrmActivity>;
   deleteCrmActivity(id: string): Promise<void>;
+
+  // CRM - Import Jobs
+  getImportJob(id: string): Promise<CrmImportJob | undefined>;
+  getImportJobsForOrg(ownerId: string): Promise<CrmImportJob[]>;
+  createImportJob(job: InsertCrmImportJob): Promise<CrmImportJob>;
+  updateImportJob(id: string, updates: Partial<InsertCrmImportJob>): Promise<CrmImportJob>;
+  createImportedRecord(record: InsertCrmImportedRecord): Promise<CrmImportedRecord>;
+  getImportedRecordsByJob(importJobId: string): Promise<CrmImportedRecord[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2407,6 +2418,42 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCrmActivity(id: string): Promise<void> {
     await db.delete(crmActivities).where(eq(crmActivities.id, id));
+  }
+
+  // CRM - Import Jobs
+  async getImportJob(id: string): Promise<CrmImportJob | undefined> {
+    const [job] = await db.select().from(crmImportJobs).where(eq(crmImportJobs.id, id));
+    return job || undefined;
+  }
+
+  async getImportJobsForOrg(ownerId: string): Promise<CrmImportJob[]> {
+    return db.select().from(crmImportJobs)
+      .where(eq(crmImportJobs.ownerId, ownerId))
+      .orderBy(desc(crmImportJobs.createdAt));
+  }
+
+  async createImportJob(job: InsertCrmImportJob): Promise<CrmImportJob> {
+    const [created] = await db.insert(crmImportJobs).values(job).returning();
+    return created;
+  }
+
+  async updateImportJob(id: string, updates: Partial<InsertCrmImportJob>): Promise<CrmImportJob> {
+    const [updated] = await db.update(crmImportJobs)
+      .set(updates)
+      .where(eq(crmImportJobs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createImportedRecord(record: InsertCrmImportedRecord): Promise<CrmImportedRecord> {
+    const [created] = await db.insert(crmImportedRecords).values(record).returning();
+    return created;
+  }
+
+  async getImportedRecordsByJob(importJobId: string): Promise<CrmImportedRecord[]> {
+    return db.select().from(crmImportedRecords)
+      .where(eq(crmImportedRecords.importJobId, importJobId))
+      .orderBy(asc(crmImportedRecords.rowNumber));
   }
 }
 

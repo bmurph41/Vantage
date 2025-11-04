@@ -2642,6 +2642,63 @@ export const crmFormVersions = pgTable("crm_form_versions", {
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ============================================================================
+// CSV IMPORT SYSTEM TABLES
+// ============================================================================
+
+export const crmImportJobs = pgTable("crm_import_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull(),
+  totalRows: integer("total_rows").notNull(),
+  processedRows: integer("processed_rows").default(0),
+  successfulRows: integer("successful_rows").default(0),
+  failedRows: integer("failed_rows").default(0),
+  duplicatesFound: integer("duplicates_found").default(0),
+  
+  importType: text("import_type").notNull().default('contacts'),
+  fieldMappings: jsonb("field_mappings").notNull(),
+  duplicateStrategy: text("duplicate_strategy").default('skip'),
+  
+  status: text("status").notNull().default('pending'),
+  currentStep: text("current_step"),
+  progress: integer("progress").default(0),
+  
+  errorLog: jsonb("error_log").default(sql`'[]'::jsonb`),
+  validationWarnings: jsonb("validation_warnings").default(sql`'[]'::jsonb`),
+  importSummary: jsonb("import_summary").default(sql`'{}'::jsonb`),
+  
+  csvData: jsonb("csv_data"),
+  originalHeaders: jsonb("original_headers").default(sql`'[]'::jsonb`),
+  
+  canRollback: boolean("can_rollback").default(true),
+  rolledBackAt: timestamp("rolled_back_at"),
+  rolledBackBy: varchar("rolled_back_by").references(() => users.id),
+  
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const crmImportedRecords = pgTable("crm_imported_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  importJobId: varchar("import_job_id").references(() => crmImportJobs.id).notNull(),
+  
+  recordType: text("record_type").notNull(),
+  recordId: varchar("record_id").notNull(),
+  action: text("action").notNull(),
+  
+  rowNumber: integer("row_number").notNull(),
+  originalData: jsonb("original_data").notNull(),
+  
+  wasNew: boolean("was_new").default(true),
+  matchedBy: text("matched_by"),
+  validationIssues: jsonb("validation_issues").default(sql`'[]'::jsonb`),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // CRM Type Exports
 export type CrmDeal = typeof crmDeals.$inferSelect;
 export type CrmLead = typeof crmLeads.$inferSelect;
@@ -2761,3 +2818,19 @@ export type Task = typeof crmTasks.$inferSelect;
 export type Property = typeof crmProperties.$inferSelect;
 export type ContactCompany = typeof crmContactCompanies.$inferSelect;
 export type CompanyProperty = typeof crmCompanyProperties.$inferSelect;
+
+// CSV Import System Types
+export type CrmImportJob = typeof crmImportJobs.$inferSelect;
+export type CrmImportedRecord = typeof crmImportedRecords.$inferSelect;
+
+export const insertCrmImportJobSchema = createInsertSchema(crmImportJobs).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmImportJob = z.infer<typeof insertCrmImportJobSchema>;
+
+export const insertCrmImportedRecordSchema = createInsertSchema(crmImportedRecords).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmImportedRecord = z.infer<typeof insertCrmImportedRecordSchema>;

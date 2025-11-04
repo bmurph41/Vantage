@@ -4,7 +4,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,8 @@ const crmToolsNav = [
   { name: "Webhooks", href: "/crm/webhooks", icon: Webhook },
   { name: "Dedupe & Merge", href: "/crm/dedupe", icon: GitMerge },
   { name: "Scoring", href: "/crm/scoring", icon: Target },
+  { name: "Import Contacts", href: "/import-contacts", icon: Upload },
+  { name: "Import History", href: "/import-history", icon: History },
 ];
 
 // Due Diligence Navigation
