@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp } from "lucide-react";
 import CompanyFormModal from "@/components/modals/company-form-modal";
 import CompanyDetailModal from "@/components/modals/company-detail-modal";
+import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { FileUpload } from "@/components/file-upload";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -499,13 +500,17 @@ export default function Companies() {
           company={editingCompany}
         />
 
-        <CompanyDetailModal
-          isOpen={isDetailModalOpen}
-          onClose={() => {
-            setIsDetailModalOpen(false);
-            setSelectedCompany(null);
+        <DetailDrawer
+          open={isDetailModalOpen}
+          onOpenChange={(open) => {
+            setIsDetailModalOpen(open);
+            if (!open) setSelectedCompany(null);
           }}
-          company={selectedCompany}
+          entityType="company"
+          entityId={selectedCompany?.id || null}
+          onDelete={() => {
+            queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+          }}
         />
       </main>
     </div>

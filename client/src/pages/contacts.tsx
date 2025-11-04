@@ -10,6 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ContactFormModal from "@/components/modals/contact-form-modal";
 import ContactDetailModal from "@/components/modals/contact-detail-modal";
+import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { FileUpload } from "@/components/file-upload";
 import { ImportResultsModal, type ImportResult } from "@/components/import-results-modal";
 import type { Contact, Company, Deal } from "@shared/schema";
@@ -471,13 +472,17 @@ export default function Contacts() {
           contact={editingContact}
         />
 
-        <ContactDetailModal
-          isOpen={isDetailModalOpen}
-          onClose={() => {
-            setIsDetailModalOpen(false);
-            setSelectedContact(null);
+        <DetailDrawer
+          open={isDetailModalOpen}
+          onOpenChange={(open) => {
+            setIsDetailModalOpen(open);
+            if (!open) setSelectedContact(null);
           }}
-          contact={selectedContact}
+          entityType="contact"
+          entityId={selectedContact?.id || null}
+          onDelete={() => {
+            queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+          }}
         />
         
         <ImportResultsModal 
