@@ -5876,6 +5876,9 @@ Current context: Project ${req.params.projectId}`;
       const quarter = parseInt(req.params.quarter);
       const weekNumber = parseInt(req.params.weekNumber);
       
+      // Log request body for debugging
+      console.log("PUT prospecting entry - Request body:", JSON.stringify(req.body, null, 2));
+      
       // Check if entry exists
       const existingEntry = await storage.getProspectingEntryByWeek(req.user.id, year, quarter, weekNumber);
       
@@ -5905,6 +5908,7 @@ Current context: Project ${req.params.projectId}`;
       res.json(result);
     } catch (error: any) {
       if (error.name === 'ZodError') {
+        console.error("Validation error details:", JSON.stringify(error.errors, null, 2));
         return res.status(400).json({ error: "Invalid prospecting entry data", details: error.errors });
       }
       console.error("Failed to update prospecting entry:", error);
