@@ -15,7 +15,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StateSelect } from "@/components/ui/state-select";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
-import { User, Phone, Upload, Thermometer, Check, ChevronsUpDown, X, Building2, MapPin } from "lucide-react";
+import { User, Phone, Upload, Thermometer, Check, ChevronsUpDown, X, Building2, MapPin, Plus, Star } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertContactSchema, type Contact, type Deal } from "@shared/schema";
