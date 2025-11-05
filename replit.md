@@ -21,6 +21,21 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### November 2025 - Marketing Automation Backend
+- **Multi-Step Email Sequences**: Implemented comprehensive marketing automation backend for drip campaigns
+  - Database Schema: Added 3 new tables for sequence management
+    - `crmEmailSequenceSteps`: Individual steps with delay settings, content, scheduling options
+    - `crmEmailSequenceEnrollments`: Track contacts/leads/deals enrolled in sequences with status
+    - `crmEmailSequenceStepExecutions`: Track email sends with delivery, open, click metrics
+  - Storage Layer: Full CRUD operations with proper ordering and entity-specific queries
+  - API Routes: RESTful endpoints for sequences, templates, steps, enrollments
+  - Security: Comprehensive ownership checks, immutable field protection, Zod validation
+    - All routes verify user ownership before access/mutation (403 unauthorized)
+    - Immutable fields (`createdById`, `sequenceId`, `entityType`, `entityId`) stripped from updates
+    - Validation errors return 400, server errors return 500
+  - Routes: `/api/email-sequences`, `/api/email-templates`, `/api/email-sequence-enrollments`
+  - Next: Frontend UI for sequence builder, template editor, enrollment manager
+
 ### November 2025 - File Attachment System & CRM Enhancements
 - **File Upload System**: Implemented comprehensive file attachment functionality for CRM entities
   - Backend: Multer-based file upload with 10MB limit, supports images, PDFs, Office docs, CSV, and text files

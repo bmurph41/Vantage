@@ -7053,6 +7053,16 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Email Sequence Enrollments
+  app.get("/api/email-sequence-enrollments", async (req: any, res) => {
+    try {
+      const enrollments = await storage.getEmailSequenceEnrollmentsForUser(req.user.id);
+      res.json(enrollments);
+    } catch (error) {
+      console.error("Failed to get enrollments:", error);
+      res.status(500).json({ error: "Failed to retrieve enrollments" });
+    }
+  });
+
   app.get("/api/email-sequences/:sequenceId/enrollments", async (req: any, res) => {
     try {
       const sequence = await storage.getEmailSequence(req.params.sequenceId);

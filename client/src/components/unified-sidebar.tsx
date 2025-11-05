@@ -4,7 +4,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -21,6 +21,7 @@ const crmNav = [
   { name: "Properties", href: "/crm/properties", icon: Home },
   { name: "Activities", href: "/crm/activities", icon: Calendar },
   { name: "Prospecting", href: "/crm/prospecting", icon: Target },
+  { name: "Marketing", href: "/crm/marketing-automation", icon: Send },
   { name: "Analytics", href: "/crm/analytics", icon: PieChart },
   { name: "Forecast", href: "/crm/forecast", icon: TrendingUp },
 ];

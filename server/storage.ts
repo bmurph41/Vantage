@@ -375,6 +375,7 @@ export interface IStorage {
 
   // Marketing Automation - Enrollments
   getEmailSequenceEnrollment(id: string): Promise<EmailSequenceEnrollment | undefined>;
+  getEmailSequenceEnrollmentsForUser(userId: string): Promise<EmailSequenceEnrollment[]>;
   getEmailSequenceEnrollmentsBySequence(sequenceId: string): Promise<EmailSequenceEnrollment[]>;
   getEmailSequenceEnrollmentsByEntity(entityType: string, entityId: string): Promise<EmailSequenceEnrollment[]>;
   createEmailSequenceEnrollment(enrollment: InsertEmailSequenceEnrollment): Promise<EmailSequenceEnrollment>;
@@ -2650,6 +2651,12 @@ export class DatabaseStorage implements IStorage {
   async getEmailSequenceEnrollment(id: string): Promise<EmailSequenceEnrollment | undefined> {
     const [enrollment] = await db.select().from(crmEmailSequenceEnrollments).where(eq(crmEmailSequenceEnrollments.id, id));
     return enrollment || undefined;
+  }
+
+  async getEmailSequenceEnrollmentsForUser(userId: string): Promise<EmailSequenceEnrollment[]> {
+    return db.select().from(crmEmailSequenceEnrollments)
+      .where(eq(crmEmailSequenceEnrollments.enrolledById, userId))
+      .orderBy(desc(crmEmailSequenceEnrollments.enrolledAt));
   }
 
   async getEmailSequenceEnrollmentsBySequence(sequenceId: string): Promise<EmailSequenceEnrollment[]> {
