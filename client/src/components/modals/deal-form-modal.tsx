@@ -786,11 +786,11 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
   // Quick deal templates
   const dealTemplates = [
     {
-      name: "Slip Lease",
+      name: "Storage Lease",
       icon: Anchor,
       color: "from-blue-500 to-blue-600",
       data: {
-        name: "Slip Lease Agreement",
+        type: "storage_lease",
         propertyType: "slip",
         commissionType: "percentage",
         commissionRate: "3.0",
@@ -802,7 +802,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       icon: TrendingUp,
       color: "from-purple-500 to-purple-600",
       data: {
-        name: "Marina Acquisition Deal",
+        type: "marina_acquisition",
         propertyType: "marina_business",
         commissionType: "percentage",
         commissionRate: "4.0",
@@ -810,11 +810,11 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       }
     },
     {
-      name: "Mooring Purchase",
+      name: "New Listing",
       icon: Anchor,
       color: "from-cyan-500 to-cyan-600",
       data: {
-        name: "Mooring Purchase",
+        type: "new_listing",
         propertyType: "mooring",
         commissionType: "fixed",
         priority: "medium",
@@ -963,19 +963,45 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Deal Title *</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., Marina Slip A-12 Lease" {...field} data-testid="input-deal-title" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Deal Title *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Marina Slip A-12 Lease" {...field} data-testid="input-deal-title" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Deal Type</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-deal-type">
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="storage_lease">Storage Lease</SelectItem>
+                                <SelectItem value="marina_acquisition">Marina Acquisition</SelectItem>
+                                <SelectItem value="new_listing">New Listing</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <FormField

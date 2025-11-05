@@ -1629,6 +1629,7 @@ export interface Lease {
 export const crmDeals = pgTable("crm_deals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
+  type: text("type"), // Deal type: storage_lease, marina_acquisition, new_listing, etc.
   description: text("description"),
   value: decimal("value", { precision: 12, scale: 2 }),
   amount: decimal("amount", { precision: 12, scale: 2 }),
