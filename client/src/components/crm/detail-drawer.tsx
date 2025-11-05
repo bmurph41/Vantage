@@ -36,6 +36,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import type { Contact, Deal } from "@shared/schema";
+import { FileUploader } from "./file-uploader";
+import { FileList } from "./file-list";
 
 interface DetailDrawerProps {
   open: boolean;
@@ -615,12 +617,22 @@ export function DetailDrawer({
                 </div>
               </TabsContent>
 
-              <TabsContent value="files" className="mt-4">
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Files coming soon</p>
-                  <p className="text-sm">Upload and manage documents</p>
-                </div>
+              <TabsContent value="files" className="mt-4 space-y-6">
+                {entityId && (
+                  <>
+                    <FileUploader
+                      entityType={entityType}
+                      entityId={entityId}
+                    />
+                    <div>
+                      <h3 className="text-sm font-medium mb-3">Attached Files</h3>
+                      <FileList
+                        entityType={entityType}
+                        entityId={entityId}
+                      />
+                    </div>
+                  </>
+                )}
               </TabsContent>
 
               <TabsContent value="custom" className="mt-4">

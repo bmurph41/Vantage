@@ -2781,6 +2781,14 @@ export const insertCrmPropertySchema = createInsertSchema(crmProperties).omit({
 });
 export type InsertCrmProperty = z.infer<typeof insertCrmPropertySchema>;
 
+// CRM File schema
+export const insertCrmFileSchema = createInsertSchema(crmFiles).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmFile = z.infer<typeof insertCrmFileSchema>;
+export type CrmFile = typeof crmFiles.$inferSelect;
+
 // CRM Schema Aliases (for backward compatibility with original CRM code)
 export const insertDealSchema = insertCrmDealSchema;
 export type InsertDeal = InsertCrmDeal;

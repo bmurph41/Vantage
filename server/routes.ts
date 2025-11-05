@@ -18,7 +18,8 @@ import {
   insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema,
   insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema,
   insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema,
-  insertCrmTaskSchema, crmTasks
+  insertCrmTaskSchema, insertCrmFileSchema, crmTasks, crmFiles,
+  type InsertCrmFile
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { z } from "zod";
@@ -5455,6 +5456,255 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Failed to delete task:", error);
       res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // ===================================================================
+  // CRM Files API Routes - File attachments for CRM entities
+  // ===================================================================
+
+  // Configure multer storage for CRM files
+  const crmFileStorage = multer.diskStorage({
+    destination: async (req, file, cb) => {
+      const uploadPath = path.join("server/uploads/crm");
+      await fs.ensureDir(uploadPath);
+      cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+      const ext = path.extname(file.originalname);
+      const nameWithoutExt = path.basename(file.originalname, ext);
+      cb(null, `${nameWithoutExt}-${uniqueSuffix}${ext}`);
+    }
+  });
+
+  const crmFileUpload = multer({
+    storage: crmFileStorage,
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      // Allow common file types
+      const allowedMimes = [
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/csv',
+        'text/plain'
+      ];
+      
+      if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`File type ${file.mimetype} not allowed`));
+      }
+    }
+  });
+
+  // Upload file
+  app.post("/api/crm/files", crmFileUpload.single('file'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const { entityType, entityId } = req.body;
+
+      if (!entityType || !entityId) {
+        // Clean up uploaded file
+        await fs.unlink(req.file.path).catch(console.error);
+        return res.status(400).json({ error: "entityType and entityId are required" });
+      }
+
+      // Verify entity exists and belongs to the user
+      let entity;
+      if (entityType === 'contact') {
+        entity = await db.query.crmContacts.findFirst({
+          where: and(eq(crmContacts.id, entityId), eq(crmContacts.ownerId, req.user.id)),
+        });
+      } else if (entityType === 'company') {
+        entity = await db.query.crmCompanies.findFirst({
+          where: and(eq(crmCompanies.id, entityId), eq(crmCompanies.ownerId, req.user.id)),
+        });
+      } else if (entityType === 'deal') {
+        entity = await db.query.crmDeals.findFirst({
+          where: and(eq(crmDeals.id, entityId), eq(crmDeals.ownerId, req.user.id)),
+        });
+      }
+
+      if (!entity) {
+        // Clean up uploaded file
+        await fs.unlink(req.file.path).catch(console.error);
+        return res.status(404).json({ error: `${entityType} not found or unauthorized` });
+      }
+
+      const fileData: InsertCrmFile = {
+        name: req.file.originalname,
+        fileName: req.file.filename,
+        size: req.file.size,
+        mimeType: req.file.mimetype,
+        url: `/uploads/crm/${req.file.filename}`,
+        entityType,
+        entityId,
+        uploadedById: req.user.id,
+        ownerId: req.user.id,
+      };
+
+      const [file] = await db.insert(crmFiles).values(fileData).returning();
+      res.json(file);
+    } catch (error) {
+      console.error("Error uploading CRM file:", error);
+      // Clean up file if database insert failed
+      if (req.file) {
+        await fs.unlink(req.file.path).catch(console.error);
+      }
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid file data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
+  // Get files for an entity
+  app.get("/api/crm/files/:entityType/:entityId", async (req: any, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+
+      // Verify entity exists and belongs to the user
+      let entity;
+      if (entityType === 'contact') {
+        entity = await db.query.crmContacts.findFirst({
+          where: and(eq(crmContacts.id, entityId), eq(crmContacts.ownerId, req.user.id)),
+        });
+      } else if (entityType === 'company') {
+        entity = await db.query.crmCompanies.findFirst({
+          where: and(eq(crmCompanies.id, entityId), eq(crmCompanies.ownerId, req.user.id)),
+        });
+      } else if (entityType === 'deal') {
+        entity = await db.query.crmDeals.findFirst({
+          where: and(eq(crmDeals.id, entityId), eq(crmDeals.ownerId, req.user.id)),
+        });
+      }
+
+      if (!entity) {
+        return res.status(404).json({ error: `${entityType} not found or unauthorized` });
+      }
+
+      const files = await db.query.crmFiles.findMany({
+        where: and(
+          eq(crmFiles.entityType, entityType),
+          eq(crmFiles.entityId, entityId),
+          eq(crmFiles.ownerId, req.user.id)
+        ),
+        orderBy: [desc(crmFiles.createdAt)],
+      });
+
+      res.json(files);
+    } catch (error) {
+      console.error("Failed to retrieve files:", error);
+      res.status(500).json({ error: "Failed to retrieve files" });
+    }
+  });
+
+  // Download file
+  app.get("/api/crm/files/:id/download", async (req: any, res) => {
+    try {
+      const file = await db.query.crmFiles.findFirst({
+        where: and(
+          eq(crmFiles.id, req.params.id),
+          eq(crmFiles.ownerId, req.user.id)
+        ),
+      });
+
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      // Verify the file's entity belongs to the user
+      let entity;
+      if (file.entityType === 'contact') {
+        entity = await db.query.crmContacts.findFirst({
+          where: and(eq(crmContacts.id, file.entityId), eq(crmContacts.ownerId, req.user.id)),
+        });
+      } else if (file.entityType === 'company') {
+        entity = await db.query.crmCompanies.findFirst({
+          where: and(eq(crmCompanies.id, file.entityId), eq(crmCompanies.ownerId, req.user.id)),
+        });
+      } else if (file.entityType === 'deal') {
+        entity = await db.query.crmDeals.findFirst({
+          where: and(eq(crmDeals.id, file.entityId), eq(crmDeals.ownerId, req.user.id)),
+        });
+      }
+
+      if (!entity) {
+        return res.status(403).json({ error: "Unauthorized: Entity not found or not owned by you" });
+      }
+
+      const filePath = path.join(process.cwd(), "server/uploads/crm", file.fileName);
+      
+      // Check if file exists
+      const fileExists = await fs.pathExists(filePath);
+      if (!fileExists) {
+        return res.status(404).json({ error: "File not found on disk" });
+      }
+
+      res.download(filePath, file.name);
+    } catch (error) {
+      console.error("Failed to download file:", error);
+      res.status(500).json({ error: "Failed to download file" });
+    }
+  });
+
+  // Delete file
+  app.delete("/api/crm/files/:id", async (req: any, res) => {
+    try {
+      const file = await db.query.crmFiles.findFirst({
+        where: and(
+          eq(crmFiles.id, req.params.id),
+          eq(crmFiles.ownerId, req.user.id)
+        ),
+      });
+
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      // Verify the file's entity belongs to the user
+      let entity;
+      if (file.entityType === 'contact') {
+        entity = await db.query.crmContacts.findFirst({
+          where: and(eq(crmContacts.id, file.entityId), eq(crmContacts.ownerId, req.user.id)),
+        });
+      } else if (file.entityType === 'company') {
+        entity = await db.query.crmCompanies.findFirst({
+          where: and(eq(crmCompanies.id, file.entityId), eq(crmCompanies.ownerId, req.user.id)),
+        });
+      } else if (file.entityType === 'deal') {
+        entity = await db.query.crmDeals.findFirst({
+          where: and(eq(crmDeals.id, file.entityId), eq(crmDeals.ownerId, req.user.id)),
+        });
+      }
+
+      if (!entity) {
+        return res.status(403).json({ error: "Unauthorized: Entity not found or not owned by you" });
+      }
+
+      // Delete from database
+      await db.delete(crmFiles).where(eq(crmFiles.id, req.params.id));
+
+      // Delete file from filesystem
+      const filePath = path.join(process.cwd(), "server/uploads/crm", file.fileName);
+      await fs.unlink(filePath).catch((err) => {
+        console.error('Failed to delete file from disk:', err);
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete file:", error);
+      res.status(500).json({ error: "Failed to delete file" });
     }
   });
 
