@@ -4,7 +4,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -65,6 +65,11 @@ export default function UnifiedSidebar() {
   const [compsExpanded, setCompsExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleNavClick = () => {
+    setMobileMenuOpen(false);
+  };
 
   const NavLink = ({ item }: { item: { name: string; href: string; icon: any; badge?: string; disabled?: boolean } }) => {
     const isActive = location === item.href;
@@ -86,6 +91,7 @@ export default function UnifiedSidebar() {
       <Link 
         key={item.name} 
         href={item.href}
+        onClick={handleNavClick}
         className={cn(
           "flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors",
           isActive && "bg-blue-50 border-r-3 border-blue-600 text-blue-600 font-medium"
@@ -123,22 +129,64 @@ export default function UnifiedSidebar() {
   );
 
   return (
-    <div className="w-64 bg-white shadow-lg flex-shrink-0 flex flex-col h-screen" data-testid="unified-sidebar">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex-shrink-0 space-y-3">
-        <div className="flex items-center space-x-2.5" data-testid="sidebar-logo">
-          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
-            <Anchor className="w-5 h-5 text-white" />
-          </div>
-          <h1 className="text-lg font-bold text-gray-900 truncate">MarinaMatch</h1>
-        </div>
-        <SmartSearch 
-          onResultSelect={(result) => {
-            setSelectedEntity({ type: result.type, id: result.id });
-            setDrawerOpen(true);
-          }}
+    <>
+      {/* Mobile Menu Button */}
+      <button
+        onClick={() => setMobileMenuOpen(true)}
+        className="fixed top-4 left-4 z-50 md:hidden bg-white p-2 rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
+        data-testid="button-mobile-menu"
+        aria-label="Open menu"
+      >
+        <Menu className="w-6 h-6 text-gray-700" />
+      </button>
+
+      {/* Mobile Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden transition-opacity"
+          onClick={() => setMobileMenuOpen(false)}
+          data-testid="mobile-menu-overlay"
         />
-      </div>
+      )}
+
+      {/* Sidebar */}
+      <div 
+        className={cn(
+          "w-64 bg-white shadow-lg flex-shrink-0 flex flex-col h-screen",
+          "fixed md:static top-0 left-0 z-50",
+          "transition-transform duration-300 ease-in-out",
+          "md:translate-x-0",
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+        data-testid="unified-sidebar"
+      >
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 flex-shrink-0 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2.5" data-testid="sidebar-logo">
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
+                <Anchor className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="text-lg font-bold text-gray-900 truncate">MarinaMatch</h1>
+            </div>
+            {/* Mobile Close Button */}
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="md:hidden text-gray-500 hover:text-gray-700 transition-colors"
+              data-testid="button-close-mobile-menu"
+              aria-label="Close menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <SmartSearch 
+            onResultSelect={(result) => {
+              setSelectedEntity({ type: result.type, id: result.id });
+              setDrawerOpen(true);
+              setMobileMenuOpen(false);
+            }}
+          />
+        </div>
       
       {/* Scrollable Navigation */}
       <nav className="flex-1 overflow-y-auto py-4">
@@ -222,19 +270,20 @@ export default function UnifiedSidebar() {
         </div>
       </div>
 
-      {/* Global Detail Drawer for Search Results */}
-      {selectedEntity && (
-        <DetailDrawer
-          open={drawerOpen}
-          onOpenChange={setDrawerOpen}
-          entityType={selectedEntity.type}
-          entityId={selectedEntity.id}
-          onDelete={() => {
-            setDrawerOpen(false);
-            setSelectedEntity(null);
-          }}
-        />
-      )}
-    </div>
+        {/* Global Detail Drawer for Search Results */}
+        {selectedEntity && (
+          <DetailDrawer
+            open={drawerOpen}
+            onOpenChange={setDrawerOpen}
+            entityType={selectedEntity.type}
+            entityId={selectedEntity.id}
+            onDelete={() => {
+              setDrawerOpen(false);
+              setSelectedEntity(null);
+            }}
+          />
+        )}
+      </div>
+    </>
   );
 }
