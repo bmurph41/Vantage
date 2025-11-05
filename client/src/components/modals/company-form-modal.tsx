@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, X, User, Building, Star, MapPin } from "lucide-react";
+import { AddressInput, type AddressComponents } from "@/components/address-input";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertCompanySchema, insertContactSchema, type Company, type Contact, type ContactCompany, type Property, type CompanyProperty } from "@shared/schema";
@@ -559,7 +560,15 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                     <FormItem>
                       <FormLabel>Address (Optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="123 Main St, City, State, ZIP" {...field} data-testid="input-address" />
+                        <AddressInput
+                          value={field.value || ''}
+                          onChange={(value) => field.onChange(value)}
+                          onAddressSelect={(components: AddressComponents) => {
+                            field.onChange(components.fullAddress || components.street || '');
+                          }}
+                          placeholder="123 Main St, City, State, ZIP"
+                          testId="input-address"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

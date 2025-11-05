@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, X } from "lucide-react";
+import { AddressInput, type AddressComponents } from "@/components/address-input";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -289,7 +290,15 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                 <FormItem>
                   <FormLabel>Address (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="123 Harbor Way, Marina City, FL 33000" {...field} data-testid="input-property-address" />
+                    <AddressInput
+                      value={field.value || ''}
+                      onChange={(value) => field.onChange(value)}
+                      onAddressSelect={(components: AddressComponents) => {
+                        field.onChange(components.fullAddress || components.street || '');
+                      }}
+                      placeholder="123 Harbor Way, Marina City, FL 33000"
+                      testId="input-property-address"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StateSelect } from "@/components/ui/state-select";
+import { AddressInput, type AddressComponents } from "@/components/address-input";
 import { User, Phone, Upload, Thermometer, Check, ChevronsUpDown, X, Building2, MapPin } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -448,16 +449,19 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
             <CardContent>
             <div className="space-y-4">
               <div className="space-y-4">
-                <div>
-                  <Label htmlFor="address" className="text-sm">Street Address</Label>
-                  <Input 
-                    id="address" 
-                    value={address} 
-                    onChange={(e) => setAddress(e.target.value)} 
-                    placeholder="123 Marina Way" 
-                    data-testid="input-address"
-                  />
-                </div>
+                <AddressInput
+                  value={address}
+                  onChange={(value) => setAddress(value)}
+                  onAddressSelect={(components: AddressComponents) => {
+                    if (components.street) setAddress(components.street);
+                    if (components.city) setCity(components.city);
+                    if (components.state) setState(components.state);
+                    if (components.zipCode) setZipCode(components.zipCode);
+                  }}
+                  label="Street Address"
+                  placeholder="123 Marina Way"
+                  testId="input-address"
+                />
                 <div>
                   <Label htmlFor="unit" className="text-sm">Unit/Suite/Apt</Label>
                   <Input 
