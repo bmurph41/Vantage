@@ -35,13 +35,13 @@ export default function CalendarSettings() {
   // Get user's calendar settings
   const { data: settings, isLoading: settingsLoading } = useQuery<CalendarSettingsForm>({
     queryKey: ["/api/calendar/settings"],
-    enabled: connectionStatus?.connected,
+    enabled: !!connectionStatus?.connected,
   });
 
   // Get available calendars
   const { data: calendars = [], isLoading: calendarsLoading } = useQuery<any[]>({
     queryKey: ["/api/calendar/calendars"],
-    enabled: connectionStatus?.connected && settings?.syncEnabled,
+    enabled: !!(connectionStatus?.connected && settings?.syncEnabled),
   });
 
   const form = useForm<CalendarSettingsForm>({

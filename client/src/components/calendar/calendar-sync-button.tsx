@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Calendar, CalendarCheck, Loader2, CalendarX } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,6 @@ export function CalendarSyncButton({
   showText = false,
 }: CalendarSyncButtonProps) {
   const { toast } = useToast();
-  const [synced, setSynced] = useState(isSynced);
 
   const syncMutation = useMutation({
     mutationFn: async () => {
@@ -38,7 +36,6 @@ export function CalendarSyncButton({
       });
     },
     onSuccess: () => {
-      setSynced(true);
       queryClient.invalidateQueries({ queryKey: ["/api/crm-activities"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       toast({
@@ -66,7 +63,6 @@ export function CalendarSyncButton({
       });
     },
     onSuccess: () => {
-      setSynced(false);
       queryClient.invalidateQueries({ queryKey: ["/api/crm-activities"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       toast({
@@ -86,7 +82,7 @@ export function CalendarSyncButton({
   const isLoading = syncMutation.isPending || unsyncMutation.isPending;
 
   const handleClick = () => {
-    if (synced) {
+    if (isSynced) {
       unsyncMutation.mutate();
     } else {
       syncMutation.mutate();
@@ -103,7 +99,7 @@ export function CalendarSyncButton({
       );
     }
 
-    if (synced) {
+    if (isSynced) {
       return (
         <>
           <CalendarCheck className="h-4 w-4 text-green-600" />
@@ -134,7 +130,7 @@ export function CalendarSyncButton({
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        {synced ? "Remove from Google Calendar" : "Sync to Google Calendar"}
+        {isSynced ? "Remove from Google Calendar" : "Sync to Google Calendar"}
       </TooltipContent>
     </Tooltip>
   );
