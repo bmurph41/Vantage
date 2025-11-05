@@ -28,6 +28,7 @@ const crmNav = [
 
 // CRM Tools Submenu
 const crmToolsNav = [
+  { name: "Calendar Sync", href: "/calendar-settings", icon: Calendar },
   { name: "Labels", href: "/crm/labels", icon: Tag },
   { name: "Products", href: "/crm/products", icon: Package },
   { name: "Forms", href: "/crm/forms", icon: FileText },

@@ -37,6 +37,7 @@ import MilestoneDemo from "@/pages/milestone-demo";
 import NotFound from "@/pages/not-found";
 import CrmTasks from "@/pages/crm-tasks";
 import MarketingAutomation from "@/pages/marketing-automation";
+import CalendarSettings from "@/pages/calendar-settings";
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
@@ -238,6 +239,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <MarketingAutomation />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/calendar-settings">
+        {() => (
+          <UnifiedLayout>
+            <CalendarSettings />
           </UnifiedLayout>
         )}
       </Route>
