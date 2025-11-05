@@ -2,12 +2,7 @@
 
 ## Overview
 
-A unified full-stack platform combining comprehensive CRM functionality with Due Diligence Tracker capabilities for managing marina acquisition projects. The platform integrates deal pipeline management, lead tracking, contact management, and full due diligence workflow automation in a single React-based application. Built with modern web technologies including React 18, TypeScript, Express, and PostgreSQL.
-
-**Platform Components:**
-- **CRM Module**: Full-featured CRM with deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation
-- **Due Diligence Module**: Project management with task tracking, timeline visualization (Gantt-style), template management, and progress reporting
-- **Unified Interface**: Seamless navigation between CRM and DD Tracker with shared data models
+MarinaMatch is a full-stack platform designed for managing marina acquisition projects. It integrates comprehensive CRM functionalities with Due Diligence Tracking. The platform enables deal pipeline management, lead and contact tracking, and automates the due diligence workflow within a single React-based application. It aims to streamline the acquisition process from initial lead to project completion.
 
 ## User Preferences
 
@@ -19,161 +14,89 @@ Preferred communication style: Simple, everyday language.
 - Make only minimal changes needed for the specific request
 - Maintain existing code structure and patterns
 
-## Recent Changes
-
-### November 2025 - Marketing Automation Complete
-- **Multi-Step Email Sequences**: Implemented comprehensive marketing automation system with backend and frontend
-  - Database Schema: Added 3 new tables for sequence management
-    - `crmEmailSequenceSteps`: Individual steps with delay settings, content, scheduling options
-    - `crmEmailSequenceEnrollments`: Track contacts/leads/deals enrolled in sequences with status
-    - `crmEmailSequenceStepExecutions`: Track email sends with delivery, open, click metrics
-  - Storage Layer: Full CRUD operations with proper ordering and entity-specific queries including `getEmailSequenceEnrollmentsForUser`
-  - API Routes: RESTful endpoints for sequences, templates, steps, enrollments
-    - GET `/api/email-sequences` - List all sequences for user
-    - GET `/api/email-templates` - List all templates for user
-    - GET `/api/email-sequence-enrollments` - List all enrollments for user (independent of sequence status)
-  - Security: Comprehensive ownership checks, immutable field protection, Zod validation
-    - All routes verify user ownership before access/mutation (403 unauthorized)
-    - Immutable fields (`createdById`, `sequenceId`, `entityType`, `entityId`) stripped from updates
-    - Validation errors return 400, server errors return 500
-  - Frontend UI: Complete marketing automation dashboard at `/crm/marketing-automation`
-    - Three tabs: Sequences, Templates, Enrollments with real-time stats dashboard
-    - Sequence management: Create/edit/delete sequences, activate/pause/draft status control
-    - Template management: Create/edit/delete reusable email templates with categories
-    - Enrollment management: Enroll entities (contacts/leads/deals), view status, unenroll
-    - All components include proper loading states, empty states, error handling, and data-testids
-    - Query invalidation ensures UI stays synchronized after mutations
-
-### November 2025 - File Attachment System & CRM Enhancements
-- **File Upload System**: Implemented comprehensive file attachment functionality for CRM entities
-  - Backend: Multer-based file upload with 10MB limit, supports images, PDFs, Office docs, CSV, and text files
-  - Storage: Files stored in server/uploads/crm with metadata tracked in crm_files table
-  - Security: All endpoints verify entity ownership before allowing upload/download/delete operations
-  - API Endpoints: POST /api/crm/files (upload), GET /api/crm/files/:entityType/:entityId (list), GET /api/crm/files/:id/download (download), DELETE /api/crm/files/:id (delete)
-- **File Management UI**: Created FileUploader and FileList components with drag-and-drop support
-  - FileUploader: React-dropzone integration with visual feedback for drag-and-drop
-  - FileList: Displays attached files with icons, sizes, upload dates, download/delete actions
-  - DetailDrawer Integration: Files tab now fully functional for contacts, companies, and deals
-  - User Experience: Confirmation dialogs for deletions, proper loading states, error handling
-- **Bulk Actions**: Added multi-select capabilities to Contacts, Companies, and Deals pages
-  - Bulk delete with confirmation dialogs
-  - Bulk CSV export with comprehensive field coverage
-  - Select all functionality for efficient batch operations
-- **Task Kanban Board**: Built comprehensive task management system at /crm/tasks
-  - Drag-and-drop status changes using @dnd-kit (To-Do, In Progress, Done, Blocked)
-  - Inline task creation, priority/date filters
-  - Metrics dashboard showing totals, completion rate, overdue tasks, today's tasks
-  - Security: All task endpoints enforce user ownership with proper 400/403/404 error codes
-- **Global Search**: Implemented smart search with Cmd+K shortcut
-  - Searches across Contacts, Companies, and Deals
-  - Fuzzy ILIKE matching on names, emails, phones, titles
-  - Integrated into unified sidebar for quick access
-
-### November 2025 - CRM-DD Integration & UI Cleanup
-- **All Projects as Default Landing Page**: Reorganized DD Tracker navigation to make All Projects the main view
-  - Updated routing: `/` and `/projects` now display All Projects Summary page with comprehensive project details
-  - Simplified DD navigation: "All Projects" replaces "Dashboard" as the primary view
-  - Original Dashboard page still accessible at `/dashboard` route for backward compatibility
-  - All Projects shows detailed metrics for each DD project: completion %, costs, deadlines, overdue tasks
-- **Deal-to-DD Project Conversion**: Implemented first major integration feature connecting CRM and DD Tracker modules
-  - Created conversion modal allowing users to convert deals to DD projects with smart field mapping
-  - Added backend endpoint `/api/deals/convert-to-project` with automatic task creation (PCA, ESA, Survey, Title, etc.)
-  - Implemented ddProjectId tracking in crm_deals table to prevent duplicate conversions
-  - Conditional UI: "Convert to DD Project" button changes to "View DD Project" after conversion
-  - Contact mapping: Automatically converts deal contacts to DD project roles
-  - Note: ddProjectId column added via SQL for this session; production requires proper Drizzle migration
-- **UI Cleanup**: Removed redundant Investor View and Owner View pages from DD navigation
-  - Cleaned up routes in App.tsx and navigation in unified-sidebar.tsx
-  - Deleted obsolete page files to reduce maintenance burden
-  - Users now use All Projects for comprehensive DD project overview
-
-### November 2025 - CRM Integration & Currency Formatting
-- **CRM Integration Complete**: Successfully integrated standalone CRM application into MarinaMatch platform
-  - Created 46 CRM tables in PostgreSQL database (crm_deals, crm_leads, crm_contacts, crm_companies, etc.)
-  - Implemented full backend with storage layer and API routes for all CRM entities
-  - Added comprehensive frontend pages for Deals, Leads, Contacts, Companies, Pipelines, Activities
-  - Integrated email sequences, marketing automation, and prospecting features
-- **Schema Architecture**: Resolved type conflicts by using DD-prefixed types for Due Diligence entities (DDContact, DDTask, DDProject) while CRM uses non-prefixed types (Contact, Task, Deal, etc.)
-- **Currency Formatting**: Implemented CurrencyInput component with automatic comma formatting ($000,000,000) across all money input fields
-  - Updated 7 files: project-setup, deal-form-modal, property-form-modal, products, risk-management, third-party-reports
-  - Shows formatted currency with $ and commas on blur, raw numbers when focused for better UX
-
 ## System Architecture
 
 ### Frontend Architecture
-- **Framework**: React 18 with TypeScript for type safety and modern React features
-- **Routing**: Wouter for lightweight client-side routing
-- **UI Components**: shadcn/ui component library built on Radix UI primitives
-- **Styling**: Tailwind CSS with CSS variables for theming support
-- **State Management**: TanStack Query (React Query) for server state management
-- **Form Handling**: React Hook Form with Zod validation for type-safe form handling
-- **Date Management**: date-fns library for date calculations and timezone handling
+- **Framework**: React 18 with TypeScript.
+- **Routing**: Wouter.
+- **UI Components**: shadcn/ui built on Radix UI primitives.
+- **Styling**: Tailwind CSS with CSS variables.
+- **State Management**: TanStack Query (React Query) for server state.
+- **Form Handling**: React Hook Form with Zod validation.
+- **Date Management**: date-fns library.
+- **Mobile Responsiveness**: Full optimization with responsive navigation (hamburger menu), `ResponsiveTable` component, touch-friendly shadcn forms, and mobile-optimized drag-and-drop (`@dnd-kit`).
 
 ### Backend Architecture
-- **Server Framework**: Express.js with TypeScript for API routes and middleware
-- **API Design**: RESTful endpoints with consistent error handling and logging
-- **Database Integration**: Drizzle ORM for type-safe database operations
-- **Authentication**: Session-based authentication with multi-tenant support
-- **File Structure**: Organized routes, services, and storage layers for separation of concerns
+- **Server Framework**: Express.js with TypeScript.
+- **API Design**: RESTful endpoints with consistent error handling and logging.
+- **Database Integration**: Drizzle ORM.
+- **Authentication**: Session-based with multi-tenant support.
+- **File Upload System**: Multer-based with 10MB limit, storing files in `server/uploads/crm` with metadata in `crm_files` table.
 
 ### Data Storage Solutions
-- **Primary Database**: PostgreSQL with Neon serverless hosting
-- **ORM**: Drizzle ORM with schema-first approach for type safety
-- **Schema Design**: Multi-tenant architecture with organizations, users, projects, and tasks
-- **Migration System**: Drizzle Kit for database migrations and schema management
-- **Connection Pooling**: Neon serverless pool for efficient database connections
+- **Primary Database**: PostgreSQL with Neon serverless hosting.
+- **ORM**: Drizzle ORM with a schema-first approach.
+- **Schema Design**: Multi-tenant architecture for organizations, users, projects, and tasks.
+- **Migration System**: Drizzle Kit.
+- **Connection Pooling**: Neon serverless pool.
 
 ### Authentication and Authorization
-- **Multi-tenancy**: Organization-based data isolation with role-based access control
-- **User Roles**: Owner, editor, and viewer roles with appropriate permissions
-- **Session Management**: Express sessions with PostgreSQL session store
-- **Security**: Input validation with Zod schemas and SQL injection prevention
+- **Multi-tenancy**: Organization-based data isolation with role-based access control (Owner, Editor, Viewer).
+- **Session Management**: Express sessions with PostgreSQL session store.
+- **Security**: Zod schema validation and SQL injection prevention.
 
 ### Key Features Implementation
-- **Progress Tracking**: Automated progress bars with real-time calculation based on effective dates
-- **Timeline Management**: Gantt-style visualization with business day calculations
-- **Template System**: Reusable project and task templates for standardization
-- **CSV Import/Export**: Data interchange capabilities for external tools
-- **Holiday Calendar Integration**: US Federal holiday support for business day calculations
-- **Task Dependencies**: Multi-select dependency management with critical path analysis capabilities
+- **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation.
+- **Due Diligence Module**: Project management with task tracking, Gantt-style timeline visualization, template management, and progress reporting. "All Projects" serves as the default landing page.
+- **CRM-DD Integration**: Ability to convert CRM deals into DD projects with automatic task creation and contact mapping.
+- **Marketing Automation**: Multi-step email sequences with templates and enrollment tracking for contacts, leads, and deals.
+- **File Attachment System**: Comprehensive file upload, listing, download, and deletion for CRM entities.
+- **Bulk Actions**: Multi-select, bulk delete, and CSV export for Contacts, Companies, and Deals.
+- **Task Kanban Board**: Drag-and-drop task management with status changes, inline creation, filters, and metrics.
+- **Global Search**: Smart search across Contacts, Companies, and Deals with fuzzy matching and Cmd+K shortcut.
+- **Calendar Integration**: Google Calendar integration for CRM activities and DD tasks with sync capabilities, settings, and ICS export.
+- **Currency Formatting**: `CurrencyInput` component with automatic comma formatting for money input fields.
+- **Progress Tracking**: Automated progress bars based on effective dates.
+- **Timeline Management**: Gantt-style visualization with business day calculations.
+- **Template System**: Reusable project and task templates.
+- **CSV Import/Export**: Data interchange capabilities.
+- **Holiday Calendar Integration**: US Federal holiday support for business day calculations.
+- **Task Dependencies**: Multi-select dependency management.
 
 ### Future Integration Requirements
-- **Financial Model Integration**: Transaction costs from this Due Diligence Tracker will flow into the Transaction Costs tab of the related Financial Model app once all applications are merged into a single monorepo. This app serves as the primary driver for transaction cost details and timeline data.
-
-### Calendar Integration Implementation
-- **External Calendar Sync**: Implemented calendar export functionality using ICS file format for compatibility with Outlook, Gmail, and Apple Calendar
-- **User Choice**: User dismissed direct Outlook connector integration in favor of ICS export approach
-- **Current Method**: Users can sync project tasks to calendar events and download ICS files for import into their preferred calendar application
-- **Future Note**: If automated real-time calendar sync is needed in the future, consider using the Outlook connector integration (`connector:ccfg_outlook_01K4BBCKRJKP82N3PYQPZQ6DAK`) or exploring Google Calendar API integration
+- **Financial Model Integration**: Transaction costs and timeline data from this platform will integrate into a Financial Model app once merged into a monorepo.
 
 ## External Dependencies
 
 ### Core Runtime Dependencies
-- **@neondatabase/serverless**: Serverless PostgreSQL database driver for Neon hosting
-- **drizzle-orm**: Type-safe ORM for database operations and query building
-- **express**: Web framework for API server and routing
-- **@tanstack/react-query**: Server state management and caching for React
-- **wouter**: Lightweight routing library for React applications
-- **react-hook-form**: Performance-focused form library with validation
+- **@neondatabase/serverless**: Serverless PostgreSQL driver.
+- **drizzle-orm**: Type-safe ORM.
+- **express**: Web framework.
+- **@tanstack/react-query**: Server state management.
+- **wouter**: Lightweight routing.
+- **react-hook-form**: Form library.
+- **multer**: Middleware for handling `multipart/form-data`.
+- **@dnd-kit**: Drag and drop toolkit for React.
 
 ### UI and Component Libraries
-- **@radix-ui/react-***: Headless UI primitives for accessible components
-- **lucide-react**: Icon library with consistent SVG icons
-- **tailwindcss**: Utility-first CSS framework for styling
-- **class-variance-authority**: Utility for creating variant-based component APIs
-- **cmdk**: Command palette component for enhanced user interactions
+- **@radix-ui/react-***: Headless UI primitives.
+- **lucide-react**: Icon library.
+- **tailwindcss**: CSS framework.
+- **class-variance-authority**: Utility for variant-based component APIs.
+- **cmdk**: Command palette component.
+- **shadcn/ui**: Component library.
 
 ### Development and Build Tools
-- **vite**: Fast build tool and development server with HMR
-- **typescript**: Static type checking for enhanced developer experience
-- **drizzle-kit**: Database migration and introspection toolkit
-- **esbuild**: Fast JavaScript bundler for production builds
+- **vite**: Build tool and development server.
+- **typescript**: Static type checking.
+- **drizzle-kit**: Database migration and introspection.
+- **esbuild**: JavaScript bundler.
 
 ### Date and Time Processing
-- **date-fns**: Modern date utility library for calculations and formatting
-- **date-fns-tz**: Timezone support for accurate date handling across regions
+- **date-fns**: Date utility library.
+- **date-fns-tz**: Timezone support.
 
 ### Validation and Schema Management
-- **zod**: TypeScript-first schema validation library
-- **drizzle-zod**: Integration between Drizzle ORM and Zod for schema validation
-- **@hookform/resolvers**: Validation resolvers for React Hook Form integration
+- **zod**: TypeScript-first schema validation.
+- **drizzle-zod**: Drizzle ORM and Zod integration.
+- **@hookform/resolvers**: Validation resolvers for React Hook Form.
