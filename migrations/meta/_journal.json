@@ -15,6 +15,13 @@
       "when": 1761739256948,
       "tag": "0001_flat_roughhouse",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1762352847684,
+      "tag": "0002_many_mysterio",
+      "breakpoints": true
     }
   ]
 }

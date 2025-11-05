@@ -7,6 +7,7 @@ import {
   crmDeals, crmLeads, crmContacts, crmCompanies, crmPipelines, crmPipelineStages, crmActivities,
   crmImportJobs, crmImportedRecords, crmProspectingEntries,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
+  calendarSettings,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
@@ -15,6 +16,7 @@ import {
   type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
+  type CalendarSettings,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
@@ -23,7 +25,8 @@ import {
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
   type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
   type InsertCrmImportJob, type InsertCrmImportedRecord, type InsertProspectingEntry,
-  type InsertEmailSequence, type InsertEmailTemplate, type InsertEmailSequenceStep, type InsertEmailSequenceEnrollment, type InsertEmailSequenceStepExecution
+  type InsertEmailSequence, type InsertEmailTemplate, type InsertEmailSequenceStep, type InsertEmailSequenceEnrollment, type InsertEmailSequenceStepExecution,
+  type InsertCalendarSettings
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -387,6 +390,11 @@ export interface IStorage {
   getEmailSequenceStepExecutionsByEnrollment(enrollmentId: string): Promise<EmailSequenceStepExecution[]>;
   createEmailSequenceStepExecution(execution: InsertEmailSequenceStepExecution): Promise<EmailSequenceStepExecution>;
   updateEmailSequenceStepExecution(id: string, updates: Partial<InsertEmailSequenceStepExecution>): Promise<EmailSequenceStepExecution>;
+
+  // Calendar Settings
+  getCalendarSettings(userId: string): Promise<CalendarSettings | undefined>;
+  createCalendarSettings(settings: InsertCalendarSettings): Promise<CalendarSettings>;
+  updateCalendarSettings(userId: string, updates: Partial<InsertCalendarSettings>): Promise<CalendarSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2715,6 +2723,27 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(crmEmailSequenceStepExecutions)
       .set(updateData)
       .where(eq(crmEmailSequenceStepExecutions.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Calendar Settings
+
+  async getCalendarSettings(userId: string): Promise<CalendarSettings | undefined> {
+    const [settings] = await db.select().from(calendarSettings).where(eq(calendarSettings.userId, userId));
+    return settings || undefined;
+  }
+
+  async createCalendarSettings(settings: InsertCalendarSettings): Promise<CalendarSettings> {
+    const [created] = await db.insert(calendarSettings).values(settings).returning();
+    return created;
+  }
+
+  async updateCalendarSettings(userId: string, updates: Partial<InsertCalendarSettings>): Promise<CalendarSettings> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(calendarSettings)
+      .set(updateData)
+      .where(eq(calendarSettings.userId, userId))
       .returning();
     return updated;
   }

@@ -11,6 +11,7 @@ import { reconciliationService } from "./reconciliation-service";
 import { CSVImportService } from "./csv-import-service";
 import { DuplicateDetectionService } from "./duplicate-detection-service";
 import { CompanyLinkingService } from "./company-linking-service";
+import { CalendarService } from "./calendar-service";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertDDTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
@@ -19,8 +20,8 @@ import {
   insertCalendarEventSchema, insertDocumentRequirementSchema, insertProjectIntegrationSchema,
   insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema,
   insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema,
-  insertCrmTaskSchema, insertCrmFileSchema, 
-  crmTasks, crmFiles, crmContacts, crmDeals, crmCompanies, crmPipelines, crmPipelineStages,
+  insertCrmTaskSchema, insertCrmFileSchema, insertCalendarSettingsSchema,
+  crmTasks, crmFiles, crmContacts, crmDeals, crmCompanies, crmPipelines, crmPipelineStages, crmActivities,
   type InsertCrmFile
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
@@ -7125,6 +7126,424 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Calendar Settings Routes
+  app.get("/api/calendar/settings", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const settings = await storage.getCalendarSettings(req.user.id);
+      
+      if (!settings) {
+        return res.status(404).json({ error: "Calendar settings not found" });
+      }
+
+      res.json(settings);
+    } catch (error) {
+      console.error("Failed to get calendar settings:", error);
+      res.status(500).json({ error: "Failed to get calendar settings" });
+    }
+  });
+
+  app.put("/api/calendar/settings", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const validated = insertCalendarSettingsSchema.partial().omit({ userId: true }).parse(req.body);
+
+      const existingSettings = await storage.getCalendarSettings(req.user.id);
+      
+      let settings;
+      if (existingSettings) {
+        settings = await storage.updateCalendarSettings(req.user.id, validated);
+      } else {
+        settings = await storage.createCalendarSettings({
+          ...validated,
+          userId: req.user.id,
+        });
+      }
+
+      res.json(settings);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid settings data", details: error.errors });
+      }
+      console.error("Failed to update calendar settings:", error);
+      res.status(500).json({ error: "Failed to update calendar settings" });
+    }
+  });
+
+  app.get("/api/calendar/status", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const isConnected = await CalendarService.isConnected();
+      res.json({ connected: isConnected });
+    } catch (error) {
+      console.error("Failed to check calendar status:", error);
+      res.json({ connected: false });
+    }
+  });
+
+  // Calendar Sync Routes - Activities
+  app.post("/api/calendar/sync/activity/:activityId", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const activity = await storage.getCrmActivity(req.params.activityId);
+      if (!activity) {
+        return res.status(404).json({ error: "Activity not found" });
+      }
+
+      if (activity.userId !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized access to activity" });
+      }
+
+      const isConnected = await CalendarService.isConnected();
+      if (!isConnected) {
+        return res.status(400).json({ error: "Google Calendar not connected" });
+      }
+
+      const settings = await storage.getCalendarSettings(req.user.id);
+      const calendarId = settings?.defaultCalendarId || 'primary';
+
+      let startDateTime: string;
+      let endDateTime: string;
+
+      if (activity.scheduledAt) {
+        startDateTime = new Date(activity.scheduledAt).toISOString();
+        const duration = activity.duration || 30;
+        endDateTime = new Date(new Date(activity.scheduledAt).getTime() + duration * 60000).toISOString();
+      } else {
+        return res.status(400).json({ error: "Activity must have a scheduled time to sync to calendar" });
+      }
+
+      const calendarEvent = {
+        summary: activity.subject || `${activity.type} - ${activity.entityType}`,
+        description: activity.description || '',
+        start: {
+          dateTime: startDateTime,
+          timeZone: 'UTC',
+        },
+        end: {
+          dateTime: endDateTime,
+          timeZone: 'UTC',
+        },
+      };
+
+      const createdEvent = await CalendarService.createEvent(calendarEvent, calendarId);
+
+      await storage.updateCrmActivity(activity.id, {
+        calendarEventId: createdEvent.id,
+        syncedToCalendar: true,
+      });
+
+      res.status(201).json({ 
+        success: true, 
+        calendarEventId: createdEvent.id,
+        eventLink: createdEvent.htmlLink 
+      });
+    } catch (error) {
+      console.error("Failed to sync activity to calendar:", error);
+      res.status(500).json({ error: "Failed to sync activity to calendar" });
+    }
+  });
+
+  app.delete("/api/calendar/sync/activity/:activityId", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const activity = await storage.getCrmActivity(req.params.activityId);
+      if (!activity) {
+        return res.status(404).json({ error: "Activity not found" });
+      }
+
+      if (activity.userId !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized access to activity" });
+      }
+
+      if (!activity.calendarEventId) {
+        return res.status(400).json({ error: "Activity is not synced to calendar" });
+      }
+
+      const isConnected = await CalendarService.isConnected();
+      if (!isConnected) {
+        return res.status(400).json({ error: "Google Calendar not connected" });
+      }
+
+      const settings = await storage.getCalendarSettings(req.user.id);
+      const calendarId = settings?.defaultCalendarId || 'primary';
+
+      await CalendarService.deleteEvent(activity.calendarEventId, calendarId);
+
+      await storage.updateCrmActivity(activity.id, {
+        calendarEventId: null,
+        syncedToCalendar: false,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to remove activity from calendar:", error);
+      res.status(500).json({ error: "Failed to remove activity from calendar" });
+    }
+  });
+
+  // Calendar Sync Routes - DD Tasks
+  app.post("/api/calendar/sync/task/:taskId", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const task = await storage.getTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const project = await storage.getProject(task.projectId);
+      if (!project || project.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Unauthorized access to task" });
+      }
+
+      const isConnected = await CalendarService.isConnected();
+      if (!isConnected) {
+        return res.status(400).json({ error: "Google Calendar not connected" });
+      }
+
+      const settings = await storage.getCalendarSettings(req.user.id);
+      const calendarId = settings?.defaultCalendarId || 'primary';
+
+      if (!task.deadline) {
+        return res.status(400).json({ error: "Task must have a deadline to sync to calendar" });
+      }
+
+      const deadlineDate = new Date(task.deadline);
+      const calendarEvent = {
+        summary: task.title,
+        description: task.description || '',
+        start: {
+          date: deadlineDate.toISOString().split('T')[0],
+        },
+        end: {
+          date: deadlineDate.toISOString().split('T')[0],
+        },
+      };
+
+      const createdEvent = await CalendarService.createEvent(calendarEvent, calendarId);
+
+      await storage.updateTask(task.id, {
+        calendarEventId: createdEvent.id,
+        syncedToCalendar: true,
+      });
+
+      res.status(201).json({ 
+        success: true, 
+        calendarEventId: createdEvent.id,
+        eventLink: createdEvent.htmlLink 
+      });
+    } catch (error) {
+      console.error("Failed to sync task to calendar:", error);
+      res.status(500).json({ error: "Failed to sync task to calendar" });
+    }
+  });
+
+  app.delete("/api/calendar/sync/task/:taskId", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const task = await storage.getTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const project = await storage.getProject(task.projectId);
+      if (!project || project.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Unauthorized access to task" });
+      }
+
+      if (!task.calendarEventId) {
+        return res.status(400).json({ error: "Task is not synced to calendar" });
+      }
+
+      const isConnected = await CalendarService.isConnected();
+      if (!isConnected) {
+        return res.status(400).json({ error: "Google Calendar not connected" });
+      }
+
+      const settings = await storage.getCalendarSettings(req.user.id);
+      const calendarId = settings?.defaultCalendarId || 'primary';
+
+      await CalendarService.deleteEvent(task.calendarEventId, calendarId);
+
+      await storage.updateTask(task.id, {
+        calendarEventId: null,
+        syncedToCalendar: false,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to remove task from calendar:", error);
+      res.status(500).json({ error: "Failed to remove task from calendar" });
+    }
+  });
+
+  // List available Google calendars
+  app.get("/api/calendar/calendars", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const isConnected = await CalendarService.isConnected();
+      if (!isConnected) {
+        return res.status(400).json({ error: "Google Calendar not connected" });
+      }
+
+      const calendars = await CalendarService.getCalendars();
+      res.json(calendars);
+    } catch (error) {
+      console.error("Failed to get calendars:", error);
+      res.status(500).json({ error: "Failed to get calendars" });
+    }
+  });
+
+  // ICS Export Routes
+  app.get("/api/calendar/export/activities.ics", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const activities = await db
+        .select()
+        .from(crmActivities)
+        .where(eq(crmActivities.userId, req.user.id));
+
+      const icsContent = generateICS(activities.map(activity => ({
+        id: activity.id,
+        summary: activity.subject || `${activity.type} - ${activity.entityType}`,
+        description: activity.description || '',
+        start: activity.scheduledAt,
+        end: activity.scheduledAt ? new Date(new Date(activity.scheduledAt).getTime() + (activity.duration || 30) * 60000) : null,
+        type: 'activity'
+      })));
+
+      res.setHeader('Content-Type', 'text/calendar');
+      res.setHeader('Content-Disposition', 'attachment; filename="activities.ics"');
+      res.send(icsContent);
+    } catch (error) {
+      console.error("Failed to export activities:", error);
+      res.status(500).json({ error: "Failed to export activities" });
+    }
+  });
+
+  app.get("/api/calendar/export/tasks.ics", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const userProjects = await storage.getProjectsForOrg(req.user.orgId);
+      const projectIds = userProjects.map(p => p.id);
+
+      const allTasks = [];
+      for (const projectId of projectIds) {
+        const projectTasks = await storage.getTasksForProject(projectId);
+        allTasks.push(...projectTasks);
+      }
+
+      const icsContent = generateICS(allTasks.map(task => ({
+        id: task.id,
+        summary: task.title,
+        description: task.description || '',
+        start: task.deadline,
+        end: task.deadline,
+        type: 'task'
+      })));
+
+      res.setHeader('Content-Type', 'text/calendar');
+      res.setHeader('Content-Disposition', 'attachment; filename="tasks.ics"');
+      res.send(icsContent);
+    } catch (error) {
+      console.error("Failed to export tasks:", error);
+      res.status(500).json({ error: "Failed to export tasks" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
+}
+
+// Helper function to generate ICS format
+function generateICS(events: Array<{
+  id: string;
+  summary: string;
+  description: string;
+  start: Date | string | null;
+  end: Date | string | null;
+  type: 'activity' | 'task';
+}>): string {
+  const formatDate = (date: Date | string | null): string => {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  };
+
+  const formatDateOnly = (date: Date | string | null): string => {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toISOString().split('T')[0].replace(/-/g, '');
+  };
+
+  const now = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  let ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//MarinaMatch//Calendar Export//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+  ];
+
+  for (const event of events) {
+    if (!event.start) continue;
+
+    const isAllDay = event.type === 'task';
+    
+    ics.push('BEGIN:VEVENT');
+    ics.push(`UID:${event.id}@marinamatch.com`);
+    ics.push(`DTSTAMP:${now}`);
+    
+    if (isAllDay) {
+      ics.push(`DTSTART;VALUE=DATE:${formatDateOnly(event.start)}`);
+      ics.push(`DTEND;VALUE=DATE:${formatDateOnly(event.end)}`);
+    } else {
+      ics.push(`DTSTART:${formatDate(event.start)}`);
+      ics.push(`DTEND:${formatDate(event.end)}`);
+    }
+    
+    ics.push(`SUMMARY:${event.summary.replace(/\n/g, '\\n')}`);
+    
+    if (event.description) {
+      ics.push(`DESCRIPTION:${event.description.replace(/\n/g, '\\n')}`);
+    }
+    
+    ics.push('STATUS:CONFIRMED');
+    ics.push('END:VEVENT');
+  }
+
+  ics.push('END:VCALENDAR');
+
+  return ics.join('\r\n');
 }

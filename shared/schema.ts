@@ -74,6 +74,19 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Calendar Settings - User calendar preferences
+export const calendarSettings = pgTable("calendar_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  syncEnabled: boolean("sync_enabled").default(false),
+  defaultCalendarId: text("default_calendar_id").default('primary'),
+  syncActivities: boolean("sync_activities").default(true),
+  syncTasks: boolean("sync_tasks").default(true),
+  reminderMinutes: integer("reminder_minutes").default(15),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Projects
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -203,6 +216,9 @@ export const tasks = pgTable("tasks", {
   // Archive fields
   archived: boolean("archived").notNull().default(false),
   archivedAt: timestamp("archived_at"),
+  // Calendar sync fields
+  calendarEventId: text("calendar_event_id"), // Google Calendar event ID
+  syncedToCalendar: boolean("synced_to_calendar").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -1054,6 +1070,12 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
 });
 
+export const insertCalendarSettingsSchema = createInsertSchema(calendarSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
   createdAt: true,
@@ -1170,6 +1192,9 @@ export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type CalendarSettings = typeof calendarSettings.$inferSelect;
+export type InsertCalendarSettings = z.infer<typeof insertCalendarSettingsSchema>;
 
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
@@ -1810,6 +1835,8 @@ export const crmActivities = pgTable("crm_activities", {
   completedAt: timestamp("completed_at"),
   metadata: jsonb("metadata"), // phone number, email subject, document URL, page visited, social platform, etc.
   score: integer("score").default(0), // activity scoring for lead qualification
+  calendarEventId: text("calendar_event_id"), // Google Calendar event ID
+  syncedToCalendar: boolean("synced_to_calendar").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
