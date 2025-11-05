@@ -21,6 +21,31 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### November 2025 - File Attachment System & CRM Enhancements
+- **File Upload System**: Implemented comprehensive file attachment functionality for CRM entities
+  - Backend: Multer-based file upload with 10MB limit, supports images, PDFs, Office docs, CSV, and text files
+  - Storage: Files stored in server/uploads/crm with metadata tracked in crm_files table
+  - Security: All endpoints verify entity ownership before allowing upload/download/delete operations
+  - API Endpoints: POST /api/crm/files (upload), GET /api/crm/files/:entityType/:entityId (list), GET /api/crm/files/:id/download (download), DELETE /api/crm/files/:id (delete)
+- **File Management UI**: Created FileUploader and FileList components with drag-and-drop support
+  - FileUploader: React-dropzone integration with visual feedback for drag-and-drop
+  - FileList: Displays attached files with icons, sizes, upload dates, download/delete actions
+  - DetailDrawer Integration: Files tab now fully functional for contacts, companies, and deals
+  - User Experience: Confirmation dialogs for deletions, proper loading states, error handling
+- **Bulk Actions**: Added multi-select capabilities to Contacts, Companies, and Deals pages
+  - Bulk delete with confirmation dialogs
+  - Bulk CSV export with comprehensive field coverage
+  - Select all functionality for efficient batch operations
+- **Task Kanban Board**: Built comprehensive task management system at /crm/tasks
+  - Drag-and-drop status changes using @dnd-kit (To-Do, In Progress, Done, Blocked)
+  - Inline task creation, priority/date filters
+  - Metrics dashboard showing totals, completion rate, overdue tasks, today's tasks
+  - Security: All task endpoints enforce user ownership with proper 400/403/404 error codes
+- **Global Search**: Implemented smart search with Cmd+K shortcut
+  - Searches across Contacts, Companies, and Deals
+  - Fuzzy ILIKE matching on names, emails, phones, titles
+  - Integrated into unified sidebar for quick access
+
 ### November 2025 - CRM-DD Integration & UI Cleanup
 - **All Projects as Default Landing Page**: Reorganized DD Tracker navigation to make All Projects the main view
   - Updated routing: `/` and `/projects` now display All Projects Summary page with comprehensive project details
