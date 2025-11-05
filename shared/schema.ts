@@ -2699,6 +2699,57 @@ export const crmImportedRecords = pgTable("crm_imported_records", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Email Sequence Steps - Multi-step drip campaign support
+
+export const crmEmailSequenceSteps = pgTable("crm_email_sequence_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sequenceId: varchar("sequence_id").references(() => crmEmailSequences.id).notNull(),
+  stepOrder: integer("step_order").notNull(),
+  delayDays: integer("delay_days").default(0),
+  delayHours: integer("delay_hours").default(0),
+  emailTemplateId: varchar("email_template_id").references(() => crmEmailTemplates.id),
+  subject: text("subject").notNull(),
+  content: text("content").notNull(),
+  sendTime: text("send_time"),
+  skipWeekends: boolean("skip_weekends").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const crmEmailSequenceEnrollments = pgTable("crm_email_sequence_enrollments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sequenceId: varchar("sequence_id").references(() => crmEmailSequences.id).notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  status: text("status").notNull().default('active'),
+  currentStep: integer("current_step").default(0),
+  enrolledAt: timestamp("enrolled_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  pausedAt: timestamp("paused_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  exitReason: text("exit_reason"),
+  enrolledById: varchar("enrolled_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const crmEmailSequenceStepExecutions = pgTable("crm_email_sequence_step_executions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  enrollmentId: varchar("enrollment_id").references(() => crmEmailSequenceEnrollments.id).notNull(),
+  stepId: varchar("step_id").references(() => crmEmailSequenceSteps.id).notNull(),
+  status: text("status").notNull().default('pending'),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  openedAt: timestamp("opened_at"),
+  clickedAt: timestamp("clicked_at"),
+  bouncedAt: timestamp("bounced_at"),
+  errorMessage: text("error_message"),
+  emailCommunicationId: varchar("email_communication_id").references(() => crmEmailCommunications.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // CRM Type Exports
 export type CrmDeal = typeof crmDeals.$inferSelect;
 export type CrmLead = typeof crmLeads.$inferSelect;
@@ -2826,6 +2877,48 @@ export type Task = typeof crmTasks.$inferSelect;
 export type Property = typeof crmProperties.$inferSelect;
 export type ContactCompany = typeof crmContactCompanies.$inferSelect;
 export type CompanyProperty = typeof crmCompanyProperties.$inferSelect;
+
+// Email Sequence Types
+export type EmailSequence = typeof crmEmailSequences.$inferSelect;
+export type EmailTemplate = typeof crmEmailTemplates.$inferSelect;
+export type EmailSequenceStep = typeof crmEmailSequenceSteps.$inferSelect;
+export type EmailSequenceEnrollment = typeof crmEmailSequenceEnrollments.$inferSelect;
+export type EmailSequenceStepExecution = typeof crmEmailSequenceStepExecutions.$inferSelect;
+
+export const insertEmailSequenceSchema = createInsertSchema(crmEmailSequences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEmailSequence = z.infer<typeof insertEmailSequenceSchema>;
+
+export const insertEmailTemplateSchema = createInsertSchema(crmEmailTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+
+export const insertEmailSequenceStepSchema = createInsertSchema(crmEmailSequenceSteps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEmailSequenceStep = z.infer<typeof insertEmailSequenceStepSchema>;
+
+export const insertEmailSequenceEnrollmentSchema = createInsertSchema(crmEmailSequenceEnrollments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEmailSequenceEnrollment = z.infer<typeof insertEmailSequenceEnrollmentSchema>;
+
+export const insertEmailSequenceStepExecutionSchema = createInsertSchema(crmEmailSequenceStepExecutions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEmailSequenceStepExecution = z.infer<typeof insertEmailSequenceStepExecutionSchema>;
 
 // CSV Import System Types
 export type CrmImportJob = typeof crmImportJobs.$inferSelect;
