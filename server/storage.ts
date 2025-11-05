@@ -6,6 +6,7 @@ import {
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
   crmDeals, crmLeads, crmContacts, crmCompanies, crmPipelines, crmPipelineStages, crmActivities,
   crmImportJobs, crmImportedRecords, crmProspectingEntries,
+  crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
@@ -13,6 +14,7 @@ import {
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
   type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry,
+  type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
@@ -20,7 +22,8 @@ import {
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
   type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
-  type InsertCrmImportJob, type InsertCrmImportedRecord, type InsertProspectingEntry
+  type InsertCrmImportJob, type InsertCrmImportedRecord, type InsertProspectingEntry,
+  type InsertEmailSequence, type InsertEmailTemplate, type InsertEmailSequenceStep, type InsertEmailSequenceEnrollment, type InsertEmailSequenceStepExecution
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -348,6 +351,41 @@ export interface IStorage {
   createProspectingEntry(entry: InsertProspectingEntry): Promise<ProspectingEntry>;
   updateProspectingEntry(id: string, updates: Partial<InsertProspectingEntry>): Promise<ProspectingEntry>;
   deleteProspectingEntry(id: string): Promise<void>;
+
+  // Marketing Automation - Email Sequences
+  getEmailSequence(id: string): Promise<EmailSequence | undefined>;
+  getEmailSequencesForUser(userId: string): Promise<EmailSequence[]>;
+  createEmailSequence(sequence: InsertEmailSequence): Promise<EmailSequence>;
+  updateEmailSequence(id: string, updates: Partial<InsertEmailSequence>): Promise<EmailSequence>;
+  deleteEmailSequence(id: string): Promise<void>;
+
+  // Marketing Automation - Email Templates
+  getEmailTemplate(id: string): Promise<EmailTemplate | undefined>;
+  getEmailTemplatesForUser(userId: string): Promise<EmailTemplate[]>;
+  createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate>;
+  updateEmailTemplate(id: string, updates: Partial<InsertEmailTemplate>): Promise<EmailTemplate>;
+  deleteEmailTemplate(id: string): Promise<void>;
+
+  // Marketing Automation - Sequence Steps
+  getEmailSequenceStep(id: string): Promise<EmailSequenceStep | undefined>;
+  getEmailSequenceStepsBySequence(sequenceId: string): Promise<EmailSequenceStep[]>;
+  createEmailSequenceStep(step: InsertEmailSequenceStep): Promise<EmailSequenceStep>;
+  updateEmailSequenceStep(id: string, updates: Partial<InsertEmailSequenceStep>): Promise<EmailSequenceStep>;
+  deleteEmailSequenceStep(id: string): Promise<void>;
+
+  // Marketing Automation - Enrollments
+  getEmailSequenceEnrollment(id: string): Promise<EmailSequenceEnrollment | undefined>;
+  getEmailSequenceEnrollmentsBySequence(sequenceId: string): Promise<EmailSequenceEnrollment[]>;
+  getEmailSequenceEnrollmentsByEntity(entityType: string, entityId: string): Promise<EmailSequenceEnrollment[]>;
+  createEmailSequenceEnrollment(enrollment: InsertEmailSequenceEnrollment): Promise<EmailSequenceEnrollment>;
+  updateEmailSequenceEnrollment(id: string, updates: Partial<InsertEmailSequenceEnrollment>): Promise<EmailSequenceEnrollment>;
+  deleteEmailSequenceEnrollment(id: string): Promise<void>;
+
+  // Marketing Automation - Step Executions
+  getEmailSequenceStepExecution(id: string): Promise<EmailSequenceStepExecution | undefined>;
+  getEmailSequenceStepExecutionsByEnrollment(enrollmentId: string): Promise<EmailSequenceStepExecution[]>;
+  createEmailSequenceStepExecution(execution: InsertEmailSequenceStepExecution): Promise<EmailSequenceStepExecution>;
+  updateEmailSequenceStepExecution(id: string, updates: Partial<InsertEmailSequenceStepExecution>): Promise<EmailSequenceStepExecution>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2512,6 +2550,166 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProspectingEntry(id: string): Promise<void> {
     await db.delete(crmProspectingEntries).where(eq(crmProspectingEntries.id, id));
+  }
+
+  // Marketing Automation - Email Sequences
+
+  async getEmailSequence(id: string): Promise<EmailSequence | undefined> {
+    const [sequence] = await db.select().from(crmEmailSequences).where(eq(crmEmailSequences.id, id));
+    return sequence || undefined;
+  }
+
+  async getEmailSequencesForUser(userId: string): Promise<EmailSequence[]> {
+    return db.select().from(crmEmailSequences)
+      .where(eq(crmEmailSequences.createdById, userId))
+      .orderBy(desc(crmEmailSequences.createdAt));
+  }
+
+  async createEmailSequence(sequence: InsertEmailSequence): Promise<EmailSequence> {
+    const [created] = await db.insert(crmEmailSequences).values(sequence).returning();
+    return created;
+  }
+
+  async updateEmailSequence(id: string, updates: Partial<InsertEmailSequence>): Promise<EmailSequence> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmEmailSequences)
+      .set(updateData)
+      .where(eq(crmEmailSequences.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEmailSequence(id: string): Promise<void> {
+    await db.delete(crmEmailSequences).where(eq(crmEmailSequences.id, id));
+  }
+
+  // Marketing Automation - Email Templates
+
+  async getEmailTemplate(id: string): Promise<EmailTemplate | undefined> {
+    const [template] = await db.select().from(crmEmailTemplates).where(eq(crmEmailTemplates.id, id));
+    return template || undefined;
+  }
+
+  async getEmailTemplatesForUser(userId: string): Promise<EmailTemplate[]> {
+    return db.select().from(crmEmailTemplates)
+      .where(eq(crmEmailTemplates.createdById, userId))
+      .orderBy(desc(crmEmailTemplates.createdAt));
+  }
+
+  async createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate> {
+    const [created] = await db.insert(crmEmailTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateEmailTemplate(id: string, updates: Partial<InsertEmailTemplate>): Promise<EmailTemplate> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmEmailTemplates)
+      .set(updateData)
+      .where(eq(crmEmailTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEmailTemplate(id: string): Promise<void> {
+    await db.delete(crmEmailTemplates).where(eq(crmEmailTemplates.id, id));
+  }
+
+  // Marketing Automation - Sequence Steps
+
+  async getEmailSequenceStep(id: string): Promise<EmailSequenceStep | undefined> {
+    const [step] = await db.select().from(crmEmailSequenceSteps).where(eq(crmEmailSequenceSteps.id, id));
+    return step || undefined;
+  }
+
+  async getEmailSequenceStepsBySequence(sequenceId: string): Promise<EmailSequenceStep[]> {
+    return db.select().from(crmEmailSequenceSteps)
+      .where(eq(crmEmailSequenceSteps.sequenceId, sequenceId))
+      .orderBy(asc(crmEmailSequenceSteps.stepOrder));
+  }
+
+  async createEmailSequenceStep(step: InsertEmailSequenceStep): Promise<EmailSequenceStep> {
+    const [created] = await db.insert(crmEmailSequenceSteps).values(step).returning();
+    return created;
+  }
+
+  async updateEmailSequenceStep(id: string, updates: Partial<InsertEmailSequenceStep>): Promise<EmailSequenceStep> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmEmailSequenceSteps)
+      .set(updateData)
+      .where(eq(crmEmailSequenceSteps.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEmailSequenceStep(id: string): Promise<void> {
+    await db.delete(crmEmailSequenceSteps).where(eq(crmEmailSequenceSteps.id, id));
+  }
+
+  // Marketing Automation - Enrollments
+
+  async getEmailSequenceEnrollment(id: string): Promise<EmailSequenceEnrollment | undefined> {
+    const [enrollment] = await db.select().from(crmEmailSequenceEnrollments).where(eq(crmEmailSequenceEnrollments.id, id));
+    return enrollment || undefined;
+  }
+
+  async getEmailSequenceEnrollmentsBySequence(sequenceId: string): Promise<EmailSequenceEnrollment[]> {
+    return db.select().from(crmEmailSequenceEnrollments)
+      .where(eq(crmEmailSequenceEnrollments.sequenceId, sequenceId))
+      .orderBy(desc(crmEmailSequenceEnrollments.enrolledAt));
+  }
+
+  async getEmailSequenceEnrollmentsByEntity(entityType: string, entityId: string): Promise<EmailSequenceEnrollment[]> {
+    return db.select().from(crmEmailSequenceEnrollments)
+      .where(and(
+        eq(crmEmailSequenceEnrollments.entityType, entityType),
+        eq(crmEmailSequenceEnrollments.entityId, entityId)
+      ))
+      .orderBy(desc(crmEmailSequenceEnrollments.enrolledAt));
+  }
+
+  async createEmailSequenceEnrollment(enrollment: InsertEmailSequenceEnrollment): Promise<EmailSequenceEnrollment> {
+    const [created] = await db.insert(crmEmailSequenceEnrollments).values(enrollment).returning();
+    return created;
+  }
+
+  async updateEmailSequenceEnrollment(id: string, updates: Partial<InsertEmailSequenceEnrollment>): Promise<EmailSequenceEnrollment> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmEmailSequenceEnrollments)
+      .set(updateData)
+      .where(eq(crmEmailSequenceEnrollments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEmailSequenceEnrollment(id: string): Promise<void> {
+    await db.delete(crmEmailSequenceEnrollments).where(eq(crmEmailSequenceEnrollments.id, id));
+  }
+
+  // Marketing Automation - Step Executions
+
+  async getEmailSequenceStepExecution(id: string): Promise<EmailSequenceStepExecution | undefined> {
+    const [execution] = await db.select().from(crmEmailSequenceStepExecutions).where(eq(crmEmailSequenceStepExecutions.id, id));
+    return execution || undefined;
+  }
+
+  async getEmailSequenceStepExecutionsByEnrollment(enrollmentId: string): Promise<EmailSequenceStepExecution[]> {
+    return db.select().from(crmEmailSequenceStepExecutions)
+      .where(eq(crmEmailSequenceStepExecutions.enrollmentId, enrollmentId))
+      .orderBy(asc(crmEmailSequenceStepExecutions.scheduledAt));
+  }
+
+  async createEmailSequenceStepExecution(execution: InsertEmailSequenceStepExecution): Promise<EmailSequenceStepExecution> {
+    const [created] = await db.insert(crmEmailSequenceStepExecutions).values(execution).returning();
+    return created;
+  }
+
+  async updateEmailSequenceStepExecution(id: string, updates: Partial<InsertEmailSequenceStepExecution>): Promise<EmailSequenceStepExecution> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmEmailSequenceStepExecutions)
+      .set(updateData)
+      .where(eq(crmEmailSequenceStepExecutions.id, id))
+      .returning();
+    return updated;
   }
 }
 

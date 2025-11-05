@@ -6789,6 +6789,332 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Marketing Automation - Email Sequences & Templates
+  app.use("/api/email-sequences", authenticateUser);
+  app.use("/api/email-templates", authenticateUser);
+
+  // Get all email sequences for a user
+  app.get("/api/email-sequences", async (req: any, res) => {
+    try {
+      const sequences = await storage.getEmailSequencesForUser(req.user.id);
+      res.json(sequences);
+    } catch (error) {
+      console.error("Failed to get email sequences:", error);
+      res.status(500).json({ error: "Failed to retrieve email sequences" });
+    }
+  });
+
+  // Get a specific email sequence with steps
+  app.get("/api/email-sequences/:id", async (req: any, res) => {
+    try {
+      const sequence = await storage.getEmailSequence(req.params.id);
+      if (!sequence) {
+        return res.status(404).json({ error: "Email sequence not found" });
+      }
+      if (sequence.createdById !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      const steps = await storage.getEmailSequenceStepsBySequence(req.params.id);
+      res.json({ ...sequence, steps });
+    } catch (error) {
+      console.error("Failed to get email sequence:", error);
+      res.status(500).json({ error: "Failed to retrieve email sequence" });
+    }
+  });
+
+  // Create a new email sequence
+  app.post("/api/email-sequences", async (req: any, res) => {
+    try {
+      const { insertEmailSequenceSchema } = await import("@shared/schema");
+      const validated = insertEmailSequenceSchema.parse({
+        ...req.body,
+        createdById: req.user.id,
+      });
+      
+      const sequence = await storage.createEmailSequence(validated);
+      res.status(201).json(sequence);
+    } catch (error) {
+      console.error("Failed to create email sequence:", error);
+      res.status(500).json({ error: "Failed to create email sequence" });
+    }
+  });
+
+  // Update an email sequence
+  app.put("/api/email-sequences/:id", async (req: any, res) => {
+    try {
+      const sequence = await storage.getEmailSequence(req.params.id);
+      if (!sequence) {
+        return res.status(404).json({ error: "Email sequence not found" });
+      }
+      if (sequence.createdById !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const { insertEmailSequenceSchema } = await import("@shared/schema");
+      const validated = insertEmailSequenceSchema.partial().omit({ createdById: true }).parse(req.body);
+      const updated = await storage.updateEmailSequence(req.params.id, validated);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      console.error("Failed to update email sequence:", error);
+      res.status(500).json({ error: "Failed to update email sequence" });
+    }
+  });
+
+  // Delete an email sequence
+  app.delete("/api/email-sequences/:id", async (req: any, res) => {
+    try {
+      const sequence = await storage.getEmailSequence(req.params.id);
+      if (!sequence) {
+        return res.status(404).json({ error: "Email sequence not found" });
+      }
+      if (sequence.createdById !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      await storage.deleteEmailSequence(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete email sequence:", error);
+      res.status(500).json({ error: "Failed to delete email sequence" });
+    }
+  });
+
+  // Email Sequence Steps
+  app.get("/api/email-sequences/:sequenceId/steps", async (req: any, res) => {
+    try {
+      const sequence = await storage.getEmailSequence(req.params.sequenceId);
+      if (!sequence) {
+        return res.status(404).json({ error: "Email sequence not found" });
+      }
+      if (sequence.createdById !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      const steps = await storage.getEmailSequenceStepsBySequence(req.params.sequenceId);
+      res.json(steps);
+    } catch (error) {
+      console.error("Failed to get sequence steps:", error);
+      res.status(500).json({ error: "Failed to retrieve sequence steps" });
+    }
+  });
+
+  app.post("/api/email-sequences/:sequenceId/steps", async (req: any, res) => {
+    try {
+      const sequence = await storage.getEmailSequence(req.params.sequenceId);
+      if (!sequence) {
+        return res.status(404).json({ error: "Email sequence not found" });
+      }
+      if (sequence.createdById !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const { insertEmailSequenceStepSchema } = await import("@shared/schema");
+      const validated = insertEmailSequenceStepSchema.parse({
+        ...req.body,
+        sequenceId: req.params.sequenceId,
+      });
+      
+      const step = await storage.createEmailSequenceStep(validated);
+      res.status(201).json(step);
+    } catch (error) {
+      console.error("Failed to create sequence step:", error);
+      res.status(500).json({ error: "Failed to create sequence step" });
+    }
+  });
+
+  app.put("/api/email-sequence-steps/:id", async (req: any, res) => {
+    try {
+      const step = await storage.getEmailSequenceStep(req.params.id);
+      if (!step) {
+        return res.status(404).json({ error: "Sequence step not found" });
+      }
+      
+      const sequence = await storage.getEmailSequence(step.sequenceId);
+      if (!sequence || sequence.createdById !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const { insertEmailSequenceStepSchema } = await import("@shared/schema");
+      const validated = insertEmailSequenceStepSchema.partial().omit({ sequenceId: true }).parse(req.body);
+      const updated = await storage.updateEmailSequenceStep(req.params.id, validated);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      console.error("Failed to update sequence step:", error);
+      res.status(500).json({ error: "Failed to update sequence step" });
+    }
+  });
+
+  app.delete("/api/email-sequence-steps/:id", async (req: any, res) => {
+    try {
+      const step = await storage.getEmailSequenceStep(req.params.id);
+      if (!step) {
+        return res.status(404).json({ error: "Sequence step not found" });
+      }
+      
+      const sequence = await storage.getEmailSequence(step.sequenceId);
+      if (!sequence || sequence.createdById !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      await storage.deleteEmailSequenceStep(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete sequence step:", error);
+      res.status(500).json({ error: "Failed to delete sequence step" });
+    }
+  });
+
+  // Email Templates
+  app.get("/api/email-templates", async (req: any, res) => {
+    try {
+      const templates = await storage.getEmailTemplatesForUser(req.user.id);
+      res.json(templates);
+    } catch (error) {
+      console.error("Failed to get email templates:", error);
+      res.status(500).json({ error: "Failed to retrieve email templates" });
+    }
+  });
+
+  app.get("/api/email-templates/:id", async (req: any, res) => {
+    try {
+      const template = await storage.getEmailTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Email template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Failed to get email template:", error);
+      res.status(500).json({ error: "Failed to retrieve email template" });
+    }
+  });
+
+  app.post("/api/email-templates", async (req: any, res) => {
+    try {
+      const { insertEmailTemplateSchema } = await import("@shared/schema");
+      const validated = insertEmailTemplateSchema.parse({
+        ...req.body,
+        createdById: req.user.id,
+      });
+      
+      const template = await storage.createEmailTemplate(validated);
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Failed to create email template:", error);
+      res.status(500).json({ error: "Failed to create email template" });
+    }
+  });
+
+  app.put("/api/email-templates/:id", async (req: any, res) => {
+    try {
+      const template = await storage.getEmailTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Email template not found" });
+      }
+      if (template.createdById !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const { insertEmailTemplateSchema } = await import("@shared/schema");
+      const validated = insertEmailTemplateSchema.partial().omit({ createdById: true }).parse(req.body);
+      const updated = await storage.updateEmailTemplate(req.params.id, validated);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      console.error("Failed to update email template:", error);
+      res.status(500).json({ error: "Failed to update email template" });
+    }
+  });
+
+  app.delete("/api/email-templates/:id", async (req: any, res) => {
+    try {
+      const template = await storage.getEmailTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Email template not found" });
+      }
+      if (template.createdById !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      await storage.deleteEmailTemplate(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete email template:", error);
+      res.status(500).json({ error: "Failed to delete email template" });
+    }
+  });
+
+  // Email Sequence Enrollments
+  app.get("/api/email-sequences/:sequenceId/enrollments", async (req: any, res) => {
+    try {
+      const sequence = await storage.getEmailSequence(req.params.sequenceId);
+      if (!sequence) {
+        return res.status(404).json({ error: "Email sequence not found" });
+      }
+      if (sequence.createdById !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const enrollments = await storage.getEmailSequenceEnrollmentsBySequence(req.params.sequenceId);
+      res.json(enrollments);
+    } catch (error) {
+      console.error("Failed to get enrollments:", error);
+      res.status(500).json({ error: "Failed to retrieve enrollments" });
+    }
+  });
+
+  app.post("/api/email-sequence-enrollments", async (req: any, res) => {
+    try {
+      const { insertEmailSequenceEnrollmentSchema } = await import("@shared/schema");
+      const validated = insertEmailSequenceEnrollmentSchema.parse({
+        ...req.body,
+        enrolledById: req.user.id,
+      });
+      
+      const enrollment = await storage.createEmailSequenceEnrollment(validated);
+      res.status(201).json(enrollment);
+    } catch (error) {
+      console.error("Failed to create enrollment:", error);
+      res.status(500).json({ error: "Failed to create enrollment" });
+    }
+  });
+
+  app.put("/api/email-sequence-enrollments/:id", async (req: any, res) => {
+    try {
+      const enrollment = await storage.getEmailSequenceEnrollment(req.params.id);
+      if (!enrollment) {
+        return res.status(404).json({ error: "Enrollment not found" });
+      }
+      if (enrollment.enrolledById !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const { insertEmailSequenceEnrollmentSchema } = await import("@shared/schema");
+      const validated = insertEmailSequenceEnrollmentSchema.partial().omit({ 
+        sequenceId: true,
+        enrolledById: true,
+        entityType: true,
+        entityId: true
+      }).parse(req.body);
+      const updated = await storage.updateEmailSequenceEnrollment(req.params.id, validated);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      console.error("Failed to update enrollment:", error);
+      res.status(500).json({ error: "Failed to update enrollment" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
