@@ -6575,7 +6575,7 @@ Current context: Project ${req.params.projectId}`;
   // Pipeline Stages aliases (both /api/stages and /api/pipeline-stages)
   app.get("/api/stages", async (req: any, res) => {
     try {
-      const stages = await storage.getCrmStagesForOrg(req.user.orgId);
+      const stages = await storage.getAllCrmPipelineStages(req.user.orgId);
       res.json(stages);
     } catch (error) {
       console.error("Failed to get stages:", error);
@@ -6611,7 +6611,7 @@ Current context: Project ${req.params.projectId}`;
   });
   app.get("/api/pipeline-stages", async (req: any, res) => {
     try {
-      const stages = await storage.getCrmStagesForOrg(req.user.orgId);
+      const stages = await storage.getAllCrmPipelineStages(req.user.orgId);
       res.json(stages);
     } catch (error) {
       console.error("Failed to get stages:", error);
