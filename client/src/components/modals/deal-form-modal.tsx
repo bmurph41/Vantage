@@ -625,7 +625,8 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       }
 
       const cleanData = { 
-        ...data, 
+        ...data,
+        title: data.name, // Map form field 'name' to database field 'title'
         amount: parseNumber(data.amount, parseFloat),
         expectedCloseDate: data.expectedCloseDate?.toISOString(),
         commissionRate: parseNumber(data.commissionRate, parseFloat),
@@ -642,6 +643,9 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         secondDepositAmount: parseNumber(data.secondDepositAmount, parseFloat),
         secondDepositDays: parseNumber(data.secondDepositDays, parseInt),
       };
+      
+      // Remove the 'name' field since we've mapped it to 'title'
+      delete cleanData.name;
       
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key] === "" || cleanData[key] === undefined || cleanData[key] === "none" || cleanData[key] === null) {
@@ -723,7 +727,8 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       }
 
       const cleanData = { 
-        ...data, 
+        ...data,
+        title: data.name, // Map form field 'name' to database field 'title'
         amount: parseNumber(data.amount, parseFloat),
         expectedCloseDate: data.expectedCloseDate?.toISOString(),
         commissionRate: parseNumber(data.commissionRate, parseFloat),
@@ -740,6 +745,9 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         secondDepositAmount: parseNumber(data.secondDepositAmount, parseFloat),
         secondDepositDays: parseNumber(data.secondDepositDays, parseInt),
       };
+      
+      // Remove the 'name' field since we've mapped it to 'title'
+      delete cleanData.name;
       
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key] === "" || cleanData[key] === undefined || cleanData[key] === "none" || cleanData[key] === null) {
