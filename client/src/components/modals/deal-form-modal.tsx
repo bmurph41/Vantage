@@ -18,9 +18,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   CalendarIcon, Percent, DollarSign, Anchor, MapPin, 
-  FileText, Users, TrendingUp, Calendar as CalendarClock, Clock, Plus, X, Trash2
+  FileText, Users, TrendingUp, Calendar as CalendarClock, Clock, Plus, X, Trash2,
+  Sparkles, Zap, Info, CheckCircle2
 } from "lucide-react";
 import { format, addDays, parseISO } from "date-fns";
 import { addBusinessDays } from "@/lib/business-days";
@@ -781,11 +783,99 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
 
   const isLoading = createDealMutation.isPending || updateDealMutation.isPending || quickStageChangeMutation.isPending;
 
+  // Quick deal templates
+  const dealTemplates = [
+    {
+      name: "Slip Lease",
+      icon: Anchor,
+      color: "from-blue-500 to-blue-600",
+      data: {
+        name: "Slip Lease Agreement",
+        propertyType: "slip",
+        commissionType: "percentage",
+        commissionRate: "3.0",
+        priority: "medium",
+      }
+    },
+    {
+      name: "Marina Acquisition",
+      icon: TrendingUp,
+      color: "from-purple-500 to-purple-600",
+      data: {
+        name: "Marina Acquisition Deal",
+        propertyType: "marina_business",
+        commissionType: "percentage",
+        commissionRate: "4.0",
+        priority: "high",
+      }
+    },
+    {
+      name: "Mooring Purchase",
+      icon: Anchor,
+      color: "from-cyan-500 to-cyan-600",
+      data: {
+        name: "Mooring Purchase",
+        propertyType: "mooring",
+        commissionType: "fixed",
+        priority: "medium",
+      }
+    },
+  ];
+
+  const applyTemplate = (template: typeof dealTemplates[0]) => {
+    Object.entries(template.data).forEach(([key, value]) => {
+      form.setValue(key as any, value);
+    });
+    toast({ 
+      title: "Template applied", 
+      description: `${template.name} template loaded successfully` 
+    });
+  };
+
+  const formattedDealValue = dealAmount ? 
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(parseFloat(dealAmount)) : 
+    "$0";
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="deal-form-modal">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">{deal ? 'Edit Deal' : 'Create New Deal'}</DialogTitle>
+        <DialogHeader className="space-y-3">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-blue-600" />
+              {deal ? 'Edit Deal' : 'Create New Deal'}
+            </DialogTitle>
+            {!deal && dealAmount && (
+              <div className="text-right">
+                <div className="text-xs text-gray-500 font-medium">Deal Value</div>
+                <div className="text-xl font-bold text-green-600">{formattedDealValue}</div>
+              </div>
+            )}
+          </div>
+          {!deal && (
+            <div className="flex items-center gap-2 pt-2">
+              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                <Zap className="w-3.5 h-3.5" />
+                <span className="font-medium">Quick Start:</span>
+              </div>
+              {dealTemplates.map((template) => {
+                const Icon = template.icon;
+                return (
+                  <Button
+                    key={template.name}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={`text-xs h-7 bg-gradient-to-r ${template.color} text-white border-0 hover:opacity-90 transition-opacity`}
+                    onClick={() => applyTemplate(template)}
+                  >
+                    <Icon className="w-3 h-3 mr-1" />
+                    {template.name}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
         </DialogHeader>
         
         {/* Quick Stage Selector */}
@@ -845,9 +935,10 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
           </div>
         )}
         
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Tabs defaultValue="details" className="w-full">
+        <TooltipProvider>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <Tabs defaultValue="details" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="details" className="flex items-center gap-2" data-testid="tab-deal-details">
                   <FileText className="w-4 h-4" />
@@ -2376,7 +2467,17 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                         name="commissionRate"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Commission Rate (%)</FormLabel>
+                            <div className="flex items-center gap-1.5">
+                              <FormLabel>Commission Rate (%)</FormLabel>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-sm">The percentage of the deal value that will be paid as commission. Auto-populated based on deal source.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                             <FormControl>
                               <div className="relative">
                                 <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -2438,26 +2539,45 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
               </TabsContent>
             </Tabs>
 
-            <div className="flex justify-end space-x-3 pt-4 border-t">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose}
-                disabled={isLoading}
-                data-testid="button-cancel"
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isLoading}
-                data-testid="button-save-deal"
-              >
-                {isLoading ? 'Saving...' : (deal ? 'Update Deal' : 'Create Deal')}
-              </Button>
+            <div className="flex items-center justify-between pt-4 border-t bg-gray-50 -mx-6 px-6 py-4 -mb-6 rounded-b-lg">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Info className="w-3.5 h-3.5" />
+                <span>Press <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">Esc</kbd> to cancel</span>
+              </div>
+              <div className="flex gap-3">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={onClose}
+                  disabled={isLoading}
+                  data-testid="button-cancel"
+                  className="hover:bg-gray-100"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isLoading}
+                  data-testid="button-save-deal"
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white min-w-[140px]"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Saving...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>{deal ? 'Update Deal' : 'Create Deal'}</span>
+                    </div>
+                  )}
+                </Button>
+              </div>
             </div>
           </form>
         </Form>
+        </TooltipProvider>
       </DialogContent>
     </Dialog>
   );
