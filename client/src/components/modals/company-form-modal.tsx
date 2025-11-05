@@ -53,7 +53,7 @@ const industries = [
 ];
 
 export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFormModalProps) {
-  const { toast } = useToast();
+  const { toast} = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("basic");
   const [isLinkingContact, setIsLinkingContact] = useState(false);
@@ -62,6 +62,11 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
   const [contactRole, setContactRole] = useState("");
   const [isLinkingProperty, setIsLinkingProperty] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
+  
+  // Pending relationships for new companies
+  const [pendingContacts, setPendingContacts] = useState<Array<{contact: Contact, role?: string}>>([]);
+  const [pendingContactsToCreate, setPendingContactsToCreate] = useState<Array<{data: any, role?: string}>>([]);
+  const [pendingProperties, setPendingProperties] = useState<Property[]>([]);
 
   // Query to fetch linked contacts for existing company
   const { data: linkedContacts = [], refetch: refetchLinkedContacts } = useQuery<CompanyContactWithContact[]>({
@@ -69,10 +74,10 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
     enabled: !!company?.id && isOpen,
   });
 
-  // Query to fetch all contacts for linking
+  // Query to fetch all contacts for linking (enabled when on contacts tab or linking)
   const { data: allContacts = [] } = useQuery<Contact[]>({
     queryKey: ['/api/contacts'],
-    enabled: isLinkingContact && isOpen,
+    enabled: (isLinkingContact || activeTab === 'contacts') && isOpen,
   });
 
   // Query to fetch linked properties for existing company
@@ -81,10 +86,10 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
     enabled: !!company?.id && isOpen,
   });
 
-  // Query to fetch all properties for linking
+  // Query to fetch all properties for linking (enabled when on properties tab or linking)
   const { data: allProperties = [] } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
-    enabled: isLinkingProperty && isOpen,
+    enabled: (isLinkingProperty || activeTab === 'properties') && isOpen,
   });
 
   const form = useForm({
@@ -147,8 +152,14 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
         website: "",
         description: "",
       });
+      // Reset pending relationships when creating a new company
+      setPendingContacts([]);
+      setPendingContactsToCreate([]);
+      setPendingProperties([]);
     }
-  }, [company, form]);
+    // Reset active tab when opening modal
+    setActiveTab("basic");
+  }, [company, form, isOpen]);
 
   const createCompanyMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -157,13 +168,59 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
         if (cleanData[key] === "") delete cleanData[key];
       });
       
-      return await apiRequest('POST', '/api/companies', cleanData);
+      const response = await apiRequest('POST', '/api/companies', cleanData);
+      const newCompany = await response.json();
+      
+      // Handle pending contacts and properties
+      if (pendingContacts.length > 0 || pendingContactsToCreate.length > 0 || pendingProperties.length > 0) {
+        // Link existing contacts
+        for (const { contact, role } of pendingContacts) {
+          await apiRequest('POST', '/api/contact-companies', {
+            contactId: contact.id,
+            companyId: newCompany.id,
+            role: role || null,
+            isPrimary: false,
+          });
+        }
+        
+        // Create and link new contacts
+        for (const { data: contactData, role } of pendingContactsToCreate) {
+          const cleanContactData = { ...contactData };
+          Object.keys(cleanContactData).forEach(key => {
+            if (cleanContactData[key] === "") delete cleanContactData[key];
+          });
+          const contactResponse = await apiRequest('POST', '/api/contacts', cleanContactData);
+          const newContact = await contactResponse.json();
+          
+          await apiRequest('POST', '/api/contact-companies', {
+            contactId: newContact.id,
+            companyId: newCompany.id,
+            role: role || null,
+            isPrimary: false,
+          });
+        }
+        
+        // Link properties
+        for (const property of pendingProperties) {
+          await apiRequest('POST', '/api/company-properties', {
+            propertyId: property.id,
+            companyId: newCompany.id,
+          });
+        }
+      }
+      
+      return newCompany;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       toast({ title: "Company created successfully" });
       onClose();
       form.reset();
+      setPendingContacts([]);
+      setPendingContactsToCreate([]);
+      setPendingProperties([]);
     },
     onError: (error: any) => {
       toast({ 
@@ -319,18 +376,49 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
 
   // Helper functions
   const handleLinkExistingContact = () => {
-    if (!selectedContactId || !company?.id) return;
+    if (!selectedContactId) return;
     
-    linkContactMutation.mutate({
-      contactId: selectedContactId,
-      companyId: company.id,
-      role: contactRole || null,
-      isPrimary: false,
-    });
+    if (company?.id) {
+      // Existing company - link immediately
+      linkContactMutation.mutate({
+        contactId: selectedContactId,
+        companyId: company.id,
+        role: contactRole || null,
+        isPrimary: false,
+      });
+    } else {
+      // New company - add to pending
+      const contact = allContacts.find(c => c.id === selectedContactId);
+      if (contact) {
+        setPendingContacts([...pendingContacts, { contact, role: contactRole || undefined }]);
+        setIsLinkingContact(false);
+        setSelectedContactId("");
+        setContactRole("");
+        toast({ title: "Contact added (will be linked when company is created)" });
+      }
+    }
   };
 
   const handleCreateNewContact = (data: any) => {
-    createContactMutation.mutate(data);
+    if (company?.id) {
+      // Existing company - create and link immediately
+      createContactMutation.mutate(data);
+    } else {
+      // New company - add to pending
+      setPendingContactsToCreate([...pendingContactsToCreate, { data, role: contactRole || undefined }]);
+      setIsCreatingContact(false);
+      contactForm.reset();
+      setContactRole("");
+      toast({ title: "Contact added (will be created when company is created)" });
+    }
+  };
+  
+  const handleRemovePendingContact = (index: number) => {
+    setPendingContacts(pendingContacts.filter((_, i) => i !== index));
+  };
+  
+  const handleRemovePendingContactToCreate = (index: number) => {
+    setPendingContactsToCreate(pendingContactsToCreate.filter((_, i) => i !== index));
   };
 
   const handleSetPrimary = (contactCompanyId: string) => {
@@ -384,24 +472,42 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
   });
 
   const handleLinkProperty = () => {
-    if (!selectedPropertyId || !company?.id) return;
+    if (!selectedPropertyId) return;
     
-    linkPropertyMutation.mutate({
-      propertyId: selectedPropertyId,
-      companyId: company.id,
-    });
+    if (company?.id) {
+      // Existing company - link immediately
+      linkPropertyMutation.mutate({
+        propertyId: selectedPropertyId,
+        companyId: company.id,
+      });
+    } else {
+      // New company - add to pending
+      const property = allProperties.find(p => p.id === selectedPropertyId);
+      if (property) {
+        setPendingProperties([...pendingProperties, property]);
+        setIsLinkingProperty(false);
+        setSelectedPropertyId("");
+        toast({ title: "Property added (will be linked when company is created)" });
+      }
+    }
   };
 
   const handleUnlinkProperty = (companyPropertyId: string) => {
     unlinkPropertyMutation.mutate(companyPropertyId);
   };
+  
+  const handleRemovePendingProperty = (index: number) => {
+    setPendingProperties(pendingProperties.filter((_, i) => i !== index));
+  };
 
   const isLoading = createCompanyMutation.isPending || updateCompanyMutation.isPending;
   const availableContacts = allContacts.filter((contact: Contact) => 
-    !linkedContacts.some((linked: CompanyContactWithContact) => linked.contact.id === contact.id)
+    !linkedContacts.some((linked: CompanyContactWithContact) => linked.contact.id === contact.id) &&
+    !pendingContacts.some(pending => pending.contact.id === contact.id)
   );
   const availableProperties = allProperties.filter((property: Property) => 
-    !linkedProperties.some((linked: CompanyPropertyWithProperty) => linked.property.id === property.id)
+    !linkedProperties.some((linked: CompanyPropertyWithProperty) => linked.property.id === property.id) &&
+    !pendingProperties.some(pending => pending.id === property.id)
   );
 
   // Prepare contact options for searchable select
@@ -428,13 +534,13 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
               <Building className="h-4 w-4" />
               Company Info
             </TabsTrigger>
-            <TabsTrigger value="contacts" className="flex items-center gap-2" disabled={!company}>
+            <TabsTrigger value="contacts" className="flex items-center gap-2">
               <User className="h-4 w-4" />
-              Contacts ({linkedContacts?.length || 0})
+              Contacts ({company ? linkedContacts?.length || 0 : pendingContacts.length + pendingContactsToCreate.length})
             </TabsTrigger>
-            <TabsTrigger value="properties" className="flex items-center gap-2" disabled={!company}>
+            <TabsTrigger value="properties" className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
-              Properties ({linkedProperties?.length || 0})
+              Properties ({company ? linkedProperties?.length || 0 : pendingProperties.length})
             </TabsTrigger>
           </TabsList>
 
@@ -617,45 +723,45 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
           </TabsContent>
 
           <TabsContent value="contacts" className="space-y-4">
-            {company && (
-              <>
-                {/* Linked Contacts Section */}
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium">Linked Contacts</h3>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsLinkingContact(true)}
-                        data-testid="button-link-existing-contact"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Link Existing
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsCreatingContact(true)}
-                        data-testid="button-create-new-contact"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create New
-                      </Button>
-                    </div>
-                  </div>
+            {/* Linked/Pending Contacts Section */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium">{company ? 'Linked Contacts' : 'Contacts to Add'}</h3>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsLinkingContact(true)}
+                    data-testid="button-link-existing-contact"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Link Existing
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsCreatingContact(true)}
+                    data-testid="button-create-new-contact"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New
+                  </Button>
+                </div>
+              </div>
 
-                  {linkedContacts?.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No contacts linked to this company yet.</p>
-                      <p className="text-sm">Click the buttons above to add contacts.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {linkedContacts?.map((linkedContact: any) => (
+              {company ? (
+                // Existing company - show linked contacts
+                linkedContacts?.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No contacts linked to this company yet.</p>
+                    <p className="text-sm">Click the buttons above to add contacts.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {linkedContacts?.map((linkedContact: any) => (
                         <div
                           key={linkedContact.id}
                           className="flex items-center justify-between p-4 border rounded-lg bg-card"
@@ -711,11 +817,96 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
+                )
+              ) : (
+                // New company - show pending contacts
+                (pendingContacts.length === 0 && pendingContactsToCreate.length === 0) ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No contacts added yet.</p>
+                    <p className="text-sm">Contacts added here will be linked when you create the company.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Pending existing contacts */}
+                    {pendingContacts.map((pending, index) => (
+                      <div
+                        key={`pending-${index}`}
+                        className="flex items-center justify-between p-4 border rounded-lg bg-card border-dashed"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+                            <User className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {pending.contact.firstName} {pending.contact.lastName}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {pending.contact.email}
+                              {pending.role && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  {pending.role}
+                                </Badge>
+                              )}
+                              <Badge variant="secondary" className="ml-2 text-xs">Pending</Badge>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemovePendingContact(index)}
+                          data-testid={`button-remove-pending-contact-${index}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {/* Pending new contacts to create */}
+                    {pendingContactsToCreate.map((pending, index) => (
+                      <div
+                        key={`pending-create-${index}`}
+                        className="flex items-center justify-between p-4 border rounded-lg bg-card border-dashed border-green-300"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+                            <User className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {pending.data.firstName} {pending.data.lastName}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {pending.data.email}
+                              {pending.role && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  {pending.role}
+                                </Badge>
+                              )}
+                              <Badge variant="secondary" className="ml-2 text-xs bg-green-100 text-green-800">Will Create</Badge>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemovePendingContactToCreate(index)}
+                          data-testid={`button-remove-pending-create-contact-${index}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
 
-                {/* Link Existing Contact Section */}
-                {isLinkingContact && (
+            {/* Link Existing Contact Section */}
+            {isLinkingContact && (
                   <div className="border rounded-lg p-4 bg-muted/50">
                     <h4 className="font-medium mb-3">Link Existing Contact</h4>
                     <div className="space-y-3">
@@ -877,38 +1068,36 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                     </Form>
                   </div>
                 )}
-              </>
-            )}
           </TabsContent>
 
           <TabsContent value="properties" className="space-y-4">
-            {company && (
-              <>
-                {/* Linked Properties Section */}
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium">Linked Properties</h3>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsLinkingProperty(true)}
-                      data-testid="button-link-property"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Link Property
-                    </Button>
-                  </div>
+            {/* Linked/Pending Properties Section */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium">{company ? 'Linked Properties' : 'Properties to Add'}</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsLinkingProperty(true)}
+                  data-testid="button-link-property"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Link Property
+                </Button>
+              </div>
 
-                  {linkedProperties?.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No properties linked to this company yet.</p>
-                      <p className="text-sm">Click the button above to link properties.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {linkedProperties?.map((linkedProperty: any) => (
+              {company ? (
+                // Existing company - show linked properties
+                linkedProperties?.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No properties linked to this company yet.</p>
+                    <p className="text-sm">Click the button above to link properties.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {linkedProperties?.map((linkedProperty: any) => (
                         <div
                           key={linkedProperty.id}
                           className="flex items-center justify-between p-4 border rounded-lg bg-card"
@@ -943,11 +1132,59 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
+                  )
+              ) : (
+                // New company - show pending properties
+                pendingProperties.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No properties added yet.</p>
+                    <p className="text-sm">Properties added here will be linked when you create the company.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingProperties.map((property, index) => (
+                      <div
+                        key={`pending-prop-${index}`}
+                        className="flex items-center justify-between p-4 border rounded-lg bg-card border-dashed"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+                            <MapPin className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {property.title}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {property.address}
+                              {property.listingPrice && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  ${property.listingPrice.toLocaleString()}
+                                </Badge>
+                              )}
+                              <Badge variant="secondary" className="ml-2 text-xs">Pending</Badge>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemovePendingProperty(index)}
+                          data-testid={`button-remove-pending-property-${index}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
 
-                {/* Link Property Section */}
-                {isLinkingProperty && (
+            {/* Link Property Section */}
+            {isLinkingProperty && (
                   <div className="border rounded-lg p-4 bg-muted/50">
                     <h4 className="font-medium mb-3">Link Property</h4>
                     <div className="space-y-3">
@@ -991,8 +1228,6 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                     </div>
                   </div>
                 )}
-              </>
-            )}
           </TabsContent>
         </Tabs>
       </DialogContent>
