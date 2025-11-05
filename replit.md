@@ -21,20 +21,28 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### November 2025 - Marketing Automation Backend
-- **Multi-Step Email Sequences**: Implemented comprehensive marketing automation backend for drip campaigns
+### November 2025 - Marketing Automation Complete
+- **Multi-Step Email Sequences**: Implemented comprehensive marketing automation system with backend and frontend
   - Database Schema: Added 3 new tables for sequence management
     - `crmEmailSequenceSteps`: Individual steps with delay settings, content, scheduling options
     - `crmEmailSequenceEnrollments`: Track contacts/leads/deals enrolled in sequences with status
     - `crmEmailSequenceStepExecutions`: Track email sends with delivery, open, click metrics
-  - Storage Layer: Full CRUD operations with proper ordering and entity-specific queries
+  - Storage Layer: Full CRUD operations with proper ordering and entity-specific queries including `getEmailSequenceEnrollmentsForUser`
   - API Routes: RESTful endpoints for sequences, templates, steps, enrollments
+    - GET `/api/email-sequences` - List all sequences for user
+    - GET `/api/email-templates` - List all templates for user
+    - GET `/api/email-sequence-enrollments` - List all enrollments for user (independent of sequence status)
   - Security: Comprehensive ownership checks, immutable field protection, Zod validation
     - All routes verify user ownership before access/mutation (403 unauthorized)
     - Immutable fields (`createdById`, `sequenceId`, `entityType`, `entityId`) stripped from updates
     - Validation errors return 400, server errors return 500
-  - Routes: `/api/email-sequences`, `/api/email-templates`, `/api/email-sequence-enrollments`
-  - Next: Frontend UI for sequence builder, template editor, enrollment manager
+  - Frontend UI: Complete marketing automation dashboard at `/crm/marketing-automation`
+    - Three tabs: Sequences, Templates, Enrollments with real-time stats dashboard
+    - Sequence management: Create/edit/delete sequences, activate/pause/draft status control
+    - Template management: Create/edit/delete reusable email templates with categories
+    - Enrollment management: Enroll entities (contacts/leads/deals), view status, unenroll
+    - All components include proper loading states, empty states, error handling, and data-testids
+    - Query invalidation ensures UI stays synchronized after mutations
 
 ### November 2025 - File Attachment System & CRM Enhancements
 - **File Upload System**: Implemented comprehensive file attachment functionality for CRM entities
