@@ -326,7 +326,7 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
                   data-testid="checkbox-link-to-portfolio-upload"
                 />
                 <Label className="text-sm font-medium cursor-pointer" onClick={() => setLinkToPortfolio(!linkToPortfolio)}>
-                  Link imported comps to a portfolio
+                  Portfolio Sale
                 </Label>
               </div>
 

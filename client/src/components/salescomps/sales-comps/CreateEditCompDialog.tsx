@@ -420,96 +420,70 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         )}
                       />
                       
-                      <FormField
-                        control={form.control}
-                        name="isPortfolio"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                data-testid="checkbox-is-portfolio"
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel className="text-sm font-normal">
-                                Portfolio Sale
-                              </FormLabel>
-                              <p className="text-xs text-muted-foreground">
-                                Check if this is a portfolio sale containing multiple properties
-                              </p>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-
-                      {!form.watch("isPortfolio") && (
-                        <div className="space-y-3">
-                          <div className="flex items-center space-x-3">
-                            <Checkbox
-                              checked={linkToPortfolio}
-                              onCheckedChange={(checked) => {
-                                setLinkToPortfolio(!!checked);
-                                if (!checked) {
-                                  form.setValue("parentPortfolioId", "");
-                                }
-                              }}
-                              data-testid="checkbox-link-to-portfolio"
-                            />
-                            <Label className="text-sm font-normal cursor-pointer" onClick={() => setLinkToPortfolio(!linkToPortfolio)}>
-                              Link to Portfolio
-                            </Label>
-                          </div>
-
-                          {linkToPortfolio && (
-                            <div className="flex gap-2">
-                              <FormField
-                                control={form.control}
-                                name="parentPortfolioId"
-                                render={({ field }) => (
-                                  <FormItem className="flex-1">
-                                    <FormControl>
-                                      <Select 
-                                        value={field.value || ""} 
-                                        onValueChange={field.onChange}
-                                      >
-                                        <SelectTrigger data-testid="select-portfolio">
-                                          <SelectValue placeholder="Select a portfolio..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {portfoliosData?.comps && portfoliosData.comps.length > 0 ? (
-                                            portfoliosData.comps.map((portfolio) => (
-                                              <SelectItem key={portfolio.id} value={portfolio.id}>
-                                                {portfolio.marina}
-                                              </SelectItem>
-                                            ))
-                                          ) : (
-                                            <SelectItem value="no-portfolios" disabled>
-                                              No portfolios available
-                                            </SelectItem>
-                                          )}
-                                        </SelectContent>
-                                      </Select>
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setShowNewPortfolioDialog(true)}
-                                data-testid="button-new-portfolio"
-                              >
-                                <Plus className="h-4 w-4 mr-1" />
-                                New Portfolio
-                              </Button>
-                            </div>
-                          )}
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <Checkbox
+                            checked={linkToPortfolio}
+                            onCheckedChange={(checked) => {
+                              setLinkToPortfolio(!!checked);
+                              if (!checked) {
+                                form.setValue("parentPortfolioId", "");
+                              }
+                            }}
+                            data-testid="checkbox-portfolio-sale"
+                          />
+                          <Label className="text-sm font-normal cursor-pointer" onClick={() => setLinkToPortfolio(!linkToPortfolio)}>
+                            Portfolio Sale
+                          </Label>
                         </div>
-                      )}
+
+                        {linkToPortfolio && (
+                          <div className="flex gap-2">
+                            <FormField
+                              control={form.control}
+                              name="parentPortfolioId"
+                              render={({ field }) => (
+                                <FormItem className="flex-1">
+                                  <FormControl>
+                                    <Select 
+                                      value={field.value || ""} 
+                                      onValueChange={field.onChange}
+                                    >
+                                      <SelectTrigger data-testid="select-portfolio">
+                                        <SelectValue placeholder="Select a portfolio..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {portfoliosData?.comps && portfoliosData.comps.length > 0 ? (
+                                          portfoliosData.comps.map((portfolio) => (
+                                            <SelectItem key={portfolio.id} value={portfolio.id}>
+                                              {portfolio.marina}
+                                            </SelectItem>
+                                          ))
+                                        ) : (
+                                          <SelectItem value="no-portfolios" disabled>
+                                            No portfolios available
+                                          </SelectItem>
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowNewPortfolioDialog(true)}
+                              data-testid="button-new-portfolio"
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              New Portfolio
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                       
                       <div className="grid grid-cols-2 gap-3">
                         <FormField
