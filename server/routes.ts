@@ -7754,7 +7754,7 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.orgId;
 
-      const { mapping, normalization, excludedRows = [] } = req.body;
+      const { mapping, normalization, excludedRows = [], parentPortfolioId } = req.body;
       
       console.log(`Starting import for ${req.params.importId} with mapping:`, mapping);
       
@@ -7764,7 +7764,8 @@ Current context: Project ${req.params.projectId}`;
         userId,
         mapping,
         normalization,
-        excludedRows
+        excludedRows,
+        parentPortfolioId
       );
       
       console.log(`Import completed for ${req.params.importId}:`, result);

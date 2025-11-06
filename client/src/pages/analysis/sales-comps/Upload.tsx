@@ -2,11 +2,17 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Upload as UploadIcon, X, Check, AlertTriangle } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ArrowLeft, Upload as UploadIcon, X, Check, AlertTriangle, Plus } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { salesCompsApi } from "@/lib/salescomps/api";
 import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/salescomps/queryKeys";
 import { formatFileSize } from "@/lib/salescomps/format";
 import ColumnMapper from "@/components/salescomps/sales-comps/ColumnMapper";
 import DuplicateReview from "@/components/salescomps/sales-comps/DuplicateReview";
@@ -33,7 +39,18 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
   });
   const [duplicates, setDuplicates] = useState<any[]>([]);
   const [excludedRows, setExcludedRows] = useState<number[]>([]);
+  const [linkToPortfolio, setLinkToPortfolio] = useState(false);
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>("");
+  const [showNewPortfolioDialog, setShowNewPortfolioDialog] = useState(false);
+  const [newPortfolioName, setNewPortfolioName] = useState("");
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch existing portfolio comps
+  const { data: portfoliosData } = useQuery({
+    queryKey: queryKeys.comps.portfolios,
+    queryFn: () => salesCompsApi.getComps({ isPortfolio: true }),
+    enabled: linkToPortfolio,
+  });
 
   const uploadMutation = useMutation({
     mutationFn: salesCompsApi.uploadFile,
@@ -73,8 +90,8 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
   });
 
   const commitMutation = useMutation({
-    mutationFn: ({ importId, mapping, normalization, excludedRows }: any) =>
-      salesCompsApi.commitImport(importId, mapping, normalization, excludedRows),
+    mutationFn: ({ importId, mapping, normalization, excludedRows, parentPortfolioId }: any) =>
+      salesCompsApi.commitImport(importId, mapping, normalization, excludedRows, parentPortfolioId),
     onSuccess: () => {
       setStep('processing');
       // Poll for completion status
@@ -83,6 +100,30 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     onError: (error) => {
       toast({
         title: "Import Failed", 
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createPortfolioMutation = useMutation({
+    mutationFn: (name: string) => salesCompsApi.createComp({ 
+      marina: name, 
+      isPortfolio: true,
+    } as any),
+    onSuccess: (newPortfolio) => {
+      toast({
+        title: "Success",
+        description: "Portfolio created successfully",
+      });
+      setSelectedPortfolioId(newPortfolio.id);
+      setShowNewPortfolioDialog(false);
+      setNewPortfolioName("");
+      queryClient.invalidateQueries({ queryKey: queryKeys.comps.portfolios });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
         description: (error as Error).message,
         variant: "destructive",
       });
@@ -185,6 +226,7 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
       mapping,
       normalization,
       excludedRows,
+      parentPortfolioId: linkToPortfolio ? selectedPortfolioId : undefined,
     });
   };
 
@@ -268,6 +310,65 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
             normalization={normalization}
             onNormalizationChange={setNormalization}
           />
+
+          {/* Portfolio Selection */}
+          <Card className="mt-6 p-4">
+            <div className="space-y-3">
+              <div className="flex items-center space-x-3">
+                <Checkbox
+                  checked={linkToPortfolio}
+                  onCheckedChange={(checked) => {
+                    setLinkToPortfolio(!!checked);
+                    if (!checked) {
+                      setSelectedPortfolioId("");
+                    }
+                  }}
+                  data-testid="checkbox-link-to-portfolio-upload"
+                />
+                <Label className="text-sm font-medium cursor-pointer" onClick={() => setLinkToPortfolio(!linkToPortfolio)}>
+                  Link imported comps to a portfolio
+                </Label>
+              </div>
+
+              {linkToPortfolio && (
+                <div className="flex gap-2 ml-6">
+                  <div className="flex-1">
+                    <Select 
+                      value={selectedPortfolioId} 
+                      onValueChange={setSelectedPortfolioId}
+                    >
+                      <SelectTrigger data-testid="select-portfolio-upload">
+                        <SelectValue placeholder="Select a portfolio..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {portfoliosData?.comps && portfoliosData.comps.length > 0 ? (
+                          portfoliosData.comps.map((portfolio) => (
+                            <SelectItem key={portfolio.id} value={portfolio.id}>
+                              {portfolio.marina}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-portfolios" disabled>
+                            No portfolios available
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowNewPortfolioDialog(true)}
+                    data-testid="button-new-portfolio-upload"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    New Portfolio
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
         </>
       )}
     </div>
@@ -451,6 +552,50 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
           </div>
         </div>
       </Card>
+
+      {/* New Portfolio Dialog */}
+      <Dialog open={showNewPortfolioDialog} onOpenChange={setShowNewPortfolioDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Portfolio</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="portfolio-name-upload">Portfolio Name *</Label>
+              <Input
+                id="portfolio-name-upload"
+                value={newPortfolioName}
+                onChange={(e) => setNewPortfolioName(e.target.value)}
+                placeholder="Enter portfolio name..."
+                data-testid="input-new-portfolio-name-upload"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowNewPortfolioDialog(false);
+                setNewPortfolioName("");
+              }}
+              data-testid="button-cancel-new-portfolio-upload"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (newPortfolioName.trim()) {
+                  createPortfolioMutation.mutate(newPortfolioName.trim());
+                }
+              }}
+              disabled={!newPortfolioName.trim() || createPortfolioMutation.isPending}
+              data-testid="button-create-portfolio-upload"
+            >
+              {createPortfolioMutation.isPending ? "Creating..." : "Create Portfolio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -179,7 +179,8 @@ export class CompService {
     userId: string,
     mapping: Record<string, string>,
     normalization: any,
-    excludedRows: number[] = []
+    excludedRows: number[] = [],
+    parentPortfolioId?: string
   ): Promise<any> {
     try {
       // Update import status
@@ -258,7 +259,8 @@ export class CompService {
             yearBuilt: transformedData.yearBuilt || undefined,
             notes: transformedData.notes || undefined,
             articleUrls: transformedData.articleUrls || [],
-            custom: transformedData.custom || {}
+            custom: transformedData.custom || {},
+            parentPortfolioId: parentPortfolioId || undefined,
           };
 
           await this.storage.createComp(compData);

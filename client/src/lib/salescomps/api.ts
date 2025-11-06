@@ -131,11 +131,12 @@ export const salesCompsApi = {
     return await response.json();
   },
 
-  commitImport: async (importId: string, mapping: Record<string, string>, normalization: any, excludedRows: number[] = []): Promise<any> => {
+  commitImport: async (importId: string, mapping: Record<string, string>, normalization: any, excludedRows: number[] = [], parentPortfolioId?: string): Promise<any> => {
     const response = await apiRequest('POST', `/api/sales-comps/import/${importId}/commit`, {
       mapping,
       normalization,
       excludedRows,
+      parentPortfolioId,
     });
     return await response.json();
   },
