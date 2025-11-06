@@ -49,6 +49,8 @@ Preferred communication style: Simple, everyday language.
 - **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation.
 - **Due Diligence Module**: Project management with task tracking, Gantt-style timeline visualization, template management, and progress reporting. "All Projects" serves as the default landing page.
 - **CRM-DD Integration**: Ability to convert CRM deals into DD projects with automatic task creation and contact mapping.
+- **SalesComps Module**: Marina sales comparables management with CSV import/export, project grouping, rate analysis, Google Maps address autocomplete, organization-based multi-tenancy, portfolio functionality, and customizable storage types.
+- **SalesComps-CRM Properties Integration**: Automatic property matching during CSV import based on marina name, city, and state. Unmatched comps create pending property profile tasks with banner notifications on Properties page.
 - **Marketing Automation**: Multi-step email sequences with templates and enrollment tracking for contacts, leads, and deals.
 - **File Attachment System**: Comprehensive file upload, listing, download, and deletion for CRM entities.
 - **Bulk Actions**: Multi-select, bulk delete, and CSV export for Contacts, Companies, and Deals.
