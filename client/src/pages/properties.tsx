@@ -232,13 +232,13 @@ export default function Properties() {
                 className="h-auto p-0 text-sm text-blue-600 hover:text-blue-800 underline"
                 onClick={() => {
                   toast({
-                    title: "Feature coming soon",
-                    description: "Property form will be available in the next update to complete these profiles.",
+                    title: "Property profiles needed",
+                    description: `${pendingCount} sales comp${pendingCount !== 1 ? 's' : ''} waiting for property profile creation. Property form coming soon.`,
                   });
                 }}
                 data-testid="button-complete-profiles"
               >
-                Complete now
+                View pending
               </Button>
             </div>
             <Button
