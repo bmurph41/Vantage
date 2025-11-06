@@ -92,6 +92,7 @@ export default function CompsDataGrid({
     dragStartIndex: number;
     dropTargetIndex: number;
     columnPositions: Array<{ key: string; left: number; right: number; centerX: number }>;
+    isDragging: boolean; // Track if we've passed the threshold
   } | null>(null);
   const [detailCompId, setDetailCompId] = useState<string | null>(null);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
@@ -609,12 +610,28 @@ export default function CompsDataGrid({
 
   // Enhanced mouse-based column dragging with position caching for fluid movement
   const handleColumnMouseDown = (e: React.MouseEvent, columnKey: string) => {
-    // Only start drag on header, not resize handle
-    if ((e.target as HTMLElement).closest('[data-testid^="resize-handle"]')) {
+    const target = e.target as HTMLElement;
+    
+    // Don't start drag if clicking on interactive elements
+    if (
+      target.closest('[data-testid^="resize-handle"]') ||
+      target.closest('button') ||
+      target.closest('[role="button"]') ||
+      target.closest('input') ||
+      target.closest('[data-radix-collection-item]') // Radix UI dropdown items
+    ) {
+      return;
+    }
+    
+    // Only allow dragging from non-sortable columns or the label area
+    const column = columns.find(col => col.key === columnKey);
+    if (!column || column.key === 'expand' || column.key === 'actions') {
       return;
     }
     
     e.preventDefault();
+    e.stopPropagation();
+    
     const columnIndex = columns.findIndex(col => col.key === columnKey);
     if (columnIndex === -1) return;
     
@@ -638,21 +655,23 @@ export default function CompsDataGrid({
       });
     }
     
-    setIsDraggingColumn(columnKey);
+    // Don't set isDraggingColumn yet - wait for threshold
     setDragState({
       draggedKey: columnKey,
       startX: e.clientX,
       currentX: e.clientX,
       dragStartIndex: columnIndex,
       dropTargetIndex: columnIndex,
-      columnPositions
+      columnPositions,
+      isDragging: false
     });
   };
 
   const handleColumnMouseMove = useCallback((e: MouseEvent) => {
-    if (!dragState || !isDraggingColumn) return;
+    if (!dragState) return;
     
     const currentX = e.clientX;
+    const dragThreshold = 5; // pixels to move before drag starts
     
     // Use requestAnimationFrame for smooth 60fps updates
     requestAnimationFrame(() => {
@@ -660,16 +679,30 @@ export default function CompsDataGrid({
       setDragState(prev => {
         if (!prev) return null;
         
+        const distance = Math.abs(currentX - prev.startX);
+        
+        // Check if we've passed the drag threshold
+        if (!prev.isDragging && distance > dragThreshold) {
+          // Activate dragging
+          setIsDraggingColumn(prev.draggedKey);
+          return { ...prev, isDragging: true, currentX };
+        }
+        
+        // Only update drop target if we're actively dragging
+        if (!prev.isDragging) {
+          return { ...prev, currentX };
+        }
+        
         // Find the target column using pre-calculated positions (much faster than DOM queries)
         let newTargetIndex = prev.dragStartIndex;
         let closestDistance = Infinity;
         
         prev.columnPositions.forEach((position, index) => {
-          const distance = Math.abs(currentX - position.centerX);
+          const dist = Math.abs(currentX - position.centerX);
           const halfWidth = (position.right - position.left) / 2;
           
-          if (distance < closestDistance && distance < halfWidth) {
-            closestDistance = distance;
+          if (dist < closestDistance && dist < halfWidth) {
+            closestDistance = dist;
             newTargetIndex = index;
           }
         });
@@ -681,17 +714,17 @@ export default function CompsDataGrid({
         };
       });
     });
-  }, [dragState, isDraggingColumn]);
+  }, [dragState]);
 
   const handleColumnMouseUp = useCallback(() => {
-    if (!dragState || !isDraggingColumn) return;
+    if (!dragState) return;
     
-    const { draggedKey, dragStartIndex, dropTargetIndex } = dragState;
+    const { draggedKey, dragStartIndex, dropTargetIndex, isDragging } = dragState;
     
     // Use a small delay to ensure smooth animation completion
     requestAnimationFrame(() => {
-      // Only reorder if dropped on a different position
-      if (dragStartIndex !== dropTargetIndex) {
+      // Only reorder if we actually started dragging and dropped on a different position
+      if (isDragging && dragStartIndex !== dropTargetIndex) {
         const targetColumn = columns[dropTargetIndex];
         if (targetColumn) {
           handleColumnReorder(draggedKey, targetColumn.key);
@@ -702,15 +735,19 @@ export default function CompsDataGrid({
       setIsDraggingColumn(null);
       setDragState(null);
     });
-  }, [dragState, isDraggingColumn, columns]);
+  }, [dragState, columns]);
 
   // Global mouse event listeners for smooth dragging
   useEffect(() => {
-    if (isDraggingColumn && dragState) {
+    if (dragState) {
       document.addEventListener('mousemove', handleColumnMouseMove);
       document.addEventListener('mouseup', handleColumnMouseUp);
-      document.body.style.cursor = 'grabbing';
-      document.body.style.userSelect = 'none';
+      
+      // Only change cursor if actively dragging
+      if (dragState.isDragging) {
+        document.body.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
+      }
       
       return () => {
         document.removeEventListener('mousemove', handleColumnMouseMove);
@@ -719,7 +756,7 @@ export default function CompsDataGrid({
         document.body.style.userSelect = '';
       };
     }
-  }, [isDraggingColumn, dragState, handleColumnMouseMove, handleColumnMouseUp]);
+  }, [dragState, handleColumnMouseMove, handleColumnMouseUp]);
 
   // Helper function to calculate aggregated NOI for portfolios
   const getPortfolioNOI = (portfolioComp: SalesComp): number | null => {
@@ -1037,23 +1074,27 @@ export default function CompsDataGrid({
                       width: `${column.width}px`,
                       minWidth: `${column.width}px`,
                       maxWidth: `${column.width}px`,
-                      cursor: column.key !== 'expand' && column.key !== 'actions' ? 'grab' : 'default',
                       transform: isDraggingColumn === column.key && dragState ? 
                         `translateX(${dragState.currentX - dragState.startX}px)` : 'none',
                       zIndex: isDraggingColumn === column.key ? 1000 : 'auto',
                       position: isDraggingColumn === column.key ? 'relative' : 'static'
                     }}
-                    onMouseDown={(e) => handleColumnMouseDown(e, column.key)}
                     data-testid={`header-${column.key}`}
                   >
-                    <div className="flex items-center justify-between h-full">
-                      <div className="flex items-center flex-1 min-w-0">
+                    <div 
+                      className="flex items-center justify-between h-full"
+                      onMouseDown={(e) => handleColumnMouseDown(e, column.key)}
+                    >
+                      <div className="flex items-center flex-1 min-w-0 cursor-grab active:cursor-grabbing">
                         {column.sortable ? (
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-auto p-0 font-medium text-muted-foreground hover:text-foreground truncate"
-                            onClick={() => onSort(column.key)}
+                            className="h-auto p-0 font-medium text-muted-foreground hover:text-foreground truncate cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSort(column.key);
+                            }}
                             data-testid={`sort-${column.key}`}
                           >
                             <span className="truncate">{column.label}</span>
