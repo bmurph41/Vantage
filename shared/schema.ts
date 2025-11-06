@@ -3074,6 +3074,18 @@ export const salesComps = pgTable('sales_comps', {
   orgCoastalIdx: index('sales_comps_org_coastal_idx').on(table.orgId, table.coastalType),
 }));
 
+// Custom storage types table - per-organization customizable storage types
+export const scCustomStorageTypes = pgTable('sc_custom_storage_types', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('sc_custom_storage_types_org_idx').on(table.orgId),
+  orgNameIdx: index('sc_custom_storage_types_org_name_idx').on(table.orgId, table.name),
+}));
+
 // Column definitions for dynamic columns
 export const compColumns = pgTable('comp_columns', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -3492,3 +3504,9 @@ export type ProfitCenter = z.infer<typeof profitCentersSchema>[number];
 export type ScSavedSearch = typeof scSavedSearches.$inferSelect;
 export type InsertScSavedSearch = z.infer<typeof insertScSavedSearchSchema>;
 export type UpdateScSavedSearch = z.infer<typeof updateScSavedSearchSchema>;
+export type ScCustomStorageType = typeof scCustomStorageTypes.$inferSelect;
+export const insertScCustomStorageTypeSchema = createInsertSchema(scCustomStorageTypes).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertScCustomStorageType = z.infer<typeof insertScCustomStorageTypeSchema>;

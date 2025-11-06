@@ -8,7 +8,7 @@ import {
   crmImportJobs, crmImportedRecords, crmProspectingEntries,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
-  salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches,
+  salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
@@ -18,7 +18,7 @@ import {
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
-  type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch,
+  type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScCustomStorageType,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
@@ -32,7 +32,7 @@ import {
   type InsertSalesComp, type UpdateSalesComp, type InsertCompColumn, type UpdateCompColumn, type InsertCompImport,
   type InsertScProject, type UpdateScProject, type InsertScProjectComp, type UpdateScProjectComp,
   type InsertScRecommendationFeedback, type InsertScOrgPreferences, type UpdateScOrgPreferences,
-  type InsertScSavedSearch, type UpdateScSavedSearch
+  type InsertScSavedSearch, type UpdateScSavedSearch, type InsertScCustomStorageType
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, isNull, or, count } from "drizzle-orm";
@@ -480,6 +480,11 @@ export interface IStorage {
   updateScSavedSearch(id: string, data: UpdateScSavedSearch, orgId: string): Promise<ScSavedSearch | undefined>;
   deleteScSavedSearch(id: string, orgId: string, deletedBy: string): Promise<boolean>;
   incrementScSavedSearchUsage(id: string, orgId: string): Promise<void>;
+
+  // SalesComps - Custom Storage Types
+  getScCustomStorageTypes(orgId: string): Promise<ScCustomStorageType[]>;
+  createScCustomStorageType(data: InsertScCustomStorageType): Promise<ScCustomStorageType>;
+  deleteScCustomStorageType(id: string, orgId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3356,6 +3361,31 @@ export class DatabaseStorage implements IStorage {
         eq(scSavedSearches.orgId, orgId),
         isNull(scSavedSearches.deletedAt)
       ));
+  }
+
+  // Custom Storage Types
+  async getScCustomStorageTypes(orgId: string): Promise<ScCustomStorageType[]> {
+    return await db.select()
+      .from(scCustomStorageTypes)
+      .where(eq(scCustomStorageTypes.orgId, orgId))
+      .orderBy(asc(scCustomStorageTypes.name));
+  }
+
+  async createScCustomStorageType(data: InsertScCustomStorageType): Promise<ScCustomStorageType> {
+    const [created] = await db.insert(scCustomStorageTypes)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async deleteScCustomStorageType(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(scCustomStorageTypes)
+      .where(and(
+        eq(scCustomStorageTypes.id, id),
+        eq(scCustomStorageTypes.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
   }
 
   // ============================================================================

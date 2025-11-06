@@ -21,6 +21,7 @@ import { z } from "zod";
 import type { SalesComp, InsertSalesComp, UpdateSalesComp } from "@shared/schema";
 import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES } from "@shared/salescomps-constants";
 import AddressAutocomplete from "@/components/salescomps/AddressAutocomplete";
+import { useCustomStorageTypes, useCreateCustomStorageType } from "@/hooks/salescomps/useCustomStorageTypes";
 
 const compFormSchema = z.object({
   marina: z.string().min(1, "Marina name is required"),
@@ -119,6 +120,14 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     queryFn: () => salesCompsApi.getComps({ isPortfolio: true }),
     enabled: open && linkToPortfolio,
   });
+
+  // Fetch custom storage types
+  const { data: customStorageTypes = [] } = useCustomStorageTypes();
+  const createCustomStorageType = useCreateCustomStorageType();
+  const [newStorageTypeName, setNewStorageTypeName] = useState("");
+
+  // Merge predefined and custom storage types
+  const allStorageTypes = [...STORAGE_TYPES, ...customStorageTypes.map(t => t.name)];
 
   const form = useForm<CompFormData>({
     resolver: zodResolver(compFormSchema),
@@ -682,8 +691,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 </AlertDescription>
                               </Alert>
                             )}
+                            
                             <div className="grid grid-cols-2 gap-2 mt-2">
-                              {STORAGE_TYPES.map((type) => (
+                              {allStorageTypes.map((type) => (
                                 <FormField
                                   key={type}
                                   control={form.control}
@@ -713,6 +723,68 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 />
                               ))}
                             </div>
+
+                            <div className="flex gap-2 mt-3">
+                              <Input
+                                placeholder="Add new storage type..."
+                                value={newStorageTypeName}
+                                onChange={(e) => setNewStorageTypeName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (newStorageTypeName.trim()) {
+                                      createCustomStorageType.mutate(newStorageTypeName.trim(), {
+                                        onSuccess: () => {
+                                          setNewStorageTypeName("");
+                                          toast({
+                                            title: "Storage type added",
+                                            description: `"${newStorageTypeName.trim()}" has been added to your storage types.`,
+                                          });
+                                        },
+                                        onError: (error: any) => {
+                                          toast({
+                                            variant: "destructive",
+                                            title: "Error",
+                                            description: error.message || "Failed to add storage type",
+                                          });
+                                        },
+                                      });
+                                    }
+                                  }
+                                }}
+                                data-testid="input-new-storage-type"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => {
+                                  if (newStorageTypeName.trim()) {
+                                    createCustomStorageType.mutate(newStorageTypeName.trim(), {
+                                      onSuccess: () => {
+                                        setNewStorageTypeName("");
+                                        toast({
+                                          title: "Storage type added",
+                                          description: `"${newStorageTypeName.trim()}" has been added to your storage types.`,
+                                        });
+                                      },
+                                      onError: (error: any) => {
+                                        toast({
+                                          variant: "destructive",
+                                          title: "Error",
+                                          description: error.message || "Failed to add storage type",
+                                        });
+                                      },
+                                    });
+                                  }
+                                }}
+                                disabled={!newStorageTypeName.trim() || createCustomStorageType.isPending}
+                                data-testid="button-add-storage-type"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+
                             <FormMessage />
                           </FormItem>
                         )}

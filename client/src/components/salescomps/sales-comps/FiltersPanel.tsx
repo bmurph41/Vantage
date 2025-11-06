@@ -11,6 +11,7 @@ import { STORAGE_TYPES } from "@shared/salescomps-constants";
 import debounce from "lodash.debounce";
 import throttle from "lodash.throttle";
 import SavedSearchesMenu from "./SavedSearchesMenu";
+import { useCustomStorageTypes } from "@/hooks/salescomps/useCustomStorageTypes";
 
 interface FiltersPanelProps {
   filters: FilterState;
@@ -33,6 +34,10 @@ export default function FiltersPanel({
     capRateMin: "",
     capRateMax: ""
   });
+  
+  // Fetch custom storage types
+  const { data: customStorageTypes = [] } = useCustomStorageTypes();
+  const allStorageTypes = [...STORAGE_TYPES, ...customStorageTypes.map(t => t.name)];
   
   // Collapsible sections state
   const [openSections, setOpenSections] = useState({
@@ -500,7 +505,7 @@ export default function FiltersPanel({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">All Types</SelectItem>
-                {STORAGE_TYPES.map((type) => (
+                {allStorageTypes.map((type) => (
                   <SelectItem key={type} value={type}>
                     {type}
                   </SelectItem>
