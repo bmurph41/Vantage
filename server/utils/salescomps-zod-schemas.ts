@@ -6,16 +6,20 @@ export const salesCompCreateSchema = z.object({
   salePrice: z.number().positive().optional().transform(val => val?.toString()),
   isPriceDisclosed: z.boolean().default(true),
   capRate: z.number().min(0).max(100).optional().transform(val => val?.toString()),
+  isCapRateDisclosed: z.boolean().default(true),
   noi: z.number().positive().optional().transform(val => val?.toString()),
   isNoiDisclosed: z.boolean().default(true),
   saleMonth: z.number().min(1).max(12).optional(),
   saleYear: z.number().min(1900).max(new Date().getFullYear() + 1).optional(),
-  market: z.string().optional(),
+  city: z.string().optional(),
+  market: z.string().optional(), // Legacy - use city
   state: z.string().min(1).max(50).optional(),
   wetSlips: z.number().int().min(0).optional(),
   dryRacks: z.number().int().min(0).optional(),
   ioBoth: z.preprocess(v => v === '' || v === 'none' ? undefined : v, z.enum(STORAGE_TYPES).optional()),
+  storageTypes: z.array(z.enum(STORAGE_TYPES)).default([]),
   bodyOfWater: z.string().optional(),
+  waterBodyName: z.string().optional(),
   waterfront: z.string().optional(),
   region: z.string().optional(),
   saleCondition: z.string().optional(),
@@ -32,6 +36,8 @@ export const salesCompCreateSchema = z.object({
   yearBuilt: z.number().int().min(1800).max(new Date().getFullYear()).optional(),
   articleUrls: z.array(z.string().url()).default([]),
   notes: z.string().optional(),
+  waterType: z.enum(['Coastal', 'Lake', 'River']).optional(),
+  coastalType: z.enum(['Coastal', 'Lake', 'River']).optional(), // Legacy - use waterType
   
   // Portfolio functionality
   isPortfolio: z.boolean().default(false),
