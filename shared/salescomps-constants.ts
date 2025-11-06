@@ -18,9 +18,13 @@ export const PROFIT_CENTERS = [
 
 export type ProfitCenter = typeof PROFIT_CENTERS[number];
 
-// Coastal types
-export const COASTAL_TYPES = ['coastal', 'lake'] as const;
-export type CoastalType = typeof COASTAL_TYPES[number];
+// Water types
+export const WATER_TYPES = ['Coastal', 'Lake', 'River'] as const;
+export type WaterType = typeof WATER_TYPES[number];
+
+// Legacy coastal types (deprecated - keeping for backward compatibility)
+export const COASTAL_TYPES = WATER_TYPES;
+export type CoastalType = WaterType;
 
 // Storage types for marinas
 export const STORAGE_TYPES = [
@@ -66,8 +70,8 @@ export function getCapacityBucket(totalCapacity: number): keyof typeof CAPACITY_
 }
 
 // Helper function to generate segment key for org preferences
-export function generateSegmentKey(coastalType?: CoastalType, totalCapacity?: number): string {
-  const coastalPart = coastalType || 'any';
+export function generateSegmentKey(waterType?: WaterType, totalCapacity?: number): string {
+  const waterPart = waterType || 'any';
   const capacityBucket = totalCapacity ? getCapacityBucket(totalCapacity) : 'any';
-  return `${coastalPart}|cap:${capacityBucket}`;
+  return `${waterPart}|cap:${capacityBucket}`;
 }

@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/salescomps/authUtils";
 import { z } from "zod";
 import type { SalesComp, InsertSalesComp, UpdateSalesComp } from "@shared/schema";
-import { PROFIT_CENTERS, COASTAL_TYPES, STORAGE_TYPES } from "@shared/salescomps-constants";
+import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES } from "@shared/salescomps-constants";
 import AddressAutocomplete from "@/components/salescomps/AddressAutocomplete";
 
 const compFormSchema = z.object({
@@ -27,6 +27,7 @@ const compFormSchema = z.object({
   salePrice: z.union([z.string(), z.number()]).optional(),
   isPriceDisclosed: z.boolean().default(true),
   capRate: z.union([z.string(), z.number()]).optional(),
+  isCapRateDisclosed: z.boolean().default(true),
   noi: z.union([z.string(), z.number()]).optional(),
   isNoiDisclosed: z.boolean().default(true),
   saleMonth: z.union([z.string(), z.number()]).optional(),
@@ -36,7 +37,9 @@ const compFormSchema = z.object({
   wetSlips: z.union([z.string(), z.number()]).optional(),
   dryRacks: z.union([z.string(), z.number()]).optional(),
   ioBoth: z.string().optional(),
+  storageTypes: z.array(z.string()).default([]),
   bodyOfWater: z.string().optional(),
+  waterBodyName: z.string().optional(),
   waterfront: z.string().optional(),
   region: z.string().optional(),
   saleCondition: z.string().optional(),
@@ -53,7 +56,8 @@ const compFormSchema = z.object({
   yearBuilt: z.union([z.string(), z.number()]).optional(),
   articleUrls: z.array(z.string()).default([]),
   notes: z.string().optional(),
-  coastalType: z.string().optional(),
+  waterType: z.string().optional(),
+  coastalType: z.string().optional(), // Legacy field
   isPortfolio: z.boolean().default(false),
   parentPortfolioId: z.string().optional(),
   // Individual profit center boolean fields
@@ -123,6 +127,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       salePrice: comp?.salePrice ? Number(comp.salePrice) : "",
       isPriceDisclosed: comp?.isPriceDisclosed ?? true,
       capRate: comp?.capRate ? Number(comp.capRate) : "",
+      isCapRateDisclosed: comp?.isCapRateDisclosed ?? true,
       noi: comp?.noi ? Number(comp.noi) : "",
       isNoiDisclosed: comp?.isNoiDisclosed ?? true,
       saleMonth: comp?.saleMonth || "",
@@ -132,7 +137,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       wetSlips: comp?.wetSlips || "",
       dryRacks: comp?.dryRacks || "",
       ioBoth: (comp?.ioBoth && STORAGE_TYPES.includes(comp.ioBoth as any)) ? comp.ioBoth : undefined,
+      storageTypes: comp?.storageTypes || [],
       bodyOfWater: comp?.bodyOfWater || "",
+      waterBodyName: comp?.waterBodyName || "",
       waterfront: comp?.waterfront || "",
       region: comp?.region || "",
       saleCondition: comp?.saleCondition || "",
@@ -149,6 +156,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       yearBuilt: comp?.yearBuilt || "",
       articleUrls: comp?.articleUrls || [],
       notes: comp?.notes || "",
+      waterType: comp?.waterType || comp?.coastalType || "",
       coastalType: comp?.coastalType || "",
       isPortfolio: comp?.isPortfolio ?? isPortfolioMode,
       parentPortfolioId: comp?.parentPortfolioId || "",
@@ -296,10 +304,12 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       occupancy: data.occupancy === "" ? undefined : Number(data.occupancy),
       yearBuilt: data.yearBuilt === "" ? undefined : Number(data.yearBuilt),
       ioBoth: data.ioBoth === "" || data.ioBoth === "none-selected" ? undefined : data.ioBoth,
+      storageTypes: data.storageTypes || [],
       articleUrls: articleUrls.filter(url => url.trim() !== ""),
-      market: data.market || undefined,
+      city: data.city || undefined,
       state: data.state || undefined,
       bodyOfWater: data.bodyOfWater || undefined,
+      waterBodyName: data.waterBodyName || undefined,
       waterfront: data.waterfront || undefined,
       region: data.region || undefined,
       saleCondition: data.saleCondition || undefined,
@@ -310,7 +320,10 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       company: data.company || undefined,
       owner: data.owner || undefined,
       notes: data.notes || undefined,
-      coastalType: data.coastalType === "" || data.coastalType === "none-selected" ? undefined : data.coastalType,
+      waterType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType,
+      coastalType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType, // Sync with waterType for backward compatibility
+      isPriceDisclosed: data.isPriceDisclosed,
+      isCapRateDisclosed: data.isCapRateDisclosed,
       // Individual profit center boolean fields
       profitCenterStorage: data.profitCenterStorage,
       profitCenterEvents: data.profitCenterEvents,
@@ -658,32 +671,48 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       
                       <FormField
                         control={form.control}
-                        name="ioBoth"
-                        render={({ field }) => (
+                        name="storageTypes"
+                        render={() => (
                           <FormItem>
-                            <FormLabel>Storage Type</FormLabel>
+                            <FormLabel>Storage Types</FormLabel>
                             {showLegacyStorageWarning && (
                               <Alert className="mb-2">
                                 <AlertDescription>
-                                  This comp has an outdated storage type value ("{comp?.ioBoth}"). Please select one of the new storage type options below.
+                                  This comp has an outdated storage type value ("{comp?.ioBoth}"). Please select one or more of the new storage type options below.
                                 </AlertDescription>
                               </Alert>
                             )}
-                            <Select onValueChange={(value) => { field.onChange(value); setShowLegacyStorageWarning(false); }} value={field.value || ""}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-storage-type">
-                                  <SelectValue placeholder="Select storage type" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="none-selected">Select storage type</SelectItem>
-                                {STORAGE_TYPES.map((type) => (
-                                  <SelectItem key={type} value={type}>
-                                    {type}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              {STORAGE_TYPES.map((type) => (
+                                <FormField
+                                  key={type}
+                                  control={form.control}
+                                  name="storageTypes"
+                                  render={({ field }) => {
+                                    return (
+                                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                        <FormControl>
+                                          <Checkbox
+                                            checked={field.value?.includes(type)}
+                                            onCheckedChange={(checked) => {
+                                              setShowLegacyStorageWarning(false);
+                                              const updated = checked
+                                                ? [...(field.value || []), type]
+                                                : (field.value || []).filter((val) => val !== type);
+                                              field.onChange(updated);
+                                            }}
+                                            data-testid={`checkbox-storage-${type.toLowerCase().replace(/\s+/g, '-')}`}
+                                          />
+                                        </FormControl>
+                                        <FormLabel className="text-sm font-normal">
+                                          {type}
+                                        </FormLabel>
+                                      </FormItem>
+                                    );
+                                  }}
+                                />
+                              ))}
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -704,20 +733,25 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         <FormField
                           control={form.control}
                           name="salePrice"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Sale Price</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  {...field} 
-                                  type="number"
-                                  placeholder="12500000"
-                                  data-testid="input-sale-price"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                          render={({ field }) => {
+                            const isPriceUndisclosed = !form.watch("isPriceDisclosed");
+                            return (
+                              <FormItem>
+                                <FormLabel>Sale Price</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    {...field}
+                                    value={isPriceUndisclosed ? "N/A" : field.value}
+                                    type={isPriceUndisclosed ? "text" : "number"}
+                                    placeholder="12500000"
+                                    disabled={isPriceUndisclosed}
+                                    data-testid="input-sale-price"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            );
+                          }}
                         />
                         
                         <FormField
@@ -763,21 +797,26 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         <FormField
                           control={form.control}
                           name="capRate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Cap Rate (%)</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  {...field} 
-                                  type="number"
-                                  step="0.1"
-                                  placeholder="7.2"
-                                  data-testid="input-cap-rate"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                          render={({ field }) => {
+                            const isCapRateUndisclosed = !form.watch("isCapRateDisclosed");
+                            return (
+                              <FormItem>
+                                <FormLabel>Cap Rate (%)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    {...field}
+                                    value={isCapRateUndisclosed ? "N/A" : field.value}
+                                    type={isCapRateUndisclosed ? "text" : "number"}
+                                    step="0.1"
+                                    placeholder="7.2"
+                                    disabled={isCapRateUndisclosed}
+                                    data-testid="input-cap-rate"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            );
+                          }}
                         />
                       </div>
                       
@@ -830,13 +869,32 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                             <FormItem className="flex items-center space-x-2">
                               <FormControl>
                                 <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                  data-testid="checkbox-price-disclosed"
+                                  checked={!field.value}
+                                  onCheckedChange={(checked) => field.onChange(!checked)}
+                                  data-testid="checkbox-price-undisclosed"
                                 />
                               </FormControl>
                               <FormLabel className="text-sm font-normal">
-                                Price disclosed
+                                Price Undisclosed
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="isCapRateDisclosed"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center space-x-2">
+                              <FormControl>
+                                <Checkbox
+                                  checked={!field.value}
+                                  onCheckedChange={(checked) => field.onChange(!checked)}
+                                  data-testid="checkbox-cap-rate-undisclosed"
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm font-normal">
+                                Cap Rate Undisclosed
                               </FormLabel>
                             </FormItem>
                           )}
@@ -968,25 +1026,39 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                 <CardContent className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="coastalType"
+                    name="waterType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Coastal Type</FormLabel>
+                        <FormLabel>Water Type</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-coastal-type">
-                              <SelectValue placeholder="Select coastal type" />
+                            <SelectTrigger data-testid="select-water-type">
+                              <SelectValue placeholder="Select water type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="none-selected">Select coastal type</SelectItem>
-                            {COASTAL_TYPES.map((type) => (
+                            <SelectItem value="none-selected">Select water type</SelectItem>
+                            {WATER_TYPES.map((type) => (
                               <SelectItem key={type} value={type}>
-                                {type === 'coastal' ? 'Coastal' : 'Lake'}
+                                {type}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="waterBodyName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Water Body Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="e.g., Gulf of America, Lake Superior" data-testid="input-water-body-name" />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

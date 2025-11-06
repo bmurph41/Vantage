@@ -2997,6 +2997,7 @@ export const salesComps = pgTable('sales_comps', {
   salePrice: integer('sale_price'),
   isPriceDisclosed: boolean('is_price_disclosed').default(true),
   capRate: integer('cap_rate'),
+  isCapRateDisclosed: boolean('is_cap_rate_disclosed').default(true),
   noi: integer('noi'),
   isNoiDisclosed: boolean('is_noi_disclosed').default(true),
   saleMonth: integer('sale_month'), // 1-12
@@ -3005,8 +3006,10 @@ export const salesComps = pgTable('sales_comps', {
   state: text('state'),
   wetSlips: integer('wet_slips'),
   dryRacks: integer('dry_racks'),
-  ioBoth: text('inside_outside_both'),
+  ioBoth: text('inside_outside_both'), // Legacy field - deprecated
+  storageTypes: text('storage_types').array().default(sql`'{}'`), // Multi-select storage types
   bodyOfWater: text('body_of_water'),
+  waterBodyName: text('water_body_name'), // Specific name like "Gulf of America", "Lake Superior"
   waterfront: text('waterfront'),
   region: text('region'),
   saleCondition: text('sale_condition'),
@@ -3054,7 +3057,8 @@ export const salesComps = pgTable('sales_comps', {
   
   // Legacy profit centers field (deprecated - keeping for migration compatibility)
   profitCenters: text('profit_centers').array().default(sql`'{}'`),
-  coastalType: text('coastal_type'), // 'coastal'|'lake'
+  coastalType: text('coastal_type'), // Legacy: now called waterType - 'Coastal'|'Lake'|'River'
+  waterType: text('water_type'), // 'Coastal'|'Lake'|'River'
 
   // Portfolio functionality
   isPortfolio: boolean('is_portfolio').default(false),
@@ -3132,7 +3136,8 @@ export const scProjects = pgTable('sc_projects', {
     targetPriceMax?: number;
     states?: string[];
     regions?: string[];
-    coastalType?: 'coastal' | 'lake';
+    waterType?: 'Coastal' | 'Lake' | 'River';
+    coastalType?: 'Coastal' | 'Lake' | 'River'; // Legacy - use waterType
     mustHaveProfitCenters?: string[];
     niceToHaveProfitCenters?: string[];
   }>().default({}),
@@ -3445,7 +3450,8 @@ export const scProjectProfileSchema = z.object({
   targetPriceMax: z.number().optional(),
   states: z.array(z.string()).optional(),
   regions: z.array(z.string()).optional(),
-  coastalType: z.enum(['coastal', 'lake']).optional(),
+  waterType: z.enum(['Coastal', 'Lake', 'River']).optional(),
+  coastalType: z.enum(['Coastal', 'Lake', 'River']).optional(), // Legacy - use waterType
   mustHaveProfitCenters: profitCentersSchema.optional(),
   niceToHaveProfitCenters: profitCentersSchema.optional(),
 });
