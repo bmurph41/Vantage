@@ -3064,6 +3064,9 @@ export const salesComps = pgTable('sales_comps', {
   isPortfolio: boolean('is_portfolio').default(false),
   parentPortfolioId: varchar('parent_portfolio_id').references((): any => salesComps.id, { onDelete: 'cascade' }),
 
+  // Link to CRM Property
+  propertyId: varchar('property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
+
   // Expandable data
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
 }, (table) => ({
@@ -3084,6 +3087,20 @@ export const scCustomStorageTypes = pgTable('sc_custom_storage_types', {
 }, (table) => ({
   orgIdx: index('sc_custom_storage_types_org_idx').on(table.orgId),
   orgNameIdx: index('sc_custom_storage_types_org_name_idx').on(table.orgId, table.name),
+}));
+
+// Pending property profiles - tracks comps that need property profiles created
+export const scPendingPropertyProfiles = pgTable('sc_pending_property_profiles', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  compId: varchar('comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  status: text('status').notNull().default('pending'), // 'pending' | 'completed' | 'skipped'
+  createdAt: timestamp('created_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+}, (table) => ({
+  orgIdx: index('sc_pending_property_profiles_org_idx').on(table.orgId),
+  compIdx: index('sc_pending_property_profiles_comp_idx').on(table.compId),
+  statusIdx: index('sc_pending_property_profiles_status_idx').on(table.orgId, table.status),
 }));
 
 // Column definitions for dynamic columns
