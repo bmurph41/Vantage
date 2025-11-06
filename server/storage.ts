@@ -8,6 +8,7 @@ import {
   crmImportJobs, crmImportedRecords, crmProspectingEntries,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
+  salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
@@ -17,6 +18,7 @@ import {
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
+  type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
@@ -26,10 +28,14 @@ import {
   type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
   type InsertCrmImportJob, type InsertCrmImportedRecord, type InsertProspectingEntry,
   type InsertEmailSequence, type InsertEmailTemplate, type InsertEmailSequenceStep, type InsertEmailSequenceEnrollment, type InsertEmailSequenceStepExecution,
-  type InsertCalendarSettings
+  type InsertCalendarSettings,
+  type InsertSalesComp, type UpdateSalesComp, type InsertCompColumn, type UpdateCompColumn, type InsertCompImport,
+  type InsertScProject, type UpdateScProject, type InsertScProjectComp, type UpdateScProjectComp,
+  type InsertScRecommendationFeedback, type InsertScOrgPreferences, type UpdateScOrgPreferences,
+  type InsertScSavedSearch, type UpdateScSavedSearch
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, isNull, or, count } from "drizzle-orm";
 
 export interface IStorage {
   // Organizations
@@ -395,6 +401,85 @@ export interface IStorage {
   getCalendarSettings(userId: string): Promise<CalendarSettings | undefined>;
   createCalendarSettings(settings: InsertCalendarSettings): Promise<CalendarSettings>;
   updateCalendarSettings(userId: string, updates: Partial<InsertCalendarSettings>): Promise<CalendarSettings>;
+
+  // SalesComps - Sales Comparables Operations
+  getSalesComps(params: {
+    orgId: string;
+    filters?: Record<string, any>;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ comps: SalesComp[]; total: number }>;
+  getAllSalesCompIds(orgId: string): Promise<string[]>;
+  getColumnUniqueValues(orgId: string, column: string): Promise<string[]>;
+  getSalesComp(id: string, orgId: string): Promise<SalesComp | undefined>;
+  createSalesComp(comp: InsertSalesComp): Promise<SalesComp>;
+  updateSalesComp(id: string, comp: UpdateSalesComp, orgId: string): Promise<SalesComp | undefined>;
+  deleteSalesComp(id: string, orgId: string, deletedBy: string): Promise<boolean>;
+  bulkUpdateSalesComps(ids: string[], updates: UpdateSalesComp, orgId: string): Promise<number>;
+  bulkDeleteSalesComps(ids: string[], orgId: string, deletedBy: string): Promise<number>;
+
+  // SalesComps - Columns Management
+  getCompColumns(orgId: string): Promise<CompColumn[]>;
+  createCompColumn(column: InsertCompColumn): Promise<CompColumn>;
+  updateCompColumn(id: string, column: UpdateCompColumn, orgId: string): Promise<CompColumn | undefined>;
+  deleteCompColumn(id: string, orgId: string): Promise<boolean>;
+
+  // SalesComps - Import Operations
+  createCompImport(importData: InsertCompImport): Promise<CompImport>;
+  getCompImport(id: string, orgId: string): Promise<CompImport | undefined>;
+  updateCompImport(id: string, updates: Partial<CompImport>, orgId: string): Promise<CompImport | undefined>;
+
+  // SalesComps - Duplicate Detection
+  findPotentialDuplicates(orgId: string, marina: string, state?: string, saleYear?: number): Promise<SalesComp[]>;
+
+  // SalesComps - Project Operations
+  getScProjects(orgId: string, userId: string): Promise<ScProject[]>;
+  getScProject(id: string, orgId: string): Promise<ScProject | undefined>;
+  createScProject(data: InsertScProject): Promise<ScProject>;
+  updateScProject(id: string, data: UpdateScProject, orgId: string): Promise<ScProject | undefined>;
+  deleteScProject(id: string, orgId: string, deletedBy: string): Promise<boolean>;
+
+  // SalesComps - Project-Comp Associations
+  getScProjectComps(projectId: string, orgId: string): Promise<(ScProjectComp & { salesComp: SalesComp })[]>;
+  addCompToScProject(projectId: string, salesCompId: string, orgId: string, userId: string): Promise<ScProjectComp>;
+  removeCompFromScProject(projectId: string, salesCompId: string, orgId: string): Promise<boolean>;
+  updateScProjectComp(id: string, data: UpdateScProjectComp, orgId: string): Promise<ScProjectComp | undefined>;
+
+  // SalesComps - Audit Operations
+  createScAuditLog(log: {
+    orgId: string;
+    userId: string;
+    entity: string;
+    entityId: string;
+    action: string;
+    before?: any;
+    after?: any;
+  }): Promise<ScAuditLog>;
+
+  // SalesComps - Recommendation System
+  getSalesCompsForRecommendation(params: {
+    orgId: string;
+    filters?: Record<string, any>;
+  }): Promise<SalesComp[]>;
+
+  // SalesComps - Recommendation Feedback
+  createScRecommendationFeedback(feedback: InsertScRecommendationFeedback): Promise<ScRecommendationFeedback>;
+  getScRecommendationFeedback(orgId: string, projectId?: string): Promise<ScRecommendationFeedback[]>;
+
+  // SalesComps - Organization Preferences
+  getScOrgPreferences(orgId: string, segmentKey: string): Promise<ScOrgPreferences | undefined>;
+  upsertScOrgPreferences(preferences: InsertScOrgPreferences): Promise<ScOrgPreferences>;
+  updateScOrgPreferences(orgId: string, segmentKey: string, updates: UpdateScOrgPreferences): Promise<ScOrgPreferences | undefined>;
+
+  // SalesComps - Saved Searches
+  getScSavedSearches(orgId: string, userId?: string): Promise<ScSavedSearch[]>;
+  getScSavedSearch(id: string, orgId: string): Promise<ScSavedSearch | undefined>;
+  createScSavedSearch(data: InsertScSavedSearch): Promise<ScSavedSearch>;
+  updateScSavedSearch(id: string, data: UpdateScSavedSearch, orgId: string): Promise<ScSavedSearch | undefined>;
+  deleteScSavedSearch(id: string, orgId: string, deletedBy: string): Promise<boolean>;
+  incrementScSavedSearchUsage(id: string, orgId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2746,6 +2831,531 @@ export class DatabaseStorage implements IStorage {
       .where(eq(calendarSettings.userId, userId))
       .returning();
     return updated;
+  }
+
+  // ============================================================================
+  // SALESCOMPS STORAGE METHODS
+  // ============================================================================
+
+  // Sales Comps Operations
+  async getSalesComps(params: {
+    orgId: string;
+    filters?: Record<string, any>;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ comps: SalesComp[]; total: number }> {
+    const { orgId, filters = {}, sortBy = 'createdAt', sortDir = 'desc', page = 1, pageSize = 25 } = params;
+    
+    const conditions = [eq(salesComps.orgId, orgId), isNull(salesComps.deletedAt)];
+    
+    if (filters.q) {
+      conditions.push(sql`${salesComps.marina} ILIKE ${`%${filters.q}%`}`);
+    }
+    if (filters.state) {
+      conditions.push(eq(salesComps.state, filters.state));
+    }
+    if (filters.saleYearMin) {
+      conditions.push(sql`${salesComps.saleYear} >= ${filters.saleYearMin}`);
+    }
+    if (filters.saleYearMax) {
+      conditions.push(sql`${salesComps.saleYear} <= ${filters.saleYearMax}`);
+    }
+    if (filters.priceMin) {
+      conditions.push(sql`${salesComps.salePrice} >= ${filters.priceMin}`);
+    }
+    if (filters.priceMax) {
+      conditions.push(sql`${salesComps.salePrice} <= ${filters.priceMax}`);
+    }
+    if (filters.disclosedOnly) {
+      conditions.push(eq(salesComps.isPriceDisclosed, true));
+    }
+
+    const [{ total }] = await db.select({ total: count() })
+      .from(salesComps)
+      .where(and(...conditions));
+
+    const orderColumn = sortBy === 'marina' ? salesComps.marina :
+                       sortBy === 'saleYear' ? salesComps.saleYear :
+                       sortBy === 'salePrice' ? salesComps.salePrice :
+                       sortBy === 'state' ? salesComps.state :
+                       salesComps.createdAt;
+    
+    const orderFn = sortDir === 'asc' ? asc : desc;
+
+    const comps = await db.select().from(salesComps)
+      .where(and(...conditions))
+      .orderBy(orderFn(orderColumn))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    return { comps, total };
+  }
+
+  async getAllSalesCompIds(orgId: string): Promise<string[]> {
+    const comps = await db.select({ id: salesComps.id })
+      .from(salesComps)
+      .where(and(
+        eq(salesComps.orgId, orgId),
+        isNull(salesComps.deletedAt)
+      ));
+    return comps.map(comp => comp.id);
+  }
+
+  async getColumnUniqueValues(orgId: string, column: string): Promise<string[]> {
+    try {
+      let dbColumn;
+      switch (column) {
+        case 'marina':
+          dbColumn = salesComps.marina;
+          break;
+        case 'state':
+          dbColumn = salesComps.state;
+          break;
+        case 'saleYear':
+          dbColumn = salesComps.saleYear;
+          break;
+        case 'market':
+          dbColumn = salesComps.market;
+          break;
+        default:
+          return [];
+      }
+
+      const results = await db
+        .selectDistinct({ value: dbColumn })
+        .from(salesComps)
+        .where(and(
+          eq(salesComps.orgId, orgId),
+          isNull(salesComps.deletedAt),
+          column === 'saleYear' ? 
+            sql`${dbColumn} IS NOT NULL AND ${dbColumn}::text != '' AND ${dbColumn} > 0` : 
+            sql`${dbColumn} IS NOT NULL AND ${dbColumn} != ''`
+        ))
+        .orderBy(asc(dbColumn));
+
+      return results.map(r => String(r.value)).filter(Boolean);
+    } catch (error) {
+      console.error(`Error getting unique values for column ${column}:`, error);
+      return [];
+    }
+  }
+
+  async getSalesComp(id: string, orgId: string): Promise<SalesComp | undefined> {
+    const [comp] = await db.select().from(salesComps)
+      .where(and(
+        eq(salesComps.id, id),
+        eq(salesComps.orgId, orgId),
+        isNull(salesComps.deletedAt)
+      ));
+    return comp;
+  }
+
+  async createSalesComp(comp: InsertSalesComp): Promise<SalesComp> {
+    const [newComp] = await db.insert(salesComps).values(comp as any).returning();
+    return newComp;
+  }
+
+  async updateSalesComp(id: string, comp: UpdateSalesComp, orgId: string): Promise<SalesComp | undefined> {
+    const [updatedComp] = await db.update(salesComps)
+      .set({ ...comp, updatedAt: new Date() } as any)
+      .where(and(
+        eq(salesComps.id, id),
+        eq(salesComps.orgId, orgId),
+        isNull(salesComps.deletedAt)
+      ))
+      .returning();
+    return updatedComp;
+  }
+
+  async deleteSalesComp(id: string, orgId: string, deletedBy: string): Promise<boolean> {
+    const [deletedComp] = await db.update(salesComps)
+      .set({ deletedAt: new Date(), updatedBy: deletedBy })
+      .where(and(
+        eq(salesComps.id, id),
+        eq(salesComps.orgId, orgId),
+        isNull(salesComps.deletedAt)
+      ))
+      .returning();
+    return !!deletedComp;
+  }
+
+  async bulkUpdateSalesComps(ids: string[], updates: UpdateSalesComp, orgId: string): Promise<number> {
+    const result = await db.update(salesComps)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(and(
+        inArray(salesComps.id, ids),
+        eq(salesComps.orgId, orgId),
+        isNull(salesComps.deletedAt)
+      ));
+    return result.rowCount || 0;
+  }
+
+  async bulkDeleteSalesComps(ids: string[], orgId: string, deletedBy: string): Promise<number> {
+    const CHUNK_SIZE = 1000;
+    let totalDeleted = 0;
+
+    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+      const chunk = ids.slice(i, i + CHUNK_SIZE);
+      const result = await db.update(salesComps)
+        .set({ deletedAt: new Date(), updatedBy: deletedBy })
+        .where(and(
+          inArray(salesComps.id, chunk),
+          eq(salesComps.orgId, orgId),
+          isNull(salesComps.deletedAt)
+        ));
+      totalDeleted += result.rowCount || 0;
+    }
+    
+    return totalDeleted;
+  }
+
+  // Columns Operations
+  async getCompColumns(orgId: string): Promise<CompColumn[]> {
+    return await db.select().from(compColumns)
+      .where(eq(compColumns.orgId, orgId))
+      .orderBy(asc(compColumns.orderIndex));
+  }
+
+  async createCompColumn(column: InsertCompColumn): Promise<CompColumn> {
+    const [newColumn] = await db.insert(compColumns).values(column as any).returning();
+    return newColumn;
+  }
+
+  async updateCompColumn(id: string, column: UpdateCompColumn, orgId: string): Promise<CompColumn | undefined> {
+    const [updatedColumn] = await db.update(compColumns)
+      .set({ ...column, updatedAt: new Date() } as any)
+      .where(and(eq(compColumns.id, id), eq(compColumns.orgId, orgId)))
+      .returning();
+    return updatedColumn;
+  }
+
+  async deleteCompColumn(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(compColumns)
+      .where(and(eq(compColumns.id, id), eq(compColumns.orgId, orgId)));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Import Operations
+  async createCompImport(importData: InsertCompImport): Promise<CompImport> {
+    const [newImport] = await db.insert(compImports).values(importData as any).returning();
+    return newImport;
+  }
+
+  async getCompImport(id: string, orgId: string): Promise<CompImport | undefined> {
+    const [importRecord] = await db.select().from(compImports)
+      .where(and(eq(compImports.id, id), eq(compImports.orgId, orgId)));
+    return importRecord;
+  }
+
+  async updateCompImport(id: string, updates: Partial<CompImport>, orgId: string): Promise<CompImport | undefined> {
+    const [updatedImport] = await db.update(compImports)
+      .set(updates)
+      .where(and(eq(compImports.id, id), eq(compImports.orgId, orgId)))
+      .returning();
+    return updatedImport;
+  }
+
+  // Duplicate Detection
+  async findPotentialDuplicates(orgId: string, marina: string, state?: string, saleYear?: number): Promise<SalesComp[]> {
+    const duplicates = await db.select()
+      .from(salesComps)
+      .where(and(
+        eq(salesComps.orgId, orgId),
+        isNull(salesComps.deletedAt),
+        sql`LOWER(${salesComps.marina}) = LOWER(${marina})`,
+        state ? sql`LOWER(${salesComps.state}) = LOWER(${state})` : sql`1=1`,
+        saleYear ? eq(salesComps.saleYear, saleYear) : sql`1=1`
+      ))
+      .limit(10);
+    
+    return duplicates;
+  }
+
+  // SC Project Operations
+  async getScProjects(orgId: string, userId: string): Promise<ScProject[]> {
+    return await db.select().from(scProjects)
+      .where(and(
+        eq(scProjects.orgId, orgId),
+        isNull(scProjects.deletedAt)
+      ))
+      .orderBy(desc(scProjects.updatedAt));
+  }
+
+  async getScProject(id: string, orgId: string): Promise<ScProject | undefined> {
+    const [project] = await db.select().from(scProjects)
+      .where(and(
+        eq(scProjects.id, id),
+        eq(scProjects.orgId, orgId),
+        isNull(scProjects.deletedAt)
+      ));
+    return project;
+  }
+
+  async createScProject(data: InsertScProject): Promise<ScProject> {
+    const [newProject] = await db.insert(scProjects).values(data as any).returning();
+    return newProject;
+  }
+
+  async updateScProject(id: string, data: UpdateScProject, orgId: string): Promise<ScProject | undefined> {
+    const [updatedProject] = await db.update(scProjects)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(and(
+        eq(scProjects.id, id),
+        eq(scProjects.orgId, orgId),
+        isNull(scProjects.deletedAt)
+      ))
+      .returning();
+    return updatedProject;
+  }
+
+  async deleteScProject(id: string, orgId: string, deletedBy: string): Promise<boolean> {
+    const [deletedProject] = await db.update(scProjects)
+      .set({ deletedAt: new Date(), updatedBy: deletedBy })
+      .where(and(
+        eq(scProjects.id, id),
+        eq(scProjects.orgId, orgId),
+        isNull(scProjects.deletedAt)
+      ))
+      .returning();
+    return !!deletedProject;
+  }
+
+  // Project-Comp Operations
+  async getScProjectComps(projectId: string, orgId: string): Promise<(ScProjectComp & { salesComp: SalesComp })[]> {
+    const results = await db.select({
+      id: scProjectComps.id,
+      orgId: scProjectComps.orgId,
+      scProjectId: scProjectComps.scProjectId,
+      salesCompId: scProjectComps.salesCompId,
+      addedBy: scProjectComps.addedBy,
+      addedAt: scProjectComps.addedAt,
+      notes: scProjectComps.notes,
+      salesComp: salesComps,
+    })
+      .from(scProjectComps)
+      .innerJoin(salesComps, and(
+        eq(scProjectComps.salesCompId, salesComps.id),
+        eq(salesComps.orgId, scProjectComps.orgId),
+        isNull(salesComps.deletedAt)
+      ))
+      .where(and(
+        eq(scProjectComps.scProjectId, projectId),
+        eq(scProjectComps.orgId, orgId)
+      ))
+      .orderBy(desc(scProjectComps.addedAt));
+
+    return results as (ScProjectComp & { salesComp: SalesComp })[];
+  }
+
+  async addCompToScProject(projectId: string, salesCompId: string, orgId: string, userId: string): Promise<ScProjectComp> {
+    const project = await this.getScProject(projectId, orgId);
+    if (!project) {
+      throw new Error('Project not found or access denied');
+    }
+
+    const salesComp = await this.getSalesComp(salesCompId, orgId);
+    if (!salesComp) {
+      throw new Error('Sales comp not found or access denied');
+    }
+
+    const [projectComp] = await db.insert(scProjectComps).values({
+      orgId,
+      scProjectId: projectId,
+      salesCompId,
+      addedBy: userId,
+    } as any).returning();
+    return projectComp;
+  }
+
+  async removeCompFromScProject(projectId: string, salesCompId: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(scProjectComps)
+      .where(and(
+        eq(scProjectComps.scProjectId, projectId),
+        eq(scProjectComps.salesCompId, salesCompId),
+        eq(scProjectComps.orgId, orgId)
+      ));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async updateScProjectComp(id: string, data: UpdateScProjectComp, orgId: string): Promise<ScProjectComp | undefined> {
+    const [updatedProjectComp] = await db.update(scProjectComps)
+      .set(data as any)
+      .where(and(
+        eq(scProjectComps.id, id),
+        eq(scProjectComps.orgId, orgId)
+      ))
+      .returning();
+    return updatedProjectComp;
+  }
+
+  // Audit Operations
+  async createScAuditLog(log: {
+    orgId: string;
+    userId: string;
+    entity: string;
+    entityId: string;
+    action: string;
+    before?: any;
+    after?: any;
+  }): Promise<ScAuditLog> {
+    const [auditEntry] = await db.insert(scAuditLog).values(log).returning();
+    return auditEntry;
+  }
+
+  // Recommendation System
+  async getSalesCompsForRecommendation(params: {
+    orgId: string;
+    filters?: Record<string, any>;
+  }): Promise<SalesComp[]> {
+    const { orgId, filters = {} } = params;
+    
+    const conditions = [
+      eq(salesComps.orgId, orgId),
+      isNull(salesComps.deletedAt)
+    ];
+
+    if (filters.regions && filters.regions.length > 0) {
+      conditions.push(inArray(salesComps.region, filters.regions));
+    }
+    if (filters.states && filters.states.length > 0) {
+      conditions.push(inArray(salesComps.state, filters.states));
+    }
+    if (filters.coastalType) {
+      conditions.push(eq(salesComps.coastalType, filters.coastalType));
+    }
+    if (filters.excludeIds && filters.excludeIds.length > 0) {
+      conditions.push(sql`${salesComps.id} NOT IN (${sql.join(filters.excludeIds.map((id: string) => sql`${id}`), sql`, `)})`);
+    }
+
+    const comps = await db.select().from(salesComps)
+      .where(and(...conditions))
+      .orderBy(desc(salesComps.createdAt));
+
+    return comps;
+  }
+
+  // Recommendation Feedback
+  async createScRecommendationFeedback(feedback: InsertScRecommendationFeedback): Promise<ScRecommendationFeedback> {
+    const [newFeedback] = await db.insert(scRecommendationFeedback)
+      .values(feedback as any)
+      .returning();
+    return newFeedback;
+  }
+
+  async getScRecommendationFeedback(orgId: string, projectId?: string): Promise<ScRecommendationFeedback[]> {
+    const conditions = [eq(scRecommendationFeedback.orgId, orgId)];
+    if (projectId) {
+      conditions.push(eq(scRecommendationFeedback.scProjectId, projectId));
+    }
+
+    return await db.select().from(scRecommendationFeedback)
+      .where(and(...conditions))
+      .orderBy(desc(scRecommendationFeedback.createdAt));
+  }
+
+  // Organization Preferences
+  async getScOrgPreferences(orgId: string, segmentKey: string): Promise<ScOrgPreferences | undefined> {
+    const [preferences] = await db.select().from(scOrgPreferences)
+      .where(and(
+        eq(scOrgPreferences.orgId, orgId),
+        eq(scOrgPreferences.segmentKey, segmentKey)
+      ));
+    return preferences;
+  }
+
+  async upsertScOrgPreferences(preferences: InsertScOrgPreferences): Promise<ScOrgPreferences> {
+    const [result] = await db.insert(scOrgPreferences)
+      .values(preferences as any)
+      .onConflictDoUpdate({
+        target: [scOrgPreferences.orgId, scOrgPreferences.segmentKey],
+        set: {
+          weights: preferences.weights,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return result;
+  }
+
+  async updateScOrgPreferences(orgId: string, segmentKey: string, updates: UpdateScOrgPreferences): Promise<ScOrgPreferences | undefined> {
+    const [updatedPreferences] = await db.update(scOrgPreferences)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(and(
+        eq(scOrgPreferences.orgId, orgId),
+        eq(scOrgPreferences.segmentKey, segmentKey)
+      ))
+      .returning();
+    return updatedPreferences;
+  }
+
+  // Saved Searches
+  async getScSavedSearches(orgId: string, userId?: string): Promise<ScSavedSearch[]> {
+    const conditions = [
+      eq(scSavedSearches.orgId, orgId),
+      isNull(scSavedSearches.deletedAt)
+    ];
+    
+    if (userId) {
+      conditions.push(eq(scSavedSearches.createdBy, userId));
+    }
+
+    return await db.select().from(scSavedSearches)
+      .where(and(...conditions))
+      .orderBy(desc(scSavedSearches.isPinned), desc(scSavedSearches.lastUsedAt));
+  }
+
+  async getScSavedSearch(id: string, orgId: string): Promise<ScSavedSearch | undefined> {
+    const [savedSearch] = await db.select().from(scSavedSearches)
+      .where(and(
+        eq(scSavedSearches.id, id),
+        eq(scSavedSearches.orgId, orgId),
+        isNull(scSavedSearches.deletedAt)
+      ));
+    return savedSearch;
+  }
+
+  async createScSavedSearch(data: InsertScSavedSearch): Promise<ScSavedSearch> {
+    const [newSearch] = await db.insert(scSavedSearches).values(data as any).returning();
+    return newSearch;
+  }
+
+  async updateScSavedSearch(id: string, data: UpdateScSavedSearch, orgId: string): Promise<ScSavedSearch | undefined> {
+    const [updatedSearch] = await db.update(scSavedSearches)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(and(
+        eq(scSavedSearches.id, id),
+        eq(scSavedSearches.orgId, orgId),
+        isNull(scSavedSearches.deletedAt)
+      ))
+      .returning();
+    return updatedSearch;
+  }
+
+  async deleteScSavedSearch(id: string, orgId: string, deletedBy: string): Promise<boolean> {
+    const [deletedSearch] = await db.update(scSavedSearches)
+      .set({ deletedAt: new Date(), updatedBy: deletedBy })
+      .where(and(
+        eq(scSavedSearches.id, id),
+        eq(scSavedSearches.orgId, orgId),
+        isNull(scSavedSearches.deletedAt)
+      ))
+      .returning();
+    return !!deletedSearch;
+  }
+
+  async incrementScSavedSearchUsage(id: string, orgId: string): Promise<void> {
+    await db.update(scSavedSearches)
+      .set({
+        useCount: sql`${scSavedSearches.useCount} + 1`,
+        lastUsedAt: new Date()
+      })
+      .where(and(
+        eq(scSavedSearches.id, id),
+        eq(scSavedSearches.orgId, orgId),
+        isNull(scSavedSearches.deletedAt)
+      ));
   }
 }
 
