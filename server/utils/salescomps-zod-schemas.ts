@@ -43,6 +43,34 @@ export const salesCompCreateSchema = z.object({
   isPortfolio: z.boolean().default(false),
   parentPortfolioId: z.string().uuid().nullable().optional(),
   
+  // Profit centers
+  profitCenterStorage: z.boolean().default(false),
+  profitCenterEvents: z.boolean().default(false),
+  profitCenterService: z.boolean().default(false),
+  profitCenterThirdPartyLeases: z.boolean().default(false),
+  profitCenterBoatRentals: z.boolean().default(false),
+  profitCenterBoatBrokerage: z.boolean().default(false),
+  profitCenterRvPark: z.boolean().default(false),
+  profitCenterFuel: z.boolean().default(false),
+  profitCenterShipStore: z.boolean().default(false),
+  profitCenterParts: z.boolean().default(false),
+  profitCenterBoatClub: z.boolean().default(false),
+  profitCenterBoatSales: z.boolean().default(false),
+  profitCenterFnb: z.boolean().default(false),
+  profitCenterHospitality: z.boolean().default(false),
+  
+  // Profit center operation types
+  profitCenterBoatRentalsType: z.string().optional(),
+  profitCenterBoatBrokerageType: z.string().optional(),
+  profitCenterFuelType: z.string().optional(),
+  profitCenterShipStoreType: z.string().optional(),
+  profitCenterPartsType: z.string().optional(),
+  profitCenterBoatSalesType: z.string().optional(),
+  profitCenterFnbType: z.string().optional(),
+  profitCenterHospitalityType: z.string().optional(),
+  profitCenterBoatClubType: z.string().optional(),
+  profitCenterBoatClubCompany: z.string().optional(),
+  
   custom: z.record(z.unknown()).default({}),
 });
 
