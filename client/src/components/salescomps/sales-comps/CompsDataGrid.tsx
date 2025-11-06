@@ -25,10 +25,10 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatCurrency, formatPercent, formatNumber } from '@/lib/salescomps/format';
 import CellEditModal from "./CellEditModal";
-import Detail from "@/pages/sales-comps/Detail";
+import Detail from "@/pages/analysis/sales-comps/Detail";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import BulkEdit from "@/pages/sales-comps/BulkEdit";
-import ProjectAssignmentDialog from "@/components/projects/ProjectAssignmentDialog";
+import BulkEdit from "@/pages/analysis/sales-comps/BulkEdit";
+import ProjectAssignmentDialog from "@/components/salescomps/projects/ProjectAssignmentDialog";
 import CreateEditCompDialog from "./CreateEditCompDialog";
 import ColumnFilter from "./ColumnFilter";
 import SelectMarinaDialog from "./SelectMarinaDialog";

@@ -1,16 +1,3 @@
-// TODO: Missing SalesComps-specific components - these need to be copied:
-// - @/components/sales-comps/FiltersPanel
-// - @/components/sales-comps/CompsDataGrid
-// - @/components/sales-comps/MetricsTab
-// - @/components/sales-comps/CreateEditCompDialog
-// - @/components/sales-comps/ColumnEditorDialog
-// - @/components/projects/ProjectAssignmentDialog
-// - @/lib/api (salesCompsApi)
-// - @/lib/queryKeys
-// - @/lib/authUtils
-// - @/lib/seo
-// - @/lib/types (FilterState)
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,14 +6,31 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2 } from "lucide-react";
 import { Link } from "wouter";
+import { salesCompsApi } from "@/lib/salescomps/api";
+import { queryKeys } from "@/lib/salescomps/queryKeys";
 import { useToast } from "@/hooks/use-toast";
+import { isUnauthorizedError } from "@/lib/salescomps/authUtils";
+import FiltersPanel from "@/components/salescomps/sales-comps/FiltersPanel";
+import CompsDataGrid from "@/components/salescomps/sales-comps/CompsDataGrid";
+// import MetricsTab from "@/components/salescomps/sales-comps/MetricsTab"; // TODO: Add metrics components
+import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEditCompDialog";
+import ColumnEditorDialog from "@/components/salescomps/sales-comps/ColumnEditorDialog";
+import BulkEdit from "./BulkEdit";
+import Upload from "./Upload";
+import ProjectAssignmentDialog from "@/components/salescomps/projects/ProjectAssignmentDialog";
+import type { FilterState } from "@/lib/salescomps/types";
 
 export default function SalesCompsIndex() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
+  // TODO: Replace with actual MarinaMatch auth when available
+  const user = { role: 'Admin' };
+  const isAuthenticated = true;
+  const isLoading = false;
+  
   const [searchQuery, setSearchQuery] = useState("");
-  const [filters, setFilters] = useState<any>({
+  const [filters, setFilters] = useState<FilterState>({
     q: "",
     state: "",
     region: "",
@@ -54,7 +58,29 @@ export default function SalesCompsIndex() {
   const [activeSavedSearchId, setActiveSavedSearchId] = useState<string | null>(null);
   const [activeSavedSearchName, setActiveSavedSearchName] = useState<string | null>(null);
 
+  // Fetch unique values for filterable columns
   const filterableColumns = ['marina', 'state', 'saleYear', 'market'];
+  
+  // React Query for column unique values
+  const columnQueries = useQueries({
+    queries: filterableColumns.map(column => ({
+      queryKey: ['column-values', column],
+      queryFn: () => salesCompsApi.getColumnUniqueValues(column),
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    }))
+  });
+
+  // Update column unique values when queries complete
+  useEffect(() => {
+    const newValues: Record<string, string[]> = {};
+    filterableColumns.forEach((column, index) => {
+      const query = columnQueries[index];
+      if (query.data?.values) {
+        newValues[column] = query.data.values;
+      }
+    });
+    setColumnUniqueValues(newValues);
+  }, [columnQueries]);
   
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("data");
@@ -67,24 +93,60 @@ export default function SalesCompsIndex() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editData, setEditData] = useState<any[]>([]);
 
-  // TODO: Implement API integration when salesCompsApi is available
-  const compsLoading = false;
-  const data = [];
-  const total = 0;
+  const queryParams = {
+    q: searchQuery,
+    ...Object.fromEntries(
+      Object.entries(filters).filter(([_, value]) => 
+        value !== "" && value !== false && value !== null && value !== undefined
+      )
+    ),
+    sortBy,
+    sortDir,
+  };
 
-  // TODO: Get user from MarinaMatch auth context (req.user is already available)
-  const user = { role: 'Admin' }; // Placeholder
-  const canCreate = true;
-  const canManageColumns = true;
-  const canDelete = true;
-  const canAddToProject = true;
+  // Load all data at once
+  const { data: compsData, isLoading: compsLoading, error } = useQuery({
+    queryKey: queryKeys.comps.list(queryParams),
+    queryFn: () => salesCompsApi.getComps({ ...queryParams, pageSize: 10000 }), // Load all data
+    retry: false,
+  });
+
+  const data = compsData?.comps || [];
+  const total = compsData?.total || 0;
+
+  // Handle API errors
+  if (error && isUnauthorizedError(error as Error)) {
+    toast({
+      title: "Unauthorized",
+      description: "You are logged out. Please log in again.",
+      variant: "destructive",
+    });
+    return null;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const canCreate = user && ['Owner', 'Broker', 'Analyst', 'Admin'].includes((user as any).role);
+  const canManageColumns = user && ['Owner', 'Admin'].includes((user as any).role);
+  const canDelete = user && ['Owner', 'Admin', 'Analyst'].includes((user as any).role);
+  const canAddToProject = user && ['Owner', 'Broker', 'Analyst', 'Admin'].includes((user as any).role);
 
   const handleSearch = (value: string) => {
     setSearchQuery(value);
   };
 
-  const handleFilterChange = (newFilters: any) => {
+  const handleFilterChange = (newFilters: FilterState) => {
     setFilters(newFilters);
+    // Clear active saved search when filters are manually changed
     if (activeSavedSearchId) {
       setActiveSavedSearchId(null);
       setActiveSavedSearchName(null);
@@ -105,25 +167,48 @@ export default function SalesCompsIndex() {
     }
   };
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => salesCompsApi.bulkDelete(ids),
+    onSuccess: (result) => {
+      toast({
+        title: "Success",
+        description: `Deleted ${result.deleted} comps successfully`,
+      });
+      setSelectedIds([]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error as Error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Error",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleBulkDelete = () => {
     if (selectedIds.length === 0) return;
     
     const confirmed = window.confirm(`Are you sure you want to delete ${selectedIds.length} selected sales comps? This action cannot be undone.`);
     if (confirmed) {
-      // TODO: Implement bulk delete when salesCompsApi is available
-      toast({
-        title: "TODO",
-        description: "Bulk delete functionality pending API integration",
-        variant: "destructive",
-      });
+      bulkDeleteMutation.mutate(selectedIds);
     }
   };
 
   const handleExport = () => {
     if (!data?.length) return;
     
+    // Convert data to CSV format
     const headers = ['Marina', 'State', 'Sale Year', 'Sale Price', 'Cap Rate', 'NOI', 'Wet Slips', 'Dry Racks', 'Occupancy', 'Market'];
-    const csvData = data.map((comp: any) => [
+    const csvData = data.map(comp => [
       comp.marina,
       comp.state || '',
       comp.saleYear || '',
@@ -150,6 +235,7 @@ export default function SalesCompsIndex() {
   };
 
   const handleEnterEditMode = () => {
+    // Create a deep copy of the current data for editing
     setEditData(data.map(comp => ({ ...comp })));
     setIsEditMode(true);
   };
@@ -160,12 +246,72 @@ export default function SalesCompsIndex() {
   };
 
   const handleSaveChanges = async () => {
-    // TODO: Implement save changes when API is available
-    toast({
-      title: "TODO",
-      description: "Save changes functionality pending API integration",
-      variant: "destructive",
-    });
+    try {
+      // Find changed items by comparing with original data
+      const changedItems = editData.filter(editedComp => {
+        const originalComp = data.find(comp => comp.id === editedComp.id);
+        if (!originalComp) return false;
+        
+        // Check if any field has changed
+        return Object.keys(editedComp).some(key => {
+          const originalValue = originalComp[key as keyof typeof originalComp];
+          const editedValue = editedComp[key as keyof typeof editedComp];
+          return originalValue !== editedValue;
+        });
+      });
+
+      if (changedItems.length === 0) {
+        toast({
+          title: "No changes",
+          description: "No changes were made to save",
+        });
+        setIsEditMode(false);
+        setEditData([]);
+        return;
+      }
+
+      // Save each changed item
+      const savePromises = changedItems.map(async (changedComp) => {
+        const originalComp = data.find(comp => comp.id === changedComp.id);
+        if (!originalComp) return;
+
+        // Build update object with only changed fields
+        const updateData: Record<string, any> = {};
+        Object.keys(changedComp).forEach(key => {
+          const originalValue = originalComp[key as keyof typeof originalComp];
+          const editedValue = changedComp[key as keyof typeof changedComp];
+          if (originalValue !== editedValue) {
+            updateData[key] = editedValue;
+          }
+        });
+
+        // Make API call to update the comp
+        return salesCompsApi.updateComp(changedComp.id, updateData);
+      });
+
+      await Promise.all(savePromises);
+
+      // Invalidate and refetch data
+      queryClient.invalidateQueries({ 
+        queryKey: queryKeys.comps.all,
+      });
+      
+      toast({
+        title: "Success",
+        description: `${changedItems.length} item(s) saved successfully`,
+      });
+      
+      setIsEditMode(false);
+      setEditData([]);
+      
+    } catch (error) {
+      console.error('Error saving changes:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCellChange = (compId: string, field: string, value: any) => {
@@ -177,8 +323,13 @@ export default function SalesCompsIndex() {
   };
 
   if (showUpload) {
-    // TODO: Import Upload component
-    return <div>Upload component pending</div>;
+    return <Upload 
+      onClose={() => setShowUpload(false)} 
+      onImportComplete={() => {
+        // The query cache has already been invalidated by Upload component
+        // This will trigger a fresh data fetch
+      }}
+    />;
   }
 
   return (
@@ -190,8 +341,12 @@ export default function SalesCompsIndex() {
           <p className="text-sm text-muted-foreground">Manage marina sales comparables</p>
         </div>
 
-        {/* TODO: Import FiltersPanel component */}
-        <div className="p-4 text-sm text-muted-foreground">Filters panel pending</div>
+        <FiltersPanel 
+          filters={filters}
+          onFiltersChange={handleFilterChange}
+          activeSavedSearchId={activeSavedSearchId}
+          onActiveSavedSearchChange={handleActiveSavedSearchChange}
+        />
       </div>
 
       {/* Main Content */}
@@ -246,6 +401,7 @@ export default function SalesCompsIndex() {
                   </Button>
                 )}
 
+                {/* Edit/Save buttons */}
                 {!isEditMode ? (
                   <>
                     <Button
@@ -339,6 +495,29 @@ export default function SalesCompsIndex() {
                   <Button
                     variant="link"
                     size="sm"
+                    onClick={async () => {
+                      try {
+                        const response = await salesCompsApi.getAllIds();
+                        setSelectedIds(response.ids || []);
+                        toast({
+                          title: "Success",
+                          description: `Selected all ${response.ids.length} comps`,
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Error",
+                          description: "Failed to select all comps",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    data-testid="button-select-all"
+                  >
+                    Select all ({total})
+                  </Button>
+                  <Button
+                    variant="link"
+                    size="sm"
                     onClick={() => setSelectedIds([])}
                     data-testid="button-clear-selection"
                   >
@@ -409,20 +588,81 @@ export default function SalesCompsIndex() {
 
           {/* Tab Content */}
           <TabsContent value="data" className="flex-1 min-h-0 overflow-hidden m-0" data-testid="tab-content-data">
-            {/* TODO: Import CompsDataGrid component */}
-            <div className="p-8 text-center text-muted-foreground">
-              CompsDataGrid component pending
-            </div>
+            {/* Data Grid */}
+            <CompsDataGrid
+              data={isEditMode ? editData : data}
+              loading={compsLoading}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={handleSort}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
+              total={total}
+              canDelete={canDelete}
+              canAddToProject={canAddToProject}
+              columnFilters={filters.columnFilters}
+              onColumnFilterChange={(column, excludedValues) => {
+                setFilters(prev => ({
+                  ...prev,
+                  columnFilters: {
+                    ...prev.columnFilters,
+                    [column]: excludedValues
+                  }
+                }));
+              }}
+              columnUniqueValues={columnUniqueValues}
+              isEditMode={isEditMode}
+              onCellChange={handleCellChange}
+            />
           </TabsContent>
 
           <TabsContent value="metrics" className="flex-1 overflow-auto m-0" data-testid="tab-content-metrics">
-            {/* TODO: Import MetricsTab component */}
-            <div className="p-8 text-center text-muted-foreground">
-              MetricsTab component pending
+            {/* Metrics Tab - TODO: Add metrics components */}
+            <div className="p-6">
+              <p className="text-muted-foreground">Metrics and analytics coming soon...</p>
             </div>
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Dialogs */}
+      <CreateEditCompDialog
+        open={showCreateDialog}
+        onClose={() => {
+          setShowCreateDialog(false);
+          setIsPortfolioMode(false);
+        }}
+        isPortfolioMode={isPortfolioMode}
+      />
+
+      {canManageColumns && (
+        <ColumnEditorDialog
+          open={showColumnsDialog}
+          onClose={() => setShowColumnsDialog(false)}
+        />
+      )}
+
+      {/* Bulk Edit Modal */}
+      {showBulkEdit && (
+        <BulkEdit
+          selectedIds={selectedIds}
+          onClose={() => setShowBulkEdit(false)}
+        />
+      )}
+
+      {/* Project Assignment Dialog */}
+      {showProjectAssignment && (
+        <ProjectAssignmentDialog
+          open={showProjectAssignment}
+          onClose={() => setShowProjectAssignment(false)}
+          selectedIds={selectedIds}
+          selectedCompsPreview={data.filter(comp => selectedIds.includes(comp.id))}
+          onSuccess={() => {
+            setSelectedIds([]);
+            setShowProjectAssignment(false);
+          }}
+        />
+      )}
     </div>
   );
 }

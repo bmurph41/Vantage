@@ -14,8 +14,8 @@ import {
   Eye
 } from "lucide-react";
 import { formatCurrency, formatPercent, formatNumber } from '@/lib/salescomps/format';
-import CreateEditCompDialog from "@/components/sales-comps/CreateEditCompDialog";
-import Detail from "@/pages/sales-comps/Detail";
+import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEditCompDialog";
+import Detail from "@/pages/analysis/sales-comps/Detail";
 import { useAuth } from "@/hooks/useAuth";
 import type { SalesComp, User } from "@shared/schema";
 import type { ProjectCompsResponse } from '@/lib/salescomps/api';

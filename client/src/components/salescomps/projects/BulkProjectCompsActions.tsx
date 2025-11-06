@@ -12,7 +12,7 @@ import {
   Download
 } from "lucide-react";
 import { useBulkRemoveCompsFromProject } from '@/hooks/salescomps/useProjects';
-import BulkEdit from "@/pages/sales-comps/BulkEdit";
+import BulkEdit from "@/pages/analysis/sales-comps/BulkEdit";
 import ProjectAssignmentDialog from "./ProjectAssignmentDialog";
 import { useAuth } from "@/hooks/useAuth";
 import type { SalesComp, User } from "@shared/schema";

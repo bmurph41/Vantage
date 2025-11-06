@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Filter, X, ChevronDown, ChevronRight } from "lucide-react";
 import type { FilterState } from '@/lib/salescomps/types';
-import { STORAGE_TYPES } from "@shared/constants";
+import { STORAGE_TYPES } from "@shared/salescomps-constants";
 import debounce from "lodash.debounce";
 import throttle from "lodash.throttle";
 import SavedSearchesMenu from "./SavedSearchesMenu";

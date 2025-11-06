@@ -15,10 +15,10 @@ import { X, Save, Plus, Trash2 } from "lucide-react";
 import { salesCompsApi } from '@/lib/salescomps/api';
 import { queryKeys } from '@/lib/salescomps/queryKeys';
 import { useToast } from "@/hooks/use-toast";
-import { isUnauthorizedError } from "@/lib/authUtils";
+import { isUnauthorizedError } from "@/lib/salescomps/authUtils";
 import { z } from "zod";
 import type { SalesComp, InsertSalesComp, UpdateSalesComp } from "@shared/schema";
-import { PROFIT_CENTERS, COASTAL_TYPES, STORAGE_TYPES } from "@shared/constants";
+import { PROFIT_CENTERS, COASTAL_TYPES, STORAGE_TYPES } from "@shared/salescomps-constants";
 
 const compFormSchema = z.object({
   marina: z.string().min(1, "Marina name is required"),

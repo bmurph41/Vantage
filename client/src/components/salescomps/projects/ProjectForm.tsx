@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { X, Save, Palette, Target, Settings } from "lucide-react";
 import { z } from "zod";
 import type { Project, InsertProject, UpdateProject } from "@shared/schema";
-import { PROFIT_CENTERS, COASTAL_TYPES, DEFAULT_RECOMMENDATION_WEIGHTS } from "@shared/constants";
+import { PROFIT_CENTERS, COASTAL_TYPES, DEFAULT_RECOMMENDATION_WEIGHTS } from "@shared/salescomps-constants";
 
 const projectFormSchema = z.object({
   name: z.string().min(1, "Project name is required").max(100, "Project name must be less than 100 characters"),

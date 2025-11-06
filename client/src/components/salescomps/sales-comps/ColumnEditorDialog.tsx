@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import ColumnManager from "@/pages/sales-comps/ColumnManager";
+import ColumnManager from "@/pages/analysis/sales-comps/ColumnManager";
 
 interface ColumnEditorDialogProps {
   open: boolean;
