@@ -7646,6 +7646,65 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Custom Column Management routes (must be before /:id route)
+  app.get('/api/sales-comps/columns', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const columns = await storage.getCompColumns(orgId);
+      res.json(columns);
+    } catch (error) {
+      console.error("Error fetching custom columns:", error);
+      res.status(500).json({ message: "Failed to fetch custom columns" });
+    }
+  });
+
+  app.post('/api/sales-comps/columns', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { key, label, type, options, required, visible, orderIndex } = req.body;
+
+      if (!key || !label || !type) {
+        return res.status(400).json({ message: "Field key, label, and type are required" });
+      }
+
+      // Check for duplicate key
+      const existing = await storage.getCompColumns(orgId);
+      if (existing.some(c => c.key === key)) {
+        return res.status(400).json({ message: "Column with this key already exists" });
+      }
+
+      const column = await storage.createCompColumn({
+        orgId,
+        key,
+        label,
+        type,
+        options: options || null,
+        required: required || false,
+        visible: visible !== false,
+        orderIndex: orderIndex || 0,
+      });
+
+      res.status(201).json(column);
+    } catch (error) {
+      console.error("Error creating custom column:", error);
+      res.status(500).json({ message: "Failed to create custom column" });
+    }
+  });
+
+  app.delete('/api/sales-comps/columns/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await storage.deleteCompColumn(req.params.id, orgId);
+
+      if (!success) return res.status(404).json({ message: "Column not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting custom column:", error);
+      res.status(500).json({ message: "Failed to delete custom column" });
+    }
+  });
+
   // Pending Property Profiles routes (must be before /:id route)
   app.get('/api/sales-comps/pending-property-profiles', async (req: any, res) => {
     try {

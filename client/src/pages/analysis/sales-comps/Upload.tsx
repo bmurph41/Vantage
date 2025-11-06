@@ -14,7 +14,7 @@ import { salesCompsApi } from "@/lib/salescomps/api";
 import { queryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/salescomps/queryKeys";
 import { formatFileSize } from "@/lib/salescomps/format";
-import ColumnMapper from "@/components/salescomps/sales-comps/ColumnMapper";
+import ColumnMapperSimple from "@/components/salescomps/sales-comps/ColumnMapperSimple";
 import DuplicateReview from "@/components/salescomps/sales-comps/DuplicateReview";
 import { useToast } from "@/hooks/use-toast";
 
@@ -303,12 +303,10 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
             </div>
           </Card>
 
-          <ColumnMapper
+          <ColumnMapperSimple
             analysis={uploadData.analysis}
             mapping={mapping}
             onMappingChange={setMapping}
-            normalization={normalization}
-            onNormalizationChange={setNormalization}
           />
 
           {/* Portfolio Selection */}
