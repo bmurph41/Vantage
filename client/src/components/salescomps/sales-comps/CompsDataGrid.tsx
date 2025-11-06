@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { 
   ChevronUp, 
@@ -24,7 +23,6 @@ import {
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatCurrency, formatPercent, formatNumber } from '@/lib/salescomps/format';
-import CellEditModal from "./CellEditModal";
 import Detail from "@/pages/analysis/sales-comps/Detail";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import BulkEdit from "@/pages/analysis/sales-comps/BulkEdit";
@@ -78,13 +76,6 @@ export default function CompsDataGrid({
   isEditMode = false,
   onCellChange,
 }: CompsDataGridProps) {
-  const [editingCell, setEditingCell] = useState<{
-    comp: SalesComp;
-    field: string;
-    value: any;
-  } | null>(null);
-  const [isCellModalOpen, setIsCellModalOpen] = useState(false);
-  
   // Column configuration state for widths and ordering
   const [columnConfig, setColumnConfig] = useState<Record<string, { width: number; order: number }>>({});
   const [isResizing, setIsResizing] = useState<{ columnKey: string; startX: number; startWidth: number } | null>(null);
@@ -944,139 +935,6 @@ export default function CompsDataGrid({
     }
   };
 
-  const renderEditableCell = (comp: SalesComp, column: string) => {
-    const value = comp[column as keyof SalesComp];
-    
-    // Simple fields with text input
-    const textFields = ['marina', 'market', 'notes', 'brokerName', 'brokerCompany'];
-    
-    // Numeric fields
-    const numericFields = ['saleYear', 'salePrice', 'listPrice', 'noi', 'occupancy', 'wetSlips', 'dryRacks', 'acres', 'yearBuilt', 'daysOnMarket'];
-    
-    // Select fields
-    const selectFields = ['state', 'saleCondition'];
-    
-    if (textFields.includes(column)) {
-      return (
-        <Input
-          value={value?.toString() || ''}
-          onChange={(e) => onCellChange && onCellChange(comp.id, column, e.target.value)}
-          className="h-8 text-sm border-0 bg-transparent focus:bg-background focus:border-border"
-          data-testid={`edit-input-${column}-${comp.id}`}
-        />
-      );
-    }
-    
-    if (numericFields.includes(column)) {
-      return (
-        <Input
-          type="number"
-          value={value?.toString() || ''}
-          onChange={(e) => {
-            const numValue = e.target.value === '' ? null : parseFloat(e.target.value);
-            onCellChange && onCellChange(comp.id, column, numValue);
-          }}
-          className="h-8 text-sm border-0 bg-transparent focus:bg-background focus:border-border"
-          data-testid={`edit-input-${column}-${comp.id}`}
-        />
-      );
-    }
-    
-    if (column === 'state') {
-      return (
-        <Select
-          value={value?.toString() || ''}
-          onValueChange={(newValue) => onCellChange && onCellChange(comp.id, column, newValue)}
-        >
-          <SelectTrigger className="h-8 text-sm border-0 bg-transparent focus:bg-background focus:border-border" data-testid={`edit-select-${column}-${comp.id}`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="FL">Florida</SelectItem>
-            <SelectItem value="CA">California</SelectItem>
-            <SelectItem value="TX">Texas</SelectItem>
-            <SelectItem value="NY">New York</SelectItem>
-            <SelectItem value="NC">North Carolina</SelectItem>
-            <SelectItem value="SC">South Carolina</SelectItem>
-            <SelectItem value="GA">Georgia</SelectItem>
-            <SelectItem value="MD">Maryland</SelectItem>
-            <SelectItem value="VA">Virginia</SelectItem>
-          </SelectContent>
-        </Select>
-      );
-    }
-    
-    // For non-editable fields, just return the formatted value
-    return formatCellValue(comp, column);
-  };
-
-  const handleCellClick = (comp: SalesComp, field: string) => {
-    // Define all editable fields - most data fields can be edited
-    const editableFields = [
-      'marina', 'state', 'market', 'saleYear', 'salePrice', 'listPrice', 'noi',
-      'capRate', 'occupancy', 'wetSlips', 'dryRacks', 'acres', 'yearBuilt', 
-      'daysOnMarket', 'notes', 'saleCondition', 'brokerName', 'brokerCompany'
-    ];
-    
-    // Skip non-editable fields
-    const nonEditableFields = ['expand', 'actions'];
-    if (nonEditableFields.includes(field)) {
-      return;
-    }
-    
-    if (editableFields.includes(field)) {
-      setEditingCell({
-        comp,
-        field,
-        value: comp[field as keyof SalesComp],
-      });
-      setIsCellModalOpen(true);
-    }
-  };
-
-  // Cell edit mutation for real-time updates
-  const cellEditMutation = useMutation<SalesComp, Error, { compId: string; field: string; value: any }>({
-    mutationFn: async ({ compId, field, value }: { compId: string; field: string; value: any }) => {
-      const updateData = { [field]: value };
-      return await apiRequest('PATCH', `/api/sales-comps/${compId}`, updateData);
-    },
-    onSuccess: (updatedComp: SalesComp) => {
-      // Update the cache immediately for real-time feel
-      queryClient.setQueryData<any>(['/api/sales-comps'], (oldData: any) => {
-        if (!oldData?.comps) return oldData;
-        
-        return {
-          ...oldData,
-          comps: oldData.comps.map((comp: SalesComp) => 
-            comp.id === updatedComp.id ? { ...comp, ...updatedComp } : comp
-          )
-        };
-      });
-      
-      toast({
-        title: "Field updated",
-        description: `Successfully updated ${editingCell?.field}`,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Update failed",
-        description: error.message || "Failed to update field",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleCellEdit = async (value: any) => {
-    if (!editingCell) return;
-    
-    await cellEditMutation.mutateAsync({
-      compId: editingCell.comp.id,
-      field: editingCell.field,
-      value
-    });
-  };
-
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       onSelectionChange(data.map(comp => comp.id));
@@ -1638,20 +1496,6 @@ export default function CompsDataGrid({
         </DialogContent>
       </Dialog>
 
-      {/* Cell Edit Modal */}
-      {editingCell && (
-        <CellEditModal
-          isOpen={isCellModalOpen}
-          onClose={() => {
-            setEditingCell(null);
-            setIsCellModalOpen(false);
-          }}
-          onSave={handleCellEdit}
-          comp={editingCell.comp}
-          field={editingCell.field}
-          value={editingCell.value}
-        />
-      )}
       {/* Select Marina Dialog */}
       <SelectMarinaDialog
         open={showSelectMarinaDialog}
