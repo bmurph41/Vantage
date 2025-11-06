@@ -2977,3 +2977,512 @@ export type InsertCrmProspectingEntry = z.infer<typeof insertCrmProspectingEntry
 export type ProspectingEntry = CrmProspectingEntry;
 export type InsertProspectingEntry = InsertCrmProspectingEntry;
 export const insertProspectingEntrySchema = insertCrmProspectingEntrySchema;
+
+// ============================================================================
+// SALES COMPS / ANALYSIS MODULE
+// ============================================================================
+
+// Sales comparables table
+export const salesComps = pgTable('sales_comps', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+
+  // Standardized core fields
+  marina: text('marina').notNull(),
+  salePrice: integer('sale_price'),
+  isPriceDisclosed: boolean('is_price_disclosed').default(true),
+  capRate: integer('cap_rate'),
+  noi: integer('noi'),
+  isNoiDisclosed: boolean('is_noi_disclosed').default(true),
+  saleMonth: integer('sale_month'), // 1-12
+  saleYear: integer('sale_year'),
+  market: text('market'),
+  state: text('state'),
+  wetSlips: integer('wet_slips'),
+  dryRacks: integer('dry_racks'),
+  ioBoth: text('inside_outside_both'),
+  bodyOfWater: text('body_of_water'),
+  waterfront: text('waterfront'),
+  region: text('region'),
+  saleCondition: text('sale_condition'),
+  daysOnMarket: integer('days_on_market'),
+  broker: text('broker'),
+  address: text('address'),
+  zip: text('zip'),
+  seller: text('seller'),
+  company: text('company'),
+  owner: text('owner'),
+  listPrice: integer('list_price'),
+  acres: integer('acres'),
+  occupancy: integer('occupancy'),
+  yearBuilt: integer('year_built'),
+  articleUrls: text('article_urls').array().default(sql`'{}'`),
+  notes: text('notes'),
+
+  // Profit centers (revenue streams) - individual boolean columns
+  profitCenterStorage: boolean('profit_center_storage').default(false),
+  profitCenterEvents: boolean('profit_center_events').default(false),
+  profitCenterService: boolean('profit_center_service').default(false),
+  profitCenterThirdPartyLeases: boolean('profit_center_third_party_leases').default(false),
+  profitCenterBoatRentals: boolean('profit_center_boat_rentals').default(false),
+  profitCenterBoatBrokerage: boolean('profit_center_boat_brokerage').default(false),
+  profitCenterRvPark: boolean('profit_center_rv_park').default(false),
+  profitCenterFuel: boolean('profit_center_fuel').default(false),
+  profitCenterShipStore: boolean('profit_center_ship_store').default(false),
+  profitCenterParts: boolean('profit_center_parts').default(false),
+  profitCenterBoatClub: boolean('profit_center_boat_club').default(false),
+  profitCenterBoatSales: boolean('profit_center_boat_sales').default(false),
+  profitCenterFnb: boolean('profit_center_fnb').default(false),
+  profitCenterHospitality: boolean('profit_center_hospitality').default(false),
+  
+  // Profit center operation types (In-House/Leased/Third-Party)
+  profitCenterBoatRentalsType: varchar('profit_center_boat_rentals_type', { length: 20 }),
+  profitCenterBoatBrokerageType: varchar('profit_center_boat_brokerage_type', { length: 20 }),
+  profitCenterFuelType: varchar('profit_center_fuel_type', { length: 20 }),
+  profitCenterShipStoreType: varchar('profit_center_ship_store_type', { length: 20 }),
+  profitCenterPartsType: varchar('profit_center_parts_type', { length: 20 }),
+  profitCenterBoatSalesType: varchar('profit_center_boat_sales_type', { length: 20 }),
+  profitCenterFnbType: varchar('profit_center_fnb_type', { length: 20 }),
+  profitCenterHospitalityType: varchar('profit_center_hospitality_type', { length: 20 }),
+  profitCenterBoatClubType: varchar('profit_center_boat_club_type', { length: 20 }),
+  profitCenterBoatClubCompany: text('profit_center_boat_club_company'),
+  
+  // Legacy profit centers field (deprecated - keeping for migration compatibility)
+  profitCenters: text('profit_centers').array().default(sql`'{}'`),
+  coastalType: text('coastal_type'), // 'coastal'|'lake'
+
+  // Portfolio functionality
+  isPortfolio: boolean('is_portfolio').default(false),
+  parentPortfolioId: varchar('parent_portfolio_id').references((): any => salesComps.id, { onDelete: 'cascade' }),
+
+  // Expandable data
+  custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
+}, (table) => ({
+  orgIdx: index('sales_comps_org_idx').on(table.orgId),
+  orgStateIdx: index('sales_comps_org_state_idx').on(table.orgId, table.state),
+  orgYearIdx: index('sales_comps_org_year_idx').on(table.orgId, table.saleYear),
+  orgPriceIdx: index('sales_comps_org_price_idx').on(table.orgId, table.salePrice),
+  orgCoastalIdx: index('sales_comps_org_coastal_idx').on(table.orgId, table.coastalType),
+}));
+
+// Column definitions for dynamic columns
+export const compColumns = pgTable('comp_columns', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  key: text('key').notNull(),
+  label: text('label').notNull(),
+  type: text('type').notNull(), // 'text'|'number'|'currency'|'percent'|'date'|'boolean'|'select'
+  options: text('options').array(),
+  required: boolean('required').default(false),
+  visible: boolean('visible').default(true),
+  orderIndex: integer('order_index').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('comp_columns_org_idx').on(table.orgId),
+  orgKeyIdx: index('comp_columns_org_key_idx').on(table.orgId, table.key),
+}));
+
+// File uploads / import jobs
+export const compImports = pgTable('comp_imports', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  filename: text('filename').notNull(),
+  status: text('status').notNull(), // 'pending'|'mapping'|'processing'|'completed'|'failed'
+  columnMapping: jsonb('column_mapping').$type<Record<string, string>>(),
+  parsedData: jsonb('parsed_data').$type<Record<string, any>[]>(),
+  summary: jsonb('summary').$type<{
+    totalRows: number;
+    successCount: number;
+    errorCount: number;
+    warningCount: number;
+    errors: Array<{ row: number; message: string; }>;
+  }>(),
+}, (table) => ({
+  orgIdx: index('comp_imports_org_idx').on(table.orgId),
+}));
+
+// SC Projects table for organizing sales comps (renamed from "projects" to avoid conflict with DD projects)
+export const scProjects = pgTable('sc_projects', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+
+  // Project fields
+  name: text('name').notNull(),
+  description: text('description'),
+  color: varchar('color', { length: 7 }), // Hex color code like #FF0000
+  
+  // Project profile for matching
+  profile: jsonb('profile').$type<{
+    targetNOI?: number;
+    targetCapacity?: number;
+    targetPriceMin?: number;
+    targetPriceMax?: number;
+    states?: string[];
+    regions?: string[];
+    coastalType?: 'coastal' | 'lake';
+    mustHaveProfitCenters?: string[];
+    niceToHaveProfitCenters?: string[];
+  }>().default({}),
+  
+  // User weight overrides for recommendation algorithm
+  weightOverrides: jsonb('weight_overrides').$type<{
+    capacity?: number;
+    financial?: number;
+    profitCenters?: number;
+    regional?: number;
+    geo?: number;
+  }>().default({}),
+}, (table) => ({
+  orgIdx: index('sc_projects_org_idx').on(table.orgId),
+  orgNameIdx: index('sc_projects_org_name_idx').on(table.orgId, table.name),
+}));
+
+// Project-Comps junction table (many-to-many)
+export const scProjectComps = pgTable('sc_project_comps', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  scProjectId: varchar('sc_project_id').notNull().references(() => scProjects.id, { onDelete: 'cascade' }),
+  salesCompId: varchar('sales_comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
+  addedBy: varchar('added_by').notNull().references(() => users.id),
+  addedAt: timestamp('added_at').defaultNow(),
+  notes: text('notes'), // Optional notes specific to this comp in this project
+}, (table) => ({
+  orgIdx: index('sc_project_comps_org_idx').on(table.orgId),
+  projectIdx: index('sc_project_comps_project_idx').on(table.scProjectId),
+  salesCompIdx: index('sc_project_comps_sales_comp_idx').on(table.salesCompId),
+  uniqueProjectComp: unique('sc_project_comps_unique_idx').on(table.orgId, table.scProjectId, table.salesCompId),
+}));
+
+// Audit log for sales comps
+export const scAuditLog = pgTable('sc_audit_log', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  entity: text('entity').notNull(), // 'sales_comp' | 'comp_column' | 'sc_project' | 'sc_project_comp'
+  entityId: varchar('entity_id').notNull(),
+  action: text('action').notNull(), // 'create'|'update'|'delete'|'import'
+  before: jsonb('before'),
+  after: jsonb('after'),
+  at: timestamp('at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('sc_audit_log_org_idx').on(table.orgId),
+  entityIdx: index('sc_audit_log_entity_idx').on(table.entityId),
+}));
+
+// Recommendation feedback for learning system
+export const scRecommendationFeedback = pgTable('sc_recommendation_feedback', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  scProjectId: varchar('sc_project_id').notNull().references(() => scProjects.id, { onDelete: 'cascade' }),
+  salesCompId: varchar('sales_comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  action: text('action').notNull(), // 'selected'|'rejected'|'liked'|'viewed'
+  scoreAtTime: integer('score_at_time'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('sc_recommendation_feedback_org_idx').on(table.orgId),
+  projectIdx: index('sc_recommendation_feedback_project_idx').on(table.scProjectId),
+}));
+
+// Org-specific learned preferences
+export const scOrgPreferences = pgTable('sc_org_preferences', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  segmentKey: text('segment_key').notNull(), // e.g., 'coastal|cap:large' for categorizing preferences
+  weights: jsonb('weights').$type<{
+    capacity: number;
+    financial: number;
+    profitCenters: number;
+    regional: number;
+    geo: number;
+  }>().default({ capacity: 0.40, financial: 0.35, profitCenters: 0.15, regional: 0.07, geo: 0.03 }),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('sc_org_preferences_org_idx').on(table.orgId),
+  uniqueSegment: unique('sc_org_preferences_unique_idx').on(table.orgId, table.segmentKey),
+}));
+
+// Saved searches for quick access to frequently used filter combinations
+export const scSavedSearches = pgTable('sc_saved_searches', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+
+  // Search configuration
+  name: text('name').notNull(),
+  description: text('description'),
+  filters: jsonb('filters').$type<Record<string, any>>().default({}),
+  
+  // Alert configuration
+  emailAlertsEnabled: boolean('email_alerts_enabled').default(false),
+  alertFrequency: text('alert_frequency'), // 'immediate'|'daily'|'weekly'
+  lastAlertSent: timestamp('last_alert_sent'),
+  
+  // Usage tracking
+  lastUsedAt: timestamp('last_used_at'),
+  useCount: integer('use_count').default(0),
+  
+  // Organization
+  isPinned: boolean('is_pinned').default(false),
+  color: varchar('color', { length: 7 }), // Hex color for visual organization
+}, (table) => ({
+  orgIdx: index('sc_saved_searches_org_idx').on(table.orgId),
+  orgCreatedByIdx: index('sc_saved_searches_org_created_by_idx').on(table.orgId, table.createdBy),
+  orgPinnedIdx: index('sc_saved_searches_org_pinned_idx').on(table.orgId, table.isPinned),
+}));
+
+// Relations
+export const salesCompsRelations = relations(salesComps, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [salesComps.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [salesComps.createdBy],
+    references: [users.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [salesComps.updatedBy],
+    references: [users.id],
+  }),
+  scProjectComps: many(scProjectComps),
+}));
+
+export const compColumnsRelations = relations(compColumns, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [compColumns.orgId],
+    references: [organizations.id],
+  }),
+}));
+
+export const compImportsRelations = relations(compImports, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [compImports.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [compImports.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const scProjectsRelations = relations(scProjects, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [scProjects.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [scProjects.createdBy],
+    references: [users.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [scProjects.updatedBy],
+    references: [users.id],
+  }),
+  scProjectComps: many(scProjectComps),
+}));
+
+export const scProjectCompsRelations = relations(scProjectComps, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [scProjectComps.orgId],
+    references: [organizations.id],
+  }),
+  scProject: one(scProjects, {
+    fields: [scProjectComps.scProjectId],
+    references: [scProjects.id],
+  }),
+  salesComp: one(salesComps, {
+    fields: [scProjectComps.salesCompId],
+    references: [salesComps.id],
+  }),
+  addedByUser: one(users, {
+    fields: [scProjectComps.addedBy],
+    references: [users.id],
+  }),
+}));
+
+export const scRecommendationFeedbackRelations = relations(scRecommendationFeedback, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [scRecommendationFeedback.orgId],
+    references: [organizations.id],
+  }),
+  scProject: one(scProjects, {
+    fields: [scRecommendationFeedback.scProjectId],
+    references: [scProjects.id],
+  }),
+  salesComp: one(salesComps, {
+    fields: [scRecommendationFeedback.salesCompId],
+    references: [salesComps.id],
+  }),
+  user: one(users, {
+    fields: [scRecommendationFeedback.userId],
+    references: [users.id],
+  }),
+}));
+
+export const scOrgPreferencesRelations = relations(scOrgPreferences, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [scOrgPreferences.orgId],
+    references: [organizations.id],
+  }),
+}));
+
+// Zod schemas
+export const insertSalesCompSchema = createInsertSchema(salesComps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateSalesCompSchema = insertSalesCompSchema.partial().omit({
+  orgId: true,
+  createdBy: true,
+});
+
+export const insertCompColumnSchema = createInsertSchema(compColumns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateCompColumnSchema = insertCompColumnSchema.partial().omit({
+  orgId: true,
+});
+
+export const insertCompImportSchema = createInsertSchema(compImports).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertScProjectSchema = createInsertSchema(scProjects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateScProjectSchema = insertScProjectSchema.partial().omit({
+  orgId: true,
+  createdBy: true,
+});
+
+export const insertScProjectCompSchema = createInsertSchema(scProjectComps).omit({
+  id: true,
+  addedAt: true,
+});
+
+export const updateScProjectCompSchema = insertScProjectCompSchema.partial().omit({
+  orgId: true,
+  scProjectId: true,
+  salesCompId: true,
+  addedBy: true,
+});
+
+export const insertScRecommendationFeedbackSchema = createInsertSchema(scRecommendationFeedback).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertScOrgPreferencesSchema = createInsertSchema(scOrgPreferences).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const updateScOrgPreferencesSchema = insertScOrgPreferencesSchema.partial().omit({
+  orgId: true,
+});
+
+export const insertScSavedSearchSchema = createInsertSchema(scSavedSearches).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+});
+
+export const updateScSavedSearchSchema = insertScSavedSearchSchema.partial();
+
+// Profit Centers constant schema
+export const profitCentersSchema = z.array(z.enum([
+  'Storage',
+  'Fuel', 
+  'Events',
+  'Ship Store',
+  'Service',
+  'Parts',
+  'Third-Party Leases',
+  'Boat Club',
+  'Boat Rentals',
+  'Boat Sales',
+  'Boat Brokerage',
+  'F&B',
+  'RV Park',
+  'Hospitality/Accommodations'
+]));
+
+// SC Project profile validation
+export const scProjectProfileSchema = z.object({
+  targetNOI: z.number().optional(),
+  targetCapacity: z.number().optional(),
+  targetPriceMin: z.number().optional(),
+  targetPriceMax: z.number().optional(),
+  states: z.array(z.string()).optional(),
+  regions: z.array(z.string()).optional(),
+  coastalType: z.enum(['coastal', 'lake']).optional(),
+  mustHaveProfitCenters: profitCentersSchema.optional(),
+  niceToHaveProfitCenters: profitCentersSchema.optional(),
+});
+
+// Weight overrides validation
+export const scWeightOverridesSchema = z.object({
+  capacity: z.number().min(0).max(1).optional(),
+  financial: z.number().min(0).max(1).optional(),
+  profitCenters: z.number().min(0).max(1).optional(),
+  regional: z.number().min(0).max(1).optional(),
+  geo: z.number().min(0).max(1).optional(),
+});
+
+// Types
+export type SalesComp = typeof salesComps.$inferSelect;
+export type InsertSalesComp = z.infer<typeof insertSalesCompSchema>;
+export type UpdateSalesComp = z.infer<typeof updateSalesCompSchema>;
+export type CompColumn = typeof compColumns.$inferSelect;
+export type InsertCompColumn = z.infer<typeof insertCompColumnSchema>;
+export type UpdateCompColumn = z.infer<typeof updateCompColumnSchema>;
+export type CompImport = typeof compImports.$inferSelect;
+export type InsertCompImport = z.infer<typeof insertCompImportSchema>;
+export type ScAuditLog = typeof scAuditLog.$inferSelect;
+export type ScProject = typeof scProjects.$inferSelect;
+export type InsertScProject = z.infer<typeof insertScProjectSchema>;
+export type UpdateScProject = z.infer<typeof updateScProjectSchema>;
+export type ScProjectComp = typeof scProjectComps.$inferSelect;
+export type InsertScProjectComp = z.infer<typeof insertScProjectCompSchema>;
+export type UpdateScProjectComp = z.infer<typeof updateScProjectCompSchema>;
+export type ScRecommendationFeedback = typeof scRecommendationFeedback.$inferSelect;
+export type InsertScRecommendationFeedback = z.infer<typeof insertScRecommendationFeedbackSchema>;
+export type ScOrgPreferences = typeof scOrgPreferences.$inferSelect;
+export type InsertScOrgPreferences = z.infer<typeof insertScOrgPreferencesSchema>;
+export type UpdateScOrgPreferences = z.infer<typeof updateScOrgPreferencesSchema>;
+export type ScProjectProfile = z.infer<typeof scProjectProfileSchema>;
+export type ScWeightOverrides = z.infer<typeof scWeightOverridesSchema>;
+export type ProfitCenter = z.infer<typeof profitCentersSchema>[number];
+export type ScSavedSearch = typeof scSavedSearches.$inferSelect;
+export type InsertScSavedSearch = z.infer<typeof insertScSavedSearchSchema>;
+export type UpdateScSavedSearch = z.infer<typeof updateScSavedSearchSchema>;
