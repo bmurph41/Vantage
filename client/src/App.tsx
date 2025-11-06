@@ -38,6 +38,16 @@ import NotFound from "@/pages/not-found";
 import CrmTasks from "@/pages/crm-tasks";
 import MarketingAutomation from "@/pages/marketing-automation";
 import CalendarSettings from "@/pages/calendar-settings";
+// Analysis / Sales Comps pages
+import SalesCompsIndex from "@/pages/analysis/sales-comps/Index";
+import SalesCompsDetail from "@/pages/analysis/sales-comps/Detail";
+import SalesCompsUpload from "@/pages/analysis/sales-comps/Upload";
+import SalesCompsCompare from "@/pages/analysis/sales-comps/Compare";
+import SalesCompsBulkEdit from "@/pages/analysis/sales-comps/BulkEdit";
+import SalesCompsColumnManager from "@/pages/analysis/sales-comps/ColumnManager";
+import ScProjectsIndex from "@/pages/analysis/projects/Index";
+import ScProjectsReport from "@/pages/analysis/projects/Report";
+import RateCompsIndex from "@/pages/analysis/rate-comps/Index";
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
@@ -323,6 +333,71 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <ImportHistory />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* Analysis / Sales Comps Routes */}
+      <Route path="/analysis/sales-comps">
+        {() => (
+          <UnifiedLayout>
+            <SalesCompsIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/sales-comps/upload">
+        {() => (
+          <UnifiedLayout>
+            <SalesCompsUpload />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/sales-comps/columns">
+        {() => (
+          <UnifiedLayout>
+            <SalesCompsColumnManager />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/sales-comps/bulk-edit">
+        {() => (
+          <UnifiedLayout>
+            <SalesCompsBulkEdit />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/sales-comps/compare">
+        {() => (
+          <UnifiedLayout>
+            <SalesCompsCompare />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/sales-comps/:id">
+        {(params) => (
+          <UnifiedLayout>
+            <SalesCompsDetail {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/projects">
+        {() => (
+          <UnifiedLayout>
+            <ScProjectsIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/projects/:id">
+        {(params) => (
+          <UnifiedLayout>
+            <ScProjectsReport {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/rate-comps">
+        {() => (
+          <UnifiedLayout>
+            <RateCompsIndex />
           </UnifiedLayout>
         )}
       </Route>
