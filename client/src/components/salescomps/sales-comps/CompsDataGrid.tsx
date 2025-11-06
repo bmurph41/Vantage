@@ -106,6 +106,8 @@ export default function CompsDataGrid({
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showProjectAssignment, setShowProjectAssignment] = useState(false);
   const [selectedCompForProject, setSelectedCompForProject] = useState<SalesComp | null>(null);
+  const [editingComp, setEditingComp] = useState<SalesComp | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [expandedPortfolios, setExpandedPortfolios] = useState<Set<string>>(new Set());
   const [showAddPropertyDialog, setShowAddPropertyDialog] = useState(false);
   const [selectedPortfolioForProperty, setSelectedPortfolioForProperty] = useState<SalesComp | null>(null);
@@ -1443,7 +1445,10 @@ export default function CompsDataGrid({
                             View Details
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={() => handleCellClick(comp, 'marina')}
+                            onClick={() => {
+                              setEditingComp(comp);
+                              setShowEditDialog(true);
+                            }}
                             data-testid={`action-edit-${comp.id}`}
                           >
                             <Edit className="h-4 w-4 mr-2" />
@@ -1659,6 +1664,18 @@ export default function CompsDataGrid({
               setExpandedPortfolios(prev => new Set(prev).add(selectedPortfolioForAdd));
             }
           }}
+        />
+      )}
+
+      {/* Edit Comp Dialog */}
+      {showEditDialog && editingComp && (
+        <CreateEditCompDialog
+          open={showEditDialog}
+          onClose={() => {
+            setShowEditDialog(false);
+            setEditingComp(null);
+          }}
+          comp={editingComp}
         />
       )}
     </>

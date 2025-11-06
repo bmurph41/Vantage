@@ -7737,7 +7737,42 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.orgId;
 
+      console.log('🔍 POST /api/sales-comps - Request body profit centers:', {
+        profitCenterStorage: req.body.profitCenterStorage,
+        profitCenterEvents: req.body.profitCenterEvents,
+        profitCenterService: req.body.profitCenterService,
+        profitCenterThirdPartyLeases: req.body.profitCenterThirdPartyLeases,
+        profitCenterBoatRentals: req.body.profitCenterBoatRentals,
+        profitCenterBoatBrokerage: req.body.profitCenterBoatBrokerage,
+        profitCenterRvPark: req.body.profitCenterRvPark,
+        profitCenterFuel: req.body.profitCenterFuel,
+        profitCenterShipStore: req.body.profitCenterShipStore,
+        profitCenterParts: req.body.profitCenterParts,
+        profitCenterBoatClub: req.body.profitCenterBoatClub,
+        profitCenterBoatSales: req.body.profitCenterBoatSales,
+        profitCenterFnb: req.body.profitCenterFnb,
+        profitCenterHospitality: req.body.profitCenterHospitality,
+      });
+
       const compData = salesCompCreateSchema.parse(req.body);
+      
+      console.log('🔍 POST /api/sales-comps - After Zod parse profit centers:', {
+        profitCenterStorage: compData.profitCenterStorage,
+        profitCenterEvents: compData.profitCenterEvents,
+        profitCenterService: compData.profitCenterService,
+        profitCenterThirdPartyLeases: compData.profitCenterThirdPartyLeases,
+        profitCenterBoatRentals: compData.profitCenterBoatRentals,
+        profitCenterBoatBrokerage: compData.profitCenterBoatBrokerage,
+        profitCenterRvPark: compData.profitCenterRvPark,
+        profitCenterFuel: compData.profitCenterFuel,
+        profitCenterShipStore: compData.profitCenterShipStore,
+        profitCenterParts: compData.profitCenterParts,
+        profitCenterBoatClub: compData.profitCenterBoatClub,
+        profitCenterBoatSales: compData.profitCenterBoatSales,
+        profitCenterFnb: compData.profitCenterFnb,
+        profitCenterHospitality: compData.profitCenterHospitality,
+      });
+
       const comp = await compService.createComp({
         ...compData,
         orgId,
@@ -7756,7 +7791,42 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.orgId;
 
+      console.log('🔍 PATCH /api/sales-comps/:id - Request body profit centers:', {
+        profitCenterStorage: req.body.profitCenterStorage,
+        profitCenterEvents: req.body.profitCenterEvents,
+        profitCenterService: req.body.profitCenterService,
+        profitCenterThirdPartyLeases: req.body.profitCenterThirdPartyLeases,
+        profitCenterBoatRentals: req.body.profitCenterBoatRentals,
+        profitCenterBoatBrokerage: req.body.profitCenterBoatBrokerage,
+        profitCenterRvPark: req.body.profitCenterRvPark,
+        profitCenterFuel: req.body.profitCenterFuel,
+        profitCenterShipStore: req.body.profitCenterShipStore,
+        profitCenterParts: req.body.profitCenterParts,
+        profitCenterBoatClub: req.body.profitCenterBoatClub,
+        profitCenterBoatSales: req.body.profitCenterBoatSales,
+        profitCenterFnb: req.body.profitCenterFnb,
+        profitCenterHospitality: req.body.profitCenterHospitality,
+      });
+
       const updates = salesCompUpdateSchema.parse(req.body);
+      
+      console.log('🔍 PATCH /api/sales-comps/:id - After Zod parse profit centers:', {
+        profitCenterStorage: updates.profitCenterStorage,
+        profitCenterEvents: updates.profitCenterEvents,
+        profitCenterService: updates.profitCenterService,
+        profitCenterThirdPartyLeases: updates.profitCenterThirdPartyLeases,
+        profitCenterBoatRentals: updates.profitCenterBoatRentals,
+        profitCenterBoatBrokerage: updates.profitCenterBoatBrokerage,
+        profitCenterRvPark: updates.profitCenterRvPark,
+        profitCenterFuel: updates.profitCenterFuel,
+        profitCenterShipStore: updates.profitCenterShipStore,
+        profitCenterParts: updates.profitCenterParts,
+        profitCenterBoatClub: updates.profitCenterBoatClub,
+        profitCenterBoatSales: updates.profitCenterBoatSales,
+        profitCenterFnb: updates.profitCenterFnb,
+        profitCenterHospitality: updates.profitCenterHospitality,
+      });
+
       const comp = await compService.updateComp(
         req.params.id,
         { ...updates, updatedBy: userId },
