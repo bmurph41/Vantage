@@ -20,7 +20,6 @@ interface ColumnMapperSimpleProps {
 
 // Standard fields that can be mapped to
 const STANDARD_FIELDS = [
-  { value: '', label: 'Do not import' },
   { value: 'marina', label: 'Marina Name', required: true },
   { value: 'salePrice', label: 'Sale Price' },
   { value: 'capRate', label: 'Cap Rate' },
@@ -117,13 +116,14 @@ export default function ColumnMapperSimple({
         type: 'text'
       });
       setShowNewColumnDialog(true);
+    } else if (targetField === '__SKIP__') {
+      // Remove from mapping to skip this column
+      const newMapping = { ...mapping };
+      delete newMapping[csvColumn];
+      onMappingChange(newMapping);
     } else {
       const newMapping = { ...mapping };
-      if (targetField === '') {
-        delete newMapping[csvColumn];
-      } else {
-        newMapping[csvColumn] = targetField;
-      }
+      newMapping[csvColumn] = targetField;
       onMappingChange(newMapping);
     }
   };
@@ -210,6 +210,9 @@ export default function ColumnMapperSimple({
                         <SelectValue placeholder="Select field..." />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="__SKIP__" className="text-muted-foreground">
+                          Do not import
+                        </SelectItem>
                         {allFields.map((field) => (
                           <SelectItem key={field.value} value={field.value}>
                             {field.label}
