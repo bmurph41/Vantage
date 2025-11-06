@@ -82,8 +82,10 @@ export default function ColumnMapperSimple({
     mutationFn: async (columnData: typeof newColumnData) => {
       return await apiRequest('POST', '/api/sales-comps/columns', columnData);
     },
-    onSuccess: (newColumn) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/sales-comps/columns'] });
+    onSuccess: async (newColumn) => {
+      // Invalidate and wait for the query to refetch
+      await queryClient.invalidateQueries({ queryKey: ['/api/sales-comps/columns'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/sales-comps/columns'] });
       
       // Auto-map the new column to the pending CSV column
       if (pendingColumnName) {

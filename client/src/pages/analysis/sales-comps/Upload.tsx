@@ -43,6 +43,7 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>("");
   const [showNewPortfolioDialog, setShowNewPortfolioDialog] = useState(false);
   const [newPortfolioName, setNewPortfolioName] = useState("");
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch existing portfolio comps
@@ -74,7 +75,8 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     onSuccess: (data) => {
       setDuplicates(data.duplicates || []);
       if (data.duplicatesFound > 0) {
-        setStep('duplicates');
+        // Show duplicates modal instead of changing step
+        setShowDuplicatesModal(true);
       } else {
         // No duplicates found, proceed directly to processing
         handleCommitAfterDuplicateCheck();
@@ -241,9 +243,12 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
   const handleBack = () => {
     if (step === 'mapping') {
       setStep('upload');
-    } else if (step === 'duplicates') {
-      setStep('mapping');
     }
+  };
+
+  const handleProceedWithImport = () => {
+    setShowDuplicatesModal(false);
+    handleCommitAfterDuplicateCheck();
   };
 
   const renderUploadStep = () => (
@@ -372,22 +377,6 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     </div>
   );
 
-  const renderDuplicatesStep = () => (
-    <div>
-      <div className="mb-6">
-        <h3 className="text-lg font-medium text-foreground mb-2">Step 3: Review Duplicates</h3>
-        <p className="text-sm text-muted-foreground">
-          We found {duplicates.length} potential duplicates. Review and exclude any you don't want to import.
-        </p>
-      </div>
-
-      <DuplicateReview
-        duplicates={duplicates}
-        excludedRows={excludedRows}
-        onExcludeChange={handleExcludeChange}
-      />
-    </div>
-  );
 
   const renderProcessingStep = () => (
     <div>
@@ -495,7 +484,6 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
         <div className="flex-1 overflow-auto p-6">
           {step === 'upload' && renderUploadStep()}
           {step === 'mapping' && renderMappingStep()}
-          {step === 'duplicates' && renderDuplicatesStep()}
           {step === 'processing' && renderProcessingStep()}
           {step === 'complete' && renderCompleteStep()}
         </div>
@@ -509,10 +497,10 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
               disabled={step === 'upload' || step === 'processing' || step === 'complete'}
               data-testid="button-back"
             >
-              {(step === 'mapping' || step === 'duplicates') && (
+              {step === 'mapping' && (
                 <ArrowLeft className="h-4 w-4 mr-2" />
               )}
-              {(step === 'mapping' || step === 'duplicates') ? 'Back' : ''}
+              {step === 'mapping' ? 'Back' : ''}
             </Button>
             
             <div className="flex items-center gap-2">
@@ -534,16 +522,6 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
                   data-testid="button-next"
                 >
                   {detectDuplicatesMutation.isPending ? 'Checking...' : 'Next: Check for Duplicates'}
-                </Button>
-              )}
-              
-              {step === 'duplicates' && (
-                <Button 
-                  onClick={handleCommitAfterDuplicateCheck}
-                  disabled={commitMutation.isPending}
-                  data-testid="button-import"
-                >
-                  {commitMutation.isPending ? 'Importing...' : `Import ${duplicates.length - excludedRows.length} Records`}
                 </Button>
               )}
             </div>
@@ -591,6 +569,53 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
             >
               {createPortfolioMutation.isPending ? "Creating..." : "Create Portfolio"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Duplicates Review Modal */}
+      <Dialog open={showDuplicatesModal} onOpenChange={setShowDuplicatesModal}>
+        <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              Review Potential Duplicates
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-auto py-4">
+            <p className="text-sm text-muted-foreground mb-6">
+              We found {duplicates.length} potential duplicate{duplicates.length !== 1 ? 's' : ''} in your upload. 
+              Review each item below and decide whether to include or exclude it from the import.
+            </p>
+            
+            <DuplicateReview
+              duplicates={duplicates}
+              excludedRows={excludedRows}
+              onExcludeChange={handleExcludeChange}
+            />
+          </div>
+
+          <DialogFooter className="flex justify-between items-center">
+            <div className="text-sm text-muted-foreground">
+              {excludedRows.length} of {duplicates.length} duplicates will be excluded
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowDuplicatesModal(false)}
+                data-testid="button-cancel-duplicates"
+              >
+                Back to Mapping
+              </Button>
+              <Button 
+                onClick={handleProceedWithImport}
+                disabled={commitMutation.isPending}
+                data-testid="button-proceed-import"
+              >
+                {commitMutation.isPending ? 'Importing...' : `Import ${duplicates.length - excludedRows.length} Records`}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
