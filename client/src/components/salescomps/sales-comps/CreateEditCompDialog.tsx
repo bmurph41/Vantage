@@ -1162,8 +1162,8 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                                 <FormControl>
                                   <Checkbox
-                                    checked={field.value || false}
-                                    onCheckedChange={field.onChange}
+                                    checked={field.value === true}
+                                    onCheckedChange={(checked) => field.onChange(checked === true)}
                                     data-testid={`checkbox-${profitCenter.key.toLowerCase()}`}
                                   />
                                 </FormControl>
@@ -1195,8 +1195,8 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                                 <FormControl>
                                   <Checkbox
-                                    checked={field.value || false}
-                                    onCheckedChange={field.onChange}
+                                    checked={field.value === true}
+                                    onCheckedChange={(checked) => field.onChange(checked === true)}
                                     data-testid={`checkbox-${profitCenter.key.toLowerCase()}`}
                                   />
                                 </FormControl>
@@ -1242,8 +1242,8 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                             <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                               <FormControl>
                                 <Checkbox
-                                  checked={field.value || false}
-                                  onCheckedChange={field.onChange}
+                                  checked={field.value === true}
+                                  onCheckedChange={(checked) => field.onChange(checked === true)}
                                   data-testid="checkbox-profitcenterboatclub"
                                 />
                               </FormControl>
