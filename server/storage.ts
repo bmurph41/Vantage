@@ -485,6 +485,15 @@ export interface IStorage {
   getScCustomStorageTypes(orgId: string): Promise<ScCustomStorageType[]>;
   createScCustomStorageType(data: InsertScCustomStorageType): Promise<ScCustomStorageType>;
   deleteScCustomStorageType(id: string, orgId: string): Promise<boolean>;
+
+  // SalesComps - Pending Property Profiles
+  getPendingPropertyProfiles(orgId: string, status?: string): Promise<ScPendingPropertyProfile[]>;
+  createPendingPropertyProfile(data: InsertScPendingPropertyProfile): Promise<ScPendingPropertyProfile>;
+  updatePendingPropertyProfile(id: string, data: Partial<InsertScPendingPropertyProfile>): Promise<ScPendingPropertyProfile>;
+  deletePendingPropertyProfile(id: string): Promise<boolean>;
+  
+  // CRM Properties - search by name/city/state
+  findPropertyByLocation(orgId: string, marina: string, city?: string, state?: string): Promise<Property | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3386,6 +3395,67 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return result.length > 0;
+  }
+
+  // Pending Property Profiles
+  async getPendingPropertyProfiles(orgId: string, status?: string): Promise<ScPendingPropertyProfile[]> {
+    const conditions = [eq(scPendingPropertyProfiles.orgId, orgId)];
+    if (status) {
+      conditions.push(eq(scPendingPropertyProfiles.status, status));
+    }
+    return await db.select()
+      .from(scPendingPropertyProfiles)
+      .where(and(...conditions))
+      .orderBy(desc(scPendingPropertyProfiles.createdAt));
+  }
+
+  async createPendingPropertyProfile(data: InsertScPendingPropertyProfile): Promise<ScPendingPropertyProfile> {
+    const [created] = await db.insert(scPendingPropertyProfiles)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updatePendingPropertyProfile(id: string, data: Partial<InsertScPendingPropertyProfile>): Promise<ScPendingPropertyProfile> {
+    const [updated] = await db.update(scPendingPropertyProfiles)
+      .set(data)
+      .where(eq(scPendingPropertyProfiles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePendingPropertyProfile(id: string): Promise<boolean> {
+    const result = await db.delete(scPendingPropertyProfiles)
+      .where(eq(scPendingPropertyProfiles.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async findPropertyByLocation(orgId: string, marina: string, city?: string, state?: string): Promise<Property | undefined> {
+    const conditions = [eq(crmProperties.ownerId, orgId)];
+    
+    // Normalize marina name for comparison (case-insensitive, trim whitespace)
+    const normalizedMarina = marina.trim().toLowerCase();
+    conditions.push(sql`LOWER(TRIM(${crmProperties.title})) = ${normalizedMarina}`);
+    
+    // If city is provided, match it (case-insensitive)
+    if (city) {
+      const normalizedCity = city.trim().toLowerCase();
+      conditions.push(sql`LOWER(TRIM(${crmProperties.address})) LIKE ${'%' + normalizedCity + '%'}`);
+    }
+    
+    // If state is provided, match it (case-insensitive)
+    if (state) {
+      const normalizedState = state.trim().toLowerCase();
+      conditions.push(sql`LOWER(TRIM(${crmProperties.address})) LIKE ${'%' + normalizedState + '%'}`);
+    }
+    
+    const [property] = await db.select()
+      .from(crmProperties)
+      .where(and(...conditions))
+      .limit(1);
+    
+    return property || undefined;
   }
 
   // ============================================================================

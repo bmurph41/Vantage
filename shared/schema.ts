@@ -3527,3 +3527,9 @@ export const insertScCustomStorageTypeSchema = createInsertSchema(scCustomStorag
   createdAt: true,
 });
 export type InsertScCustomStorageType = z.infer<typeof insertScCustomStorageTypeSchema>;
+export type ScPendingPropertyProfile = typeof scPendingPropertyProfiles.$inferSelect;
+export const insertScPendingPropertyProfileSchema = createInsertSchema(scPendingPropertyProfiles).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertScPendingPropertyProfile = z.infer<typeof insertScPendingPropertyProfileSchema>;

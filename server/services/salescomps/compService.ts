@@ -224,6 +224,29 @@ export class CompService {
             continue;
           }
 
+          // Try to match existing property by name, city, and state
+          let propertyId: string | undefined = undefined;
+          let needsPropertyProfile = false;
+          
+          try {
+            const matchedProperty = await this.storage.findPropertyByLocation(
+              orgId,
+              transformedData.marina,
+              transformedData.city,
+              transformedData.state
+            );
+            
+            if (matchedProperty) {
+              propertyId = matchedProperty.id;
+            } else {
+              // No matching property found - will need to create profile later
+              needsPropertyProfile = true;
+            }
+          } catch (error) {
+            console.error('Error matching property:', error);
+            // Continue without property link
+          }
+
           // Create comp record
           const compData = {
             orgId,
@@ -261,10 +284,25 @@ export class CompService {
             articleUrls: transformedData.articleUrls || [],
             custom: transformedData.custom || {},
             parentPortfolioId: parentPortfolioId || undefined,
+            propertyId: propertyId,
           };
 
-          await this.storage.createComp(compData);
+          const createdComp = await this.storage.createComp(compData);
           results.successCount++;
+
+          // Create pending property profile if needed
+          if (needsPropertyProfile && createdComp) {
+            try {
+              await this.storage.createPendingPropertyProfile({
+                compId: createdComp.id,
+                orgId,
+                status: 'pending',
+              });
+            } catch (error) {
+              console.error('Error creating pending property profile:', error);
+              // Don't fail the whole import if this fails
+            }
+          }
 
         } catch (error) {
           results.errors.push({ 
