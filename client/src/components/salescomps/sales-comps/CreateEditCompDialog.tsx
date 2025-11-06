@@ -20,6 +20,7 @@ import { isUnauthorizedError } from "@/lib/salescomps/authUtils";
 import { z } from "zod";
 import type { SalesComp, InsertSalesComp, UpdateSalesComp } from "@shared/schema";
 import { PROFIT_CENTERS, COASTAL_TYPES, STORAGE_TYPES } from "@shared/salescomps-constants";
+import AddressAutocomplete from "@/components/salescomps/AddressAutocomplete";
 
 const compFormSchema = z.object({
   marina: z.string().min(1, "Marina name is required"),
@@ -492,8 +493,14 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           <FormItem>
                             <FormLabel>Address</FormLabel>
                             <FormControl>
-                              <Input 
-                                {...field} 
+                              <AddressAutocomplete
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onAddressSelect={(address) => {
+                                  form.setValue("city", address.city);
+                                  form.setValue("state", address.state);
+                                  form.setValue("zip", address.zip);
+                                }}
                                 placeholder="Enter full address..."
                                 data-testid="input-address"
                               />
