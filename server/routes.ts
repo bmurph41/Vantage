@@ -7590,6 +7590,61 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Custom Storage Types routes (must be before /:id route)
+  app.get('/api/sales-comps/custom-storage-types', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const types = await storage.getScCustomStorageTypes(orgId);
+      res.json(types);
+    } catch (error) {
+      console.error("Error fetching custom storage types:", error);
+      res.status(500).json({ message: "Failed to fetch custom storage types" });
+    }
+  });
+
+  app.post('/api/sales-comps/custom-storage-types', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { name } = req.body;
+
+      if (!name || typeof name !== 'string' || name.trim() === '') {
+        return res.status(400).json({ message: "Storage type name is required" });
+      }
+
+      // Check for duplicates (case-insensitive)
+      const existing = await storage.getScCustomStorageTypes(orgId);
+      if (existing.some(t => t.name.toLowerCase() === name.trim().toLowerCase())) {
+        return res.status(400).json({ message: "Storage type already exists" });
+      }
+
+      const type = await storage.createScCustomStorageType({
+        orgId,
+        name: name.trim(),
+        createdBy: userId,
+      });
+
+      res.status(201).json(type);
+    } catch (error) {
+      console.error("Error creating custom storage type:", error);
+      res.status(500).json({ message: "Failed to create custom storage type" });
+    }
+  });
+
+  app.delete('/api/sales-comps/custom-storage-types/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await storage.deleteScCustomStorageType(req.params.id, orgId);
+
+      if (!success) return res.status(404).json({ message: "Storage type not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting custom storage type:", error);
+      res.status(500).json({ message: "Failed to delete custom storage type" });
+    }
+  });
+
   app.get('/api/sales-comps/:id', async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -7845,61 +7900,6 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error deleting column:", error);
       res.status(500).json({ message: "Failed to delete column" });
-    }
-  });
-
-  // Custom Storage Types routes
-  app.get('/api/sales-comps/custom-storage-types', async (req: any, res) => {
-    try {
-      const orgId = req.user.orgId;
-      const types = await storage.getScCustomStorageTypes(orgId);
-      res.json(types);
-    } catch (error) {
-      console.error("Error fetching custom storage types:", error);
-      res.status(500).json({ message: "Failed to fetch custom storage types" });
-    }
-  });
-
-  app.post('/api/sales-comps/custom-storage-types', async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const orgId = req.user.orgId;
-      const { name } = req.body;
-
-      if (!name || typeof name !== 'string' || name.trim() === '') {
-        return res.status(400).json({ message: "Storage type name is required" });
-      }
-
-      // Check for duplicates (case-insensitive)
-      const existing = await storage.getScCustomStorageTypes(orgId);
-      if (existing.some(t => t.name.toLowerCase() === name.trim().toLowerCase())) {
-        return res.status(400).json({ message: "Storage type already exists" });
-      }
-
-      const type = await storage.createScCustomStorageType({
-        orgId,
-        name: name.trim(),
-        createdBy: userId,
-      });
-
-      res.status(201).json(type);
-    } catch (error) {
-      console.error("Error creating custom storage type:", error);
-      res.status(500).json({ message: "Failed to create custom storage type" });
-    }
-  });
-
-  app.delete('/api/sales-comps/custom-storage-types/:id', async (req: any, res) => {
-    try {
-      const orgId = req.user.orgId;
-      const success = await storage.deleteScCustomStorageType(req.params.id, orgId);
-
-      if (!success) return res.status(404).json({ message: "Storage type not found" });
-
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting custom storage type:", error);
-      res.status(500).json({ message: "Failed to delete custom storage type" });
     }
   });
 
