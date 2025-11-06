@@ -51,9 +51,11 @@ const modelingNav = [
   { name: "Coming Soon", href: "#", icon: Calculator, disabled: true },
 ];
 
-// Comps Navigation (placeholder for future)
-const compsNav = [
-  { name: "Coming Soon", href: "#", icon: BarChart3, disabled: true },
+// Analysis Navigation (Sales Comps)
+const analysisNav = [
+  { name: "Sales Comps", href: "/analysis/sales-comps", icon: BarChart3 },
+  { name: "Projects", href: "/analysis/projects", icon: FolderKanban },
+  { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
 ];
 
 export default function UnifiedSidebar() {
@@ -62,7 +64,7 @@ export default function UnifiedSidebar() {
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [ddExpanded, setDdExpanded] = useState(false);
   const [modelingExpanded, setModelingExpanded] = useState(false);
-  const [compsExpanded, setCompsExpanded] = useState(false);
+  const [analysisExpanded, setAnalysisExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -241,14 +243,14 @@ export default function UnifiedSidebar() {
           ))}
         </div>
         
-        {/* Comps Section */}
+        {/* Analysis Section */}
         <div className="mb-2">
           <SectionHeader 
-            title="Comps" 
-            expanded={compsExpanded} 
-            onToggle={() => setCompsExpanded(!compsExpanded)} 
+            title="Analysis" 
+            expanded={analysisExpanded} 
+            onToggle={() => setAnalysisExpanded(!analysisExpanded)} 
           />
-          {compsExpanded && compsNav.map((item) => (
+          {analysisExpanded && analysisNav.map((item) => (
             <NavLink key={item.name} item={item} />
           ))}
         </div>
