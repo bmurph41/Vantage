@@ -3357,6 +3357,168 @@ export class DatabaseStorage implements IStorage {
         isNull(scSavedSearches.deletedAt)
       ));
   }
+
+  // ============================================================================
+  // SALESCOMPS METHOD ALIASES - Map short names (used by routes) to long names
+  // ============================================================================
+
+  // Sales Comps CRUD - Aliases
+  async getComps(params: {
+    orgId: string;
+    filters?: Record<string, any>;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ comps: SalesComp[]; total: number }> {
+    return this.getSalesComps(params);
+  }
+
+  async getComp(id: string, orgId: string): Promise<SalesComp | undefined> {
+    return this.getSalesComp(id, orgId);
+  }
+
+  async createComp(comp: InsertSalesComp): Promise<SalesComp> {
+    return this.createSalesComp(comp);
+  }
+
+  async updateComp(id: string, comp: UpdateSalesComp, orgId: string): Promise<SalesComp | undefined> {
+    return this.updateSalesComp(id, comp, orgId);
+  }
+
+  async deleteComp(id: string, orgId: string, deletedBy: string): Promise<boolean> {
+    return this.deleteSalesComp(id, orgId, deletedBy);
+  }
+
+  async bulkUpdateComps(ids: string[], updates: UpdateSalesComp, orgId: string): Promise<number> {
+    return this.bulkUpdateSalesComps(ids, updates, orgId);
+  }
+
+  async bulkDeleteComps(ids: string[], orgId: string, deletedBy: string): Promise<number> {
+    return this.bulkDeleteSalesComps(ids, orgId, deletedBy);
+  }
+
+  // Column Management - Aliases
+  async getColumns(orgId: string): Promise<CompColumn[]> {
+    return this.getCompColumns(orgId);
+  }
+
+  async createColumn(column: InsertCompColumn): Promise<CompColumn> {
+    return this.createCompColumn(column);
+  }
+
+  async updateColumn(id: string, column: UpdateCompColumn, orgId: string): Promise<CompColumn | undefined> {
+    return this.updateCompColumn(id, column, orgId);
+  }
+
+  async deleteColumn(id: string, orgId: string): Promise<boolean> {
+    return this.deleteCompColumn(id, orgId);
+  }
+
+  // Import Operations - Aliases
+  async createImport(importData: InsertCompImport): Promise<CompImport> {
+    return this.createCompImport(importData);
+  }
+
+  async getImport(id: string, orgId: string): Promise<CompImport | undefined> {
+    return this.getCompImport(id, orgId);
+  }
+
+  async updateImport(id: string, updates: Partial<InsertCompImport>, orgId: string): Promise<CompImport | undefined> {
+    return this.updateCompImport(id, updates, orgId);
+  }
+
+  // Project Operations - Aliases
+  async getProjects(orgId: string, userId: string): Promise<ScProject[]> {
+    return this.getScProjects(orgId, userId);
+  }
+
+  async getProject(id: string, orgId: string): Promise<ScProject | undefined> {
+    return this.getScProject(id, orgId);
+  }
+
+  async createProject(data: InsertScProject): Promise<ScProject> {
+    return this.createScProject(data);
+  }
+
+  async updateProject(id: string, data: UpdateScProject, orgId: string): Promise<ScProject | undefined> {
+    return this.updateScProject(id, data, orgId);
+  }
+
+  async deleteProject(id: string, orgId: string, deletedBy: string): Promise<boolean> {
+    return this.deleteScProject(id, orgId, deletedBy);
+  }
+
+  // Project-Comp Operations - Aliases
+  async getProjectComps(projectId: string, orgId: string): Promise<(ScProjectComp & { salesComp: SalesComp })[]> {
+    return this.getScProjectComps(projectId, orgId);
+  }
+
+  async addCompToProject(projectId: string, salesCompId: string, orgId: string, userId: string): Promise<ScProjectComp> {
+    return this.addCompToScProject(projectId, salesCompId, orgId, userId);
+  }
+
+  async removeCompFromProject(projectId: string, salesCompId: string, orgId: string): Promise<boolean> {
+    return this.removeCompFromScProject(projectId, salesCompId, orgId);
+  }
+
+  async updateProjectComp(id: string, data: UpdateScProjectComp, orgId: string): Promise<ScProjectComp | undefined> {
+    return this.updateScProjectComp(id, data, orgId);
+  }
+
+  // Saved Searches - Aliases
+  async getSavedSearches(orgId: string, userId?: string): Promise<ScSavedSearch[]> {
+    return this.getScSavedSearches(orgId, userId);
+  }
+
+  async getSavedSearch(id: string, orgId: string): Promise<ScSavedSearch | undefined> {
+    return this.getScSavedSearch(id, orgId);
+  }
+
+  async createSavedSearch(data: InsertScSavedSearch): Promise<ScSavedSearch> {
+    return this.createScSavedSearch(data);
+  }
+
+  async updateSavedSearch(id: string, data: UpdateScSavedSearch, orgId: string): Promise<ScSavedSearch | undefined> {
+    return this.updateScSavedSearch(id, data, orgId);
+  }
+
+  async deleteSavedSearch(id: string, orgId: string, deletedBy: string): Promise<boolean> {
+    return this.deleteScSavedSearch(id, orgId, deletedBy);
+  }
+
+  async incrementSavedSearchUsage(id: string, orgId: string): Promise<void> {
+    return this.incrementScSavedSearchUsage(id, orgId);
+  }
+
+  // Recommendation System - Aliases
+  async getCompsForRecommendation(params: {
+    orgId: string;
+    filters?: Record<string, any>;
+  }): Promise<SalesComp[]> {
+    return this.getSalesCompsForRecommendation(params);
+  }
+
+  async createRecommendationFeedback(feedback: InsertScRecommendationFeedback): Promise<ScRecommendationFeedback> {
+    return this.createScRecommendationFeedback(feedback);
+  }
+
+  async getRecommendationFeedback(orgId: string, projectId?: string): Promise<ScRecommendationFeedback[]> {
+    return this.getScRecommendationFeedback(orgId, projectId);
+  }
+
+  // Organization Preferences - Aliases
+  async getOrgPreferences(orgId: string, segmentKey: string): Promise<ScOrgPreferences | undefined> {
+    return this.getScOrgPreferences(orgId, segmentKey);
+  }
+
+  async upsertOrgPreferences(preferences: InsertScOrgPreferences): Promise<ScOrgPreferences> {
+    return this.upsertScOrgPreferences(preferences);
+  }
+
+  async updateOrgPreferences(orgId: string, segmentKey: string, updates: UpdateScOrgPreferences): Promise<ScOrgPreferences | undefined> {
+    return this.updateScOrgPreferences(orgId, segmentKey, updates);
+  }
 }
 
 export const storage = new DatabaseStorage();
