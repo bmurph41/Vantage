@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2 } from "lucide-react";
+import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2, PanelLeftClose, PanelLeft } from "lucide-react";
 import { Link } from "wouter";
 import { salesCompsApi } from "@/lib/salescomps/api";
 import { queryKeys } from "@/lib/salescomps/queryKeys";
@@ -93,6 +93,7 @@ export default function SalesCompsIndex() {
   const [showProjectAssignment, setShowProjectAssignment] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editData, setEditData] = useState<any[]>([]);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const queryParams = {
     q: searchQuery,
@@ -345,19 +346,21 @@ export default function SalesCompsIndex() {
   return (
     <div className="flex flex-1 bg-background h-screen">
       {/* Left Sidebar - Filters */}
-      <div className="w-64 bg-card border-r border-border flex flex-col">
-        <div className="p-6 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">Sales Comps</h2>
-          <p className="text-sm text-muted-foreground">Manage marina sales comparables</p>
-        </div>
+      {!isSidebarCollapsed && (
+        <div className="w-64 bg-card border-r border-border flex flex-col">
+          <div className="p-6 border-b border-border">
+            <h2 className="text-lg font-semibold text-foreground">Sales Comps</h2>
+            <p className="text-sm text-muted-foreground">Manage marina sales comparables</p>
+          </div>
 
-        <FiltersPanel 
-          filters={filters}
-          onFiltersChange={handleFilterChange}
-          activeSavedSearchId={activeSavedSearchId}
-          onActiveSavedSearchChange={handleActiveSavedSearchChange}
-        />
-      </div>
+          <FiltersPanel 
+            filters={filters}
+            onFiltersChange={handleFilterChange}
+            activeSavedSearchId={activeSavedSearchId}
+            onActiveSavedSearchChange={handleActiveSavedSearchChange}
+          />
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -366,6 +369,19 @@ export default function SalesCompsIndex() {
           <div className="bg-card border-b border-border px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                  className="mr-2"
+                  data-testid="button-toggle-sidebar"
+                >
+                  {isSidebarCollapsed ? (
+                    <PanelLeft className="h-4 w-4" />
+                  ) : (
+                    <PanelLeftClose className="h-4 w-4" />
+                  )}
+                </Button>
                 <div className="flex items-center gap-1">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
