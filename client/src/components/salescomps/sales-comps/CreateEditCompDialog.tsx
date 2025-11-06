@@ -778,20 +778,25 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         <FormField
                           control={form.control}
                           name="noi"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>NOI</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  {...field} 
-                                  type="number"
-                                  placeholder="900000"
-                                  data-testid="input-noi"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                          render={({ field }) => {
+                            const isNoiUndisclosed = !form.watch("isNoiDisclosed");
+                            return (
+                              <FormItem>
+                                <FormLabel>NOI</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    {...field}
+                                    value={isNoiUndisclosed ? "N/A" : field.value}
+                                    type={isNoiUndisclosed ? "text" : "number"}
+                                    placeholder="900000"
+                                    disabled={isNoiUndisclosed}
+                                    data-testid="input-noi"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            );
+                          }}
                         />
                         
                         <FormField
@@ -907,13 +912,13 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                             <FormItem className="flex items-center space-x-2">
                               <FormControl>
                                 <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                  data-testid="checkbox-noi-disclosed"
+                                  checked={!field.value}
+                                  onCheckedChange={(checked) => field.onChange(!checked)}
+                                  data-testid="checkbox-noi-undisclosed"
                                 />
                               </FormControl>
                               <FormLabel className="text-sm font-normal">
-                                NOI disclosed
+                                NOI Undisclosed
                               </FormLabel>
                             </FormItem>
                           )}

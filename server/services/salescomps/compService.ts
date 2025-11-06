@@ -16,7 +16,7 @@ export class CompService {
     await this.storage.createAuditLog({
       orgId: compData.orgId,
       userId,
-      entity: 'sales_comp',
+      entityType: 'sales_comp',
       entityId: comp.id,
       action: 'create',
       after: comp,
@@ -37,7 +37,7 @@ export class CompService {
     await this.storage.createAuditLog({
       orgId,
       userId,
-      entity: 'sales_comp',
+      entityType: 'sales_comp',
       entityId: id,
       action: 'update',
       before,
@@ -58,7 +58,7 @@ export class CompService {
       await this.storage.createAuditLog({
         orgId,
         userId,
-        entity: 'sales_comp',
+        entityType: 'sales_comp',
         entityId: id,
         action: 'delete',
         before,
@@ -85,7 +85,7 @@ export class CompService {
           await this.storage.createAuditLog({
             orgId,
             userId,
-            entity: 'sales_comp',
+            entityType: 'sales_comp',
             entityId: ids[i],
             action: 'update',
             before,
@@ -113,7 +113,7 @@ export class CompService {
         await this.storage.createAuditLog({
           orgId,
           userId,
-          entity: 'sales_comp',
+          entityType: 'sales_comp',
           entityId: ids[i],
           action: 'delete',
           before,
@@ -285,7 +285,7 @@ export class CompService {
       await this.storage.createAuditLog({
         orgId,
         userId,
-        entity: 'sales_comp',
+        entityType: 'sales_comp',
         entityId: importId,
         action: 'import',
         after: results,
