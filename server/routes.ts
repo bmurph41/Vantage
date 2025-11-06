@@ -16,6 +16,7 @@ import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
 import { RecommendationService } from "./services/salescomps/recommendationService";
+import { calculateMetrics, generateInsights, type AnalyticsFilters } from "./services/salescomps/analyticsService";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertDDTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
@@ -8139,6 +8140,40 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error incrementing saved search usage:", error);
       res.status(500).json({ message: "Failed to update saved search usage" });
+    }
+  });
+
+  // Analytics/Metrics routes
+  app.post('/api/analytics/calculate', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: AnalyticsFilters = req.body.filters || {};
+
+      const analysis = await calculateMetrics(orgId, filters);
+      const insights = await generateInsights(analysis, filters);
+
+      res.json({
+        analysis,
+        insights,
+      });
+    } catch (error) {
+      console.error("Error calculating analytics:", error);
+      res.status(500).json({ message: "Failed to calculate analytics" });
+    }
+  });
+
+  app.post('/api/analytics/insights', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: AnalyticsFilters = req.body.filters || {};
+
+      const analysis = await calculateMetrics(orgId, filters);
+      const insights = await generateInsights(analysis, filters);
+
+      res.json({ insights });
+    } catch (error) {
+      console.error("Error generating insights:", error);
+      res.status(500).json({ message: "Failed to generate insights" });
     }
   });
 
