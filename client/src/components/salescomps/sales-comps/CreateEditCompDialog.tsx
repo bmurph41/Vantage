@@ -98,9 +98,10 @@ interface CreateEditCompDialogProps {
   projectId?: string;
   projectName?: string;
   isPortfolioMode?: boolean;
+  onUpdate?: (updatedComp: SalesComp) => void;
 }
 
-export default function CreateEditCompDialog({ open, onClose, comp, projectId, projectName, isPortfolioMode = false }: CreateEditCompDialogProps) {
+export default function CreateEditCompDialog({ open, onClose, comp, projectId, projectName, isPortfolioMode = false, onUpdate }: CreateEditCompDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEdit = !!comp;
@@ -240,11 +241,17 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
 
   const updateMutation = useMutation({
     mutationFn: (data: UpdateSalesComp) => salesCompsApi.updateComp(comp!.id, data),
-    onSuccess: () => {
+    onSuccess: (updatedComp) => {
       toast({
         title: "Success",
         description: projectId ? "Comp updated successfully in project context" : "Comp updated successfully",
       });
+      
+      // Call onUpdate callback if provided (for edit mode state sync)
+      if (onUpdate && updatedComp) {
+        onUpdate(updatedComp);
+      }
+      
       onClose();
       queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
       // Invalidate project comps if editing in project context

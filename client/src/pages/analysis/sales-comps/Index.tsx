@@ -19,6 +19,7 @@ import BulkEdit from "./BulkEdit";
 import Upload from "./Upload";
 import ProjectAssignmentDialog from "@/components/salescomps/projects/ProjectAssignmentDialog";
 import type { FilterState } from "@/lib/salescomps/types";
+import type { SalesComp } from "@shared/schema";
 
 export default function SalesCompsIndex() {
   const { toast } = useToast();
@@ -322,6 +323,15 @@ export default function SalesCompsIndex() {
     );
   };
 
+  const handleCompUpdate = (updatedComp: SalesComp) => {
+    // Update the editData state with the updated comp data
+    setEditData(prev => 
+      prev.map(comp => 
+        comp.id === updatedComp.id ? { ...updatedComp } : comp
+      )
+    );
+  };
+
   if (showUpload) {
     return <Upload 
       onClose={() => setShowUpload(false)} 
@@ -613,6 +623,7 @@ export default function SalesCompsIndex() {
               columnUniqueValues={columnUniqueValues}
               isEditMode={isEditMode}
               onCellChange={handleCellChange}
+              onCompUpdate={handleCompUpdate}
             />
           </TabsContent>
 
