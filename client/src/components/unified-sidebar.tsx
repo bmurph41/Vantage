@@ -54,8 +54,9 @@ const modelingNav = [
 // Analysis Navigation (Sales Comps)
 const analysisNav = [
   { name: "Sales Comps", href: "/analysis/sales-comps", icon: BarChart3 },
-  { name: "Projects", href: "/analysis/projects", icon: FolderKanban },
   { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
+  { name: "Demographics", href: "/analysis/demographics", icon: Users },
+  { name: "Projects", href: "/analysis/projects", icon: FolderKanban },
 ];
 
 export default function UnifiedSidebar() {

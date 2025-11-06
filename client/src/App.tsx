@@ -48,6 +48,7 @@ import SalesCompsColumnManager from "@/pages/analysis/sales-comps/ColumnManager"
 import ScProjectsIndex from "@/pages/analysis/projects/Index";
 import ScProjectsReport from "@/pages/analysis/projects/Report";
 import RateCompsIndex from "@/pages/analysis/rate-comps/Index";
+import DemographicsIndex from "@/pages/analysis/demographics/Index";
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
@@ -398,6 +399,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <RateCompsIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/demographics">
+        {() => (
+          <UnifiedLayout>
+            <DemographicsIndex />
           </UnifiedLayout>
         )}
       </Route>
