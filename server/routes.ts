@@ -12,6 +12,10 @@ import { CSVImportService } from "./csv-import-service";
 import { DuplicateDetectionService } from "./duplicate-detection-service";
 import { CompanyLinkingService } from "./company-linking-service";
 import { CalendarService } from "./calendar-service";
+import { ParserService } from "./services/salescomps/parser";
+import { CompService } from "./services/salescomps/compService";
+import { FilterBuilder } from "./services/salescomps/filterBuilder";
+import { recommendationService } from "./services/salescomps/recommendationService";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertDDTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
@@ -22,9 +26,29 @@ import {
   insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema,
   insertCrmTaskSchema, insertCrmFileSchema, insertCalendarSettingsSchema,
   crmTasks, crmFiles, crmContacts, crmDeals, crmCompanies, crmPipelines, crmPipelineStages, crmActivities,
-  type InsertCrmFile
+  type InsertCrmFile,
+  insertSavedSearchSchema,
+  updateSavedSearchSchema,
+  insertRecommendationFeedbackSchema,
+  projectProfileSchema,
+  weightOverridesSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
+import { 
+  salesCompCreateSchema,
+  salesCompUpdateSchema,
+  bulkUpdateSchema,
+  compColumnCreateSchema,
+  compColumnUpdateSchema,
+  compFiltersSchema,
+  projectCreateSchema as scProjectCreateSchema,
+  projectUpdateSchema as scProjectUpdateSchema,
+  projectCompCreateSchema,
+  projectCompUpdateSchema,
+  projectCompBulkSchema,
+  columnMappingSchema
+} from "./utils/salescomps-zod-schemas";
+import { PROFIT_CENTERS } from "@shared/salescomps-constants";
 import { z } from "zod";
 import crypto from "crypto";
 import { WebhookSecurity, type WebhookEvent } from "./webhook-security";
@@ -105,6 +129,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/stages", authenticateUser);
   app.use("/api/pipeline-stages", authenticateUser);
   app.use("/api/activities", authenticateUser);
+  app.use("/api/sales-comps", authenticateUser);
+  app.use("/api/comp-columns", authenticateUser);
+  app.use("/api/sc-projects", authenticateUser);
+  app.use("/api/saved-searches", authenticateUser);
+  app.use("/api/profit-centers", authenticateUser);
+  app.use("/api/recommendations", authenticateUser);
+
+  // Initialize SalesComps services
+  const parserService = new ParserService();
+  const compService = new CompService(storage, parserService);
+  const filterBuilder = new FilterBuilder();
+
+  // Multer configuration for file uploads (SalesComps CSV/Excel imports)
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = [
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only CSV and Excel files are allowed.'));
+      }
+    }
+  });
 
   // Projects
   app.get("/api/dd/projects", async (req: any, res) => {
@@ -7478,6 +7531,910 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Failed to export tasks:", error);
       res.status(500).json({ error: "Failed to export tasks" });
+    }
+  });
+
+  // ===========================
+  // SalesComps Module Routes
+  // ===========================
+
+  // Sales Comps CRUD routes
+  app.get('/api/sales-comps', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+
+      const filters = compFiltersSchema.parse(req.query);
+      const sqlFilters = filterBuilder.buildFilters(filters);
+      
+      const { comps, total } = await storage.getComps({
+        orgId,
+        filters: sqlFilters,
+        sortBy: filters.sortBy,
+        sortDir: filters.sortDir,
+        page: filters.page,
+        pageSize: filters.pageSize,
+      });
+
+      res.json({ comps, total, page: filters.page, pageSize: filters.pageSize });
+    } catch (error) {
+      console.error("Error fetching comps:", error);
+      res.status(500).json({ message: "Failed to fetch comps" });
+    }
+  });
+
+  app.get('/api/sales-comps/ids', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+      const ids = await storage.getAllCompIds(orgId);
+      res.json({ ids });
+    } catch (error) {
+      console.error('Error getting comp IDs:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get('/api/sales-comps/column-values/:column', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+      const { column } = req.params;
+      const values = await storage.getColumnUniqueValues(orgId, column);
+      res.json({ values });
+    } catch (error) {
+      console.error('Error getting column values:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get('/api/sales-comps/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+      const comp = await storage.getComp(req.params.id, orgId);
+      if (!comp) return res.status(404).json({ message: "Comp not found" });
+      res.json(comp);
+    } catch (error) {
+      console.error("Error fetching comp:", error);
+      res.status(500).json({ message: "Failed to fetch comp" });
+    }
+  });
+
+  app.post('/api/sales-comps', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const compData = salesCompCreateSchema.parse(req.body);
+      const comp = await compService.createComp({
+        ...compData,
+        orgId,
+        createdBy: userId,
+      }, userId);
+
+      res.status(201).json(comp);
+    } catch (error) {
+      console.error("Error creating comp:", error);
+      res.status(500).json({ message: "Failed to create comp" });
+    }
+  });
+
+  app.patch('/api/sales-comps/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const updates = salesCompUpdateSchema.parse(req.body);
+      const comp = await compService.updateComp(
+        req.params.id,
+        { ...updates, updatedBy: userId },
+        orgId,
+        userId
+      );
+
+      if (!comp) return res.status(404).json({ message: "Comp not found" });
+      res.json(comp);
+    } catch (error) {
+      console.error("Error updating comp:", error);
+      res.status(500).json({ message: "Failed to update comp" });
+    }
+  });
+
+  app.delete('/api/sales-comps/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const success = await compService.deleteComp(req.params.id, orgId, userId);
+      if (!success) return res.status(404).json({ message: "Comp not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting comp:", error);
+      res.status(500).json({ message: "Failed to delete comp" });
+    }
+  });
+
+  app.post('/api/sales-comps/bulk-update', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const { ids, updates } = bulkUpdateSchema.parse(req.body);
+      const count = await compService.bulkUpdateComps(ids, updates, orgId, userId);
+
+      res.json({ updated: count });
+    } catch (error) {
+      console.error("Error bulk updating comps:", error);
+      res.status(500).json({ message: "Failed to bulk update comps" });
+    }
+  });
+
+  app.post('/api/sales-comps/bulk-delete', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: "Invalid or empty IDs array" });
+      }
+
+      const count = await compService.bulkDeleteComps(ids, orgId, userId);
+      res.json({ deleted: count });
+    } catch (error) {
+      console.error("Error bulk deleting comps:", error);
+      res.status(500).json({ message: "Failed to bulk delete comps" });
+    }
+  });
+
+  // Upload and Import routes
+  app.post('/api/sales-comps/upload', upload.single('file'), async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const analysis = await parserService.analyzeFile(req.file);
+      const fullData = await parserService.parseFullFile(req.file);
+      
+      console.log(`Parsed ${fullData.length} rows from file ${req.file.originalname}`);
+      
+      const importRecord = await storage.createImport({
+        orgId,
+        createdBy: userId,
+        filename: req.file.originalname,
+        status: 'mapping',
+        parsedData: fullData,
+        summary: {
+          totalRows: fullData.length,
+          successCount: 0,
+          errorCount: 0,
+          warningCount: 0,
+          errors: []
+        }
+      });
+
+      res.json({
+        importId: importRecord.id,
+        analysis,
+      });
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      res.status(500).json({ message: "Failed to upload file" });
+    }
+  });
+
+  app.post('/api/sales-comps/import/:importId/detect-duplicates', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+      const { mapping, normalization } = req.body;
+      
+      const result = await compService.detectDuplicates(
+        req.params.importId,
+        orgId,
+        mapping,
+        normalization
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error detecting duplicates:", error);
+      res.status(500).json({ message: "Failed to detect duplicates" });
+    }
+  });
+
+  app.post('/api/sales-comps/import/:importId/commit', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const { mapping, normalization, excludedRows = [] } = req.body;
+      
+      console.log(`Starting import for ${req.params.importId} with mapping:`, mapping);
+      
+      const result = await compService.processImport(
+        req.params.importId,
+        orgId,
+        userId,
+        mapping,
+        normalization,
+        excludedRows
+      );
+      
+      console.log(`Import completed for ${req.params.importId}:`, result);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error processing import:", error);
+      res.status(500).json({ message: "Failed to process import" });
+    }
+  });
+
+  app.get('/api/sales-comps/import/:importId/status', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+      const importRecord = await storage.getImport(req.params.importId, orgId);
+      if (!importRecord) return res.status(404).json({ message: "Import not found" });
+
+      res.json(importRecord);
+    } catch (error) {
+      console.error("Error fetching import status:", error);
+      res.status(500).json({ message: "Failed to fetch import status" });
+    }
+  });
+
+  // Comp Columns management routes
+  app.get('/api/comp-columns', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+      const columns = await storage.getCompColumns(orgId);
+      res.json(columns);
+    } catch (error) {
+      console.error("Error fetching columns:", error);
+      res.status(500).json({ message: "Failed to fetch columns" });
+    }
+  });
+
+  app.post('/api/comp-columns', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+
+      const columnData = compColumnCreateSchema.parse(req.body);
+      const column = await storage.createCompColumn({
+        ...columnData,
+        orgId,
+      });
+
+      res.status(201).json(column);
+    } catch (error) {
+      console.error("Error creating column:", error);
+      res.status(500).json({ message: "Failed to create column" });
+    }
+  });
+
+  app.patch('/api/comp-columns/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+
+      const updates = compColumnUpdateSchema.parse(req.body);
+      const column = await storage.updateCompColumn(req.params.id, updates, orgId);
+
+      if (!column) return res.status(404).json({ message: "Column not found" });
+      res.json(column);
+    } catch (error) {
+      console.error("Error updating column:", error);
+      res.status(500).json({ message: "Failed to update column" });
+    }
+  });
+
+  app.delete('/api/comp-columns/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+
+      const success = await storage.deleteCompColumn(req.params.id, orgId);
+      if (!success) return res.status(404).json({ message: "Column not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting column:", error);
+      res.status(500).json({ message: "Failed to delete column" });
+    }
+  });
+
+  // Saved Searches routes
+  app.get('/api/saved-searches', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const searches = await storage.getSavedSearches(orgId, userId);
+      res.json(searches);
+    } catch (error) {
+      console.error("Error fetching saved searches:", error);
+      res.status(500).json({ message: "Failed to fetch saved searches" });
+    }
+  });
+
+  app.get('/api/saved-searches/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+
+      const search = await storage.getSavedSearch(req.params.id, orgId);
+      if (!search) return res.status(404).json({ message: "Saved search not found" });
+
+      res.json(search);
+    } catch (error) {
+      console.error("Error fetching saved search:", error);
+      res.status(500).json({ message: "Failed to fetch saved search" });
+    }
+  });
+
+  app.post('/api/saved-searches', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const searchData = insertSavedSearchSchema.parse(req.body);
+      const search = await storage.createSavedSearch({
+        ...searchData,
+        orgId,
+        createdBy: userId,
+      } as any);
+
+      res.status(201).json(search);
+    } catch (error) {
+      console.error("Error creating saved search:", error);
+      res.status(500).json({ message: "Failed to create saved search" });
+    }
+  });
+
+  app.patch('/api/saved-searches/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const searchData = updateSavedSearchSchema.parse(req.body);
+      const search = await storage.updateSavedSearch(req.params.id, {
+        ...searchData,
+        updatedBy: userId,
+      }, orgId);
+
+      if (!search) return res.status(404).json({ message: "Saved search not found" });
+
+      res.json(search);
+    } catch (error) {
+      console.error("Error updating saved search:", error);
+      res.status(500).json({ message: "Failed to update saved search" });
+    }
+  });
+
+  app.delete('/api/saved-searches/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const success = await storage.deleteSavedSearch(req.params.id, orgId, userId);
+      if (!success) return res.status(404).json({ message: "Saved search not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting saved search:", error);
+      res.status(500).json({ message: "Failed to delete saved search" });
+    }
+  });
+
+  app.post('/api/saved-searches/:id/use', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+
+      await storage.incrementSavedSearchUsage(req.params.id, orgId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error incrementing saved search usage:", error);
+      res.status(500).json({ message: "Failed to update saved search usage" });
+    }
+  });
+
+  // SC Projects routes
+  app.get('/api/sc-projects', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const projects = await storage.getScProjects(orgId, userId);
+      res.json(projects);
+    } catch (error) {
+      console.error("Error fetching SC projects:", error);
+      res.status(500).json({ message: "Failed to fetch SC projects" });
+    }
+  });
+
+  app.get('/api/sc-projects/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+
+      const project = await storage.getScProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      res.json(project);
+    } catch (error) {
+      console.error("Error fetching SC project:", error);
+      res.status(500).json({ message: "Failed to fetch SC project" });
+    }
+  });
+
+  app.post('/api/sc-projects', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const projectData = scProjectCreateSchema.parse(req.body);
+      const project = await storage.createScProject({
+        ...projectData,
+        orgId,
+        createdBy: userId,
+      });
+
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entity: 'sc_project',
+        entityId: project.id,
+        action: 'create',
+        after: project,
+      });
+
+      res.status(201).json(project);
+    } catch (error) {
+      console.error("Error creating SC project:", error);
+      res.status(500).json({ message: "Failed to create SC project" });
+    }
+  });
+
+  app.put('/api/sc-projects/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const currentProject = await storage.getScProject(req.params.id, orgId);
+      if (!currentProject) return res.status(404).json({ message: "Project not found" });
+
+      const updates = scProjectUpdateSchema.parse(req.body);
+      const updatedProject = await storage.updateScProject(req.params.id, {
+        ...updates,
+        updatedBy: userId,
+      }, orgId);
+
+      if (!updatedProject) return res.status(404).json({ message: "Project not found" });
+
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entity: 'sc_project',
+        entityId: updatedProject.id,
+        action: 'update',
+        before: currentProject,
+        after: updatedProject,
+      });
+
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error updating SC project:", error);
+      res.status(500).json({ message: "Failed to update SC project" });
+    }
+  });
+
+  app.delete('/api/sc-projects/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const currentProject = await storage.getScProject(req.params.id, orgId);
+      if (!currentProject) return res.status(404).json({ message: "Project not found" });
+
+      const success = await storage.deleteScProject(req.params.id, orgId, userId);
+      if (!success) return res.status(404).json({ message: "Project not found" });
+
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entity: 'sc_project',
+        entityId: req.params.id,
+        action: 'delete',
+        before: currentProject,
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting SC project:", error);
+      res.status(500).json({ message: "Failed to delete SC project" });
+    }
+  });
+
+  // SC Project Comps routes
+  app.get('/api/sc-projects/:id/comps', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+
+      const project = await storage.getScProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const projectComps = await storage.getScProjectComps(req.params.id, orgId);
+      res.json(projectComps);
+    } catch (error) {
+      console.error("Error fetching SC project comps:", error);
+      res.status(500).json({ message: "Failed to fetch SC project comps" });
+    }
+  });
+
+  app.post('/api/sc-projects/:id/comps', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const project = await storage.getScProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const compData = projectCompCreateSchema.parse(req.body);
+      
+      try {
+        const projectComp = await storage.addCompToScProject(
+          req.params.id,
+          compData.salesCompId,
+          orgId,
+          userId
+        );
+
+        await storage.createAuditLog({
+          orgId,
+          userId,
+          entity: 'sc_project_comp',
+          entityId: projectComp.id,
+          action: 'create',
+          after: projectComp,
+        });
+
+        res.status(201).json(projectComp);
+      } catch (error: any) {
+        if (error.message.includes('duplicate key value') || error.code === '23505') {
+          return res.status(409).json({ message: "Sales comp is already added to this project" });
+        }
+        throw error;
+      }
+    } catch (error) {
+      console.error("Error adding comp to SC project:", error);
+      res.status(500).json({ message: "Failed to add comp to SC project" });
+    }
+  });
+
+  app.post('/api/sc-projects/:id/comps/bulk', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const project = await storage.getScProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const bulkData = projectCompBulkSchema.parse(req.body);
+      const results: { success: any[]; failed: any[] } = { success: [], failed: [] };
+
+      for (const salesCompId of bulkData.salesCompIds) {
+        try {
+          const projectComp = await storage.addCompToScProject(
+            req.params.id,
+            salesCompId,
+            orgId,
+            userId
+          );
+
+          await storage.createAuditLog({
+            orgId,
+            userId,
+            entity: 'sc_project_comp',
+            entityId: projectComp.id,
+            action: 'create',
+            after: projectComp,
+          });
+
+          results.success.push({ salesCompId, projectComp });
+        } catch (error: any) {
+          results.failed.push({ 
+            salesCompId, 
+            error: error.message.includes('duplicate key') ? 'Already in project' : 'Failed to add' 
+          });
+        }
+      }
+
+      res.json(results);
+    } catch (error) {
+      console.error("Error bulk adding comps to SC project:", error);
+      res.status(500).json({ message: "Failed to bulk add comps to SC project" });
+    }
+  });
+
+  app.delete('/api/sc-projects/:id/comps/bulk', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const project = await storage.getScProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const { compIds } = req.body;
+      if (!Array.isArray(compIds) || compIds.length === 0) {
+        return res.status(400).json({ message: "Invalid or empty comp IDs array" });
+      }
+
+      let removedCount = 0;
+      for (const compId of compIds) {
+        try {
+          const success = await storage.removeCompFromScProject(
+            req.params.id,
+            compId,
+            orgId
+          );
+          
+          if (success) {
+            removedCount++;
+            await storage.createAuditLog({
+              orgId,
+              userId,
+              entity: 'sc_project_comp',
+              entityId: compId,
+              action: 'delete',
+              before: { projectId: req.params.id, salesCompId: compId },
+            });
+          }
+        } catch (error) {
+          console.error(`Error removing comp ${compId} from SC project:`, error);
+        }
+      }
+
+      res.json({ removed: removedCount });
+    } catch (error) {
+      console.error("Error bulk removing comps from SC project:", error);
+      res.status(500).json({ message: "Failed to bulk remove comps from SC project" });
+    }
+  });
+
+  app.delete('/api/sc-projects/:id/comps/:compId', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const project = await storage.getScProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const success = await storage.removeCompFromScProject(
+        req.params.id,
+        req.params.compId,
+        orgId
+      );
+      
+      if (!success) return res.status(404).json({ message: "Comp not found in project" });
+
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entity: 'sc_project_comp',
+        entityId: req.params.compId,
+        action: 'delete',
+        before: { projectId: req.params.id, salesCompId: req.params.compId },
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing comp from SC project:", error);
+      res.status(500).json({ message: "Failed to remove comp from SC project" });
+    }
+  });
+
+  app.patch('/api/sc-projects/:id/comps/:compId', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const project = await storage.getScProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const updates = projectCompUpdateSchema.parse(req.body);
+      const updatedProjectComp = await storage.updateScProjectComp(
+        req.params.compId,
+        updates,
+        orgId
+      );
+
+      if (!updatedProjectComp) return res.status(404).json({ message: "Project comp not found" });
+
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entity: 'sc_project_comp',
+        entityId: req.params.compId,
+        action: 'update',
+        after: updatedProjectComp,
+      });
+
+      res.json(updatedProjectComp);
+    } catch (error) {
+      console.error("Error updating SC project comp:", error);
+      res.status(500).json({ message: "Failed to update SC project comp" });
+    }
+  });
+
+  // Recommendations routes
+  app.get('/api/profit-centers', async (req: any, res) => {
+    try {
+      res.json(PROFIT_CENTERS);
+    } catch (error) {
+      console.error("Error fetching profit centers:", error);
+      res.status(500).json({ message: "Failed to fetch profit centers" });
+    }
+  });
+
+  app.get('/api/sc-projects/:id/recommendations', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+
+      const projectId = req.params.id;
+      const project = await storage.getScProject(projectId, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const excludeAssigned = req.query.excludeAssigned === 'true';
+
+      let excludeCompIds: string[] = [];
+      if (excludeAssigned) {
+        const projectComps = await storage.getScProjectComps(projectId, orgId);
+        excludeCompIds = projectComps.map(pc => pc.salesCompId);
+      }
+
+      const projectProfile = (project.profile as any) || {};
+      const userWeightOverrides = (project.weightOverrides as any) || undefined;
+
+      const recommendations = await recommendationService.getRecommendations({
+        orgId,
+        projectProfile,
+        userWeightOverrides,
+        excludeCompIds,
+        limit,
+      });
+
+      res.json({
+        items: recommendations,
+        total: recommendations.length,
+        projectProfile,
+        weights: userWeightOverrides,
+      });
+    } catch (error) {
+      console.error("Error generating recommendations:", error);
+      res.status(500).json({ message: "Failed to generate recommendations" });
+    }
+  });
+
+  app.get('/api/sc-projects/:id/preferences', async (req: any, res) => {
+    try {
+      const orgId = req.user.organizationId;
+
+      const projectId = req.params.id;
+      const project = await storage.getScProject(projectId, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      res.json({
+        profile: project.profile || {},
+        weightOverrides: project.weightOverrides || {},
+      });
+    } catch (error) {
+      console.error("Error fetching SC project preferences:", error);
+      res.status(500).json({ message: "Failed to fetch SC project preferences" });
+    }
+  });
+
+  app.put('/api/sc-projects/:id/preferences', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const projectId = req.params.id;
+      const project = await storage.getScProject(projectId, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const { profile, weightOverrides } = req.body;
+
+      let validatedProfile, validatedWeights;
+      
+      try {
+        validatedProfile = profile ? projectProfileSchema.parse(profile) : project.profile;
+        validatedWeights = weightOverrides ? weightOverridesSchema.parse(weightOverrides) : project.weightOverrides;
+      } catch (validationError: any) {
+        console.error("Validation error in SC project preferences:", validationError);
+        return res.status(400).json({ 
+          message: "Invalid SC project preferences data", 
+          details: validationError?.errors || validationError?.message 
+        });
+      }
+
+      const updatedProject = await storage.updateScProject(projectId, {
+        profile: validatedProfile,
+        weightOverrides: validatedWeights,
+        updatedBy: userId,
+      }, orgId);
+
+      if (!updatedProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      res.json({
+        profile: updatedProject.profile,
+        weightOverrides: updatedProject.weightOverrides,
+      });
+    } catch (error) {
+      console.error("Error updating SC project preferences:", error);
+      res.status(500).json({ message: "Failed to update SC project preferences" });
+    }
+  });
+
+  app.post('/api/recommendations/feedback', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.organizationId;
+
+      const feedbackData = insertRecommendationFeedbackSchema.parse({
+        ...req.body,
+        orgId,
+        userId,
+      });
+
+      const feedback = await storage.createRecommendationFeedback(feedbackData);
+
+      if (['selected', 'rejected', 'liked'].includes(feedbackData.action)) {
+        const project = await storage.getScProject(feedbackData.projectId, orgId);
+        const comp = await storage.getComp(feedbackData.salesCompId, orgId);
+        
+        if (project && comp) {
+          const projectProfile = (project.profile as any) || {};
+          
+          let scoreBreakdown = req.body.breakdown;
+          let currentScore = parseFloat(req.body.scoreAtTime) || 0;
+          
+          if (!scoreBreakdown) {
+            const recommendations = await recommendationService.getRecommendations({
+              orgId,
+              projectProfile,
+              userWeightOverrides: (project.weightOverrides as any) || undefined,
+              excludeCompIds: [],
+              limit: 1000,
+            });
+
+            const matchingRec = recommendations.find(r => r.comp.id === comp.id);
+            if (matchingRec) {
+              scoreBreakdown = matchingRec.breakdown;
+              currentScore = matchingRec.score;
+            }
+          }
+          
+          if (scoreBreakdown) {
+            await recommendationService.updateLearningWeights({
+              orgId,
+              projectProfile,
+              selectedComp: comp,
+              action: feedbackData.action as 'selected' | 'rejected' | 'liked',
+              currentScore,
+              breakdown: scoreBreakdown,
+            });
+          }
+        }
+      }
+
+      res.json(feedback);
+    } catch (error) {
+      console.error("Error submitting recommendation feedback:", error);
+      res.status(500).json({ message: "Failed to submit feedback" });
     }
   });
 
