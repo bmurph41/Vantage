@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Plus, Sparkles } from "lucide-react";
+import { CheckCircle2, Plus, Sparkles, X } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { FileAnalysis } from '@/lib/salescomps/types';
@@ -57,8 +57,10 @@ export default function ColumnMapperSimple({
   const [newColumnData, setNewColumnData] = useState({
     key: '',
     label: '',
-    type: 'text' as 'text' | 'number' | 'currency' | 'percent' | 'date' | 'boolean'
+    type: 'text' as 'text' | 'number' | 'currency' | 'percent' | 'date' | 'boolean' | 'select',
+    options: [] as string[]
   });
+  const [newOptionInput, setNewOptionInput] = useState('');
 
   // Fetch custom columns for this org
   const { data: customColumns = [] } = useQuery<any[]>({
@@ -70,7 +72,7 @@ export default function ColumnMapperSimple({
     ...STANDARD_FIELDS,
     ...customColumns.map(col => ({
       value: col.key,
-      label: `${col.label} (Custom)`,
+      label: col.label,
       custom: true
     }))
   ];
@@ -96,7 +98,8 @@ export default function ColumnMapperSimple({
       
       setShowNewColumnDialog(false);
       setPendingColumnName("");
-      setNewColumnData({ key: '', label: '', type: 'text' });
+      setNewColumnData({ key: '', label: '', type: 'text', options: [] });
+      setNewOptionInput('');
     },
     onError: (error: any) => {
       toast({
@@ -113,7 +116,8 @@ export default function ColumnMapperSimple({
       setNewColumnData({
         key: csvColumn.toLowerCase().replace(/[^a-z0-9]/g, '_'),
         label: csvColumn,
-        type: 'text'
+        type: 'text',
+        options: []
       });
       setShowNewColumnDialog(true);
     } else if (targetField === '__SKIP__') {
@@ -137,7 +141,34 @@ export default function ColumnMapperSimple({
       });
       return;
     }
+    
+    if (newColumnData.type === 'select' && newColumnData.options.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one option for the dropdown",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     createColumnMutation.mutate(newColumnData);
+  };
+
+  const handleAddOption = () => {
+    if (newOptionInput.trim()) {
+      setNewColumnData(prev => ({
+        ...prev,
+        options: [...prev.options, newOptionInput.trim()]
+      }));
+      setNewOptionInput('');
+    }
+  };
+
+  const handleRemoveOption = (index: number) => {
+    setNewColumnData(prev => ({
+      ...prev,
+      options: prev.options.filter((_, i) => i !== index)
+    }));
   };
 
   // Check if a field is auto-suggested (high confidence)
@@ -278,7 +309,7 @@ export default function ColumnMapperSimple({
               <Label htmlFor="field-type">Data Type</Label>
               <Select
                 value={newColumnData.type}
-                onValueChange={(value: any) => setNewColumnData(prev => ({ ...prev, type: value }))}
+                onValueChange={(value: any) => setNewColumnData(prev => ({ ...prev, type: value, options: [] }))}
               >
                 <SelectTrigger id="field-type" data-testid="select-new-column-type">
                   <SelectValue />
@@ -290,10 +321,66 @@ export default function ColumnMapperSimple({
                   <SelectItem value="percent">Percent</SelectItem>
                   <SelectItem value="date">Date</SelectItem>
                   <SelectItem value="boolean">Yes/No</SelectItem>
+                  <SelectItem value="select">Dropdown</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
+
+          {/* Dropdown Options Input */}
+          {newColumnData.type === 'select' && (
+            <div className="space-y-3">
+              <Label>Dropdown Options</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Add an option..."
+                  value={newOptionInput}
+                  onChange={(e) => setNewOptionInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddOption();
+                    }
+                  }}
+                  data-testid="input-dropdown-option"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAddOption}
+                  disabled={!newOptionInput.trim()}
+                  data-testid="button-add-option"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {newColumnData.options.length > 0 && (
+                <div className="space-y-2">
+                  {newColumnData.options.map((option, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 rounded border bg-muted">
+                      <span className="flex-1 text-sm">{option}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveOption(index)}
+                        data-testid={`button-remove-option-${index}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {newColumnData.options.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Add at least one option for the dropdown
+                </p>
+              )}
+            </div>
+          )}
 
           <DialogFooter>
             <Button
@@ -301,7 +388,8 @@ export default function ColumnMapperSimple({
               onClick={() => {
                 setShowNewColumnDialog(false);
                 setPendingColumnName("");
-                setNewColumnData({ key: '', label: '', type: 'text' });
+                setNewColumnData({ key: '', label: '', type: 'text', options: [] });
+                setNewOptionInput('');
               }}
               data-testid="button-cancel-new-column"
             >
