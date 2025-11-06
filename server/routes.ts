@@ -7542,7 +7542,7 @@ Current context: Project ${req.params.projectId}`;
   // Sales Comps CRUD routes
   app.get('/api/sales-comps', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.set('Pragma', 'no-cache');
@@ -7569,7 +7569,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.get('/api/sales-comps/ids', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
       const ids = await storage.getAllCompIds(orgId);
       res.json({ ids });
     } catch (error) {
@@ -7580,7 +7580,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.get('/api/sales-comps/column-values/:column', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
       const { column } = req.params;
       const values = await storage.getColumnUniqueValues(orgId, column);
       res.json({ values });
@@ -7592,7 +7592,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.get('/api/sales-comps/:id', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
       const comp = await storage.getComp(req.params.id, orgId);
       if (!comp) return res.status(404).json({ message: "Comp not found" });
       res.json(comp);
@@ -7605,7 +7605,7 @@ Current context: Project ${req.params.projectId}`;
   app.post('/api/sales-comps', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const compData = salesCompCreateSchema.parse(req.body);
       const comp = await compService.createComp({
@@ -7624,7 +7624,7 @@ Current context: Project ${req.params.projectId}`;
   app.patch('/api/sales-comps/:id', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const updates = salesCompUpdateSchema.parse(req.body);
       const comp = await compService.updateComp(
@@ -7645,7 +7645,7 @@ Current context: Project ${req.params.projectId}`;
   app.delete('/api/sales-comps/:id', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const success = await compService.deleteComp(req.params.id, orgId, userId);
       if (!success) return res.status(404).json({ message: "Comp not found" });
@@ -7660,7 +7660,7 @@ Current context: Project ${req.params.projectId}`;
   app.post('/api/sales-comps/bulk-update', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const { ids, updates } = bulkUpdateSchema.parse(req.body);
       const count = await compService.bulkUpdateComps(ids, updates, orgId, userId);
@@ -7675,7 +7675,7 @@ Current context: Project ${req.params.projectId}`;
   app.post('/api/sales-comps/bulk-delete', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const { ids } = req.body;
       if (!Array.isArray(ids) || ids.length === 0) {
@@ -7694,7 +7694,7 @@ Current context: Project ${req.params.projectId}`;
   app.post('/api/sales-comps/upload', uploadSalesComps.single('file'), async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -7732,7 +7732,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.post('/api/sales-comps/import/:importId/detect-duplicates', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
       const { mapping, normalization } = req.body;
       
       const result = await compService.detectDuplicates(
@@ -7752,7 +7752,7 @@ Current context: Project ${req.params.projectId}`;
   app.post('/api/sales-comps/import/:importId/commit', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const { mapping, normalization, excludedRows = [] } = req.body;
       
@@ -7778,7 +7778,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.get('/api/sales-comps/import/:importId/status', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
       const importRecord = await storage.getImport(req.params.importId, orgId);
       if (!importRecord) return res.status(404).json({ message: "Import not found" });
 
@@ -7792,7 +7792,7 @@ Current context: Project ${req.params.projectId}`;
   // Comp Columns management routes
   app.get('/api/comp-columns', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
       const columns = await storage.getCompColumns(orgId);
       res.json(columns);
     } catch (error) {
@@ -7803,7 +7803,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.post('/api/comp-columns', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const columnData = compColumnCreateSchema.parse(req.body);
       const column = await storage.createCompColumn({
@@ -7820,7 +7820,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.patch('/api/comp-columns/:id', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const updates = compColumnUpdateSchema.parse(req.body);
       const column = await storage.updateCompColumn(req.params.id, updates, orgId);
@@ -7835,7 +7835,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.delete('/api/comp-columns/:id', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const success = await storage.deleteCompColumn(req.params.id, orgId);
       if (!success) return res.status(404).json({ message: "Column not found" });
@@ -7851,7 +7851,7 @@ Current context: Project ${req.params.projectId}`;
   app.get('/api/saved-searches', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const searches = await storage.getSavedSearches(orgId, userId);
       res.json(searches);
@@ -7863,7 +7863,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.get('/api/saved-searches/:id', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const search = await storage.getSavedSearch(req.params.id, orgId);
       if (!search) return res.status(404).json({ message: "Saved search not found" });
@@ -7878,7 +7878,7 @@ Current context: Project ${req.params.projectId}`;
   app.post('/api/saved-searches', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const searchData = insertScSavedSearchSchema.parse(req.body);
       const search = await storage.createSavedSearch({
@@ -7897,7 +7897,7 @@ Current context: Project ${req.params.projectId}`;
   app.patch('/api/saved-searches/:id', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const searchData = updateScSavedSearchSchema.parse(req.body);
       const search = await storage.updateSavedSearch(req.params.id, {
@@ -7917,7 +7917,7 @@ Current context: Project ${req.params.projectId}`;
   app.delete('/api/saved-searches/:id', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const success = await storage.deleteSavedSearch(req.params.id, orgId, userId);
       if (!success) return res.status(404).json({ message: "Saved search not found" });
@@ -7931,7 +7931,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.post('/api/saved-searches/:id/use', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       await storage.incrementSavedSearchUsage(req.params.id, orgId);
       res.status(204).send();
@@ -7945,7 +7945,7 @@ Current context: Project ${req.params.projectId}`;
   app.get('/api/sc-projects', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const projects = await storage.getScProjects(orgId, userId);
       res.json(projects);
@@ -7957,7 +7957,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.get('/api/sc-projects/:id', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const project = await storage.getScProject(req.params.id, orgId);
       if (!project) return res.status(404).json({ message: "Project not found" });
@@ -7972,7 +7972,7 @@ Current context: Project ${req.params.projectId}`;
   app.post('/api/sc-projects', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const projectData = scProjectCreateSchema.parse(req.body);
       const project = await storage.createScProject({
@@ -8000,7 +8000,7 @@ Current context: Project ${req.params.projectId}`;
   app.put('/api/sc-projects/:id', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const currentProject = await storage.getScProject(req.params.id, orgId);
       if (!currentProject) return res.status(404).json({ message: "Project not found" });
@@ -8033,7 +8033,7 @@ Current context: Project ${req.params.projectId}`;
   app.delete('/api/sc-projects/:id', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const currentProject = await storage.getScProject(req.params.id, orgId);
       if (!currentProject) return res.status(404).json({ message: "Project not found" });
@@ -8060,7 +8060,7 @@ Current context: Project ${req.params.projectId}`;
   // SC Project Comps routes
   app.get('/api/sc-projects/:id/comps', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const project = await storage.getScProject(req.params.id, orgId);
       if (!project) return res.status(404).json({ message: "Project not found" });
@@ -8076,7 +8076,7 @@ Current context: Project ${req.params.projectId}`;
   app.post('/api/sc-projects/:id/comps', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const project = await storage.getScProject(req.params.id, orgId);
       if (!project) return res.status(404).json({ message: "Project not found" });
@@ -8116,7 +8116,7 @@ Current context: Project ${req.params.projectId}`;
   app.post('/api/sc-projects/:id/comps/bulk', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const project = await storage.getScProject(req.params.id, orgId);
       if (!project) return res.status(404).json({ message: "Project not found" });
@@ -8161,7 +8161,7 @@ Current context: Project ${req.params.projectId}`;
   app.delete('/api/sc-projects/:id/comps/bulk', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const project = await storage.getScProject(req.params.id, orgId);
       if (!project) return res.status(404).json({ message: "Project not found" });
@@ -8206,7 +8206,7 @@ Current context: Project ${req.params.projectId}`;
   app.delete('/api/sc-projects/:id/comps/:compId', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const project = await storage.getScProject(req.params.id, orgId);
       if (!project) return res.status(404).json({ message: "Project not found" });
@@ -8238,7 +8238,7 @@ Current context: Project ${req.params.projectId}`;
   app.patch('/api/sc-projects/:id/comps/:compId', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const project = await storage.getScProject(req.params.id, orgId);
       if (!project) return res.status(404).json({ message: "Project not found" });
@@ -8280,7 +8280,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.get('/api/sc-projects/:id/recommendations', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const projectId = req.params.id;
       const project = await storage.getScProject(projectId, orgId);
@@ -8320,7 +8320,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.get('/api/sc-projects/:id/preferences', async (req: any, res) => {
     try {
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const projectId = req.params.id;
       const project = await storage.getScProject(projectId, orgId);
@@ -8339,7 +8339,7 @@ Current context: Project ${req.params.projectId}`;
   app.put('/api/sc-projects/:id/preferences', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const projectId = req.params.id;
       const project = await storage.getScProject(projectId, orgId);
@@ -8383,7 +8383,7 @@ Current context: Project ${req.params.projectId}`;
   app.post('/api/recommendations/feedback', async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const orgId = req.user.organizationId;
+      const orgId = req.user.orgId;
 
       const feedbackData = insertScRecommendationFeedbackSchema.parse({
         ...req.body,
