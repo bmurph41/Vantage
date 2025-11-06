@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { X, Save, Plus, Trash2 } from "lucide-react";
 import { salesCompsApi } from '@/lib/salescomps/api';
 import { queryKeys } from '@/lib/salescomps/queryKeys';
@@ -99,10 +100,20 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   const isEdit = !!comp;
 
   const [articleUrls, setArticleUrls] = useState<string[]>(comp?.articleUrls || [""]);
+  const [showNewPortfolioDialog, setShowNewPortfolioDialog] = useState(false);
+  const [newPortfolioName, setNewPortfolioName] = useState("");
+  const [linkToPortfolio, setLinkToPortfolio] = useState(!!(comp?.parentPortfolioId));
   
   // Check if the existing comp has a legacy storage type value
   const hasLegacyStorageType = comp?.ioBoth && !STORAGE_TYPES.includes(comp.ioBoth as any);
   const [showLegacyStorageWarning, setShowLegacyStorageWarning] = useState(hasLegacyStorageType);
+
+  // Fetch existing portfolio comps
+  const { data: portfoliosData } = useQuery({
+    queryKey: queryKeys.comps.portfolios,
+    queryFn: () => salesCompsApi.getComps({ isPortfolio: true }),
+    enabled: open && linkToPortfolio,
+  });
 
   const form = useForm<CompFormData>({
     resolver: zodResolver(compFormSchema),
@@ -235,6 +246,30 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
         }, 500);
         return;
       }
+      toast({
+        title: "Error",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createPortfolioMutation = useMutation({
+    mutationFn: (name: string) => salesCompsApi.createComp({ 
+      marina: name, 
+      isPortfolio: true,
+    } as any),
+    onSuccess: (newPortfolio) => {
+      toast({
+        title: "Success",
+        description: "Portfolio created successfully",
+      });
+      form.setValue("parentPortfolioId", newPortfolio.id);
+      setShowNewPortfolioDialog(false);
+      setNewPortfolioName("");
+      queryClient.invalidateQueries({ queryKey: queryKeys.comps.portfolios });
+    },
+    onError: (error) => {
       toast({
         title: "Error",
         description: (error as Error).message,
@@ -408,6 +443,73 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           </FormItem>
                         )}
                       />
+
+                      {!form.watch("isPortfolio") && (
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-3">
+                            <Checkbox
+                              checked={linkToPortfolio}
+                              onCheckedChange={(checked) => {
+                                setLinkToPortfolio(!!checked);
+                                if (!checked) {
+                                  form.setValue("parentPortfolioId", "");
+                                }
+                              }}
+                              data-testid="checkbox-link-to-portfolio"
+                            />
+                            <Label className="text-sm font-normal cursor-pointer" onClick={() => setLinkToPortfolio(!linkToPortfolio)}>
+                              Link to Portfolio
+                            </Label>
+                          </div>
+
+                          {linkToPortfolio && (
+                            <div className="flex gap-2">
+                              <FormField
+                                control={form.control}
+                                name="parentPortfolioId"
+                                render={({ field }) => (
+                                  <FormItem className="flex-1">
+                                    <FormControl>
+                                      <Select 
+                                        value={field.value || ""} 
+                                        onValueChange={field.onChange}
+                                      >
+                                        <SelectTrigger data-testid="select-portfolio">
+                                          <SelectValue placeholder="Select a portfolio..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {portfoliosData?.comps && portfoliosData.comps.length > 0 ? (
+                                            portfoliosData.comps.map((portfolio) => (
+                                              <SelectItem key={portfolio.id} value={portfolio.id}>
+                                                {portfolio.marina}
+                                              </SelectItem>
+                                            ))
+                                          ) : (
+                                            <SelectItem value="no-portfolios" disabled>
+                                              No portfolios available
+                                            </SelectItem>
+                                          )}
+                                        </SelectContent>
+                                      </Select>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowNewPortfolioDialog(true)}
+                                data-testid="button-new-portfolio"
+                              >
+                                <Plus className="h-4 w-4 mr-1" />
+                                New Portfolio
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       
                       <div className="grid grid-cols-2 gap-3">
                         <FormField
@@ -1144,6 +1246,50 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
           </div>
         </div>
       </Card>
+
+      {/* New Portfolio Dialog */}
+      <Dialog open={showNewPortfolioDialog} onOpenChange={setShowNewPortfolioDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Portfolio</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="portfolio-name">Portfolio Name *</Label>
+              <Input
+                id="portfolio-name"
+                value={newPortfolioName}
+                onChange={(e) => setNewPortfolioName(e.target.value)}
+                placeholder="Enter portfolio name..."
+                data-testid="input-new-portfolio-name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowNewPortfolioDialog(false);
+                setNewPortfolioName("");
+              }}
+              data-testid="button-cancel-new-portfolio"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (newPortfolioName.trim()) {
+                  createPortfolioMutation.mutate(newPortfolioName.trim());
+                }
+              }}
+              disabled={!newPortfolioName.trim() || createPortfolioMutation.isPending}
+              data-testid="button-create-portfolio"
+            >
+              {createPortfolioMutation.isPending ? "Creating..." : "Create Portfolio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

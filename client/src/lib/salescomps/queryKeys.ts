@@ -5,6 +5,7 @@ export const queryKeys = {
     list: (filters: Record<string, any>) => [...queryKeys.comps.lists(), filters] as const,
     details: () => [...queryKeys.comps.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.comps.details(), id] as const,
+    portfolios: ['comps', 'portfolios'] as const,
   },
   
   columns: {
