@@ -8440,6 +8440,11 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Google Maps API key endpoint
+  app.get("/api/config/google-maps-key", (req, res) => {
+    res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY || "" });
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
@@ -8506,8 +8511,3 @@ function generateICS(events: Array<{
 
   return ics.join('\r\n');
 }
-
-  // Google Maps API key endpoint
-  app.get("/api/config/google-maps-key", (req, res) => {
-    res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY || "" });
-  });
