@@ -15,7 +15,7 @@ import { CalendarService } from "./calendar-service";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
-import { recommendationService } from "./services/salescomps/recommendationService";
+import { RecommendationService } from "./services/salescomps/recommendationService";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertDDTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
@@ -27,11 +27,11 @@ import {
   insertCrmTaskSchema, insertCrmFileSchema, insertCalendarSettingsSchema,
   crmTasks, crmFiles, crmContacts, crmDeals, crmCompanies, crmPipelines, crmPipelineStages, crmActivities,
   type InsertCrmFile,
-  insertSavedSearchSchema,
-  updateSavedSearchSchema,
-  insertRecommendationFeedbackSchema,
-  projectProfileSchema,
-  weightOverridesSchema
+  insertScSavedSearchSchema,
+  updateScSavedSearchSchema,
+  insertScRecommendationFeedbackSchema,
+  scProjectProfileSchema,
+  scWeightOverridesSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -140,9 +140,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const parserService = new ParserService();
   const compService = new CompService(storage, parserService);
   const filterBuilder = new FilterBuilder();
+  const recommendationService = new RecommendationService(storage);
 
   // Multer configuration for file uploads (SalesComps CSV/Excel imports)
-  const upload = multer({ 
+  const uploadSalesComps = multer({ 
     storage: multer.memoryStorage(),
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
     fileFilter: (req, file, cb) => {
@@ -7690,7 +7691,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Upload and Import routes
-  app.post('/api/sales-comps/upload', upload.single('file'), async (req: any, res) => {
+  app.post('/api/sales-comps/upload', uploadSalesComps.single('file'), async (req: any, res) => {
     try {
       const userId = req.user.id;
       const orgId = req.user.organizationId;
@@ -7879,7 +7880,7 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.organizationId;
 
-      const searchData = insertSavedSearchSchema.parse(req.body);
+      const searchData = insertScSavedSearchSchema.parse(req.body);
       const search = await storage.createSavedSearch({
         ...searchData,
         orgId,
@@ -7898,7 +7899,7 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.organizationId;
 
-      const searchData = updateSavedSearchSchema.parse(req.body);
+      const searchData = updateScSavedSearchSchema.parse(req.body);
       const search = await storage.updateSavedSearch(req.params.id, {
         ...searchData,
         updatedBy: userId,
@@ -8349,8 +8350,8 @@ Current context: Project ${req.params.projectId}`;
       let validatedProfile, validatedWeights;
       
       try {
-        validatedProfile = profile ? projectProfileSchema.parse(profile) : project.profile;
-        validatedWeights = weightOverrides ? weightOverridesSchema.parse(weightOverrides) : project.weightOverrides;
+        validatedProfile = profile ? scProjectProfileSchema.parse(profile) : project.profile;
+        validatedWeights = weightOverrides ? scWeightOverridesSchema.parse(weightOverrides) : project.weightOverrides;
       } catch (validationError: any) {
         console.error("Validation error in SC project preferences:", validationError);
         return res.status(400).json({ 
@@ -8384,7 +8385,7 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.organizationId;
 
-      const feedbackData = insertRecommendationFeedbackSchema.parse({
+      const feedbackData = insertScRecommendationFeedbackSchema.parse({
         ...req.body,
         orgId,
         userId,

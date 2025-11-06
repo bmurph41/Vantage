@@ -1,5 +1,5 @@
-import { storage } from "../storage";
-import type { SalesComp, ProjectProfile, WeightOverrides, TenantPreferences } from "@shared/schema";
+import type { IStorage } from "../../storage";
+import type { SalesComp, ProjectProfile, WeightOverrides, TenantPreferences, ScOrgPreferences } from "@shared/schema";
 import { 
   DEFAULT_RECOMMENDATION_WEIGHTS, 
   PROFIT_CENTERS, 
@@ -29,6 +29,8 @@ export interface RecommendationWeights {
 }
 
 export class RecommendationService {
+  constructor(private storage: IStorage) {}
+
   /**
    * Get personalized recommendation weights for a tenant and project profile
    */
@@ -48,7 +50,7 @@ export class RecommendationService {
       regional: DEFAULT_RECOMMENDATION_WEIGHTS.regional,
       geo: DEFAULT_RECOMMENDATION_WEIGHTS.geo
     };
-    const tenantPrefs = await storage.getTenantPreferences(orgId, segmentKey);
+    const tenantPrefs = await this.storage.getOrgPreferences(orgId, segmentKey);
     if (tenantPrefs?.weights) {
       learnedWeights = tenantPrefs.weights as RecommendationWeights;
     }
@@ -294,7 +296,7 @@ export class RecommendationService {
     const weights = await this.getEffectiveWeights(orgId, projectProfile, userWeightOverrides);
 
     // Get candidate comps from database with prefiltering
-    const comps = await storage.getCompsForRecommendation({
+    const comps = await this.storage.getCompsForRecommendation({
       orgId,
       filters: {
         regions: projectProfile.regions,
@@ -383,7 +385,7 @@ export class RecommendationService {
       regional: DEFAULT_RECOMMENDATION_WEIGHTS.regional,
       geo: DEFAULT_RECOMMENDATION_WEIGHTS.geo
     };
-    const tenantPrefs = await storage.getTenantPreferences(orgId, segmentKey);
+    const tenantPrefs = await this.storage.getOrgPreferences(orgId, segmentKey);
     if (tenantPrefs?.weights) {
       currentWeights = tenantPrefs.weights as RecommendationWeights;
     }
@@ -417,12 +419,10 @@ export class RecommendationService {
     });
 
     // Update or create tenant preferences
-    await storage.upsertTenantPreferences({
+    await this.storage.upsertOrgPreferences({
       orgId,
       segmentKey,
       weights: newWeights,
     });
   }
 }
-
-export const recommendationService = new RecommendationService();

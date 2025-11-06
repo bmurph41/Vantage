@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { STORAGE_TYPES } from '@shared/constants';
+import { STORAGE_TYPES } from '@shared/salescomps-constants';
 
 export const salesCompCreateSchema = z.object({
   marina: z.string().min(1, "Marina name is required"),

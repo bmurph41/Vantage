@@ -1,4 +1,4 @@
-import { IStorage } from "../storage";
+import { IStorage } from "../../storage";
 import { ParserService } from "./parser";
 import type { InsertSalesComp, UpdateSalesComp, SalesComp, Project } from "@shared/schema";
 import type { AnalyticsReportData, ProjectReportData } from "../openai";
