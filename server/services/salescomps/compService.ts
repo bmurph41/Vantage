@@ -10,7 +10,46 @@ export class CompService {
   ) {}
 
   async createComp(compData: InsertSalesComp, userId: string): Promise<SalesComp> {
-    const comp = await this.storage.createComp(compData);
+    // Try to auto-match property by name/city/state before creating
+    let propertyId = compData.propertyId;
+    let needsPropertyProfile = false;
+    
+    if (!propertyId && compData.marina) {
+      try {
+        const matchedProperty = await this.storage.findPropertyByLocation(
+          compData.orgId,
+          compData.marina,
+          compData.city,
+          compData.state
+        );
+        
+        if (matchedProperty) {
+          propertyId = matchedProperty.id;
+        } else {
+          needsPropertyProfile = true;
+        }
+      } catch (error) {
+        console.error('Error matching property during comp creation:', error);
+      }
+    }
+
+    const comp = await this.storage.createComp({
+      ...compData,
+      propertyId,
+    });
+    
+    // Create pending property profile if needed
+    if (needsPropertyProfile) {
+      try {
+        await this.storage.createPendingPropertyProfile({
+          compId: comp.id,
+          orgId: compData.orgId,
+          status: 'pending',
+        });
+      } catch (error) {
+        console.error('Error creating pending property profile:', error);
+      }
+    }
     
     // Log audit trail
     await this.storage.createAuditLog({
