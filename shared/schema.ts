@@ -3533,3 +3533,140 @@ export const insertScPendingPropertyProfileSchema = createInsertSchema(scPending
   createdAt: true,
 });
 export type InsertScPendingPropertyProfile = z.infer<typeof insertScPendingPropertyProfileSchema>;
+
+// Analytics/Metrics Tables
+export const scMetricSeries = pgTable('sc_metric_series', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  metricType: text('metric_type').notNull(), // 'price_per_slip', 'cap_rate', 'total_price', 'noi', etc.
+  aggregationType: text('aggregation_type').notNull(), // 'average', 'median', 'min', 'max', 'sum', 'count'
+  filters: jsonb('filters').$type<Record<string, any>>().default({}),
+  groupBy: text('group_by'), // 'state', 'year', 'water_type', 'price_range', etc.
+  
+  isActive: boolean('is_active').default(true),
+}, (table) => ({
+  orgIdx: index('sc_metric_series_org_idx').on(table.orgId),
+  orgMetricTypeIdx: index('sc_metric_series_org_metric_type_idx').on(table.orgId, table.metricType),
+}));
+
+export const scMetricPoints = pgTable('sc_metric_points', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  seriesId: varchar('series_id').notNull().references(() => scMetricSeries.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  
+  timestamp: timestamp('timestamp').notNull(),
+  value: decimal('value', { precision: 20, scale: 2 }).notNull(),
+  sampleSize: integer('sample_size').default(0),
+  metadata: jsonb('metadata').$type<Record<string, any>>().default({}),
+  groupValue: text('group_value'), // The value of the groupBy dimension (e.g., 'FL', '2023', etc.)
+}, (table) => ({
+  seriesIdx: index('sc_metric_points_series_idx').on(table.seriesId),
+  orgTimestampIdx: index('sc_metric_points_org_timestamp_idx').on(table.orgId, table.timestamp),
+  seriesTimestampIdx: index('sc_metric_points_series_timestamp_idx').on(table.seriesId, table.timestamp),
+}));
+
+export const scMetricAlerts = pgTable('sc_metric_alerts', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  seriesId: varchar('series_id').notNull().references(() => scMetricSeries.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  
+  name: text('name').notNull(),
+  condition: text('condition').notNull(), // 'above', 'below', 'between', 'outside'
+  threshold: decimal('threshold', { precision: 20, scale: 2 }),
+  thresholdMin: decimal('threshold_min', { precision: 20, scale: 2 }),
+  thresholdMax: decimal('threshold_max', { precision: 20, scale: 2 }),
+  
+  isActive: boolean('is_active').default(true),
+  lastTriggered: timestamp('last_triggered'),
+  notificationChannels: text('notification_channels').array().default(sql`ARRAY[]::text[]`), // ['email', 'in_app']
+}, (table) => ({
+  orgIdx: index('sc_metric_alerts_org_idx').on(table.orgId),
+  seriesIdx: index('sc_metric_alerts_series_idx').on(table.seriesId),
+}));
+
+// Relations
+export const scMetricSeriesRelations = relations(scMetricSeries, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [scMetricSeries.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [scMetricSeries.createdBy],
+    references: [users.id],
+  }),
+  points: many(scMetricPoints),
+  alerts: many(scMetricAlerts),
+}));
+
+export const scMetricPointsRelations = relations(scMetricPoints, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [scMetricPoints.orgId],
+    references: [organizations.id],
+  }),
+  series: one(scMetricSeries, {
+    fields: [scMetricPoints.seriesId],
+    references: [scMetricSeries.id],
+  }),
+}));
+
+export const scMetricAlertsRelations = relations(scMetricAlerts, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [scMetricAlerts.orgId],
+    references: [organizations.id],
+  }),
+  series: one(scMetricSeries, {
+    fields: [scMetricAlerts.seriesId],
+    references: [scMetricSeries.id],
+  }),
+  createdByUser: one(users, {
+    fields: [scMetricAlerts.createdBy],
+    references: [users.id],
+  }),
+}));
+
+// Zod schemas for analytics
+export const insertScMetricSeriesSchema = createInsertSchema(scMetricSeries).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateScMetricSeriesSchema = insertScMetricSeriesSchema.partial();
+
+export const insertScMetricPointSchema = createInsertSchema(scMetricPoints).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+});
+
+export const insertScMetricAlertSchema = createInsertSchema(scMetricAlerts).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateScMetricAlertSchema = insertScMetricAlertSchema.partial();
+
+// Types for analytics
+export type ScMetricSeries = typeof scMetricSeries.$inferSelect;
+export type InsertScMetricSeries = z.infer<typeof insertScMetricSeriesSchema>;
+export type UpdateScMetricSeries = z.infer<typeof updateScMetricSeriesSchema>;
+export type ScMetricPoint = typeof scMetricPoints.$inferSelect;
+export type InsertScMetricPoint = z.infer<typeof insertScMetricPointSchema>;
+export type ScMetricAlert = typeof scMetricAlerts.$inferSelect;
+export type InsertScMetricAlert = z.infer<typeof insertScMetricAlertSchema>;
+export type UpdateScMetricAlert = z.infer<typeof updateScMetricAlertSchema>;
