@@ -7645,6 +7645,81 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Pending Property Profiles routes (must be before /:id route)
+  app.get('/api/sales-comps/pending-property-profiles', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const status = req.query.status as string | undefined;
+      const profiles = await storage.getPendingPropertyProfiles(orgId, status);
+      res.json(profiles);
+    } catch (error) {
+      console.error("Error fetching pending property profiles:", error);
+      res.status(500).json({ message: "Failed to fetch pending property profiles" });
+    }
+  });
+
+  app.post('/api/sales-comps/pending-property-profiles', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { compId, status } = req.body;
+
+      if (!compId) {
+        return res.status(400).json({ message: "compId is required" });
+      }
+
+      const profile = await storage.createPendingPropertyProfile({
+        compId,
+        orgId,
+        status: status || 'pending',
+      });
+
+      res.status(201).json(profile);
+    } catch (error) {
+      console.error("Error creating pending property profile:", error);
+      res.status(500).json({ message: "Failed to create pending property profile" });
+    }
+  });
+
+  app.patch('/api/sales-comps/pending-property-profiles/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { status } = req.body;
+      
+      // Verify ownership before updating
+      const existing = await storage.getPendingPropertyProfiles(orgId);
+      const profile = existing.find(p => p.id === req.params.id);
+      if (!profile) {
+        return res.status(404).json({ message: "Pending property profile not found" });
+      }
+      
+      const updated = await storage.updatePendingPropertyProfile(req.params.id, { status });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating pending property profile:", error);
+      res.status(500).json({ message: "Failed to update pending property profile" });
+    }
+  });
+
+  app.delete('/api/sales-comps/pending-property-profiles/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      // Verify ownership before deleting
+      const existing = await storage.getPendingPropertyProfiles(orgId);
+      const profile = existing.find(p => p.id === req.params.id);
+      if (!profile) {
+        return res.status(404).json({ message: "Pending property profile not found" });
+      }
+      
+      const success = await storage.deletePendingPropertyProfile(req.params.id);
+      if (!success) return res.status(404).json({ message: "Pending property profile not found" });
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting pending property profile:", error);
+      res.status(500).json({ message: "Failed to delete pending property profile" });
+    }
+  });
+
   app.get('/api/sales-comps/:id', async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
