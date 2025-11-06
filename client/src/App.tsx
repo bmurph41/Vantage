@@ -49,6 +49,7 @@ import ScProjectsIndex from "@/pages/analysis/projects/Index";
 import ScProjectsReport from "@/pages/analysis/projects/Report";
 import RateCompsIndex from "@/pages/analysis/rate-comps/Index";
 import DemographicsIndex from "@/pages/analysis/demographics/Index";
+import AnalyticsIndex from "@/pages/analysis/analytics/Index";
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
@@ -406,6 +407,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <DemographicsIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/analytics">
+        {() => (
+          <UnifiedLayout>
+            <AnalyticsIndex />
           </UnifiedLayout>
         )}
       </Route>
