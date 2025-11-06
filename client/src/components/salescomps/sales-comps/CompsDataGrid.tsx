@@ -1319,10 +1319,16 @@ export default function CompsDataGrid({
                         comp.isPortfolio ? 
                           'bg-gradient-to-r from-purple-50 via-purple-25 to-transparent border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:via-purple-900/10 dark:to-transparent font-medium hover:from-purple-100 hover:via-purple-50 hover:to-purple-25' : 
                           ''
+                      } ${
+                        isEditMode ? 'cursor-pointer hover:bg-primary/5 transition-colors' : ''
                       }`}
+                      onClick={isEditMode ? () => {
+                        setEditingComp(comp);
+                        setShowEditDialog(true);
+                      } : undefined}
                       data-testid={`row-comp-${comp.id}`}
                     >
-                    <TableCell className="data-table-cell">
+                    <TableCell className="data-table-cell" onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selectedIds.includes(comp.id)}
                         onCheckedChange={(checked) => handleSelectRow(comp.id, checked as boolean)}
@@ -1331,7 +1337,7 @@ export default function CompsDataGrid({
                     </TableCell>
                     
                     {/* Expand/Collapse Column */}
-                    <TableCell className="data-table-cell w-8">
+                    <TableCell className="data-table-cell w-8" onClick={(e) => e.stopPropagation()}>
                       {comp.isPortfolio ? (
                         <Button
                           variant="ghost"
@@ -1387,13 +1393,13 @@ export default function CompsDataGrid({
                                 Portfolio
                               </div>
                             )}
-                            {isEditMode ? renderEditableCell(comp, column.key) : formatCellValue(comp, column.key)}
+                            {formatCellValue(comp, column.key)}
                             {column.key === 'marina' && comp.articleUrls && comp.articleUrls.length > 0 && (
                               <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary cursor-pointer" />
                             )}
                           </div>
                           {column.key === 'marina' && comp.isPortfolio && !isEditMode && (
-                            <div className="flex gap-2 mt-1">
+                            <div className="flex gap-2 mt-1" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1429,7 +1435,7 @@ export default function CompsDataGrid({
                     ))}
                     
                     {/* Actions */}
-                    <TableCell className="data-table-cell text-left w-20 whitespace-nowrap">
+                    <TableCell className="data-table-cell text-left w-20 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm" data-testid={`actions-${comp.id}`}>
@@ -1444,16 +1450,18 @@ export default function CompsDataGrid({
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              setEditingComp(comp);
-                              setShowEditDialog(true);
-                            }}
-                            data-testid={`action-edit-${comp.id}`}
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
+                          {!isEditMode && (
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                setEditingComp(comp);
+                                setShowEditDialog(true);
+                              }}
+                              data-testid={`action-edit-${comp.id}`}
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                          )}
                           {canAddToProject && (
                             <DropdownMenuItem 
                               onClick={() => {
