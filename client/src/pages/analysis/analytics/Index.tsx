@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { TrendingUp, DollarSign, BarChart3, Map, Calendar, Lightbulb, Download } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface AnalyticsFilters {
   states?: string[];
@@ -58,14 +59,24 @@ export default function AnalyticsIndex() {
   const [filters, setFilters] = useState<AnalyticsFilters>({});
   const [selectedState, setSelectedState] = useState<string[]>([]);
   const [selectedWaterType, setSelectedWaterType] = useState<string[]>([]);
+  const { toast } = useToast();
 
-  const { data, isLoading, refetch } = useQuery<{ analysis: ComparativeAnalysis; insights: string[] }>({
-    queryKey: ['/api/analytics/calculate', filters],
-    enabled: false,
+  const { data, isPending, mutate } = useMutation<{ analysis: ComparativeAnalysis; insights: string[] }>({
+    mutationFn: async () => {
+      const result = await apiRequest('POST', '/api/analytics/calculate', { filters });
+      return result;
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to calculate analytics",
+        variant: "destructive",
+      });
+    },
   });
 
   const handleCalculate = () => {
-    refetch();
+    mutate();
   };
 
   const formatCurrency = (value: number) => {
@@ -191,7 +202,7 @@ export default function AnalyticsIndex() {
       </Card>
 
       {/* Loading State */}
-      {isLoading && (
+      {isPending && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
@@ -207,7 +218,7 @@ export default function AnalyticsIndex() {
       )}
 
       {/* Results */}
-      {data && !isLoading && (
+      {data && !isPending && (
         <>
           {/* Key Insights */}
           {data.insights && data.insights.length > 0 && (
@@ -434,7 +445,7 @@ export default function AnalyticsIndex() {
       )}
 
       {/* Empty State */}
-      {!data && !isLoading && (
+      {!data && !isPending && (
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
