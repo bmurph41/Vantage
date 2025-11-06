@@ -238,7 +238,7 @@ export class CompService {
             saleMonth: transformedData.saleMonth || undefined,
             saleYear: transformedData.saleYear || undefined,
             state: transformedData.state || undefined,
-            market: transformedData.market || undefined,
+            city: transformedData.city || undefined,
             region: transformedData.region || undefined,
             wetSlips: transformedData.wetSlips || undefined,
             dryRacks: transformedData.dryRacks || undefined,
@@ -584,32 +584,32 @@ export class CompService {
       .sort((a, b) => b.totalVolume - a.totalVolume)
       .slice(0, 10); // Top 10 states
 
-    // Top markets (by market field)
-    const marketData = new Map<string, { count: number; totalVolume: number; prices: number[] }>();
+    // Top cities (by city field)
+    const cityData = new Map<string, { count: number; totalVolume: number; prices: number[] }>();
     
     pricedComps.forEach(comp => {
-      const market = comp.market || comp.state || "Unknown";
+      const city = comp.city || comp.state || "Unknown";
       const price = parseFloat(comp.salePrice!.toString());
       
-      if (!marketData.has(market)) {
-        marketData.set(market, { count: 0, totalVolume: 0, prices: [] });
+      if (!cityData.has(city)) {
+        cityData.set(city, { count: 0, totalVolume: 0, prices: [] });
       }
       
-      const data = marketData.get(market)!;
+      const data = cityData.get(city)!;
       data.count++;
       data.totalVolume += price;
       data.prices.push(price);
     });
 
-    const topMarkets = Array.from(marketData.entries())
-      .map(([market, data]) => ({
-        market,
+    const topCities = Array.from(cityData.entries())
+      .map(([city, data]) => ({
+        city,
         count: data.count,
         totalVolume: data.totalVolume,
         avgPrice: data.totalVolume / data.count,
       }))
       .sort((a, b) => b.totalVolume - a.totalVolume)
-      .slice(0, 10); // Top 10 markets
+      .slice(0, 10); // Top 10 cities
 
     return {
       totalComps,
@@ -619,7 +619,7 @@ export class CompService {
       timeSeries,
       priceDistribution,
       stateBreakdown,
-      topMarkets,
+      topCities,
     };
   }
 
@@ -723,7 +723,7 @@ export class CompService {
       id: comp.id,
       marina: comp.marina,
       state: comp.state || null,
-      market: comp.market || null,
+      city: comp.city || null,
       salePrice: comp.salePrice ? parseFloat(comp.salePrice.toString()) : null,
       capRate: comp.capRate ? parseFloat(comp.capRate.toString()) : null,
       saleYear: comp.saleYear || null,

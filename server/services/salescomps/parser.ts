@@ -79,9 +79,9 @@ export class ParserService {
       required: false,
       description: 'Year of sale'
     }],
-    ['market', {
-      patterns: ['market', 'location', 'area', 'city', 'metro', 'msa'],
-      keywords: ['market', 'city', 'location', 'area', 'metro'],
+    ['city', {
+      patterns: ['city', 'market', 'location', 'area', 'metro', 'msa'],
+      keywords: ['city', 'market', 'location', 'area', 'metro'],
       type: 'text',
       required: false,
       description: 'Market or city location'

@@ -3001,7 +3001,7 @@ export const salesComps = pgTable('sales_comps', {
   isNoiDisclosed: boolean('is_noi_disclosed').default(true),
   saleMonth: integer('sale_month'), // 1-12
   saleYear: integer('sale_year'),
-  market: text('market'),
+  city: text('city'),
   state: text('state'),
   wetSlips: integer('wet_slips'),
   dryRacks: integer('dry_racks'),
