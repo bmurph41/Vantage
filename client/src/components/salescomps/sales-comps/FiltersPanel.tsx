@@ -234,7 +234,7 @@ export default function FiltersPanel({
   });
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto pt-6">
       {/* Quick Filters */}
       <Collapsible open={openSections.quick} onOpenChange={() => toggleSection('quick')}>
         <div className="filter-section">
