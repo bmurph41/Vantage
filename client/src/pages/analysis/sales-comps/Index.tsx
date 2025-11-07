@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/salescomps/authUtils";
 import FiltersPanel from "@/components/salescomps/sales-comps/FiltersPanel";
 import CompsDataGrid from "@/components/salescomps/sales-comps/CompsDataGrid";
-// import MetricsTab from "@/components/salescomps/sales-comps/MetricsTab"; // TODO: Add metrics components
+import AnalyticsWorkbench from "@/components/salescomps/analytics/AnalyticsWorkbench";
 import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEditCompDialog";
 import ColumnEditorDialog from "@/components/salescomps/sales-comps/ColumnEditorDialog";
 import BulkEdit from "./BulkEdit";
@@ -705,11 +705,8 @@ export default function SalesCompsIndex() {
             )}
           </TabsContent>
 
-          <TabsContent value="metrics" className="flex-1 overflow-auto m-0" data-testid="tab-content-metrics">
-            {/* Metrics Tab - TODO: Add metrics components */}
-            <div className="p-6">
-              <p className="text-muted-foreground">Metrics and analytics coming soon...</p>
-            </div>
+          <TabsContent value="metrics" className="flex-1 overflow-auto m-0 p-6" data-testid="tab-content-metrics">
+            <AnalyticsWorkbench />
           </TabsContent>
         </Tabs>
       </div>

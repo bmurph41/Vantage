@@ -8186,6 +8186,22 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Analytics endpoint
+  app.post('/api/sales-comps/analytics', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: AnalyticsFilters = req.body;
+
+      const metrics = await calculateMetrics(orgId, filters);
+      const insights = await generateInsights(metrics, filters);
+
+      res.json({ metrics, insights });
+    } catch (error) {
+      console.error("Error calculating analytics:", error);
+      res.status(500).json({ message: "Failed to calculate analytics" });
+    }
+  });
+
   // Saved Searches routes
   app.get('/api/saved-searches', async (req: any, res) => {
     try {
