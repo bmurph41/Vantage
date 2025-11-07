@@ -15,7 +15,6 @@ export interface FilterState {
   dryRacksMin: string;
   dryRacksMax: string;
   ioBoth: string;
-  hasArticle: boolean;
   disclosedOnly: boolean;
   disclosedCapRateOnly: boolean;
   portfoliosOnly: boolean;

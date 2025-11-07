@@ -49,7 +49,6 @@ export default function SalesCompsIndex() {
     dryRacksMin: "",
     dryRacksMax: "",
     ioBoth: "",
-    hasArticle: false,
     disclosedOnly: false,
     disclosedCapRateOnly: false,
     portfoliosOnly: false,

@@ -2936,11 +2936,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(salesComps.isCapRateDisclosed, true));
     }
     if (filters.portfoliosOnly) {
-      conditions.push(sql`EXISTS (
-        SELECT 1 FROM ${scPortfolioComps} 
-        WHERE ${scPortfolioComps.salesCompId} = ${salesComps.id} 
-        AND ${scPortfolioComps.orgId} = ${orgId}
-      )`);
+      conditions.push(eq(salesComps.isPortfolio, true));
     }
 
     const [{ total }] = await db.select({ total: count() })

@@ -110,7 +110,6 @@ export const compFiltersSchema = z.object({
   dryRacksMin: z.coerce.number().int().min(0).optional(),
   dryRacksMax: z.coerce.number().int().min(0).optional(),
   ioBoth: z.preprocess(v => v === '' || v === 'none' ? undefined : v, z.enum(STORAGE_TYPES).optional()),
-  hasArticle: z.coerce.boolean().optional(),
   disclosedOnly: z.coerce.boolean().optional(),
   disclosedCapRateOnly: z.coerce.boolean().optional(),
   portfoliosOnly: z.coerce.boolean().optional(),

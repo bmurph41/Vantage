@@ -61,7 +61,6 @@ export default function FiltersPanel({
       case 'quick':
         if (filters.disclosedOnly) count++;
         if (filters.disclosedCapRateOnly) count++;
-        if (filters.hasArticle) count++;
         if (filters.portfoliosOnly) count++;
         break;
       case 'location':
@@ -253,7 +252,6 @@ export default function FiltersPanel({
       dryRacksMin: "",
       dryRacksMax: "",
       ioBoth: "",
-      hasArticle: false,
       disclosedOnly: false,
       disclosedCapRateOnly: false,
       portfoliosOnly: false,
@@ -317,18 +315,6 @@ export default function FiltersPanel({
                 />
                 <Label htmlFor="disclosed-cap-rate-only" className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
                   Disclosed Cap Rates Only
-                </Label>
-              </div>
-              <div className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                <Checkbox
-                  id="has-article"
-                  checked={filters.hasArticle}
-                  onCheckedChange={(checked) => updateFilter('hasArticle', checked)}
-                  data-testid="checkbox-has-article"
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="has-article" className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
-                  Has Article
                 </Label>
               </div>
               <div className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">

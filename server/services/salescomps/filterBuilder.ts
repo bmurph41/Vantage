@@ -15,7 +15,6 @@ export interface FilterParams {
   dryRacksMin?: number;
   dryRacksMax?: number;
   ioBoth?: string;
-  hasArticle?: boolean;
   disclosedOnly?: boolean;
   disclosedCapRateOnly?: boolean;
   portfoliosOnly?: boolean;
@@ -92,9 +91,6 @@ export class FilterBuilder {
     }
 
     // Boolean filters
-    if (params.hasArticle) {
-      filters.hasArticle = params.hasArticle;
-    }
     if (params.disclosedOnly) {
       filters.disclosedOnly = params.disclosedOnly;
     }
