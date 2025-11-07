@@ -3811,3 +3811,756 @@ export type InsertScMetricPoint = z.infer<typeof insertScMetricPointSchema>;
 export type ScMetricAlert = typeof scMetricAlerts.$inferSelect;
 export type InsertScMetricAlert = z.infer<typeof insertScMetricAlertSchema>;
 export type UpdateScMetricAlert = z.infer<typeof updateScMetricAlertSchema>;
+
+// ============================================================================
+// RATE COMPS / ANALYSIS MODULE
+// ============================================================================
+
+// Rate comparables table (completely separate from sales comps)
+export const rateComps = pgTable('rate_comps', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+
+  // Standardized core fields
+  marina: text('marina').notNull(),
+  salePrice: integer('sale_price'),
+  isPriceDisclosed: boolean('is_price_disclosed').default(true),
+  capRate: integer('cap_rate'),
+  isCapRateDisclosed: boolean('is_cap_rate_disclosed').default(true),
+  noi: integer('noi'),
+  isNoiDisclosed: boolean('is_noi_disclosed').default(true),
+  saleMonth: integer('sale_month'), // 1-12
+  saleYear: integer('sale_year'),
+  city: text('city'),
+  state: text('state'),
+  wetSlips: integer('wet_slips'),
+  dryRacks: integer('dry_racks'),
+  ioBoth: text('inside_outside_both'), // Legacy field - deprecated
+  storageTypes: text('storage_types').array().default(sql`'{}'`), // Multi-select storage types
+  bodyOfWater: text('body_of_water'),
+  waterBodyName: text('water_body_name'), // Specific name like "Gulf of America", "Lake Superior"
+  waterfront: text('waterfront'),
+  region: text('region'),
+  saleCondition: text('sale_condition'),
+  daysOnMarket: integer('days_on_market'),
+  broker: text('broker'),
+  address: text('address'),
+  zip: text('zip'),
+  seller: text('seller'),
+  company: text('company'),
+  owner: text('owner'),
+  listPrice: integer('list_price'),
+  acres: integer('acres'),
+  occupancy: integer('occupancy'),
+  yearBuilt: integer('year_built'),
+  articleUrls: text('article_urls').array().default(sql`'{}'`),
+  notes: text('notes'),
+
+  // Profit centers (revenue streams) - individual boolean columns
+  profitCenterStorage: boolean('profit_center_storage').default(false),
+  profitCenterEvents: boolean('profit_center_events').default(false),
+  profitCenterService: boolean('profit_center_service').default(false),
+  profitCenterThirdPartyLeases: boolean('profit_center_third_party_leases').default(false),
+  profitCenterBoatRentals: boolean('profit_center_boat_rentals').default(false),
+  profitCenterBoatBrokerage: boolean('profit_center_boat_brokerage').default(false),
+  profitCenterRvPark: boolean('profit_center_rv_park').default(false),
+  profitCenterFuel: boolean('profit_center_fuel').default(false),
+  profitCenterShipStore: boolean('profit_center_ship_store').default(false),
+  profitCenterParts: boolean('profit_center_parts').default(false),
+  profitCenterBoatClub: boolean('profit_center_boat_club').default(false),
+  profitCenterBoatSales: boolean('profit_center_boat_sales').default(false),
+  profitCenterFnb: boolean('profit_center_fnb').default(false),
+  profitCenterHospitality: boolean('profit_center_hospitality').default(false),
+  
+  // Profit center operation types (In-House/Leased/Third-Party)
+  profitCenterBoatRentalsType: varchar('profit_center_boat_rentals_type', { length: 20 }),
+  profitCenterBoatBrokerageType: varchar('profit_center_boat_brokerage_type', { length: 20 }),
+  profitCenterFuelType: varchar('profit_center_fuel_type', { length: 20 }),
+  profitCenterShipStoreType: varchar('profit_center_ship_store_type', { length: 20 }),
+  profitCenterPartsType: varchar('profit_center_parts_type', { length: 20 }),
+  profitCenterBoatSalesType: varchar('profit_center_boat_sales_type', { length: 20 }),
+  profitCenterFnbType: varchar('profit_center_fnb_type', { length: 20 }),
+  profitCenterHospitalityType: varchar('profit_center_hospitality_type', { length: 20 }),
+  profitCenterBoatClubType: varchar('profit_center_boat_club_type', { length: 20 }),
+  profitCenterBoatClubCompany: text('profit_center_boat_club_company'),
+  
+  // Legacy profit centers field (deprecated - keeping for migration compatibility)
+  profitCenters: text('profit_centers').array().default(sql`'{}'`),
+  coastalType: text('coastal_type'), // Legacy: now called waterType - 'Coastal'|'Lake'|'River'
+  waterType: text('water_type'), // 'Coastal'|'Lake'|'River'
+
+  // Portfolio functionality
+  isPortfolio: boolean('is_portfolio').default(false),
+  parentPortfolioId: varchar('parent_portfolio_id').references((): any => rateComps.id, { onDelete: 'cascade' }),
+
+  // Link to CRM Property
+  propertyId: varchar('property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
+
+  // Transaction parties - CRM links
+  sellerCompanyId: varchar('seller_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  sellerContactId: varchar('seller_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+  buyerCompanyId: varchar('buyer_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  buyerContactId: varchar('buyer_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+
+  // Expandable data
+  custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
+}, (table) => ({
+  orgIdx: index('rate_comps_org_idx').on(table.orgId),
+  orgStateIdx: index('rate_comps_org_state_idx').on(table.orgId, table.state),
+  orgYearIdx: index('rate_comps_org_year_idx').on(table.orgId, table.saleYear),
+  orgPriceIdx: index('rate_comps_org_price_idx').on(table.orgId, table.salePrice),
+  orgCoastalIdx: index('rate_comps_org_coastal_idx').on(table.orgId, table.coastalType),
+  orgMarinaIdx: index('rate_comps_org_marina_idx').on(table.orgId, table.marina),
+  orgRegionIdx: index('rate_comps_org_region_idx').on(table.orgId, table.region),
+}));
+
+// Custom storage types table - per-organization customizable storage types
+export const rcCustomStorageTypes = pgTable('rc_custom_storage_types', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('rc_custom_storage_types_org_idx').on(table.orgId),
+  orgNameIdx: index('rc_custom_storage_types_org_name_idx').on(table.orgId, table.name),
+}));
+
+// Pending property profiles - tracks comps that need property profiles created
+export const rcPendingPropertyProfiles = pgTable('rc_pending_property_profiles', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  compId: varchar('comp_id').notNull().references(() => rateComps.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  status: text('status').notNull().default('pending'), // 'pending' | 'completed' | 'skipped'
+  createdAt: timestamp('created_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+}, (table) => ({
+  orgIdx: index('rc_pending_property_profiles_org_idx').on(table.orgId),
+  compIdx: index('rc_pending_property_profiles_comp_idx').on(table.compId),
+  statusIdx: index('rc_pending_property_profiles_status_idx').on(table.orgId, table.status),
+}));
+
+// Column definitions for dynamic columns
+export const rateCompColumns = pgTable('rate_comp_columns', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  key: text('key').notNull(),
+  label: text('label').notNull(),
+  type: text('type').notNull(), // 'text'|'number'|'currency'|'percent'|'date'|'boolean'|'select'
+  options: text('options').array(),
+  required: boolean('required').default(false),
+  visible: boolean('visible').default(true),
+  orderIndex: integer('order_index').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('rate_comp_columns_org_idx').on(table.orgId),
+  orgKeyIdx: index('rate_comp_columns_org_key_idx').on(table.orgId, table.key),
+}));
+
+// File uploads / import jobs
+export const rateCompImports = pgTable('rate_comp_imports', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  filename: text('filename').notNull(),
+  status: text('status').notNull(), // 'pending'|'mapping'|'processing'|'completed'|'failed'
+  columnMapping: jsonb('column_mapping').$type<Record<string, string>>(),
+  parsedData: jsonb('parsed_data').$type<Record<string, any>[]>(),
+  summary: jsonb('summary').$type<{
+    totalRows: number;
+    successCount: number;
+    errorCount: number;
+    warningCount: number;
+    errors: Array<{ row: number; message: string; }>;
+  }>(),
+}, (table) => ({
+  orgIdx: index('rate_comp_imports_org_idx').on(table.orgId),
+}));
+
+// RC Projects table for organizing rate comps (separate from sc_projects)
+export const rcProjects = pgTable('rc_projects', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+
+  // Project fields
+  name: text('name').notNull(),
+  description: text('description'),
+  color: varchar('color', { length: 7 }), // Hex color code like #FF0000
+  
+  // Project profile for matching
+  profile: jsonb('profile').$type<{
+    targetNOI?: number;
+    targetCapacity?: number;
+    targetPriceMin?: number;
+    targetPriceMax?: number;
+    states?: string[];
+    regions?: string[];
+    waterType?: 'Coastal' | 'Lake' | 'River';
+    coastalType?: 'Coastal' | 'Lake' | 'River'; // Legacy - use waterType
+    mustHaveProfitCenters?: string[];
+    niceToHaveProfitCenters?: string[];
+  }>().default({}),
+  
+  // User weight overrides for recommendation algorithm
+  weightOverrides: jsonb('weight_overrides').$type<{
+    capacity?: number;
+    financial?: number;
+    profitCenters?: number;
+    regional?: number;
+    geo?: number;
+  }>().default({}),
+}, (table) => ({
+  orgIdx: index('rc_projects_org_idx').on(table.orgId),
+  orgNameIdx: index('rc_projects_org_name_idx').on(table.orgId, table.name),
+}));
+
+// Project-Comps junction table (many-to-many)
+export const rcProjectComps = pgTable('rc_project_comps', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  rcProjectId: varchar('rc_project_id').notNull().references(() => rcProjects.id, { onDelete: 'cascade' }),
+  rateCompId: varchar('rate_comp_id').notNull().references(() => rateComps.id, { onDelete: 'cascade' }),
+  addedBy: varchar('added_by').notNull().references(() => users.id),
+  addedAt: timestamp('added_at').defaultNow(),
+  notes: text('notes'), // Optional notes specific to this comp in this project
+}, (table) => ({
+  orgIdx: index('rc_project_comps_org_idx').on(table.orgId),
+  projectIdx: index('rc_project_comps_project_idx').on(table.rcProjectId),
+  rateCompIdx: index('rc_project_comps_rate_comp_idx').on(table.rateCompId),
+  uniqueProjectComp: unique('rc_project_comps_unique_idx').on(table.orgId, table.rcProjectId, table.rateCompId),
+}));
+
+// Audit log for rate comps
+export const rcAuditLog = pgTable('rc_audit_log', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  entity: text('entity').notNull(), // 'rate_comp' | 'rate_comp_column' | 'rc_project' | 'rc_project_comp'
+  entityId: varchar('entity_id').notNull(),
+  action: text('action').notNull(), // 'create'|'update'|'delete'|'import'
+  before: jsonb('before'),
+  after: jsonb('after'),
+  at: timestamp('at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('rc_audit_log_org_idx').on(table.orgId),
+  entityIdx: index('rc_audit_log_entity_idx').on(table.entityId),
+}));
+
+// Recommendation feedback for learning system
+export const rcRecommendationFeedback = pgTable('rc_recommendation_feedback', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  rcProjectId: varchar('rc_project_id').notNull().references(() => rcProjects.id, { onDelete: 'cascade' }),
+  rateCompId: varchar('rate_comp_id').notNull().references(() => rateComps.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  action: text('action').notNull(), // 'selected'|'rejected'|'liked'|'viewed'
+  scoreAtTime: integer('score_at_time'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('rc_recommendation_feedback_org_idx').on(table.orgId),
+  projectIdx: index('rc_recommendation_feedback_project_idx').on(table.rcProjectId),
+}));
+
+// Org-specific learned preferences
+export const rcOrgPreferences = pgTable('rc_org_preferences', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  segmentKey: text('segment_key').notNull(), // e.g., 'coastal|cap:large' for categorizing preferences
+  weights: jsonb('weights').$type<{
+    capacity: number;
+    financial: number;
+    profitCenters: number;
+    regional: number;
+    geo: number;
+  }>().default({ capacity: 0.40, financial: 0.35, profitCenters: 0.15, regional: 0.07, geo: 0.03 }),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('rc_org_preferences_org_idx').on(table.orgId),
+  uniqueSegment: unique('rc_org_preferences_unique_idx').on(table.orgId, table.segmentKey),
+}));
+
+// Saved searches for quick access to frequently used filter combinations
+export const rcSavedSearches = pgTable('rc_saved_searches', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+
+  // Search configuration
+  name: text('name').notNull(),
+  description: text('description'),
+  filters: jsonb('filters').$type<Record<string, any>>().default({}),
+  
+  // Alert configuration
+  emailAlertsEnabled: boolean('email_alerts_enabled').default(false),
+  alertFrequency: text('alert_frequency'), // 'immediate'|'daily'|'weekly'
+  lastAlertSent: timestamp('last_alert_sent'),
+  
+  // Usage tracking
+  lastUsedAt: timestamp('last_used_at'),
+  useCount: integer('use_count').default(0),
+  
+  // Organization
+  isPinned: boolean('is_pinned').default(false),
+  color: varchar('color', { length: 7 }), // Hex color for visual organization
+}, (table) => ({
+  orgIdx: index('rc_saved_searches_org_idx').on(table.orgId),
+  orgCreatedByIdx: index('rc_saved_searches_org_created_by_idx').on(table.orgId, table.createdBy),
+  orgPinnedIdx: index('rc_saved_searches_org_pinned_idx').on(table.orgId, table.isPinned),
+}));
+
+// Portfolios - Grouping mechanism for bulk comp transactions
+export const rcPortfolios = pgTable('rc_portfolios', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+
+  // Portfolio fields
+  name: text('name').notNull(),
+  description: text('description'),
+  notes: text('notes'),
+}, (table) => ({
+  orgIdx: index('rc_portfolios_org_idx').on(table.orgId),
+  orgNameIdx: index('rc_portfolios_org_name_idx').on(table.orgId, table.name),
+}));
+
+// Portfolio-Comps junction table (many-to-many)
+export const rcPortfolioComps = pgTable('rc_portfolio_comps', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  portfolioId: varchar('portfolio_id').notNull().references(() => rcPortfolios.id, { onDelete: 'cascade' }),
+  rateCompId: varchar('rate_comp_id').notNull().references(() => rateComps.id, { onDelete: 'cascade' }),
+  addedBy: varchar('added_by').notNull().references(() => users.id),
+  addedAt: timestamp('added_at').defaultNow(),
+  orderIndex: integer('order_index').default(0), // For maintaining comp order within portfolio
+}, (table) => ({
+  orgIdx: index('rc_portfolio_comps_org_idx').on(table.orgId),
+  portfolioIdx: index('rc_portfolio_comps_portfolio_idx').on(table.portfolioId),
+  rateCompIdx: index('rc_portfolio_comps_rate_comp_idx').on(table.rateCompId),
+  uniquePortfolioComp: unique('rc_portfolio_comps_unique_idx').on(table.orgId, table.portfolioId, table.rateCompId),
+}));
+
+// Analytics/Metrics Tables for Rate Comps
+export const rcMetricSeries = pgTable('rc_metric_series', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  metricType: text('metric_type').notNull(), // 'price_per_slip', 'cap_rate', 'total_price', 'noi', etc.
+  aggregationType: text('aggregation_type').notNull(), // 'average', 'median', 'min', 'max', 'sum', 'count'
+  filters: jsonb('filters').$type<Record<string, any>>().default({}),
+  groupBy: text('group_by'), // 'state', 'year', 'water_type', 'price_range', etc.
+  
+  isActive: boolean('is_active').default(true),
+}, (table) => ({
+  orgIdx: index('rc_metric_series_org_idx').on(table.orgId),
+  orgMetricTypeIdx: index('rc_metric_series_org_metric_type_idx').on(table.orgId, table.metricType),
+}));
+
+export const rcMetricPoints = pgTable('rc_metric_points', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  seriesId: varchar('series_id').notNull().references(() => rcMetricSeries.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  
+  timestamp: timestamp('timestamp').notNull(),
+  value: decimal('value', { precision: 20, scale: 2 }).notNull(),
+  sampleSize: integer('sample_size').default(0),
+  metadata: jsonb('metadata').$type<Record<string, any>>().default({}),
+  groupValue: text('group_value'), // The value of the groupBy dimension (e.g., 'FL', '2023', etc.)
+}, (table) => ({
+  seriesIdx: index('rc_metric_points_series_idx').on(table.seriesId),
+  orgTimestampIdx: index('rc_metric_points_org_timestamp_idx').on(table.orgId, table.timestamp),
+  seriesTimestampIdx: index('rc_metric_points_series_timestamp_idx').on(table.seriesId, table.timestamp),
+}));
+
+export const rcMetricAlerts = pgTable('rc_metric_alerts', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  seriesId: varchar('series_id').notNull().references(() => rcMetricSeries.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  condition: jsonb('condition').$type<{
+    operator: 'gt' | 'lt' | 'gte' | 'lte' | 'eq' | 'between';
+    value: number;
+    value2?: number; // For 'between' operator
+  }>().notNull(),
+  isActive: boolean('is_active').default(true),
+  lastTriggeredAt: timestamp('last_triggered_at'),
+}, (table) => ({
+  orgIdx: index('rc_metric_alerts_org_idx').on(table.orgId),
+  seriesIdx: index('rc_metric_alerts_series_idx').on(table.seriesId),
+  activeIdx: index('rc_metric_alerts_active_idx').on(table.isActive),
+}));
+
+// Relations for Rate Comps
+export const rateCompsRelations = relations(rateComps, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [rateComps.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [rateComps.createdBy],
+    references: [users.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [rateComps.updatedBy],
+    references: [users.id],
+  }),
+  rcProjectComps: many(rcProjectComps),
+}));
+
+export const rateCompColumnsRelations = relations(rateCompColumns, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [rateCompColumns.orgId],
+    references: [organizations.id],
+  }),
+}));
+
+export const rateCompImportsRelations = relations(rateCompImports, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [rateCompImports.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [rateCompImports.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const rcProjectsRelations = relations(rcProjects, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [rcProjects.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [rcProjects.createdBy],
+    references: [users.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [rcProjects.updatedBy],
+    references: [users.id],
+  }),
+  rcProjectComps: many(rcProjectComps),
+}));
+
+export const rcProjectCompsRelations = relations(rcProjectComps, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [rcProjectComps.orgId],
+    references: [organizations.id],
+  }),
+  rcProject: one(rcProjects, {
+    fields: [rcProjectComps.rcProjectId],
+    references: [rcProjects.id],
+  }),
+  rateComp: one(rateComps, {
+    fields: [rcProjectComps.rateCompId],
+    references: [rateComps.id],
+  }),
+  addedByUser: one(users, {
+    fields: [rcProjectComps.addedBy],
+    references: [users.id],
+  }),
+}));
+
+export const rcRecommendationFeedbackRelations = relations(rcRecommendationFeedback, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [rcRecommendationFeedback.orgId],
+    references: [organizations.id],
+  }),
+  rcProject: one(rcProjects, {
+    fields: [rcRecommendationFeedback.rcProjectId],
+    references: [rcProjects.id],
+  }),
+  rateComp: one(rateComps, {
+    fields: [rcRecommendationFeedback.rateCompId],
+    references: [rateComps.id],
+  }),
+  user: one(users, {
+    fields: [rcRecommendationFeedback.userId],
+    references: [users.id],
+  }),
+}));
+
+export const rcOrgPreferencesRelations = relations(rcOrgPreferences, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [rcOrgPreferences.orgId],
+    references: [organizations.id],
+  }),
+}));
+
+export const rcPortfoliosRelations = relations(rcPortfolios, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [rcPortfolios.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [rcPortfolios.createdBy],
+    references: [users.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [rcPortfolios.updatedBy],
+    references: [users.id],
+  }),
+  rcPortfolioComps: many(rcPortfolioComps),
+}));
+
+export const rcPortfolioCompsRelations = relations(rcPortfolioComps, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [rcPortfolioComps.orgId],
+    references: [organizations.id],
+  }),
+  portfolio: one(rcPortfolios, {
+    fields: [rcPortfolioComps.portfolioId],
+    references: [rcPortfolios.id],
+  }),
+  rateComp: one(rateComps, {
+    fields: [rcPortfolioComps.rateCompId],
+    references: [rateComps.id],
+  }),
+  addedByUser: one(users, {
+    fields: [rcPortfolioComps.addedBy],
+    references: [users.id],
+  }),
+}));
+
+export const rcMetricSeriesRelations = relations(rcMetricSeries, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [rcMetricSeries.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [rcMetricSeries.createdBy],
+    references: [users.id],
+  }),
+  rcMetricPoints: many(rcMetricPoints),
+  rcMetricAlerts: many(rcMetricAlerts),
+}));
+
+export const rcMetricPointsRelations = relations(rcMetricPoints, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [rcMetricPoints.orgId],
+    references: [organizations.id],
+  }),
+  series: one(rcMetricSeries, {
+    fields: [rcMetricPoints.seriesId],
+    references: [rcMetricSeries.id],
+  }),
+}));
+
+export const rcMetricAlertsRelations = relations(rcMetricAlerts, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [rcMetricAlerts.orgId],
+    references: [organizations.id],
+  }),
+  series: one(rcMetricSeries, {
+    fields: [rcMetricAlerts.seriesId],
+    references: [rcMetricSeries.id],
+  }),
+  createdByUser: one(users, {
+    fields: [rcMetricAlerts.createdBy],
+    references: [users.id],
+  }),
+}));
+
+// Zod schemas for Rate Comps
+export const insertRateCompSchema = createInsertSchema(rateComps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateRateCompSchema = insertRateCompSchema.partial().omit({
+  orgId: true,
+  createdBy: true,
+});
+
+export const insertRateCompColumnSchema = createInsertSchema(rateCompColumns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateRateCompColumnSchema = insertRateCompColumnSchema.partial().omit({
+  orgId: true,
+});
+
+export const insertRateCompImportSchema = createInsertSchema(rateCompImports).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertRcProjectSchema = createInsertSchema(rcProjects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateRcProjectSchema = insertRcProjectSchema.partial().omit({
+  orgId: true,
+  createdBy: true,
+});
+
+export const insertRcProjectCompSchema = createInsertSchema(rcProjectComps).omit({
+  id: true,
+  addedAt: true,
+});
+
+export const updateRcProjectCompSchema = insertRcProjectCompSchema.partial().omit({
+  orgId: true,
+  rcProjectId: true,
+  rateCompId: true,
+  addedBy: true,
+});
+
+export const insertRcRecommendationFeedbackSchema = createInsertSchema(rcRecommendationFeedback).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertRcOrgPreferencesSchema = createInsertSchema(rcOrgPreferences).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const updateRcOrgPreferencesSchema = insertRcOrgPreferencesSchema.partial().omit({
+  orgId: true,
+});
+
+export const insertRcSavedSearchSchema = createInsertSchema(rcSavedSearches).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+});
+
+export const updateRcSavedSearchSchema = insertRcSavedSearchSchema.partial();
+
+export const insertRcPortfolioSchema = createInsertSchema(rcPortfolios).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+});
+
+export const updateRcPortfolioSchema = insertRcPortfolioSchema.partial();
+
+export const insertRcPortfolioCompSchema = createInsertSchema(rcPortfolioComps).omit({
+  id: true,
+  addedAt: true,
+});
+
+export const insertRcCustomStorageTypeSchema = createInsertSchema(rcCustomStorageTypes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertRcPendingPropertyProfileSchema = createInsertSchema(rcPendingPropertyProfiles).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertRcMetricSeriesSchema = createInsertSchema(rcMetricSeries).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateRcMetricSeriesSchema = insertRcMetricSeriesSchema.partial();
+
+export const insertRcMetricPointSchema = createInsertSchema(rcMetricPoints).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+});
+
+export const insertRcMetricAlertSchema = createInsertSchema(rcMetricAlerts).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateRcMetricAlertSchema = insertRcMetricAlertSchema.partial();
+
+// RC Project profile validation (reuse same schema as SC)
+export const rcProjectProfileSchema = scProjectProfileSchema;
+export const rcWeightOverridesSchema = scWeightOverridesSchema;
+
+// Types for Rate Comps
+export type RateComp = typeof rateComps.$inferSelect;
+export type InsertRateComp = z.infer<typeof insertRateCompSchema>;
+export type UpdateRateComp = z.infer<typeof updateRateCompSchema>;
+export type RateCompColumn = typeof rateCompColumns.$inferSelect;
+export type InsertRateCompColumn = z.infer<typeof insertRateCompColumnSchema>;
+export type UpdateRateCompColumn = z.infer<typeof updateRateCompColumnSchema>;
+export type RateCompImport = typeof rateCompImports.$inferSelect;
+export type InsertRateCompImport = z.infer<typeof insertRateCompImportSchema>;
+export type RcAuditLog = typeof rcAuditLog.$inferSelect;
+export type RcProject = typeof rcProjects.$inferSelect;
+export type InsertRcProject = z.infer<typeof insertRcProjectSchema>;
+export type UpdateRcProject = z.infer<typeof updateRcProjectSchema>;
+export type RcProjectComp = typeof rcProjectComps.$inferSelect;
+export type InsertRcProjectComp = z.infer<typeof insertRcProjectCompSchema>;
+export type UpdateRcProjectComp = z.infer<typeof updateRcProjectCompSchema>;
+export type RcRecommendationFeedback = typeof rcRecommendationFeedback.$inferSelect;
+export type InsertRcRecommendationFeedback = z.infer<typeof insertRcRecommendationFeedbackSchema>;
+export type RcOrgPreferences = typeof rcOrgPreferences.$inferSelect;
+export type InsertRcOrgPreferences = z.infer<typeof insertRcOrgPreferencesSchema>;
+export type UpdateRcOrgPreferences = z.infer<typeof updateRcOrgPreferencesSchema>;
+export type RcProjectProfile = z.infer<typeof rcProjectProfileSchema>;
+export type RcWeightOverrides = z.infer<typeof rcWeightOverridesSchema>;
+export type RcSavedSearch = typeof rcSavedSearches.$inferSelect;
+export type InsertRcSavedSearch = z.infer<typeof insertRcSavedSearchSchema>;
+export type UpdateRcSavedSearch = z.infer<typeof updateRcSavedSearchSchema>;
+export type RcPortfolio = typeof rcPortfolios.$inferSelect;
+export type InsertRcPortfolio = z.infer<typeof insertRcPortfolioSchema>;
+export type UpdateRcPortfolio = z.infer<typeof updateRcPortfolioSchema>;
+export type RcPortfolioComp = typeof rcPortfolioComps.$inferSelect;
+export type InsertRcPortfolioComp = z.infer<typeof insertRcPortfolioCompSchema>;
+export type RcCustomStorageType = typeof rcCustomStorageTypes.$inferSelect;
+export type InsertRcCustomStorageType = z.infer<typeof insertRcCustomStorageTypeSchema>;
+export type RcPendingPropertyProfile = typeof rcPendingPropertyProfiles.$inferSelect;
+export type InsertRcPendingPropertyProfile = z.infer<typeof insertRcPendingPropertyProfileSchema>;
+export type RcMetricSeries = typeof rcMetricSeries.$inferSelect;
+export type InsertRcMetricSeries = z.infer<typeof insertRcMetricSeriesSchema>;
+export type UpdateRcMetricSeries = z.infer<typeof updateRcMetricSeriesSchema>;
+export type RcMetricPoint = typeof rcMetricPoints.$inferSelect;
+export type InsertRcMetricPoint = z.infer<typeof insertRcMetricPointSchema>;
+export type RcMetricAlert = typeof rcMetricAlerts.$inferSelect;
+export type InsertRcMetricAlert = z.infer<typeof insertRcMetricAlertSchema>;
+export type UpdateRcMetricAlert = z.infer<typeof updateRcMetricAlertSchema>;
