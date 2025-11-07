@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { X, Save, Plus, Trash2 } from "lucide-react";
 import { salesCompsApi } from '@/lib/salescomps/api';
 import { queryKeys } from '@/lib/salescomps/queryKeys';
@@ -110,6 +111,15 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   const [showNewPortfolioDialog, setShowNewPortfolioDialog] = useState(false);
   const [newPortfolioName, setNewPortfolioName] = useState("");
   const [linkToPortfolio, setLinkToPortfolio] = useState(!!(comp?.parentPortfolioId));
+  
+  // Portfolio mode state
+  const [portfolioTabs, setPortfolioTabs] = useState<Array<{id: string, marinaName: string}>>([
+    { id: '1', marinaName: '' },
+    { id: '2', marinaName: '' },
+    { id: '3', marinaName: '' },
+  ]);
+  const [activePortfolioTab, setActivePortfolioTab] = useState('1');
+  const [portfolioName, setPortfolioName] = useState('');
   
   // Check if the existing comp has a legacy storage type value
   const hasLegacyStorageType = comp?.ioBoth && !STORAGE_TYPES.includes(comp.ioBoth as any);
@@ -392,6 +402,34 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     setArticleUrls(newUrls);
   };
 
+  // Portfolio tab management
+  const addMarinaTab = () => {
+    const nextId = (Math.max(...portfolioTabs.map(t => parseInt(t.id))) + 1).toString();
+    setPortfolioTabs([...portfolioTabs, { id: nextId, marinaName: '' }]);
+    setActivePortfolioTab(nextId);
+  };
+
+  const updateMarinaName = (tabId: string, name: string) => {
+    setPortfolioTabs(tabs => tabs.map(tab => 
+      tab.id === tabId ? { ...tab, marinaName: name } : tab
+    ));
+  };
+
+  const removeMarinaTab = (tabId: string) => {
+    if (portfolioTabs.length <= 1) {
+      toast({
+        title: "Cannot remove",
+        description: "Portfolio must have at least one marina",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPortfolioTabs(tabs => tabs.filter(t => t.id !== tabId));
+    if (activePortfolioTab === tabId) {
+      setActivePortfolioTab(portfolioTabs[0].id);
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -401,7 +439,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
         <CardHeader className="border-b border-border">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>{isEdit ? "Edit Comp" : "Create New Comp"}</CardTitle>
+              <CardTitle>
+                {isEdit ? "Edit Comp" : (isPortfolioMode ? "Create New Portfolio" : "Create New Comp")}
+              </CardTitle>
               {projectId && projectName && (
                 <p className="text-sm text-muted-foreground mt-1">
                   Editing in project: <span className="font-medium">{projectName}</span>
@@ -421,33 +461,123 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
 
         {/* Content */}
         <div className="p-6 max-h-[70vh] overflow-auto">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Left Column */}
-                <div className="space-y-6">
-                  {/* Identity Section */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Identity</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="marina"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Marina Name *</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="Enter marina name..."
-                                data-testid="input-marina"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+          {isPortfolioMode && !isEdit ? (
+            /* Portfolio Creation Mode with Tabs */
+            <div className="space-y-4">
+              {/* Portfolio Name */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Portfolio Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div>
+                    <Label htmlFor="portfolio-name">Portfolio Name *</Label>
+                    <Input
+                      id="portfolio-name"
+                      value={portfolioName}
+                      onChange={(e) => setPortfolioName(e.target.value)}
+                      placeholder="Enter portfolio name..."
+                      data-testid="input-portfolio-name"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Marina Tabs */}
+              <Tabs value={activePortfolioTab} onValueChange={setActivePortfolioTab}>
+                <div className="flex items-center justify-between mb-2">
+                  <TabsList>
+                    {portfolioTabs.map(tab => (
+                      <TabsTrigger key={tab.id} value={tab.id} data-testid={`tab-marina-${tab.id}`}>
+                        {tab.marinaName || `Marina ${tab.id}`}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addMarinaTab}
+                    data-testid="button-add-marina"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Marina
+                  </Button>
+                </div>
+
+                {portfolioTabs.map(tab => (
+                  <TabsContent key={tab.id} value={tab.id} className="mt-4">
+                    <Form {...form}>
+                      <form className="space-y-6">
+                        <div className="grid grid-cols-2 gap-6">
+                          {/* Left Column */}
+                          <div className="space-y-6">
+                            {/* Identity Section */}
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="text-lg">Identity</CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-4">
+                                <FormField
+                                  control={form.control}
+                                  name="marina"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Marina Name *</FormLabel>
+                                      <FormControl>
+                                        <Input 
+                                          {...field} 
+                                          onChange={(e) => {
+                                            field.onChange(e);
+                                            updateMarinaName(tab.id, e.target.value);
+                                          }}
+                                          placeholder="Enter marina name..."
+                                          data-testid={`input-marina-${tab.id}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </CardContent>
+                            </Card>
+                          </div>
+                        </div>
+                      </form>
+                    </Form>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </div>
+          ) : (
+            /* Regular Comp Creation/Edit Mode */
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Left Column */}
+                  <div className="space-y-6">
+                    {/* Identity Section */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Identity</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="marina"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Marina Name *</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  placeholder="Enter marina name..."
+                                  data-testid="input-marina"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                       />
                       
                       <div className="space-y-3">
@@ -1372,6 +1502,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
               </Card>
             </form>
           </Form>
+          )}
         </div>
 
         {/* Footer */}
