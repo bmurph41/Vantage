@@ -48,7 +48,13 @@ import SalesCompsBulkEdit from "@/pages/analysis/sales-comps/BulkEdit";
 import SalesCompsColumnManager from "@/pages/analysis/sales-comps/ColumnManager";
 import ScProjectsIndex from "@/pages/analysis/projects/Index";
 import ScProjectsReport from "@/pages/analysis/projects/Report";
+// Analysis / Rate Comps pages
 import RateCompsIndex from "@/pages/analysis/rate-comps/Index";
+import RateCompsDetail from "@/pages/analysis/rate-comps/Detail";
+import RateCompsUpload from "@/pages/analysis/rate-comps/Upload";
+import RateCompsCompare from "@/pages/analysis/rate-comps/Compare";
+import RateCompsBulkEdit from "@/pages/analysis/rate-comps/BulkEdit";
+import RateCompsColumnManager from "@/pages/analysis/rate-comps/ColumnManager";
 import DemographicsIndex from "@/pages/analysis/demographics/Index";
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
@@ -407,6 +413,41 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <RateCompsIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/rate-comps/upload">
+        {() => (
+          <UnifiedLayout>
+            <RateCompsUpload />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/rate-comps/columns">
+        {() => (
+          <UnifiedLayout>
+            <RateCompsColumnManager />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/rate-comps/bulk-edit">
+        {() => (
+          <UnifiedLayout>
+            <RateCompsBulkEdit />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/rate-comps/compare">
+        {() => (
+          <UnifiedLayout>
+            <RateCompsCompare />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/rate-comps/:id">
+        {(params) => (
+          <UnifiedLayout>
+            <RateCompsDetail {...params} />
           </UnifiedLayout>
         )}
       </Route>
