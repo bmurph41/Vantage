@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Filter, X, ChevronDown, ChevronRight } from "lucide-react";
 import type { FilterState } from '@/lib/salescomps/types';
-import { STORAGE_TYPES } from "@shared/salescomps-constants";
+import { STORAGE_TYPES, US_REGIONS } from "@shared/salescomps-constants";
 import debounce from "lodash.debounce";
 import throttle from "lodash.throttle";
 import SavedSearchesMenu from "./SavedSearchesMenu";
@@ -65,7 +65,7 @@ export default function FiltersPanel({
         break;
       case 'location':
         if (filters.state && filters.state !== 'none') count++;
-        if (filters.region) count++;
+        if (filters.regions && filters.regions.length > 0) count += filters.regions.length;
         break;
       case 'saleDetails':
         if (filters.saleYearMin) count++;
@@ -238,7 +238,7 @@ export default function FiltersPanel({
     onFiltersChange({
       q: "",
       state: "",
-      region: "",
+      regions: [],
       saleYearMin: "",
       saleYearMax: "",
       priceMin: "",
@@ -447,14 +447,28 @@ export default function FiltersPanel({
           </div>
           <div>
             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Region</Label>
-            <Input
-              type="text"
-              placeholder="Enter region..."
-              className="w-full h-10"
-              value={filters.region}
-              onChange={(e) => debouncedUpdateFilter('region', e.target.value)}
-              data-testid="input-region"
-            />
+            <div className="space-y-3">
+              {US_REGIONS.map((region) => (
+                <div key={region} className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
+                  <Checkbox
+                    id={`region-${region}`}
+                    checked={filters.regions?.includes(region) || false}
+                    onCheckedChange={(checked) => {
+                      const currentRegions = filters.regions || [];
+                      const newRegions = checked
+                        ? [...currentRegions, region]
+                        : currentRegions.filter(r => r !== region);
+                      updateFilter('regions', newRegions);
+                    }}
+                    data-testid={`checkbox-region-${region.toLowerCase().replace(/\s+/g, '-')}`}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor={`region-${region}`} className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
+                    {region}
+                  </Label>
+                </div>
+              ))}
+            </div>
           </div>
             </div>
           </CollapsibleContent>

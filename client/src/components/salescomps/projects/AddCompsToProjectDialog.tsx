@@ -37,7 +37,7 @@ interface AddCompsToProjectDialogProps {
 interface FilterState {
   q: string;
   state: string;
-  region: string;
+  regions: string[];
   saleYearMin: string;
   saleYearMax: string;
   priceMin: string;
@@ -70,7 +70,7 @@ export default function AddCompsToProjectDialog({
   const [filters, setFilters] = useState<FilterState>({
     q: "",
     state: "",
-    region: "",
+    regions: [],
     saleYearMin: "",
     saleYearMax: "",
     priceMin: "",
@@ -154,7 +154,7 @@ export default function AddCompsToProjectDialog({
     setFilters({
       q: "",
       state: "",
-      region: "",
+      regions: [],
       saleYearMin: "",
       saleYearMax: "",
       priceMin: "",
@@ -311,16 +311,7 @@ export default function AddCompsToProjectDialog({
                         data-testid="filter-state"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="region">Region</Label>
-                      <Input
-                        id="region"
-                        placeholder="e.g., Southeast"
-                        value={filters.region}
-                        onChange={(e) => setFilters(prev => ({ ...prev, region: e.target.value }))}
-                        data-testid="filter-region"
-                      />
-                    </div>
+                    {/* Region filter removed - use main filters panel for region filtering */}
                     <div className="space-y-2">
                       <Label htmlFor="saleYearMin">Sale Year (Min)</Label>
                       <Input

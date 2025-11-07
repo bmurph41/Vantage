@@ -1,7 +1,7 @@
 export interface FilterParams {
   q?: string;
   state?: string;
-  region?: string;
+  regions?: string[];
   saleYearMin?: number;
   saleYearMax?: number;
   priceMin?: number;
@@ -37,8 +37,8 @@ export class FilterBuilder {
     if (params.state) {
       filters.state = params.state;
     }
-    if (params.region) {
-      filters.region = params.region;
+    if (params.regions && params.regions.length > 0) {
+      filters.regions = params.regions;
     }
 
     // Year range

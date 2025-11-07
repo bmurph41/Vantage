@@ -37,6 +37,17 @@ export const STORAGE_TYPES = [
 ] as const;
 export type StorageType = typeof STORAGE_TYPES[number];
 
+// US Regions for geographic classification
+export const US_REGIONS = [
+  'Northeast',
+  'Southeast',
+  'Mid-Atlantic',
+  'Mid-West',
+  'Northwest',
+  'Southwest'
+] as const;
+export type USRegion = typeof US_REGIONS[number];
+
 // Default recommendation weights
 export const DEFAULT_RECOMMENDATION_WEIGHTS = {
   capacity: 0.40,

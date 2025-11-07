@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/salescomps/authUtils";
 import { z } from "zod";
 import type { SalesComp, InsertSalesComp, UpdateSalesComp } from "@shared/schema";
-import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES } from "@shared/salescomps-constants";
+import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES, US_REGIONS } from "@shared/salescomps-constants";
 import AddressAutocomplete from "@/components/salescomps/AddressAutocomplete";
 import { useCustomStorageTypes, useCreateCustomStorageType } from "@/hooks/salescomps/useCustomStorageTypes";
 
@@ -1273,6 +1273,32 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         <FormControl>
                           <Input {...field} placeholder="e.g., Gulf of America, Lake Superior" data-testid="input-water-body-name" />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="region"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Region</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-region">
+                              <SelectValue placeholder="Select region" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none-selected">Select region</SelectItem>
+                            {US_REGIONS.map((region) => (
+                              <SelectItem key={region} value={region}>
+                                {region}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}

@@ -1,7 +1,7 @@
 export interface FilterState {
   q: string;
   state: string;
-  region: string;
+  regions: string[];
   saleYearMin: string;
   saleYearMax: string;
   priceMin: string;
