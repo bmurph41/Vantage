@@ -323,10 +323,11 @@ export class CompService {
             updatedBy: userId,
             marina: transformedData.marina,
             salePrice: transformedData.salePrice || undefined,
-            isPriceDisclosed: transformedData.isPriceDisclosed !== false,
+            isPriceDisclosed: transformedData.isPriceDisclosed !== undefined ? transformedData.isPriceDisclosed : Boolean(transformedData.salePrice),
             capRate: transformedData.capRate || undefined,
+            isCapRateDisclosed: transformedData.isCapRateDisclosed !== undefined ? transformedData.isCapRateDisclosed : Boolean(transformedData.capRate),
             noi: transformedData.noi || undefined,
-            isNoiDisclosed: transformedData.isNoiDisclosed !== false,
+            isNoiDisclosed: transformedData.isNoiDisclosed !== undefined ? transformedData.isNoiDisclosed : Boolean(transformedData.noi),
             saleMonth: transformedData.saleMonth || undefined,
             saleYear: transformedData.saleYear || undefined,
             state: transformedData.state || undefined,
@@ -475,6 +476,8 @@ export class CompService {
         // Set disclosure flags
         if (targetField === 'salePrice') {
           transformed.isPriceDisclosed = undisclosedResult.isDisclosed;
+        } else if (targetField === 'capRate') {
+          transformed.isCapRateDisclosed = undisclosedResult.isDisclosed;
         } else if (targetField === 'noi') {
           transformed.isNoiDisclosed = undisclosedResult.isDisclosed;
         }
