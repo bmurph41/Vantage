@@ -29,7 +29,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import BulkEdit from "@/pages/analysis/sales-comps/BulkEdit";
 import ProjectAssignmentDialog from "@/components/salescomps/projects/ProjectAssignmentDialog";
 import CreateEditCompDialog from "./CreateEditCompDialog";
-import ColumnFilter from "./ColumnFilter";
 import SelectMarinaDialog from "./SelectMarinaDialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1110,16 +1109,6 @@ export default function CompsDataGrid({
                           <span className="font-semibold text-gray-700 truncate">{column.label}</span>
                         )}
                       </div>
-                      {column.key !== 'expand' && (
-                        <div className="flex-shrink-0 ml-2">
-                          <ColumnFilter
-                            column={column.key}
-                            uniqueValues={columnUniqueValues[column.key] || []}
-                            selectedValues={columnFilters[column.key] || []}
-                            onFilterChange={onColumnFilterChange}
-                          />
-                        </div>
-                      )}
                     </div>
                     
                     {/* Drop indicator for column reordering */}
