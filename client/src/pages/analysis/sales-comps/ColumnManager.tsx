@@ -1,9 +1,3 @@
-// TODO: Missing SalesComps-specific utilities:
-// - @/lib/api (columnsApi)
-// - @/lib/queryKeys
-// - @/lib/authUtils
-// - @shared/schema types (CompColumn, InsertCompColumn, UpdateCompColumn)
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,12 +7,42 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, Save, X, GripVertical } from "lucide-react";
+import { Plus, Edit, Trash2, Save, X, GripVertical, Check, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ColumnManagerProps {
   onClose: () => void;
 }
+
+// Default sales comp columns from the data grid
+const defaultSalesCompColumns = [
+  { key: 'expand', label: 'Expand', type: 'action', sortable: false, editable: false },
+  { key: 'marina', label: 'Marina', type: 'text', sortable: true, editable: true },
+  { key: 'state', label: 'State', type: 'text', sortable: true, editable: true },
+  { key: 'saleYear', label: 'Year', type: 'number', sortable: true, editable: true },
+  { key: 'salePrice', label: 'Sale Price', type: 'currency', sortable: true, editable: true },
+  { key: 'capRate', label: 'Cap Rate', type: 'percent', sortable: true, editable: true },
+  { key: 'noi', label: 'NOI', type: 'currency', sortable: true, editable: true },
+  { key: 'wetSlips', label: 'Wet Slips', type: 'number', sortable: true, editable: true },
+  { key: 'dryRacks', label: 'Dry Racks', type: 'number', sortable: true, editable: true },
+  { key: 'occupancy', label: 'Occupancy', type: 'percent', sortable: true, editable: true },
+  { key: 'market', label: 'Market', type: 'text', sortable: true, editable: true },
+  { key: 'profitCenterStorage', label: 'Storage', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterEvents', label: 'Events', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterService', label: 'Service', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterThirdPartyLeases', label: 'Third-Party Leases', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterBoatRentals', label: 'Boat Rentals', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterBoatBrokerage', label: 'Boat Brokerage', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterRvPark', label: 'RV Park', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterFuel', label: 'Fuel', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterShipStore', label: 'Ship Store', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterParts', label: 'Parts', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterBoatClub', label: 'Boat Club', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterBoatSales', label: 'Boat Sales', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterFnb', label: 'F&B', type: 'boolean', sortable: false, editable: true },
+  { key: 'profitCenterHospitality', label: 'Hospitality/Accommodations', type: 'boolean', sortable: false, editable: true },
+  { key: 'actions', label: 'Actions', type: 'action', sortable: false, editable: false },
+];
 
 export default function ColumnManager({ onClose }: ColumnManagerProps) {
   const { toast } = useToast();
@@ -35,9 +59,12 @@ export default function ColumnManager({ onClose }: ColumnManagerProps) {
     orderIndex: 0,
   });
 
-  // TODO: Fetch columns when API is available
-  const columns: any[] = [];
+  // Use default columns from the data grid
+  const columns = defaultSalesCompColumns;
   const isLoading = false;
+  
+  // Custom columns (for future implementation)
+  const customColumns: any[] = [];
 
   const resetForm = () => {
     setFormData({
@@ -207,12 +234,45 @@ export default function ColumnManager({ onClose }: ColumnManagerProps) {
             </Card>
           )}
 
-          {/* Columns List */}
+          {/* Existing Standard Columns */}
           <div className="space-y-3">
             <h3 className="font-semibold text-foreground">Existing Columns</h3>
-            {columns && columns.length > 0 ? (
+            <div className="space-y-2">
+              {columns.map((column: any) => (
+                <Card key={column.key} className="border bg-gray-50/50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{column.label}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {column.type}
+                            </Badge>
+                            {column.sortable && (
+                              <Badge variant="secondary" className="text-xs">
+                                Sortable
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Key: <code className="bg-gray-200 px-1 rounded">{column.key}</code>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom Columns Section */}
+          <div className="space-y-3 mt-6">
+            <h3 className="font-semibold text-foreground">Custom Columns</h3>
+            {customColumns && customColumns.length > 0 ? (
               <div className="space-y-2">
-                {columns.map((column: any) => (
+                {customColumns.map((column: any) => (
                   <Card key={column.id} className="border">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
@@ -272,7 +332,7 @@ export default function ColumnManager({ onClose }: ColumnManagerProps) {
         <div className="px-6 py-4 border-t border-border">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              {columns?.length || 0} custom column{columns?.length !== 1 ? 's' : ''}
+              {columns?.length || 0} standard column{columns?.length !== 1 ? 's' : ''} • {customColumns?.length || 0} custom column{customColumns?.length !== 1 ? 's' : ''}
             </p>
             <Button onClick={onClose} data-testid="button-done">
               Done
