@@ -8,8 +8,8 @@ import {
   crmImportJobs, crmImportedRecords, crmProspectingEntries,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
-  salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes, scPortfolios, scPortfolioComps,
-  rateComps, rateCompColumns, rateCompImports, rcProjects, rcProjectComps, rcAuditLog, rcRecommendationFeedback, rcOrgPreferences, rcSavedSearches, rcCustomStorageTypes, rcPortfolios, rcPortfolioComps, rcPendingPropertyProfiles,
+  salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes, scPortfolios, scPortfolioComps, scPendingPropertyProfiles, scMetricSeries, scMetricPoints, scMetricAlerts,
+  rateComps, rateCompColumns, rateCompImports, rcProjects, rcProjectComps, rcAuditLog, rcRecommendationFeedback, rcOrgPreferences, rcSavedSearches, rcCustomStorageTypes, rcPortfolios, rcPortfolioComps, rcPendingPropertyProfiles, rcMetricSeries, rcMetricPoints, rcMetricAlerts,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
@@ -19,8 +19,8 @@ import {
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
-  type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScCustomStorageType,
-  type RateComp, type RateCompColumn, type RateCompImport, type RcProject, type RcProjectComp, type RcAuditLog, type RcRecommendationFeedback, type RcOrgPreferences, type RcSavedSearch, type RcCustomStorageType, type RcPendingPropertyProfile,
+  type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScCustomStorageType, type ScPendingPropertyProfile, type ScMetricSeries, type ScMetricPoint, type ScMetricAlert,
+  type RateComp, type RateCompColumn, type RateCompImport, type RcProject, type RcProjectComp, type RcAuditLog, type RcRecommendationFeedback, type RcOrgPreferences, type RcSavedSearch, type RcCustomStorageType, type RcPendingPropertyProfile, type RcMetricSeries, type RcMetricPoint, type RcMetricAlert,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
@@ -34,11 +34,13 @@ import {
   type InsertSalesComp, type UpdateSalesComp, type InsertCompColumn, type UpdateCompColumn, type InsertCompImport,
   type InsertScProject, type UpdateScProject, type InsertScProjectComp, type UpdateScProjectComp,
   type InsertScRecommendationFeedback, type InsertScOrgPreferences, type UpdateScOrgPreferences,
-  type InsertScSavedSearch, type UpdateScSavedSearch, type InsertScCustomStorageType,
+  type InsertScSavedSearch, type UpdateScSavedSearch, type InsertScCustomStorageType, type InsertScPendingPropertyProfile,
+  type InsertScMetricSeries, type UpdateScMetricSeries, type InsertScMetricPoint, type InsertScMetricAlert, type UpdateScMetricAlert,
   type InsertRateComp, type UpdateRateComp, type InsertRateCompColumn, type UpdateRateCompColumn, type InsertRateCompImport,
   type InsertRcProject, type UpdateRcProject, type InsertRcProjectComp, type UpdateRcProjectComp,
   type InsertRcRecommendationFeedback, type InsertRcOrgPreferences, type UpdateRcOrgPreferences,
-  type InsertRcSavedSearch, type UpdateRcSavedSearch, type InsertRcCustomStorageType, type InsertRcPendingPropertyProfile
+  type InsertRcSavedSearch, type UpdateRcSavedSearch, type InsertRcCustomStorageType, type InsertRcPendingPropertyProfile,
+  type InsertRcMetricSeries, type UpdateRcMetricSeries, type InsertRcMetricPoint, type InsertRcMetricAlert, type UpdateRcMetricAlert
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, isNull, or, count } from "drizzle-orm";
