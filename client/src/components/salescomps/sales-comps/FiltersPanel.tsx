@@ -35,6 +35,9 @@ export default function FiltersPanel({
     capRateMax: ""
   });
   
+  const [isMarketBid, setIsMarketBid] = useState(false);
+  const [previousPriceMin, setPreviousPriceMin] = useState("");
+  
   // Fetch custom storage types
   const { data: customStorageTypes = [] } = useCustomStorageTypes();
   const allStorageTypes = [...STORAGE_TYPES, ...customStorageTypes.map(t => t.name)];
@@ -125,6 +128,37 @@ export default function FiltersPanel({
       capRateMax: filters.capRateMax ? `${parseFloat(filters.capRateMax).toFixed(2)}%` : ""
     });
   }, [filters.capRateMin, filters.capRateMax]);
+  
+  // Sync Market Bid checkbox with priceMin filter
+  useEffect(() => {
+    if (filters.priceMin === "Market") {
+      setIsMarketBid(true);
+    } else {
+      setIsMarketBid(false);
+      // If priceMin changed externally (e.g., from saved search), reset previousPriceMin
+      // so we don't restore stale data
+      if (filters.priceMin !== "" && filters.priceMin !== "Market") {
+        setPreviousPriceMin("");
+      }
+    }
+  }, [filters.priceMin]);
+  
+  // Handle Market Bid checkbox change
+  const handleMarketBidChange = (checked: boolean) => {
+    setIsMarketBid(checked);
+    if (checked) {
+      // Save current value before setting to "Market" (only if it's not "Market")
+      if (filters.priceMin !== "Market") {
+        setPreviousPriceMin(filters.priceMin);
+      }
+      updateFilter('priceMin', 'Market');
+    } else {
+      // Restore previous value when unchecking, or clear if no previous value
+      updateFilter('priceMin', previousPriceMin || '');
+      // Clear the saved value after restoring
+      setPreviousPriceMin("");
+    }
+  };
 
   // Sanitize input value - remove everything except numbers, dots, and single %
   const sanitizeCapRateInput = (value: string): string => {
@@ -429,7 +463,21 @@ export default function FiltersPanel({
             </div>
           </div>
           <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Sale Price</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Price</Label>
+              <div className="flex items-center gap-2 p-1.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
+                <Checkbox
+                  id="market-bid"
+                  checked={isMarketBid}
+                  onCheckedChange={handleMarketBidChange}
+                  data-testid="checkbox-market-bid"
+                  className="h-3.5 w-3.5"
+                />
+                <Label htmlFor="market-bid" className="text-xs text-foreground font-medium cursor-pointer leading-none">
+                  Market Bid
+                </Label>
+              </div>
+            </div>
             <div className="flex items-center gap-2.5">
               <Input
                 type="text"
@@ -438,6 +486,7 @@ export default function FiltersPanel({
                 value={filters.priceMin}
                 onChange={(e) => debouncedUpdateFilter('priceMin', e.target.value)}
                 data-testid="input-price-min"
+                disabled={isMarketBid}
               />
               <span className="text-muted-foreground text-sm font-medium">to</span>
               <Input
