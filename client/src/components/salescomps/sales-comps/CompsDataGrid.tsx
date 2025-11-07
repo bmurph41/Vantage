@@ -1054,7 +1054,7 @@ export default function CompsDataGrid({
           tabIndex={0}
         >
             <Table className="min-w-full w-full" style={{ minWidth: '1500px' }} data-testid="data-table">
-            <TableHeader className="sticky top-0 bg-muted/90 backdrop-blur-sm z-10 border-b border-border">
+            <TableHeader className="sticky top-0 bg-card backdrop-blur-sm z-20 border-b border-border shadow-sm">
               <TableRow>
                 <TableHead className="data-table-header w-8">
                   <Checkbox
