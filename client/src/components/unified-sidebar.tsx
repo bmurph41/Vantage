@@ -68,7 +68,7 @@ type PendingProperty = {
 
 export default function UnifiedSidebar() {
   const [location] = useLocation();
-  const [crmExpanded, setCrmExpanded] = useState(true);
+  const [crmExpanded, setCrmExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [ddExpanded, setDdExpanded] = useState(false);
   const [modelingExpanded, setModelingExpanded] = useState(false);
