@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2, PanelLeftClose, PanelLeft } from "lucide-react";
 import { Link } from "wouter";
+import debounce from "lodash.debounce";
 import { salesCompsApi } from "@/lib/salescomps/api";
 import { queryKeys } from "@/lib/salescomps/queryKeys";
 import { useToast } from "@/hooks/use-toast";
@@ -67,7 +68,8 @@ export default function SalesCompsIndex() {
     queries: filterableColumns.map(column => ({
       queryKey: ['column-values', column],
       queryFn: () => salesCompsApi.getColumnUniqueValues(column),
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 10 * 60 * 1000, // 10 minutes - these values don't change often
+      gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
     }))
   });
 
@@ -94,9 +96,27 @@ export default function SalesCompsIndex() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editData, setEditData] = useState<any[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
-  const queryParams = {
-    q: searchQuery,
+  // Debounce search query updates
+  const debouncedSetSearch = useMemo(
+    () => debounce((value: string) => {
+      setDebouncedSearchQuery(value);
+    }, 300),
+    []
+  );
+
+  useEffect(() => {
+    debouncedSetSearch(searchQuery);
+    return () => {
+      debouncedSetSearch.cancel();
+    };
+  }, [searchQuery, debouncedSetSearch]);
+
+  const queryParams = useMemo(() => ({
+    q: debouncedSearchQuery,
     ...Object.fromEntries(
       Object.entries(filters).filter(([_, value]) => 
         value !== "" && value !== false && value !== null && value !== undefined
@@ -104,13 +124,16 @@ export default function SalesCompsIndex() {
     ),
     sortBy,
     sortDir,
-  };
+    page,
+    pageSize,
+  }), [debouncedSearchQuery, filters, sortBy, sortDir, page, pageSize]);
 
-  // Load all data at once
+  // Load paginated data
   const { data: compsData, isLoading: compsLoading, error } = useQuery({
     queryKey: queryKeys.comps.list(queryParams),
-    queryFn: () => salesCompsApi.getComps({ ...queryParams, pageSize: 10000 }), // Load all data
+    queryFn: () => salesCompsApi.getComps(queryParams),
     retry: false,
+    keepPreviousData: true, // Keep showing old data while new data loads
   });
 
   const data = compsData?.comps || [];
@@ -144,10 +167,12 @@ export default function SalesCompsIndex() {
 
   const handleSearch = (value: string) => {
     setSearchQuery(value);
+    setPage(1); // Reset to first page on search
   };
 
   const handleFilterChange = (newFilters: FilterState) => {
     setFilters(newFilters);
+    setPage(1); // Reset to first page on filter change
     // Clear active saved search when filters are manually changed
     if (activeSavedSearchId) {
       setActiveSavedSearchId(null);
@@ -612,34 +637,72 @@ export default function SalesCompsIndex() {
           </div>
 
           {/* Tab Content */}
-          <TabsContent value="data" className="flex-1 min-h-0 overflow-hidden m-0" data-testid="tab-content-data">
+          <TabsContent value="data" className="flex-1 min-h-0 overflow-hidden m-0 flex flex-col" data-testid="tab-content-data">
             {/* Data Grid */}
-            <CompsDataGrid
-              data={isEditMode ? editData : data}
-              loading={compsLoading}
-              sortBy={sortBy}
-              sortDir={sortDir}
-              onSort={handleSort}
-              selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
-              total={total}
-              canDelete={canDelete}
-              canAddToProject={canAddToProject}
-              columnFilters={filters.columnFilters}
-              onColumnFilterChange={(column, excludedValues) => {
-                setFilters(prev => ({
-                  ...prev,
-                  columnFilters: {
-                    ...prev.columnFilters,
-                    [column]: excludedValues
-                  }
-                }));
-              }}
-              columnUniqueValues={columnUniqueValues}
-              isEditMode={isEditMode}
-              onCellChange={handleCellChange}
-              onCompUpdate={handleCompUpdate}
-            />
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <CompsDataGrid
+                data={isEditMode ? editData : data}
+                loading={compsLoading}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={handleSort}
+                selectedIds={selectedIds}
+                onSelectionChange={setSelectedIds}
+                total={total}
+                canDelete={canDelete}
+                canAddToProject={canAddToProject}
+                columnFilters={filters.columnFilters}
+                onColumnFilterChange={(column, excludedValues) => {
+                  setFilters(prev => ({
+                    ...prev,
+                    columnFilters: {
+                      ...prev.columnFilters,
+                      [column]: excludedValues
+                    }
+                  }));
+                }}
+                columnUniqueValues={columnUniqueValues}
+                isEditMode={isEditMode}
+                onCellChange={handleCellChange}
+                onCompUpdate={handleCompUpdate}
+              />
+            </div>
+            
+            {/* Pagination Controls */}
+            {!isEditMode && total > 0 && (
+              <div className="border-t border-border bg-background px-6 py-3 flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>
+                    Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, total)} of {total} comps
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1 || compsLoading}
+                    data-testid="button-prev-page"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+                  <div className="text-sm text-muted-foreground">
+                    Page {page} of {Math.ceil(total / pageSize)}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={page >= Math.ceil(total / pageSize) || compsLoading}
+                    data-testid="button-next-page"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="metrics" className="flex-1 overflow-auto m-0" data-testid="tab-content-metrics">

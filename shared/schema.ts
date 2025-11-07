@@ -3117,6 +3117,8 @@ export const salesComps = pgTable('sales_comps', {
   orgYearIdx: index('sales_comps_org_year_idx').on(table.orgId, table.saleYear),
   orgPriceIdx: index('sales_comps_org_price_idx').on(table.orgId, table.salePrice),
   orgCoastalIdx: index('sales_comps_org_coastal_idx').on(table.orgId, table.coastalType),
+  orgMarinaIdx: index('sales_comps_org_marina_idx').on(table.orgId, table.marina),
+  orgRegionIdx: index('sales_comps_org_region_idx').on(table.orgId, table.region),
 }));
 
 // Custom storage types table - per-organization customizable storage types
