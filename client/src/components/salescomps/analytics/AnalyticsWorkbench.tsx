@@ -207,15 +207,10 @@ export default function AnalyticsWorkbench() {
                   </p>
                 </Card>
               ) : (
-                <div className="space-y-2">
-                  {metrics.trends && (
-                    <TimeSeriesView
-                      priceOverTime={metrics.trends.priceOverTime}
-                      capRateOverTime={metrics.trends.capRateOverTime}
-                      isLoading={isLoading}
-                    />
-                  )}
-                </div>
+                <Card className="p-4 text-center border-dashed">
+                  <BarChart3 className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                  <p className="text-xs text-muted-foreground">Use the tabs above to view detailed analysis</p>
+                </Card>
               )}
             </TabsContent>
 
