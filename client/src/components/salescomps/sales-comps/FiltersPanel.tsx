@@ -234,48 +234,65 @@ export default function FiltersPanel({
   });
 
   return (
-    <div className="flex-1 overflow-y-auto pt-6">
+    <div className="flex-1 overflow-y-auto pt-6 px-1">
       {/* Quick Filters */}
       <Collapsible open={openSections.quick} onOpenChange={() => toggleSection('quick')}>
-        <div className="filter-section">
-          <CollapsibleTrigger className="w-full">
-            <h3 className="font-medium text-foreground mb-2 flex items-center justify-between gap-2 text-sm hover:text-primary transition-colors">
-              <span className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                Quick Filters
+        <div className="mb-5">
+          <CollapsibleTrigger className="w-full group">
+            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-all cursor-pointer">
+              <div className="flex items-center gap-2.5">
+                <Filter className="h-4 w-4 text-primary" />
+                <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                  Quick Filters
+                </h3>
                 {getActiveFilterCount('quick') > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-medium rounded-full bg-primary/10 text-primary">
+                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10px] font-semibold rounded-full bg-primary text-primary-foreground">
                     {getActiveFilterCount('quick')}
                   </span>
                 )}
-              </span>
-              {openSections.quick ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </h3>
+              </div>
+              {openSections.quick ? 
+                <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /> : 
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              }
+            </div>
           </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="space-y-2">
-              <div className="flex items-center gap-1.5">
+          <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+            <div className="mt-3 px-3 space-y-3.5">
+              <div className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
                 <Checkbox
                   id="disclosed-only"
                   checked={filters.disclosedOnly}
                   onCheckedChange={(checked) => updateFilter('disclosedOnly', checked)}
                   data-testid="checkbox-disclosed-only"
-                  className="h-3.5 w-3.5"
+                  className="h-4 w-4"
                 />
-                <Label htmlFor="disclosed-only" className="text-xs text-foreground leading-none">
+                <Label htmlFor="disclosed-only" className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
                   Disclosed Prices Only
                 </Label>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
                 <Checkbox
                   id="disclosed-cap-rate-only"
                   checked={filters.disclosedCapRateOnly}
                   onCheckedChange={(checked) => updateFilter('disclosedCapRateOnly', checked)}
                   data-testid="checkbox-disclosed-cap-rate-only"
-                  className="h-3.5 w-3.5"
+                  className="h-4 w-4"
                 />
-                <Label htmlFor="disclosed-cap-rate-only" className="text-xs text-foreground leading-none">
+                <Label htmlFor="disclosed-cap-rate-only" className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
                   Disclosed Cap Rates Only
+                </Label>
+              </div>
+              <div className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
+                <Checkbox
+                  id="has-article"
+                  checked={filters.hasArticle}
+                  onCheckedChange={(checked) => updateFilter('hasArticle', checked)}
+                  data-testid="checkbox-has-article"
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="has-article" className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
+                  Has Article
                 </Label>
               </div>
             </div>
@@ -285,29 +302,34 @@ export default function FiltersPanel({
 
       {/* Location */}
       <Collapsible open={openSections.location} onOpenChange={() => toggleSection('location')}>
-        <div className="filter-section">
-          <CollapsibleTrigger className="w-full">
-            <h3 className="font-medium text-foreground mb-2 flex items-center justify-between gap-2 text-sm hover:text-primary transition-colors">
-              <span className="flex items-center gap-2">
-                Location
+        <div className="mb-5">
+          <CollapsibleTrigger className="w-full group">
+            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-all cursor-pointer">
+              <div className="flex items-center gap-2.5">
+                <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                  Location
+                </h3>
                 {getActiveFilterCount('location') > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-medium rounded-full bg-primary/10 text-primary">
+                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10px] font-semibold rounded-full bg-primary text-primary-foreground">
                     {getActiveFilterCount('location')}
                   </span>
                 )}
-              </span>
-              {openSections.location ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </h3>
+              </div>
+              {openSections.location ? 
+                <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /> : 
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              }
+            </div>
           </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="space-y-3">
+          <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+            <div className="mt-3 px-3 space-y-4">
           <div>
-            <Label className="text-sm text-muted-foreground">State/Country</Label>
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">State/Country</Label>
             <Select
               value={filters.state}
               onValueChange={(value) => updateFilter('state', value)}
             >
-              <SelectTrigger className="w-full mt-1" data-testid="select-state">
+              <SelectTrigger className="w-full h-10 bg-background" data-testid="select-state">
                 <SelectValue placeholder="All States/Countries" />
               </SelectTrigger>
               <SelectContent>
@@ -346,11 +368,11 @@ export default function FiltersPanel({
             </Select>
           </div>
           <div>
-            <Label className="text-sm text-muted-foreground">Region</Label>
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Region</Label>
             <Input
               type="text"
               placeholder="Enter region..."
-              className="w-full mt-1"
+              className="w-full h-10"
               value={filters.region}
               onChange={(e) => debouncedUpdateFilter('region', e.target.value)}
               data-testid="input-region"
@@ -363,38 +385,43 @@ export default function FiltersPanel({
 
       {/* Sale Details */}
       <Collapsible open={openSections.saleDetails} onOpenChange={() => toggleSection('saleDetails')}>
-        <div className="filter-section">
-          <CollapsibleTrigger className="w-full">
-            <h3 className="font-medium text-foreground mb-2 flex items-center justify-between gap-2 text-sm hover:text-primary transition-colors">
-              <span className="flex items-center gap-2">
-                Sale Details
+        <div className="mb-5">
+          <CollapsibleTrigger className="w-full group">
+            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-all cursor-pointer">
+              <div className="flex items-center gap-2.5">
+                <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                  Sale Details
+                </h3>
                 {getActiveFilterCount('saleDetails') > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-medium rounded-full bg-primary/10 text-primary">
+                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10px] font-semibold rounded-full bg-primary text-primary-foreground">
                     {getActiveFilterCount('saleDetails')}
                   </span>
                 )}
-              </span>
-              {openSections.saleDetails ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </h3>
+              </div>
+              {openSections.saleDetails ? 
+                <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /> : 
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              }
+            </div>
           </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="space-y-4">
+          <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+            <div className="mt-3 px-3 space-y-5">
           <div>
-            <Label className="text-sm text-muted-foreground">Sale Year</Label>
-            <div className="flex items-center gap-2 mt-2">
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Sale Year</Label>
+            <div className="flex items-center gap-2.5">
               <Input
                 type="number"
                 placeholder="2020"
-                className="flex-1"
+                className="flex-1 h-10"
                 value={filters.saleYearMin}
                 onChange={(e) => throttledUpdateFilter('saleYearMin', e.target.value)}
                 data-testid="input-sale-year-min"
               />
-              <span className="text-muted-foreground text-sm">to</span>
+              <span className="text-muted-foreground text-sm font-medium">to</span>
               <Input
                 type="number"
                 placeholder="2024"
-                className="flex-1"
+                className="flex-1 h-10"
                 value={filters.saleYearMax}
                 onChange={(e) => throttledUpdateFilter('saleYearMax', e.target.value)}
                 data-testid="input-sale-year-max"
@@ -402,21 +429,21 @@ export default function FiltersPanel({
             </div>
           </div>
           <div>
-            <Label className="text-sm text-muted-foreground">Sale Price</Label>
-            <div className="flex items-center gap-2 mt-2">
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Sale Price</Label>
+            <div className="flex items-center gap-2.5">
               <Input
                 type="text"
                 placeholder="$0"
-                className="flex-1"
+                className="flex-1 h-10"
                 value={filters.priceMin}
                 onChange={(e) => debouncedUpdateFilter('priceMin', e.target.value)}
                 data-testid="input-price-min"
               />
-              <span className="text-muted-foreground text-sm">to</span>
+              <span className="text-muted-foreground text-sm font-medium">to</span>
               <Input
                 type="text"
                 placeholder="$50M"
-                className="flex-1"
+                className="flex-1 h-10"
                 value={filters.priceMax}
                 onChange={(e) => debouncedUpdateFilter('priceMax', e.target.value)}
                 data-testid="input-price-max"
@@ -424,23 +451,23 @@ export default function FiltersPanel({
             </div>
           </div>
           <div>
-            <Label className="text-sm text-muted-foreground">Cap Rate (%)</Label>
-            <div className="flex items-center gap-2 mt-2">
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Cap Rate (%)</Label>
+            <div className="flex items-center gap-2.5">
               <Input
                 type="text"
                 placeholder="0.00%"
-                className="flex-1"
+                className="flex-1 h-10"
                 value={capRateInputs.capRateMin}
                 onFocus={() => handleCapRateFocus('capRateMin')}
                 onChange={(e) => handleCapRateChange('capRateMin', e.target.value)}
                 onBlur={() => handleCapRateBlur('capRateMin')}
                 data-testid="input-cap-rate-min"
               />
-              <span className="text-muted-foreground text-sm">to</span>
+              <span className="text-muted-foreground text-sm font-medium">to</span>
               <Input
                 type="text"
                 placeholder="15.00%"
-                className="flex-1"
+                className="flex-1 h-10"
                 value={capRateInputs.capRateMax}
                 onFocus={() => handleCapRateFocus('capRateMax')}
                 onChange={(e) => handleCapRateChange('capRateMax', e.target.value)}
@@ -456,51 +483,100 @@ export default function FiltersPanel({
 
       {/* Marina Features */}
       <Collapsible open={openSections.marinaFeatures} onOpenChange={() => toggleSection('marinaFeatures')}>
-        <div className="filter-section">
-          <CollapsibleTrigger className="w-full">
-            <h3 className="font-medium text-foreground mb-2 flex items-center justify-between gap-2 text-sm hover:text-primary transition-colors">
-              <span className="flex items-center gap-2">
-                Marina Features
+        <div className="mb-5">
+          <CollapsibleTrigger className="w-full group">
+            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-all cursor-pointer">
+              <div className="flex items-center gap-2.5">
+                <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                  Marina Features
+                </h3>
                 {getActiveFilterCount('marinaFeatures') > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-medium rounded-full bg-primary/10 text-primary">
+                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10px] font-semibold rounded-full bg-primary text-primary-foreground">
                     {getActiveFilterCount('marinaFeatures')}
                   </span>
                 )}
-              </span>
-              {openSections.marinaFeatures ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </h3>
+              </div>
+              {openSections.marinaFeatures ? 
+                <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /> : 
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              }
+            </div>
           </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="space-y-3">
+          <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+            <div className="mt-3 px-3 space-y-4">
           <div>
-            <Label className="text-sm text-muted-foreground">Wet Slips</Label>
-            <Input
-              type="number"
-              placeholder="Min slips..."
-              className="w-full mt-1"
-              value={filters.wetSlipsMin}
-              onChange={(e) => throttledUpdateFilter('wetSlipsMin', e.target.value)}
-              data-testid="input-wet-slips-min"
-            />
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Wet Slips</Label>
+            <div className="flex items-center gap-2.5">
+              <Input
+                type="number"
+                placeholder="Min"
+                className="flex-1 h-10"
+                value={filters.wetSlipsMin}
+                onChange={(e) => throttledUpdateFilter('wetSlipsMin', e.target.value)}
+                data-testid="input-wet-slips-min"
+              />
+              <span className="text-muted-foreground text-sm font-medium">to</span>
+              <Input
+                type="number"
+                placeholder="Max"
+                className="flex-1 h-10"
+                value={filters.wetSlipsMax}
+                onChange={(e) => throttledUpdateFilter('wetSlipsMax', e.target.value)}
+                data-testid="input-wet-slips-max"
+              />
+            </div>
           </div>
           <div>
-            <Label className="text-sm text-muted-foreground">Dry Racks</Label>
-            <Input
-              type="number"
-              placeholder="Min racks..."
-              className="w-full mt-1"
-              value={filters.dryRacksMin}
-              onChange={(e) => throttledUpdateFilter('dryRacksMin', e.target.value)}
-              data-testid="input-dry-racks-min"
-            />
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Dry Racks</Label>
+            <div className="flex items-center gap-2.5">
+              <Input
+                type="number"
+                placeholder="Min"
+                className="flex-1 h-10"
+                value={filters.dryRacksMin}
+                onChange={(e) => throttledUpdateFilter('dryRacksMin', e.target.value)}
+                data-testid="input-dry-racks-min"
+              />
+              <span className="text-muted-foreground text-sm font-medium">to</span>
+              <Input
+                type="number"
+                placeholder="Max"
+                className="flex-1 h-10"
+                value={filters.dryRacksMax}
+                onChange={(e) => throttledUpdateFilter('dryRacksMax', e.target.value)}
+                data-testid="input-dry-racks-max"
+              />
+            </div>
           </div>
           <div>
-            <Label className="text-sm text-muted-foreground">Storage Type</Label>
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Occupancy (%)</Label>
+            <div className="flex items-center gap-2.5">
+              <Input
+                type="number"
+                placeholder="Min %"
+                className="flex-1 h-10"
+                value={filters.occupancyMin}
+                onChange={(e) => throttledUpdateFilter('occupancyMin', e.target.value)}
+                data-testid="input-occupancy-min"
+              />
+              <span className="text-muted-foreground text-sm font-medium">to</span>
+              <Input
+                type="number"
+                placeholder="Max %"
+                className="flex-1 h-10"
+                value={filters.occupancyMax}
+                onChange={(e) => throttledUpdateFilter('occupancyMax', e.target.value)}
+                data-testid="input-occupancy-max"
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Storage Type</Label>
             <Select
               value={filters.ioBoth}
               onValueChange={(value) => updateFilter('ioBoth', value === 'none' ? '' : value)}
             >
-              <SelectTrigger className="w-full mt-1" data-testid="select-storage-type">
+              <SelectTrigger className="w-full h-10 bg-background" data-testid="select-storage-type">
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
@@ -519,8 +595,8 @@ export default function FiltersPanel({
       </Collapsible>
 
       {/* Filter Actions */}
-      <div className="p-4 border-t border-border">
-        <div className="space-y-2">
+      <div className="mt-6 pt-5 px-3 border-t border-border/60">
+        <div className="space-y-3">
           <SavedSearchesMenu
             filters={filters}
             onFiltersChange={onFiltersChange}
@@ -530,16 +606,16 @@ export default function FiltersPanel({
           {hasActiveFilters && (
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full h-10 font-medium hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all"
               onClick={clearAllFilters}
               data-testid="button-clear-filters"
             >
               <X className="h-4 w-4 mr-2" />
-              Clear Filters
+              Clear All Filters
             </Button>
           )}
-          <div className="text-xs text-muted-foreground text-center">
-            {hasActiveFilters ? 'Filters applied' : 'No filters applied'}
+          <div className="text-xs text-muted-foreground text-center py-2">
+            {hasActiveFilters ? 'Filters are active' : 'No filters applied'}
           </div>
         </div>
       </div>
