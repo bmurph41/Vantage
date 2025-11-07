@@ -358,7 +358,7 @@ export default function FiltersPanel({
           <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
             <div className="mt-3 px-3 space-y-4">
           <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">State/Country</Label>
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">State</Label>
             <Select
               value={filters.state}
               onValueChange={(value) => updateFilter('state', value)}
@@ -368,36 +368,34 @@ export default function FiltersPanel({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">All States/Countries</SelectItem>
-                {/* US States */}
-                <SelectItem value="FL">Florida</SelectItem>
-                <SelectItem value="CA">California</SelectItem>
-                <SelectItem value="TX">Texas</SelectItem>
-                <SelectItem value="KS">Kansas</SelectItem>
-                <SelectItem value="NY">New York</SelectItem>
-                <SelectItem value="NC">North Carolina</SelectItem>
-                <SelectItem value="SC">South Carolina</SelectItem>
-                <SelectItem value="GA">Georgia</SelectItem>
-                <SelectItem value="MD">Maryland</SelectItem>
-                <SelectItem value="VA">Virginia</SelectItem>
-                {/* International Countries */}
-                <SelectItem value="Canada">Canada</SelectItem>
-                <SelectItem value="Costa Rica">Costa Rica</SelectItem>
-                <SelectItem value="Monaco">Monaco</SelectItem>
+                <SelectItem value="Australia">Australia</SelectItem>
                 <SelectItem value="Bahamas">Bahamas</SelectItem>
                 <SelectItem value="Bermuda">Bermuda</SelectItem>
-                <SelectItem value="Mexico">Mexico</SelectItem>
-                <SelectItem value="France">France</SelectItem>
-                <SelectItem value="Italy">Italy</SelectItem>
-                <SelectItem value="Spain">Spain</SelectItem>
-                <SelectItem value="Greece">Greece</SelectItem>
-                <SelectItem value="Croatia">Croatia</SelectItem>
-                <SelectItem value="Australia">Australia</SelectItem>
-                <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                <SelectItem value="Netherlands">Netherlands</SelectItem>
                 <SelectItem value="British Virgin Islands">British Virgin Islands</SelectItem>
+                <SelectItem value="CA">California</SelectItem>
+                <SelectItem value="Canada">Canada</SelectItem>
                 <SelectItem value="Cayman Islands">Cayman Islands</SelectItem>
-                <SelectItem value="Virgin Islands">Virgin Islands</SelectItem>
+                <SelectItem value="Costa Rica">Costa Rica</SelectItem>
+                <SelectItem value="Croatia">Croatia</SelectItem>
+                <SelectItem value="FL">Florida</SelectItem>
+                <SelectItem value="France">France</SelectItem>
+                <SelectItem value="GA">Georgia</SelectItem>
+                <SelectItem value="Greece">Greece</SelectItem>
+                <SelectItem value="Italy">Italy</SelectItem>
+                <SelectItem value="KS">Kansas</SelectItem>
+                <SelectItem value="MD">Maryland</SelectItem>
+                <SelectItem value="Mexico">Mexico</SelectItem>
+                <SelectItem value="Monaco">Monaco</SelectItem>
+                <SelectItem value="NC">North Carolina</SelectItem>
+                <SelectItem value="Netherlands">Netherlands</SelectItem>
+                <SelectItem value="NY">New York</SelectItem>
                 <SelectItem value="Puerto Rico">Puerto Rico</SelectItem>
+                <SelectItem value="SC">South Carolina</SelectItem>
+                <SelectItem value="Spain">Spain</SelectItem>
+                <SelectItem value="TX">Texas</SelectItem>
+                <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                <SelectItem value="VA">Virginia</SelectItem>
+                <SelectItem value="Virgin Islands">Virgin Islands</SelectItem>
               </SelectContent>
             </Select>
           </div>

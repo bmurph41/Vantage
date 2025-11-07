@@ -1055,9 +1055,9 @@ export default function CompsDataGrid({
           tabIndex={0}
         >
             <Table className="min-w-full w-full" style={{ minWidth: '1500px' }} data-testid="data-table">
-            <TableHeader className="bg-gray-100 border-b-2 border-gray-300">
+            <TableHeader className="bg-gray-100 border-b-2 border-gray-300 sticky top-0 z-20">
               <TableRow>
-                <TableHead className="data-table-header w-8 bg-gray-100 sticky top-[52px] z-20 shadow-sm border-b-2 border-gray-300">
+                <TableHead className="data-table-header w-8 bg-gray-100 sticky top-0 z-20 shadow-sm border-b-2 border-gray-300">
                   <Checkbox
                     checked={selectedIds.length === data.length && data.length > 0}
                     onCheckedChange={handleSelectAll}
@@ -1067,7 +1067,7 @@ export default function CompsDataGrid({
                 {columns.map((column, index) => (
                   <TableHead 
                     key={column.key}
-                    className={`data-table-header text-left relative select-none transition-all duration-75 bg-gray-100 sticky top-[52px] z-20 shadow-sm border-b-2 border-gray-300 ${
+                    className={`data-table-header text-left relative select-none transition-all duration-75 bg-gray-100 sticky top-0 z-20 shadow-sm border-b-2 border-gray-300 ${
                       isDraggingColumn === column.key ? 'opacity-60 shadow-lg z-50' : ''
                     } ${
                       dragState && dragState.dropTargetIndex === index && isDraggingColumn !== column.key 
