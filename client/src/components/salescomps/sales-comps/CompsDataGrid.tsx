@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Fragment, useMemo, useCallback } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -112,7 +113,6 @@ export default function CompsDataGrid({
     comp: SalesComp | null;
     childCount: number;
   }>({ isOpen: false, comp: null, childCount: 0 });
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const horizontalScrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -445,6 +445,16 @@ export default function CompsDataGrid({
   };
 
   const hierarchicalData = organizeHierarchicalData(data);
+  
+  // Virtual scrolling setup
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  
+  const rowVirtualizer = useVirtualizer({
+    count: hierarchicalData.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 60, // Estimated row height in pixels
+    overscan: 5, // Render 5 extra rows above and below viewport
+  });
 
   // Default column configuration with pixel widths
   const defaultColumns = [
@@ -1008,7 +1018,7 @@ export default function CompsDataGrid({
       <div className="flex-1 border-2 border-border rounded-lg bg-card shadow-lg overflow-y-hidden" style={{height: 'calc(100vh - 120px)'}}>
         {/* Data Grid container with enhanced horizontal and vertical scroll */}
         <div 
-          ref={scrollContainerRef}
+          ref={tableContainerRef}
           className="flex-1 overflow-x-auto overflow-y-auto border border-border rounded-md"
           style={{
             width: '100%',
@@ -1020,7 +1030,7 @@ export default function CompsDataGrid({
             display: 'block'
           }}
           onKeyDown={(e) => {
-            const container = scrollContainerRef.current;
+            const container = tableContainerRef.current;
             if (!container) return;
             
             switch (e.key) {
@@ -1156,7 +1166,14 @@ export default function CompsDataGrid({
                 </TableRow>
               ) : (
                 <>
-                  {hierarchicalData.map((comp, index) => {
+                  {/* Spacer for virtual scrolling - adds padding before first visible row */}
+                  {rowVirtualizer.getVirtualItems().length > 0 && (
+                    <tr style={{ height: `${rowVirtualizer.getVirtualItems()[0]?.start ?? 0}px` }} />
+                  )}
+                  
+                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const comp = hierarchicalData[virtualRow.index];
+                    const index = virtualRow.index;
                     // Handle empty portfolio actions row
                     if (comp.isEmptyPortfolioActions) {
                       return (
@@ -1442,6 +1459,16 @@ export default function CompsDataGrid({
                   </TableRow>
                     );
                   })}
+                  
+                  {/* Spacer for virtual scrolling - adds padding after last visible row */}
+                  {rowVirtualizer.getVirtualItems().length > 0 && (
+                    <tr style={{ 
+                      height: `${
+                        rowVirtualizer.getTotalSize() - 
+                        (rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end ?? 0)
+                      }px` 
+                    }} />
+                  )}
                 </>
               )}
             </TableBody>
