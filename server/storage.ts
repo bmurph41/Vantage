@@ -4,7 +4,7 @@ import {
   contacts, projectContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
-  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmPipelines, crmPipelineStages, crmActivities,
+  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, pendingProperties, crmPipelines, crmPipelineStages, crmActivities,
   crmImportJobs, crmImportedRecords, crmProspectingEntries,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
@@ -14,7 +14,7 @@ import {
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
-  type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
+  type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type PendingProperty, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
@@ -25,7 +25,7 @@ import {
   type InsertDDContact, type UpdateDDContact, type InsertProjectContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
-  type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertProperty, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
+  type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertProperty, type InsertPendingProperty, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
   type InsertCrmImportJob, type InsertCrmImportedRecord, type InsertProspectingEntry,
   type InsertEmailSequence, type InsertEmailTemplate, type InsertEmailSequenceStep, type InsertEmailSequenceEnrollment, type InsertEmailSequenceStepExecution,
   type InsertCalendarSettings,
@@ -501,6 +501,14 @@ export interface IStorage {
   
   // CRM Properties - search by name/city/state
   findPropertyByLocation(orgId: string, marina: string, city?: string, state?: string): Promise<Property | undefined>;
+  findSimilarProperties(orgId: string, marina: string, city?: string, state?: string): Promise<Property[]>;
+  
+  // Pending Properties - Review queue for properties created from comps
+  getPendingProperties(orgId: string, status?: string): Promise<PendingProperty[]>;
+  getPendingProperty(id: string, orgId: string): Promise<PendingProperty | undefined>;
+  createPendingProperty(data: InsertPendingProperty): Promise<PendingProperty>;
+  acceptPendingProperty(id: string, orgId: string, userId: string): Promise<Property | undefined>;
+  rejectPendingProperty(id: string, orgId: string, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3495,6 +3503,155 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     
     return property || undefined;
+  }
+
+  async findSimilarProperties(orgId: string, marina: string, city?: string, state?: string): Promise<Property[]> {
+    const normalizedMarina = marina.trim().toLowerCase();
+    
+    // Build comprehensive similarity query
+    // 1. Exact match on title
+    // 2. Title contains any significant word from marina name (3+ chars)
+    // 3. Marina name contains title
+    const marinaWords = normalizedMarina.split(/\s+/).filter(w => w.length >= 3);
+    
+    const titleConditions = [
+      sql`LOWER(TRIM(${crmProperties.title})) = ${normalizedMarina}`, // Exact match
+      ...marinaWords.map(word => 
+        sql`LOWER(${crmProperties.title}) LIKE ${'%' + word + '%'}`  // Contains word
+      ),
+      sql`LOWER(${normalizedMarina}) LIKE '%' || LOWER(${crmProperties.title}) || '%'` // Name contains title
+    ];
+    
+    const similarityCondition = or(...titleConditions);
+    
+    // Base conditions
+    const conditions = [
+      eq(crmProperties.ownerId, orgId),
+      similarityCondition
+    ];
+    
+    // Add location filters if provided
+    if (city) {
+      const normalizedCity = city.trim().toLowerCase();
+      conditions.push(sql`LOWER(${crmProperties.address}) LIKE ${'%' + normalizedCity + '%'}`);
+    }
+    
+    if (state) {
+      const normalizedState = state.trim().toLowerCase();
+      conditions.push(sql`LOWER(${crmProperties.address}) LIKE ${'%' + normalizedState + '%'}`);
+    }
+    
+    const properties = await db.select()
+      .from(crmProperties)
+      .where(and(...conditions))
+      .limit(10); // Increased limit for better suggestions
+    
+    return properties;
+  }
+
+  // ============================================================================
+  // Pending Properties - Review queue for properties created from comps
+  // ============================================================================
+
+  async getPendingProperties(orgId: string, status?: string): Promise<PendingProperty[]> {
+    const conditions = [eq(pendingProperties.orgId, orgId)];
+    if (status) {
+      conditions.push(eq(pendingProperties.status, status as any));
+    }
+    return await db.select()
+      .from(pendingProperties)
+      .where(and(...conditions))
+      .orderBy(desc(pendingProperties.createdAt));
+  }
+
+  async getPendingProperty(id: string, orgId: string): Promise<PendingProperty | undefined> {
+    const [property] = await db.select()
+      .from(pendingProperties)
+      .where(and(
+        eq(pendingProperties.id, id),
+        eq(pendingProperties.orgId, orgId)
+      ));
+    return property || undefined;
+  }
+
+  async createPendingProperty(data: InsertPendingProperty): Promise<PendingProperty> {
+    const [created] = await db.insert(pendingProperties)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async acceptPendingProperty(id: string, orgId: string, userId: string): Promise<Property | undefined> {
+    // Use transaction to ensure atomicity across 3 table updates
+    return await db.transaction(async (tx) => {
+      // Get and lock the pending property with concurrency check
+      const [pending] = await tx.select()
+        .from(pendingProperties)
+        .where(and(
+          eq(pendingProperties.id, id),
+          eq(pendingProperties.orgId, orgId),
+          eq(pendingProperties.status, 'pending' as any) // Only accept if still pending
+        ))
+        .limit(1);
+
+      if (!pending) {
+        return undefined; // Already processed or not found
+      }
+
+      // Create the actual property
+      const address = [
+        pending.address,
+        pending.city && pending.state ? `${pending.city}, ${pending.state}` : pending.city || pending.state
+      ].filter(Boolean).join(', ');
+
+      const [newProperty] = await tx.insert(crmProperties).values({
+        title: pending.marinaName,
+        type: 'marina',
+        status: 'available',
+        address: address || undefined,
+        ownerId: orgId,
+        listingPrice: pending.salePrice ? String(pending.salePrice) : undefined,
+        description: `Created from sales comp`,
+      }).returning();
+
+      // Update pending property status (with WHERE clause to prevent race conditions)
+      await tx.update(pendingProperties)
+        .set({
+          status: 'accepted',
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+          createdPropertyId: newProperty.id,
+        })
+        .where(and(
+          eq(pendingProperties.id, id),
+          eq(pendingProperties.status, 'pending' as any) // Double-check still pending
+        ));
+
+      // Update the comp to link to the new property
+      await tx.update(salesComps)
+        .set({ propertyId: newProperty.id })
+        .where(eq(salesComps.id, pending.compId));
+
+      return newProperty;
+    });
+  }
+
+  async rejectPendingProperty(id: string, orgId: string, userId: string): Promise<boolean> {
+    // Use WHERE clause with status check to prevent race conditions
+    const result = await db.update(pendingProperties)
+      .set({
+        status: 'rejected',
+        reviewedBy: userId,
+        reviewedAt: new Date(),
+      })
+      .where(and(
+        eq(pendingProperties.id, id),
+        eq(pendingProperties.orgId, orgId),
+        eq(pendingProperties.status, 'pending' as any) // Only reject if still pending
+      ))
+      .returning();
+
+    return result.length > 0;
   }
 
   // ============================================================================

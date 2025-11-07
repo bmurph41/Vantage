@@ -49,6 +49,7 @@ export const parseStatusEnum = pgEnum("parse_status", ["pending", "parsing", "pa
 export const embeddingsStatusEnum = pgEnum("embeddings_status", ["pending", "processing", "completed", "failed"]);
 export const severityEnum = pgEnum("severity", ["low", "med", "high", "critical"]);
 export const confidenceLevelEnum = pgEnum("confidence_level", ["low", "medium", "high"]);
+export const pendingPropertyStatusEnum = pgEnum("pending_property_status", ["pending", "accepted", "rejected"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -1446,6 +1447,37 @@ export const crmProperties = pgTable("crm_properties", {
   listingAgentId: varchar("listing_agent_id").references(() => crmContacts.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Pending Properties - Review queue for properties created from sales comps
+export const pendingProperties = pgTable("pending_properties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  compId: varchar("comp_id").notNull().references(() => salesComps.id),
+  
+  // Property data extracted from comp
+  marinaName: text("marina_name").notNull(),
+  city: text("city"),
+  state: text("state"),
+  address: text("address"),
+  salePrice: integer("sale_price"),
+  
+  // Review status
+  status: pendingPropertyStatusEnum("status").notNull().default("pending"),
+  
+  // Additional metadata from comp for review
+  compMetadata: jsonb("comp_metadata").default({}), // Stores full comp details for reference
+  
+  // Suggested duplicate matches for user review
+  suggestedDuplicates: jsonb("suggested_duplicates").default([]), // Array of potential property IDs
+  
+  // Created property ID when accepted
+  createdPropertyId: varchar("created_property_id").references(() => crmProperties.id),
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Leads table (separate from contacts for better lead management)
@@ -2859,6 +2891,16 @@ export const insertCrmPropertySchema = createInsertSchema(crmProperties).omit({
   updatedAt: true,
 });
 export type InsertCrmProperty = z.infer<typeof insertCrmPropertySchema>;
+
+// Pending Property schema
+export const insertPendingPropertySchema = createInsertSchema(pendingProperties).omit({
+  id: true,
+  createdAt: true,
+  reviewedAt: true,
+  createdPropertyId: true,
+});
+export type InsertPendingProperty = z.infer<typeof insertPendingPropertySchema>;
+export type PendingProperty = typeof pendingProperties.$inferSelect;
 
 // CRM File schema
 export const insertCrmFileSchema = createInsertSchema(crmFiles).omit({

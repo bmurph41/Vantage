@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { 
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -60,6 +61,11 @@ const analysisNav = [
   { name: "Demographics", href: "/analysis/demographics", icon: Users },
 ];
 
+type PendingProperty = {
+  id: string;
+  status: string;
+};
+
 export default function UnifiedSidebar() {
   const [location] = useLocation();
   const [crmExpanded, setCrmExpanded] = useState(true);
@@ -70,6 +76,27 @@ export default function UnifiedSidebar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Fetch pending properties count
+  const { data: pendingProperties = [] } = useQuery<PendingProperty[]>({
+    queryKey: ['/api/pending-properties'],
+    refetchInterval: 60000, // Refresh every minute
+  });
+
+  const pendingCount = pendingProperties.filter(p => p.status === 'pending').length;
+
+  // Create dynamic CRM navigation with pending properties badge
+  // Properties is at index 6 in crmNav
+  const dynamicCrmNav = [
+    ...crmNav.slice(0, 7), // Includes Properties at index 6
+    ...(pendingCount > 0 ? [{ 
+      name: "Pending Properties", 
+      href: "/crm/pending-properties", 
+      icon: AlertCircle,
+      badge: String(pendingCount)
+    }] : []),
+    ...crmNav.slice(7), // Everything after Properties (Activities, Prospecting, etc.)
+  ];
 
   const handleNavClick = () => {
     setMobileMenuOpen(false);
@@ -203,7 +230,7 @@ export default function UnifiedSidebar() {
             expanded={crmExpanded} 
             onToggle={() => setCrmExpanded(!crmExpanded)} 
           />
-          {crmExpanded && crmNav.map((item) => (
+          {crmExpanded && dynamicCrmNav.map((item) => (
             <NavLink key={item.name} item={item} />
           ))}
           {crmExpanded && (

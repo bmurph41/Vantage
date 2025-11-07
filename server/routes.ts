@@ -8280,6 +8280,56 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Pending Properties routes - Review queue for properties created from comps
+  app.get('/api/pending-properties', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { status } = req.query;
+
+      const pendingProps = await storage.getPendingProperties(orgId, status);
+      res.json(pendingProps);
+    } catch (error) {
+      console.error("Error fetching pending properties:", error);
+      res.status(500).json({ message: "Failed to fetch pending properties" });
+    }
+  });
+
+  app.post('/api/pending-properties/:id/accept', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const property = await storage.acceptPendingProperty(id, orgId, userId);
+      if (!property) {
+        return res.status(404).json({ message: "Pending property not found or already processed" });
+      }
+
+      res.json(property);
+    } catch (error) {
+      console.error("Error accepting pending property:", error);
+      res.status(500).json({ message: "Failed to accept pending property" });
+    }
+  });
+
+  app.post('/api/pending-properties/:id/reject', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const success = await storage.rejectPendingProperty(id, orgId, userId);
+      if (!success) {
+        return res.status(404).json({ message: "Pending property not found or already processed" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error rejecting pending property:", error);
+      res.status(500).json({ message: "Failed to reject pending property" });
+    }
+  });
+
   // Analytics/Metrics routes
   app.post('/api/analytics/calculate', async (req: any, res) => {
     try {

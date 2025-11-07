@@ -20,6 +20,7 @@ import Deals from "@/pages/deals";
 import DealDetail from "@/pages/deal-detail";
 import Activities from "@/pages/activities";
 import Properties from "@/pages/properties";
+import PendingProperties from "@/pages/pending-properties";
 import Prospecting from "@/pages/prospecting";
 import Analytics from "@/pages/analytics";
 import Forecast from "@/pages/forecast";
@@ -209,6 +210,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <Properties />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/crm/pending-properties">
+        {() => (
+          <UnifiedLayout>
+            <PendingProperties />
           </UnifiedLayout>
         )}
       </Route>

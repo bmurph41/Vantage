@@ -12,6 +12,7 @@ export class CompService {
   async createComp(compData: InsertSalesComp, userId: string): Promise<SalesComp> {
     // Try to auto-match property by name/city/state before creating
     let propertyId = compData.propertyId;
+    let pendingPropertyId: string | undefined;
     
     if (!propertyId && compData.marina) {
       try {
@@ -25,26 +26,12 @@ export class CompService {
         if (matchedProperty) {
           propertyId = matchedProperty.id;
         } else {
-          // Auto-create property from comp data
-          const address = [
-            compData.address,
-            compData.city && compData.state ? `${compData.city}, ${compData.state}` : compData.city || compData.state
-          ].filter(Boolean).join(', ');
-
-          const newProperty = await this.storage.createCrmProperty({
-            title: compData.marina,
-            type: 'marina',
-            status: 'available',
-            address: address || undefined,
-            ownerId: compData.orgId,
-            listingPrice: compData.salePrice ? String(compData.salePrice) : undefined,
-            description: `Auto-created from sales comp import`,
-          });
-          
-          propertyId = newProperty.id;
+          // Don't auto-create property - this will be done after creating the comp
+          // so we have a compId to reference in pending_properties
+          pendingPropertyId = 'pending';
         }
       } catch (error) {
-        console.error('Error matching/creating property during comp creation:', error);
+        console.error('Error matching property during comp creation:', error);
       }
     }
 
@@ -52,6 +39,47 @@ export class CompService {
       ...compData,
       propertyId,
     });
+    
+    // Create pending property if no match was found
+    if (pendingPropertyId === 'pending' && compData.marina) {
+      try {
+        const address = [
+          compData.address,
+          compData.city && compData.state ? `${compData.city}, ${compData.state}` : compData.city || compData.state
+        ].filter(Boolean).join(', ');
+
+        // Find similar properties for suggested duplicates
+        const similarProperties = await this.storage.findSimilarProperties(
+          compData.orgId,
+          compData.marina,
+          compData.city,
+          compData.state
+        );
+
+        await this.storage.createPendingProperty({
+          orgId: compData.orgId,
+          compId: comp.id,
+          marinaName: compData.marina,
+          city: compData.city || null,
+          state: compData.state || null,
+          address: address || null,
+          salePrice: compData.salePrice || null,
+          status: 'pending',
+          compMetadata: {
+            saleYear: compData.saleYear,
+            saleMonth: compData.saleMonth,
+            wetSlips: compData.wetSlips,
+            dryRacks: compData.dryRacks,
+            bodyOfWater: compData.bodyOfWater,
+          },
+          suggestedDuplicates: similarProperties.map(p => p.id),
+          createdBy: userId,
+          reviewedBy: null,
+        });
+      } catch (error) {
+        console.error('Error creating pending property:', error);
+      }
+    }
     
     // Log audit trail
     await this.storage.createAuditLog({
