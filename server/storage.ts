@@ -8,7 +8,7 @@ import {
   crmImportJobs, crmImportedRecords, crmProspectingEntries,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
-  salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes,
+  salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes, scPortfolios, scPortfolioComps,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
@@ -2931,6 +2931,16 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters.disclosedOnly) {
       conditions.push(eq(salesComps.isPriceDisclosed, true));
+    }
+    if (filters.disclosedCapRateOnly) {
+      conditions.push(eq(salesComps.isCapRateDisclosed, true));
+    }
+    if (filters.portfoliosOnly) {
+      conditions.push(sql`EXISTS (
+        SELECT 1 FROM ${scPortfolioComps} 
+        WHERE ${scPortfolioComps.salesCompId} = ${salesComps.id} 
+        AND ${scPortfolioComps.orgId} = ${orgId}
+      )`);
     }
 
     const [{ total }] = await db.select({ total: count() })

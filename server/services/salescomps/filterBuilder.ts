@@ -17,6 +17,8 @@ export interface FilterParams {
   ioBoth?: string;
   hasArticle?: boolean;
   disclosedOnly?: boolean;
+  disclosedCapRateOnly?: boolean;
+  portfoliosOnly?: boolean;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   page?: number;
@@ -95,6 +97,12 @@ export class FilterBuilder {
     }
     if (params.disclosedOnly) {
       filters.disclosedOnly = params.disclosedOnly;
+    }
+    if (params.disclosedCapRateOnly) {
+      filters.disclosedCapRateOnly = params.disclosedCapRateOnly;
+    }
+    if (params.portfoliosOnly) {
+      filters.portfoliosOnly = params.portfoliosOnly;
     }
 
     return filters;

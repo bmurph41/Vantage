@@ -32,7 +32,9 @@ import {
   updateScSavedSearchSchema,
   insertScRecommendationFeedbackSchema,
   scProjectProfileSchema,
-  scWeightOverridesSchema
+  scWeightOverridesSchema,
+  scPortfolios,
+  scPortfolioComps
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -47,7 +49,8 @@ import {
   projectCompCreateSchema,
   projectCompUpdateSchema,
   projectCompBulkSchema,
-  columnMappingSchema
+  columnMappingSchema,
+  bulkPortfolioCreateSchema
 } from "./utils/salescomps-zod-schemas";
 import { PROFIT_CENTERS } from "@shared/salescomps-constants";
 import { z } from "zod";
@@ -8377,6 +8380,86 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error generating insights:", error);
       res.status(500).json({ message: "Failed to generate insights" });
+    }
+  });
+
+  // Portfolio bulk creation routes
+  app.post('/api/sales-comps/portfolios', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      // Validate request body using Zod schema
+      const validatedData = bulkPortfolioCreateSchema.parse(req.body);
+      const { portfolio, comps } = validatedData;
+
+      // Wrap everything in a transaction to ensure atomicity
+      const result = await db.transaction(async (tx) => {
+        // Create portfolio first
+        const [createdPortfolio] = await tx.insert(scPortfolios).values({
+          orgId,
+          createdBy: userId,
+          name: portfolio.name,
+          description: portfolio.description || null,
+          notes: portfolio.notes || null,
+        }).returning();
+
+        // Create all comps and link to portfolio
+        const createdComps = [];
+        for (let i = 0; i < comps.length; i++) {
+          const compData = comps[i];
+          
+          // Create the comp using compService (handles property linking, etc.)
+          const comp = await compService.createComp({
+            ...compData,
+            orgId,
+            createdBy: userId,
+          }, userId);
+          
+          createdComps.push(comp);
+
+          // Link comp to portfolio
+          await tx.insert(scPortfolioComps).values({
+            orgId,
+            portfolioId: createdPortfolio.id,
+            salesCompId: comp.id,
+            addedBy: userId,
+            orderIndex: i,
+          });
+        }
+
+        return {
+          portfolio: createdPortfolio,
+          comps: createdComps,
+        };
+      });
+
+      // Create audit log (outside transaction since it's not critical)
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entityType: 'sc_portfolio',
+        entityId: result.portfolio.id,
+        action: 'create',
+        after: {
+          portfolio: result.portfolio,
+          compCount: result.comps.length,
+        },
+      });
+
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error creating portfolio:", error);
+      
+      // Handle Zod validation errors
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to create portfolio", error: error instanceof Error ? error.message : String(error) });
     }
   });
 

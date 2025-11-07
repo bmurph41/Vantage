@@ -3326,6 +3326,41 @@ export const scSavedSearches = pgTable('sc_saved_searches', {
   orgPinnedIdx: index('sc_saved_searches_org_pinned_idx').on(table.orgId, table.isPinned),
 }));
 
+// Portfolios - Grouping mechanism for bulk comp transactions
+export const scPortfolios = pgTable('sc_portfolios', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+
+  // Portfolio fields
+  name: text('name').notNull(),
+  description: text('description'),
+  notes: text('notes'),
+}, (table) => ({
+  orgIdx: index('sc_portfolios_org_idx').on(table.orgId),
+  orgNameIdx: index('sc_portfolios_org_name_idx').on(table.orgId, table.name),
+}));
+
+// Portfolio-Comps junction table (many-to-many)
+export const scPortfolioComps = pgTable('sc_portfolio_comps', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  portfolioId: varchar('portfolio_id').notNull().references(() => scPortfolios.id, { onDelete: 'cascade' }),
+  salesCompId: varchar('sales_comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
+  addedBy: varchar('added_by').notNull().references(() => users.id),
+  addedAt: timestamp('added_at').defaultNow(),
+  orderIndex: integer('order_index').default(0), // For maintaining comp order within portfolio
+}, (table) => ({
+  orgIdx: index('sc_portfolio_comps_org_idx').on(table.orgId),
+  portfolioIdx: index('sc_portfolio_comps_portfolio_idx').on(table.portfolioId),
+  salesCompIdx: index('sc_portfolio_comps_sales_comp_idx').on(table.salesCompId),
+  uniquePortfolioComp: unique('sc_portfolio_comps_unique_idx').on(table.orgId, table.portfolioId, table.salesCompId),
+}));
+
 // Relations
 export const salesCompsRelations = relations(salesComps, ({ one, many }) => ({
   organization: one(organizations, {
@@ -3422,6 +3457,41 @@ export const scOrgPreferencesRelations = relations(scOrgPreferences, ({ one }) =
   }),
 }));
 
+export const scPortfoliosRelations = relations(scPortfolios, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [scPortfolios.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [scPortfolios.createdBy],
+    references: [users.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [scPortfolios.updatedBy],
+    references: [users.id],
+  }),
+  scPortfolioComps: many(scPortfolioComps),
+}));
+
+export const scPortfolioCompsRelations = relations(scPortfolioComps, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [scPortfolioComps.orgId],
+    references: [organizations.id],
+  }),
+  portfolio: one(scPortfolios, {
+    fields: [scPortfolioComps.portfolioId],
+    references: [scPortfolios.id],
+  }),
+  salesComp: one(salesComps, {
+    fields: [scPortfolioComps.salesCompId],
+    references: [salesComps.id],
+  }),
+  addedByUser: one(users, {
+    fields: [scPortfolioComps.addedBy],
+    references: [users.id],
+  }),
+}));
+
 // Zod schemas
 export const insertSalesCompSchema = createInsertSchema(salesComps).omit({
   id: true,
@@ -3497,6 +3567,22 @@ export const insertScSavedSearchSchema = createInsertSchema(scSavedSearches).omi
 
 export const updateScSavedSearchSchema = insertScSavedSearchSchema.partial();
 
+export const insertScPortfolioSchema = createInsertSchema(scPortfolios).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+});
+
+export const updateScPortfolioSchema = insertScPortfolioSchema.partial();
+
+export const insertScPortfolioCompSchema = createInsertSchema(scPortfolioComps).omit({
+  id: true,
+  addedAt: true,
+});
+
 // Profit Centers constant schema
 export const profitCentersSchema = z.array(z.enum([
   'Storage',
@@ -3565,6 +3651,11 @@ export type ProfitCenter = z.infer<typeof profitCentersSchema>[number];
 export type ScSavedSearch = typeof scSavedSearches.$inferSelect;
 export type InsertScSavedSearch = z.infer<typeof insertScSavedSearchSchema>;
 export type UpdateScSavedSearch = z.infer<typeof updateScSavedSearchSchema>;
+export type ScPortfolio = typeof scPortfolios.$inferSelect;
+export type InsertScPortfolio = z.infer<typeof insertScPortfolioSchema>;
+export type UpdateScPortfolio = z.infer<typeof updateScPortfolioSchema>;
+export type ScPortfolioComp = typeof scPortfolioComps.$inferSelect;
+export type InsertScPortfolioComp = z.infer<typeof insertScPortfolioCompSchema>;
 export type ScCustomStorageType = typeof scCustomStorageTypes.$inferSelect;
 export const insertScCustomStorageTypeSchema = createInsertSchema(scCustomStorageTypes).omit({
   id: true,

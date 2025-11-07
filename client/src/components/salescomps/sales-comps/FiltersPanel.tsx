@@ -62,6 +62,7 @@ export default function FiltersPanel({
         if (filters.disclosedOnly) count++;
         if (filters.disclosedCapRateOnly) count++;
         if (filters.hasArticle) count++;
+        if (filters.portfoliosOnly) count++;
         break;
       case 'location':
         if (filters.state && filters.state !== 'none') count++;
@@ -255,6 +256,7 @@ export default function FiltersPanel({
       hasArticle: false,
       disclosedOnly: false,
       disclosedCapRateOnly: false,
+      portfoliosOnly: false,
       columnFilters: {},
     });
   };
@@ -327,6 +329,18 @@ export default function FiltersPanel({
                 />
                 <Label htmlFor="has-article" className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
                   Has Article
+                </Label>
+              </div>
+              <div className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
+                <Checkbox
+                  id="portfolios-only"
+                  checked={filters.portfoliosOnly}
+                  onCheckedChange={(checked) => updateFilter('portfoliosOnly', checked)}
+                  data-testid="checkbox-portfolios-only"
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="portfolios-only" className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
+                  Portfolios
                 </Label>
               </div>
             </div>

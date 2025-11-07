@@ -1055,19 +1055,20 @@ export default function CompsDataGrid({
           tabIndex={0}
         >
             <Table className="min-w-full w-full" style={{ minWidth: '1500px' }} data-testid="data-table">
-            <TableHeader className="bg-card border-b border-border">
+            <TableHeader className="bg-[#0066CC] border-b border-border">
               <TableRow>
-                <TableHead className="data-table-header w-8 bg-card sticky top-0 z-20 shadow-sm">
+                <TableHead className="data-table-header w-8 bg-[#0066CC] text-white sticky top-0 z-20 shadow-sm">
                   <Checkbox
                     checked={selectedIds.length === data.length && data.length > 0}
                     onCheckedChange={handleSelectAll}
                     data-testid="checkbox-select-all"
+                    className="border-white data-[state=checked]:bg-white data-[state=checked]:text-[#0066CC]"
                   />
                 </TableHead>
                 {columns.map((column, index) => (
                   <TableHead 
                     key={column.key}
-                    className={`data-table-header text-left relative select-none transition-all duration-75 bg-card sticky top-0 z-20 shadow-sm ${
+                    className={`data-table-header text-left relative select-none transition-all duration-75 bg-[#0066CC] text-white sticky top-0 z-20 shadow-sm ${
                       isDraggingColumn === column.key ? 'opacity-60 shadow-lg z-50' : ''
                     } ${
                       dragState && dragState.dropTargetIndex === index && isDraggingColumn !== column.key 
@@ -1092,7 +1093,7 @@ export default function CompsDataGrid({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-auto p-0 font-medium text-muted-foreground hover:text-foreground truncate cursor-pointer"
+                            className="h-auto p-0 font-medium text-white hover:text-white/90 truncate cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               onSort(column.key);
@@ -1102,12 +1103,12 @@ export default function CompsDataGrid({
                             <span className="truncate">{column.label}</span>
                             {sortBy === column.key && (
                               sortDir === 'asc' ? 
-                              <ChevronUp className="ml-1 h-3 w-3 text-primary flex-shrink-0" /> :
-                              <ChevronDown className="ml-1 h-3 w-3 text-primary flex-shrink-0" />
+                              <ChevronUp className="ml-1 h-3 w-3 text-white flex-shrink-0" /> :
+                              <ChevronDown className="ml-1 h-3 w-3 text-white flex-shrink-0" />
                             )}
                           </Button>
                         ) : (
-                          <span className="font-medium text-muted-foreground truncate">{column.label}</span>
+                          <span className="font-medium text-white truncate">{column.label}</span>
                         )}
                       </div>
                       {column.key !== 'expand' && (

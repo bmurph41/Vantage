@@ -18,6 +18,7 @@ export interface FilterState {
   hasArticle: boolean;
   disclosedOnly: boolean;
   disclosedCapRateOnly: boolean;
+  portfoliosOnly: boolean;
   columnFilters: Record<string, string[]>;
 }
 

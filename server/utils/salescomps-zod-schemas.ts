@@ -113,6 +113,7 @@ export const compFiltersSchema = z.object({
   hasArticle: z.coerce.boolean().optional(),
   disclosedOnly: z.coerce.boolean().optional(),
   disclosedCapRateOnly: z.coerce.boolean().optional(),
+  portfoliosOnly: z.coerce.boolean().optional(),
   columnFilters: z.preprocess(
     (val) => {
       if (typeof val === 'string') {
@@ -385,4 +386,16 @@ export const metricsSnapshotQuerySchema = z.object({
   categories: z.array(z.enum(['internal', 'macro', 'rates', 'fuel'])).optional(),
   metricKeys: z.array(z.string()).optional(),
   includeDerived: z.boolean().default(true),
+});
+
+// Portfolio schemas
+export const portfolioCreateSchema = z.object({
+  name: z.string().min(1, "Portfolio name is required").max(255, "Portfolio name too long"),
+  description: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export const bulkPortfolioCreateSchema = z.object({
+  portfolio: portfolioCreateSchema,
+  comps: z.array(salesCompCreateSchema).min(1, "At least one comp is required").max(150, "Maximum 150 comps per portfolio"),
 });
