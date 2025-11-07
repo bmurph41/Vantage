@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2, PanelLeftClose, PanelLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import debounce from "lodash.debounce";
 import { salesCompsApi } from "@/lib/salescomps/api";
