@@ -797,17 +797,8 @@ export default function CompsDataGrid({
     
     switch (column) {
       case 'marina':
-        // Show marina name with green check if linked to CRM property
         return (
-          <div className="flex items-center gap-2">
-            {comp.propertyId && (
-              <Check 
-                className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" 
-                title="Linked to CRM Property"
-              />
-            )}
-            <span className="truncate">{value || '—'}</span>
-          </div>
+          <span className="truncate">{value || '—'}</span>
         );
       case 'salePrice':
         if (!comp.isPriceDisclosed) {
