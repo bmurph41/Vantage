@@ -42,11 +42,11 @@ export default function FiltersPanel({
   const { data: customStorageTypes = [] } = useCustomStorageTypes();
   const allStorageTypes = [...STORAGE_TYPES, ...customStorageTypes.map(t => t.name)];
   
-  // Collapsible sections state
+  // Collapsible sections state - all collapsed by default
   const [openSections, setOpenSections] = useState({
-    quick: true,
-    location: true,
-    saleDetails: true,
+    quick: false,
+    location: false,
+    saleDetails: false,
     marinaFeatures: false
   });
   
