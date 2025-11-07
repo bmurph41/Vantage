@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, BarChart3, TrendingUp, Layers, Lightbulb, MapPin } from "lucide-react";
+import { Download, BarChart3, TrendingUp, Layers, Lightbulb, MapPin, PieChart, ScatterChart, Calculator, Table2, FileSpreadsheet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import AnalyticsFiltersPanel, { type AnalyticsFilters } from "./AnalyticsFilters";
@@ -12,6 +12,9 @@ import TimeSeriesView from "./TimeSeriesView";
 import RegionalComparisonView from "./RegionalComparisonView";
 import CohortAnalysisView from "./CohortAnalysisView";
 import InsightsPanel from "./InsightsPanel";
+import DistributionAnalysisView from "./DistributionAnalysisView";
+import CorrelationAnalysisView from "./CorrelationAnalysisView";
+import ValuationModelsView from "./ValuationModelsView";
 
 interface ComparativeAnalysis {
   overall: {
@@ -178,22 +181,34 @@ export default function AnalyticsWorkbench() {
 
           {/* Analysis Views */}
           <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 lg:w-auto">
               <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
                 <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Overview</span>
+                <span className="hidden lg:inline">Overview</span>
               </TabsTrigger>
               <TabsTrigger value="trends" className="flex items-center gap-2" data-testid="tab-trends">
                 <TrendingUp className="h-4 w-4" />
-                <span className="hidden sm:inline">Trends</span>
+                <span className="hidden lg:inline">Trends</span>
               </TabsTrigger>
               <TabsTrigger value="regional" className="flex items-center gap-2" data-testid="tab-regional">
                 <MapPin className="h-4 w-4" />
-                <span className="hidden sm:inline">Regional</span>
+                <span className="hidden lg:inline">Regional</span>
               </TabsTrigger>
               <TabsTrigger value="cohorts" className="flex items-center gap-2" data-testid="tab-cohorts">
                 <Layers className="h-4 w-4" />
-                <span className="hidden sm:inline">Cohorts</span>
+                <span className="hidden lg:inline">Cohorts</span>
+              </TabsTrigger>
+              <TabsTrigger value="distribution" className="flex items-center gap-2" data-testid="tab-distribution">
+                <PieChart className="h-4 w-4" />
+                <span className="hidden lg:inline">Distribution</span>
+              </TabsTrigger>
+              <TabsTrigger value="correlation" className="flex items-center gap-2" data-testid="tab-correlation">
+                <ScatterChart className="h-4 w-4" />
+                <span className="hidden lg:inline">Correlation</span>
+              </TabsTrigger>
+              <TabsTrigger value="valuation" className="flex items-center gap-2" data-testid="tab-valuation">
+                <Calculator className="h-4 w-4" />
+                <span className="hidden lg:inline">Valuation</span>
               </TabsTrigger>
             </TabsList>
 
@@ -255,6 +270,48 @@ export default function AnalyticsWorkbench() {
                 <Card className="p-4 text-center border-dashed">
                   <Layers className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
                   <p className="text-xs text-muted-foreground">Apply filters to view cohort analysis</p>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="distribution" className="mt-2" data-testid="tab-content-distribution">
+              {metrics ? (
+                <DistributionAnalysisView
+                  data={metrics}
+                  isLoading={isLoading}
+                />
+              ) : (
+                <Card className="p-4 text-center border-dashed">
+                  <PieChart className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                  <p className="text-xs text-muted-foreground">Apply filters to view distribution analysis</p>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="correlation" className="mt-2" data-testid="tab-content-correlation">
+              {metrics ? (
+                <CorrelationAnalysisView
+                  data={metrics}
+                  isLoading={isLoading}
+                />
+              ) : (
+                <Card className="p-4 text-center border-dashed">
+                  <ScatterChart className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                  <p className="text-xs text-muted-foreground">Apply filters to view correlation analysis</p>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="valuation" className="mt-2" data-testid="tab-content-valuation">
+              {metrics ? (
+                <ValuationModelsView
+                  data={metrics}
+                  isLoading={isLoading}
+                />
+              ) : (
+                <Card className="p-4 text-center border-dashed">
+                  <Calculator className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                  <p className="text-xs text-muted-foreground">Apply filters to view valuation models</p>
                 </Card>
               )}
             </TabsContent>
