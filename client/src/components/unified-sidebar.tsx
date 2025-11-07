@@ -165,8 +165,8 @@ export default function UnifiedSidebar() {
         data-testid="unified-sidebar"
       >
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 flex-shrink-0 space-y-3">
-          <div className="flex items-center justify-between">
+        <div className="px-3 py-4 border-b border-gray-200 flex-shrink-0 space-y-3">
+          <div className="flex items-center justify-between px-1">
             <div className="flex items-center space-x-2.5" data-testid="sidebar-logo">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
                 <Anchor className="w-5 h-5 text-white" />
@@ -183,13 +183,15 @@ export default function UnifiedSidebar() {
               <X className="w-5 h-5" />
             </button>
           </div>
-          <SmartSearch 
-            onResultSelect={(result) => {
-              setSelectedEntity({ type: result.type, id: result.id });
-              setDrawerOpen(true);
-              setMobileMenuOpen(false);
-            }}
-          />
+          <div className="w-full">
+            <SmartSearch 
+              onResultSelect={(result) => {
+                setSelectedEntity({ type: result.type, id: result.id });
+                setDrawerOpen(true);
+                setMobileMenuOpen(false);
+              }}
+            />
+          </div>
         </div>
       
       {/* Scrollable Navigation */}

@@ -220,7 +220,7 @@ export default function SalesCompsIndex() {
       comp.wetSlips || '',
       comp.dryRacks || '',
       comp.occupancy || '',
-      comp.market || '',
+      (comp as any).market || '',
     ]);
 
     const csvContent = [headers, ...csvData]
@@ -347,10 +347,9 @@ export default function SalesCompsIndex() {
     <div className="flex flex-1 bg-background h-screen">
       {/* Left Sidebar - Filters */}
       {!isSidebarCollapsed && (
-        <div className="w-64 bg-card border-r border-border flex flex-col">
-          <div className="p-6 border-b border-border">
+        <div className="w-64 bg-card border-r border-border flex flex-col flex-shrink-0">
+          <div className="px-4 py-4 border-b border-border">
             <h2 className="text-lg font-semibold text-foreground">Sales Comps</h2>
-            <p className="text-sm text-muted-foreground">Manage marina sales comparables</p>
           </div>
 
           <FiltersPanel 
