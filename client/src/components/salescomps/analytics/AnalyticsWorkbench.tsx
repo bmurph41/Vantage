@@ -131,7 +131,7 @@ export default function AnalyticsWorkbench() {
   const insights = analyticsData?.insights || [];
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-full">
+    <div className="flex flex-col lg:flex-row gap-4 h-full">
       {/* Filters Sidebar */}
       <div className="w-full lg:w-80 flex-shrink-0">
         <AnalyticsFiltersPanel
@@ -145,7 +145,7 @@ export default function AnalyticsWorkbench() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
@@ -196,17 +196,17 @@ export default function AnalyticsWorkbench() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="overview" className="space-y-6 mt-6" data-testid="tab-content-overview">
+            <TabsContent value="overview" className="space-y-4 mt-4" data-testid="tab-content-overview">
               {!metrics ? (
-                <Card className="p-12 text-center border-dashed">
-                  <Lightbulb className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-semibold mb-2">Start Your Analysis</h3>
-                  <p className="text-muted-foreground max-w-md mx-auto">
+                <Card className="p-8 text-center border-dashed">
+                  <Lightbulb className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                  <h3 className="text-base font-semibold mb-1">Start Your Analysis</h3>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
                     Apply filters on the left to generate comprehensive market analytics and insights
                   </p>
                 </Card>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {metrics.trends && (
                     <TimeSeriesView
                       priceOverTime={metrics.trends.priceOverTime}
@@ -218,7 +218,7 @@ export default function AnalyticsWorkbench() {
               )}
             </TabsContent>
 
-            <TabsContent value="trends" className="mt-6" data-testid="tab-content-trends">
+            <TabsContent value="trends" className="mt-4" data-testid="tab-content-trends">
               {metrics?.trends ? (
                 <TimeSeriesView
                   priceOverTime={metrics.trends.priceOverTime}
@@ -226,14 +226,14 @@ export default function AnalyticsWorkbench() {
                   isLoading={isLoading}
                 />
               ) : (
-                <Card className="p-12 text-center border-dashed">
-                  <TrendingUp className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">Apply filters to view time series trends</p>
+                <Card className="p-8 text-center border-dashed">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                  <p className="text-sm text-muted-foreground">Apply filters to view time series trends</p>
                 </Card>
               )}
             </TabsContent>
 
-            <TabsContent value="regional" className="mt-6" data-testid="tab-content-regional">
+            <TabsContent value="regional" className="mt-4" data-testid="tab-content-regional">
               {metrics ? (
                 <RegionalComparisonView
                   byState={metrics.byState}
@@ -241,14 +241,14 @@ export default function AnalyticsWorkbench() {
                   isLoading={isLoading}
                 />
               ) : (
-                <Card className="p-12 text-center border-dashed">
-                  <MapPin className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">Apply filters to view regional comparison</p>
+                <Card className="p-8 text-center border-dashed">
+                  <MapPin className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                  <p className="text-sm text-muted-foreground">Apply filters to view regional comparison</p>
                 </Card>
               )}
             </TabsContent>
 
-            <TabsContent value="cohorts" className="mt-6" data-testid="tab-content-cohorts">
+            <TabsContent value="cohorts" className="mt-4" data-testid="tab-content-cohorts">
               {metrics ? (
                 <CohortAnalysisView
                   byPriceRange={metrics.byPriceRange}
@@ -256,9 +256,9 @@ export default function AnalyticsWorkbench() {
                   isLoading={isLoading}
                 />
               ) : (
-                <Card className="p-12 text-center border-dashed">
-                  <Layers className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">Apply filters to view cohort analysis</p>
+                <Card className="p-8 text-center border-dashed">
+                  <Layers className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                  <p className="text-sm text-muted-foreground">Apply filters to view cohort analysis</p>
                 </Card>
               )}
             </TabsContent>
