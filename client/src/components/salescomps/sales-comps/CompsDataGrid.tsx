@@ -1013,11 +1013,11 @@ export default function CompsDataGrid({
           style={{
             width: '100%',
             height: '100%',
-            minWidth: 0, // Allow shrinking
-            scrollbarWidth: 'auto', // Firefox
-            msOverflowStyle: 'scrollbar', // IE/Edge
-            position: 'relative',
-            scrollbarColor: 'auto'
+            minWidth: 0,
+            scrollbarWidth: 'auto',
+            msOverflowStyle: 'scrollbar',
+            scrollbarColor: 'auto',
+            display: 'block'
           }}
           onKeyDown={(e) => {
             const container = scrollContainerRef.current;
@@ -1054,9 +1054,9 @@ export default function CompsDataGrid({
           tabIndex={0}
         >
             <Table className="min-w-full w-full" style={{ minWidth: '1500px' }} data-testid="data-table">
-            <TableHeader className="sticky top-0 bg-card backdrop-blur-sm z-20 border-b border-border shadow-sm">
+            <TableHeader className="bg-card border-b border-border">
               <TableRow>
-                <TableHead className="data-table-header w-8">
+                <TableHead className="data-table-header w-8 bg-card sticky top-0 z-20 shadow-sm">
                   <Checkbox
                     checked={selectedIds.length === data.length && data.length > 0}
                     onCheckedChange={handleSelectAll}
@@ -1066,7 +1066,7 @@ export default function CompsDataGrid({
                 {columns.map((column, index) => (
                   <TableHead 
                     key={column.key}
-                    className={`data-table-header text-left relative select-none transition-all duration-75 ${
+                    className={`data-table-header text-left relative select-none transition-all duration-75 bg-card sticky top-0 z-20 shadow-sm ${
                       isDraggingColumn === column.key ? 'opacity-60 shadow-lg z-50' : ''
                     } ${
                       dragState && dragState.dropTargetIndex === index && isDraggingColumn !== column.key 
@@ -1078,8 +1078,7 @@ export default function CompsDataGrid({
                       maxWidth: `${column.width}px`,
                       transform: isDraggingColumn === column.key && dragState ? 
                         `translateX(${dragState.currentX - dragState.startX}px)` : 'none',
-                      zIndex: isDraggingColumn === column.key ? 1000 : 'auto',
-                      position: isDraggingColumn === column.key ? 'relative' : 'static'
+                      zIndex: isDraggingColumn === column.key ? 1000 : undefined
                     }}
                     data-testid={`header-${column.key}`}
                   >
