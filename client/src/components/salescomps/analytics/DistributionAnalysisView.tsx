@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { PieChart, Histogram } from "lucide-react";
+import { PieChart, BarChart3 } from "lucide-react";
 
 interface DistributionAnalysisViewProps {
   data: any;
@@ -13,7 +13,7 @@ export default function DistributionAnalysisView({ data, isLoading }: Distributi
   if (isLoading || !data) {
     return (
       <Card className="p-6 text-center border-dashed">
-        <Histogram className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+        <BarChart3 className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
         <p className="text-sm text-muted-foreground">Loading distribution analysis...</p>
       </Card>
     );
@@ -50,7 +50,7 @@ export default function DistributionAnalysisView({ data, isLoading }: Distributi
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Histogram className="h-4 w-4" />
+              <BarChart3 className="h-4 w-4" />
               Price Distribution
             </CardTitle>
           </CardHeader>
@@ -75,7 +75,7 @@ export default function DistributionAnalysisView({ data, isLoading }: Distributi
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Histogram className="h-4 w-4" />
+              <BarChart3 className="h-4 w-4" />
               Capacity Distribution
             </CardTitle>
           </CardHeader>
@@ -100,7 +100,7 @@ export default function DistributionAnalysisView({ data, isLoading }: Distributi
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Histogram className="h-4 w-4" />
+              <BarChart3 className="h-4 w-4" />
               Cap Rate Distribution
             </CardTitle>
           </CardHeader>
