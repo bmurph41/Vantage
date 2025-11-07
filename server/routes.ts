@@ -139,6 +139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/saved-searches", authenticateUser);
   app.use("/api/profit-centers", authenticateUser);
   app.use("/api/recommendations", authenticateUser);
+  app.use("/api/pending-properties", authenticateUser);
 
   // Initialize SalesComps services
   const parserService = new ParserService();

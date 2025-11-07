@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, BarChart3, AlertCircle, FileDown, TrendingUp, DollarSign, Percent } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import { salesCompsApi } from "@/lib/salescomps/api";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/salescomps/format";
@@ -243,19 +243,66 @@ export default function Compare() {
                 <CardTitle>Sale Price Comparison</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={compsData.filter(c => c.salePrice).map((comp, i) => ({
-                    name: comp.marina,
-                    price: comp.salePrice,
-                    fill: CHART_COLORS[i % CHART_COLORS.length]
-                  }))}>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart 
+                    data={compsData.filter(c => c.salePrice).map((comp, i) => ({
+                      name: comp.marina,
+                      displayName: comp.marina.length > 20 ? comp.marina.substring(0, 20) + '...' : comp.marina,
+                      price: comp.salePrice,
+                      isSubject: i === 0,
+                      fill: i === 0 ? '#10b981' : '#3b82f6'
+                    }))}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                    <YAxis tickFormatter={(value) => `$${(value / 1000000).toFixed(1)}M`} />
-                    <RechartsTooltip formatter={(value: any) => formatCurrency(value)} />
-                    <Bar dataKey="price" />
+                    <XAxis 
+                      dataKey="displayName" 
+                      angle={-45} 
+                      textAnchor="end" 
+                      height={100}
+                      interval={0}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis 
+                      tickFormatter={(value) => `$${(value / 1000000).toFixed(1)}M`}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <RechartsTooltip 
+                      formatter={(value: any, name: string, props: any) => [
+                        formatCurrency(value),
+                        props.payload.isSubject ? 'Subject Property' : 'Comparable'
+                      ]}
+                      labelFormatter={(label, payload) => {
+                        if (payload && payload.length > 0) {
+                          return payload[0].payload.name;
+                        }
+                        return label;
+                      }}
+                    />
+                    <Bar 
+                      dataKey="price" 
+                      barSize={60}
+                      radius={[8, 8, 0, 0]}
+                    >
+                      {compsData.filter(c => c.salePrice).map((comp, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={index === 0 ? '#10b981' : '#3b82f6'}
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                <div className="mt-4 flex items-center justify-center gap-6 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-[#10b981]"></div>
+                    <span className="text-muted-foreground">Subject Property (First in comparison)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-[#3b82f6]"></div>
+                    <span className="text-muted-foreground">Comparables</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
