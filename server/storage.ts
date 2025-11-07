@@ -9,6 +9,7 @@ import {
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
   salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes, scPortfolios, scPortfolioComps,
+  rateComps, rateCompColumns, rateCompImports, rcProjects, rcProjectComps, rcAuditLog, rcRecommendationFeedback, rcOrgPreferences, rcSavedSearches, rcCustomStorageTypes, rcPortfolios, rcPortfolioComps, rcPendingPropertyProfiles,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
@@ -19,6 +20,7 @@ import {
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
   type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScCustomStorageType,
+  type RateComp, type RateCompColumn, type RateCompImport, type RcProject, type RcProjectComp, type RcAuditLog, type RcRecommendationFeedback, type RcOrgPreferences, type RcSavedSearch, type RcCustomStorageType, type RcPendingPropertyProfile,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
@@ -32,7 +34,11 @@ import {
   type InsertSalesComp, type UpdateSalesComp, type InsertCompColumn, type UpdateCompColumn, type InsertCompImport,
   type InsertScProject, type UpdateScProject, type InsertScProjectComp, type UpdateScProjectComp,
   type InsertScRecommendationFeedback, type InsertScOrgPreferences, type UpdateScOrgPreferences,
-  type InsertScSavedSearch, type UpdateScSavedSearch, type InsertScCustomStorageType
+  type InsertScSavedSearch, type UpdateScSavedSearch, type InsertScCustomStorageType,
+  type InsertRateComp, type UpdateRateComp, type InsertRateCompColumn, type UpdateRateCompColumn, type InsertRateCompImport,
+  type InsertRcProject, type UpdateRcProject, type InsertRcProjectComp, type UpdateRcProjectComp,
+  type InsertRcRecommendationFeedback, type InsertRcOrgPreferences, type UpdateRcOrgPreferences,
+  type InsertRcSavedSearch, type UpdateRcSavedSearch, type InsertRcCustomStorageType, type InsertRcPendingPropertyProfile
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, isNull, or, count } from "drizzle-orm";
@@ -517,6 +523,96 @@ export interface IStorage {
   createPendingProperty(data: InsertPendingProperty): Promise<PendingProperty>;
   acceptPendingProperty(id: string, orgId: string, userId: string): Promise<Property | undefined>;
   rejectPendingProperty(id: string, orgId: string, userId: string): Promise<boolean>;
+
+  // RateComps - Rate Comparables Operations
+  getRateComps(params: {
+    orgId: string;
+    filters?: Record<string, any>;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ comps: RateComp[]; total: number }>;
+  getAllRateCompIds(orgId: string): Promise<string[]>;
+  getRateCompColumnUniqueValues(orgId: string, column: string): Promise<string[]>;
+  getRateComp(id: string, orgId: string): Promise<RateComp | undefined>;
+  createRateComp(comp: InsertRateComp): Promise<RateComp>;
+  updateRateComp(id: string, comp: UpdateRateComp, orgId: string): Promise<RateComp | undefined>;
+  deleteRateComp(id: string, orgId: string, deletedBy: string): Promise<boolean>;
+  bulkUpdateRateComps(ids: string[], updates: UpdateRateComp, orgId: string): Promise<number>;
+  bulkDeleteRateComps(ids: string[], orgId: string, deletedBy: string): Promise<number>;
+
+  // RateComps - Columns Management
+  getRateCompColumns(orgId: string): Promise<RateCompColumn[]>;
+  createRateCompColumn(column: InsertRateCompColumn): Promise<RateCompColumn>;
+  updateRateCompColumn(id: string, column: UpdateRateCompColumn, orgId: string): Promise<RateCompColumn | undefined>;
+  deleteRateCompColumn(id: string, orgId: string): Promise<boolean>;
+
+  // RateComps - Import Operations
+  createRateCompImport(importData: InsertRateCompImport): Promise<RateCompImport>;
+  getRateCompImport(id: string, orgId: string): Promise<RateCompImport | undefined>;
+  updateRateCompImport(id: string, updates: Partial<RateCompImport>, orgId: string): Promise<RateCompImport | undefined>;
+
+  // RateComps - Duplicate Detection
+  findPotentialRateCompDuplicates(orgId: string, marina: string, state?: string, saleYear?: number): Promise<RateComp[]>;
+
+  // RateComps - Project Operations
+  getRcProjects(orgId: string, userId: string): Promise<RcProject[]>;
+  getRcProject(id: string, orgId: string): Promise<RcProject | undefined>;
+  createRcProject(data: InsertRcProject): Promise<RcProject>;
+  updateRcProject(id: string, data: UpdateRcProject, orgId: string): Promise<RcProject | undefined>;
+  deleteRcProject(id: string, orgId: string, deletedBy: string): Promise<boolean>;
+
+  // RateComps - Project-Comp Associations
+  getRcProjectComps(projectId: string, orgId: string): Promise<(RcProjectComp & { rateComp: RateComp })[]>;
+  addCompToRcProject(projectId: string, rateCompId: string, orgId: string, userId: string): Promise<RcProjectComp>;
+  removeCompFromRcProject(projectId: string, rateCompId: string, orgId: string): Promise<boolean>;
+  updateRcProjectComp(id: string, data: UpdateRcProjectComp, orgId: string): Promise<RcProjectComp | undefined>;
+
+  // RateComps - Audit Operations
+  createRcAuditLog(log: {
+    orgId: string;
+    userId: string;
+    entity: string;
+    entityId: string;
+    action: string;
+    before?: any;
+    after?: any;
+  }): Promise<RcAuditLog>;
+
+  // RateComps - Recommendation System
+  getRateCompsForRecommendation(params: {
+    orgId: string;
+    filters?: Record<string, any>;
+  }): Promise<RateComp[]>;
+
+  // RateComps - Recommendation Feedback
+  createRcRecommendationFeedback(feedback: InsertRcRecommendationFeedback): Promise<RcRecommendationFeedback>;
+  getRcRecommendationFeedback(orgId: string, projectId?: string): Promise<RcRecommendationFeedback[]>;
+
+  // RateComps - Organization Preferences
+  getRcOrgPreferences(orgId: string, segmentKey: string): Promise<RcOrgPreferences | undefined>;
+  upsertRcOrgPreferences(preferences: InsertRcOrgPreferences): Promise<RcOrgPreferences>;
+  updateRcOrgPreferences(orgId: string, segmentKey: string, updates: UpdateRcOrgPreferences): Promise<RcOrgPreferences | undefined>;
+
+  // RateComps - Saved Searches
+  getRcSavedSearches(orgId: string, userId?: string): Promise<RcSavedSearch[]>;
+  getRcSavedSearch(id: string, orgId: string): Promise<RcSavedSearch | undefined>;
+  createRcSavedSearch(data: InsertRcSavedSearch): Promise<RcSavedSearch>;
+  updateRcSavedSearch(id: string, data: UpdateRcSavedSearch, orgId: string): Promise<RcSavedSearch | undefined>;
+  deleteRcSavedSearch(id: string, orgId: string, deletedBy: string): Promise<boolean>;
+  incrementRcSavedSearchUsage(id: string, orgId: string): Promise<void>;
+
+  // RateComps - Custom Storage Types
+  getRcCustomStorageTypes(orgId: string): Promise<RcCustomStorageType[]>;
+  createRcCustomStorageType(data: InsertRcCustomStorageType): Promise<RcCustomStorageType>;
+  deleteRcCustomStorageType(id: string, orgId: string): Promise<boolean>;
+
+  // RateComps - Pending Property Profiles
+  getRcPendingPropertyProfiles(orgId: string, status?: string): Promise<RcPendingPropertyProfile[]>;
+  createRcPendingPropertyProfile(data: InsertRcPendingPropertyProfile): Promise<RcPendingPropertyProfile>;
+  updateRcPendingPropertyProfile(id: string, data: Partial<InsertRcPendingPropertyProfile>): Promise<RcPendingPropertyProfile>;
+  deleteRcPendingPropertyProfile(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3918,6 +4014,596 @@ export class DatabaseStorage implements IStorage {
 
   async updateOrgPreferences(orgId: string, segmentKey: string, updates: UpdateScOrgPreferences): Promise<ScOrgPreferences | undefined> {
     return this.updateScOrgPreferences(orgId, segmentKey, updates);
+  }
+
+  // ============================================================================
+  // RATE COMPS STORAGE METHODS
+  // ============================================================================
+
+  // Rate Comps Operations
+  async getRateComps(params: {
+    orgId: string;
+    filters?: Record<string, any>;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ comps: RateComp[]; total: number }> {
+    const { orgId, filters = {}, sortBy = 'createdAt', sortDir = 'desc', page = 1, pageSize = 25 } = params;
+    
+    const conditions = [eq(rateComps.orgId, orgId), isNull(rateComps.deletedAt)];
+    
+    if (filters.q) {
+      conditions.push(sql`${rateComps.marina} ILIKE ${`%${filters.q}%`}`);
+    }
+    if (filters.state) {
+      conditions.push(eq(rateComps.state, filters.state));
+    }
+    if (filters.saleYearMin) {
+      conditions.push(sql`${rateComps.saleYear} >= ${filters.saleYearMin}`);
+    }
+    if (filters.saleYearMax) {
+      conditions.push(sql`${rateComps.saleYear} <= ${filters.saleYearMax}`);
+    }
+    if (filters.priceMin) {
+      conditions.push(sql`${rateComps.salePrice} >= ${filters.priceMin}`);
+    }
+    if (filters.priceMax) {
+      conditions.push(sql`${rateComps.salePrice} <= ${filters.priceMax}`);
+    }
+    if (filters.disclosedOnly) {
+      conditions.push(eq(rateComps.isPriceDisclosed, true));
+    }
+    if (filters.disclosedCapRateOnly) {
+      conditions.push(eq(rateComps.isCapRateDisclosed, true));
+    }
+    if (filters.portfoliosOnly) {
+      conditions.push(eq(rateComps.isPortfolio, true));
+    }
+
+    const [{ total }] = await db.select({ total: count() })
+      .from(rateComps)
+      .where(and(...conditions));
+
+    const orderColumn = sortBy === 'marina' ? rateComps.marina :
+                       sortBy === 'saleYear' ? rateComps.saleYear :
+                       sortBy === 'salePrice' ? rateComps.salePrice :
+                       sortBy === 'state' ? rateComps.state :
+                       rateComps.createdAt;
+    
+    const orderFn = sortDir === 'asc' ? asc : desc;
+
+    const comps = await db.select().from(rateComps)
+      .where(and(...conditions))
+      .orderBy(orderFn(orderColumn))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    return { comps, total };
+  }
+
+  async getAllRateCompIds(orgId: string): Promise<string[]> {
+    const comps = await db.select({ id: rateComps.id })
+      .from(rateComps)
+      .where(and(
+        eq(rateComps.orgId, orgId),
+        isNull(rateComps.deletedAt)
+      ));
+    return comps.map(comp => comp.id);
+  }
+
+  async getRateCompColumnUniqueValues(orgId: string, column: string): Promise<string[]> {
+    try {
+      let dbColumn;
+      switch (column) {
+        case 'marina':
+          dbColumn = rateComps.marina;
+          break;
+        case 'state':
+          dbColumn = rateComps.state;
+          break;
+        case 'saleYear':
+          dbColumn = rateComps.saleYear;
+          break;
+        case 'market':
+          dbColumn = rateComps.market;
+          break;
+        default:
+          return [];
+      }
+
+      const results = await db
+        .selectDistinct({ value: dbColumn })
+        .from(rateComps)
+        .where(and(
+          eq(rateComps.orgId, orgId),
+          isNull(rateComps.deletedAt),
+          column === 'saleYear' ? 
+            sql`${dbColumn} IS NOT NULL AND ${dbColumn}::text != '' AND ${dbColumn} > 0` : 
+            sql`${dbColumn} IS NOT NULL AND ${dbColumn} != ''`
+        ))
+        .orderBy(asc(dbColumn));
+
+      return results.map(r => String(r.value)).filter(Boolean);
+    } catch (error) {
+      console.error(`Error getting unique values for column ${column}:`, error);
+      return [];
+    }
+  }
+
+  async getRateComp(id: string, orgId: string): Promise<RateComp | undefined> {
+    const [comp] = await db.select().from(rateComps)
+      .where(and(
+        eq(rateComps.id, id),
+        eq(rateComps.orgId, orgId),
+        isNull(rateComps.deletedAt)
+      ));
+    return comp;
+  }
+
+  async createRateComp(comp: InsertRateComp): Promise<RateComp> {
+    const [newComp] = await db.insert(rateComps).values(comp as any).returning();
+    return newComp;
+  }
+
+  async updateRateComp(id: string, comp: UpdateRateComp, orgId: string): Promise<RateComp | undefined> {
+    const [updatedComp] = await db.update(rateComps)
+      .set({ ...comp, updatedAt: new Date() } as any)
+      .where(and(
+        eq(rateComps.id, id),
+        eq(rateComps.orgId, orgId),
+        isNull(rateComps.deletedAt)
+      ))
+      .returning();
+    return updatedComp;
+  }
+
+  async deleteRateComp(id: string, orgId: string, deletedBy: string): Promise<boolean> {
+    const [deletedComp] = await db.update(rateComps)
+      .set({ deletedAt: new Date(), updatedBy: deletedBy })
+      .where(and(
+        eq(rateComps.id, id),
+        eq(rateComps.orgId, orgId),
+        isNull(rateComps.deletedAt)
+      ))
+      .returning();
+    return !!deletedComp;
+  }
+
+  async bulkUpdateRateComps(ids: string[], updates: UpdateRateComp, orgId: string): Promise<number> {
+    const result = await db.update(rateComps)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(and(
+        inArray(rateComps.id, ids),
+        eq(rateComps.orgId, orgId),
+        isNull(rateComps.deletedAt)
+      ));
+    return result.rowCount || 0;
+  }
+
+  async bulkDeleteRateComps(ids: string[], orgId: string, deletedBy: string): Promise<number> {
+    const CHUNK_SIZE = 1000;
+    let totalDeleted = 0;
+
+    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+      const chunk = ids.slice(i, i + CHUNK_SIZE);
+      const result = await db.update(rateComps)
+        .set({ deletedAt: new Date(), updatedBy: deletedBy })
+        .where(and(
+          inArray(rateComps.id, chunk),
+          eq(rateComps.orgId, orgId),
+          isNull(rateComps.deletedAt)
+        ));
+      totalDeleted += result.rowCount || 0;
+    }
+    
+    return totalDeleted;
+  }
+
+  // Columns Operations
+  async getRateCompColumns(orgId: string): Promise<RateCompColumn[]> {
+    return await db.select().from(rateCompColumns)
+      .where(eq(rateCompColumns.orgId, orgId))
+      .orderBy(asc(rateCompColumns.orderIndex));
+  }
+
+  async createRateCompColumn(column: InsertRateCompColumn): Promise<RateCompColumn> {
+    const [newColumn] = await db.insert(rateCompColumns).values(column as any).returning();
+    return newColumn;
+  }
+
+  async updateRateCompColumn(id: string, column: UpdateRateCompColumn, orgId: string): Promise<RateCompColumn | undefined> {
+    const [updatedColumn] = await db.update(rateCompColumns)
+      .set({ ...column, updatedAt: new Date() } as any)
+      .where(and(eq(rateCompColumns.id, id), eq(rateCompColumns.orgId, orgId)))
+      .returning();
+    return updatedColumn;
+  }
+
+  async deleteRateCompColumn(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(rateCompColumns)
+      .where(and(eq(rateCompColumns.id, id), eq(rateCompColumns.orgId, orgId)));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Import Operations
+  async createRateCompImport(importData: InsertRateCompImport): Promise<RateCompImport> {
+    const [newImport] = await db.insert(rateCompImports).values(importData as any).returning();
+    return newImport;
+  }
+
+  async getRateCompImport(id: string, orgId: string): Promise<RateCompImport | undefined> {
+    const [importRecord] = await db.select().from(rateCompImports)
+      .where(and(eq(rateCompImports.id, id), eq(rateCompImports.orgId, orgId)));
+    return importRecord;
+  }
+
+  async updateRateCompImport(id: string, updates: Partial<RateCompImport>, orgId: string): Promise<RateCompImport | undefined> {
+    const [updatedImport] = await db.update(rateCompImports)
+      .set(updates)
+      .where(and(eq(rateCompImports.id, id), eq(rateCompImports.orgId, orgId)))
+      .returning();
+    return updatedImport;
+  }
+
+  // Duplicate Detection
+  async findPotentialRateCompDuplicates(orgId: string, marina: string, state?: string, saleYear?: number): Promise<RateComp[]> {
+    const duplicates = await db.select()
+      .from(rateComps)
+      .where(and(
+        eq(rateComps.orgId, orgId),
+        isNull(rateComps.deletedAt),
+        sql`LOWER(${rateComps.marina}) = LOWER(${marina})`,
+        state ? sql`LOWER(${rateComps.state}) = LOWER(${state})` : sql`1=1`,
+        saleYear ? eq(rateComps.saleYear, saleYear) : sql`1=1`
+      ))
+      .limit(10);
+    
+    return duplicates;
+  }
+
+  // RC Project Operations
+  async getRcProjects(orgId: string, userId: string): Promise<RcProject[]> {
+    return await db.select().from(rcProjects)
+      .where(and(
+        eq(rcProjects.orgId, orgId),
+        isNull(rcProjects.deletedAt)
+      ))
+      .orderBy(desc(rcProjects.updatedAt));
+  }
+
+  async getRcProject(id: string, orgId: string): Promise<RcProject | undefined> {
+    const [project] = await db.select().from(rcProjects)
+      .where(and(
+        eq(rcProjects.id, id),
+        eq(rcProjects.orgId, orgId),
+        isNull(rcProjects.deletedAt)
+      ));
+    return project;
+  }
+
+  async createRcProject(data: InsertRcProject): Promise<RcProject> {
+    const [newProject] = await db.insert(rcProjects).values(data as any).returning();
+    return newProject;
+  }
+
+  async updateRcProject(id: string, data: UpdateRcProject, orgId: string): Promise<RcProject | undefined> {
+    const [updatedProject] = await db.update(rcProjects)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(and(
+        eq(rcProjects.id, id),
+        eq(rcProjects.orgId, orgId),
+        isNull(rcProjects.deletedAt)
+      ))
+      .returning();
+    return updatedProject;
+  }
+
+  async deleteRcProject(id: string, orgId: string, deletedBy: string): Promise<boolean> {
+    const [deletedProject] = await db.update(rcProjects)
+      .set({ deletedAt: new Date(), updatedBy: deletedBy })
+      .where(and(
+        eq(rcProjects.id, id),
+        eq(rcProjects.orgId, orgId),
+        isNull(rcProjects.deletedAt)
+      ))
+      .returning();
+    return !!deletedProject;
+  }
+
+  // Project-Comp Operations
+  async getRcProjectComps(projectId: string, orgId: string): Promise<(RcProjectComp & { rateComp: RateComp })[]> {
+    const results = await db.select({
+      id: rcProjectComps.id,
+      orgId: rcProjectComps.orgId,
+      rcProjectId: rcProjectComps.rcProjectId,
+      rateCompId: rcProjectComps.rateCompId,
+      addedBy: rcProjectComps.addedBy,
+      addedAt: rcProjectComps.addedAt,
+      notes: rcProjectComps.notes,
+      rateComp: rateComps,
+    })
+      .from(rcProjectComps)
+      .innerJoin(rateComps, and(
+        eq(rcProjectComps.rateCompId, rateComps.id),
+        eq(rateComps.orgId, rcProjectComps.orgId),
+        isNull(rateComps.deletedAt)
+      ))
+      .where(and(
+        eq(rcProjectComps.rcProjectId, projectId),
+        eq(rcProjectComps.orgId, orgId)
+      ))
+      .orderBy(desc(rcProjectComps.addedAt));
+
+    return results as (RcProjectComp & { rateComp: RateComp })[];
+  }
+
+  async addCompToRcProject(projectId: string, rateCompId: string, orgId: string, userId: string): Promise<RcProjectComp> {
+    const project = await this.getRcProject(projectId, orgId);
+    if (!project) {
+      throw new Error('Project not found or access denied');
+    }
+
+    const rateComp = await this.getRateComp(rateCompId, orgId);
+    if (!rateComp) {
+      throw new Error('Rate comp not found or access denied');
+    }
+
+    const [projectComp] = await db.insert(rcProjectComps).values({
+      orgId,
+      rcProjectId: projectId,
+      rateCompId,
+      addedBy: userId,
+    } as any).returning();
+    return projectComp;
+  }
+
+  async removeCompFromRcProject(projectId: string, rateCompId: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(rcProjectComps)
+      .where(and(
+        eq(rcProjectComps.rcProjectId, projectId),
+        eq(rcProjectComps.rateCompId, rateCompId),
+        eq(rcProjectComps.orgId, orgId)
+      ));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async updateRcProjectComp(id: string, data: UpdateRcProjectComp, orgId: string): Promise<RcProjectComp | undefined> {
+    const [updatedProjectComp] = await db.update(rcProjectComps)
+      .set(data as any)
+      .where(and(
+        eq(rcProjectComps.id, id),
+        eq(rcProjectComps.orgId, orgId)
+      ))
+      .returning();
+    return updatedProjectComp;
+  }
+
+  // Audit Operations
+  async createRcAuditLog(log: {
+    orgId: string;
+    userId: string;
+    entity: string;
+    entityId: string;
+    action: string;
+    before?: any;
+    after?: any;
+  }): Promise<RcAuditLog> {
+    const [auditEntry] = await db.insert(rcAuditLog).values(log).returning();
+    return auditEntry;
+  }
+
+  // Recommendation System
+  async getRateCompsForRecommendation(params: {
+    orgId: string;
+    filters?: Record<string, any>;
+  }): Promise<RateComp[]> {
+    const { orgId, filters = {} } = params;
+    
+    const conditions = [
+      eq(rateComps.orgId, orgId),
+      isNull(rateComps.deletedAt)
+    ];
+
+    if (filters.regions && filters.regions.length > 0) {
+      conditions.push(inArray(rateComps.region, filters.regions));
+    }
+    if (filters.states && filters.states.length > 0) {
+      conditions.push(inArray(rateComps.state, filters.states));
+    }
+    if (filters.coastalType) {
+      conditions.push(eq(rateComps.coastalType, filters.coastalType));
+    }
+    if (filters.excludeIds && filters.excludeIds.length > 0) {
+      conditions.push(sql`${rateComps.id} NOT IN (${sql.join(filters.excludeIds.map((id: string) => sql`${id}`), sql`, `)})`);
+    }
+
+    const comps = await db.select().from(rateComps)
+      .where(and(...conditions))
+      .orderBy(desc(rateComps.createdAt));
+
+    return comps;
+  }
+
+  // Recommendation Feedback
+  async createRcRecommendationFeedback(feedback: InsertRcRecommendationFeedback): Promise<RcRecommendationFeedback> {
+    const [newFeedback] = await db.insert(rcRecommendationFeedback)
+      .values(feedback as any)
+      .returning();
+    return newFeedback;
+  }
+
+  async getRcRecommendationFeedback(orgId: string, projectId?: string): Promise<RcRecommendationFeedback[]> {
+    const conditions = [eq(rcRecommendationFeedback.orgId, orgId)];
+    if (projectId) {
+      conditions.push(eq(rcRecommendationFeedback.rcProjectId, projectId));
+    }
+
+    return await db.select().from(rcRecommendationFeedback)
+      .where(and(...conditions))
+      .orderBy(desc(rcRecommendationFeedback.createdAt));
+  }
+
+  // Organization Preferences
+  async getRcOrgPreferences(orgId: string, segmentKey: string): Promise<RcOrgPreferences | undefined> {
+    const [preferences] = await db.select().from(rcOrgPreferences)
+      .where(and(
+        eq(rcOrgPreferences.orgId, orgId),
+        eq(rcOrgPreferences.segmentKey, segmentKey)
+      ));
+    return preferences;
+  }
+
+  async upsertRcOrgPreferences(preferences: InsertRcOrgPreferences): Promise<RcOrgPreferences> {
+    const [result] = await db.insert(rcOrgPreferences)
+      .values(preferences as any)
+      .onConflictDoUpdate({
+        target: [rcOrgPreferences.orgId, rcOrgPreferences.segmentKey],
+        set: {
+          weights: preferences.weights,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return result;
+  }
+
+  async updateRcOrgPreferences(orgId: string, segmentKey: string, updates: UpdateRcOrgPreferences): Promise<RcOrgPreferences | undefined> {
+    const [updatedPreferences] = await db.update(rcOrgPreferences)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(and(
+        eq(rcOrgPreferences.orgId, orgId),
+        eq(rcOrgPreferences.segmentKey, segmentKey)
+      ))
+      .returning();
+    return updatedPreferences;
+  }
+
+  // Saved Searches
+  async getRcSavedSearches(orgId: string, userId?: string): Promise<RcSavedSearch[]> {
+    const conditions = [
+      eq(rcSavedSearches.orgId, orgId),
+      isNull(rcSavedSearches.deletedAt)
+    ];
+    
+    if (userId) {
+      conditions.push(eq(rcSavedSearches.createdBy, userId));
+    }
+
+    return await db.select().from(rcSavedSearches)
+      .where(and(...conditions))
+      .orderBy(desc(rcSavedSearches.isPinned), desc(rcSavedSearches.lastUsedAt));
+  }
+
+  async getRcSavedSearch(id: string, orgId: string): Promise<RcSavedSearch | undefined> {
+    const [savedSearch] = await db.select().from(rcSavedSearches)
+      .where(and(
+        eq(rcSavedSearches.id, id),
+        eq(rcSavedSearches.orgId, orgId),
+        isNull(rcSavedSearches.deletedAt)
+      ));
+    return savedSearch;
+  }
+
+  async createRcSavedSearch(data: InsertRcSavedSearch): Promise<RcSavedSearch> {
+    const [newSearch] = await db.insert(rcSavedSearches).values(data as any).returning();
+    return newSearch;
+  }
+
+  async updateRcSavedSearch(id: string, data: UpdateRcSavedSearch, orgId: string): Promise<RcSavedSearch | undefined> {
+    const [updatedSearch] = await db.update(rcSavedSearches)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(and(
+        eq(rcSavedSearches.id, id),
+        eq(rcSavedSearches.orgId, orgId),
+        isNull(rcSavedSearches.deletedAt)
+      ))
+      .returning();
+    return updatedSearch;
+  }
+
+  async deleteRcSavedSearch(id: string, orgId: string, deletedBy: string): Promise<boolean> {
+    const [deletedSearch] = await db.update(rcSavedSearches)
+      .set({ deletedAt: new Date(), updatedBy: deletedBy })
+      .where(and(
+        eq(rcSavedSearches.id, id),
+        eq(rcSavedSearches.orgId, orgId),
+        isNull(rcSavedSearches.deletedAt)
+      ))
+      .returning();
+    return !!deletedSearch;
+  }
+
+  async incrementRcSavedSearchUsage(id: string, orgId: string): Promise<void> {
+    await db.update(rcSavedSearches)
+      .set({
+        useCount: sql`${rcSavedSearches.useCount} + 1`,
+        lastUsedAt: new Date()
+      })
+      .where(and(
+        eq(rcSavedSearches.id, id),
+        eq(rcSavedSearches.orgId, orgId),
+        isNull(rcSavedSearches.deletedAt)
+      ));
+  }
+
+  // Custom Storage Types
+  async getRcCustomStorageTypes(orgId: string): Promise<RcCustomStorageType[]> {
+    return await db.select()
+      .from(rcCustomStorageTypes)
+      .where(eq(rcCustomStorageTypes.orgId, orgId))
+      .orderBy(asc(rcCustomStorageTypes.name));
+  }
+
+  async createRcCustomStorageType(data: InsertRcCustomStorageType): Promise<RcCustomStorageType> {
+    const [created] = await db.insert(rcCustomStorageTypes)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async deleteRcCustomStorageType(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(rcCustomStorageTypes)
+      .where(and(
+        eq(rcCustomStorageTypes.id, id),
+        eq(rcCustomStorageTypes.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Pending Property Profiles
+  async getRcPendingPropertyProfiles(orgId: string, status?: string): Promise<RcPendingPropertyProfile[]> {
+    const conditions = [eq(rcPendingPropertyProfiles.orgId, orgId)];
+    if (status) {
+      conditions.push(eq(rcPendingPropertyProfiles.status, status));
+    }
+    return await db.select()
+      .from(rcPendingPropertyProfiles)
+      .where(and(...conditions))
+      .orderBy(desc(rcPendingPropertyProfiles.createdAt));
+  }
+
+  async createRcPendingPropertyProfile(data: InsertRcPendingPropertyProfile): Promise<RcPendingPropertyProfile> {
+    const [created] = await db.insert(rcPendingPropertyProfiles)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateRcPendingPropertyProfile(id: string, data: Partial<InsertRcPendingPropertyProfile>): Promise<RcPendingPropertyProfile> {
+    const [updated] = await db.update(rcPendingPropertyProfiles)
+      .set(data)
+      .where(eq(rcPendingPropertyProfiles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRcPendingPropertyProfile(id: string): Promise<boolean> {
+    const result = await db.delete(rcPendingPropertyProfiles)
+      .where(eq(rcPendingPropertyProfiles.id, id))
+      .returning();
+    return result.length > 0;
   }
 }
 
