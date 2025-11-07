@@ -627,7 +627,7 @@ export default function SalesCompsIndex() {
             <TabsList className="grid w-full max-w-md grid-cols-2" data-testid="tabs-navigation">
               <TabsTrigger value="data" className="flex items-center gap-2" data-testid="tab-data">
                 <Table className="h-4 w-4" />
-                All Comps
+                Sales Comps
               </TabsTrigger>
               <TabsTrigger value="metrics" className="flex items-center gap-2" data-testid="tab-metrics">
                 <TrendingUp className="h-4 w-4" />
