@@ -131,7 +131,7 @@ export default function AnalyticsWorkbench() {
   const insights = analyticsData?.insights || [];
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 h-full">
+    <div className="flex flex-col lg:flex-row gap-3 h-full">
       {/* Filters Sidebar */}
       <div className="w-full lg:w-80 flex-shrink-0">
         <AnalyticsFiltersPanel
@@ -145,11 +145,11 @@ export default function AnalyticsWorkbench() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        <div className="space-y-3">
+        <div className="space-y-2">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-1">
             <div>
-              <h2 className="text-xl font-bold text-foreground">Market Analytics</h2>
+              <h2 className="text-lg font-bold text-foreground">Market Analytics</h2>
               <p className="text-xs text-muted-foreground">
                 Institutional-grade comparative analysis for marina sales data
               </p>
@@ -177,7 +177,7 @@ export default function AnalyticsWorkbench() {
           )}
 
           {/* Analysis Views */}
-          <Tabs value={activeView} onValueChange={setActiveView} className="w-full -mt-1">
+          <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
             <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
               <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
                 <BarChart3 className="h-4 w-4" />
@@ -197,17 +197,17 @@ export default function AnalyticsWorkbench() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="overview" className="space-y-3 mt-3" data-testid="tab-content-overview">
+            <TabsContent value="overview" className="space-y-2 mt-2" data-testid="tab-content-overview">
               {!metrics ? (
-                <Card className="p-6 text-center border-dashed">
-                  <Lightbulb className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-50" />
+                <Card className="p-4 text-center border-dashed">
+                  <Lightbulb className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
                   <h3 className="text-sm font-semibold mb-1">Start Your Analysis</h3>
                   <p className="text-xs text-muted-foreground max-w-md mx-auto">
                     Apply filters on the left to generate comprehensive market analytics and insights
                   </p>
                 </Card>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {metrics.trends && (
                     <TimeSeriesView
                       priceOverTime={metrics.trends.priceOverTime}
@@ -219,7 +219,7 @@ export default function AnalyticsWorkbench() {
               )}
             </TabsContent>
 
-            <TabsContent value="trends" className="mt-3" data-testid="tab-content-trends">
+            <TabsContent value="trends" className="mt-2" data-testid="tab-content-trends">
               {metrics?.trends ? (
                 <TimeSeriesView
                   priceOverTime={metrics.trends.priceOverTime}
@@ -227,14 +227,14 @@ export default function AnalyticsWorkbench() {
                   isLoading={isLoading}
                 />
               ) : (
-                <Card className="p-6 text-center border-dashed">
-                  <TrendingUp className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-50" />
+                <Card className="p-4 text-center border-dashed">
+                  <TrendingUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
                   <p className="text-xs text-muted-foreground">Apply filters to view time series trends</p>
                 </Card>
               )}
             </TabsContent>
 
-            <TabsContent value="regional" className="mt-3" data-testid="tab-content-regional">
+            <TabsContent value="regional" className="mt-2" data-testid="tab-content-regional">
               {metrics ? (
                 <RegionalComparisonView
                   byState={metrics.byState}
@@ -242,14 +242,14 @@ export default function AnalyticsWorkbench() {
                   isLoading={isLoading}
                 />
               ) : (
-                <Card className="p-6 text-center border-dashed">
-                  <MapPin className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-50" />
+                <Card className="p-4 text-center border-dashed">
+                  <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
                   <p className="text-xs text-muted-foreground">Apply filters to view regional comparison</p>
                 </Card>
               )}
             </TabsContent>
 
-            <TabsContent value="cohorts" className="mt-3" data-testid="tab-content-cohorts">
+            <TabsContent value="cohorts" className="mt-2" data-testid="tab-content-cohorts">
               {metrics ? (
                 <CohortAnalysisView
                   byPriceRange={metrics.byPriceRange}
@@ -257,8 +257,8 @@ export default function AnalyticsWorkbench() {
                   isLoading={isLoading}
                 />
               ) : (
-                <Card className="p-6 text-center border-dashed">
-                  <Layers className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-50" />
+                <Card className="p-4 text-center border-dashed">
+                  <Layers className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
                   <p className="text-xs text-muted-foreground">Apply filters to view cohort analysis</p>
                 </Card>
               )}
