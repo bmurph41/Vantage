@@ -370,8 +370,8 @@ export default function SalesCompsIndex() {
 
   return (
     <div className="flex flex-1 bg-background h-screen">
-      {/* Left Sidebar - Filters */}
-      {!isSidebarCollapsed && (
+      {/* Left Sidebar - Filters (Only show on All Comps tab) */}
+      {!isSidebarCollapsed && activeTab === "data" && (
         <div className="w-64 bg-card border-r border-border flex flex-col flex-shrink-0">
           <div className="px-4 py-4 border-b border-border">
             <h2 className="text-lg font-semibold text-foreground">Sales Comps</h2>
