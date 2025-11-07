@@ -503,6 +503,14 @@ export interface IStorage {
   findPropertyByLocation(orgId: string, marina: string, city?: string, state?: string): Promise<Property | undefined>;
   findSimilarProperties(orgId: string, marina: string, city?: string, state?: string): Promise<Property[]>;
   
+  // CRM Companies - search by name
+  findCompanyByName(orgId: string, companyName: string): Promise<CRMCompany | undefined>;
+  findSimilarCompanies(orgId: string, companyName: string): Promise<CRMCompany[]>;
+  
+  // CRM Contacts - search by name
+  findContactByName(orgId: string, contactName: string): Promise<CRMContact | undefined>;
+  findSimilarContacts(orgId: string, contactName: string): Promise<CRMContact[]>;
+  
   // Pending Properties - Review queue for properties created from comps
   getPendingProperties(orgId: string, status?: string): Promise<PendingProperty[]>;
   getPendingProperty(id: string, orgId: string): Promise<PendingProperty | undefined>;
@@ -3553,6 +3561,96 @@ export class DatabaseStorage implements IStorage {
       .limit(10); // Increased limit for better suggestions
     
     return properties;
+  }
+
+  // ============================================================================
+  // CRM Companies - Search by name
+  // ============================================================================
+
+  async findCompanyByName(orgId: string, companyName: string): Promise<CRMCompany | undefined> {
+    // Normalize company name for comparison (case-insensitive, trim whitespace)
+    const normalizedName = companyName.trim().toLowerCase();
+    
+    const [company] = await db.select()
+      .from(crmCompanies)
+      .where(and(
+        eq(crmCompanies.orgId, orgId),
+        sql`LOWER(TRIM(${crmCompanies.name})) = ${normalizedName}`
+      ))
+      .limit(1);
+    
+    return company || undefined;
+  }
+
+  async findSimilarCompanies(orgId: string, companyName: string): Promise<CRMCompany[]> {
+    const normalizedName = companyName.trim().toLowerCase();
+    
+    // Build similarity query
+    const nameWords = normalizedName.split(/\s+/).filter(w => w.length >= 3);
+    
+    const nameConditions = [
+      sql`LOWER(TRIM(${crmCompanies.name})) = ${normalizedName}`, // Exact match
+      ...nameWords.map(word => 
+        sql`LOWER(${crmCompanies.name}) LIKE ${'%' + word + '%'}`  // Contains word
+      ),
+    ];
+    
+    const similarityCondition = or(...nameConditions);
+    
+    const companies = await db.select()
+      .from(crmCompanies)
+      .where(and(
+        eq(crmCompanies.orgId, orgId),
+        similarityCondition
+      ))
+      .limit(10);
+    
+    return companies;
+  }
+
+  // ============================================================================
+  // CRM Contacts - Search by name
+  // ============================================================================
+
+  async findContactByName(orgId: string, contactName: string): Promise<CRMContact | undefined> {
+    // Normalize contact name for comparison (case-insensitive, trim whitespace)
+    const normalizedName = contactName.trim().toLowerCase();
+    
+    const [contact] = await db.select()
+      .from(crmContacts)
+      .where(and(
+        eq(crmContacts.orgId, orgId),
+        sql`LOWER(TRIM(${crmContacts.firstName} || ' ' || ${crmContacts.lastName})) = ${normalizedName}`
+      ))
+      .limit(1);
+    
+    return contact || undefined;
+  }
+
+  async findSimilarContacts(orgId: string, contactName: string): Promise<CRMContact[]> {
+    const normalizedName = contactName.trim().toLowerCase();
+    
+    // Build similarity query
+    const nameWords = normalizedName.split(/\s+/).filter(w => w.length >= 2);
+    
+    const nameConditions = [
+      sql`LOWER(TRIM(${crmContacts.firstName} || ' ' || ${crmContacts.lastName})) = ${normalizedName}`, // Exact full name match
+      ...nameWords.map(word => 
+        sql`(LOWER(${crmContacts.firstName}) LIKE ${'%' + word + '%'} OR LOWER(${crmContacts.lastName}) LIKE ${'%' + word + '%'})`
+      ),
+    ];
+    
+    const similarityCondition = or(...nameConditions);
+    
+    const contacts = await db.select()
+      .from(crmContacts)
+      .where(and(
+        eq(crmContacts.orgId, orgId),
+        similarityCondition
+      ))
+      .limit(10);
+    
+    return contacts;
   }
 
   // ============================================================================

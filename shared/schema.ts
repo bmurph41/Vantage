@@ -3109,6 +3109,12 @@ export const salesComps = pgTable('sales_comps', {
   // Link to CRM Property
   propertyId: varchar('property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
 
+  // Transaction parties - CRM links
+  sellerCompanyId: varchar('seller_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  sellerContactId: varchar('seller_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+  buyerCompanyId: varchar('buyer_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  buyerContactId: varchar('buyer_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+
   // Expandable data
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
 }, (table) => ({

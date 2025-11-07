@@ -53,6 +53,11 @@ const compFormSchema = z.object({
   company: z.string().optional(),
   owner: z.string().optional(),
   listPrice: z.union([z.string(), z.number()]).optional(),
+  // Transaction parties
+  sellerCompany: z.string().optional(),
+  sellerPrincipal: z.string().optional(),
+  buyerCompany: z.string().optional(),
+  buyerPrincipal: z.string().optional(),
   acres: z.union([z.string(), z.number()]).optional(),
   occupancy: z.union([z.string(), z.number()]).optional(),
   yearBuilt: z.union([z.string(), z.number()]).optional(),
@@ -345,6 +350,10 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       seller: data.seller || undefined,
       company: data.company || undefined,
       owner: data.owner || undefined,
+      sellerCompany: data.sellerCompany || undefined,
+      sellerPrincipal: data.sellerPrincipal || undefined,
+      buyerCompany: data.buyerCompany || undefined,
+      buyerPrincipal: data.buyerPrincipal || undefined,
       notes: data.notes || undefined,
       waterType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType,
       coastalType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType, // Sync with waterType for backward compatibility
@@ -1231,6 +1240,94 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                   </Card>
                 </div>
               </div>
+
+              {/* Transaction Parties */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Transaction Parties</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Seller Section */}
+                    <div className="space-y-4">
+                      <h4 className="font-semibold text-sm text-gray-700">Seller</h4>
+                      <FormField
+                        control={form.control}
+                        name="sellerCompany"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Company</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                placeholder="Seller company name"
+                                data-testid="input-seller-company"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="sellerPrincipal"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Principal</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                placeholder="Principal contact name"
+                                data-testid="input-seller-principal"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Buyer Section */}
+                    <div className="space-y-4">
+                      <h4 className="font-semibold text-sm text-gray-700">Buyer</h4>
+                      <FormField
+                        control={form.control}
+                        name="buyerCompany"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Company</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                placeholder="Buyer company name"
+                                data-testid="input-buyer-company"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="buyerPrincipal"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Principal</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                placeholder="Principal contact name"
+                                data-testid="input-buyer-principal"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Profit Centers & Location */}
               <Card>
