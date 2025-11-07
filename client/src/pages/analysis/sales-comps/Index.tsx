@@ -624,7 +624,7 @@ export default function SalesCompsIndex() {
           )}
 
           {/* Tab Navigation */}
-          <div className="px-6 border-b border-border">
+          <div className="px-6 border-b border-border sticky top-0 z-30 bg-background">
             <TabsList className="grid w-full max-w-md grid-cols-2" data-testid="tabs-navigation">
               <TabsTrigger value="data" className="flex items-center gap-2" data-testid="tab-data">
                 <Table className="h-4 w-4" />
