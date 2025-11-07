@@ -4,7 +4,7 @@ import {
   contacts, projectContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
-  crmDeals, crmLeads, crmContacts, crmCompanies, crmPipelines, crmPipelineStages, crmActivities,
+  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmPipelines, crmPipelineStages, crmActivities,
   crmImportJobs, crmImportedRecords, crmProspectingEntries,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
@@ -14,7 +14,7 @@ import {
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
-  type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
+  type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
@@ -25,7 +25,7 @@ import {
   type InsertDDContact, type UpdateDDContact, type InsertProjectContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
-  type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
+  type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertProperty, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
   type InsertCrmImportJob, type InsertCrmImportedRecord, type InsertProspectingEntry,
   type InsertEmailSequence, type InsertEmailTemplate, type InsertEmailSequenceStep, type InsertEmailSequenceEnrollment, type InsertEmailSequenceStepExecution,
   type InsertCalendarSettings,
@@ -319,6 +319,13 @@ export interface IStorage {
   createCrmCompany(company: InsertCrmCompany): Promise<CrmCompany>;
   updateCrmCompany(id: string, updates: Partial<InsertCrmCompany>): Promise<CrmCompany>;
   deleteCrmCompany(id: string): Promise<void>;
+
+  // CRM - Properties
+  getCrmProperty(id: string): Promise<Property | undefined>;
+  getCrmPropertiesForOrg(orgId: string): Promise<Property[]>;
+  createCrmProperty(property: InsertProperty): Promise<Property>;
+  updateCrmProperty(id: string, updates: Partial<InsertProperty>): Promise<Property>;
+  deleteCrmProperty(id: string): Promise<void>;
 
   // CRM - Pipelines
   getCrmPipeline(id: string): Promise<CrmPipeline | undefined>;
@@ -2455,6 +2462,38 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCrmCompany(id: string): Promise<void> {
     await db.delete(crmCompanies).where(eq(crmCompanies.id, id));
+  }
+
+  // CRM - Properties
+  async getCrmProperty(id: string): Promise<Property | undefined> {
+    const [property] = await db.select()
+      .from(crmProperties)
+      .where(eq(crmProperties.id, id));
+    return property || undefined;
+  }
+
+  async getCrmPropertiesForOrg(orgId: string): Promise<Property[]> {
+    return await db.select()
+      .from(crmProperties)
+      .where(eq(crmProperties.ownerId, orgId));
+  }
+
+  async createCrmProperty(property: InsertProperty): Promise<Property> {
+    const [created] = await db.insert(crmProperties).values(property).returning();
+    return created;
+  }
+
+  async updateCrmProperty(id: string, updates: Partial<InsertProperty>): Promise<Property> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmProperties)
+      .set(updateData)
+      .where(eq(crmProperties.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCrmProperty(id: string): Promise<void> {
+    await db.delete(crmProperties).where(eq(crmProperties.id, id));
   }
 
   // CRM - Pipelines

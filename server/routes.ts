@@ -7792,6 +7792,84 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.post('/api/sales-comps/backfill-properties', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      
+      console.log('🔧 Starting property backfill for org:', orgId);
+      
+      const result = await storage.getComps({ orgId, pageSize: 10000 });
+      const comps = result.comps;
+      const compsWithoutProperty = comps.filter(comp => !comp.propertyId && comp.marina);
+      
+      console.log(`📊 Found ${compsWithoutProperty.length} comps without properties out of ${comps.length} total comps`);
+      
+      let created = 0;
+      let matched = 0;
+      let failed = 0;
+      
+      for (const comp of compsWithoutProperty) {
+        try {
+          let propertyId = null;
+          
+          const matchedProperty = await storage.findPropertyByLocation(
+            orgId,
+            comp.marina!,
+            comp.city || undefined,
+            comp.state || undefined
+          );
+          
+          if (matchedProperty) {
+            propertyId = matchedProperty.id;
+            matched++;
+            console.log(`✅ Matched comp "${comp.marina}" to existing property`);
+          } else {
+            const address = [
+              comp.address,
+              comp.city && comp.state ? `${comp.city}, ${comp.state}` : comp.city || comp.state
+            ].filter(Boolean).join(', ');
+            
+            const newProperty = await storage.createCrmProperty({
+              title: comp.marina!,
+              type: 'marina',
+              status: 'available',
+              address: address || undefined,
+              ownerId: orgId,
+              listingPrice: comp.salePrice ? String(comp.salePrice) : undefined,
+              description: `Auto-created from sales comp backfill`,
+            });
+            
+            propertyId = newProperty.id;
+            created++;
+            console.log(`✨ Created new property for comp "${comp.marina}"`);
+          }
+          
+          if (propertyId) {
+            await storage.updateComp(comp.id, { propertyId }, orgId);
+          }
+        } catch (error) {
+          failed++;
+          console.error(`❌ Failed to process comp ${comp.id}:`, error);
+        }
+      }
+      
+      const summary = {
+        total: compsWithoutProperty.length,
+        propertiesCreated: created,
+        propertiesMatched: matched,
+        failed,
+      };
+      
+      console.log('✅ Property backfill completed:', summary);
+      
+      res.json(summary);
+    } catch (error) {
+      console.error("Error during property backfill:", error);
+      res.status(500).json({ message: "Failed to backfill properties" });
+    }
+  });
+
   app.post('/api/sales-comps', async (req: any, res) => {
     try {
       const userId = req.user.id;
