@@ -17,6 +17,11 @@ import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
 import { RecommendationService } from "./services/salescomps/recommendationService";
 import { calculateMetrics, generateInsights, type AnalyticsFilters } from "./services/salescomps/analyticsService";
+import { ParserService as RcParserService } from "./services/ratecomps/parser";
+import { CompService as RcCompService } from "./services/ratecomps/compService";
+import { FilterBuilder as RcFilterBuilder } from "./services/ratecomps/filterBuilder";
+import { RecommendationService as RcRecommendationService } from "./services/ratecomps/recommendationService";
+import { calculateMetrics as rcCalculateMetrics, generateInsights as rcGenerateInsights, type AnalyticsFilters as RcAnalyticsFilters } from "./services/ratecomps/analyticsService";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertDDTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
@@ -140,6 +145,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/profit-centers", authenticateUser);
   app.use("/api/recommendations", authenticateUser);
   app.use("/api/pending-properties", authenticateUser);
+  app.use("/api/rate-comps", authenticateUser);
+  app.use("/api/rc-columns", authenticateUser);
+  app.use("/api/rc-projects", authenticateUser);
+  app.use("/api/rc-saved-searches", authenticateUser);
+  app.use("/api/rc-recommendations", authenticateUser);
+  app.use("/api/rc-pending-properties", authenticateUser);
 
   // Initialize SalesComps services
   const parserService = new ParserService();
@@ -147,8 +158,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const filterBuilder = new FilterBuilder();
   const recommendationService = new RecommendationService(storage);
 
+  // Initialize RateComps services
+  const rcParserService = new RcParserService();
+  const rcCompService = new RcCompService(storage, rcParserService);
+  const rcFilterBuilder = new RcFilterBuilder();
+  const rcRecommendationService = new RcRecommendationService(storage);
+
   // Multer configuration for file uploads (SalesComps CSV/Excel imports)
   const uploadSalesComps = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = [
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only CSV and Excel files are allowed.'));
+      }
+    }
+  });
+
+  // Multer configuration for file uploads (RateComps CSV/Excel imports)
+  const uploadRateComps = multer({ 
     storage: multer.memoryStorage(),
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
     fileFilter: (req, file, cb) => {
@@ -8958,6 +8993,1417 @@ Current context: Project ${req.params.projectId}`;
       res.json(feedback);
     } catch (error) {
       console.error("Error submitting recommendation feedback:", error);
+      res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
+
+  // ============ RATE COMPS API ROUTES ============
+
+  // Rate Comps CRUD routes
+  app.get('/api/rate-comps', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+
+      const filters = compFiltersSchema.parse(req.query);
+      const sqlFilters = rcFilterBuilder.buildFilters(filters);
+      
+      const { comps, total } = await storage.getRateComps({
+        orgId,
+        filters: sqlFilters,
+        sortBy: filters.sortBy,
+        sortDir: filters.sortDir,
+        page: filters.page,
+        pageSize: filters.pageSize,
+      });
+
+      res.json({ comps, total, page: filters.page, pageSize: filters.pageSize });
+    } catch (error) {
+      console.error("Error fetching rate comps:", error);
+      res.status(500).json({ message: "Failed to fetch rate comps" });
+    }
+  });
+
+  app.get('/api/rate-comps/ids', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const ids = await storage.getAllRateCompIds(orgId);
+      res.json({ ids });
+    } catch (error) {
+      console.error('Error getting rate comp IDs:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get('/api/rate-comps/column-values/:column', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { column } = req.params;
+      const values = await storage.getRateCompColumnUniqueValues(orgId, column);
+      res.json({ values });
+    } catch (error) {
+      console.error('Error getting column values:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Custom Storage Types routes (must be before /:id route)
+  app.get('/api/rate-comps/custom-storage-types', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const types = await storage.getRcCustomStorageTypes(orgId);
+      res.json(types);
+    } catch (error) {
+      console.error("Error fetching custom storage types:", error);
+      res.status(500).json({ message: "Failed to fetch custom storage types" });
+    }
+  });
+
+  app.post('/api/rate-comps/custom-storage-types', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { name } = req.body;
+
+      if (!name || typeof name !== 'string' || name.trim() === '') {
+        return res.status(400).json({ message: "Storage type name is required" });
+      }
+
+      // Check for duplicates (case-insensitive)
+      const existing = await storage.getRcCustomStorageTypes(orgId);
+      if (existing.some(t => t.name.toLowerCase() === name.trim().toLowerCase())) {
+        return res.status(400).json({ message: "Storage type already exists" });
+      }
+
+      const type = await storage.createRcCustomStorageType({
+        orgId,
+        name: name.trim(),
+        createdBy: userId,
+      });
+
+      res.status(201).json(type);
+    } catch (error) {
+      console.error("Error creating custom storage type:", error);
+      res.status(500).json({ message: "Failed to create custom storage type" });
+    }
+  });
+
+  app.delete('/api/rate-comps/custom-storage-types/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await storage.deleteRcCustomStorageType(req.params.id, orgId);
+
+      if (!success) return res.status(404).json({ message: "Storage type not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting custom storage type:", error);
+      res.status(500).json({ message: "Failed to delete custom storage type" });
+    }
+  });
+
+  // Custom Column Management routes (must be before /:id route)
+  app.get('/api/rate-comps/columns', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const columns = await storage.getRateCompColumns(orgId);
+      res.json(columns);
+    } catch (error) {
+      console.error("Error fetching custom columns:", error);
+      res.status(500).json({ message: "Failed to fetch custom columns" });
+    }
+  });
+
+  app.post('/api/rate-comps/columns', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { key, label, type, options, required, visible, orderIndex } = req.body;
+
+      if (!key || !label || !type) {
+        return res.status(400).json({ message: "Field key, label, and type are required" });
+      }
+
+      // Check for duplicate key
+      const existing = await storage.getRateCompColumns(orgId);
+      if (existing.some(c => c.key === key)) {
+        return res.status(400).json({ message: "Column with this key already exists" });
+      }
+
+      const column = await storage.createRateCompColumn({
+        orgId,
+        key,
+        label,
+        type,
+        options: options || null,
+        required: required || false,
+        visible: visible !== false,
+        orderIndex: orderIndex || 0,
+      });
+
+      res.status(201).json(column);
+    } catch (error) {
+      console.error("Error creating custom column:", error);
+      res.status(500).json({ message: "Failed to create custom column" });
+    }
+  });
+
+  app.delete('/api/rate-comps/columns/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await storage.deleteRateCompColumn(req.params.id, orgId);
+
+      if (!success) return res.status(404).json({ message: "Column not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting custom column:", error);
+      res.status(500).json({ message: "Failed to delete custom column" });
+    }
+  });
+
+  // Pending Property Profiles routes (must be before /:id route)
+  app.get('/api/rate-comps/pending-property-profiles', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const status = req.query.status as string | undefined;
+      const profiles = await storage.getRcPendingPropertyProfiles(orgId, status);
+      res.json(profiles);
+    } catch (error) {
+      console.error("Error fetching pending property profiles:", error);
+      res.status(500).json({ message: "Failed to fetch pending property profiles" });
+    }
+  });
+
+  app.post('/api/rate-comps/pending-property-profiles', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { compId, status } = req.body;
+
+      if (!compId) {
+        return res.status(400).json({ message: "compId is required" });
+      }
+
+      const profile = await storage.createRcPendingPropertyProfile({
+        compId,
+        orgId,
+        status: status || 'pending',
+      });
+
+      res.status(201).json(profile);
+    } catch (error) {
+      console.error("Error creating pending property profile:", error);
+      res.status(500).json({ message: "Failed to create pending property profile" });
+    }
+  });
+
+  app.patch('/api/rate-comps/pending-property-profiles/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { status } = req.body;
+      
+      // Verify ownership before updating
+      const existing = await storage.getRcPendingPropertyProfiles(orgId);
+      const profile = existing.find(p => p.id === req.params.id);
+      if (!profile) {
+        return res.status(404).json({ message: "Pending property profile not found" });
+      }
+      
+      const updated = await storage.updateRcPendingPropertyProfile(req.params.id, { status });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating pending property profile:", error);
+      res.status(500).json({ message: "Failed to update pending property profile" });
+    }
+  });
+
+  app.delete('/api/rate-comps/pending-property-profiles/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      // Verify ownership before deleting
+      const existing = await storage.getRcPendingPropertyProfiles(orgId);
+      const profile = existing.find(p => p.id === req.params.id);
+      if (!profile) {
+        return res.status(404).json({ message: "Pending property profile not found" });
+      }
+      
+      const success = await storage.deleteRcPendingPropertyProfile(req.params.id);
+      if (!success) return res.status(404).json({ message: "Pending property profile not found" });
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting pending property profile:", error);
+      res.status(500).json({ message: "Failed to delete pending property profile" });
+    }
+  });
+
+  app.get('/api/rate-comps/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const comp = await storage.getRateComp(req.params.id, orgId);
+      if (!comp) return res.status(404).json({ message: "Rate comp not found" });
+      res.json(comp);
+    } catch (error) {
+      console.error("Error fetching rate comp:", error);
+      res.status(500).json({ message: "Failed to fetch rate comp" });
+    }
+  });
+
+  app.post('/api/rate-comps/backfill-properties', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      
+      console.log('🔧 Starting property backfill for rate comps in org:', orgId);
+      
+      const result = await storage.getRateComps({ orgId, pageSize: 10000 });
+      const comps = result.comps;
+      const compsWithoutProperty = comps.filter(comp => !comp.propertyId && comp.marina);
+      
+      console.log(`📊 Found ${compsWithoutProperty.length} rate comps without properties out of ${comps.length} total comps`);
+      
+      let created = 0;
+      let matched = 0;
+      let failed = 0;
+      
+      for (const comp of compsWithoutProperty) {
+        try {
+          let propertyId = null;
+          
+          const matchedProperty = await storage.findPropertyByLocation(
+            orgId,
+            comp.marina!,
+            comp.city || undefined,
+            comp.state || undefined
+          );
+          
+          if (matchedProperty) {
+            propertyId = matchedProperty.id;
+            matched++;
+            console.log(`✅ Matched rate comp "${comp.marina}" to existing property`);
+          } else {
+            const address = [
+              comp.address,
+              comp.city && comp.state ? `${comp.city}, ${comp.state}` : comp.city || comp.state
+            ].filter(Boolean).join(', ');
+            
+            const newProperty = await storage.createCrmProperty({
+              title: comp.marina!,
+              type: 'marina',
+              status: 'available',
+              address: address || undefined,
+              ownerId: orgId,
+              listingPrice: comp.salePrice ? String(comp.salePrice) : undefined,
+              description: `Auto-created from rate comp backfill`,
+            });
+            
+            propertyId = newProperty.id;
+            created++;
+            console.log(`✨ Created new property for rate comp "${comp.marina}"`);
+          }
+          
+          if (propertyId) {
+            await storage.updateRateComp(comp.id, { propertyId }, orgId);
+          }
+        } catch (error) {
+          failed++;
+          console.error(`❌ Failed to process rate comp ${comp.id}:`, error);
+        }
+      }
+      
+      const summary = {
+        total: compsWithoutProperty.length,
+        propertiesCreated: created,
+        propertiesMatched: matched,
+        failed,
+      };
+      
+      console.log('✅ Property backfill completed:', summary);
+      
+      res.json(summary);
+    } catch (error) {
+      console.error("Error during property backfill:", error);
+      res.status(500).json({ message: "Failed to backfill properties" });
+    }
+  });
+
+  app.post('/api/rate-comps', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      console.log('🔍 POST /api/rate-comps - Request body profit centers:', {
+        profitCenterStorage: req.body.profitCenterStorage,
+        profitCenterEvents: req.body.profitCenterEvents,
+        profitCenterService: req.body.profitCenterService,
+        profitCenterThirdPartyLeases: req.body.profitCenterThirdPartyLeases,
+        profitCenterBoatRentals: req.body.profitCenterBoatRentals,
+        profitCenterBoatBrokerage: req.body.profitCenterBoatBrokerage,
+        profitCenterRvPark: req.body.profitCenterRvPark,
+        profitCenterFuel: req.body.profitCenterFuel,
+        profitCenterShipStore: req.body.profitCenterShipStore,
+        profitCenterParts: req.body.profitCenterParts,
+        profitCenterBoatClub: req.body.profitCenterBoatClub,
+        profitCenterBoatSales: req.body.profitCenterBoatSales,
+        profitCenterFnb: req.body.profitCenterFnb,
+        profitCenterHospitality: req.body.profitCenterHospitality,
+      });
+
+      const compData = salesCompCreateSchema.parse(req.body);
+      
+      console.log('🔍 POST /api/rate-comps - After Zod parse profit centers:', {
+        profitCenterStorage: compData.profitCenterStorage,
+        profitCenterEvents: compData.profitCenterEvents,
+        profitCenterService: compData.profitCenterService,
+        profitCenterThirdPartyLeases: compData.profitCenterThirdPartyLeases,
+        profitCenterBoatRentals: compData.profitCenterBoatRentals,
+        profitCenterBoatBrokerage: compData.profitCenterBoatBrokerage,
+        profitCenterRvPark: compData.profitCenterRvPark,
+        profitCenterFuel: compData.profitCenterFuel,
+        profitCenterShipStore: compData.profitCenterShipStore,
+        profitCenterParts: compData.profitCenterParts,
+        profitCenterBoatClub: compData.profitCenterBoatClub,
+        profitCenterBoatSales: compData.profitCenterBoatSales,
+        profitCenterFnb: compData.profitCenterFnb,
+        profitCenterHospitality: compData.profitCenterHospitality,
+      });
+
+      const comp = await rcCompService.createComp({
+        ...compData,
+        orgId,
+        createdBy: userId,
+      }, userId);
+
+      res.status(201).json(comp);
+    } catch (error) {
+      console.error("Error creating rate comp:", error);
+      res.status(500).json({ message: "Failed to create rate comp" });
+    }
+  });
+
+  app.patch('/api/rate-comps/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      console.log('🔍 PATCH /api/rate-comps/:id - Request body profit centers:', {
+        profitCenterStorage: req.body.profitCenterStorage,
+        profitCenterEvents: req.body.profitCenterEvents,
+        profitCenterService: req.body.profitCenterService,
+        profitCenterThirdPartyLeases: req.body.profitCenterThirdPartyLeases,
+        profitCenterBoatRentals: req.body.profitCenterBoatRentals,
+        profitCenterBoatBrokerage: req.body.profitCenterBoatBrokerage,
+        profitCenterRvPark: req.body.profitCenterRvPark,
+        profitCenterFuel: req.body.profitCenterFuel,
+        profitCenterShipStore: req.body.profitCenterShipStore,
+        profitCenterParts: req.body.profitCenterParts,
+        profitCenterBoatClub: req.body.profitCenterBoatClub,
+        profitCenterBoatSales: req.body.profitCenterBoatSales,
+        profitCenterFnb: req.body.profitCenterFnb,
+        profitCenterHospitality: req.body.profitCenterHospitality,
+      });
+
+      const updates = salesCompUpdateSchema.parse(req.body);
+      
+      console.log('🔍 PATCH /api/rate-comps/:id - After Zod parse profit centers:', {
+        profitCenterStorage: updates.profitCenterStorage,
+        profitCenterEvents: updates.profitCenterEvents,
+        profitCenterService: updates.profitCenterService,
+        profitCenterThirdPartyLeases: updates.profitCenterThirdPartyLeases,
+        profitCenterBoatRentals: updates.profitCenterBoatRentals,
+        profitCenterBoatBrokerage: updates.profitCenterBoatBrokerage,
+        profitCenterRvPark: updates.profitCenterRvPark,
+        profitCenterFuel: updates.profitCenterFuel,
+        profitCenterShipStore: updates.profitCenterShipStore,
+        profitCenterParts: updates.profitCenterParts,
+        profitCenterBoatClub: updates.profitCenterBoatClub,
+        profitCenterBoatSales: updates.profitCenterBoatSales,
+        profitCenterFnb: updates.profitCenterFnb,
+        profitCenterHospitality: updates.profitCenterHospitality,
+      });
+
+      const comp = await rcCompService.updateComp(
+        req.params.id,
+        { ...updates, updatedBy: userId },
+        orgId,
+        userId
+      );
+
+      if (!comp) return res.status(404).json({ message: "Rate comp not found" });
+      res.json(comp);
+    } catch (error) {
+      console.error("Error updating rate comp:", error);
+      res.status(500).json({ message: "Failed to update rate comp" });
+    }
+  });
+
+  app.delete('/api/rate-comps/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const success = await rcCompService.deleteComp(req.params.id, orgId, userId);
+      if (!success) return res.status(404).json({ message: "Rate comp not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting rate comp:", error);
+      res.status(500).json({ message: "Failed to delete rate comp" });
+    }
+  });
+
+  app.post('/api/rate-comps/bulk-update', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const { ids, updates } = bulkUpdateSchema.parse(req.body);
+      const count = await rcCompService.bulkUpdateComps(ids, updates, orgId, userId);
+
+      res.json({ updated: count });
+    } catch (error) {
+      console.error("Error bulk updating rate comps:", error);
+      res.status(500).json({ message: "Failed to bulk update rate comps" });
+    }
+  });
+
+  app.post('/api/rate-comps/bulk-delete', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: "Invalid or empty IDs array" });
+      }
+
+      const count = await rcCompService.bulkDeleteComps(ids, orgId, userId);
+      res.json({ deleted: count });
+    } catch (error) {
+      console.error("Error bulk deleting rate comps:", error);
+      res.status(500).json({ message: "Failed to bulk delete rate comps" });
+    }
+  });
+
+  // Upload and Import routes
+  app.post('/api/rate-comps/upload', uploadRateComps.single('file'), async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const analysis = await rcParserService.analyzeFile(req.file);
+      const fullData = await rcParserService.parseFullFile(req.file);
+      
+      console.log(`Parsed ${fullData.length} rows from rate comp file ${req.file.originalname}`);
+      
+      const importRecord = await storage.createRateCompImport({
+        orgId,
+        createdBy: userId,
+        filename: req.file.originalname,
+        status: 'mapping',
+        parsedData: fullData,
+        summary: {
+          totalRows: fullData.length,
+          successCount: 0,
+          errorCount: 0,
+          warningCount: 0,
+          errors: []
+        }
+      });
+
+      res.json({
+        importId: importRecord.id,
+        analysis,
+      });
+    } catch (error) {
+      console.error("Error uploading rate comp file:", error);
+      res.status(500).json({ message: "Failed to upload file" });
+    }
+  });
+
+  app.post('/api/rate-comps/import/:importId/detect-duplicates', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { mapping, normalization } = req.body;
+      
+      const result = await rcCompService.detectDuplicates(
+        req.params.importId,
+        orgId,
+        mapping,
+        normalization
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error detecting duplicates:", error);
+      res.status(500).json({ message: "Failed to detect duplicates" });
+    }
+  });
+
+  app.post('/api/rate-comps/import/:importId/commit', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const { mapping, normalization, excludedRows = [], parentPortfolioId } = req.body;
+      
+      console.log(`Starting rate comp import for ${req.params.importId} with mapping:`, mapping);
+      
+      const result = await rcCompService.processImport(
+        req.params.importId,
+        orgId,
+        userId,
+        mapping,
+        normalization,
+        excludedRows,
+        parentPortfolioId
+      );
+      
+      console.log(`Rate comp import completed for ${req.params.importId}:`, result);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error processing rate comp import:", error);
+      res.status(500).json({ message: "Failed to process import" });
+    }
+  });
+
+  app.get('/api/rate-comps/import/:importId/status', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const importRecord = await storage.getRateCompImport(req.params.importId, orgId);
+      if (!importRecord) return res.status(404).json({ message: "Import not found" });
+
+      res.json(importRecord);
+    } catch (error) {
+      console.error("Error fetching import status:", error);
+      res.status(500).json({ message: "Failed to fetch import status" });
+    }
+  });
+
+  // Rate Comp Columns management routes
+  app.get('/api/rc-columns', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const columns = await storage.getRateCompColumns(orgId);
+      res.json(columns);
+    } catch (error) {
+      console.error("Error fetching rate comp columns:", error);
+      res.status(500).json({ message: "Failed to fetch columns" });
+    }
+  });
+
+  app.post('/api/rc-columns', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      const columnData = compColumnCreateSchema.parse(req.body);
+      const column = await storage.createRateCompColumn({
+        ...columnData,
+        orgId,
+      });
+
+      res.status(201).json(column);
+    } catch (error) {
+      console.error("Error creating rate comp column:", error);
+      res.status(500).json({ message: "Failed to create column" });
+    }
+  });
+
+  app.patch('/api/rc-columns/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      const updates = compColumnUpdateSchema.parse(req.body);
+      const column = await storage.updateRateCompColumn(req.params.id, updates, orgId);
+
+      if (!column) return res.status(404).json({ message: "Column not found" });
+      res.json(column);
+    } catch (error) {
+      console.error("Error updating rate comp column:", error);
+      res.status(500).json({ message: "Failed to update column" });
+    }
+  });
+
+  app.delete('/api/rc-columns/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      const success = await storage.deleteRateCompColumn(req.params.id, orgId);
+      if (!success) return res.status(404).json({ message: "Column not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting rate comp column:", error);
+      res.status(500).json({ message: "Failed to delete column" });
+    }
+  });
+
+  // Analytics endpoint
+  app.post('/api/rate-comps/analytics', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: RcAnalyticsFilters = req.body;
+
+      const metrics = await rcCalculateMetrics(orgId, filters);
+      const insights = await rcGenerateInsights(metrics, filters);
+
+      res.json({ metrics, insights });
+    } catch (error) {
+      console.error("Error calculating rate comp analytics:", error);
+      res.status(500).json({ message: "Failed to calculate analytics" });
+    }
+  });
+
+  // Saved Searches routes
+  app.get('/api/rc-saved-searches', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const searches = await storage.getRcSavedSearches(orgId, userId);
+      res.json(searches);
+    } catch (error) {
+      console.error("Error fetching saved searches:", error);
+      res.status(500).json({ message: "Failed to fetch saved searches" });
+    }
+  });
+
+  app.get('/api/rc-saved-searches/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      const search = await storage.getRcSavedSearch(req.params.id, orgId);
+      if (!search) return res.status(404).json({ message: "Saved search not found" });
+
+      res.json(search);
+    } catch (error) {
+      console.error("Error fetching saved search:", error);
+      res.status(500).json({ message: "Failed to fetch saved search" });
+    }
+  });
+
+  app.post('/api/rc-saved-searches', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const searchData = insertScSavedSearchSchema.parse(req.body);
+      const search = await storage.createRcSavedSearch({
+        ...searchData,
+        orgId,
+        createdBy: userId,
+      } as any);
+
+      res.status(201).json(search);
+    } catch (error) {
+      console.error("Error creating saved search:", error);
+      res.status(500).json({ message: "Failed to create saved search" });
+    }
+  });
+
+  app.patch('/api/rc-saved-searches/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const searchData = updateScSavedSearchSchema.parse(req.body);
+      const search = await storage.updateRcSavedSearch(req.params.id, {
+        ...searchData,
+        updatedBy: userId,
+      }, orgId);
+
+      if (!search) return res.status(404).json({ message: "Saved search not found" });
+
+      res.json(search);
+    } catch (error) {
+      console.error("Error updating saved search:", error);
+      res.status(500).json({ message: "Failed to update saved search" });
+    }
+  });
+
+  app.delete('/api/rc-saved-searches/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const success = await storage.deleteRcSavedSearch(req.params.id, orgId, userId);
+      if (!success) return res.status(404).json({ message: "Saved search not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting saved search:", error);
+      res.status(500).json({ message: "Failed to delete saved search" });
+    }
+  });
+
+  app.post('/api/rc-saved-searches/:id/use', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      await storage.incrementRcSavedSearchUsage(req.params.id, orgId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error incrementing saved search usage:", error);
+      res.status(500).json({ message: "Failed to update saved search usage" });
+    }
+  });
+
+  // Pending Properties routes - Review queue for properties created from rate comps
+  app.get('/api/rc-pending-properties', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { status } = req.query;
+
+      const pendingProps = await storage.getRcPendingProperties(orgId, status);
+      res.json(pendingProps);
+    } catch (error) {
+      console.error("Error fetching pending properties:", error);
+      res.status(500).json({ message: "Failed to fetch pending properties" });
+    }
+  });
+
+  app.post('/api/rc-pending-properties/:id/accept', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const property = await storage.acceptRcPendingProperty(id, orgId, userId);
+      if (!property) {
+        return res.status(404).json({ message: "Pending property not found or already processed" });
+      }
+
+      res.json(property);
+    } catch (error) {
+      console.error("Error accepting pending property:", error);
+      res.status(500).json({ message: "Failed to accept pending property" });
+    }
+  });
+
+  app.post('/api/rc-pending-properties/:id/reject', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const success = await storage.rejectRcPendingProperty(id, orgId, userId);
+      if (!success) {
+        return res.status(404).json({ message: "Pending property not found or already processed" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error rejecting pending property:", error);
+      res.status(500).json({ message: "Failed to reject pending property" });
+    }
+  });
+
+  // Analytics/Metrics routes
+  app.post('/api/rc-analytics/calculate', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: RcAnalyticsFilters = req.body.filters || {};
+
+      const analysis = await rcCalculateMetrics(orgId, filters);
+      const insights = await rcGenerateInsights(analysis, filters);
+
+      res.json({
+        analysis,
+        insights,
+      });
+    } catch (error) {
+      console.error("Error calculating rate comp analytics:", error);
+      res.status(500).json({ message: "Failed to calculate analytics" });
+    }
+  });
+
+  app.post('/api/rc-analytics/insights', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: RcAnalyticsFilters = req.body.filters || {};
+
+      const analysis = await rcCalculateMetrics(orgId, filters);
+      const insights = await rcGenerateInsights(analysis, filters);
+
+      res.json({ insights });
+    } catch (error) {
+      console.error("Error generating insights:", error);
+      res.status(500).json({ message: "Failed to generate insights" });
+    }
+  });
+
+  // Portfolio bulk creation routes
+  app.post('/api/rate-comps/portfolios', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      // Validate request body using Zod schema
+      const validatedData = bulkPortfolioCreateSchema.parse(req.body);
+      const { portfolio, comps } = validatedData;
+
+      // Wrap everything in a transaction to ensure atomicity
+      const result = await db.transaction(async (tx) => {
+        // Create portfolio first
+        const [createdPortfolio] = await tx.insert(scPortfolios).values({
+          orgId,
+          createdBy: userId,
+          name: portfolio.name,
+          description: portfolio.description || null,
+          notes: portfolio.notes || null,
+        }).returning();
+
+        // Create all comps and link to portfolio
+        const createdComps = [];
+        for (let i = 0; i < comps.length; i++) {
+          const compData = comps[i];
+          
+          // Create the comp using rcCompService (handles property linking, etc.)
+          const comp = await rcCompService.createComp({
+            ...compData,
+            orgId,
+            createdBy: userId,
+          }, userId);
+          
+          createdComps.push(comp);
+
+          // Link comp to portfolio
+          await tx.insert(scPortfolioComps).values({
+            orgId,
+            portfolioId: createdPortfolio.id,
+            salesCompId: comp.id,
+            addedBy: userId,
+            orderIndex: i,
+          });
+        }
+
+        return {
+          portfolio: createdPortfolio,
+          comps: createdComps,
+        };
+      });
+
+      // Create audit log (outside transaction since it's not critical)
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entityType: 'rc_portfolio',
+        entityId: result.portfolio.id,
+        action: 'create',
+        after: {
+          portfolio: result.portfolio,
+          compCount: result.comps.length,
+        },
+      });
+
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error creating portfolio:", error);
+      
+      // Handle Zod validation errors
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to create portfolio", error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // RC Projects routes
+  app.get('/api/rc-projects', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const projects = await storage.getRcProjects(orgId, userId);
+      res.json(projects);
+    } catch (error) {
+      console.error("Error fetching RC projects:", error);
+      res.status(500).json({ message: "Failed to fetch RC projects" });
+    }
+  });
+
+  app.get('/api/rc-projects/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      const project = await storage.getRcProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      res.json(project);
+    } catch (error) {
+      console.error("Error fetching RC project:", error);
+      res.status(500).json({ message: "Failed to fetch RC project" });
+    }
+  });
+
+  app.post('/api/rc-projects', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const projectData = scProjectCreateSchema.parse(req.body);
+      const project = await storage.createRcProject({
+        ...projectData,
+        orgId,
+        createdBy: userId,
+      });
+
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entity: 'rc_project',
+        entityId: project.id,
+        action: 'create',
+        after: project,
+      });
+
+      res.status(201).json(project);
+    } catch (error) {
+      console.error("Error creating RC project:", error);
+      res.status(500).json({ message: "Failed to create RC project" });
+    }
+  });
+
+  app.put('/api/rc-projects/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const currentProject = await storage.getRcProject(req.params.id, orgId);
+      if (!currentProject) return res.status(404).json({ message: "Project not found" });
+
+      const updates = scProjectUpdateSchema.parse(req.body);
+      const updatedProject = await storage.updateRcProject(req.params.id, {
+        ...updates,
+        updatedBy: userId,
+      }, orgId);
+
+      if (!updatedProject) return res.status(404).json({ message: "Project not found" });
+
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entity: 'rc_project',
+        entityId: updatedProject.id,
+        action: 'update',
+        before: currentProject,
+        after: updatedProject,
+      });
+
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error updating RC project:", error);
+      res.status(500).json({ message: "Failed to update RC project" });
+    }
+  });
+
+  app.delete('/api/rc-projects/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const currentProject = await storage.getRcProject(req.params.id, orgId);
+      if (!currentProject) return res.status(404).json({ message: "Project not found" });
+
+      const success = await storage.deleteRcProject(req.params.id, orgId, userId);
+      if (!success) return res.status(404).json({ message: "Project not found" });
+
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entity: 'rc_project',
+        entityId: req.params.id,
+        action: 'delete',
+        before: currentProject,
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting RC project:", error);
+      res.status(500).json({ message: "Failed to delete RC project" });
+    }
+  });
+
+  // RC Project Comps routes
+  app.get('/api/rc-projects/:id/comps', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      const project = await storage.getRcProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const projectComps = await storage.getRcProjectComps(req.params.id, orgId);
+      res.json(projectComps);
+    } catch (error) {
+      console.error("Error fetching RC project comps:", error);
+      res.status(500).json({ message: "Failed to fetch RC project comps" });
+    }
+  });
+
+  app.post('/api/rc-projects/:id/comps', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const project = await storage.getRcProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const compData = projectCompCreateSchema.parse(req.body);
+      
+      try {
+        const projectComp = await storage.addCompToRcProject(
+          req.params.id,
+          compData.salesCompId,
+          orgId,
+          userId
+        );
+
+        await storage.createAuditLog({
+          orgId,
+          userId,
+          entity: 'rc_project_comp',
+          entityId: projectComp.id,
+          action: 'create',
+          after: projectComp,
+        });
+
+        res.status(201).json(projectComp);
+      } catch (error: any) {
+        if (error.message.includes('duplicate key value') || error.code === '23505') {
+          return res.status(409).json({ message: "Rate comp is already added to this project" });
+        }
+        throw error;
+      }
+    } catch (error) {
+      console.error("Error adding comp to RC project:", error);
+      res.status(500).json({ message: "Failed to add comp to RC project" });
+    }
+  });
+
+  app.post('/api/rc-projects/:id/comps/bulk', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const project = await storage.getRcProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const bulkData = projectCompBulkSchema.parse(req.body);
+      const results: { success: any[]; failed: any[] } = { success: [], failed: [] };
+
+      for (const rateCompId of bulkData.salesCompIds) {
+        try {
+          const projectComp = await storage.addCompToRcProject(
+            req.params.id,
+            rateCompId,
+            orgId,
+            userId
+          );
+
+          await storage.createAuditLog({
+            orgId,
+            userId,
+            entity: 'rc_project_comp',
+            entityId: projectComp.id,
+            action: 'create',
+            after: projectComp,
+          });
+
+          results.success.push({ rateCompId, projectComp });
+        } catch (error: any) {
+          results.failed.push({ 
+            rateCompId, 
+            error: error.message.includes('duplicate key') ? 'Already in project' : 'Failed to add' 
+          });
+        }
+      }
+
+      res.json(results);
+    } catch (error) {
+      console.error("Error bulk adding comps to RC project:", error);
+      res.status(500).json({ message: "Failed to bulk add comps to RC project" });
+    }
+  });
+
+  app.delete('/api/rc-projects/:id/comps/bulk', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const project = await storage.getRcProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const { compIds } = req.body;
+      if (!Array.isArray(compIds) || compIds.length === 0) {
+        return res.status(400).json({ message: "Invalid or empty comp IDs array" });
+      }
+
+      let removedCount = 0;
+      for (const compId of compIds) {
+        try {
+          const success = await storage.removeCompFromRcProject(
+            req.params.id,
+            compId,
+            orgId
+          );
+          
+          if (success) {
+            removedCount++;
+            await storage.createAuditLog({
+              orgId,
+              userId,
+              entity: 'rc_project_comp',
+              entityId: compId,
+              action: 'delete',
+              before: { projectId: req.params.id, rateCompId: compId },
+            });
+          }
+        } catch (error) {
+          console.error(`Error removing rate comp ${compId} from RC project:`, error);
+        }
+      }
+
+      res.json({ removed: removedCount });
+    } catch (error) {
+      console.error("Error bulk removing comps from RC project:", error);
+      res.status(500).json({ message: "Failed to bulk remove comps from RC project" });
+    }
+  });
+
+  app.delete('/api/rc-projects/:id/comps/:compId', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const project = await storage.getRcProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const success = await storage.removeCompFromRcProject(
+        req.params.id,
+        req.params.compId,
+        orgId
+      );
+      
+      if (!success) return res.status(404).json({ message: "Comp not found in project" });
+
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entity: 'rc_project_comp',
+        entityId: req.params.compId,
+        action: 'delete',
+        before: { projectId: req.params.id, rateCompId: req.params.compId },
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing comp from RC project:", error);
+      res.status(500).json({ message: "Failed to remove comp from RC project" });
+    }
+  });
+
+  app.patch('/api/rc-projects/:id/comps/:compId', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const project = await storage.getRcProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const updates = projectCompUpdateSchema.parse(req.body);
+      const updatedProjectComp = await storage.updateRcProjectComp(
+        req.params.compId,
+        updates,
+        orgId
+      );
+
+      if (!updatedProjectComp) return res.status(404).json({ message: "Project comp not found" });
+
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entity: 'rc_project_comp',
+        entityId: req.params.compId,
+        action: 'update',
+        after: updatedProjectComp,
+      });
+
+      res.json(updatedProjectComp);
+    } catch (error) {
+      console.error("Error updating RC project comp:", error);
+      res.status(500).json({ message: "Failed to update RC project comp" });
+    }
+  });
+
+  // Recommendations routes
+  app.get('/api/rc-projects/:id/recommendations', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      const projectId = req.params.id;
+      const project = await storage.getRcProject(projectId, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const excludeAssigned = req.query.excludeAssigned === 'true';
+
+      let excludeCompIds: string[] = [];
+      if (excludeAssigned) {
+        const projectComps = await storage.getRcProjectComps(projectId, orgId);
+        excludeCompIds = projectComps.map(pc => pc.rateCompId);
+      }
+
+      const projectProfile = (project.profile as any) || {};
+      const userWeightOverrides = (project.weightOverrides as any) || undefined;
+
+      const recommendations = await rcRecommendationService.getRecommendations({
+        orgId,
+        projectProfile,
+        userWeightOverrides,
+        excludeCompIds,
+        limit,
+      });
+
+      res.json({
+        items: recommendations,
+        total: recommendations.length,
+        projectProfile,
+        weights: userWeightOverrides,
+      });
+    } catch (error) {
+      console.error("Error generating recommendations:", error);
+      res.status(500).json({ message: "Failed to generate recommendations" });
+    }
+  });
+
+  app.get('/api/rc-projects/:id/preferences', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      const projectId = req.params.id;
+      const project = await storage.getRcProject(projectId, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      res.json({
+        profile: project.profile || {},
+        weightOverrides: project.weightOverrides || {},
+      });
+    } catch (error) {
+      console.error("Error fetching RC project preferences:", error);
+      res.status(500).json({ message: "Failed to fetch RC project preferences" });
+    }
+  });
+
+  app.put('/api/rc-projects/:id/preferences', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const projectId = req.params.id;
+      const project = await storage.getRcProject(projectId, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const { profile, weightOverrides } = req.body;
+
+      let validatedProfile, validatedWeights;
+      
+      try {
+        validatedProfile = profile ? scProjectProfileSchema.parse(profile) : project.profile;
+        validatedWeights = weightOverrides ? scWeightOverridesSchema.parse(weightOverrides) : project.weightOverrides;
+      } catch (validationError: any) {
+        console.error("Validation error in RC project preferences:", validationError);
+        return res.status(400).json({ 
+          message: "Invalid RC project preferences data", 
+          details: validationError?.errors || validationError?.message 
+        });
+      }
+
+      const updatedProject = await storage.updateRcProject(projectId, {
+        profile: validatedProfile,
+        weightOverrides: validatedWeights,
+        updatedBy: userId,
+      }, orgId);
+
+      if (!updatedProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      res.json({
+        profile: updatedProject.profile,
+        weightOverrides: updatedProject.weightOverrides,
+      });
+    } catch (error) {
+      console.error("Error updating RC project preferences:", error);
+      res.status(500).json({ message: "Failed to update RC project preferences" });
+    }
+  });
+
+  app.post('/api/rc-recommendations/feedback', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const feedbackData = insertScRecommendationFeedbackSchema.parse({
+        ...req.body,
+        orgId,
+        userId,
+      });
+
+      const feedback = await storage.createRcRecommendationFeedback(feedbackData);
+
+      if (['selected', 'rejected', 'liked'].includes(feedbackData.action)) {
+        const project = await storage.getRcProject(feedbackData.projectId, orgId);
+        const comp = await storage.getRateComp(feedbackData.salesCompId, orgId);
+        
+        if (project && comp) {
+          const projectProfile = (project.profile as any) || {};
+          
+          let scoreBreakdown = req.body.breakdown;
+          let currentScore = parseFloat(req.body.scoreAtTime) || 0;
+          
+          if (!scoreBreakdown) {
+            const recommendations = await rcRecommendationService.getRecommendations({
+              orgId,
+              projectProfile,
+              userWeightOverrides: (project.weightOverrides as any) || undefined,
+              excludeCompIds: [],
+              limit: 1000,
+            });
+
+            const matchingRec = recommendations.find(r => r.comp.id === comp.id);
+            if (matchingRec) {
+              scoreBreakdown = matchingRec.breakdown;
+              currentScore = matchingRec.score;
+            }
+          }
+          
+          if (scoreBreakdown) {
+            await rcRecommendationService.updateLearningWeights({
+              orgId,
+              projectProfile,
+              selectedComp: comp,
+              action: feedbackData.action as 'selected' | 'rejected' | 'liked',
+              currentScore,
+              breakdown: scoreBreakdown,
+            });
+          }
+        }
+      }
+
+      res.json(feedback);
+    } catch (error) {
+      console.error("Error submitting rate comp recommendation feedback:", error);
       res.status(500).json({ message: "Failed to submit feedback" });
     }
   });
