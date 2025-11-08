@@ -453,14 +453,14 @@ export default function FiltersPanel({
         </div>
       </Collapsible>
 
-      {/* Sale Details */}
+      {/* Rate Details */}
       <Collapsible open={openSections.saleDetails} onOpenChange={() => toggleSection('saleDetails')}>
         <div className="mb-5">
           <CollapsibleTrigger className="w-full group">
             <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-all cursor-pointer">
               <div className="flex items-center gap-2.5">
                 <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                  Sale Details
+                  Rate Details
                 </h3>
                 {getActiveFilterCount('saleDetails') > 0 && (
                   <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10px] font-semibold rounded-full bg-primary text-primary-foreground">
