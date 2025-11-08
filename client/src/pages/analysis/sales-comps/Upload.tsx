@@ -25,7 +25,7 @@ interface UploadProps {
 
 export default function Upload({ onClose, onImportComplete }: UploadProps) {
   const { toast } = useToast();
-  const [step, setStep] = useState<'upload' | 'mapping' | 'duplicates' | 'processing' | 'complete'>('upload');
+  const [step, setStep] = useState<'upload' | 'mapping' | 'mode' | 'preview' | 'duplicates' | 'processing' | 'complete'>('upload');
   const [uploadData, setUploadData] = useState<{
     importId: string;
     analysis: any;
@@ -37,6 +37,14 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     states: true,
     undisclosed: true,
   });
+  const [importMode, setImportMode] = useState<'insert' | 'update' | 'upsert'>('upsert');
+  const [updateBlankValues, setUpdateBlankValues] = useState(false);
+  const [previewData, setPreviewData] = useState<{
+    toInsert: number;
+    toUpdate: number;
+    toSkip: number;
+    duplicateMatches: Array<{ row: any; match: any; confidence: number; action: 'insert' | 'update' | 'skip' }>;
+  } | null>(null);
   const [duplicates, setDuplicates] = useState<any[]>([]);
   const [excludedRows, setExcludedRows] = useState<number[]>([]);
   const [linkToPortfolio, setLinkToPortfolio] = useState(false);
@@ -377,6 +385,150 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     </div>
   );
 
+  const renderModeStep = () => (
+    <div>
+      <div className="mb-6">
+        <h3 className="text-lg font-medium text-foreground mb-2">Step 3: Choose Import Mode</h3>
+        <p className="text-sm text-muted-foreground">How should we handle existing records?</p>
+      </div>
+
+      <RadioGroup value={importMode} onValueChange={(value: any) => setImportMode(value)}>
+        <Card className="p-4 mb-3 cursor-pointer hover:border-primary" onClick={() => setImportMode('upsert')}>
+          <div className="flex items-start space-x-3">
+            <RadioGroupItem value="upsert" id="mode-upsert" className="mt-1" />
+            <div className="flex-1">
+              <Label htmlFor="mode-upsert" className="text-base font-medium cursor-pointer">
+                Upsert (Recommended)
+              </Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Add new records and update existing ones. Matches are based on marina name, city, and state.
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4 mb-3 cursor-pointer hover:border-primary" onClick={() => setImportMode('insert')}>
+          <div className="flex items-start space-x-3">
+            <RadioGroupItem value="insert" id="mode-insert" className="mt-1" />
+            <div className="flex-1">
+              <Label htmlFor="mode-insert" className="text-base font-medium cursor-pointer">
+                Insert Only
+              </Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Only add new records. Skip any records that already exist.
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4 cursor-pointer hover:border-primary" onClick={() => setImportMode('update')}>
+          <div className="flex items-start space-x-3">
+            <RadioGroupItem value="update" id="mode-update" className="mt-1" />
+            <div className="flex-1">
+              <Label htmlFor="mode-update" className="text-base font-medium cursor-pointer">
+                Update Only
+              </Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Only update existing records. Ignore new records that don't have a match.
+              </p>
+            </div>
+          </div>
+        </Card>
+      </RadioGroup>
+
+      {(importMode === 'update' || importMode === 'upsert') && (
+        <Card className="p-4 mt-4">
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              checked={updateBlankValues}
+              onCheckedChange={(checked) => setUpdateBlankValues(!!checked)}
+              id="update-blanks"
+            />
+            <div className="flex-1">
+              <Label htmlFor="update-blanks" className="text-sm font-medium cursor-pointer">
+                Overwrite existing data with blank values
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                If unchecked, blank cells in your import file will preserve existing data
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+
+  const renderPreviewStep = () => (
+    <div>
+      <div className="mb-6">
+        <h3 className="text-lg font-medium text-foreground mb-2">Step 4: Preview Import</h3>
+        <p className="text-sm text-muted-foreground">Review what will be imported</p>
+      </div>
+
+      {previewData && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <Card className="p-4 text-center">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {previewData.toInsert}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">Will be added</div>
+            </Card>
+            <Card className="p-4 text-center">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                {previewData.toUpdate}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">Will be updated</div>
+            </Card>
+            <Card className="p-4 text-center">
+              <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                {previewData.toSkip}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">Will be skipped</div>
+            </Card>
+          </div>
+
+          {previewData.duplicateMatches.length > 0 && (
+            <Card className="p-4">
+              <h4 className="font-medium text-foreground mb-3">Duplicate Matches Found</h4>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {previewData.duplicateMatches.slice(0, 10).map((match, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
+                    <div className="flex-1">
+                      <span className="font-medium">{match.row.marina || 'Unknown'}</span>
+                      <span className="text-muted-foreground ml-2">
+                        ({match.row.city}, {match.row.state})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(match.confidence * 100)}% match
+                      </span>
+                      {match.action === 'update' && (
+                        <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
+                          Will update
+                        </span>
+                      )}
+                      {match.action === 'skip' && (
+                        <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded">
+                          Will skip
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {previewData.duplicateMatches.length > 10 && (
+                  <div className="text-xs text-muted-foreground text-center pt-2">
+                    ... and {previewData.duplicateMatches.length - 10} more matches
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   const renderProcessingStep = () => (
     <div>

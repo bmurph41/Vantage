@@ -134,3 +134,49 @@ export interface FileAnalysis {
   columnTypes: Record<string, string>;
   dataQuality: Record<string, DataQuality>;
 }
+
+// Import System Types (Constant Contact-style)
+export type ImportMode = 'insert' | 'update' | 'upsert';
+
+export interface RowMatchResult {
+  rowIndex: number;
+  rowData: Record<string, any>;
+  matchedCompId?: string;
+  matchedComp?: any;
+  confidence: number; // 0-1
+  matchType: 'exact' | 'fuzzy' | 'none';
+  action: 'insert' | 'update' | 'skip';
+  reason?: string;
+  fieldChanges?: Array<{
+    field: string;
+    oldValue: any;
+    newValue: any;
+    willUpdate: boolean;
+  }>;
+}
+
+export interface ImportPlan {
+  mode: ImportMode;
+  updateBlankValues: boolean;
+  rows: RowMatchResult[];
+  summary: {
+    totalRows: number;
+    toInsert: number;
+    toUpdate: number;
+    toSkip: number;
+  };
+}
+
+export interface ImportPreviewData {
+  toInsert: number;
+  toUpdate: number;
+  toSkip: number;
+  duplicateMatches: Array<{
+    row: Record<string, any>;
+    match: any;
+    confidence: number;
+    action: 'insert' | 'update' | 'skip';
+    rowIndex: number;
+  }>;
+  plan: ImportPlan;
+}
