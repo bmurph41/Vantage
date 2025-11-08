@@ -114,9 +114,10 @@ export default function ProjectList({ onSelectProject, selectedProjectId }: Proj
             <Button 
               onClick={() => setShowForm(true)}
               data-testid="button-create-project"
+              size="lg"
             >
               <Plus className="mr-2 h-4 w-4" />
-              New Project
+              Start New Project
             </Button>
           )}
         </div>
@@ -183,9 +184,10 @@ export default function ProjectList({ onSelectProject, selectedProjectId }: Proj
                     <Button 
                       onClick={() => setShowForm(true)}
                       data-testid="button-create-first-project"
+                      size="lg"
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Create First Project
+                      Start New Project
                     </Button>
                   )}
                 </>
