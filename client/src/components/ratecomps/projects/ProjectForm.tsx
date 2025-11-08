@@ -634,7 +634,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                   Algorithm Weight Preferences
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Adjust how important each factor is for recommendations (0.0 to 1.0). Leave empty for defaults.
+                  Adjust how important each factor is for recommendations (0% to 100%). Leave empty for defaults.
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -644,17 +644,17 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                     name="capacityWeight"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Capacity Similarity (default: {DEFAULT_RECOMMENDATION_WEIGHTS.capacity})</FormLabel>
+                        <FormLabel>Capacity Similarity (default: {(DEFAULT_RECOMMENDATION_WEIGHTS.capacity * 100)}%)</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
                             type="number"
                             min="0"
-                            max="1"
-                            step="0.01"
-                            placeholder={DEFAULT_RECOMMENDATION_WEIGHTS.capacity.toString()}
-                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                            value={field.value ?? ""}
+                            max="100"
+                            step="1"
+                            placeholder={(DEFAULT_RECOMMENDATION_WEIGHTS.capacity * 100).toString()}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) / 100 : undefined)}
+                            value={field.value !== undefined && field.value !== null ? Math.round(field.value * 100) : ""}
                             data-testid="input-capacity-weight"
                           />
                         </FormControl>
@@ -668,17 +668,17 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                     name="financialWeight"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Financial Similarity (default: {DEFAULT_RECOMMENDATION_WEIGHTS.financial})</FormLabel>
+                        <FormLabel>Financial Similarity (default: {(DEFAULT_RECOMMENDATION_WEIGHTS.financial * 100)}%)</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
                             type="number"
                             min="0"
-                            max="1"
-                            step="0.01"
-                            placeholder={DEFAULT_RECOMMENDATION_WEIGHTS.financial.toString()}
-                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                            value={field.value ?? ""}
+                            max="100"
+                            step="1"
+                            placeholder={(DEFAULT_RECOMMENDATION_WEIGHTS.financial * 100).toString()}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) / 100 : undefined)}
+                            value={field.value !== undefined && field.value !== null ? Math.round(field.value * 100) : ""}
                             data-testid="input-financial-weight"
                           />
                         </FormControl>
@@ -694,17 +694,17 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                     name="profitCentersWeight"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Profit Centers (default: {DEFAULT_RECOMMENDATION_WEIGHTS.profitCenters})</FormLabel>
+                        <FormLabel>Profit Centers (default: {(DEFAULT_RECOMMENDATION_WEIGHTS.profitCenters * 100)}%)</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
                             type="number"
                             min="0"
-                            max="1"
-                            step="0.01"
-                            placeholder={DEFAULT_RECOMMENDATION_WEIGHTS.profitCenters.toString()}
-                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                            value={field.value ?? ""}
+                            max="100"
+                            step="1"
+                            placeholder={(DEFAULT_RECOMMENDATION_WEIGHTS.profitCenters * 100).toString()}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) / 100 : undefined)}
+                            value={field.value !== undefined && field.value !== null ? Math.round(field.value * 100) : ""}
                             data-testid="input-profit-centers-weight"
                           />
                         </FormControl>
@@ -718,17 +718,17 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                     name="regionalWeight"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Regional Match (default: {DEFAULT_RECOMMENDATION_WEIGHTS.regional})</FormLabel>
+                        <FormLabel>Regional Match (default: {(DEFAULT_RECOMMENDATION_WEIGHTS.regional * 100)}%)</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
                             type="number"
                             min="0"
-                            max="1"
-                            step="0.01"
-                            placeholder={DEFAULT_RECOMMENDATION_WEIGHTS.regional.toString()}
-                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                            value={field.value ?? ""}
+                            max="100"
+                            step="1"
+                            placeholder={(DEFAULT_RECOMMENDATION_WEIGHTS.regional * 100).toString()}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) / 100 : undefined)}
+                            value={field.value !== undefined && field.value !== null ? Math.round(field.value * 100) : ""}
                             data-testid="input-regional-weight"
                           />
                         </FormControl>
@@ -742,17 +742,17 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                     name="geoWeight"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Geographic (default: {DEFAULT_RECOMMENDATION_WEIGHTS.geo})</FormLabel>
+                        <FormLabel>Geographic (default: {(DEFAULT_RECOMMENDATION_WEIGHTS.geo * 100)}%)</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
                             type="number"
                             min="0"
-                            max="1"
-                            step="0.01"
-                            placeholder={DEFAULT_RECOMMENDATION_WEIGHTS.geo.toString()}
-                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                            value={field.value ?? ""}
+                            max="100"
+                            step="1"
+                            placeholder={(DEFAULT_RECOMMENDATION_WEIGHTS.geo * 100).toString()}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) / 100 : undefined)}
+                            value={field.value !== undefined && field.value !== null ? Math.round(field.value * 100) : ""}
                             data-testid="input-geo-weight"
                           />
                         </FormControl>
