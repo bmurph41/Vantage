@@ -99,6 +99,13 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
+      <Route path="/dd/projects">
+        {() => (
+          <UnifiedLayout>
+            <AllProjectsSummaryPage />
+          </UnifiedLayout>
+        )}
+      </Route>
       <Route path="/dashboard">
         {() => (
           <UnifiedLayout>
