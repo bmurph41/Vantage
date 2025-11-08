@@ -1494,12 +1494,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create tasks from template blueprint
       const createdTasks = [];
       if (template.tasksBlueprint && template.tasksBlueprint.length > 0) {
-        for (const taskTitle of template.tasksBlueprint) {
-          if (taskTitle && taskTitle.trim()) {
+        for (const taskBlueprint of template.tasksBlueprint) {
+          if (taskBlueprint && taskBlueprint.trim()) {
+            // Parse title and description from blueprint (format: "Title||Description")
+            const parts = taskBlueprint.split('||');
+            const title = parts[0]?.trim() || taskBlueprint.trim();
+            const description = parts[1]?.trim() || "";
+            
             const taskData = {
               projectId: req.params.projectId,
-              title: taskTitle.trim(),
-              description: "",
+              title: title,
+              description: description,
               startStrategy: "offset" as const,
               startOffsetDays: 0,
               deadlineType: "days_after_psa" as const,
