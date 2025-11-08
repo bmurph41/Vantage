@@ -39,7 +39,10 @@ import {
   scProjectProfileSchema,
   scWeightOverridesSchema,
   scPortfolios,
-  scPortfolioComps
+  scPortfolioComps,
+  fuelSales,
+  insertFuelSaleSchema,
+  updateFuelSaleSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -10697,7 +10700,7 @@ Current context: Project ${req.params.projectId}`;
   // ==================== OPERATIONS - FUEL SALES ROUTES ====================
 
   // Get all fuel sales for organization
-  app.get("/api/operations/fuel-sales", requireAuth, async (req, res) => {
+  app.get("/api/operations/fuel-sales", authenticateUser, async (req, res) => {
     try {
       const sales = await db.query.fuelSales.findMany({
         where: eq(fuelSales.orgId, req.user!.orgId),
@@ -10720,7 +10723,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create a new fuel sale
-  app.post("/api/operations/fuel-sales", requireAuth, async (req, res) => {
+  app.post("/api/operations/fuel-sales", authenticateUser, async (req, res) => {
     try {
       const saleData = insertFuelSaleSchema.parse(req.body);
       const [sale] = await db.insert(fuelSales).values({
@@ -10738,7 +10741,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get a specific fuel sale
-  app.get("/api/operations/fuel-sales/:id", requireAuth, async (req, res) => {
+  app.get("/api/operations/fuel-sales/:id", authenticateUser, async (req, res) => {
     try {
       const sale = await db.query.fuelSales.findFirst({
         where: and(
@@ -10768,7 +10771,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update a fuel sale
-  app.patch("/api/operations/fuel-sales/:id", requireAuth, async (req, res) => {
+  app.patch("/api/operations/fuel-sales/:id", authenticateUser, async (req, res) => {
     try {
       const updateData = updateFuelSaleSchema.parse(req.body);
       
@@ -10798,7 +10801,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete a fuel sale
-  app.delete("/api/operations/fuel-sales/:id", requireAuth, async (req, res) => {
+  app.delete("/api/operations/fuel-sales/:id", authenticateUser, async (req, res) => {
     try {
       const [deleted] = await db.delete(fuelSales)
         .where(and(
@@ -10819,7 +10822,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get fuel sales summary/stats
-  app.get("/api/operations/fuel-sales/stats/summary", requireAuth, async (req, res) => {
+  app.get("/api/operations/fuel-sales/stats/summary", authenticateUser, async (req, res) => {
     try {
       const { startDate, endDate } = req.query;
       
