@@ -8595,15 +8595,36 @@ Current context: Project ${req.params.projectId}`;
         after: project,
       });
 
-      // Auto-run recommendations and add matching comps if project has a profile with criteria
+      // Auto-run recommendations and add matching comps if project has meaningful profile criteria
       let recommendations = null;
       let addedCount = 0;
-      const hasProfileCriteria = project.profile && Object.keys(project.profile).length > 0;
       
-      if (hasProfileCriteria) {
-        console.log(`🔍 Auto-adding comps for new SC project "${project.name}" with profile:`, project.profile);
+      // Helper function to check if a value is meaningful
+      const isMeaningfulValue = (value: any): boolean => {
+        if (value === undefined || value === null) return false;
+        if (typeof value === 'string' && value.trim() === '') return false;
+        if (Array.isArray(value) && value.length === 0) return false;
+        if (typeof value === 'object' && !Array.isArray(value)) {
+          // For objects, check if any nested value is meaningful
+          return Object.values(value).some(isMeaningfulValue);
+        }
+        // Allow all other values including 0, false, etc.
+        return true;
+      };
+      
+      // Deep normalize profile by removing all undefined/null/empty values
+      const normalizedProfile = project.profile ? 
+        Object.fromEntries(
+          Object.entries(project.profile)
+            .filter(([_, value]) => isMeaningfulValue(value))
+        ) : {};
+      
+      const hasValidCriteria = Object.keys(normalizedProfile).length > 0;
+      
+      if (hasValidCriteria) {
+        console.log(`🔍 Auto-adding comps for new SC project "${project.name}" with profile:`, normalizedProfile);
         try {
-          const projectProfile = project.profile as ProjectProfile;
+          const projectProfile = normalizedProfile as ProjectProfile;
           const userWeightOverrides = (project.weightOverrides as any) || undefined;
           
           recommendations = await recommendationService.getRecommendations({
@@ -10061,15 +10082,36 @@ Current context: Project ${req.params.projectId}`;
         after: project,
       });
 
-      // Auto-run recommendations and add matching comps if project has a profile with criteria
+      // Auto-run recommendations and add matching comps if project has meaningful profile criteria
       let recommendations = null;
       let addedCount = 0;
-      const hasProfileCriteria = project.profile && Object.keys(project.profile).length > 0;
       
-      if (hasProfileCriteria) {
-        console.log(`🔍 Auto-adding comps for new RC project "${project.name}" with profile:`, project.profile);
+      // Helper function to check if a value is meaningful
+      const isMeaningfulValue = (value: any): boolean => {
+        if (value === undefined || value === null) return false;
+        if (typeof value === 'string' && value.trim() === '') return false;
+        if (Array.isArray(value) && value.length === 0) return false;
+        if (typeof value === 'object' && !Array.isArray(value)) {
+          // For objects, check if any nested value is meaningful
+          return Object.values(value).some(isMeaningfulValue);
+        }
+        // Allow all other values including 0, false, etc.
+        return true;
+      };
+      
+      // Deep normalize profile by removing all undefined/null/empty values
+      const normalizedProfile = project.profile ? 
+        Object.fromEntries(
+          Object.entries(project.profile)
+            .filter(([_, value]) => isMeaningfulValue(value))
+        ) : {};
+      
+      const hasValidCriteria = Object.keys(normalizedProfile).length > 0;
+      
+      if (hasValidCriteria) {
+        console.log(`🔍 Auto-adding comps for new RC project "${project.name}" with profile:`, normalizedProfile);
         try {
-          const projectProfile = project.profile as ProjectProfile;
+          const projectProfile = normalizedProfile as ProjectProfile;
           const userWeightOverrides = (project.weightOverrides as any) || undefined;
           
           recommendations = await rcRecommendationService.getRecommendations({
