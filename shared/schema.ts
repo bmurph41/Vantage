@@ -3842,6 +3842,10 @@ export const rateComps = pgTable('rate_comps', {
   dryRacks: integer('dry_racks'),
   ioBoth: text('inside_outside_both'), // Legacy field - deprecated
   storageTypes: text('storage_types').array().default(sql`'{}'`), // Multi-select storage types
+  rateType: text('rate_type'), // 'Monthly', 'Annual', 'Daily', 'Weekly', etc.
+  seasonality: text('seasonality'), // 'Year-Round', 'Seasonal', 'Summer Only', 'Winter Only', etc.
+  boatLengthMin: integer('boat_length_min'), // Minimum boat length in feet
+  boatLengthMax: integer('boat_length_max'), // Maximum boat length in feet
   bodyOfWater: text('body_of_water'),
   waterBodyName: text('water_body_name'), // Specific name like "Gulf of America", "Lake Superior"
   waterfront: text('waterfront'),

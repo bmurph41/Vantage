@@ -4119,6 +4119,21 @@ export class DatabaseStorage implements IStorage {
     if (filters.states && filters.states.length > 0) {
       conditions.push(inArray(rateComps.state, filters.states));
     }
+    if (filters.storageTypes && filters.storageTypes.length > 0) {
+      conditions.push(sql`${rateComps.storageTypes} && ARRAY[${sql.raw(filters.storageTypes.map((t: string) => `'${t}'`).join(','))}]::text[]`);
+    }
+    if (filters.rateTypes && filters.rateTypes.length > 0) {
+      conditions.push(inArray(rateComps.rateType, filters.rateTypes));
+    }
+    if (filters.seasonalities && filters.seasonalities.length > 0) {
+      conditions.push(inArray(rateComps.seasonality, filters.seasonalities));
+    }
+    if (filters.boatLengthMin) {
+      conditions.push(sql`${rateComps.boatLengthMax} >= ${filters.boatLengthMin}`);
+    }
+    if (filters.boatLengthMax) {
+      conditions.push(sql`${rateComps.boatLengthMin} <= ${filters.boatLengthMax}`);
+    }
     if (filters.saleYearMin) {
       conditions.push(sql`${rateComps.saleYear} >= ${filters.saleYearMin}`);
     }

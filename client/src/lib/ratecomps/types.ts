@@ -2,6 +2,11 @@ export interface FilterState {
   q: string;
   states: string[];
   regions: string[];
+  storageTypes: string[];
+  rateTypes: string[];
+  seasonalities: string[];
+  boatLengthMin: string;
+  boatLengthMax: string;
   saleYearMin: string;
   saleYearMax: string;
   priceMin: string;

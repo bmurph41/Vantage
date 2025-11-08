@@ -68,12 +68,11 @@ export default function FiltersPanel({
         if (filters.regions && filters.regions.length > 0) count += filters.regions.length;
         break;
       case 'saleDetails':
-        if (filters.saleYearMin) count++;
-        if (filters.saleYearMax) count++;
-        if (filters.priceMin) count++;
-        if (filters.priceMax) count++;
-        if (filters.capRateMin) count++;
-        if (filters.capRateMax) count++;
+        if (filters.storageTypes && filters.storageTypes.length > 0) count += filters.storageTypes.length;
+        if (filters.rateTypes && filters.rateTypes.length > 0) count += filters.rateTypes.length;
+        if (filters.seasonalities && filters.seasonalities.length > 0) count += filters.seasonalities.length;
+        if (filters.boatLengthMin) count++;
+        if (filters.boatLengthMax) count++;
         break;
       case 'marinaFeatures':
         if (filters.wetSlipsMin) count++;
@@ -477,91 +476,107 @@ export default function FiltersPanel({
           </CollapsibleTrigger>
           <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
             <div className="mt-3 px-3 space-y-5">
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Sale Year</Label>
-            <div className="flex items-center gap-2.5">
-              <Input
-                type="number"
-                placeholder="2020"
-                className="flex-1 h-10"
-                value={filters.saleYearMin}
-                onChange={(e) => throttledUpdateFilter('saleYearMin', e.target.value)}
-                data-testid="input-sale-year-min"
-              />
-              <span className="text-muted-foreground text-sm font-medium">to</span>
-              <Input
-                type="number"
-                placeholder="2024"
-                className="flex-1 h-10"
-                value={filters.saleYearMax}
-                onChange={(e) => throttledUpdateFilter('saleYearMax', e.target.value)}
-                data-testid="input-sale-year-max"
-              />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Price</Label>
-              <div className="flex items-center gap-2 p-1.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                <Checkbox
-                  id="market-bid"
-                  checked={isMarketBid}
-                  onCheckedChange={handleMarketBidChange}
-                  data-testid="checkbox-market-bid"
-                  className="h-3.5 w-3.5"
-                />
-                <Label htmlFor="market-bid" className="text-xs text-foreground font-medium cursor-pointer leading-none">
-                  Market Bid
-                </Label>
+              {/* Storage Type */}
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Storage Type</Label>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {allStorageTypes.map(storageType => (
+                    <div key={storageType} className="flex items-center gap-2 p-1.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
+                      <Checkbox
+                        id={`storage-${storageType}`}
+                        checked={filters.storageTypes?.includes(storageType) || false}
+                        onCheckedChange={(checked) => {
+                          const newStorageTypes = checked
+                            ? [...(filters.storageTypes || []), storageType]
+                            : (filters.storageTypes || []).filter(s => s !== storageType);
+                          updateFilter('storageTypes', newStorageTypes);
+                        }}
+                        className="h-3.5 w-3.5"
+                        data-testid={`checkbox-storage-${storageType}`}
+                      />
+                      <Label htmlFor={`storage-${storageType}`} className="text-xs text-foreground font-medium cursor-pointer leading-none flex-1">
+                        {storageType}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <Input
-                type="text"
-                placeholder="$0"
-                className="flex-1 h-10"
-                value={filters.priceMin}
-                onChange={(e) => debouncedUpdateFilter('priceMin', e.target.value)}
-                data-testid="input-price-min"
-                disabled={isMarketBid}
-              />
-              <span className="text-muted-foreground text-sm font-medium">to</span>
-              <Input
-                type="text"
-                placeholder="$50M"
-                className="flex-1 h-10"
-                value={filters.priceMax}
-                onChange={(e) => debouncedUpdateFilter('priceMax', e.target.value)}
-                data-testid="input-price-max"
-              />
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Cap Rate (%)</Label>
-            <div className="flex items-center gap-2.5">
-              <Input
-                type="text"
-                placeholder="0.00%"
-                className="flex-1 h-10"
-                value={capRateInputs.capRateMin}
-                onFocus={() => handleCapRateFocus('capRateMin')}
-                onChange={(e) => handleCapRateChange('capRateMin', e.target.value)}
-                onBlur={() => handleCapRateBlur('capRateMin')}
-                data-testid="input-cap-rate-min"
-              />
-              <span className="text-muted-foreground text-sm font-medium">to</span>
-              <Input
-                type="text"
-                placeholder="15.00%"
-                className="flex-1 h-10"
-                value={capRateInputs.capRateMax}
-                onFocus={() => handleCapRateFocus('capRateMax')}
-                onChange={(e) => handleCapRateChange('capRateMax', e.target.value)}
-                onBlur={() => handleCapRateBlur('capRateMax')}
-                data-testid="input-cap-rate-max"
-              />
-            </div>
-          </div>
+
+              {/* Rate Type */}
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Rate Type</Label>
+                <div className="space-y-2">
+                  {['Monthly', 'Annual', 'Daily', 'Weekly', 'Seasonal'].map(rateType => (
+                    <div key={rateType} className="flex items-center gap-2 p-1.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
+                      <Checkbox
+                        id={`rate-type-${rateType}`}
+                        checked={filters.rateTypes?.includes(rateType) || false}
+                        onCheckedChange={(checked) => {
+                          const newRateTypes = checked
+                            ? [...(filters.rateTypes || []), rateType]
+                            : (filters.rateTypes || []).filter(r => r !== rateType);
+                          updateFilter('rateTypes', newRateTypes);
+                        }}
+                        className="h-3.5 w-3.5"
+                        data-testid={`checkbox-rate-type-${rateType}`}
+                      />
+                      <Label htmlFor={`rate-type-${rateType}`} className="text-xs text-foreground font-medium cursor-pointer leading-none flex-1">
+                        {rateType}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Seasonality */}
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Seasonality</Label>
+                <div className="space-y-2">
+                  {['Year-Round', 'Seasonal', 'Summer Only', 'Winter Only'].map(seasonality => (
+                    <div key={seasonality} className="flex items-center gap-2 p-1.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
+                      <Checkbox
+                        id={`seasonality-${seasonality}`}
+                        checked={filters.seasonalities?.includes(seasonality) || false}
+                        onCheckedChange={(checked) => {
+                          const newSeasonalities = checked
+                            ? [...(filters.seasonalities || []), seasonality]
+                            : (filters.seasonalities || []).filter(s => s !== seasonality);
+                          updateFilter('seasonalities', newSeasonalities);
+                        }}
+                        className="h-3.5 w-3.5"
+                        data-testid={`checkbox-seasonality-${seasonality}`}
+                      />
+                      <Label htmlFor={`seasonality-${seasonality}`} className="text-xs text-foreground font-medium cursor-pointer leading-none flex-1">
+                        {seasonality}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Boat Length Range */}
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Boat Length (feet)</Label>
+                <div className="flex items-center gap-2.5">
+                  <Input
+                    type="number"
+                    placeholder="Min"
+                    className="flex-1 h-10"
+                    value={filters.boatLengthMin}
+                    onChange={(e) => throttledUpdateFilter('boatLengthMin', e.target.value)}
+                    data-testid="input-boat-length-min"
+                  />
+                  <span className="text-muted-foreground text-sm font-medium">to</span>
+                  <Input
+                    type="number"
+                    placeholder="Max"
+                    className="flex-1 h-10"
+                    value={filters.boatLengthMax}
+                    onChange={(e) => throttledUpdateFilter('boatLengthMax', e.target.value)}
+                    data-testid="input-boat-length-max"
+                  />
+                </div>
+              </div>
             </div>
           </CollapsibleContent>
         </div>
