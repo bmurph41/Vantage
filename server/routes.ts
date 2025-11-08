@@ -8595,8 +8595,9 @@ Current context: Project ${req.params.projectId}`;
         after: project,
       });
 
-      // Auto-run recommendations if project has a profile
+      // Auto-run recommendations and add matching comps if project has a profile
       let recommendations = null;
+      let addedCount = 0;
       if (project.projectProfile) {
         try {
           const projectProfile = project.projectProfile as ProjectProfile;
@@ -8606,15 +8607,36 @@ Current context: Project ${req.params.projectId}`;
             orgId,
             projectProfile,
             userWeightOverrides,
-            limit: 10,
+            limit: 50,
           });
+
+          // Auto-add top 30 matching comps to the project
+          if (recommendations && recommendations.items && recommendations.items.length > 0) {
+            const topComps = recommendations.items.slice(0, 30);
+            for (const rec of topComps) {
+              try {
+                await storage.addCompToScProject(
+                  project.id,
+                  rec.id,
+                  orgId,
+                  userId
+                );
+                addedCount++;
+              } catch (addError: any) {
+                // Skip duplicates or errors, continue adding others
+                if (!addError.message?.includes('duplicate key')) {
+                  console.error("Error auto-adding comp:", addError);
+                }
+              }
+            }
+          }
         } catch (recError) {
           console.error("Error generating recommendations for new project:", recError);
           // Don't fail project creation if recommendations fail
         }
       }
 
-      res.status(201).json({ project, recommendations });
+      res.status(201).json({ project, recommendations, addedCount });
     } catch (error) {
       console.error("Error creating SC project:", error);
       res.status(500).json({ message: "Failed to create SC project" });
@@ -10034,8 +10056,9 @@ Current context: Project ${req.params.projectId}`;
         after: project,
       });
 
-      // Auto-run recommendations if project has a profile
+      // Auto-run recommendations and add matching comps if project has a profile
       let recommendations = null;
+      let addedCount = 0;
       if (project.projectProfile) {
         try {
           const projectProfile = project.projectProfile as ProjectProfile;
@@ -10045,15 +10068,36 @@ Current context: Project ${req.params.projectId}`;
             orgId,
             projectProfile,
             userWeightOverrides,
-            limit: 10,
+            limit: 50,
           });
+
+          // Auto-add top 30 matching comps to the project
+          if (recommendations && recommendations.items && recommendations.items.length > 0) {
+            const topComps = recommendations.items.slice(0, 30);
+            for (const rec of topComps) {
+              try {
+                await storage.addCompToRcProject(
+                  project.id,
+                  rec.id,
+                  orgId,
+                  userId
+                );
+                addedCount++;
+              } catch (addError: any) {
+                // Skip duplicates or errors, continue adding others
+                if (!addError.message?.includes('duplicate key')) {
+                  console.error("Error auto-adding comp:", addError);
+                }
+              }
+            }
+          }
         } catch (recError) {
           console.error("Error generating recommendations for new RC project:", recError);
           // Don't fail project creation if recommendations fail
         }
       }
 
-      res.status(201).json({ project, recommendations });
+      res.status(201).json({ project, recommendations, addedCount });
     } catch (error) {
       console.error("Error creating RC project:", error);
       res.status(500).json({ message: "Failed to create RC project" });
