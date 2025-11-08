@@ -10694,6 +10694,180 @@ Current context: Project ${req.params.projectId}`;
     res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY || "" });
   });
 
+  // ==================== OPERATIONS - FUEL SALES ROUTES ====================
+
+  // Get all fuel sales for organization
+  app.get("/api/operations/fuel-sales", requireAuth, async (req, res) => {
+    try {
+      const sales = await db.query.fuelSales.findMany({
+        where: eq(fuelSales.orgId, req.user!.orgId),
+        orderBy: desc(fuelSales.transactionDate),
+        with: {
+          processedByUser: {
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+            }
+          },
+        },
+      });
+      res.json(sales);
+    } catch (error) {
+      console.error("Error fetching fuel sales:", error);
+      res.status(500).json({ message: "Failed to fetch fuel sales" });
+    }
+  });
+
+  // Create a new fuel sale
+  app.post("/api/operations/fuel-sales", requireAuth, async (req, res) => {
+    try {
+      const saleData = insertFuelSaleSchema.parse(req.body);
+      const [sale] = await db.insert(fuelSales).values({
+        ...saleData,
+        orgId: req.user!.orgId,
+      }).returning();
+      res.json(sale);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error creating fuel sale:", error);
+      res.status(500).json({ message: "Failed to create fuel sale" });
+    }
+  });
+
+  // Get a specific fuel sale
+  app.get("/api/operations/fuel-sales/:id", requireAuth, async (req, res) => {
+    try {
+      const sale = await db.query.fuelSales.findFirst({
+        where: and(
+          eq(fuelSales.id, req.params.id),
+          eq(fuelSales.orgId, req.user!.orgId)
+        ),
+        with: {
+          processedByUser: {
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+            }
+          },
+        },
+      });
+
+      if (!sale) {
+        return res.status(404).json({ message: "Fuel sale not found" });
+      }
+
+      res.json(sale);
+    } catch (error) {
+      console.error("Error fetching fuel sale:", error);
+      res.status(500).json({ message: "Failed to fetch fuel sale" });
+    }
+  });
+
+  // Update a fuel sale
+  app.patch("/api/operations/fuel-sales/:id", requireAuth, async (req, res) => {
+    try {
+      const updateData = updateFuelSaleSchema.parse(req.body);
+      
+      const [updated] = await db.update(fuelSales)
+        .set({
+          ...updateData,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(fuelSales.id, req.params.id),
+          eq(fuelSales.orgId, req.user!.orgId)
+        ))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Fuel sale not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error updating fuel sale:", error);
+      res.status(500).json({ message: "Failed to update fuel sale" });
+    }
+  });
+
+  // Delete a fuel sale
+  app.delete("/api/operations/fuel-sales/:id", requireAuth, async (req, res) => {
+    try {
+      const [deleted] = await db.delete(fuelSales)
+        .where(and(
+          eq(fuelSales.id, req.params.id),
+          eq(fuelSales.orgId, req.user!.orgId)
+        ))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Fuel sale not found" });
+      }
+
+      res.json({ message: "Fuel sale deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting fuel sale:", error);
+      res.status(500).json({ message: "Failed to delete fuel sale" });
+    }
+  });
+
+  // Get fuel sales summary/stats
+  app.get("/api/operations/fuel-sales/stats/summary", requireAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      let conditions = [eq(fuelSales.orgId, req.user!.orgId)];
+      
+      if (startDate) {
+        conditions.push(gte(fuelSales.transactionDate, new Date(startDate as string)));
+      }
+      if (endDate) {
+        conditions.push(lte(fuelSales.transactionDate, new Date(endDate as string)));
+      }
+
+      const sales = await db.query.fuelSales.findMany({
+        where: and(...conditions),
+      });
+
+      const stats = {
+        totalSales: sales.length,
+        totalRevenue: sales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0),
+        totalGallons: sales.reduce((sum, sale) => sum + Number(sale.quantityGallons), 0),
+        byFuelType: sales.reduce((acc: Record<string, any>, sale) => {
+          if (!acc[sale.fuelType]) {
+            acc[sale.fuelType] = {
+              count: 0,
+              gallons: 0,
+              revenue: 0,
+            };
+          }
+          acc[sale.fuelType].count++;
+          acc[sale.fuelType].gallons += Number(sale.quantityGallons);
+          acc[sale.fuelType].revenue += Number(sale.totalAmount);
+          return acc;
+        }, {}),
+        byPaymentMethod: sales.reduce((acc: Record<string, number>, sale) => {
+          if (sale.paymentMethod) {
+            acc[sale.paymentMethod] = (acc[sale.paymentMethod] || 0) + 1;
+          }
+          return acc;
+        }, {}),
+      };
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching fuel sales stats:", error);
+      res.status(500).json({ message: "Failed to fetch fuel sales stats" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

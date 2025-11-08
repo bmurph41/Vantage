@@ -4268,6 +4268,18 @@ export const fuelSales = pgTable('fuel_sales', {
   processedByIdx: index('fuel_sales_processed_by_idx').on(table.processedBy),
 }));
 
+// Relations for Fuel Sales
+export const fuelSalesRelations = relations(fuelSales, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [fuelSales.orgId],
+    references: [organizations.id],
+  }),
+  processedByUser: one(users, {
+    fields: [fuelSales.processedBy],
+    references: [users.id],
+  }),
+}));
+
 // Relations for Rate Comps
 export const rateCompsRelations = relations(rateComps, ({ one, many }) => ({
   organization: one(organizations, {
