@@ -20,7 +20,7 @@ import {
   Lightbulb
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useProject, useProjectComps, useUpdateProject, useDeleteProject } from '@/hooks/salescomps/useProjects';
+import { useProject, useProjectComps, useUpdateProject, useDeleteProject, useAutoPopulateProject } from '@/hooks/salescomps/useProjects';
 import { useAuth } from "@/hooks/useAuth";
 import ProjectForm from "./ProjectForm";
 import ProjectCompsTable from "./ProjectCompsTable";
@@ -52,6 +52,7 @@ export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDe
   const { data: projectCompsData, isLoading: compsLoading, refetch: refetchComps } = useProjectComps(projectId);
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
+  const autoPopulate = useAutoPopulateProject();
 
   const canEdit: boolean = Boolean(user && ['Owner', 'Broker', 'Analyst', 'Admin'].includes((user as User).role));
   const canDelete: boolean = Boolean(user && ['Owner', 'Admin'].includes((user as User).role));
@@ -95,6 +96,16 @@ export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDe
 
   const handleGenerateReport = () => {
     setLocation(`/projects/${projectId}/report`);
+  };
+
+  const handleAutoPopulate = () => {
+    autoPopulate.mutate({ 
+      projectId, 
+      options: { 
+        limit: 30,
+        minScore: 0.3 
+      } 
+    });
   };
 
   // Filter comps based on search query  
@@ -252,6 +263,33 @@ export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDe
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handleAutoPopulate}
+                    disabled={autoPopulate.isPending || !project?.profile}
+                    data-testid="button-auto-add-suggestions"
+                    className="w-full sm:w-auto"
+                  >
+                    {autoPopulate.isPending ? (
+                      <>
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Auto-Add Comps
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Automatically add top 30 matching comps based on your project criteria</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={handleGenerateReport}
                     data-testid="button-generate-project-report"
                     disabled={comps.length === 0}
@@ -304,6 +342,9 @@ export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDe
           canEdit={canEdit}
           canDelete={canDelete}
           projectId={projectId}
+          project={project}
+          onAutoPopulate={handleAutoPopulate}
+          onEditProject={() => setShowEditForm(true)}
           projectName={project.name}
         />
       </div>

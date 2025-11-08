@@ -224,3 +224,28 @@ export function useRemoveCompFromProject() {
     },
   });
 }
+
+export function useAutoPopulateProject() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ projectId, options }: { projectId: string; options?: { limit?: number; minScore?: number } }) => 
+      projectsApi.autoPopulateProject(projectId, options),
+    onSuccess: (result, { projectId }) => {
+      toast({
+        title: "Success",
+        description: result.message,
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.comps(projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: (error as Error).message || "Failed to auto-populate project",
+        variant: "destructive",
+      });
+    },
+  });
+}

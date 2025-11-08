@@ -9013,6 +9013,83 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.post('/api/sc-projects/:id/auto-populate', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const projectId = req.params.id;
+      
+      const project = await storage.getScProject(projectId, orgId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      // Get configuration from request body
+      const limit = req.body.limit || 30;
+      const minScore = req.body.minScore || 0.3; // Only add comps with score >= 0.3
+      
+      // Get existing comps to exclude
+      const projectComps = await storage.getScProjectComps(projectId, orgId);
+      const excludeCompIds = projectComps.map(pc => pc.salesCompId);
+
+      // Get recommendations
+      const projectProfile = (project.profile as any) || {};
+      const userWeightOverrides = (project.weightOverrides as any) || undefined;
+      
+      const recommendations = await recommendationService.getRecommendations({
+        orgId,
+        projectProfile,
+        userWeightOverrides,
+        excludeCompIds,
+        limit: limit * 2, // Get more to ensure we have enough after filtering
+      });
+
+      // Filter by minimum score and take top N
+      const topRecommendations = recommendations
+        .filter(rec => rec.score >= minScore)
+        .slice(0, limit);
+
+      // Auto-add to project
+      let addedCount = 0;
+      let skippedCount = 0;
+      const addedComps = [];
+
+      for (const rec of topRecommendations) {
+        try {
+          const projectComp = await storage.addCompToScProject(
+            projectId,
+            rec.comp.id,
+            orgId,
+            userId
+          );
+          addedComps.push({
+            ...projectComp,
+            score: rec.score,
+            reasons: rec.reasons
+          });
+          addedCount++;
+        } catch (addError: any) {
+          // Skip duplicates or errors
+          if (addError.message?.includes('duplicate key')) {
+            skippedCount++;
+          } else {
+            console.error("Error auto-adding comp:", addError);
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        addedCount,
+        skippedCount,
+        totalRecommendations: recommendations.length,
+        addedComps,
+        message: `Successfully added ${addedCount} comp${addedCount !== 1 ? 's' : ''} to project${skippedCount > 0 ? ` (${skippedCount} already in project)` : ''}`
+      });
+    } catch (error) {
+      console.error("Error auto-populating SC project:", error);
+      res.status(500).json({ message: "Failed to auto-populate project" });
+    }
+  });
+
   app.get('/api/sc-projects/:id/preferences', async (req: any, res) => {
     try {
       const orgId = req.user.orgId;

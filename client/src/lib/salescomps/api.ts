@@ -275,4 +275,15 @@ export const projectsApi = {
   removeCompFromProject: async (projectId: string, compId: string): Promise<void> => {
     await apiRequest('DELETE', `/api/sc-projects/${projectId}/comps/${compId}`);
   },
+
+  autoPopulateProject: async (projectId: string, options?: { limit?: number; minScore?: number }): Promise<{
+    success: boolean;
+    addedCount: number;
+    skippedCount: number;
+    totalRecommendations: number;
+    message: string;
+  }> => {
+    const response = await apiRequest('POST', `/api/sc-projects/${projectId}/auto-populate`, options || {});
+    return await response.json();
+  },
 };

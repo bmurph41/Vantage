@@ -11,13 +11,15 @@ import {
   Trash2, 
   ExternalLink,
   MoreHorizontal,
-  Eye
+  Eye,
+  Lightbulb,
+  Settings
 } from "lucide-react";
 import { formatCurrency, formatPercent, formatNumber } from '@/lib/salescomps/format';
 import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEditCompDialog";
 import Detail from "@/pages/analysis/sales-comps/Detail";
 import { useAuth } from "@/hooks/useAuth";
-import type { SalesComp, User } from "@shared/schema";
+import type { SalesComp, User, Project } from "@shared/schema";
 import type { ProjectCompsResponse } from '@/lib/salescomps/api';
 
 interface ProjectCompsTableProps {
@@ -32,6 +34,9 @@ interface ProjectCompsTableProps {
   canDelete?: boolean;
   projectId?: string;
   projectName?: string;
+  project?: Project | null;
+  onAutoPopulate?: () => void;
+  onEditProject?: () => void;
 }
 
 export default function ProjectCompsTable({
@@ -46,6 +51,9 @@ export default function ProjectCompsTable({
   canDelete = false,
   projectId,
   projectName,
+  project,
+  onAutoPopulate,
+  onEditProject,
 }: ProjectCompsTableProps) {
   const { user } = useAuth();
   const [editingComp, setEditingComp] = useState<SalesComp | null>(null);
@@ -181,11 +189,48 @@ export default function ProjectCompsTable({
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length + 1} className="text-center py-8">
-                  <div className="text-muted-foreground">
-                    <p className="text-lg mb-2">No comps in this project</p>
-                    <p className="text-sm">Use the "Add Comps" button to add sales comps to this project</p>
-                  </div>
+                <TableCell colSpan={columns.length + 1} className="text-center py-12">
+                  {!project?.profile || Object.keys(project.profile).length === 0 ? (
+                    <div className="max-w-md mx-auto">
+                      <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-lg font-medium mb-2">No Target Criteria Set</p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Set target criteria (states, price range, capacity, etc.) to automatically populate this project with matching comps.
+                      </p>
+                      {onEditProject && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={onEditProject}
+                          data-testid="button-set-criteria"
+                        >
+                          <Settings className="mr-2 h-4 w-4" />
+                          Set Target Criteria
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="max-w-md mx-auto">
+                      <Lightbulb className="h-12 w-12 text-primary mx-auto mb-4" />
+                      <p className="text-lg font-medium mb-2">No comps in this project yet</p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Your project has target criteria set. Use "Auto-Add Comps" to automatically add the top 30 matching comps, or manually select comps with "Add Comps".
+                      </p>
+                      {onAutoPopulate && (
+                        <div className="flex gap-2 justify-center">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={onAutoPopulate}
+                            data-testid="button-auto-add-from-empty"
+                          >
+                            <Lightbulb className="mr-2 h-4 w-4" />
+                            Auto-Add Comps
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             ) : (
