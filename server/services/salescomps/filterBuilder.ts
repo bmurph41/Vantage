@@ -1,6 +1,6 @@
 export interface FilterParams {
   q?: string;
-  state?: string;
+  states?: string[];
   regions?: string[];
   saleYearMin?: number;
   saleYearMax?: number;
@@ -34,8 +34,8 @@ export class FilterBuilder {
     }
 
     // Location filters
-    if (params.state) {
-      filters.state = params.state;
+    if (params.states && params.states.length > 0) {
+      filters.states = params.states;
     }
     if (params.regions && params.regions.length > 0) {
       filters.regions = params.regions;

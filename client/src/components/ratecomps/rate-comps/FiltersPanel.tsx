@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Filter, X, ChevronDown, ChevronRight } from "lucide-react";
 import type { FilterState } from '@/lib/ratecomps/types';
-import { STORAGE_TYPES, US_REGIONS } from "@shared/salescomps-constants";
+import { STORAGE_TYPES, US_REGIONS, US_STATES, COUNTRIES } from "@shared/salescomps-constants";
 import debounce from "lodash.debounce";
 import throttle from "lodash.throttle";
 import SavedSearchesMenu from "./SavedSearchesMenu";
@@ -64,7 +64,7 @@ export default function FiltersPanel({
         if (filters.portfoliosOnly) count++;
         break;
       case 'location':
-        if (filters.state && filters.state !== 'none') count++;
+        if (filters.states && filters.states.length > 0) count += filters.states.length;
         if (filters.regions && filters.regions.length > 0) count += filters.regions.length;
         break;
       case 'saleDetails':
@@ -358,92 +358,71 @@ export default function FiltersPanel({
           <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
             <div className="mt-3 px-3 space-y-4">
           <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">State</Label>
-            <Select
-              value={filters.state}
-              onValueChange={(value) => updateFilter('state', value)}
-            >
-              <SelectTrigger className="w-full h-10 bg-background" data-testid="select-state">
-                <SelectValue placeholder="All States/Countries" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">All States/Countries</SelectItem>
-                {/* US States - Alphabetical */}
-                <SelectItem value="AL">Alabama</SelectItem>
-                <SelectItem value="AK">Alaska</SelectItem>
-                <SelectItem value="AZ">Arizona</SelectItem>
-                <SelectItem value="AR">Arkansas</SelectItem>
-                <SelectItem value="CA">California</SelectItem>
-                <SelectItem value="CO">Colorado</SelectItem>
-                <SelectItem value="CT">Connecticut</SelectItem>
-                <SelectItem value="DE">Delaware</SelectItem>
-                <SelectItem value="FL">Florida</SelectItem>
-                <SelectItem value="GA">Georgia</SelectItem>
-                <SelectItem value="HI">Hawaii</SelectItem>
-                <SelectItem value="ID">Idaho</SelectItem>
-                <SelectItem value="IL">Illinois</SelectItem>
-                <SelectItem value="IN">Indiana</SelectItem>
-                <SelectItem value="IA">Iowa</SelectItem>
-                <SelectItem value="KS">Kansas</SelectItem>
-                <SelectItem value="KY">Kentucky</SelectItem>
-                <SelectItem value="LA">Louisiana</SelectItem>
-                <SelectItem value="ME">Maine</SelectItem>
-                <SelectItem value="MD">Maryland</SelectItem>
-                <SelectItem value="MA">Massachusetts</SelectItem>
-                <SelectItem value="MI">Michigan</SelectItem>
-                <SelectItem value="MN">Minnesota</SelectItem>
-                <SelectItem value="MS">Mississippi</SelectItem>
-                <SelectItem value="MO">Missouri</SelectItem>
-                <SelectItem value="MT">Montana</SelectItem>
-                <SelectItem value="NE">Nebraska</SelectItem>
-                <SelectItem value="NV">Nevada</SelectItem>
-                <SelectItem value="NH">New Hampshire</SelectItem>
-                <SelectItem value="NJ">New Jersey</SelectItem>
-                <SelectItem value="NM">New Mexico</SelectItem>
-                <SelectItem value="NY">New York</SelectItem>
-                <SelectItem value="NC">North Carolina</SelectItem>
-                <SelectItem value="ND">North Dakota</SelectItem>
-                <SelectItem value="OH">Ohio</SelectItem>
-                <SelectItem value="OK">Oklahoma</SelectItem>
-                <SelectItem value="OR">Oregon</SelectItem>
-                <SelectItem value="PA">Pennsylvania</SelectItem>
-                <SelectItem value="RI">Rhode Island</SelectItem>
-                <SelectItem value="SC">South Carolina</SelectItem>
-                <SelectItem value="SD">South Dakota</SelectItem>
-                <SelectItem value="TN">Tennessee</SelectItem>
-                <SelectItem value="TX">Texas</SelectItem>
-                <SelectItem value="UT">Utah</SelectItem>
-                <SelectItem value="VT">Vermont</SelectItem>
-                <SelectItem value="VA">Virginia</SelectItem>
-                <SelectItem value="WA">Washington</SelectItem>
-                <SelectItem value="WV">West Virginia</SelectItem>
-                <SelectItem value="WI">Wisconsin</SelectItem>
-                <SelectItem value="WY">Wyoming</SelectItem>
-                
-                {/* Separator */}
-                <div className="border-t border-border my-1"></div>
-                
-                {/* International Countries - Alphabetical */}
-                <SelectItem value="Australia">Australia</SelectItem>
-                <SelectItem value="Bahamas">Bahamas</SelectItem>
-                <SelectItem value="Bermuda">Bermuda</SelectItem>
-                <SelectItem value="British Virgin Islands">British Virgin Islands</SelectItem>
-                <SelectItem value="Canada">Canada</SelectItem>
-                <SelectItem value="Cayman Islands">Cayman Islands</SelectItem>
-                <SelectItem value="Costa Rica">Costa Rica</SelectItem>
-                <SelectItem value="Croatia">Croatia</SelectItem>
-                <SelectItem value="France">France</SelectItem>
-                <SelectItem value="Greece">Greece</SelectItem>
-                <SelectItem value="Italy">Italy</SelectItem>
-                <SelectItem value="Mexico">Mexico</SelectItem>
-                <SelectItem value="Monaco">Monaco</SelectItem>
-                <SelectItem value="Netherlands">Netherlands</SelectItem>
-                <SelectItem value="Puerto Rico">Puerto Rico</SelectItem>
-                <SelectItem value="Spain">Spain</SelectItem>
-                <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                <SelectItem value="Virgin Islands">Virgin Islands</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">State/Country</Label>
+              {filters.states && filters.states.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => updateFilter('states', [])}
+                  className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  data-testid="button-clear-states"
+                >
+                  Clear ({filters.states.length})
+                </Button>
+              )}
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-1 border border-border rounded-md p-2">
+              {/* US States */}
+              <div className="mb-2">
+                <div className="text-xs font-semibold text-muted-foreground px-2 py-1">US States</div>
+                {US_STATES.map((state) => (
+                  <div key={state.code} className="flex items-center gap-2.5 p-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
+                    <Checkbox
+                      id={`state-${state.code}`}
+                      checked={filters.states?.includes(state.code) || false}
+                      onCheckedChange={(checked) => {
+                        const currentStates = filters.states || [];
+                        const newStates = checked
+                          ? [...currentStates, state.code]
+                          : currentStates.filter(s => s !== state.code);
+                        updateFilter('states', newStates);
+                      }}
+                      data-testid={`checkbox-state-${state.code.toLowerCase()}`}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor={`state-${state.code}`} className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
+                      {state.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              
+              {/* International */}
+              <div className="border-t border-border pt-2 mt-2">
+                <div className="text-xs font-semibold text-muted-foreground px-2 py-1">International</div>
+                {COUNTRIES.map((country) => (
+                  <div key={country} className="flex items-center gap-2.5 p-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
+                    <Checkbox
+                      id={`country-${country}`}
+                      checked={filters.states?.includes(country) || false}
+                      onCheckedChange={(checked) => {
+                        const currentStates = filters.states || [];
+                        const newStates = checked
+                          ? [...currentStates, country]
+                          : currentStates.filter(s => s !== country);
+                        updateFilter('states', newStates);
+                      }}
+                      data-testid={`checkbox-country-${country.toLowerCase().replace(/\s+/g, '-')}`}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor={`country-${country}`} className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
+                      {country}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
           <div>
             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Region</Label>

@@ -34,7 +34,7 @@ export default function SalesCompsIndex() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<FilterState>({
     q: "",
-    state: "",
+    states: [],
     regions: [],
     saleYearMin: "",
     saleYearMax: "",

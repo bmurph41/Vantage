@@ -1,6 +1,6 @@
 export interface FilterState {
   q: string;
-  state: string;
+  states: string[];
   regions: string[];
   saleYearMin: string;
   saleYearMax: string;

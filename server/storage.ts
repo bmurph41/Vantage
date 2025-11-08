@@ -3020,8 +3020,8 @@ export class DatabaseStorage implements IStorage {
     if (filters.q) {
       conditions.push(sql`${salesComps.marina} ILIKE ${`%${filters.q}%`}`);
     }
-    if (filters.state) {
-      conditions.push(eq(salesComps.state, filters.state));
+    if (filters.states && filters.states.length > 0) {
+      conditions.push(inArray(salesComps.state, filters.states));
     }
     if (filters.saleYearMin) {
       conditions.push(sql`${salesComps.saleYear} >= ${filters.saleYearMin}`);
@@ -4038,8 +4038,8 @@ export class DatabaseStorage implements IStorage {
     if (filters.q) {
       conditions.push(sql`${rateComps.marina} ILIKE ${`%${filters.q}%`}`);
     }
-    if (filters.state) {
-      conditions.push(eq(rateComps.state, filters.state));
+    if (filters.states && filters.states.length > 0) {
+      conditions.push(inArray(rateComps.state, filters.states));
     }
     if (filters.saleYearMin) {
       conditions.push(sql`${rateComps.saleYear} >= ${filters.saleYearMin}`);
