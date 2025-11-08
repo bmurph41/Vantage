@@ -468,13 +468,13 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
-                  {/* Coastal Type */}
+                  {/* Water Type */}
                   <FormField
                     control={form.control}
                     name="coastalType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Coastal Type</FormLabel>
+                        <FormLabel>Water Type</FormLabel>
                         <Select onValueChange={(v) => field.onChange(v || undefined)} value={field.value ?? ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-target-coastal-type">
