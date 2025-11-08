@@ -8589,13 +8589,32 @@ Current context: Project ${req.params.projectId}`;
       await storage.createAuditLog({
         orgId,
         userId,
-        entity: 'sc_project',
+        entityType: 'sc_project',
         entityId: project.id,
         action: 'create',
         after: project,
       });
 
-      res.status(201).json(project);
+      // Auto-run recommendations if project has a profile
+      let recommendations = null;
+      if (project.projectProfile) {
+        try {
+          const projectProfile = project.projectProfile as ProjectProfile;
+          const userWeightOverrides = (project.weightOverrides as any) || undefined;
+          
+          recommendations = await recommendationService.getRecommendations({
+            orgId,
+            projectProfile,
+            userWeightOverrides,
+            limit: 10,
+          });
+        } catch (recError) {
+          console.error("Error generating recommendations for new project:", recError);
+          // Don't fail project creation if recommendations fail
+        }
+      }
+
+      res.status(201).json({ project, recommendations });
     } catch (error) {
       console.error("Error creating SC project:", error);
       res.status(500).json({ message: "Failed to create SC project" });
@@ -8621,7 +8640,7 @@ Current context: Project ${req.params.projectId}`;
       await storage.createAuditLog({
         orgId,
         userId,
-        entity: 'sc_project',
+        entityType: 'sc_project',
         entityId: updatedProject.id,
         action: 'update',
         before: currentProject,
@@ -8649,7 +8668,7 @@ Current context: Project ${req.params.projectId}`;
       await storage.createAuditLog({
         orgId,
         userId,
-        entity: 'sc_project',
+        entityType: 'sc_project',
         entityId: req.params.id,
         action: 'delete',
         before: currentProject,
@@ -8699,7 +8718,7 @@ Current context: Project ${req.params.projectId}`;
         await storage.createAuditLog({
           orgId,
           userId,
-          entity: 'sc_project_comp',
+          entityType: 'sc_project_comp',
           entityId: projectComp.id,
           action: 'create',
           after: projectComp,
@@ -8741,7 +8760,7 @@ Current context: Project ${req.params.projectId}`;
           await storage.createAuditLog({
             orgId,
             userId,
-            entity: 'sc_project_comp',
+            entityType: 'sc_project_comp',
             entityId: projectComp.id,
             action: 'create',
             after: projectComp,
@@ -8790,7 +8809,7 @@ Current context: Project ${req.params.projectId}`;
             await storage.createAuditLog({
               orgId,
               userId,
-              entity: 'sc_project_comp',
+              entityType: 'sc_project_comp',
               entityId: compId,
               action: 'delete',
               before: { projectId: req.params.id, salesCompId: compId },
@@ -8827,7 +8846,7 @@ Current context: Project ${req.params.projectId}`;
       await storage.createAuditLog({
         orgId,
         userId,
-        entity: 'sc_project_comp',
+        entityType: 'sc_project_comp',
         entityId: req.params.compId,
         action: 'delete',
         before: { projectId: req.params.id, salesCompId: req.params.compId },
@@ -8860,7 +8879,7 @@ Current context: Project ${req.params.projectId}`;
       await storage.createAuditLog({
         orgId,
         userId,
-        entity: 'sc_project_comp',
+        entityType: 'sc_project_comp',
         entityId: req.params.compId,
         action: 'update',
         after: updatedProjectComp,
@@ -10009,13 +10028,32 @@ Current context: Project ${req.params.projectId}`;
       await storage.createAuditLog({
         orgId,
         userId,
-        entity: 'rc_project',
+        entityType: 'rc_project',
         entityId: project.id,
         action: 'create',
         after: project,
       });
 
-      res.status(201).json(project);
+      // Auto-run recommendations if project has a profile
+      let recommendations = null;
+      if (project.projectProfile) {
+        try {
+          const projectProfile = project.projectProfile as ProjectProfile;
+          const userWeightOverrides = (project.weightOverrides as any) || undefined;
+          
+          recommendations = await rcRecommendationService.getRecommendations({
+            orgId,
+            projectProfile,
+            userWeightOverrides,
+            limit: 10,
+          });
+        } catch (recError) {
+          console.error("Error generating recommendations for new RC project:", recError);
+          // Don't fail project creation if recommendations fail
+        }
+      }
+
+      res.status(201).json({ project, recommendations });
     } catch (error) {
       console.error("Error creating RC project:", error);
       res.status(500).json({ message: "Failed to create RC project" });
@@ -10041,7 +10079,7 @@ Current context: Project ${req.params.projectId}`;
       await storage.createAuditLog({
         orgId,
         userId,
-        entity: 'rc_project',
+        entityType: 'rc_project',
         entityId: updatedProject.id,
         action: 'update',
         before: currentProject,
@@ -10069,7 +10107,7 @@ Current context: Project ${req.params.projectId}`;
       await storage.createAuditLog({
         orgId,
         userId,
-        entity: 'rc_project',
+        entityType: 'rc_project',
         entityId: req.params.id,
         action: 'delete',
         before: currentProject,
@@ -10119,7 +10157,7 @@ Current context: Project ${req.params.projectId}`;
         await storage.createAuditLog({
           orgId,
           userId,
-          entity: 'rc_project_comp',
+          entityType: 'rc_project_comp',
           entityId: projectComp.id,
           action: 'create',
           after: projectComp,
@@ -10161,7 +10199,7 @@ Current context: Project ${req.params.projectId}`;
           await storage.createAuditLog({
             orgId,
             userId,
-            entity: 'rc_project_comp',
+            entityType: 'rc_project_comp',
             entityId: projectComp.id,
             action: 'create',
             after: projectComp,
@@ -10210,7 +10248,7 @@ Current context: Project ${req.params.projectId}`;
             await storage.createAuditLog({
               orgId,
               userId,
-              entity: 'rc_project_comp',
+              entityType: 'rc_project_comp',
               entityId: compId,
               action: 'delete',
               before: { projectId: req.params.id, rateCompId: compId },
@@ -10247,7 +10285,7 @@ Current context: Project ${req.params.projectId}`;
       await storage.createAuditLog({
         orgId,
         userId,
-        entity: 'rc_project_comp',
+        entityType: 'rc_project_comp',
         entityId: req.params.compId,
         action: 'delete',
         before: { projectId: req.params.id, rateCompId: req.params.compId },
@@ -10280,7 +10318,7 @@ Current context: Project ${req.params.projectId}`;
       await storage.createAuditLog({
         orgId,
         userId,
-        entity: 'rc_project_comp',
+        entityType: 'rc_project_comp',
         entityId: req.params.compId,
         action: 'update',
         after: updatedProjectComp,
