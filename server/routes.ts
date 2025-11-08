@@ -8385,6 +8385,48 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.patch('/api/pending-properties/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const updates = req.body;
+
+      const updated = await storage.updatePendingProperty(id, orgId, updates);
+      if (!updated) {
+        return res.status(404).json({ message: "Pending property not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating pending property:", error);
+      res.status(500).json({ message: "Failed to update pending property" });
+    }
+  });
+
+  app.post('/api/pending-properties/:id/merge', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { propertyId } = req.body;
+
+      if (!propertyId) {
+        return res.status(400).json({ message: "Property ID is required" });
+      }
+
+      const result = await storage.mergePendingPropertyWithExisting(id, propertyId, orgId, userId);
+      if (!result) {
+        return res.status(404).json({ message: "Pending property or target property not found" });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error merging pending property:", error);
+      res.status(500).json({ message: "Failed to merge pending property" });
+    }
+  });
+
   // Analytics/Metrics routes
   app.post('/api/analytics/calculate', async (req: any, res) => {
     try {

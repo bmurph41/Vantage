@@ -525,6 +525,8 @@ export interface IStorage {
   createPendingProperty(data: InsertPendingProperty): Promise<PendingProperty>;
   acceptPendingProperty(id: string, orgId: string, userId: string): Promise<Property | undefined>;
   rejectPendingProperty(id: string, orgId: string, userId: string): Promise<boolean>;
+  updatePendingProperty(id: string, orgId: string, updates: Partial<PendingProperty>): Promise<PendingProperty | undefined>;
+  mergePendingPropertyWithExisting(pendingId: string, propertyId: string, orgId: string, userId: string): Promise<Property | undefined>;
 
   // RateComps - Rate Comparables Operations
   getRateComps(params: {
@@ -3854,6 +3856,82 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return result.length > 0;
+  }
+
+  async updatePendingProperty(id: string, orgId: string, updates: Partial<PendingProperty>): Promise<PendingProperty | undefined> {
+    // Only allow updating specific fields
+    const allowedUpdates: any = {};
+    if (updates.marinaName !== undefined) allowedUpdates.marinaName = updates.marinaName;
+    if (updates.city !== undefined) allowedUpdates.city = updates.city;
+    if (updates.state !== undefined) allowedUpdates.state = updates.state;
+    if (updates.address !== undefined) allowedUpdates.address = updates.address;
+    if (updates.salePrice !== undefined) allowedUpdates.salePrice = updates.salePrice;
+
+    if (Object.keys(allowedUpdates).length === 0) {
+      // No valid updates
+      return this.getPendingProperty(id, orgId);
+    }
+
+    const result = await db.update(pendingProperties)
+      .set(allowedUpdates)
+      .where(and(
+        eq(pendingProperties.id, id),
+        eq(pendingProperties.orgId, orgId)
+      ))
+      .returning();
+
+    return result.length > 0 ? result[0] : undefined;
+  }
+
+  async mergePendingPropertyWithExisting(pendingId: string, propertyId: string, orgId: string, userId: string): Promise<Property | undefined> {
+    return await db.transaction(async (tx) => {
+      // Get the pending property
+      const [pending] = await tx.select()
+        .from(pendingProperties)
+        .where(and(
+          eq(pendingProperties.id, pendingId),
+          eq(pendingProperties.orgId, orgId),
+          eq(pendingProperties.status, 'pending' as any)
+        ))
+        .limit(1);
+
+      if (!pending) {
+        return undefined;
+      }
+
+      // Get the existing property
+      const [existingProperty] = await tx.select()
+        .from(crmProperties)
+        .where(and(
+          eq(crmProperties.id, propertyId),
+          eq(crmProperties.ownerId, orgId)
+        ))
+        .limit(1);
+
+      if (!existingProperty) {
+        return undefined;
+      }
+
+      // Mark the pending property as accepted and linked to existing property
+      await tx.update(pendingProperties)
+        .set({
+          status: 'accepted',
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+          createdPropertyId: propertyId,
+        })
+        .where(and(
+          eq(pendingProperties.id, pendingId),
+          eq(pendingProperties.status, 'pending' as any)
+        ));
+
+      // Link the comp to the existing property
+      await tx.update(salesComps)
+        .set({ propertyId: propertyId })
+        .where(eq(salesComps.id, pending.compId));
+
+      return existingProperty;
+    });
   }
 
   // ============================================================================

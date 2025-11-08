@@ -23,6 +23,7 @@ import { Check, X, AlertTriangle, MapPin, DollarSign, Calendar, Building } from 
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PendingPropertyDetailDialog } from "@/components/pending-property-detail-dialog";
 
 type PendingProperty = {
   id: string;
@@ -59,6 +60,7 @@ type Property = {
 export default function PendingProperties() {
   const [selectedPending, setSelectedPending] = useState<PendingProperty | null>(null);
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -204,7 +206,15 @@ export default function PendingProperties() {
                 {pendingProperties
                   .filter(p => p.status === 'pending')
                   .map((pending) => (
-                    <TableRow key={pending.id}>
+                    <TableRow
+                      key={pending.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setSelectedPending(pending);
+                        setShowDetailDialog(true);
+                      }}
+                      data-testid={`row-pending-${pending.id}`}
+                    >
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <Building className="h-4 w-4 text-muted-foreground" />
@@ -256,12 +266,15 @@ export default function PendingProperties() {
                           <span className="text-xs text-muted-foreground">None</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-2">
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleReject(pending)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReject(pending);
+                            }}
                             data-testid={`button-reject-${pending.id}`}
                           >
                             <X className="h-4 w-4 mr-1" />
@@ -269,7 +282,10 @@ export default function PendingProperties() {
                           </Button>
                           <Button
                             size="sm"
-                            onClick={() => handleAccept(pending)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAccept(pending);
+                            }}
                             data-testid={`button-accept-${pending.id}`}
                           >
                             <Check className="h-4 w-4 mr-1" />
@@ -362,6 +378,13 @@ export default function PendingProperties() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* New Detail Dialog */}
+      <PendingPropertyDetailDialog
+        pending={selectedPending}
+        open={showDetailDialog}
+        onOpenChange={setShowDetailDialog}
+      />
     </div>
   );
 }
