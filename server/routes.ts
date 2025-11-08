@@ -8131,6 +8131,27 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.post('/api/sales-comps/import/:importId/preview', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { mapping, normalization, importMode = 'upsert', updateBlankValues = false } = req.body;
+      
+      const result = await compService.previewImport(
+        req.params.importId,
+        orgId,
+        mapping,
+        normalization,
+        importMode,
+        updateBlankValues
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error previewing import:", error);
+      res.status(500).json({ message: "Failed to preview import" });
+    }
+  });
+
   app.post('/api/sales-comps/import/:importId/commit', async (req: any, res) => {
     try {
       const userId = req.user.id;

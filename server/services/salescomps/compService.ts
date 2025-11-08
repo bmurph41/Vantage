@@ -1,13 +1,18 @@
 import { IStorage } from "../../storage";
 import { ParserService } from "./parser";
+import { ImportAnalysisService } from "./importAnalysisService";
 import type { InsertSalesComp, UpdateSalesComp, SalesComp, Project } from "@shared/schema";
 import type { AnalyticsReportData, ProjectReportData } from "../openai";
 
 export class CompService {
+  private importAnalysis: ImportAnalysisService;
+
   constructor(
     private storage: IStorage,
     private parser: ParserService = new ParserService()
-  ) {}
+  ) {
+    this.importAnalysis = new ImportAnalysisService(storage);
+  }
 
   async createComp(compData: InsertSalesComp, userId: string): Promise<SalesComp> {
     // Try to auto-match property by name/city/state before creating
@@ -239,6 +244,50 @@ export class CompService {
       totalRows: importRecord.parsedData.length,
       duplicatesFound: duplicates.length,
       duplicates
+    };
+  }
+
+  async previewImport(
+    importId: string,
+    orgId: string,
+    mapping: Record<string, string>,
+    normalization: any,
+    importMode: 'insert' | 'update' | 'upsert' = 'upsert',
+    updateBlankValues: boolean = false
+  ): Promise<any> {
+    const importRecord = await this.storage.getImport(importId, orgId);
+    if (!importRecord || !importRecord.parsedData) {
+      throw new Error('Import record or parsed data not found');
+    }
+
+    const transformedRows = importRecord.parsedData.map((row: any) => 
+      this.transformRow(row, mapping, normalization)
+    );
+
+    const plan = await this.importAnalysis.analyzeImport(
+      orgId,
+      transformedRows,
+      importMode,
+      updateBlankValues
+    );
+
+    const duplicateMatches = plan.rows
+      .filter(r => r.matchedComp)
+      .slice(0, 20)
+      .map(r => ({
+        row: r.rowData,
+        match: r.matchedComp,
+        confidence: r.confidence,
+        action: r.action,
+        rowIndex: r.rowIndex
+      }));
+
+    return {
+      toInsert: plan.summary.toInsert,
+      toUpdate: plan.summary.toUpdate,
+      toSkip: plan.summary.toSkip,
+      duplicateMatches,
+      plan
     };
   }
 
