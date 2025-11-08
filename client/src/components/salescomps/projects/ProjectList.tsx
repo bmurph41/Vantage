@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Plus, Grid, List } from "lucide-react";
 import ProjectCard from "./ProjectCard";
 import ProjectForm from "./ProjectForm";
+import RecommendationsDialog from "./RecommendationsDialog";
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/hooks/salescomps/useProjects';
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -23,9 +24,19 @@ export default function ProjectList({ onSelectProject, selectedProjectId }: Proj
   const [showForm, setShowForm] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectWithStats | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const [newProjectWithRecs, setNewProjectWithRecs] = useState<{ project: Project; recommendations: any } | null>(null);
 
   const { data: projects, isLoading, error } = useProjects();
-  const createProject = useCreateProject();
+  
+  const handleProjectCreated = (project: Project, recommendations: any) => {
+    if (recommendations && recommendations.items && recommendations.items.length > 0) {
+      setNewProjectWithRecs({ project, recommendations });
+      setShowRecommendations(true);
+    }
+  };
+  
+  const createProject = useCreateProject(handleProjectCreated);
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
 
@@ -212,6 +223,23 @@ export default function ProjectList({ onSelectProject, selectedProjectId }: Proj
         project={editingProject || undefined}
         isLoading={createProject.isPending || updateProject.isPending}
       />
+
+      {/* Recommendations Dialog */}
+      {showRecommendations && newProjectWithRecs && (
+        <RecommendationsDialog
+          open={showRecommendations}
+          onClose={() => {
+            setShowRecommendations(false);
+            setNewProjectWithRecs(null);
+          }}
+          project={newProjectWithRecs.project}
+          existingCompIds={[]}
+          onSuccess={() => {
+            setShowRecommendations(false);
+            setNewProjectWithRecs(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -31,18 +31,24 @@ export function useProjectComps(id: string) {
   });
 }
 
-export function useCreateProject() {
+export function useCreateProject(onProjectCreated?: (project: Project, recommendations: any) => void) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: (projectData: InsertProject) => projectsApi.createProject(projectData),
-    onSuccess: (project) => {
+    onSuccess: (response) => {
+      const { project, recommendations } = response;
       toast({
         title: "Success",
         description: `Project "${project.name}" created successfully`,
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+      
+      // Call callback with project and recommendations if provided
+      if (onProjectCreated) {
+        onProjectCreated(project, recommendations);
+      }
     },
     onError: (error) => {
       toast({

@@ -220,7 +220,7 @@ export const projectsApi = {
     return await response.json();
   },
 
-  createProject: async (project: InsertProject): Promise<Project> => {
+  createProject: async (project: InsertProject): Promise<{ project: Project; recommendations: any }> => {
     const response = await apiRequest('POST', '/api/sc-projects', project);
     return await response.json();
   },
