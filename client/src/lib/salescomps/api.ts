@@ -131,12 +131,30 @@ export const salesCompsApi = {
     return await response.json();
   },
 
-  commitImport: async (importId: string, mapping: Record<string, string>, normalization: any, excludedRows: number[] = [], parentPortfolioId?: string): Promise<any> => {
+  previewImport: async (
+    importId: string,
+    mapping: Record<string, string>,
+    normalization: any,
+    importMode: 'insert' | 'update' | 'upsert' = 'upsert',
+    updateBlankValues: boolean = false
+  ): Promise<any> => {
+    const response = await apiRequest('POST', `/api/sales-comps/import/${importId}/preview`, {
+      mapping,
+      normalization,
+      importMode,
+      updateBlankValues,
+    });
+    return await response.json();
+  },
+
+  commitImport: async (importId: string, mapping: Record<string, string>, normalization: any, excludedRows: number[] = [], parentPortfolioId?: string, importMode?: 'insert' | 'update' | 'upsert', updateBlankValues?: boolean): Promise<any> => {
     const response = await apiRequest('POST', `/api/sales-comps/import/${importId}/commit`, {
       mapping,
       normalization,
       excludedRows,
       parentPortfolioId,
+      importMode,
+      updateBlankValues,
     });
     return await response.json();
   },

@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ArrowLeft, Upload as UploadIcon, X, Check, AlertTriangle, Plus } from "lucide-react";
@@ -99,9 +100,25 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     },
   });
 
+  const previewMutation = useMutation({
+    mutationFn: ({ importId, mapping, normalization, importMode, updateBlankValues }: any) =>
+      salesCompsApi.previewImport(importId, mapping, normalization, importMode, updateBlankValues),
+    onSuccess: (data) => {
+      setPreviewData(data);
+      setStep('preview');
+    },
+    onError: (error) => {
+      toast({
+        title: "Preview Failed",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const commitMutation = useMutation({
-    mutationFn: ({ importId, mapping, normalization, excludedRows, parentPortfolioId }: any) =>
-      salesCompsApi.commitImport(importId, mapping, normalization, excludedRows, parentPortfolioId),
+    mutationFn: ({ importId, mapping, normalization, excludedRows, parentPortfolioId, importMode, updateBlankValues }: any) =>
+      salesCompsApi.commitImport(importId, mapping, normalization, excludedRows, parentPortfolioId, importMode, updateBlankValues),
     onSuccess: () => {
       setStep('processing');
       // Poll for completion status
@@ -237,6 +254,8 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
       normalization,
       excludedRows,
       parentPortfolioId: linkToPortfolio ? selectedPortfolioId : undefined,
+      importMode,
+      updateBlankValues,
     });
   };
 
@@ -251,7 +270,44 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
   const handleBack = () => {
     if (step === 'mapping') {
       setStep('upload');
+    } else if (step === 'mode') {
+      setStep('mapping');
+    } else if (step === 'preview') {
+      setStep('mode');
     }
+  };
+
+  const handleNextFromMapping = () => {
+    // After mapping, go to mode selection
+    setStep('mode');
+  };
+
+  const handleNextFromMode = () => {
+    // After mode selection, preview the import
+    if (!uploadData) return;
+    
+    previewMutation.mutate({
+      importId: uploadData.importId,
+      mapping,
+      normalization,
+      importMode,
+      updateBlankValues,
+    });
+  };
+
+  const handleConfirmImport = () => {
+    // From preview, commit the import
+    if (!uploadData) return;
+    
+    commitMutation.mutate({
+      importId: uploadData.importId,
+      mapping,
+      normalization,
+      excludedRows: [],
+      parentPortfolioId: linkToPortfolio ? selectedPortfolioId : undefined,
+      importMode,
+      updateBlankValues,
+    });
   };
 
   const handleProceedWithImport = () => {
@@ -533,7 +589,7 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
   const renderProcessingStep = () => (
     <div>
       <div className="mb-6">
-        <h3 className="text-lg font-medium text-foreground mb-2">Step 3: Importing Data</h3>
+        <h3 className="text-lg font-medium text-foreground mb-2">Step 5: Importing Data</h3>
         <p className="text-sm text-muted-foreground">Processing your file and importing records</p>
       </div>
 
@@ -636,6 +692,8 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
         <div className="flex-1 overflow-auto p-6">
           {step === 'upload' && renderUploadStep()}
           {step === 'mapping' && renderMappingStep()}
+          {step === 'mode' && renderModeStep()}
+          {step === 'preview' && renderPreviewStep()}
           {step === 'processing' && renderProcessingStep()}
           {step === 'complete' && renderCompleteStep()}
         </div>
@@ -649,10 +707,10 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
               disabled={step === 'upload' || step === 'processing' || step === 'complete'}
               data-testid="button-back"
             >
-              {step === 'mapping' && (
+              {(step === 'mapping' || step === 'mode' || step === 'preview') && (
                 <ArrowLeft className="h-4 w-4 mr-2" />
               )}
-              {step === 'mapping' ? 'Back' : ''}
+              {(step === 'mapping' || step === 'mode' || step === 'preview') ? 'Back' : ''}
             </Button>
             
             <div className="flex items-center gap-2">
@@ -669,11 +727,30 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
               
               {step === 'mapping' && (
                 <Button 
-                  onClick={handleDetectDuplicates}
-                  disabled={detectDuplicatesMutation.isPending}
+                  onClick={handleNextFromMapping}
                   data-testid="button-next"
                 >
-                  {detectDuplicatesMutation.isPending ? 'Checking...' : 'Next: Check for Duplicates'}
+                  Next: Choose Import Mode
+                </Button>
+              )}
+
+              {step === 'mode' && (
+                <Button 
+                  onClick={handleNextFromMode}
+                  disabled={previewMutation.isPending}
+                  data-testid="button-preview"
+                >
+                  {previewMutation.isPending ? 'Analyzing...' : 'Next: Preview Import'}
+                </Button>
+              )}
+
+              {step === 'preview' && (
+                <Button 
+                  onClick={handleConfirmImport}
+                  disabled={commitMutation.isPending}
+                  data-testid="button-confirm-import"
+                >
+                  {commitMutation.isPending ? 'Starting Import...' : `Confirm & Import ${previewData?.toInsert + previewData?.toUpdate || 0} Records`}
                 </Button>
               )}
             </div>
