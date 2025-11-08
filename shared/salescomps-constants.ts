@@ -29,6 +29,7 @@ export type CoastalType = WaterType;
 // Storage types for marinas
 export const STORAGE_TYPES = [
   'Wet Slips',
+  'Lift Slips',
   'Indoor Dry Racks', 
   'Outdoor Dry Racks',
   'Moorings',
