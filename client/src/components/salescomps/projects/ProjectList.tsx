@@ -117,7 +117,7 @@ export default function ProjectList({ onSelectProject, selectedProjectId }: Proj
               size="lg"
             >
               <Plus className="mr-2 h-4 w-4" />
-              Start New Project
+              Create New Project
             </Button>
           )}
         </div>
@@ -187,7 +187,7 @@ export default function ProjectList({ onSelectProject, selectedProjectId }: Proj
                       size="lg"
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Start New Project
+                      Create New Project
                     </Button>
                   )}
                 </>
