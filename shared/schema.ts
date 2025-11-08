@@ -50,6 +50,8 @@ export const embeddingsStatusEnum = pgEnum("embeddings_status", ["pending", "pro
 export const severityEnum = pgEnum("severity", ["low", "med", "high", "critical"]);
 export const confidenceLevelEnum = pgEnum("confidence_level", ["low", "medium", "high"]);
 export const pendingPropertyStatusEnum = pgEnum("pending_property_status", ["pending", "accepted", "rejected"]);
+export const fuelTypeEnum = pgEnum("fuel_type", ["diesel", "regular_gas", "premium_gas", "ethanol_free"]);
+export const paymentMethodEnum = pgEnum("payment_method", ["cash", "credit_card", "debit_card", "account_charge", "check"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -4242,6 +4244,30 @@ export const rcMetricAlerts = pgTable('rc_metric_alerts', {
   activeIdx: index('rc_metric_alerts_active_idx').on(table.isActive),
 }));
 
+// Fuel Sales - Operations Module
+export const fuelSales = pgTable('fuel_sales', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  transactionDate: timestamp('transaction_date', { withTimezone: true }).notNull().defaultNow(),
+  fuelType: fuelTypeEnum('fuel_type').notNull(),
+  quantityGallons: decimal('quantity_gallons', { precision: 10, scale: 2 }).notNull(),
+  pricePerGallon: decimal('price_per_gallon', { precision: 10, scale: 2 }).notNull(),
+  totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
+  customerName: text('customer_name'),
+  boatName: text('boat_name'),
+  slipNumber: text('slip_number'),
+  paymentMethod: paymentMethodEnum('payment_method'),
+  processedBy: varchar('processed_by').references(() => users.id),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fuel_sales_org_idx').on(table.orgId),
+  dateIdx: index('fuel_sales_date_idx').on(table.transactionDate),
+  fuelTypeIdx: index('fuel_sales_fuel_type_idx').on(table.fuelType),
+  processedByIdx: index('fuel_sales_processed_by_idx').on(table.processedBy),
+}));
+
 // Relations for Rate Comps
 export const rateCompsRelations = relations(rateComps, ({ one, many }) => ({
   organization: one(organizations, {
@@ -4539,6 +4565,20 @@ export const insertRcMetricAlertSchema = createInsertSchema(rcMetricAlerts).omit
 
 export const updateRcMetricAlertSchema = insertRcMetricAlertSchema.partial();
 
+// Fuel Sales
+export const insertFuelSaleSchema = createInsertSchema(fuelSales).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  quantityGallons: z.string().or(z.number()),
+  pricePerGallon: z.string().or(z.number()),
+  totalAmount: z.string().or(z.number()),
+});
+
+export const updateFuelSaleSchema = insertFuelSaleSchema.partial();
+
 // RC Project profile validation (reuse same schema as SC)
 export const rcProjectProfileSchema = scProjectProfileSchema;
 export const rcWeightOverridesSchema = scWeightOverridesSchema;
@@ -4586,3 +4626,8 @@ export type InsertRcMetricPoint = z.infer<typeof insertRcMetricPointSchema>;
 export type RcMetricAlert = typeof rcMetricAlerts.$inferSelect;
 export type InsertRcMetricAlert = z.infer<typeof insertRcMetricAlertSchema>;
 export type UpdateRcMetricAlert = z.infer<typeof updateRcMetricAlertSchema>;
+
+// Types for Fuel Sales
+export type FuelSale = typeof fuelSales.$inferSelect;
+export type InsertFuelSale = z.infer<typeof insertFuelSaleSchema>;
+export type UpdateFuelSale = z.infer<typeof updateFuelSaleSchema>;
