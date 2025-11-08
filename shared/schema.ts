@@ -52,6 +52,8 @@ export const confidenceLevelEnum = pgEnum("confidence_level", ["low", "medium", 
 export const pendingPropertyStatusEnum = pgEnum("pending_property_status", ["pending", "accepted", "rejected"]);
 export const fuelTypeEnum = pgEnum("fuel_type", ["diesel", "regular_gas", "premium_gas", "ethanol_free"]);
 export const paymentMethodEnum = pgEnum("payment_method", ["cash", "credit_card", "debit_card", "account_charge", "check"]);
+export const transactionStatusEnum = pgEnum("transaction_status", ["pending", "completed", "failed", "refunded"]);
+export const fuelCategoryEnum = pgEnum("fuel_category", ["regular", "premium", "diesel", "ethanol"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -4268,6 +4270,78 @@ export const fuelSales = pgTable('fuel_sales', {
   processedByIdx: index('fuel_sales_processed_by_idx').on(table.processedBy),
 }));
 
+// Fuel Types Configuration - for managing different fuel products
+export const fuelTypes = pgTable('fuel_types', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  category: fuelCategoryEnum('category').notNull(),
+  currentPrice: decimal('current_price', { precision: 10, scale: 3 }).notNull(),
+  cost: decimal('cost', { precision: 10, scale: 3 }).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fuel_types_org_idx').on(table.orgId),
+  categoryIdx: index('fuel_types_category_idx').on(table.category),
+  activeIdx: index('fuel_types_active_idx').on(table.isActive),
+}));
+
+// Fuel Inventory - for tracking fuel tank levels
+export const fuelInventory = pgTable('fuel_inventory', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  fuelTypeId: varchar('fuel_type_id').references(() => fuelTypes.id).notNull(),
+  currentLevel: decimal('current_level', { precision: 10, scale: 2 }).notNull(),
+  capacity: decimal('capacity', { precision: 10, scale: 2 }).notNull(),
+  reorderPoint: decimal('reorder_point', { precision: 10, scale: 2 }).notNull(),
+  reorderQuantity: decimal('reorder_quantity', { precision: 10, scale: 2 }).notNull(),
+  tankName: text('tank_name'),
+  lastUpdated: timestamp('last_updated').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fuel_inventory_org_idx').on(table.orgId),
+  fuelTypeIdx: index('fuel_inventory_fuel_type_idx').on(table.fuelTypeId),
+}));
+
+// Fuel Deliveries - for tracking fuel deliveries from suppliers
+export const fuelDeliveries = pgTable('fuel_deliveries', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  fuelTypeId: varchar('fuel_type_id').references(() => fuelTypes.id).notNull(),
+  quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(),
+  cost: decimal('cost', { precision: 10, scale: 2 }).notNull(),
+  pricePerGallon: decimal('price_per_gallon', { precision: 10, scale: 3 }),
+  supplier: text('supplier').notNull(),
+  deliveryDate: timestamp('delivery_date', { withTimezone: true }).notNull(),
+  invoiceNumber: text('invoice_number'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fuel_deliveries_org_idx').on(table.orgId),
+  fuelTypeIdx: index('fuel_deliveries_fuel_type_idx').on(table.fuelTypeId),
+  dateIdx: index('fuel_deliveries_date_idx').on(table.deliveryDate),
+}));
+
+// Financial Projections - for fuel sales forecasting
+export const fuelFinancialProjections = pgTable('fuel_financial_projections', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  month: integer('month').notNull(),
+  year: integer('year').notNull(),
+  projectedRevenue: decimal('projected_revenue', { precision: 12, scale: 2 }).notNull(),
+  projectedGallons: decimal('projected_gallons', { precision: 10, scale: 2 }).notNull(),
+  projectedCosts: decimal('projected_costs', { precision: 12, scale: 2 }).notNull(),
+  growthRate: decimal('growth_rate', { precision: 5, scale: 2 }).notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fuel_projections_org_idx').on(table.orgId),
+  periodIdx: index('fuel_projections_period_idx').on(table.year, table.month),
+}));
+
 // Relations for Fuel Sales
 export const fuelSalesRelations = relations(fuelSales, ({ one }) => ({
   organization: one(organizations, {
@@ -4277,6 +4351,48 @@ export const fuelSalesRelations = relations(fuelSales, ({ one }) => ({
   processedByUser: one(users, {
     fields: [fuelSales.processedBy],
     references: [users.id],
+  }),
+}));
+
+// Relations for Fuel Types
+export const fuelTypesRelations = relations(fuelTypes, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [fuelTypes.orgId],
+    references: [organizations.id],
+  }),
+  inventory: many(fuelInventory),
+  deliveries: many(fuelDeliveries),
+}));
+
+// Relations for Fuel Inventory
+export const fuelInventoryRelations = relations(fuelInventory, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [fuelInventory.orgId],
+    references: [organizations.id],
+  }),
+  fuelType: one(fuelTypes, {
+    fields: [fuelInventory.fuelTypeId],
+    references: [fuelTypes.id],
+  }),
+}));
+
+// Relations for Fuel Deliveries
+export const fuelDeliveriesRelations = relations(fuelDeliveries, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [fuelDeliveries.orgId],
+    references: [organizations.id],
+  }),
+  fuelType: one(fuelTypes, {
+    fields: [fuelDeliveries.fuelTypeId],
+    references: [fuelTypes.id],
+  }),
+}));
+
+// Relations for Fuel Financial Projections
+export const fuelFinancialProjectionsRelations = relations(fuelFinancialProjections, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [fuelFinancialProjections.orgId],
+    references: [organizations.id],
   }),
 }));
 
@@ -4591,6 +4707,63 @@ export const insertFuelSaleSchema = createInsertSchema(fuelSales).omit({
 
 export const updateFuelSaleSchema = insertFuelSaleSchema.partial();
 
+// Fuel Types
+export const insertFuelTypeSchema = createInsertSchema(fuelTypes).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  currentPrice: z.string().or(z.number()),
+  cost: z.string().or(z.number()),
+});
+
+export const updateFuelTypeSchema = insertFuelTypeSchema.partial();
+
+// Fuel Inventory
+export const insertFuelInventorySchema = createInsertSchema(fuelInventory).omit({
+  id: true,
+  orgId: true,
+  lastUpdated: true,
+  createdAt: true,
+}).extend({
+  currentLevel: z.string().or(z.number()),
+  capacity: z.string().or(z.number()),
+  reorderPoint: z.string().or(z.number()),
+  reorderQuantity: z.string().or(z.number()),
+});
+
+export const updateFuelInventorySchema = insertFuelInventorySchema.partial();
+
+// Fuel Deliveries
+export const insertFuelDeliverySchema = createInsertSchema(fuelDeliveries).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  quantity: z.string().or(z.number()),
+  cost: z.string().or(z.number()),
+  pricePerGallon: z.string().or(z.number()).optional(),
+});
+
+export const updateFuelDeliverySchema = insertFuelDeliverySchema.partial();
+
+// Fuel Financial Projections
+export const insertFuelProjectionSchema = createInsertSchema(fuelFinancialProjections).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  projectedRevenue: z.string().or(z.number()),
+  projectedGallons: z.string().or(z.number()),
+  projectedCosts: z.string().or(z.number()),
+  growthRate: z.string().or(z.number()),
+});
+
+export const updateFuelProjectionSchema = insertFuelProjectionSchema.partial();
+
 // RC Project profile validation (reuse same schema as SC)
 export const rcProjectProfileSchema = scProjectProfileSchema;
 export const rcWeightOverridesSchema = scWeightOverridesSchema;
@@ -4643,3 +4816,23 @@ export type UpdateRcMetricAlert = z.infer<typeof updateRcMetricAlertSchema>;
 export type FuelSale = typeof fuelSales.$inferSelect;
 export type InsertFuelSale = z.infer<typeof insertFuelSaleSchema>;
 export type UpdateFuelSale = z.infer<typeof updateFuelSaleSchema>;
+
+// Types for Fuel Types
+export type FuelType = typeof fuelTypes.$inferSelect;
+export type InsertFuelType = z.infer<typeof insertFuelTypeSchema>;
+export type UpdateFuelType = z.infer<typeof updateFuelTypeSchema>;
+
+// Types for Fuel Inventory
+export type FuelInventory = typeof fuelInventory.$inferSelect;
+export type InsertFuelInventory = z.infer<typeof insertFuelInventorySchema>;
+export type UpdateFuelInventory = z.infer<typeof updateFuelInventorySchema>;
+
+// Types for Fuel Deliveries
+export type FuelDelivery = typeof fuelDeliveries.$inferSelect;
+export type InsertFuelDelivery = z.infer<typeof insertFuelDeliverySchema>;
+export type UpdateFuelDelivery = z.infer<typeof updateFuelDeliverySchema>;
+
+// Types for Fuel Projections
+export type FuelProjection = typeof fuelFinancialProjections.$inferSelect;
+export type InsertFuelProjection = z.infer<typeof insertFuelProjectionSchema>;
+export type UpdateFuelProjection = z.infer<typeof updateFuelProjectionSchema>;

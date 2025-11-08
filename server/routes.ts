@@ -42,7 +42,19 @@ import {
   scPortfolioComps,
   fuelSales,
   insertFuelSaleSchema,
-  updateFuelSaleSchema
+  updateFuelSaleSchema,
+  fuelTypes,
+  insertFuelTypeSchema,
+  updateFuelTypeSchema,
+  fuelInventory,
+  insertFuelInventorySchema,
+  updateFuelInventorySchema,
+  fuelDeliveries,
+  insertFuelDeliverySchema,
+  updateFuelDeliverySchema,
+  fuelFinancialProjections,
+  insertFuelProjectionSchema,
+  updateFuelProjectionSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -10868,6 +10880,303 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error fetching fuel sales stats:", error);
       res.status(500).json({ message: "Failed to fetch fuel sales stats" });
+    }
+  });
+
+  // ==================== OPERATIONS - FUEL TYPES ROUTES ====================
+
+  // Get all fuel types for organization
+  app.get("/api/operations/fuel-types", authenticateUser, async (req, res) => {
+    try {
+      const types = await db.query.fuelTypes.findMany({
+        where: eq(fuelTypes.orgId, req.user!.orgId),
+        orderBy: [fuelTypes.category, fuelTypes.name],
+      });
+      res.json(types);
+    } catch (error) {
+      console.error("Error fetching fuel types:", error);
+      res.status(500).json({ message: "Failed to fetch fuel types" });
+    }
+  });
+
+  // Create a new fuel type
+  app.post("/api/operations/fuel-types", authenticateUser, async (req, res) => {
+    try {
+      const typeData = insertFuelTypeSchema.parse(req.body);
+      const [type] = await db.insert(fuelTypes).values({
+        ...typeData,
+        orgId: req.user!.orgId,
+      }).returning();
+      res.json(type);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error creating fuel type:", error);
+      res.status(500).json({ message: "Failed to create fuel type" });
+    }
+  });
+
+  // Update a fuel type
+  app.patch("/api/operations/fuel-types/:id", authenticateUser, async (req, res) => {
+    try {
+      const updateData = updateFuelTypeSchema.parse(req.body);
+      const [updated] = await db.update(fuelTypes)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(and(eq(fuelTypes.id, req.params.id), eq(fuelTypes.orgId, req.user!.orgId)))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Fuel type not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error updating fuel type:", error);
+      res.status(500).json({ message: "Failed to update fuel type" });
+    }
+  });
+
+  // Delete a fuel type
+  app.delete("/api/operations/fuel-types/:id", authenticateUser, async (req, res) => {
+    try {
+      const [deleted] = await db.delete(fuelTypes)
+        .where(and(eq(fuelTypes.id, req.params.id), eq(fuelTypes.orgId, req.user!.orgId)))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Fuel type not found" });
+      }
+      res.json({ message: "Fuel type deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting fuel type:", error);
+      res.status(500).json({ message: "Failed to delete fuel type" });
+    }
+  });
+
+  // ==================== OPERATIONS - FUEL INVENTORY ROUTES ====================
+
+  // Get all fuel inventory for organization
+  app.get("/api/operations/fuel-inventory", authenticateUser, async (req, res) => {
+    try {
+      const inventory = await db.query.fuelInventory.findMany({
+        where: eq(fuelInventory.orgId, req.user!.orgId),
+        with: {
+          fuelType: true,
+        },
+      });
+      res.json(inventory);
+    } catch (error) {
+      console.error("Error fetching fuel inventory:", error);
+      res.status(500).json({ message: "Failed to fetch fuel inventory" });
+    }
+  });
+
+  // Create a new fuel inventory record
+  app.post("/api/operations/fuel-inventory", authenticateUser, async (req, res) => {
+    try {
+      const inventoryData = insertFuelInventorySchema.parse(req.body);
+      const [inventory] = await db.insert(fuelInventory).values({
+        ...inventoryData,
+        orgId: req.user!.orgId,
+      }).returning();
+      res.json(inventory);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error creating fuel inventory:", error);
+      res.status(500).json({ message: "Failed to create fuel inventory" });
+    }
+  });
+
+  // Update fuel inventory
+  app.patch("/api/operations/fuel-inventory/:id", authenticateUser, async (req, res) => {
+    try {
+      const updateData = updateFuelInventorySchema.parse(req.body);
+      const [updated] = await db.update(fuelInventory)
+        .set({ ...updateData, lastUpdated: new Date() })
+        .where(and(eq(fuelInventory.id, req.params.id), eq(fuelInventory.orgId, req.user!.orgId)))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Fuel inventory not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error updating fuel inventory:", error);
+      res.status(500).json({ message: "Failed to update fuel inventory" });
+    }
+  });
+
+  // Delete fuel inventory
+  app.delete("/api/operations/fuel-inventory/:id", authenticateUser, async (req, res) => {
+    try {
+      const [deleted] = await db.delete(fuelInventory)
+        .where(and(eq(fuelInventory.id, req.params.id), eq(fuelInventory.orgId, req.user!.orgId)))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Fuel inventory not found" });
+      }
+      res.json({ message: "Fuel inventory deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting fuel inventory:", error);
+      res.status(500).json({ message: "Failed to delete fuel inventory" });
+    }
+  });
+
+  // ==================== OPERATIONS - FUEL DELIVERIES ROUTES ====================
+
+  // Get all fuel deliveries for organization
+  app.get("/api/operations/fuel-deliveries", authenticateUser, async (req, res) => {
+    try {
+      const deliveries = await db.query.fuelDeliveries.findMany({
+        where: eq(fuelDeliveries.orgId, req.user!.orgId),
+        orderBy: desc(fuelDeliveries.deliveryDate),
+        with: {
+          fuelType: true,
+        },
+      });
+      res.json(deliveries);
+    } catch (error) {
+      console.error("Error fetching fuel deliveries:", error);
+      res.status(500).json({ message: "Failed to fetch fuel deliveries" });
+    }
+  });
+
+  // Create a new fuel delivery
+  app.post("/api/operations/fuel-deliveries", authenticateUser, async (req, res) => {
+    try {
+      const deliveryData = insertFuelDeliverySchema.parse(req.body);
+      const [delivery] = await db.insert(fuelDeliveries).values({
+        ...deliveryData,
+        orgId: req.user!.orgId,
+      }).returning();
+      res.json(delivery);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error creating fuel delivery:", error);
+      res.status(500).json({ message: "Failed to create fuel delivery" });
+    }
+  });
+
+  // Update a fuel delivery
+  app.patch("/api/operations/fuel-deliveries/:id", authenticateUser, async (req, res) => {
+    try {
+      const updateData = updateFuelDeliverySchema.parse(req.body);
+      const [updated] = await db.update(fuelDeliveries)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(and(eq(fuelDeliveries.id, req.params.id), eq(fuelDeliveries.orgId, req.user!.orgId)))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Fuel delivery not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error updating fuel delivery:", error);
+      res.status(500).json({ message: "Failed to update fuel delivery" });
+    }
+  });
+
+  // Delete a fuel delivery
+  app.delete("/api/operations/fuel-deliveries/:id", authenticateUser, async (req, res) => {
+    try {
+      const [deleted] = await db.delete(fuelDeliveries)
+        .where(and(eq(fuelDeliveries.id, req.params.id), eq(fuelDeliveries.orgId, req.user!.orgId)))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Fuel delivery not found" });
+      }
+      res.json({ message: "Fuel delivery deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting fuel delivery:", error);
+      res.status(500).json({ message: "Failed to delete fuel delivery" });
+    }
+  });
+
+  // ==================== OPERATIONS - FUEL PROJECTIONS ROUTES ====================
+
+  // Get all fuel financial projections for organization
+  app.get("/api/operations/fuel-projections", authenticateUser, async (req, res) => {
+    try {
+      const projections = await db.query.fuelFinancialProjections.findMany({
+        where: eq(fuelFinancialProjections.orgId, req.user!.orgId),
+        orderBy: [fuelFinancialProjections.year, fuelFinancialProjections.month],
+      });
+      res.json(projections);
+    } catch (error) {
+      console.error("Error fetching fuel projections:", error);
+      res.status(500).json({ message: "Failed to fetch fuel projections" });
+    }
+  });
+
+  // Create a new fuel projection
+  app.post("/api/operations/fuel-projections", authenticateUser, async (req, res) => {
+    try {
+      const projectionData = insertFuelProjectionSchema.parse(req.body);
+      const [projection] = await db.insert(fuelFinancialProjections).values({
+        ...projectionData,
+        orgId: req.user!.orgId,
+      }).returning();
+      res.json(projection);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error creating fuel projection:", error);
+      res.status(500).json({ message: "Failed to create fuel projection" });
+    }
+  });
+
+  // Update a fuel projection
+  app.patch("/api/operations/fuel-projections/:id", authenticateUser, async (req, res) => {
+    try {
+      const updateData = updateFuelProjectionSchema.parse(req.body);
+      const [updated] = await db.update(fuelFinancialProjections)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(and(eq(fuelFinancialProjections.id, req.params.id), eq(fuelFinancialProjections.orgId, req.user!.orgId)))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Fuel projection not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error updating fuel projection:", error);
+      res.status(500).json({ message: "Failed to update fuel projection" });
+    }
+  });
+
+  // Delete a fuel projection
+  app.delete("/api/operations/fuel-projections/:id", authenticateUser, async (req, res) => {
+    try {
+      const [deleted] = await db.delete(fuelFinancialProjections)
+        .where(and(eq(fuelFinancialProjections.id, req.params.id), eq(fuelFinancialProjections.orgId, req.user!.orgId)))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Fuel projection not found" });
+      }
+      res.json({ message: "Fuel projection deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting fuel projection:", error);
+      res.status(500).json({ message: "Failed to delete fuel projection" });
     }
   });
 

@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -41,9 +41,14 @@ const crmToolsNav = [
   { name: "Import History", href: "/import-history", icon: History },
 ];
 
-// Operations Navigation
-const operationsNav = [
-  { name: "Fuel Sales", href: "/operations/fuel-sales", icon: Fuel },
+// Operations Navigation - Fuel Sales Subcategories
+const fuelSalesNav = [
+  { name: "Dashboard", href: "/operations/fuel/dashboard", icon: LayoutDashboard },
+  { name: "Transactions", href: "/operations/fuel/transactions", icon: CreditCard },
+  { name: "Inventory", href: "/operations/fuel/inventory", icon: Box },
+  { name: "Analytics", href: "/operations/fuel/analytics", icon: BarChart3 },
+  { name: "Reports", href: "/operations/fuel/reports", icon: FileText },
+  { name: "Financial Model", href: "/operations/fuel/financial-model", icon: Calculator },
 ];
 
 // Due Diligence Navigation
@@ -73,6 +78,7 @@ type PendingProperty = {
 export default function UnifiedSidebar() {
   const [location] = useLocation();
   const [operationsExpanded, setOperationsExpanded] = useState(false);
+  const [fuelSalesExpanded, setFuelSalesExpanded] = useState(false);
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [ddExpanded, setDdExpanded] = useState(false);
@@ -235,9 +241,24 @@ export default function UnifiedSidebar() {
             expanded={operationsExpanded} 
             onToggle={() => setOperationsExpanded(!operationsExpanded)} 
           />
-          {operationsExpanded && operationsNav.map((item) => (
-            <NavLink key={item.name} item={item} />
-          ))}
+          {operationsExpanded && (
+            <div className="ml-4 mt-1 mb-2">
+              <button
+                onClick={() => setFuelSalesExpanded(!fuelSalesExpanded)}
+                className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                data-testid="toggle-fuel-sales"
+              >
+                <div className="flex items-center space-x-3">
+                  <Fuel className="w-5 h-5" />
+                  <span>Fuel Sales</span>
+                </div>
+                {fuelSalesExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              {fuelSalesExpanded && fuelSalesNav.map((item) => (
+                <NavLink key={item.name} item={item} />
+              ))}
+            </div>
+          )}
         </div>
         
         {/* CRM Section */}

@@ -39,8 +39,13 @@ import NotFound from "@/pages/not-found";
 import CrmTasks from "@/pages/crm-tasks";
 import MarketingAutomation from "@/pages/marketing-automation";
 import CalendarSettings from "@/pages/calendar-settings";
-// Operations pages
-import FuelSales from "@/pages/operations/FuelSales";
+// Operations pages - Fuel Sales
+import FuelSalesDashboard from "@/pages/operations/fuel/Dashboard";
+import FuelSalesTransactions from "@/pages/operations/fuel/Transactions";
+import FuelSalesInventory from "@/pages/operations/fuel/Inventory";
+import FuelSalesAnalytics from "@/pages/operations/fuel/Analytics";
+import FuelSalesReports from "@/pages/operations/fuel/Reports";
+import FuelSalesFinancialModel from "@/pages/operations/fuel/FinancialModel";
 // Analysis / Sales Comps pages
 import SalesCompsIndex from "@/pages/analysis/sales-comps/Index";
 import SalesCompsDetail from "@/pages/analysis/sales-comps/Detail";
@@ -184,11 +189,46 @@ function Router() {
         )}
       </Route>
       
-      {/* Operations Routes with Unified Layout */}
-      <Route path="/operations/fuel-sales">
+      {/* Operations Routes with Unified Layout - Fuel Sales */}
+      <Route path="/operations/fuel/dashboard">
         {() => (
           <UnifiedLayout>
-            <FuelSales />
+            <FuelSalesDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/fuel/transactions">
+        {() => (
+          <UnifiedLayout>
+            <FuelSalesTransactions />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/fuel/inventory">
+        {() => (
+          <UnifiedLayout>
+            <FuelSalesInventory />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/fuel/analytics">
+        {() => (
+          <UnifiedLayout>
+            <FuelSalesAnalytics />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/fuel/reports">
+        {() => (
+          <UnifiedLayout>
+            <FuelSalesReports />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/fuel/financial-model">
+        {() => (
+          <UnifiedLayout>
+            <FuelSalesFinancialModel />
           </UnifiedLayout>
         )}
       </Route>
