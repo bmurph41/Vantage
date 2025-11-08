@@ -16,7 +16,7 @@ import { PercentageInput } from "@/components/ui/percentage-input";
 import { X, Save, Palette, Target, Settings } from "lucide-react";
 import { z } from "zod";
 import type { RcProject, InsertRcProject, UpdateRcProject } from "@shared/schema";
-import { PROFIT_CENTERS, COASTAL_TYPES, DEFAULT_RECOMMENDATION_WEIGHTS } from "@shared/salescomps-constants";
+import { PROFIT_CENTERS, COASTAL_TYPES, DEFAULT_RECOMMENDATION_WEIGHTS, US_REGIONS } from "@shared/salescomps-constants";
 
 const projectFormSchema = z.object({
   name: z.string().min(1, "Project name is required").max(100, "Project name must be less than 100 characters"),
@@ -420,45 +420,30 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Target Regions</FormLabel>
-                        <FormControl>
-                          <div className="flex flex-wrap gap-1">
-                            <Input
-                              placeholder="Type region and press Enter to add (e.g., Southeast US, Pacific Northwest)"
-                              className="flex-1 min-w-[200px]"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  const input = e.target as HTMLInputElement;
-                                  const value = input.value.trim();
-                                  if (value && !field.value.includes(value)) {
-                                    field.onChange([...field.value, value]);
-                                    input.value = '';
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          {US_REGIONS.map((region) => (
+                            <div key={region} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`region-${region}`}
+                                checked={field.value?.includes(region) || false}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    field.onChange([...(field.value || []), region]);
+                                  } else {
+                                    field.onChange(
+                                      field.value?.filter((r: string) => r !== region) || []
+                                    );
                                   }
-                                }
-                              }}
-                              data-testid="input-target-regions"
-                            />
-                          </div>
-                        </FormControl>
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {field.value?.map((region, index) => (
-                            <span 
-                              key={index} 
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-sm rounded"
-                            >
-                              {region}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newRegions = field.value.filter((_, i) => i !== index);
-                                  field.onChange(newRegions);
                                 }}
-                                className="text-green-600 dark:text-green-300 hover:text-green-800 dark:hover:text-green-100"
-                                data-testid={`remove-region-${index}`}
+                                data-testid={`checkbox-region-${region.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`}
+                              />
+                              <Label 
+                                htmlFor={`region-${region}`}
+                                className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                               >
-                                ×
-                              </button>
-                            </span>
+                                {region}
+                              </Label>
+                            </div>
                           ))}
                         </div>
                         <FormMessage />
