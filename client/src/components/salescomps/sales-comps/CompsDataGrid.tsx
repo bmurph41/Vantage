@@ -1291,6 +1291,18 @@ export default function CompsDataGrid({
                               </div>
                             )}
                             {formatCellValue(comp, column.key)}
+                            {column.key === 'marina' && comp.parentPortfolioId && !comp.isChild && (() => {
+                              const parentPortfolio = data.find(c => c.id === comp.parentPortfolioId);
+                              return parentPortfolio ? (
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-xs bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-700"
+                                  data-testid={`badge-portfolio-${comp.id}`}
+                                >
+                                  📁 {parentPortfolio.marina}
+                                </Badge>
+                              ) : null;
+                            })()}
                             {column.key === 'marina' && comp.articleUrls && comp.articleUrls.length > 0 && (
                               <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary cursor-pointer" />
                             )}
