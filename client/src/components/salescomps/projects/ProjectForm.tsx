@@ -261,54 +261,6 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                   </FormItem>
                 )}
               />
-
-              {/* Color Picker */}
-              <FormField
-                control={form.control}
-                name="color"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project Color</FormLabel>
-                    <FormControl>
-                      <div className="space-y-3">
-                        {/* Current Color Display */}
-                        <div className="flex items-center gap-3">
-                          <div 
-                            className="w-8 h-8 rounded-full border-2 border-border"
-                            style={{ backgroundColor: selectedColor }}
-                            data-testid="preview-project-color"
-                          />
-                          <Input 
-                            {...field} 
-                            placeholder="#64748b"
-                            className="font-mono text-sm"
-                            data-testid="input-project-color"
-                          />
-                        </div>
-                        
-                        {/* Color Palette */}
-                        <div className="grid grid-cols-8 gap-2">
-                          {defaultColors.map((color) => (
-                            <button
-                              key={color}
-                              type="button"
-                              className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
-                                selectedColor === color 
-                                  ? "border-foreground ring-2 ring-offset-2 ring-primary" 
-                                  : "border-border hover:border-foreground"
-                              }`}
-                              style={{ backgroundColor: color }}
-                              onClick={() => field.onChange(color)}
-                              data-testid={`color-option-${color}`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
             {/* Project Profile for Recommendations */}
@@ -316,7 +268,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Target className="h-4 w-4" />
-                  Project Profile for Matching
+                  Project Profile
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
