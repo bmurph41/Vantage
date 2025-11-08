@@ -176,21 +176,9 @@ export default function ProjectList({ onSelectProject, selectedProjectId }: Proj
                   </Button>
                 </>
               ) : (
-                <>
-                  <p className="text-muted-foreground mb-4">
-                    No projects yet. Create your first project to get started.
-                  </p>
-                  {canCreate && (
-                    <Button 
-                      onClick={() => setShowForm(true)}
-                      data-testid="button-create-first-project"
-                      size="lg"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create New Project
-                    </Button>
-                  )}
-                </>
+                <p className="text-muted-foreground">
+                  No projects yet. Create your first project to get started.
+                </p>
               )}
             </div>
           </div>
