@@ -8595,10 +8595,13 @@ Current context: Project ${req.params.projectId}`;
         after: project,
       });
 
-      // Auto-run recommendations and add matching comps if project has a profile
+      // Auto-run recommendations and add matching comps if project has a profile with criteria
       let recommendations = null;
       let addedCount = 0;
-      if (project.profile) {
+      const hasProfileCriteria = project.profile && Object.keys(project.profile).length > 0;
+      
+      if (hasProfileCriteria) {
+        console.log(`🔍 Auto-adding comps for new SC project "${project.name}" with profile:`, project.profile);
         try {
           const projectProfile = project.profile as ProjectProfile;
           const userWeightOverrides = (project.weightOverrides as any) || undefined;
@@ -8631,9 +8634,11 @@ Current context: Project ${req.params.projectId}`;
             }
           }
         } catch (recError) {
-          console.error("Error generating recommendations for new project:", recError);
+          console.error("Error generating recommendations for new SC project:", recError);
           // Don't fail project creation if recommendations fail
         }
+      } else {
+        console.log(`ℹ️  No profile criteria provided for SC project "${project.name}", skipping auto-add`);
       }
 
       res.status(201).json({ project, recommendations, addedCount });
@@ -10056,10 +10061,13 @@ Current context: Project ${req.params.projectId}`;
         after: project,
       });
 
-      // Auto-run recommendations and add matching comps if project has a profile
+      // Auto-run recommendations and add matching comps if project has a profile with criteria
       let recommendations = null;
       let addedCount = 0;
-      if (project.profile) {
+      const hasProfileCriteria = project.profile && Object.keys(project.profile).length > 0;
+      
+      if (hasProfileCriteria) {
+        console.log(`🔍 Auto-adding comps for new RC project "${project.name}" with profile:`, project.profile);
         try {
           const projectProfile = project.profile as ProjectProfile;
           const userWeightOverrides = (project.weightOverrides as any) || undefined;
@@ -10095,6 +10103,8 @@ Current context: Project ${req.params.projectId}`;
           console.error("Error generating recommendations for new RC project:", recError);
           // Don't fail project creation if recommendations fail
         }
+      } else {
+        console.log(`ℹ️  No profile criteria provided for RC project "${project.name}", skipping auto-add`);
       }
 
       res.status(201).json({ project, recommendations, addedCount });
