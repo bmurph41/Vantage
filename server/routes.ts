@@ -8598,9 +8598,9 @@ Current context: Project ${req.params.projectId}`;
       // Auto-run recommendations and add matching comps if project has a profile
       let recommendations = null;
       let addedCount = 0;
-      if (project.projectProfile) {
+      if (project.profile) {
         try {
-          const projectProfile = project.projectProfile as ProjectProfile;
+          const projectProfile = project.profile as ProjectProfile;
           const userWeightOverrides = (project.weightOverrides as any) || undefined;
           
           recommendations = await recommendationService.getRecommendations({
@@ -10059,9 +10059,9 @@ Current context: Project ${req.params.projectId}`;
       // Auto-run recommendations and add matching comps if project has a profile
       let recommendations = null;
       let addedCount = 0;
-      if (project.projectProfile) {
+      if (project.profile) {
         try {
-          const projectProfile = project.projectProfile as ProjectProfile;
+          const projectProfile = project.profile as ProjectProfile;
           const userWeightOverrides = (project.weightOverrides as any) || undefined;
           
           recommendations = await rcRecommendationService.getRecommendations({
