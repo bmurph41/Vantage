@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -41,6 +41,11 @@ const crmToolsNav = [
   { name: "Import History", href: "/import-history", icon: History },
 ];
 
+// Operations Navigation
+const operationsNav = [
+  { name: "Fuel Sales", href: "/operations/fuel-sales", icon: Fuel },
+];
+
 // Due Diligence Navigation
 const ddNav = [
   { name: "All Projects", href: "/", icon: LayoutDashboard },
@@ -67,6 +72,7 @@ type PendingProperty = {
 
 export default function UnifiedSidebar() {
   const [location] = useLocation();
+  const [operationsExpanded, setOperationsExpanded] = useState(false);
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [ddExpanded, setDdExpanded] = useState(false);
@@ -222,6 +228,18 @@ export default function UnifiedSidebar() {
       
       {/* Scrollable Navigation */}
       <nav className="flex-1 overflow-y-auto py-4">
+        {/* Operations Section */}
+        <div className="mb-2">
+          <SectionHeader 
+            title="Operations" 
+            expanded={operationsExpanded} 
+            onToggle={() => setOperationsExpanded(!operationsExpanded)} 
+          />
+          {operationsExpanded && operationsNav.map((item) => (
+            <NavLink key={item.name} item={item} />
+          ))}
+        </div>
+        
         {/* CRM Section */}
         <div className="mb-2">
           <SectionHeader 

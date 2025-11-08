@@ -39,6 +39,8 @@ import NotFound from "@/pages/not-found";
 import CrmTasks from "@/pages/crm-tasks";
 import MarketingAutomation from "@/pages/marketing-automation";
 import CalendarSettings from "@/pages/calendar-settings";
+// Operations pages
+import FuelSales from "@/pages/operations/FuelSales";
 // Analysis / Sales Comps pages
 import SalesCompsIndex from "@/pages/analysis/sales-comps/Index";
 import SalesCompsDetail from "@/pages/analysis/sales-comps/Detail";
@@ -182,6 +184,15 @@ function Router() {
         )}
       </Route>
       
+      {/* Operations Routes with Unified Layout */}
+      <Route path="/operations/fuel-sales">
+        {() => (
+          <UnifiedLayout>
+            <FuelSales />
+          </UnifiedLayout>
+        )}
+      </Route>
+
       {/* CRM Routes with Unified Layout */}
       <Route path="/crm">
         {() => (
