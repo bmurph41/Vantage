@@ -62,7 +62,7 @@ export default function RecommendationsDialog({
     projectProfile: any;
     weights: any;
   }>({
-    queryKey: ['/api/projects', project.id, 'recommendations'],
+    queryKey: ['/api/sc-projects', project.id, 'recommendations'],
     enabled: open && !!project.id,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
