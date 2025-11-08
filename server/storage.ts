@@ -448,6 +448,7 @@ export interface IStorage {
 
   // SalesComps - Duplicate Detection
   findPotentialDuplicates(orgId: string, marina: string, state?: string, saleYear?: number): Promise<SalesComp[]>;
+  bulkFindCompsByLocation(orgId: string, rows: Array<{ marina?: string; city?: string; state?: string }>): Promise<SalesComp[]>;
 
   // SalesComps - Project Operations
   getScProjects(orgId: string, userId: string): Promise<ScProject[]>;
@@ -3246,6 +3247,27 @@ export class DatabaseStorage implements IStorage {
       .limit(10);
     
     return duplicates;
+  }
+
+  async bulkFindCompsByLocation(
+    orgId: string, 
+    rows: Array<{ marina?: string; city?: string; state?: string }>
+  ): Promise<SalesComp[]> {
+    if (rows.length === 0) return [];
+
+    const uniqueStates = [...new Set(rows.map(r => r.state).filter(Boolean))];
+    
+    if (uniqueStates.length === 0) return [];
+
+    const allComps = await db.select()
+      .from(salesComps)
+      .where(and(
+        eq(salesComps.orgId, orgId),
+        isNull(salesComps.deletedAt),
+        sql`${salesComps.state} IN ${uniqueStates}`
+      ));
+
+    return allComps;
   }
 
   // SC Project Operations
