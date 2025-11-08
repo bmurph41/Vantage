@@ -8157,9 +8157,9 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.orgId;
 
-      const { mapping, normalization, excludedRows = [], parentPortfolioId } = req.body;
+      const { mapping, normalization, excludedRows = [], parentPortfolioId, importMode = 'upsert', updateBlankValues = false } = req.body;
       
-      console.log(`Starting import for ${req.params.importId} with mapping:`, mapping);
+      console.log(`Starting import for ${req.params.importId} with mapping:`, mapping, 'mode:', importMode);
       
       const result = await compService.processImport(
         req.params.importId,
@@ -8168,7 +8168,9 @@ Current context: Project ${req.params.projectId}`;
         mapping,
         normalization,
         excludedRows,
-        parentPortfolioId
+        parentPortfolioId,
+        importMode,
+        updateBlankValues
       );
       
       console.log(`Import completed for ${req.params.importId}:`, result);

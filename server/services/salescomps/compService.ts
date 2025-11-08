@@ -298,7 +298,9 @@ export class CompService {
     mapping: Record<string, string>,
     normalization: any,
     excludedRows: number[] = [],
-    parentPortfolioId?: string
+    parentPortfolioId?: string,
+    importMode: 'insert' | 'update' | 'upsert' = 'upsert',
+    updateBlankValues: boolean = false
   ): Promise<any> {
     try {
       // Update import status
@@ -313,27 +315,42 @@ export class CompService {
         throw new Error('Import record or parsed data not found');
       }
 
+      // Transform rows
+      const transformedRows = importRecord.parsedData.map((row: any) => 
+        this.transformRow(row, mapping, normalization)
+      );
+
+      // Generate import plan
+      const plan = await this.importAnalysis.analyzeImport(
+        orgId,
+        transformedRows,
+        importMode,
+        updateBlankValues
+      );
+
       const results = {
         totalRows: importRecord.parsedData.length,
         successCount: 0,
         errorCount: 0,
         warningCount: 0,
         errors: [] as Array<{ row: number; message: string; }>,
+        insertedCount: 0,
+        updatedCount: 0,
+        skippedCount: 0,
       };
 
-      // Process each row
-      for (let i = 0; i < importRecord.parsedData.length; i++) {
-        const row = importRecord.parsedData[i];
-        const rowNumber = i + 1;
+      // Process each row according to the plan
+      for (const planRow of plan.rows) {
+        const rowNumber = planRow.rowIndex + 1;
 
-        // Skip excluded rows (user decided to exclude due to duplicates)
-        if (excludedRows.includes(i)) {
+        // Skip excluded rows (user decided to exclude)
+        if (excludedRows.includes(planRow.rowIndex)) {
+          results.skippedCount++;
           continue;
         }
 
         try {
-          // Transform row using column mapping
-          const transformedData = this.transformRow(row, mapping, normalization);
+          const transformedData = planRow.rowData;
           
           // Validate required fields
           if (!transformedData.marina) {
@@ -342,7 +359,13 @@ export class CompService {
             continue;
           }
 
-          // Try to match existing property by name, city, and state
+          // Handle based on import plan action
+          if (planRow.action === 'skip') {
+            results.skippedCount++;
+            continue;
+          }
+
+          // Try to match existing property by name, city, and state (for both insert and update)
           let propertyId: string | undefined = undefined;
           let needsPropertyProfile = false;
           
@@ -357,19 +380,14 @@ export class CompService {
             if (matchedProperty) {
               propertyId = matchedProperty.id;
             } else {
-              // No matching property found - will need to create profile later
               needsPropertyProfile = true;
             }
           } catch (error) {
             console.error('Error matching property:', error);
-            // Continue without property link
           }
 
-          // Create comp record
-          const compData = {
-            orgId,
-            createdBy: userId,
-            updatedBy: userId,
+          // Prepare comp data
+          const compData: any = {
             marina: transformedData.marina,
             salePrice: transformedData.salePrice || undefined,
             isPriceDisclosed: transformedData.isPriceDisclosed !== undefined ? transformedData.isPriceDisclosed : Boolean(transformedData.salePrice),
@@ -402,25 +420,43 @@ export class CompService {
             notes: transformedData.notes || undefined,
             articleUrls: transformedData.articleUrls || [],
             custom: transformedData.custom || {},
-            parentPortfolioId: parentPortfolioId || undefined,
             propertyId: propertyId,
           };
 
-          const createdComp = await this.storage.createComp(compData);
-          results.successCount++;
+          if (planRow.action === 'insert') {
+            // Insert new comp
+            const insertData = {
+              ...compData,
+              orgId,
+              createdBy: userId,
+              updatedBy: userId,
+              parentPortfolioId: parentPortfolioId || undefined,
+            };
 
-          // Create pending property profile if needed
-          if (needsPropertyProfile && createdComp) {
-            try {
-              await this.storage.createPendingPropertyProfile({
-                compId: createdComp.id,
-                orgId,
-                status: 'pending',
-              });
-            } catch (error) {
-              console.error('Error creating pending property profile:', error);
-              // Don't fail the whole import if this fails
+            const createdComp = await this.storage.createComp(insertData);
+            results.insertedCount++;
+            results.successCount++;
+
+            // Create pending property profile if needed
+            if (needsPropertyProfile && createdComp) {
+              try {
+                await this.storage.createPendingPropertyProfile({
+                  compId: createdComp.id,
+                  orgId,
+                  status: 'pending',
+                });
+              } catch (error) {
+                console.error('Error creating pending property profile:', error);
+              }
             }
+
+          } else if (planRow.action === 'update' && planRow.matchedCompId) {
+            // Update existing comp
+            const updateData: any = { ...compData, updatedBy: userId };
+            
+            await this.storage.updateComp(planRow.matchedCompId, updateData, orgId);
+            results.updatedCount++;
+            results.successCount++;
           }
 
         } catch (error) {

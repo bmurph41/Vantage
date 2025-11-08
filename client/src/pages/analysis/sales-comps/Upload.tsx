@@ -16,7 +16,6 @@ import { queryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/salescomps/queryKeys";
 import { formatFileSize } from "@/lib/salescomps/format";
 import ColumnMapperSimple from "@/components/salescomps/sales-comps/ColumnMapperSimple";
-import DuplicateReview from "@/components/salescomps/sales-comps/DuplicateReview";
 import { useToast } from "@/hooks/use-toast";
 
 interface UploadProps {
@@ -46,13 +45,11 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     toSkip: number;
     duplicateMatches: Array<{ row: any; match: any; confidence: number; action: 'insert' | 'update' | 'skip' }>;
   } | null>(null);
-  const [duplicates, setDuplicates] = useState<any[]>([]);
   const [excludedRows, setExcludedRows] = useState<number[]>([]);
   const [linkToPortfolio, setLinkToPortfolio] = useState(false);
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>("");
   const [showNewPortfolioDialog, setShowNewPortfolioDialog] = useState(false);
   const [newPortfolioName, setNewPortfolioName] = useState("");
-  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch existing portfolio comps
@@ -78,27 +75,6 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     },
   });
 
-  const detectDuplicatesMutation = useMutation({
-    mutationFn: ({ importId, mapping, normalization }: any) =>
-      salesCompsApi.detectDuplicates(importId, mapping, normalization),
-    onSuccess: (data) => {
-      setDuplicates(data.duplicates || []);
-      if (data.duplicatesFound > 0) {
-        // Show duplicates modal instead of changing step
-        setShowDuplicatesModal(true);
-      } else {
-        // No duplicates found, proceed directly to processing
-        handleCommitAfterDuplicateCheck();
-      }
-    },
-    onError: (error) => {
-      toast({
-        title: "Duplicate Detection Failed",
-        description: (error as Error).message,
-        variant: "destructive",
-      });
-    },
-  });
 
   const previewMutation = useMutation({
     mutationFn: ({ importId, mapping, normalization, importMode, updateBlankValues }: any) =>
@@ -235,37 +211,6 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     maxSize: 50 * 1024 * 1024, // 50MB
   });
 
-  const handleDetectDuplicates = () => {
-    if (!uploadData) return;
-    
-    detectDuplicatesMutation.mutate({
-      importId: uploadData.importId,
-      mapping,
-      normalization,
-    });
-  };
-
-  const handleCommitAfterDuplicateCheck = () => {
-    if (!uploadData) return;
-    
-    commitMutation.mutate({
-      importId: uploadData.importId,
-      mapping,
-      normalization,
-      excludedRows,
-      parentPortfolioId: linkToPortfolio ? selectedPortfolioId : undefined,
-      importMode,
-      updateBlankValues,
-    });
-  };
-
-  const handleExcludeChange = (rowIndex: number, exclude: boolean) => {
-    setExcludedRows(prev => 
-      exclude 
-        ? [...prev, rowIndex]
-        : prev.filter(idx => idx !== rowIndex)
-    );
-  };
 
   const handleBack = () => {
     if (step === 'mapping') {
@@ -310,10 +255,6 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     });
   };
 
-  const handleProceedWithImport = () => {
-    setShowDuplicatesModal(false);
-    handleCommitAfterDuplicateCheck();
-  };
 
   const renderUploadStep = () => (
     <div>
@@ -798,53 +739,6 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
             >
               {createPortfolioMutation.isPending ? "Creating..." : "Create Portfolio"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Duplicates Review Modal */}
-      <Dialog open={showDuplicatesModal} onOpenChange={setShowDuplicatesModal}>
-        <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
-              Review Potential Duplicates
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex-1 overflow-auto py-4">
-            <p className="text-sm text-muted-foreground mb-6">
-              We found {duplicates.length} potential duplicate{duplicates.length !== 1 ? 's' : ''} in your upload. 
-              Review each item below and decide whether to include or exclude it from the import.
-            </p>
-            
-            <DuplicateReview
-              duplicates={duplicates}
-              excludedRows={excludedRows}
-              onExcludeChange={handleExcludeChange}
-            />
-          </div>
-
-          <DialogFooter className="flex justify-between items-center">
-            <div className="text-sm text-muted-foreground">
-              {excludedRows.length} of {duplicates.length} duplicates will be excluded
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowDuplicatesModal(false)}
-                data-testid="button-cancel-duplicates"
-              >
-                Back to Mapping
-              </Button>
-              <Button 
-                onClick={handleProceedWithImport}
-                disabled={commitMutation.isPending}
-                data-testid="button-proceed-import"
-              >
-                {commitMutation.isPending ? 'Importing...' : `Import ${duplicates.length - excludedRows.length} Records`}
-              </Button>
-            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
