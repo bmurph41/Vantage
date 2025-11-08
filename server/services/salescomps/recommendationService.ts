@@ -299,12 +299,31 @@ export class RecommendationService {
     const comps = await this.storage.getCompsForRecommendation({
       orgId,
       filters: {
+        // Geographic filters
         regions: projectProfile.regions,
         states: projectProfile.states,
-        coastalType: projectProfile.coastalType,
-        excludeIds: excludeCompIds,
-        mustHaveProfitCenters: projectProfile.mustHaveProfitCenters,
+        coastalType: projectProfile.coastalType || projectProfile.waterType,
+        
+        // Price range filters
+        priceMin: projectProfile.targetPriceMin,
+        priceMax: projectProfile.targetPriceMax,
+        
+        // NOI range filters
+        noiMin: projectProfile.targetNOIMin,
+        noiMax: projectProfile.targetNOIMax,
+        
+        // Storage capacity filters
+        wetSlipsMin: projectProfile.wetSlipsMin,
+        wetSlipsMax: projectProfile.wetSlipsMax,
+        dryRacksMin: projectProfile.dryRacksMin,
+        dryRacksMax: projectProfile.dryRacksMax,
+        
+        // Legacy filters (keep for backward compatibility)
         targetCapacity: projectProfile.targetCapacity,
+        mustHaveProfitCenters: projectProfile.mustHaveProfitCenters,
+        
+        // Exclusions
+        excludeIds: excludeCompIds,
       }
     });
 

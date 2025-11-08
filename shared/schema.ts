@@ -3210,9 +3210,15 @@ export const scProjects = pgTable('sc_projects', {
   // Project profile for matching
   profile: jsonb('profile').$type<{
     targetNOI?: number;
+    targetNOIMin?: number;
+    targetNOIMax?: number;
     targetCapacity?: number;
     targetPriceMin?: number;
     targetPriceMax?: number;
+    wetSlipsMin?: number;
+    wetSlipsMax?: number;
+    dryRacksMin?: number;
+    dryRacksMax?: number;
     states?: string[];
     regions?: string[];
     waterType?: 'Coastal' | 'Lake' | 'River';
@@ -3610,9 +3616,15 @@ export const profitCentersSchema = z.array(z.enum([
 // SC Project profile validation
 export const scProjectProfileSchema = z.object({
   targetNOI: z.number().optional(),
+  targetNOIMin: z.number().optional(),
+  targetNOIMax: z.number().optional(),
   targetCapacity: z.number().optional(),
   targetPriceMin: z.number().optional(),
   targetPriceMax: z.number().optional(),
+  wetSlipsMin: z.number().optional(),
+  wetSlipsMax: z.number().optional(),
+  dryRacksMin: z.number().optional(),
+  dryRacksMax: z.number().optional(),
   states: z.array(z.string()).optional(),
   regions: z.array(z.string()).optional(),
   waterType: z.enum(['Coastal', 'Lake', 'River']).optional(),
@@ -4006,9 +4018,15 @@ export const rcProjects = pgTable('rc_projects', {
   // Project profile for matching
   profile: jsonb('profile').$type<{
     targetNOI?: number;
+    targetNOIMin?: number;
+    targetNOIMax?: number;
     targetCapacity?: number;
     targetPriceMin?: number;
     targetPriceMax?: number;
+    wetSlipsMin?: number;
+    wetSlipsMax?: number;
+    dryRacksMin?: number;
+    dryRacksMax?: number;
     states?: string[];
     regions?: string[];
     waterType?: 'Coastal' | 'Lake' | 'River';

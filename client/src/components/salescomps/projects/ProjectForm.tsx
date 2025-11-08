@@ -24,9 +24,15 @@ const projectFormSchema = z.object({
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "Must be a valid hex color code").optional(),
   // Profile fields
   targetNOI: z.number().min(0).optional(),
+  targetNOIMin: z.number().min(0).optional(),
+  targetNOIMax: z.number().min(0).optional(),
   targetCapacity: z.number().min(0).optional(),
   targetPriceMin: z.number().min(0).optional(),
   targetPriceMax: z.number().min(0).optional(),
+  wetSlipsMin: z.number().min(0).optional(),
+  wetSlipsMax: z.number().min(0).optional(),
+  dryRacksMin: z.number().min(0).optional(),
+  dryRacksMax: z.number().min(0).optional(),
   states: z.array(z.string()).default([]),
   regions: z.array(z.string()).default([]),
   coastalType: z.enum(['coastal', 'lake', 'any']).optional(),
@@ -48,6 +54,39 @@ const projectFormSchema = z.object({
   {
     message: "Minimum price must be less than or equal to maximum price",
     path: ["targetPriceMax"],
+  }
+).refine(
+  (data) => {
+    if (data.targetNOIMin !== undefined && data.targetNOIMax !== undefined) {
+      return data.targetNOIMin <= data.targetNOIMax;
+    }
+    return true;
+  },
+  {
+    message: "Minimum NOI must be less than or equal to maximum NOI",
+    path: ["targetNOIMax"],
+  }
+).refine(
+  (data) => {
+    if (data.wetSlipsMin !== undefined && data.wetSlipsMax !== undefined) {
+      return data.wetSlipsMin <= data.wetSlipsMax;
+    }
+    return true;
+  },
+  {
+    message: "Minimum wet slips must be less than or equal to maximum wet slips",
+    path: ["wetSlipsMax"],
+  }
+).refine(
+  (data) => {
+    if (data.dryRacksMin !== undefined && data.dryRacksMax !== undefined) {
+      return data.dryRacksMin <= data.dryRacksMax;
+    }
+    return true;
+  },
+  {
+    message: "Minimum dry racks must be less than or equal to maximum dry racks",
+    path: ["dryRacksMax"],
   }
 );
 
@@ -92,9 +131,15 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
       color: project?.color || "#64748b",
       // Profile fields
       targetNOI: project?.profile?.targetNOI,
+      targetNOIMin: project?.profile?.targetNOIMin,
+      targetNOIMax: project?.profile?.targetNOIMax,
       targetCapacity: project?.profile?.targetCapacity,
       targetPriceMin: project?.profile?.targetPriceMin,
       targetPriceMax: project?.profile?.targetPriceMax,
+      wetSlipsMin: project?.profile?.wetSlipsMin,
+      wetSlipsMax: project?.profile?.wetSlipsMax,
+      dryRacksMin: project?.profile?.dryRacksMin,
+      dryRacksMax: project?.profile?.dryRacksMax,
       // Handle backward compatibility: convert legacy region to regions array
       states: project?.profile?.states || [],
       regions: project?.profile?.regions || 
@@ -119,9 +164,15 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
         color: project.color || "#64748b",
         // Profile fields
         targetNOI: project.profile?.targetNOI,
+        targetNOIMin: project.profile?.targetNOIMin,
+        targetNOIMax: project.profile?.targetNOIMax,
         targetCapacity: project.profile?.targetCapacity,
         targetPriceMin: project.profile?.targetPriceMin,
         targetPriceMax: project.profile?.targetPriceMax,
+        wetSlipsMin: project.profile?.wetSlipsMin,
+        wetSlipsMax: project.profile?.wetSlipsMax,
+        dryRacksMin: project.profile?.dryRacksMin,
+        dryRacksMax: project.profile?.dryRacksMax,
         // Handle backward compatibility: convert legacy region to regions array
         states: project.profile?.states || [],
         regions: project.profile?.regions || 
@@ -143,9 +194,15 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
         color: "#64748b",
         // Profile fields - reset to empty
         targetNOI: undefined,
+        targetNOIMin: undefined,
+        targetNOIMax: undefined,
         targetCapacity: undefined,
         targetPriceMin: undefined,
         targetPriceMax: undefined,
+        wetSlipsMin: undefined,
+        wetSlipsMax: undefined,
+        dryRacksMin: undefined,
+        dryRacksMax: undefined,
         states: [],
         regions: [],
         coastalType: undefined,
@@ -165,9 +222,15 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
     // Build profile object
     const profile = {
       targetNOI: data.targetNOI || undefined,
+      targetNOIMin: data.targetNOIMin || undefined,
+      targetNOIMax: data.targetNOIMax || undefined,
       targetCapacity: data.targetCapacity || undefined,
       targetPriceMin: data.targetPriceMin || undefined,
       targetPriceMax: data.targetPriceMax || undefined,
+      wetSlipsMin: data.wetSlipsMin || undefined,
+      wetSlipsMax: data.wetSlipsMax || undefined,
+      dryRacksMin: data.dryRacksMin || undefined,
+      dryRacksMax: data.dryRacksMax || undefined,
       states: data.states?.length ? data.states : undefined,
       regions: data.regions?.length ? data.regions : undefined,
       coastalType: (data.coastalType && data.coastalType !== 'any') ? data.coastalType : undefined,

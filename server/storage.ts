@@ -3391,6 +3391,7 @@ export class DatabaseStorage implements IStorage {
       isNull(salesComps.deletedAt)
     ];
 
+    // Geographic filters
     if (filters.regions && filters.regions.length > 0) {
       conditions.push(inArray(salesComps.region, filters.regions));
     }
@@ -3400,6 +3401,38 @@ export class DatabaseStorage implements IStorage {
     if (filters.coastalType) {
       conditions.push(eq(salesComps.coastalType, filters.coastalType));
     }
+    
+    // Price range filters
+    if (filters.priceMin !== undefined && filters.priceMin !== null) {
+      conditions.push(sql`COALESCE(${salesComps.salePrice}, 0) >= ${filters.priceMin}`);
+    }
+    if (filters.priceMax !== undefined && filters.priceMax !== null) {
+      conditions.push(sql`COALESCE(${salesComps.salePrice}, 0) <= ${filters.priceMax}`);
+    }
+    
+    // NOI range filters
+    if (filters.noiMin !== undefined && filters.noiMin !== null) {
+      conditions.push(sql`COALESCE(${salesComps.noi}, 0) >= ${filters.noiMin}`);
+    }
+    if (filters.noiMax !== undefined && filters.noiMax !== null) {
+      conditions.push(sql`COALESCE(${salesComps.noi}, 0) <= ${filters.noiMax}`);
+    }
+    
+    // Storage capacity filters
+    if (filters.wetSlipsMin !== undefined && filters.wetSlipsMin !== null) {
+      conditions.push(sql`COALESCE(${salesComps.wetSlips}, 0) >= ${filters.wetSlipsMin}`);
+    }
+    if (filters.wetSlipsMax !== undefined && filters.wetSlipsMax !== null) {
+      conditions.push(sql`COALESCE(${salesComps.wetSlips}, 0) <= ${filters.wetSlipsMax}`);
+    }
+    if (filters.dryRacksMin !== undefined && filters.dryRacksMin !== null) {
+      conditions.push(sql`COALESCE(${salesComps.dryRacks}, 0) >= ${filters.dryRacksMin}`);
+    }
+    if (filters.dryRacksMax !== undefined && filters.dryRacksMax !== null) {
+      conditions.push(sql`COALESCE(${salesComps.dryRacks}, 0) <= ${filters.dryRacksMax}`);
+    }
+    
+    // Exclude IDs
     if (filters.excludeIds && filters.excludeIds.length > 0) {
       conditions.push(sql`${salesComps.id} NOT IN (${sql.join(filters.excludeIds.map((id: string) => sql`${id}`), sql`, `)})`);
     }
@@ -4500,6 +4533,7 @@ export class DatabaseStorage implements IStorage {
       isNull(rateComps.deletedAt)
     ];
 
+    // Geographic filters
     if (filters.regions && filters.regions.length > 0) {
       conditions.push(inArray(rateComps.region, filters.regions));
     }
@@ -4509,6 +4543,38 @@ export class DatabaseStorage implements IStorage {
     if (filters.coastalType) {
       conditions.push(eq(rateComps.coastalType, filters.coastalType));
     }
+    
+    // Price range filters
+    if (filters.priceMin !== undefined && filters.priceMin !== null) {
+      conditions.push(sql`COALESCE(${rateComps.salePrice}, 0) >= ${filters.priceMin}`);
+    }
+    if (filters.priceMax !== undefined && filters.priceMax !== null) {
+      conditions.push(sql`COALESCE(${rateComps.salePrice}, 0) <= ${filters.priceMax}`);
+    }
+    
+    // NOI range filters
+    if (filters.noiMin !== undefined && filters.noiMin !== null) {
+      conditions.push(sql`COALESCE(${rateComps.noi}, 0) >= ${filters.noiMin}`);
+    }
+    if (filters.noiMax !== undefined && filters.noiMax !== null) {
+      conditions.push(sql`COALESCE(${rateComps.noi}, 0) <= ${filters.noiMax}`);
+    }
+    
+    // Storage capacity filters
+    if (filters.wetSlipsMin !== undefined && filters.wetSlipsMin !== null) {
+      conditions.push(sql`COALESCE(${rateComps.wetSlips}, 0) >= ${filters.wetSlipsMin}`);
+    }
+    if (filters.wetSlipsMax !== undefined && filters.wetSlipsMax !== null) {
+      conditions.push(sql`COALESCE(${rateComps.wetSlips}, 0) <= ${filters.wetSlipsMax}`);
+    }
+    if (filters.dryRacksMin !== undefined && filters.dryRacksMin !== null) {
+      conditions.push(sql`COALESCE(${rateComps.dryRacks}, 0) >= ${filters.dryRacksMin}`);
+    }
+    if (filters.dryRacksMax !== undefined && filters.dryRacksMax !== null) {
+      conditions.push(sql`COALESCE(${rateComps.dryRacks}, 0) <= ${filters.dryRacksMax}`);
+    }
+    
+    // Exclude IDs
     if (filters.excludeIds && filters.excludeIds.length > 0) {
       conditions.push(sql`${rateComps.id} NOT IN (${sql.join(filters.excludeIds.map((id: string) => sql`${id}`), sql`, `)})`);
     }
