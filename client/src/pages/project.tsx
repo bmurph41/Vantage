@@ -14,6 +14,7 @@ import { ArchiveView } from "@/components/archive-view";
 import { CddAdvisor } from "@/components/cdd-advisor";
 import { FindingsManager } from "@/components/findings-manager";
 import { KpisOverview } from "@/components/kpis-overview";
+import { TemplatesView } from "@/components/templates-view";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import { useProject } from "@/hooks/use-project";
 import { useQuery } from "@tanstack/react-query";
@@ -89,6 +90,7 @@ export default function ProjectPage() {
     { id: "reports", label: "Tasks & Timeline" },
     { id: "advisor", label: "CDD Copilot" },
     { id: "kpis", label: "KPIs" },
+    { id: "templates", label: "Templates" },
     { id: "setup", label: "Deal Details" },
     { id: "owners", label: "Task Owners" },
     { id: "contacts", label: "Key Contacts" },
@@ -179,6 +181,9 @@ export default function ProjectPage() {
           )}
           {activeTab === "kpis" && (
             <KpisOverview projectId={project.id} />
+          )}
+          {activeTab === "templates" && (
+            <TemplatesView projectId={project.id} />
           )}
           {activeTab === "setup" && (
             <ProjectSetup project={project} settings={settings} tasks={tasks} />
