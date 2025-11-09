@@ -52,6 +52,16 @@ Preferred communication style: Simple, everyday language.
 - **SalesComps Module**: Marina sales comparables management with CSV import/export, project grouping, rate analysis, Google Maps address autocomplete, organization-based multi-tenancy, portfolio functionality, and customizable storage types.
 - **SalesComps-CRM Properties Integration**: Every sales comp automatically creates or links to a CRM Property record. During import, the system matches existing properties by marina name, city, and state. When no match is found, a new Property record is auto-created with marina details, status, and listing price from the comp data. This ensures every comp has a corresponding property page for CRM workflows. Legacy data backfilled successfully (1,585 comps → 1,487 properties: 1,462 created, 98 matched).
 - **Analytics/Metrics Module**: Deep-dive comparative analysis for sales comps with statistical calculations (averages, medians, percentiles), filtering by state, price point, year sold, water type, and capacity. Features trend analysis, recharts visualizations (line charts, bar charts, pie charts), automated insights generation, and metrics tracking with alert capabilities.
+- **Fuel Sales Module**: Complete fuel operations management with Dashboard, Transactions, Inventory, Analytics, Reports, and Financial Model pages. All analytics use EST timezone (America/New_York) with 5:00 PM business-day cutoff for consistent metrics.
+- **Fuel Software Integration**: Full integration architecture supporting industry-standard fuel management systems (FuelCloud, MARINAGO, Dockwa, MarinaOffice). Features include:
+  - Provider-agnostic interface pattern with registry system
+  - FuelCloud API integration with OAuth, automatic token refresh, and retry logic
+  - CSV import with drag-and-drop, field mapping, validation, and duplicate detection
+  - QuickBooks export with GL account mapping and journal entry format
+  - Integration Settings page for managing API credentials and sync configuration
+  - Import History tracking with detailed logs, error reporting, and statistics dashboard
+  - Idempotent data sync using external transaction IDs for deduplication
+  - Resilient error handling with exponential backoff and partial success support
 - **Marketing Automation**: Multi-step email sequences with templates and enrollment tracking for contacts, leads, and deals.
 - **File Attachment System**: Comprehensive file upload, listing, download, and deletion for CRM entities.
 - **Bulk Actions**: Multi-select, bulk delete, and CSV export for Contacts, Companies, and Deals.
