@@ -254,9 +254,13 @@ export default function UnifiedSidebar() {
                 </div>
                 {fuelSalesExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </button>
-              {fuelSalesExpanded && fuelSalesNav.map((item) => (
-                <NavLink key={item.name} item={item} />
-              ))}
+              {fuelSalesExpanded && (
+                <div className="ml-4">
+                  {fuelSalesNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
