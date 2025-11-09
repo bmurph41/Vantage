@@ -4389,6 +4389,36 @@ export const fuelImportLogs = pgTable('fuel_import_logs', {
   dateIdx: index('fuel_import_logs_date_idx').on(table.startedAt),
 }));
 
+// ================================================================================
+// RBAC & ADVANCED COMPLIANCE SYSTEM
+// ================================================================================
+
+// User Roles - for RBAC system
+export const userRoleEnum = pgEnum("user_role", [
+  "owner", "admin", "editor", "viewer", "auditor"
+]);
+
+// Organization User Roles - maps users to organizations with roles
+export const organizationUserRoles = pgTable('organization_user_roles', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  role: userRoleEnum('role').notNull().default('viewer'),
+  permissions: jsonb('permissions').default(sql`'{}'`), // Custom permission overrides
+  isActive: boolean('is_active').default(true).notNull(),
+  assignedBy: varchar('assigned_by').references(() => users.id),
+  assignedAt: timestamp('assigned_at').defaultNow().notNull(),
+  revokedAt: timestamp('revoked_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('org_user_roles_org_idx').on(table.orgId),
+  userIdx: index('org_user_roles_user_idx').on(table.userId),
+  roleIdx: index('org_user_roles_role_idx').on(table.role),
+  activeIdx: index('org_user_roles_active_idx').on(table.isActive),
+  uniqueOrgUser: index('org_user_roles_unique').on(table.orgId, table.userId),
+}));
+
 // Relations for Fuel Sales
 export const fuelSalesRelations = relations(fuelSales, ({ one }) => ({
   organization: one(organizations, {

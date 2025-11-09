@@ -62,6 +62,14 @@ Preferred communication style: Simple, everyday language.
   - Import History tracking with detailed logs, error reporting, and statistics dashboard
   - Idempotent data sync using external transaction IDs for deduplication
   - Resilient error handling with exponential backoff and partial success support
+  - **Institutional-Grade Compliance & Security** (November 2025):
+    - **Role-Based Access Control (RBAC)**: Organization-level user roles (Owner, Admin, Editor, Viewer, Auditor) with granular permission system for fuel operations
+    - **Comprehensive Audit Trail**: Immutable event logging with before/after snapshots, change tracking, user/IP/session context capture for SOC 2/GDPR compliance
+    - **Audit Service**: Centralized logging infrastructure (`server/services/audit-service.ts`) with automatic context injection, diff calculation, and severity levels
+    - **RBAC Middleware**: Permission checking system (`server/middleware/rbac.ts`) with route protection, approval workflow enforcement, and role-based filtering
+    - **Permission Matrix**: Fine-grained permissions including fuel operations (read/create/update/delete/export/import), integration management, period locking, approval workflows, and audit access
+    - **Security Foundation**: Supports approval workflows for sensitive operations, period locking for financial controls, and comprehensive change history
+    - **Database Schema**: `organization_user_roles` table for RBAC, enhanced `audit_logs` table with full context tracking and metadata
 - **Marketing Automation**: Multi-step email sequences with templates and enrollment tracking for contacts, leads, and deals.
 - **File Attachment System**: Comprehensive file upload, listing, download, and deletion for CRM entities.
 - **Bulk Actions**: Multi-select, bulk delete, and CSV export for Contacts, Companies, and Deals.
