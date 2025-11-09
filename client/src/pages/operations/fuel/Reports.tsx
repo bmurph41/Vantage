@@ -14,8 +14,8 @@ export default function Reports() {
             <CardTitle>Reports</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">Reporting features will be implemented here.</p>
-            <p className="text-sm text-muted-foreground mt-2">This page will allow generating custom reports and exporting data.</p>
+            <p className="text-muted-foreground">Report generation features will be implemented here.</p>
+            <p className="text-sm text-muted-foreground mt-2">This page will allow generating daily/monthly reports and exporting data to CSV.</p>
           </CardContent>
         </Card>
       </div>

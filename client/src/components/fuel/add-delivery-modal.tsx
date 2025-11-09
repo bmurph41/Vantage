@@ -60,18 +60,18 @@ export function AddDeliveryModal({ isOpen, onClose }: AddDeliveryModalProps) {
   });
 
   const { data: fuelTypes = [] } = useQuery<FuelTypesResponse>({
-    queryKey: ['/api/operations/fuel/types'],
+    queryKey: ['/api/operations/fuel-types'],
   });
 
   const createDeliveryMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/operations/fuel/deliveries", data);
+      const response = await apiRequest("POST", "/api/operations/fuel-deliveries", data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel/deliveries'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel/inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel/dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel-sales/stats/summary'] });
       toast({
         title: "Success",
         description: "Delivery added successfully!",

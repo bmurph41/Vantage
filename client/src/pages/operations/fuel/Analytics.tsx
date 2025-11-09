@@ -11,11 +11,11 @@ export default function Analytics() {
       <div className="p-6">
         <Card>
           <CardHeader>
-            <CardTitle>Analytics</CardTitle>
+            <CardTitle>Analytics Dashboard</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">Analytics dashboard will be implemented here.</p>
-            <p className="text-sm text-muted-foreground mt-2">This page will include charts, trends, and performance metrics.</p>
+            <p className="text-muted-foreground">Advanced analytics features will be implemented here.</p>
+            <p className="text-sm text-muted-foreground mt-2">This page will include sales charts, fuel type analysis, performance metrics, and trend analysis.</p>
           </CardContent>
         </Card>
       </div>

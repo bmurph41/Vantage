@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { FuelTypesResponse } from "@/types/fuel-api";
 import {
@@ -60,19 +60,18 @@ export function NewSaleModal({ isOpen, onClose }: NewSaleModalProps) {
   });
 
   const { data: fuelTypes = [] } = useQuery<FuelTypesResponse>({
-    queryKey: ['/api/operations/fuel/types'],
+    queryKey: ['/api/operations/fuel-types'],
   });
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/operations/fuel/transactions", data);
+      const response = await apiRequest("POST", "/api/operations/fuel-sales", data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel/transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel/dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel/analytics'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel/inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel-sales'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel-sales/stats/summary'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/operations/fuel-inventory'] });
       toast({
         title: "Success",
         description: "Sale recorded successfully!",
