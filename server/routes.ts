@@ -54,7 +54,9 @@ import {
   updateFuelDeliverySchema,
   fuelFinancialProjections,
   insertFuelProjectionSchema,
-  updateFuelProjectionSchema
+  updateFuelProjectionSchema,
+  fuelImportLogs,
+  insertFuelImportLogSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -10880,6 +10882,129 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error fetching fuel sales stats:", error);
       res.status(500).json({ message: "Failed to fetch fuel sales stats" });
+    }
+  });
+
+  // Import fuel sales from CSV
+  app.post("/api/operations/fuel-sales/import-csv", authenticateUser, async (req, res) => {
+    const startTime = new Date();
+    const errorLog: string[] = [];
+    let recordsProcessed = 0;
+    let recordsImported = 0;
+    let recordsSkipped = 0;
+    let recordsFailed = 0;
+
+    try {
+      const { data } = req.body;
+      
+      if (!data || !Array.isArray(data)) {
+        return res.status(400).json({ message: "Invalid request: 'data' array is required" });
+      }
+
+      recordsProcessed = data.length;
+
+      // Check for duplicates within the CSV data
+      const seen = new Set<string>();
+      const duplicateIndices = new Set<number>();
+
+      data.forEach((row, index) => {
+        const duplicateKey = `${row.transactionDate}|${row.customerName || ''}|${row.quantityGallons}`;
+        if (seen.has(duplicateKey)) {
+          duplicateIndices.add(index);
+        }
+        seen.add(duplicateKey);
+      });
+
+      // Process each row
+      const importPromises = data.map(async (row, index) => {
+        try {
+          // Skip duplicates
+          if (duplicateIndices.has(index)) {
+            recordsSkipped++;
+            return null;
+          }
+
+          // Validate and insert
+          const saleData = insertFuelSaleSchema.parse({
+            transactionDate: new Date(row.transactionDate),
+            fuelType: row.fuelType,
+            quantityGallons: row.quantityGallons,
+            pricePerGallon: row.pricePerGallon,
+            totalAmount: row.totalAmount,
+            customerName: row.customerName || null,
+            boatName: row.boatName || null,
+            slipNumber: row.slipNumber || null,
+            paymentMethod: row.paymentMethod || null,
+            processedBy: req.user!.id,
+            notes: row.notes || null,
+          });
+
+          const [sale] = await db.insert(fuelSales).values({
+            ...saleData,
+            orgId: req.user!.orgId,
+          }).returning();
+
+          recordsImported++;
+          return sale;
+        } catch (error: any) {
+          recordsFailed++;
+          errorLog.push(`Row ${index + 1}: ${error.message}`);
+          return null;
+        }
+      });
+
+      await Promise.all(importPromises);
+
+      // Create import log
+      await db.insert(fuelImportLogs).values({
+        orgId: req.user!.orgId,
+        source: 'csv_upload',
+        importType: 'manual_upload',
+        status: recordsFailed > 0 ? 'partial' : 'completed',
+        recordsProcessed,
+        recordsImported,
+        recordsSkipped,
+        recordsFailed,
+        errorLog: errorLog,
+        importData: {
+          fileName: 'manual_csv_upload',
+          totalRows: recordsProcessed,
+        },
+        startedAt: startTime,
+        completedAt: new Date(),
+        createdBy: req.user!.id,
+      });
+
+      res.json({
+        imported: recordsImported,
+        skipped: recordsSkipped,
+        errors: errorLog,
+      });
+    } catch (error: any) {
+      console.error("Error importing fuel sales:", error);
+      
+      // Log failed import
+      try {
+        await db.insert(fuelImportLogs).values({
+          orgId: req.user!.orgId,
+          source: 'csv_upload',
+          importType: 'manual_upload',
+          status: 'failed',
+          recordsProcessed,
+          recordsImported,
+          recordsSkipped,
+          recordsFailed,
+          errorLog: [...errorLog, error.message],
+          importData: {},
+          startedAt: startTime,
+          completedAt: new Date(),
+          createdBy: req.user!.id,
+        });
+      } catch (logError) {
+        console.error("Error creating import log:", logError);
+      }
+
+      res.status(500).json({ message: "Failed to import fuel sales", error: error.message });
     }
   });
 

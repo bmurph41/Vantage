@@ -4342,6 +4342,53 @@ export const fuelFinancialProjections = pgTable('fuel_financial_projections', {
   periodIdx: index('fuel_projections_period_idx').on(table.year, table.month),
 }));
 
+// Fuel Integrations - store external system connection settings
+export const fuelIntegrations = pgTable('fuel_integrations', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id).unique(),
+  provider: text('provider').notNull(), // 'fuelcloud', 'marinago', 'marinaoffice', 'dockwa', 'manual_csv'
+  isEnabled: boolean('is_enabled').notNull().default(false),
+  apiUrl: text('api_url'),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
+  lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
+  syncFrequency: integer('sync_frequency').default(15), // minutes
+  autoSyncEnabled: boolean('auto_sync_enabled').default(false),
+  fieldMapping: jsonb('field_mapping').default(sql`'{}'`), // maps external fields to internal schema
+  settings: jsonb('settings').default(sql`'{}'`), // provider-specific settings
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fuel_integrations_org_idx').on(table.orgId),
+  providerIdx: index('fuel_integrations_provider_idx').on(table.provider),
+}));
+
+// Fuel Import Logs - track all import/sync operations
+export const fuelImportLogs = pgTable('fuel_import_logs', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  integrationId: varchar('integration_id').references(() => fuelIntegrations.id),
+  source: text('source').notNull(), // 'fuelcloud_api', 'csv_upload', 'manual_entry', etc.
+  importType: text('import_type').notNull(), // 'full_sync', 'incremental', 'manual_upload'
+  status: text('status').notNull(), // 'pending', 'in_progress', 'completed', 'failed', 'partial'
+  recordsProcessed: integer('records_processed').default(0),
+  recordsImported: integer('records_imported').default(0),
+  recordsSkipped: integer('records_skipped').default(0),
+  recordsFailed: integer('records_failed').default(0),
+  errorLog: jsonb('error_log').default(sql`'[]'`), // array of error messages
+  importData: jsonb('import_data').default(sql`'{}'`), // summary of imported data
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fuel_import_logs_org_idx').on(table.orgId),
+  integrationIdx: index('fuel_import_logs_integration_idx').on(table.integrationId),
+  statusIdx: index('fuel_import_logs_status_idx').on(table.status),
+  dateIdx: index('fuel_import_logs_date_idx').on(table.startedAt),
+}));
+
 // Relations for Fuel Sales
 export const fuelSalesRelations = relations(fuelSales, ({ one }) => ({
   organization: one(organizations, {
@@ -4393,6 +4440,31 @@ export const fuelFinancialProjectionsRelations = relations(fuelFinancialProjecti
   organization: one(organizations, {
     fields: [fuelFinancialProjections.orgId],
     references: [organizations.id],
+  }),
+}));
+
+// Relations for Fuel Integrations
+export const fuelIntegrationsRelations = relations(fuelIntegrations, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [fuelIntegrations.orgId],
+    references: [organizations.id],
+  }),
+  importLogs: many(fuelImportLogs),
+}));
+
+// Relations for Fuel Import Logs
+export const fuelImportLogsRelations = relations(fuelImportLogs, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [fuelImportLogs.orgId],
+    references: [organizations.id],
+  }),
+  integration: one(fuelIntegrations, {
+    fields: [fuelImportLogs.integrationId],
+    references: [fuelIntegrations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [fuelImportLogs.createdBy],
+    references: [users.id],
   }),
 }));
 
@@ -4764,6 +4836,25 @@ export const insertFuelProjectionSchema = createInsertSchema(fuelFinancialProjec
 
 export const updateFuelProjectionSchema = insertFuelProjectionSchema.partial();
 
+// Fuel Integrations
+export const insertFuelIntegrationSchema = createInsertSchema(fuelIntegrations).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateFuelIntegrationSchema = insertFuelIntegrationSchema.partial();
+
+// Fuel Import Logs
+export const insertFuelImportLogSchema = createInsertSchema(fuelImportLogs).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+});
+
+export const updateFuelImportLogSchema = insertFuelImportLogSchema.partial();
+
 // RC Project profile validation (reuse same schema as SC)
 export const rcProjectProfileSchema = scProjectProfileSchema;
 export const rcWeightOverridesSchema = scWeightOverridesSchema;
@@ -4836,3 +4927,13 @@ export type UpdateFuelDelivery = z.infer<typeof updateFuelDeliverySchema>;
 export type FuelProjection = typeof fuelFinancialProjections.$inferSelect;
 export type InsertFuelProjection = z.infer<typeof insertFuelProjectionSchema>;
 export type UpdateFuelProjection = z.infer<typeof updateFuelProjectionSchema>;
+
+// Types for Fuel Integrations
+export type FuelIntegration = typeof fuelIntegrations.$inferSelect;
+export type InsertFuelIntegration = z.infer<typeof insertFuelIntegrationSchema>;
+export type UpdateFuelIntegration = z.infer<typeof updateFuelIntegrationSchema>;
+
+// Types for Fuel Import Logs
+export type FuelImportLog = typeof fuelImportLogs.$inferSelect;
+export type InsertFuelImportLog = z.infer<typeof insertFuelImportLogSchema>;
+export type UpdateFuelImportLog = z.infer<typeof updateFuelImportLogSchema>;

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/layout/header";
 import { NewSaleModal } from "@/components/fuel/new-sale-modal";
+import { CSVImportModal } from "@/components/fuel/csv-import-modal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import type { TransactionsResponse } from "@/types/fuel-api";
-import { CalendarIcon, Download, Filter, Search, X } from "lucide-react";
+import { CalendarIcon, Download, Filter, Search, X, Upload } from "lucide-react";
 import { format } from "date-fns";
 
 export default function Transactions() {
   const [isNewSaleModalOpen, setIsNewSaleModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
@@ -121,7 +123,15 @@ export default function Transactions() {
 
       <div className="p-6 space-y-6">
         {/* Actions */}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => setIsImportModalOpen(true)}
+            data-testid="button-import-csv"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Import CSV
+          </Button>
           <Button 
             onClick={() => setIsNewSaleModalOpen(true)}
             data-testid="button-new-sale"
@@ -338,6 +348,11 @@ export default function Transactions() {
       <NewSaleModal 
         isOpen={isNewSaleModalOpen}
         onClose={() => setIsNewSaleModalOpen(false)}
+      />
+
+      <CSVImportModal
+        open={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
       />
     </>
   );
