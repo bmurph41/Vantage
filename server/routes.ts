@@ -12,6 +12,7 @@ import { CSVImportService } from "./csv-import-service";
 import { DuplicateDetectionService } from "./duplicate-detection-service";
 import { CompanyLinkingService } from "./company-linking-service";
 import { CalendarService } from "./calendar-service";
+import { FuelSyncService } from "./services/fuel/fuel-sync-service";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
@@ -11534,9 +11535,11 @@ Current context: Project ${req.params.projectId}`;
         return res.status(403).json({ message: "Unauthorized" });
       }
 
+      const fuelSyncService = new FuelSyncService(storage);
+      const result = await fuelSyncService.testConnection(req.params.id);
+
       res.json({ 
-        success: true, 
-        message: "Connection test successful",
+        ...result,
         provider: integration.provider,
         timestamp: new Date().toISOString()
       });
@@ -11563,26 +11566,24 @@ Current context: Project ${req.params.projectId}`;
         return res.status(403).json({ message: "Unauthorized" });
       }
 
-      const importLog = await storage.createFuelImportLog({
-        orgId: req.user.orgId,
-        integrationId: integration.id,
-        source: `${integration.provider}_manual`,
-        importType: 'manual',
-        status: 'pending',
-        createdBy: req.user.id
-      });
-
-      await storage.updateFuelIntegration(integration.id, {
-        lastSyncAt: new Date()
-      });
+      // Start sync asynchronously - don't wait for completion
+      const fuelSyncService = new FuelSyncService(storage);
+      
+      // Run sync in background
+      fuelSyncService.syncIntegration(integration.id, req.user.id)
+        .then(result => {
+          console.log('Sync completed:', result);
+        })
+        .catch(error => {
+          console.error('Sync failed:', error);
+        });
 
       res.json({ 
         success: true,
-        message: "Sync initiated successfully",
-        importLogId: importLog.id
+        message: "Sync initiated successfully. Check Import History for progress."
       });
     } catch (error) {
-      console.error("Error syncing fuel integration:", error);
+      console.error("Error initiating fuel sync:", error);
       res.status(500).json({ 
         success: false,
         message: "Failed to initiate sync",
