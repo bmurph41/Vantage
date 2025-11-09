@@ -7,16 +7,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { InventoryResponse, DeliveriesResponse } from "@/types/fuel-api";
+import { getBusinessDay } from "@/lib/fuel-utils";
+import type { InventoryResponse, DeliveriesResponse, TransactionsResponse } from "@/types/fuel-api";
 import { 
   Package, 
   AlertTriangle, 
   TrendingDown, 
   Truck, 
   Edit3,
-  CheckCircle 
+  CheckCircle,
+  Activity,
+  DollarSign,
+  Calendar
 } from "lucide-react";
 
 export default function Inventory() {
@@ -32,6 +37,28 @@ export default function Inventory() {
 
   const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery<DeliveriesResponse>({
     queryKey: ['/api/operations/fuel-deliveries'],
+  });
+
+  const { data: transactions = [] } = useQuery<TransactionsResponse>({
+    queryKey: ['/api/operations/fuel-sales'],
+  });
+
+  // Calculate consumption rates by fuel type over last 30 days using EST timezone
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoBusinessDay = getBusinessDay(thirtyDaysAgo);
+  
+  const consumptionByFuelType = new Map();
+  transactions.filter(tx => getBusinessDay(new Date(tx.createdAt)) >= thirtyDaysAgoBusinessDay).forEach(tx => {
+    const fuelId = tx.fuelTypeId;
+    const existing = consumptionByFuelType.get(fuelId) || 0;
+    consumptionByFuelType.set(fuelId, existing + parseFloat(tx.gallons));
+  });
+
+  // Calculate daily consumption rate for each fuel type
+  const dailyConsumptionRates = new Map();
+  consumptionByFuelType.forEach((total, fuelId) => {
+    dailyConsumptionRates.set(fuelId, total / 30); // Average daily consumption
   });
 
   const updateInventoryMutation = useMutation({
@@ -78,8 +105,17 @@ export default function Inventory() {
     return Math.min((currentLevel / capacity) * 100, 100);
   };
 
-  const getDaysRemaining = (currentLevel: number, avgDaily: number = 500) => {
-    return Math.floor(currentLevel / avgDaily);
+  const getDaysRemaining = (currentLevel: number, fuelTypeId: string) => {
+    const dailyRate = dailyConsumptionRates.get(fuelTypeId) || 0;
+    if (dailyRate === 0) return 999; // No consumption data
+    return Math.floor(currentLevel / dailyRate);
+  };
+
+  const getProjectedDepletionDate = (daysRemaining: number) => {
+    const today = new Date();
+    const depletionDate = new Date(today);
+    depletionDate.setDate(depletionDate.getDate() + daysRemaining);
+    return depletionDate;
   };
 
   if (inventoryLoading || deliveriesLoading) {
@@ -117,7 +153,10 @@ export default function Inventory() {
             const reorderPoint = parseFloat(item.reorderPoint);
             const stockStatus = getStockStatus(currentLevel, reorderPoint);
             const stockPercentage = calculateStockPercentage(currentLevel, capacity);
-            const daysRemaining = getDaysRemaining(currentLevel);
+            const daysRemaining = getDaysRemaining(currentLevel, item.fuelTypeId);
+            const depletionDate = getProjectedDepletionDate(daysRemaining);
+            const dailyConsumption = dailyConsumptionRates.get(item.fuelTypeId) || 0;
+            const last30DaysConsumption = consumptionByFuelType.get(item.fuelTypeId) || 0;
 
             return (
               <Card key={item.id}>
@@ -141,9 +180,33 @@ export default function Inventory() {
                     <Progress value={stockPercentage} className="h-2" data-testid={`inventory-progress-${index}`} />
                     <div className="flex justify-between text-xs text-muted-foreground mt-1">
                       <span>{stockPercentage.toFixed(1)}% Full</span>
-                      <span>{daysRemaining} days remaining</span>
+                      <span>{daysRemaining < 999 ? `${daysRemaining} days remaining` : 'No consumption data'}</span>
                     </div>
                   </div>
+
+                  {/* Consumption Analytics */}
+                  {dailyConsumption > 0 && (
+                    <div className="bg-muted/30 p-3 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Activity className="w-3 h-3" />
+                          <span>Daily Consumption</span>
+                        </div>
+                        <span className="font-medium text-foreground">{dailyConsumption.toFixed(1)} gal/day</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Calendar className="w-3 h-3" />
+                          <span>Projected Depletion</span>
+                        </div>
+                        <span className="font-medium text-foreground">{depletionDate.toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Last 30 Days Total</span>
+                        <span className="font-medium text-foreground">{last30DaysConsumption.toFixed(0)} gal</span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Status Badge */}
                   <Badge 

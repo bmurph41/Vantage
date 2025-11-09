@@ -9,7 +9,8 @@ import { AddDeliveryModal } from "@/components/fuel/add-delivery-modal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { DashboardStats, SalesAnalytics, TransactionsResponse } from "@/types/fuel-api";
+import type { DashboardStats, TransactionsResponse } from "@/types/fuel-api";
+import { getBusinessDay } from "@/lib/fuel-utils";
 import { 
   DollarSign, 
   Fuel, 
@@ -27,15 +28,88 @@ export default function Dashboard() {
     queryKey: ['/api/operations/fuel-sales/stats/summary'],
   });
 
-  const { data: analytics, isLoading: analyticsLoading } = useQuery<SalesAnalytics>({
-    queryKey: ['/api/operations/fuel-analytics', { days: 30 }],
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<TransactionsResponse>({
+    queryKey: ['/api/operations/fuel-sales'],
   });
 
-  const { data: transactions, isLoading: transactionsLoading } = useQuery<TransactionsResponse>({
-    queryKey: ['/api/operations/fuel-sales', { limit: 10 }],
+  const { data: inventory = [] } = useQuery({
+    queryKey: ['/api/operations/fuel-inventory'],
   });
 
-  if (statsLoading || analyticsLoading || transactionsLoading) {
+  const { data: projections = [] } = useQuery({
+    queryKey: ['/api/operations/fuel-projections'],
+  });
+
+  // Calculate yesterday's data for comparison using EST timezone with 5pm cutoff
+  const todayBusinessDay = getBusinessDay(new Date());
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayBusinessDay = getBusinessDay(yesterdayDate);
+  
+  const todaysTransactions = transactions.filter(tx => 
+    getBusinessDay(new Date(tx.createdAt)) === todayBusinessDay
+  );
+  
+  const yesterdaysTransactions = transactions.filter(tx => 
+    getBusinessDay(new Date(tx.createdAt)) === yesterdayBusinessDay
+  );
+
+  const todaysSales = todaysTransactions.reduce((sum, tx) => sum + parseFloat(tx.totalAmount), 0);
+  const yesterdaysSales = yesterdaysTransactions.reduce((sum, tx) => sum + parseFloat(tx.totalAmount), 0);
+  const salesChange = yesterdaysSales > 0 ? ((todaysSales - yesterdaysSales) / yesterdaysSales) * 100 : 0;
+
+  const todaysGallons = todaysTransactions.reduce((sum, tx) => sum + parseFloat(tx.gallons), 0);
+  const yesterdaysGallons = yesterdaysTransactions.reduce((sum, tx) => sum + parseFloat(tx.gallons), 0);
+  const gallonsChange = yesterdaysGallons > 0 ? ((todaysGallons - yesterdaysGallons) / yesterdaysGallons) * 100 : 0;
+
+  const todaysAvgPrice = todaysGallons > 0 ? todaysSales / todaysGallons : 0;
+  const yesterdaysAvgPrice = yesterdaysGallons > 0 ? yesterdaysSales / yesterdaysGallons : 0;
+  const priceChange = yesterdaysAvgPrice > 0 ? ((todaysAvgPrice - yesterdaysAvgPrice) / yesterdaysAvgPrice) * 100 : 0;
+
+  // Calculate last 30 days for trending using EST timezone
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoBusinessDay = getBusinessDay(thirtyDaysAgo);
+  
+  const last30DaysTransactions = transactions.filter(tx => 
+    getBusinessDay(new Date(tx.createdAt)) >= thirtyDaysAgoBusinessDay
+  );
+
+  // Group by EST business day for trend chart
+  const dailyDataMap = new Map();
+  last30DaysTransactions.forEach(tx => {
+    const businessDay = getBusinessDay(new Date(tx.createdAt));
+    const existing = dailyDataMap.get(businessDay) || { date: businessDay, revenue: 0, gallons: 0 };
+    dailyDataMap.set(businessDay, {
+      date: businessDay,
+      revenue: existing.revenue + parseFloat(tx.totalAmount),
+      gallons: existing.gallons + parseFloat(tx.gallons),
+    });
+  });
+
+  const dailyData = Array.from(dailyDataMap.values()).sort((a, b) => 
+    a.date.localeCompare(b.date) // Sort by yyyy-MM-dd format
+  );
+
+  // Group by fuel type
+  const fuelTypeMap = new Map();
+  last30DaysTransactions.forEach(tx => {
+    const fuelName = tx.fuelType?.name || 'Unknown';
+    const existing = fuelTypeMap.get(fuelName) || { name: fuelName, value: 0 };
+    fuelTypeMap.set(fuelName, {
+      name: fuelName,
+      value: existing.value + parseFloat(tx.totalAmount),
+    });
+  });
+
+  const fuelTypeData = Array.from(fuelTypeMap.values());
+
+  // Calculate low stock alerts from inventory
+  const lowStockItems = inventory.filter((item: any) => 
+    parseFloat(item.currentLevel) < parseFloat(item.reorderPoint || '1000')
+  );
+
+  if (statsLoading || transactionsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader className="w-8 h-8 animate-spin" data-testid="loading-spinner" />
@@ -90,40 +164,40 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             title="Today's Sales"
-            value={`$${parseFloat(stats?.todaysSales || '0').toLocaleString()}`}
+            value={`$${todaysSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={<DollarSign className="w-6 h-6 text-accent" />}
             change={{
-              value: "+12.3%",
-              type: "increase",
+              value: `${salesChange >= 0 ? '+' : ''}${salesChange.toFixed(1)}%`,
+              type: salesChange >= 0 ? "increase" : "decrease",
               label: "vs yesterday"
             }}
           />
           <MetricCard
             title="Gallons Sold"
-            value={parseFloat(stats?.gallonsSold || '0').toLocaleString()}
+            value={todaysGallons.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             icon={<Fuel className="w-6 h-6 text-primary" />}
             change={{
-              value: "+8.1%",
-              type: "increase", 
+              value: `${gallonsChange >= 0 ? '+' : ''}${gallonsChange.toFixed(1)}%`,
+              type: gallonsChange >= 0 ? "increase" : "decrease", 
               label: "vs yesterday"
             }}
           />
           <MetricCard
             title="Avg Price/Gal"
-            value={`$${parseFloat(stats?.avgPricePerGallon || '0').toFixed(2)}`}
+            value={`$${todaysAvgPrice.toFixed(2)}`}
             icon={<TrendingUp className="w-6 h-6 text-orange-600" />}
             change={{
-              value: "-2.1%",
-              type: "decrease",
+              value: `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(1)}%`,
+              type: priceChange >= 0 ? "increase" : "decrease",
               label: "vs yesterday"
             }}
           />
           <MetricCard
             title="Inventory Level"
-            value={stats?.lowStockAlerts && stats.lowStockAlerts.length > 0 ? 'Low Stock' : 'Good'}
+            value={lowStockItems.length > 0 ? `${lowStockItems.length} Low` : 'Good'}
             icon={<Package className="w-6 h-6 text-yellow-600" />}
-            change={stats?.lowStockAlerts && stats.lowStockAlerts.length > 0 ? {
-              value: "Low Stock",
+            change={lowStockItems.length > 0 ? {
+              value: "Action Needed",
               type: "warning",
               label: "reorder soon"
             } : undefined}
@@ -131,12 +205,10 @@ export default function Dashboard() {
         </div>
 
         {/* Charts Row */}
-        {analytics && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SalesTrendChart data={analytics.daily || []} />
-            <FuelTypeChart data={analytics.fuelTypeBreakdown || []} />
-          </div>
-        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SalesTrendChart data={dailyData} />
+          <FuelTypeChart data={fuelTypeData} />
+        </div>
 
         {/* Recent Transactions */}
         <Card>
@@ -160,7 +232,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {transactions?.map((transaction, index) => (
+                  {transactions?.slice(0, 10).map((transaction, index) => (
                     <tr key={transaction.id} className="hover:bg-muted/30">
                       <td className="p-4 text-sm text-foreground" data-testid={`transaction-time-${index}`}>
                         {new Date(transaction.createdAt).toLocaleTimeString('en-US', { 
@@ -196,25 +268,48 @@ export default function Dashboard() {
         </Card>
 
         {/* Inventory Alerts */}
-        {stats?.lowStockAlerts && stats.lowStockAlerts.length > 0 && (
-          <Card>
+        {lowStockItems.length > 0 && (
+          <Card className="border-l-4 border-l-destructive">
             <CardHeader>
-              <CardTitle data-testid="inventory-alerts-title">Inventory Alerts</CardTitle>
+              <CardTitle data-testid="inventory-alerts-title" className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-destructive" />
+                Inventory Alerts
+                <Badge variant="destructive">{lowStockItems.length}</Badge>
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {stats.lowStockAlerts.map((alert, index) => (
-                <div key={alert.id} className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-destructive rounded-full mt-2 flex-shrink-0"></div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground" data-testid={`alert-fuel-${index}`}>
-                      {alert.fuelType?.name} Low
-                    </p>
-                    <p className="text-xs text-muted-foreground" data-testid={`alert-level-${index}`}>
-                      {parseFloat(alert.currentLevel).toLocaleString()} gallons remaining
-                    </p>
+              {lowStockItems.map((alert: any, index: number) => {
+                const currentLevel = parseFloat(alert.currentLevel);
+                const reorderPoint = parseFloat(alert.reorderPoint || '1000');
+                const percentRemaining = (currentLevel / reorderPoint) * 100;
+                
+                return (
+                  <div key={alert.id} className="flex items-start justify-between p-3 bg-muted/30 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-2 h-2 bg-destructive rounded-full mt-2 flex-shrink-0"></div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground" data-testid={`alert-fuel-${index}`}>
+                          {alert.fuelType?.name || 'Unknown Fuel'}
+                        </p>
+                        <p className="text-xs text-muted-foreground" data-testid={`alert-level-${index}`}>
+                          {currentLevel.toLocaleString()} gallons remaining ({percentRemaining.toFixed(0)}% of reorder point)
+                        </p>
+                        <p className="text-xs text-destructive mt-1">
+                          Reorder at: {reorderPoint.toLocaleString()} gallons
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setIsAddDeliveryModalOpen(true)}
+                      data-testid={`button-reorder-${index}`}
+                    >
+                      Order Now
+                    </Button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
         )}
@@ -224,7 +319,7 @@ export default function Dashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle data-testid="financial-projections-title">Financial Projections</CardTitle>
-              <p className="text-sm text-muted-foreground">Based on current trends and historical data</p>
+              <p className="text-sm text-muted-foreground">Based on last 30 days performance</p>
             </div>
             <Button 
               variant="secondary"
@@ -239,30 +334,26 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground mb-2">Projected Monthly Revenue</p>
-                <p className="text-2xl font-bold text-foreground" data-testid="projection-revenue">$87,420</p>
-                <div className="flex items-center justify-center mt-2">
-                  <TrendingUp className="w-3 h-3 text-accent mr-1" />
-                  <span className="text-accent text-sm font-medium">+15.2%</span>
-                  <span className="text-muted-foreground text-sm ml-2">vs last month</span>
-                </div>
+                <p className="text-2xl font-bold text-foreground" data-testid="projection-revenue">
+                  ${(last30DaysTransactions.reduce((sum, tx) => sum + parseFloat(tx.totalAmount), 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Based on last 30 days</p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-muted-foreground mb-2">Projected Gallons</p>
-                <p className="text-2xl font-bold text-foreground" data-testid="projection-gallons">38,245</p>
-                <div className="flex items-center justify-center mt-2">
-                  <TrendingUp className="w-3 h-3 text-accent mr-1" />
-                  <span className="text-accent text-sm font-medium">+12.8%</span>
-                  <span className="text-muted-foreground text-sm ml-2">vs last month</span>
-                </div>
+                <p className="text-2xl font-bold text-foreground" data-testid="projection-gallons">
+                  {last30DaysTransactions.reduce((sum, tx) => sum + parseFloat(tx.gallons), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Based on last 30 days</p>
               </div>
               <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-2">Profit Margin</p>
-                <p className="text-2xl font-bold text-foreground" data-testid="projection-margin">23.4%</p>
-                <div className="flex items-center justify-center mt-2">
-                  <TrendingUp className="w-3 h-3 text-accent mr-1" />
-                  <span className="text-accent text-sm font-medium">+1.2%</span>
-                  <span className="text-muted-foreground text-sm ml-2">vs last month</span>
-                </div>
+                <p className="text-sm text-muted-foreground mb-2">Avg Transaction Size</p>
+                <p className="text-2xl font-bold text-foreground" data-testid="projection-margin">
+                  ${last30DaysTransactions.length > 0 
+                    ? (last30DaysTransactions.reduce((sum, tx) => sum + parseFloat(tx.totalAmount), 0) / last30DaysTransactions.length).toFixed(2)
+                    : '0.00'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">{last30DaysTransactions.length} transactions</p>
               </div>
             </div>
           </CardContent>

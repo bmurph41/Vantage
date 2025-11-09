@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { TransactionsResponse } from "@/types/fuel-api";
+import { getBusinessDay, formatBusinessDay } from "@/lib/fuel-utils";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -25,22 +26,23 @@ export default function Analytics() {
 
   const fuelTypeColors = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
 
-  // Filter transactions by time range
+  // Filter transactions by time range using EST timezone
   const daysAgo = parseInt(timeRange);
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+  const cutoffBusinessDay = getBusinessDay(cutoffDate);
 
   const filteredTransactions = transactions.filter(tx => 
-    new Date(tx.createdAt) >= cutoffDate
+    getBusinessDay(new Date(tx.createdAt)) >= cutoffBusinessDay
   );
 
-  // Calculate daily data
+  // Calculate daily data using EST business days
   const dailyMap = new Map<string, { revenue: number; gallons: number; count: number }>();
   
   filteredTransactions.forEach(tx => {
-    const date = new Date(tx.createdAt).toLocaleDateString();
-    const existing = dailyMap.get(date) || { revenue: 0, gallons: 0, count: 0 };
-    dailyMap.set(date, {
+    const businessDay = getBusinessDay(new Date(tx.createdAt));
+    const existing = dailyMap.get(businessDay) || { revenue: 0, gallons: 0, count: 0 };
+    dailyMap.set(businessDay, {
       revenue: existing.revenue + parseFloat(tx.totalAmount),
       gallons: existing.gallons + parseFloat(tx.gallons),
       count: existing.count + 1,
@@ -48,13 +50,13 @@ export default function Analytics() {
   });
 
   const dailyData = Array.from(dailyMap.entries())
-    .map(([date, data]) => ({
-      date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    .sort((a, b) => a[0].localeCompare(b[0])) // Sort by yyyy-MM-dd first
+    .map(([businessDay, data]) => ({
+      date: formatBusinessDay(businessDay), // Format for display only
       revenue: data.revenue,
       gallons: data.gallons,
       count: data.count,
-    }))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }));
 
   // Calculate fuel type data
   const fuelTypeMap = new Map<string, { revenue: number; gallons: number; count: number }>();

@@ -7,17 +7,27 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import type { TransactionsResponse } from "@/types/fuel-api";
-import { CalendarIcon, Download, Filter, Search } from "lucide-react";
+import { CalendarIcon, Download, Filter, Search, X } from "lucide-react";
+import { format } from "date-fns";
 
 export default function Transactions() {
   const [isNewSaleModalOpen, setIsNewSaleModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
+  const [fuelTypeFilter, setFuelTypeFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
 
   const { data: transactions = [], isLoading } = useQuery<TransactionsResponse>({
-    queryKey: ['/api/operations/fuel-sales', { limit: 100 }],
+    queryKey: ['/api/operations/fuel-sales'],
+  });
+
+  const { data: fuelTypes = [] } = useQuery({
+    queryKey: ['/api/operations/fuel-types'],
   });
 
   const getPaymentMethodBadge = (method: string) => {
@@ -46,9 +56,53 @@ export default function Transactions() {
     
     const matchesStatus = !statusFilter || statusFilter === 'all' || transaction.status === statusFilter;
     const matchesPayment = !paymentFilter || paymentFilter === 'all' || transaction.paymentMethod === paymentFilter;
+    const matchesFuelType = !fuelTypeFilter || fuelTypeFilter === 'all' || transaction.fuelTypeId === fuelTypeFilter;
     
-    return matchesSearch && matchesStatus && matchesPayment;
+    const transactionDate = new Date(transaction.createdAt);
+    const matchesDateFrom = !dateFrom || transactionDate >= dateFrom;
+    const matchesDateTo = !dateTo || transactionDate <= dateTo;
+    
+    return matchesSearch && matchesStatus && matchesPayment && matchesFuelType && matchesDateFrom && matchesDateTo;
   }) || [];
+
+  const handleExportCSV = () => {
+    const headers = ['Date', 'Time', 'Customer Name', 'Customer Email', 'Fuel Type', 'Gallons', 'Price/Gal', 'Total Amount', 'Payment Method', 'Status'];
+    
+    const csvData = filteredTransactions.map(tx => [
+      new Date(tx.createdAt).toLocaleDateString(),
+      new Date(tx.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      tx.customerName || '',
+      tx.customerEmail || '',
+      tx.fuelType?.name || '',
+      parseFloat(tx.gallons).toFixed(1),
+      parseFloat(tx.pricePerGallon).toFixed(3),
+      parseFloat(tx.totalAmount).toFixed(2),
+      tx.paymentMethod,
+      tx.status
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `fuel-transactions-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("");
+    setPaymentFilter("");
+    setFuelTypeFilter("");
+    setDateFrom(undefined);
+    setDateTo(undefined);
+  };
 
   if (isLoading) {
     return (
@@ -78,18 +132,39 @@ export default function Transactions() {
 
         {/* Filters */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center" data-testid="filters-title">
               <Filter className="w-5 h-5 mr-2" />
               Filter Transactions
             </CardTitle>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportCSV}
+                disabled={filteredTransactions.length === 0}
+                data-testid="button-export"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV ({filteredTransactions.length})
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearFilters}
+                data-testid="button-clear-filters"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Clear Filters
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
-                  placeholder="Search customers or fuel types..."
+                  placeholder="Search customers..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -97,6 +172,18 @@ export default function Transactions() {
                 />
               </div>
               
+              <Select value={fuelTypeFilter} onValueChange={setFuelTypeFilter}>
+                <SelectTrigger data-testid="select-fuel-type-filter">
+                  <SelectValue placeholder="All fuel types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All fuel types</SelectItem>
+                  {fuelTypes.map((ft: any) => (
+                    <SelectItem key={ft.id} value={ft.id}>{ft.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger data-testid="select-status-filter">
                   <SelectValue placeholder="All statuses" />
@@ -121,15 +208,40 @@ export default function Transactions() {
                 </SelectContent>
               </Select>
 
-              <div className="flex space-x-2">
-                <Button variant="outline" size="sm" data-testid="button-date-filter">
-                  <CalendarIcon className="w-4 h-4 mr-2" />
-                  Date Range
-                </Button>
-                <Button variant="outline" size="sm" data-testid="button-export">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex-1" data-testid="button-date-from">
+                      <CalendarIcon className="w-4 h-4 mr-2" />
+                      {dateFrom ? format(dateFrom, 'MMM dd') : 'From'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={setDateFrom}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex-1" data-testid="button-date-to">
+                      <CalendarIcon className="w-4 h-4 mr-2" />
+                      {dateTo ? format(dateTo, 'MMM dd') : 'To'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={setDateTo}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </CardContent>
