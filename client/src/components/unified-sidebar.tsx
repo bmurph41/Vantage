@@ -318,10 +318,10 @@ export default function UnifiedSidebar() {
           ))}
         </div>
         
-        {/* Analysis Section */}
+        {/* Market Intel Section */}
         <div className="mb-2">
           <SectionHeader 
-            title="Analysis" 
+            title="Market Intel" 
             expanded={analysisExpanded} 
             onToggle={() => setAnalysisExpanded(!analysisExpanded)} 
           />
