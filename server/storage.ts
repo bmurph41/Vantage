@@ -10,6 +10,7 @@ import {
   calendarSettings,
   salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes, scPortfolios, scPortfolioComps, scPendingPropertyProfiles, scMetricSeries, scMetricPoints, scMetricAlerts,
   rateComps, rateCompColumns, rateCompImports, rcProjects, rcProjectComps, rcAuditLog, rcRecommendationFeedback, rcOrgPreferences, rcSavedSearches, rcCustomStorageTypes, rcPortfolios, rcPortfolioComps, rcPendingPropertyProfiles, rcMetricSeries, rcMetricPoints, rcMetricAlerts,
+  fuelIntegrations, fuelImportLogs,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
@@ -21,6 +22,7 @@ import {
   type CalendarSettings,
   type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScCustomStorageType, type ScPendingPropertyProfile, type ScMetricSeries, type ScMetricPoint, type ScMetricAlert,
   type RateComp, type RateCompColumn, type RateCompImport, type RcProject, type RcProjectComp, type RcAuditLog, type RcRecommendationFeedback, type RcOrgPreferences, type RcSavedSearch, type RcCustomStorageType, type RcPendingPropertyProfile, type RcMetricSeries, type RcMetricPoint, type RcMetricAlert,
+  type FuelIntegration, type FuelImportLog,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
@@ -40,7 +42,8 @@ import {
   type InsertRcProject, type UpdateRcProject, type InsertRcProjectComp, type UpdateRcProjectComp,
   type InsertRcRecommendationFeedback, type InsertRcOrgPreferences, type UpdateRcOrgPreferences,
   type InsertRcSavedSearch, type UpdateRcSavedSearch, type InsertRcCustomStorageType, type InsertRcPendingPropertyProfile,
-  type InsertRcMetricSeries, type UpdateRcMetricSeries, type InsertRcMetricPoint, type InsertRcMetricAlert, type UpdateRcMetricAlert
+  type InsertRcMetricSeries, type UpdateRcMetricSeries, type InsertRcMetricPoint, type InsertRcMetricAlert, type UpdateRcMetricAlert,
+  type InsertFuelIntegration, type UpdateFuelIntegration, type InsertFuelImportLog
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, isNull, or, count } from "drizzle-orm";
@@ -618,6 +621,19 @@ export interface IStorage {
   createRcPendingPropertyProfile(data: InsertRcPendingPropertyProfile): Promise<RcPendingPropertyProfile>;
   updateRcPendingPropertyProfile(id: string, data: Partial<InsertRcPendingPropertyProfile>): Promise<RcPendingPropertyProfile>;
   deleteRcPendingPropertyProfile(id: string): Promise<boolean>;
+
+  // Fuel Integrations
+  getFuelIntegration(orgId: string): Promise<FuelIntegration | undefined>;
+  getFuelIntegrationById(id: string): Promise<FuelIntegration | undefined>;
+  createFuelIntegration(data: InsertFuelIntegration): Promise<FuelIntegration>;
+  updateFuelIntegration(id: string, data: UpdateFuelIntegration): Promise<FuelIntegration | undefined>;
+  deleteFuelIntegration(id: string): Promise<boolean>;
+
+  // Fuel Import Logs
+  getFuelImportLogs(orgId: string, limit?: number): Promise<FuelImportLog[]>;
+  getFuelImportLogsByIntegration(integrationId: string, limit?: number): Promise<FuelImportLog[]>;
+  createFuelImportLog(data: InsertFuelImportLog): Promise<FuelImportLog>;
+  updateFuelImportLog(id: string, data: Partial<InsertFuelImportLog>): Promise<FuelImportLog | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4787,6 +4803,73 @@ export class DatabaseStorage implements IStorage {
       .where(eq(rcPendingPropertyProfiles.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  async getFuelIntegration(orgId: string): Promise<FuelIntegration | undefined> {
+    const [integration] = await db.select()
+      .from(fuelIntegrations)
+      .where(eq(fuelIntegrations.orgId, orgId));
+    return integration || undefined;
+  }
+
+  async getFuelIntegrationById(id: string): Promise<FuelIntegration | undefined> {
+    const [integration] = await db.select()
+      .from(fuelIntegrations)
+      .where(eq(fuelIntegrations.id, id));
+    return integration || undefined;
+  }
+
+  async createFuelIntegration(data: InsertFuelIntegration): Promise<FuelIntegration> {
+    const [created] = await db.insert(fuelIntegrations)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateFuelIntegration(id: string, data: UpdateFuelIntegration): Promise<FuelIntegration | undefined> {
+    const [updated] = await db.update(fuelIntegrations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(fuelIntegrations.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteFuelIntegration(id: string): Promise<boolean> {
+    const result = await db.delete(fuelIntegrations)
+      .where(eq(fuelIntegrations.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getFuelImportLogs(orgId: string, limit: number = 50): Promise<FuelImportLog[]> {
+    return await db.select()
+      .from(fuelImportLogs)
+      .where(eq(fuelImportLogs.orgId, orgId))
+      .orderBy(desc(fuelImportLogs.startedAt))
+      .limit(limit);
+  }
+
+  async getFuelImportLogsByIntegration(integrationId: string, limit: number = 50): Promise<FuelImportLog[]> {
+    return await db.select()
+      .from(fuelImportLogs)
+      .where(eq(fuelImportLogs.integrationId, integrationId))
+      .orderBy(desc(fuelImportLogs.startedAt))
+      .limit(limit);
+  }
+
+  async createFuelImportLog(data: InsertFuelImportLog): Promise<FuelImportLog> {
+    const [created] = await db.insert(fuelImportLogs)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateFuelImportLog(id: string, data: Partial<InsertFuelImportLog>): Promise<FuelImportLog | undefined> {
+    const [updated] = await db.update(fuelImportLogs)
+      .set(data)
+      .where(eq(fuelImportLogs.id, id))
+      .returning();
+    return updated || undefined;
   }
 }
 

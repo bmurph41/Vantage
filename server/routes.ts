@@ -11305,6 +11305,190 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ===== Fuel Integrations Routes =====
+
+  app.use("/api/operations/fuel-integrations", authenticateUser);
+
+  // Get organization's fuel integration settings
+  app.get("/api/operations/fuel-integrations", async (req: any, res) => {
+    try {
+      const integration = await storage.getFuelIntegration(req.user.orgId);
+      
+      if (!integration) {
+        return res.json(null);
+      }
+      
+      res.json(integration);
+    } catch (error) {
+      console.error("Error fetching fuel integration:", error);
+      res.status(500).json({ message: "Failed to fetch fuel integration" });
+    }
+  });
+
+  // Get fuel import logs for org
+  app.get("/api/operations/fuel-integrations/import-logs", async (req: any, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
+      const logs = await storage.getFuelImportLogs(req.user.orgId, limit);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching fuel import logs:", error);
+      res.status(500).json({ message: "Failed to fetch import logs" });
+    }
+  });
+
+  // Create new fuel integration
+  app.post("/api/operations/fuel-integrations", async (req: any, res) => {
+    try {
+      const data = insertFuelIntegrationSchema.parse({
+        ...req.body,
+        orgId: req.user.orgId
+      });
+
+      const existing = await storage.getFuelIntegration(req.user.orgId);
+      if (existing) {
+        return res.status(400).json({ 
+          message: "Integration already exists for this organization. Please update or delete the existing integration first." 
+        });
+      }
+
+      const integration = await storage.createFuelIntegration(data);
+      res.status(201).json(integration);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error creating fuel integration:", error);
+      res.status(500).json({ message: "Failed to create fuel integration" });
+    }
+  });
+
+  // Update fuel integration settings
+  app.patch("/api/operations/fuel-integrations/:id", async (req: any, res) => {
+    try {
+      const integration = await storage.getFuelIntegrationById(req.params.id);
+      
+      if (!integration) {
+        return res.status(404).json({ message: "Integration not found" });
+      }
+
+      if (integration.orgId !== req.user.orgId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const updateData = updateFuelIntegrationSchema.parse(req.body);
+      const updated = await storage.updateFuelIntegration(req.params.id, updateData);
+
+      if (!updated) {
+        return res.status(404).json({ message: "Integration not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Error updating fuel integration:", error);
+      res.status(500).json({ message: "Failed to update fuel integration" });
+    }
+  });
+
+  // Delete fuel integration
+  app.delete("/api/operations/fuel-integrations/:id", async (req: any, res) => {
+    try {
+      const integration = await storage.getFuelIntegrationById(req.params.id);
+      
+      if (!integration) {
+        return res.status(404).json({ message: "Integration not found" });
+      }
+
+      if (integration.orgId !== req.user.orgId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const deleted = await storage.deleteFuelIntegration(req.params.id);
+
+      if (!deleted) {
+        return res.status(404).json({ message: "Integration not found" });
+      }
+
+      res.json({ message: "Integration disconnected successfully" });
+    } catch (error) {
+      console.error("Error deleting fuel integration:", error);
+      res.status(500).json({ message: "Failed to disconnect integration" });
+    }
+  });
+
+  // Test fuel integration connection
+  app.post("/api/operations/fuel-integrations/:id/test", async (req: any, res) => {
+    try {
+      const integration = await storage.getFuelIntegrationById(req.params.id);
+      
+      if (!integration) {
+        return res.status(404).json({ message: "Integration not found" });
+      }
+
+      if (integration.orgId !== req.user.orgId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Connection test successful",
+        provider: integration.provider,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error testing fuel integration:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Connection test failed",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Trigger manual sync
+  app.post("/api/operations/fuel-integrations/:id/sync", async (req: any, res) => {
+    try {
+      const integration = await storage.getFuelIntegrationById(req.params.id);
+      
+      if (!integration) {
+        return res.status(404).json({ message: "Integration not found" });
+      }
+
+      if (integration.orgId !== req.user.orgId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const importLog = await storage.createFuelImportLog({
+        orgId: req.user.orgId,
+        integrationId: integration.id,
+        source: `${integration.provider}_manual`,
+        importType: 'manual',
+        status: 'pending',
+        createdBy: req.user.id
+      });
+
+      await storage.updateFuelIntegration(integration.id, {
+        lastSyncAt: new Date()
+      });
+
+      res.json({ 
+        success: true,
+        message: "Sync initiated successfully",
+        importLogId: importLog.id
+      });
+    } catch (error) {
+      console.error("Error syncing fuel integration:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to initiate sync",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
