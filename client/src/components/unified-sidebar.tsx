@@ -49,6 +49,7 @@ const fuelSalesNav = [
   { name: "Analytics", href: "/operations/fuel/analytics", icon: BarChart3 },
   { name: "Reports", href: "/operations/fuel/reports", icon: FileText },
   { name: "Financial Model", href: "/operations/fuel/financial-model", icon: Calculator },
+  { name: "Import History", href: "/operations/fuel/import-history", icon: History },
   { name: "Settings", href: "/operations/fuel/integration-settings", icon: Settings },
 ];
 

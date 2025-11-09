@@ -11305,6 +11305,108 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ==================== OPERATIONS - FUEL IMPORT LOGS ROUTES ====================
+
+  // Get all fuel import logs for organization with filters
+  app.get("/api/operations/fuel-import-logs", authenticateUser, async (req, res) => {
+    try {
+      const { startDate, endDate, source, status, limit = '100', offset = '0' } = req.query;
+      
+      let query = db.select()
+        .from(fuelImportLogs)
+        .where(eq(fuelImportLogs.orgId, req.user!.orgId))
+        .$dynamic();
+
+      // Apply filters
+      const conditions = [eq(fuelImportLogs.orgId, req.user!.orgId)];
+      
+      if (startDate) {
+        conditions.push(gte(fuelImportLogs.startedAt, new Date(startDate as string)));
+      }
+      if (endDate) {
+        conditions.push(lte(fuelImportLogs.startedAt, new Date(endDate as string)));
+      }
+      if (source) {
+        conditions.push(eq(fuelImportLogs.source, source as string));
+      }
+      if (status) {
+        conditions.push(eq(fuelImportLogs.status, status as string));
+      }
+
+      const logs = await db.select()
+        .from(fuelImportLogs)
+        .where(and(...conditions))
+        .orderBy(desc(fuelImportLogs.startedAt))
+        .limit(parseInt(limit as string))
+        .offset(parseInt(offset as string));
+
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching fuel import logs:", error);
+      res.status(500).json({ message: "Failed to fetch fuel import logs" });
+    }
+  });
+
+  // Get a single fuel import log by ID
+  app.get("/api/operations/fuel-import-logs/:id", authenticateUser, async (req, res) => {
+    try {
+      const [log] = await db.select()
+        .from(fuelImportLogs)
+        .where(and(
+          eq(fuelImportLogs.id, req.params.id),
+          eq(fuelImportLogs.orgId, req.user!.orgId)
+        ));
+
+      if (!log) {
+        return res.status(404).json({ message: "Import log not found" });
+      }
+
+      res.json(log);
+    } catch (error) {
+      console.error("Error fetching fuel import log:", error);
+      res.status(500).json({ message: "Failed to fetch fuel import log" });
+    }
+  });
+
+  // Get fuel import logs statistics
+  app.get("/api/operations/fuel-import-logs/stats", authenticateUser, async (req, res) => {
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      // Get all logs from last 30 days
+      const logs = await db.select()
+        .from(fuelImportLogs)
+        .where(and(
+          eq(fuelImportLogs.orgId, req.user!.orgId),
+          gte(fuelImportLogs.startedAt, thirtyDaysAgo)
+        ));
+
+      // Get latest log
+      const [latestLog] = await db.select()
+        .from(fuelImportLogs)
+        .where(eq(fuelImportLogs.orgId, req.user!.orgId))
+        .orderBy(desc(fuelImportLogs.startedAt))
+        .limit(1);
+
+      const totalImports = logs.length;
+      const successfulImports = logs.filter(l => l.status === 'completed').length;
+      const successRate = totalImports > 0 ? (successfulImports / totalImports) * 100 : 0;
+      const totalRecordsImported = logs.reduce((sum, l) => sum + (l.recordsImported || 0), 0);
+
+      res.json({
+        totalImports,
+        successRate: Math.round(successRate * 10) / 10,
+        totalRecordsImported,
+        latestSyncStatus: latestLog?.status || null,
+        latestSyncTime: latestLog?.startedAt || null,
+      });
+    } catch (error) {
+      console.error("Error fetching fuel import log stats:", error);
+      res.status(500).json({ message: "Failed to fetch fuel import log statistics" });
+    }
+  });
+
   // ===== Fuel Integrations Routes =====
 
   app.use("/api/operations/fuel-integrations", authenticateUser);
