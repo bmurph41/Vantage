@@ -1,27 +1,31 @@
-import { toZonedTime, zonedTimeToUtc, format as formatTz } from 'date-fns-tz';
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+import { format, addDays } from 'date-fns';
 
 // EST timezone with 5pm cutoff for business day
 const EST_TIMEZONE = 'America/New_York';
 const BUSINESS_DAY_CUTOFF_HOUR = 17; // 5pm
 
 export const getBusinessDay = (date: Date): string => {
-  const estDate = toZonedTime(date, EST_TIMEZONE);
-  const hour = estDate.getHours();
+  // Get the hour in EST timezone explicitly
+  const estHour = parseInt(formatInTimeZone(date, EST_TIMEZONE, 'H'), 10);
   
-  // If before 5pm, use current date; if after 5pm, use next day
-  if (hour < BUSINESS_DAY_CUTOFF_HOUR) {
-    return format(estDate, 'yyyy-MM-dd');
-  } else {
-    const nextDay = new Date(estDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-    return format(nextDay, 'yyyy-MM-dd');
+  // Get the date in EST timezone as yyyy-MM-dd
+  let estDateStr = formatInTimeZone(date, EST_TIMEZONE, 'yyyy-MM-dd');
+  
+  // If after 5pm EST, advance to next day
+  if (estHour >= BUSINESS_DAY_CUTOFF_HOUR) {
+    const [year, month, day] = estDateStr.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    const nextDay = addDays(dateObj, 1);
+    estDateStr = format(nextDay, 'yyyy-MM-dd');
   }
+  
+  return estDateStr;
 };
 
 export const formatBusinessDay = (businessDay: string): string => {
-  // Parse yyyy-MM-dd as EST midnight using zonedTimeToUtc to anchor in EST
-  // This ensures all users see the same calendar date regardless of their browser timezone
-  const estMidnight = zonedTimeToUtc(`${businessDay}T00:00:00`, EST_TIMEZONE);
-  return formatTz(estMidnight, 'MMM dd, yyyy', { timeZone: EST_TIMEZONE });
+  // Format yyyy-MM-dd in EST timezone for consistent display across all users
+  // Use UTC noon to avoid timezone edge cases when parsing the date string
+  const date = new Date(`${businessDay}T12:00:00Z`);
+  return formatInTimeZone(date, EST_TIMEZONE, 'MMM dd, yyyy');
 };
