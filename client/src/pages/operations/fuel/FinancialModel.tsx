@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useProjectionCalculator } from "@/hooks/use-projection-calculator";
 import { 
   Calculator, 
   TrendingUp, 
@@ -24,9 +25,6 @@ import {
 const projectionSchema = z.object({
   month: z.string().min(1, "Please select a month"),
   year: z.string().min(1, "Please enter a year"),
-  projectedRevenue: z.string().min(1, "Please enter projected revenue").refine((val) => parseFloat(val) > 0, "Revenue must be greater than 0"),
-  projectedGallons: z.string().min(1, "Please enter projected gallons").refine((val) => parseFloat(val) > 0, "Gallons must be greater than 0"),
-  projectedCosts: z.string().min(1, "Please enter projected costs").refine((val) => parseFloat(val) >= 0, "Costs must be valid"),
   growthRate: z.string().min(1, "Please enter growth rate").refine((val) => parseFloat(val) >= -100, "Growth rate must be valid"),
 });
 
@@ -46,17 +44,27 @@ export default function FinancialModel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const calculator = useProjectionCalculator();
+
   const form = useForm<z.infer<typeof projectionSchema>>({
     resolver: zodResolver(projectionSchema),
     defaultValues: {
       month: "",
       year: new Date().getFullYear().toString(),
-      projectedRevenue: "",
-      projectedGallons: "",
-      projectedCosts: "",
       growthRate: "0",
     },
   });
+
+  useEffect(() => {
+    if (!isAddProjectionOpen) {
+      calculator.reset();
+      form.reset({
+        month: "",
+        year: new Date().getFullYear().toString(),
+        growthRate: "0",
+      });
+    }
+  }, [isAddProjectionOpen]);
 
   const { data: projections = [], isLoading } = useQuery<FinancialProjection[]>({
     queryKey: ['/api/operations/fuel-projections'],
@@ -73,12 +81,10 @@ export default function FinancialModel() {
         title: "Success",
         description: "Financial projection added successfully!",
       });
+      calculator.reset();
       form.reset({
         month: "",
         year: new Date().getFullYear().toString(),
-        projectedRevenue: "",
-        projectedGallons: "",
-        projectedCosts: "",
         growthRate: "0",
       });
       setIsAddProjectionOpen(false);
@@ -114,26 +120,26 @@ export default function FinancialModel() {
   });
 
   const onSubmit = (data: z.infer<typeof projectionSchema>) => {
+    if (!calculator.values.revenue || !calculator.values.gallons || !calculator.values.costs) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all financial fields (Revenue, Gallons, Costs, or Profit Margin)",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const projectionData = {
       month: parseInt(data.month),
       year: parseInt(data.year),
-      projectedRevenue: data.projectedRevenue,
-      projectedGallons: data.projectedGallons,
-      projectedCosts: data.projectedCosts,
+      projectedRevenue: calculator.values.revenue,
+      projectedGallons: calculator.values.gallons,
+      projectedCosts: calculator.values.costs,
       growthRate: data.growthRate,
     };
 
     createProjectionMutation.mutate(projectionData);
   };
-
-  const watchedValues = form.watch();
-  const profitMargin = watchedValues.projectedRevenue && watchedValues.projectedCosts 
-    ? ((parseFloat(watchedValues.projectedRevenue) - parseFloat(watchedValues.projectedCosts)) / parseFloat(watchedValues.projectedRevenue) * 100).toFixed(1)
-    : "0";
-
-  const avgPricePerGallon = watchedValues.projectedRevenue && watchedValues.projectedGallons
-    ? (parseFloat(watchedValues.projectedRevenue) / parseFloat(watchedValues.projectedGallons)).toFixed(3)
-    : "0";
 
   const months = [
     "January", "February", "March", "April", "May", "June",
@@ -309,67 +315,85 @@ export default function FinancialModel() {
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="projectedRevenue"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Projected Revenue</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="10000"
-                              {...field}
-                              data-testid="input-projected-revenue"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Projected Revenue</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="25000"
+                        value={calculator.values.revenue}
+                        onChange={(e) => calculator.updateField('revenue', e.target.value)}
+                        data-testid="input-projected-revenue"
+                      />
+                    </div>
 
-                    <FormField
-                      control={form.control}
-                      name="projectedGallons"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Projected Gallons</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="3000"
-                              {...field}
-                              data-testid="input-projected-gallons"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Projected Gallons</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="6000"
+                        value={calculator.values.gallons}
+                        onChange={(e) => calculator.updateField('gallons', e.target.value)}
+                        data-testid="input-projected-gallons"
+                      />
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="projectedCosts"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Projected Costs</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="7000"
-                              {...field}
-                              data-testid="input-projected-costs"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Projected Costs</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="7000"
+                        value={calculator.values.costs}
+                        onChange={(e) => calculator.updateField('costs', e.target.value)}
+                        data-testid="input-projected-costs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">
+                        Profit Margin (%)
+                        <span className="ml-1 text-xs text-muted-foreground">Editable</span>
+                      </label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        placeholder="15"
+                        value={calculator.values.profitMargin}
+                        onChange={(e) => calculator.updateField('profitMargin', e.target.value)}
+                        data-testid="input-profit-margin"
+                        className="border-green-300 focus:border-green-500"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {calculator.values.profitMargin && parseFloat(calculator.values.profitMargin) > 0 
+                          ? `${parseFloat(calculator.values.profitMargin).toFixed(1)}% margin` 
+                          : 'Enter margin or let it calculate'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">
+                        Avg Price/Gal
+                        <span className="ml-1 text-xs text-muted-foreground">Editable</span>
+                      </label>
+                      <Input
+                        type="number"
+                        step="0.001"
+                        placeholder="4.167"
+                        value={calculator.values.avgPricePerGallon}
+                        onChange={(e) => calculator.updateField('avgPricePerGallon', e.target.value)}
+                        data-testid="input-avg-price-per-gallon"
+                        className="border-blue-300 focus:border-blue-500"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {calculator.values.avgPricePerGallon && parseFloat(calculator.values.avgPricePerGallon) > 0 
+                          ? `$${parseFloat(calculator.values.avgPricePerGallon).toFixed(3)}/gal` 
+                          : 'Enter price or let it calculate'}
+                      </p>
+                    </div>
 
                     <FormField
                       control={form.control}
@@ -381,7 +405,7 @@ export default function FinancialModel() {
                             <Input
                               type="number"
                               step="0.1"
-                              placeholder="5"
+                              placeholder="0"
                               {...field}
                               data-testid="input-growth-rate"
                             />
@@ -390,17 +414,6 @@ export default function FinancialModel() {
                         </FormItem>
                       )}
                     />
-
-                    <div className="flex items-end gap-2">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium mb-1">Profit Margin</p>
-                        <p className="text-2xl font-bold text-green-600">{profitMargin}%</p>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium mb-1">Avg Price/Gal</p>
-                        <p className="text-2xl font-bold">${avgPricePerGallon}</p>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="flex justify-end space-x-2">

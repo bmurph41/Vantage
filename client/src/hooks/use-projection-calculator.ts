@@ -28,11 +28,20 @@ export function useProjectionCalculator(initialValues?: Partial<ProjectionFields
   };
 
   const formatValue = (value: number, decimals: number = 2): string => {
+    if (!isFinite(value)) return '0';
     return value.toFixed(decimals);
+  };
+
+  const hasValue = (value: string): boolean => {
+    return value.trim() !== '';
   };
 
   const solve = useCallback((field: FieldName, newValue: string): ProjectionFields => {
     const updatedValues = { ...values, [field]: newValue };
+    
+    if (newValue.trim() === '') {
+      return updatedValues;
+    }
     
     const revenue = parseValue(updatedValues.revenue);
     const gallons = parseValue(updatedValues.gallons);
@@ -42,7 +51,7 @@ export function useProjectionCalculator(initialValues?: Partial<ProjectionFields
 
     switch (field) {
       case 'profitMargin': {
-        if (revenue > 0) {
+        if (revenue > 0 && updatedValues.profitMargin.trim() !== '') {
           const newCosts = revenue * (1 - margin / 100);
           updatedValues.costs = newCosts >= 0 ? formatValue(newCosts) : '0';
         }
@@ -53,33 +62,33 @@ export function useProjectionCalculator(initialValues?: Partial<ProjectionFields
       }
 
       case 'revenue': {
-        if (margin > 0) {
+        if (hasValue(updatedValues.profitMargin)) {
           const newCosts = revenue * (1 - margin / 100);
           updatedValues.costs = newCosts >= 0 ? formatValue(newCosts) : '0';
-        } else if (costs > 0 && revenue > 0) {
+        } else if (hasValue(updatedValues.costs) && revenue > 0) {
           const newMargin = ((revenue - costs) / revenue) * 100;
-          updatedValues.profitMargin = newMargin >= 0 ? formatValue(newMargin, 1) : '0';
+          updatedValues.profitMargin = formatValue(newMargin, 1);
         }
         
-        if (gallons > 0) {
+        if (gallons > 0 && revenue > 0) {
           updatedValues.avgPricePerGallon = formatValue(revenue / gallons, 3);
         }
         break;
       }
 
       case 'gallons': {
-        if (revenue > 0) {
+        if (revenue > 0 && gallons > 0) {
           updatedValues.avgPricePerGallon = formatValue(revenue / gallons, 3);
         } else if (avgPrice > 0 && gallons > 0) {
           const newRevenue = gallons * avgPrice;
           updatedValues.revenue = formatValue(newRevenue);
           
-          if (margin > 0) {
+          if (hasValue(updatedValues.profitMargin)) {
             const newCosts = newRevenue * (1 - margin / 100);
             updatedValues.costs = formatValue(newCosts);
-          } else if (costs > 0) {
+          } else if (hasValue(updatedValues.costs) && newRevenue > 0) {
             const newMargin = ((newRevenue - costs) / newRevenue) * 100;
-            updatedValues.profitMargin = newMargin >= 0 ? formatValue(newMargin, 1) : '0';
+            updatedValues.profitMargin = formatValue(newMargin, 1);
           }
         }
         break;
@@ -88,22 +97,22 @@ export function useProjectionCalculator(initialValues?: Partial<ProjectionFields
       case 'costs': {
         if (revenue > 0) {
           const newMargin = ((revenue - costs) / revenue) * 100;
-          updatedValues.profitMargin = newMargin >= 0 ? formatValue(newMargin, 1) : '0';
+          updatedValues.profitMargin = formatValue(newMargin, 1);
         }
         break;
       }
 
       case 'avgPricePerGallon': {
-        if (gallons > 0) {
+        if (gallons > 0 && avgPrice > 0) {
           const newRevenue = gallons * avgPrice;
           updatedValues.revenue = formatValue(newRevenue);
           
-          if (margin > 0) {
+          if (hasValue(updatedValues.profitMargin)) {
             const newCosts = newRevenue * (1 - margin / 100);
             updatedValues.costs = formatValue(newCosts);
-          } else if (costs > 0) {
+          } else if (hasValue(updatedValues.costs) && newRevenue > 0) {
             const newMargin = ((newRevenue - costs) / newRevenue) * 100;
-            updatedValues.profitMargin = newMargin >= 0 ? formatValue(newMargin, 1) : '0';
+            updatedValues.profitMargin = formatValue(newMargin, 1);
           }
         }
         break;
