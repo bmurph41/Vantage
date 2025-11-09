@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { QuickBooksExportDialog } from "@/components/fuel/quickbooks-export-dialog";
 import type { TransactionsResponse, InventoryResponse, DeliveriesResponse } from "@/types/fuel-api";
 import { 
   FileText, 
@@ -21,6 +22,7 @@ export default function Reports() {
   const [dateRange, setDateRange] = useState("30");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [showQuickBooksDialog, setShowQuickBooksDialog] = useState(false);
 
   const { data: transactions, isLoading: transactionsLoading } = useQuery<TransactionsResponse>({
     queryKey: ['/api/operations/fuel-sales'],
@@ -173,7 +175,15 @@ export default function Reports() {
               )}
             </div>
 
-            <div className="flex justify-end mt-4">
+            <div className="flex justify-end gap-2 mt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowQuickBooksDialog(true)} 
+                data-testid="button-export-quickbooks"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export to QuickBooks
+              </Button>
               <Button onClick={exportReport} data-testid="button-export-report">
                 <Download className="w-4 h-4 mr-2" />
                 Export to CSV
@@ -373,6 +383,11 @@ export default function Reports() {
           </CardContent>
         </Card>
       </div>
+
+      <QuickBooksExportDialog 
+        open={showQuickBooksDialog} 
+        onOpenChange={setShowQuickBooksDialog} 
+      />
     </>
   );
 }

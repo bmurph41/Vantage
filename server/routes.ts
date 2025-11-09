@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, and, or, desc, asc } from "drizzle-orm";
+import { eq, and, or, desc, asc, gte, lte } from "drizzle-orm";
 import { resolveRecipient } from "@shared/recipient-utils";
 import { AIRiskAnalyzer } from "./ai-risk-analyzer";
 import { AINotesEnhancer } from "./ai-notes-enhancer";
@@ -11489,8 +11489,201 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ===== QuickBooks Export Routes =====
+
+  // Preview QuickBooks export data
+  app.post("/api/operations/fuel-sales/export-quickbooks/preview", authenticateUser, async (req: any, res) => {
+    try {
+      const { startDate, endDate, accountMappings, format } = req.body;
+
+      if (!startDate || !endDate || !accountMappings) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const sales = await db.select()
+        .from(fuelSales)
+        .where(
+          and(
+            eq(fuelSales.orgId, req.user.orgId),
+            and(
+              gte(fuelSales.transactionDate, new Date(startDate)),
+              lte(fuelSales.transactionDate, new Date(endDate + 'T23:59:59'))
+            )
+          )
+        )
+        .orderBy(fuelSales.transactionDate);
+
+      const preview = generateQuickBooksPreview(sales, accountMappings, format);
+      res.json({ preview: preview.slice(0, 10) });
+    } catch (error) {
+      console.error("Error generating QuickBooks preview:", error);
+      res.status(500).json({ error: "Failed to generate preview" });
+    }
+  });
+
+  // Export QuickBooks CSV
+  app.post("/api/operations/fuel-sales/export-quickbooks", authenticateUser, async (req: any, res) => {
+    try {
+      const { startDate, endDate, accountMappings, format, saveSettings } = req.body;
+
+      if (!startDate || !endDate || !accountMappings) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const sales = await db.select()
+        .from(fuelSales)
+        .where(
+          and(
+            eq(fuelSales.orgId, req.user.orgId),
+            and(
+              gte(fuelSales.transactionDate, new Date(startDate)),
+              lte(fuelSales.transactionDate, new Date(endDate + 'T23:59:59'))
+            )
+          )
+        )
+        .orderBy(fuelSales.transactionDate);
+
+      if (sales.length === 0) {
+        return res.status(404).json({ error: "No sales data found for the selected date range" });
+      }
+
+      if (saveSettings) {
+        const existingIntegration = await storage.getFuelIntegration(req.user.orgId);
+        
+        if (existingIntegration) {
+          await storage.updateFuelIntegration(existingIntegration.id, {
+            settings: {
+              ...existingIntegration.settings,
+              accountMappings
+            }
+          });
+        } else {
+          await storage.createFuelIntegration({
+            orgId: req.user.orgId,
+            provider: 'quickbooks',
+            isEnabled: true,
+            settings: { accountMappings }
+          });
+        }
+      }
+
+      const csv = generateQuickBooksCSV(sales, accountMappings, format);
+      const filename = `fuel-sales-quickbooks-${new Date().toISOString().split('T')[0]}.csv`;
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(csv);
+    } catch (error) {
+      console.error("Error exporting QuickBooks data:", error);
+      res.status(500).json({ error: "Failed to export data" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
+}
+
+// Helper function to generate QuickBooks CSV preview
+function generateQuickBooksPreview(sales: any[], accountMappings: any, format: string) {
+  const grouped = groupSalesByDateAndType(sales);
+  const preview = [];
+
+  for (const group of grouped.slice(0, 5)) {
+    const fuelTypeMap: Record<string, string> = {
+      'diesel': accountMappings.diesel,
+      'regular_gas': accountMappings.regularGas,
+      'premium_gas': accountMappings.premiumGas,
+      'ethanol_free': accountMappings.ethanolFree,
+    };
+
+    const revenueAccount = fuelTypeMap[group.fuelType] || '4000';
+    const arAccount = accountMappings.accountsReceivable || '1200';
+    const amount = parseFloat(group.totalAmount).toFixed(2);
+    const fuelTypeName = group.fuelType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const memo = `Fuel Sales - ${fuelTypeName} (${group.count} transactions)`;
+
+    preview.push({
+      date: group.date,
+      account: arAccount,
+      debit: amount,
+      credit: '',
+      memo,
+      name: 'Marina Operations',
+      class: 'Fuel',
+    });
+
+    preview.push({
+      date: group.date,
+      account: revenueAccount,
+      debit: '',
+      credit: amount,
+      memo,
+      name: 'Marina Operations',
+      class: 'Fuel',
+    });
+  }
+
+  return preview;
+}
+
+// Helper function to generate QuickBooks CSV
+function generateQuickBooksCSV(sales: any[], accountMappings: any, format: string): string {
+  const grouped = groupSalesByDateAndType(sales);
+  const rows = [];
+
+  rows.push('Date,Account,Debit,Credit,Memo,Name,Class');
+
+  for (const group of grouped) {
+    const fuelTypeMap: Record<string, string> = {
+      'diesel': accountMappings.diesel,
+      'regular_gas': accountMappings.regularGas,
+      'premium_gas': accountMappings.premiumGas,
+      'ethanol_free': accountMappings.ethanolFree,
+    };
+
+    const revenueAccount = fuelTypeMap[group.fuelType] || '4000';
+    const arAccount = accountMappings.accountsReceivable || '1200';
+    const amount = parseFloat(group.totalAmount).toFixed(2);
+    const fuelTypeName = group.fuelType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const memo = `Fuel Sales - ${fuelTypeName} (${group.count} transactions)`;
+
+    rows.push(`${group.date},${arAccount},${amount},,${memo},Marina Operations,Fuel`);
+    rows.push(`${group.date},${revenueAccount},,${amount},${memo},Marina Operations,Fuel`);
+  }
+
+  return rows.join('\n');
+}
+
+// Helper function to group sales by date and fuel type
+function groupSalesByDateAndType(sales: any[]): Array<{
+  date: string;
+  fuelType: string;
+  totalAmount: string;
+  gallons: string;
+  count: number;
+}> {
+  const groups: Record<string, any> = {};
+
+  for (const sale of sales) {
+    const date = new Date(sale.transactionDate).toISOString().split('T')[0];
+    const key = `${date}_${sale.fuelType}`;
+
+    if (!groups[key]) {
+      groups[key] = {
+        date,
+        fuelType: sale.fuelType,
+        totalAmount: '0',
+        gallons: '0',
+        count: 0,
+      };
+    }
+
+    groups[key].totalAmount = (parseFloat(groups[key].totalAmount) + parseFloat(sale.totalAmount)).toFixed(2);
+    groups[key].gallons = (parseFloat(groups[key].gallons) + parseFloat(sale.quantityGallons)).toFixed(2);
+    groups[key].count += 1;
+  }
+
+  return Object.values(groups).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 // Helper function to generate ICS format
