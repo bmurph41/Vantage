@@ -13,6 +13,7 @@ import { DuplicateDetectionService } from "./duplicate-detection-service";
 import { CompanyLinkingService } from "./company-linking-service";
 import { CalendarService } from "./calendar-service";
 import { FuelSyncService } from "./services/fuel/fuel-sync-service";
+import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/duplicate-finder";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
@@ -8392,6 +8393,64 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error fetching pending properties:", error);
       res.status(500).json({ message: "Failed to fetch pending properties" });
+    }
+  });
+
+  // Find all potential duplicates for a pending property with similarity scores
+  app.get('/api/pending-properties/:id/all-duplicates', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      // Get the pending property
+      const pending = await storage.getPendingProperty(id, orgId);
+      if (!pending) {
+        return res.status(404).json({ message: "Pending property not found" });
+      }
+
+      // Get all properties for this organization
+      const allProperties = await storage.getPropertiesForOrg(orgId);
+
+      // Helper function to parse currency strings
+      const parseCurrency = (value: string | number | null | undefined): number | null => {
+        if (!value) return null;
+        if (typeof value === 'number') return value;
+        // Remove currency symbols, commas, and whitespace
+        const cleaned = value.replace(/[$,\s]/g, '');
+        const parsed = parseFloat(cleaned);
+        return isNaN(parsed) ? null : parsed;
+      };
+
+      // Normalize properties with parsed prices
+      const normalizedProperties = allProperties.map(prop => ({
+        ...prop,
+        listingPrice: parseCurrency(prop.listingPrice)?.toString() || null
+      }));
+
+      // Find all potential duplicates with similarity scoring
+      const duplicateMatches = findAllPotentialDuplicates(
+        pending.marinaName,
+        pending.city,
+        pending.state,
+        pending.salePrice,
+        normalizedProperties as any,
+        30 // Minimum 30% similarity threshold
+      );
+
+      // Format the response with explanations
+      const enhancedMatches = duplicateMatches.map(match => ({
+        ...match,
+        explanation: getDuplicateExplanation(match)
+      }));
+
+      res.json({
+        pendingProperty: pending,
+        totalMatches: enhancedMatches.length,
+        matches: enhancedMatches
+      });
+    } catch (error) {
+      console.error("Error finding duplicate properties:", error);
+      res.status(500).json({ message: "Failed to find duplicate properties" });
     }
   });
 

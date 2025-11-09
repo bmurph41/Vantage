@@ -75,6 +75,19 @@ type Property = {
   state?: string;
 };
 
+type DuplicateMatch = {
+  property: Property;
+  similarityScore: number;
+  matchReasons: string[];
+  matchDetails: {
+    nameMatch: number;
+    locationMatch: number;
+    priceMatch?: number;
+    overallConfidence: 'high' | 'medium' | 'low';
+  };
+  explanation: string;
+};
+
 type SalesComp = {
   id: string;
   marina: string;
@@ -107,10 +120,14 @@ export function PendingPropertyDetailDialog({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch duplicate properties
-  const { data: properties = [] } = useQuery<Property[]>({
-    queryKey: ['/api/properties'],
-    enabled: open,
+  // Fetch ALL potential duplicates with similarity scores
+  const { data: duplicateData, isLoading: duplicatesLoading } = useQuery<{
+    pendingProperty: PendingProperty;
+    totalMatches: number;
+    matches: DuplicateMatch[];
+  }>({
+    queryKey: ['/api/pending-properties', pending?.id, 'all-duplicates'],
+    enabled: !!pending?.id && open,
   });
 
   // Fetch sales comp details
@@ -196,8 +213,25 @@ export function PendingPropertyDetailDialog({
 
   if (!pending) return null;
 
-  const getSuggestedProperties = () => {
-    return properties.filter(p => pending.suggestedDuplicates.includes(p.id));
+  const allMatches = duplicateData?.matches || [];
+  const highConfidenceMatches = allMatches.filter(m => m.matchDetails.overallConfidence === 'high');
+  const mediumConfidenceMatches = allMatches.filter(m => m.matchDetails.overallConfidence === 'medium');
+  const lowConfidenceMatches = allMatches.filter(m => m.matchDetails.overallConfidence === 'low');
+
+  const getConfidenceBadgeVariant = (confidence: 'high' | 'medium' | 'low') => {
+    switch (confidence) {
+      case 'high': return 'destructive';
+      case 'medium': return 'default';
+      case 'low': return 'secondary';
+    }
+  };
+
+  const getConfidenceColor = (confidence: 'high' | 'medium' | 'low') => {
+    switch (confidence) {
+      case 'high': return 'text-red-600';
+      case 'medium': return 'text-yellow-600';
+      case 'low': return 'text-blue-600';
+    }
   };
 
   const formatCurrency = (amount: number | null | undefined) => {
@@ -259,11 +293,13 @@ export function PendingPropertyDetailDialog({
               <TabsTrigger value="duplicates" data-testid="tab-duplicates">
                 <div className="flex items-center gap-2">
                   Duplicates
-                  {pending.suggestedDuplicates?.length > 0 && (
+                  {duplicatesLoading ? (
+                    <Badge variant="secondary" className="ml-1">...</Badge>
+                  ) : allMatches.length > 0 ? (
                     <Badge variant="destructive" className="ml-1">
-                      {pending.suggestedDuplicates.length}
+                      {allMatches.length}
                     </Badge>
-                  )}
+                  ) : null}
                 </div>
               </TabsTrigger>
             </TabsList>
@@ -436,7 +472,11 @@ export function PendingPropertyDetailDialog({
             </TabsContent>
 
             <TabsContent value="duplicates" className="flex-1 overflow-hidden flex flex-col mt-4">
-              {pending.suggestedDuplicates?.length === 0 ? (
+              {duplicatesLoading ? (
+                <div className="flex items-center justify-center h-64 text-muted-foreground">
+                  Loading duplicate matches...
+                </div>
+              ) : allMatches.length === 0 ? (
                 <div className="flex items-center justify-center h-64 text-muted-foreground">
                   No potential duplicates found
                 </div>
@@ -444,10 +484,27 @@ export function PendingPropertyDetailDialog({
                 <div className="flex-1 overflow-hidden flex flex-col space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold">Potential Duplicates</h3>
+                      <h3 className="text-lg font-semibold">All Potential Duplicates ({allMatches.length})</h3>
                       <p className="text-sm text-muted-foreground">
-                        Select a property to merge with or manage duplicate comps
+                        Every property that could be a duplicate, sorted by similarity
                       </p>
+                      <div className="flex gap-2 mt-2">
+                        {highConfidenceMatches.length > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            {highConfidenceMatches.length} High Confidence
+                          </Badge>
+                        )}
+                        {mediumConfidenceMatches.length > 0 && (
+                          <Badge variant="default" className="text-xs">
+                            {mediumConfidenceMatches.length} Medium
+                          </Badge>
+                        )}
+                        {lowConfidenceMatches.length > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {lowConfidenceMatches.length} Low
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     {selectedDuplicateId && (
                       <Button
@@ -463,45 +520,91 @@ export function PendingPropertyDetailDialog({
 
                   <ScrollArea className="flex-1 pr-4">
                     <div className="space-y-3">
-                      {getSuggestedProperties().map((prop) => (
+                      {allMatches.map((match) => (
                         <div
-                          key={prop.id}
+                          key={match.property.id}
                           className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                            selectedDuplicateId === prop.id
+                            selectedDuplicateId === match.property.id
                               ? 'border-primary bg-primary/5'
                               : 'hover:border-primary/50'
                           }`}
                           onClick={() => setSelectedDuplicateId(
-                            selectedDuplicateId === prop.id ? null : prop.id
+                            selectedDuplicateId === match.property.id ? null : match.property.id
                           )}
-                          data-testid={`duplicate-${prop.id}`}
+                          data-testid={`duplicate-${match.property.id}`}
                         >
-                          <div className="flex items-start justify-between">
+                          <div className="flex items-start justify-between mb-3">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
-                                <h4 className="font-medium">{prop.title}</h4>
-                                <Badge variant="secondary">{prop.status}</Badge>
-                                {selectedDuplicateId === prop.id && (
+                                <h4 className="font-medium">{match.property.title}</h4>
+                                <Badge variant="secondary">{match.property.status}</Badge>
+                                <Badge variant={getConfidenceBadgeVariant(match.matchDetails.overallConfidence)}>
+                                  {match.similarityScore}% Match
+                                </Badge>
+                                {selectedDuplicateId === match.property.id && (
                                   <Badge variant="default">Selected</Badge>
                                 )}
                               </div>
                               <div className="space-y-1 text-sm text-muted-foreground">
-                                {prop.address && (
+                                {match.property.address && (
                                   <div className="flex items-center gap-1">
                                     <MapPin className="h-3 w-3" />
-                                    {prop.address}
+                                    {match.property.address}
                                   </div>
                                 )}
-                                {prop.city && prop.state && (
-                                  <div>Location: {prop.city}, {prop.state}</div>
+                                {match.property.city && match.property.state && (
+                                  <div>Location: {match.property.city}, {match.property.state}</div>
                                 )}
-                                {prop.listingPrice && (
+                                {match.property.listingPrice && (
                                   <div className="flex items-center gap-1">
                                     <DollarSign className="h-3 w-3" />
-                                    {formatCurrency(parseInt(prop.listingPrice))}
+                                    {formatCurrency(parseInt(match.property.listingPrice))}
                                   </div>
                                 )}
                               </div>
+                            </div>
+                          </div>
+
+                          {/* Similarity breakdown */}
+                          <div className="space-y-2 border-t pt-3 mt-3">
+                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              Match Analysis
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground">Name</div>
+                                <div className={`font-semibold ${match.matchDetails.nameMatch >= 80 ? 'text-green-600' : match.matchDetails.nameMatch >= 60 ? 'text-yellow-600' : 'text-gray-600'}`}>
+                                  {match.matchDetails.nameMatch}%
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-muted-foreground">Location</div>
+                                <div className={`font-semibold ${match.matchDetails.locationMatch >= 80 ? 'text-green-600' : match.matchDetails.locationMatch >= 60 ? 'text-yellow-600' : 'text-gray-600'}`}>
+                                  {match.matchDetails.locationMatch}%
+                                </div>
+                              </div>
+                              {match.matchDetails.priceMatch !== undefined && (
+                                <div className="space-y-1">
+                                  <div className="text-muted-foreground">Price</div>
+                                  <div className={`font-semibold ${match.matchDetails.priceMatch >= 80 ? 'text-green-600' : match.matchDetails.priceMatch >= 60 ? 'text-yellow-600' : 'text-gray-600'}`}>
+                                    {match.matchDetails.priceMatch}%
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Match reasons */}
+                            {match.matchReasons.length > 0 && (
+                              <div className="mt-2">
+                                <div className="text-xs text-muted-foreground">
+                                  {match.matchReasons.join(' • ')}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Explanation */}
+                            <div className={`text-xs ${getConfidenceColor(match.matchDetails.overallConfidence)} bg-opacity-10 p-2 rounded`}>
+                              {match.explanation}
                             </div>
                           </div>
                         </div>
