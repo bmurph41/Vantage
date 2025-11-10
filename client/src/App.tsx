@@ -48,6 +48,7 @@ import FuelSalesReports from "@/pages/operations/fuel/Reports";
 import FuelSalesFinancialModel from "@/pages/operations/fuel/FinancialModel";
 import FuelSalesSettings from "@/pages/operations/fuel/Settings";
 import FuelSalesImportHistory from "@/pages/operations/fuel/ImportHistory";
+import FuelSalesAuditTrail from "@/pages/operations/fuel/AuditTrail";
 // Analysis / Sales Comps pages
 import SalesCompsIndex from "@/pages/analysis/sales-comps/Index";
 import SalesCompsDetail from "@/pages/analysis/sales-comps/Detail";
@@ -245,6 +246,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <FuelSalesImportHistory />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/fuel/audit-trail">
+        {() => (
+          <UnifiedLayout>
+            <FuelSalesAuditTrail />
           </UnifiedLayout>
         )}
       </Route>

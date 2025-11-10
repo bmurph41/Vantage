@@ -12037,6 +12037,97 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ===== Audit Trail Routes =====
+
+  // Get audit logs with filters
+  app.get("/api/operations/fuel/audit-logs", authenticateUser, requirePermission('fuel:read', 'audit:read'), async (req: any, res) => {
+    try {
+      const { 
+        entityType, 
+        userId, 
+        action, 
+        startDate, 
+        endDate,
+        limit = 100,
+        offset = 0 
+      } = req.query;
+
+      // Validate limit and offset
+      const validLimit = Math.min(Math.max(parseInt(limit as string) || 100, 1), 500);
+      const validOffset = Math.max(parseInt(offset as string) || 0, 0);
+
+      let query = db
+        .select({
+          id: auditLogs.id,
+          action: auditLogs.action,
+          entityType: auditLogs.entityType,
+          entityId: auditLogs.entityId,
+          userId: auditLogs.userId,
+          username: users.username,
+          userEmail: users.email,
+          beforeState: auditLogs.beforeState,
+          afterState: auditLogs.afterState,
+          metadata: auditLogs.metadata,
+          ipAddress: auditLogs.ipAddress,
+          timestamp: auditLogs.timestamp,
+        })
+        .from(auditLogs)
+        .leftJoin(users, eq(auditLogs.userId, users.id))
+        .where(eq(auditLogs.orgId, req.user.orgId))
+        .orderBy(desc(auditLogs.timestamp))
+        .$dynamic();
+
+      // Apply filters
+      const conditions = [eq(auditLogs.orgId, req.user.orgId)];
+      
+      if (entityType) {
+        conditions.push(eq(auditLogs.entityType, entityType as string));
+      }
+      
+      if (userId) {
+        conditions.push(eq(auditLogs.userId, userId as string));
+      }
+      
+      if (action) {
+        conditions.push(eq(auditLogs.action, action as string));
+      }
+      
+      if (startDate) {
+        conditions.push(gte(auditLogs.timestamp, new Date(startDate as string)));
+      }
+      
+      if (endDate) {
+        const endDateTime = new Date(endDate as string);
+        endDateTime.setHours(23, 59, 59, 999);
+        conditions.push(lte(auditLogs.timestamp, endDateTime));
+      }
+
+      if (conditions.length > 1) {
+        query = query.where(and(...conditions));
+      }
+
+      const logs = await query
+        .limit(validLimit)
+        .offset(validOffset);
+
+      // Get total count for pagination
+      const countResult = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(auditLogs)
+        .where(conditions.length > 1 ? and(...conditions) : conditions[0]);
+
+      res.json({
+        logs,
+        total: Number(countResult[0]?.count || 0),
+        limit: validLimit,
+        offset: validOffset,
+      });
+    } catch (error) {
+      console.error("Error fetching audit logs:", error);
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
   // ===== User Role Management Routes =====
 
   // Get all users in the organization with their current roles

@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -50,6 +50,7 @@ const fuelSalesNav = [
   { name: "Reports", href: "/operations/fuel/reports", icon: FileText },
   { name: "Financial Model", href: "/operations/fuel/financial-model", icon: Calculator },
   { name: "Import History", href: "/operations/fuel/import-history", icon: History },
+  { name: "Audit Trail", href: "/operations/fuel/audit-trail", icon: Shield },
   { name: "Settings", href: "/operations/fuel/integration-settings", icon: Settings },
 ];
 
