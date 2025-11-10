@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/layout/header";
 import { NewSaleModal } from "@/components/fuel/new-sale-modal";
 import { CSVImportModal } from "@/components/fuel/csv-import-modal";
+import { TransactionDetailModal } from "@/components/fuel/transaction-detail-modal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,13 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import type { TransactionsResponse } from "@/types/fuel-api";
+import type { TransactionsResponse, TransactionWithFuelType } from "@/types/fuel-api";
 import { CalendarIcon, Download, Filter, Search, X, Upload } from "lucide-react";
 import { format } from "date-fns";
 
 export default function Transactions() {
   const [isNewSaleModalOpen, setIsNewSaleModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithFuelType | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
@@ -332,7 +334,12 @@ export default function Transactions() {
                         </Badge>
                       </td>
                       <td className="p-4 text-sm">
-                        <Button variant="ghost" size="sm" data-testid={`button-view-${index}`}>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setSelectedTransaction(transaction)}
+                          data-testid={`button-view-${index}`}
+                        >
                           View
                         </Button>
                       </td>
@@ -353,6 +360,12 @@ export default function Transactions() {
       <CSVImportModal
         open={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
+      />
+
+      <TransactionDetailModal
+        transaction={selectedTransaction}
+        open={!!selectedTransaction}
+        onOpenChange={(open) => !open && setSelectedTransaction(null)}
       />
     </>
   );
