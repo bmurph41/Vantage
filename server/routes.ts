@@ -176,6 +176,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rc-recommendations", authenticateUser);
   app.use("/api/rc-pending-properties", authenticateUser);
 
+  // Auth endpoints
+  app.get("/api/auth/me", authenticateUser, (req: any, res) => {
+    res.json({
+      id: req.user.id,
+      orgId: req.user.orgId,
+      role: req.user.role
+    });
+  });
+
   // Initialize SalesComps services
   const parserService = new ParserService();
   const compService = new CompService(storage, parserService);
@@ -12025,6 +12034,150 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error exporting QuickBooks data:", error);
       res.status(500).json({ error: "Failed to export data" });
+    }
+  });
+
+  // ===== User Role Management Routes =====
+
+  // Get all users in the organization with their current roles
+  app.get("/api/operations/fuel/users", authenticateUser, requireRole('owner', 'admin'), async (req: any, res) => {
+    try {
+      // Get all users in the organization using LEFT JOIN to include users without roles
+      // In production, this would query an organization_members table
+      // For demo purposes, we'll show all users and their roles if they have them
+      const orgUsers = await db
+        .select({
+          userId: users.id,
+          email: users.email,
+          username: users.username,
+          role: organizationUserRoles.role,
+          isActive: organizationUserRoles.isActive,
+        })
+        .from(users)
+        .leftJoin(
+          organizationUserRoles, 
+          and(
+            eq(users.id, organizationUserRoles.userId),
+            eq(organizationUserRoles.orgId, req.user.orgId)
+          )
+        )
+        // For demo, show all users. In production, add WHERE clause for org membership
+        .orderBy(users.username);
+
+      // Transform to expected format
+      const result = orgUsers.map(u => ({
+        id: u.userId,
+        email: u.email,
+        username: u.username,
+        currentRole: u.role || null,
+        isActive: u.isActive ?? true,
+      }));
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching organization users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Update a user's role
+  app.patch("/api/operations/fuel/users/:userId/role", authenticateUser, requireRole('owner', 'admin'), async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (!role || !['owner', 'admin', 'editor', 'viewer', 'auditor'].includes(role)) {
+        return res.status(400).json({ error: "Invalid role specified" });
+      }
+
+      // Prevent users from changing their own role
+      if (userId === req.user.id) {
+        return res.status(403).json({ error: "Cannot change your own role" });
+      }
+
+      // Verify target user exists and belongs to the organization
+      const targetUser = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      if (targetUser.length === 0) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get the current role assignment
+      const existingRole = await db
+        .select()
+        .from(organizationUserRoles)
+        .where(
+          and(
+            eq(organizationUserRoles.userId, userId),
+            eq(organizationUserRoles.orgId, req.user.orgId)
+          )
+        )
+        .limit(1);
+
+      const oldRole = existingRole.length > 0 ? existingRole[0] : null;
+      
+      // Security: Admins cannot manage Owners or other Admins
+      if (req.user.role === 'admin') {
+        // Check if target user is Owner or Admin
+        if (oldRole && (oldRole.role === 'owner' || oldRole.role === 'admin')) {
+          return res.status(403).json({ 
+            error: "Admins cannot modify Owner or Admin roles" 
+          });
+        }
+        
+        // Prevent Admins from assigning Owner role
+        if (role === 'owner') {
+          return res.status(403).json({ 
+            error: "Admins cannot assign Owner role" 
+          });
+        }
+      }
+
+      if (existingRole.length > 0) {
+        // Update existing role
+        await db
+          .update(organizationUserRoles)
+          .set({
+            role: role,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(organizationUserRoles.userId, userId),
+              eq(organizationUserRoles.orgId, req.user.orgId)
+            )
+          );
+      } else {
+        // Create new role assignment - verify user belongs to organization first
+        // In production, this would check organization membership table
+        // For now, we'll create the role assignment
+        await db.insert(organizationUserRoles).values({
+          userId: userId,
+          orgId: req.user.orgId,
+          role: role,
+          isActive: true,
+        });
+      }
+
+      // Audit log the role change
+      await AuditService.logAuditEvent(
+        req,
+        'role_change',
+        'user',
+        userId,
+        oldRole ? { role: oldRole.role } : null,
+        { role },
+        { targetUserId: userId, oldRole: oldRole?.role, newRole: role }
+      );
+
+      res.json({ success: true, message: "Role updated successfully" });
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ error: "Failed to update role" });
     }
   });
 

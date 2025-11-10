@@ -46,7 +46,7 @@ import FuelSalesInventory from "@/pages/operations/fuel/Inventory";
 import FuelSalesAnalytics from "@/pages/operations/fuel/Analytics";
 import FuelSalesReports from "@/pages/operations/fuel/Reports";
 import FuelSalesFinancialModel from "@/pages/operations/fuel/FinancialModel";
-import FuelSalesIntegrationSettings from "@/pages/operations/fuel/IntegrationSettings";
+import FuelSalesSettings from "@/pages/operations/fuel/Settings";
 import FuelSalesImportHistory from "@/pages/operations/fuel/ImportHistory";
 // Analysis / Sales Comps pages
 import SalesCompsIndex from "@/pages/analysis/sales-comps/Index";
@@ -237,7 +237,7 @@ function Router() {
       <Route path="/operations/fuel/integration-settings">
         {() => (
           <UnifiedLayout>
-            <FuelSalesIntegrationSettings />
+            <FuelSalesSettings />
           </UnifiedLayout>
         )}
       </Route>
