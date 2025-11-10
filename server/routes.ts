@@ -14,6 +14,8 @@ import { CompanyLinkingService } from "./company-linking-service";
 import { CalendarService } from "./calendar-service";
 import { FuelSyncService } from "./services/fuel/fuel-sync-service";
 import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/duplicate-finder";
+import { requirePermission, requireRole } from "./middleware/rbac";
+import { AuditService } from "./services/audit-service";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
@@ -58,7 +60,10 @@ import {
   insertFuelProjectionSchema,
   updateFuelProjectionSchema,
   fuelImportLogs,
-  insertFuelImportLogSchema
+  insertFuelImportLogSchema,
+  fuelIntegrations,
+  insertFuelIntegrationSchema,
+  updateFuelIntegrationSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -10774,7 +10779,7 @@ Current context: Project ${req.params.projectId}`;
   // ==================== OPERATIONS - FUEL SALES ROUTES ====================
 
   // Get all fuel sales for organization
-  app.get("/api/operations/fuel-sales", authenticateUser, async (req, res) => {
+  app.get("/api/operations/fuel-sales", authenticateUser, requirePermission('fuel:read'), async (req, res) => {
     try {
       const sales = await db.query.fuelSales.findMany({
         where: eq(fuelSales.orgId, req.user!.orgId),
@@ -10797,13 +10802,23 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create a new fuel sale
-  app.post("/api/operations/fuel-sales", authenticateUser, async (req, res) => {
+  app.post("/api/operations/fuel-sales", authenticateUser, requirePermission('fuel:create'), async (req, res) => {
     try {
       const saleData = insertFuelSaleSchema.parse(req.body);
       const [sale] = await db.insert(fuelSales).values({
         ...saleData,
         orgId: req.user!.orgId,
       }).returning();
+
+      await AuditService.logFuelTransaction(
+        req,
+        'create',
+        sale.id,
+        null,
+        sale,
+        { source: 'manual_entry' }
+      );
+
       res.json(sale);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -10815,7 +10830,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get a specific fuel sale
-  app.get("/api/operations/fuel-sales/:id", authenticateUser, async (req, res) => {
+  app.get("/api/operations/fuel-sales/:id", authenticateUser, requirePermission('fuel:read'), async (req, res) => {
     try {
       const sale = await db.query.fuelSales.findFirst({
         where: and(
@@ -10845,10 +10860,21 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update a fuel sale
-  app.patch("/api/operations/fuel-sales/:id", authenticateUser, async (req, res) => {
+  app.patch("/api/operations/fuel-sales/:id", authenticateUser, requirePermission('fuel:update'), async (req, res) => {
     try {
       const updateData = updateFuelSaleSchema.parse(req.body);
       
+      // Get existing record for audit trail
+      const [existing] = await db.select().from(fuelSales)
+        .where(and(
+          eq(fuelSales.id, req.params.id),
+          eq(fuelSales.orgId, req.user!.orgId)
+        ));
+
+      if (!existing) {
+        return res.status(404).json({ message: "Fuel sale not found" });
+      }
+
       const [updated] = await db.update(fuelSales)
         .set({
           ...updateData,
@@ -10860,9 +10886,14 @@ Current context: Project ${req.params.projectId}`;
         ))
         .returning();
 
-      if (!updated) {
-        return res.status(404).json({ message: "Fuel sale not found" });
-      }
+      await AuditService.logFuelTransaction(
+        req,
+        'update',
+        req.params.id,
+        existing,
+        updated,
+        { modifiedFields: Object.keys(updateData) }
+      );
 
       res.json(updated);
     } catch (error) {
@@ -10875,7 +10906,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete a fuel sale
-  app.delete("/api/operations/fuel-sales/:id", authenticateUser, async (req, res) => {
+  app.delete("/api/operations/fuel-sales/:id", authenticateUser, requirePermission('fuel:delete'), async (req, res) => {
     try {
       const [deleted] = await db.delete(fuelSales)
         .where(and(
@@ -10888,6 +10919,15 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ message: "Fuel sale not found" });
       }
 
+      await AuditService.logFuelTransaction(
+        req,
+        'delete',
+        req.params.id,
+        deleted,
+        null,
+        { deletionReason: req.body?.reason || 'Not specified' }
+      );
+
       res.json({ message: "Fuel sale deleted successfully" });
     } catch (error) {
       console.error("Error deleting fuel sale:", error);
@@ -10896,7 +10936,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get fuel sales summary/stats
-  app.get("/api/operations/fuel-sales/stats/summary", authenticateUser, async (req, res) => {
+  app.get("/api/operations/fuel-sales/stats/summary", authenticateUser, requirePermission('fuel:read', 'analytics:read'), async (req, res) => {
     try {
       const { startDate, endDate } = req.query;
       
@@ -10946,7 +10986,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Import fuel sales from CSV
-  app.post("/api/operations/fuel-sales/import-csv", authenticateUser, async (req, res) => {
+  app.post("/api/operations/fuel-sales/import-csv", authenticateUser, requirePermission('fuel:import'), async (req, res) => {
     const startTime = new Date();
     const errorLog: string[] = [];
     let recordsProcessed = 0;
@@ -11035,6 +11075,24 @@ Current context: Project ${req.params.projectId}`;
         createdBy: req.user!.id,
       });
 
+      // Audit log the import
+      await AuditService.logFuelTransaction(
+        req,
+        'import',
+        null,
+        null,
+        null,
+        { 
+          source: 'csv_upload',
+          recordsProcessed,
+          recordsImported,
+          recordsSkipped,
+          recordsFailed,
+          status: recordsFailed > 0 ? 'partial' : 'completed',
+          duration: new Date().getTime() - startTime.getTime()
+        }
+      );
+
       res.json({
         imported: recordsImported,
         skipped: recordsSkipped,
@@ -11071,7 +11129,7 @@ Current context: Project ${req.params.projectId}`;
   // ==================== OPERATIONS - FUEL TYPES ROUTES ====================
 
   // Get all fuel types for organization
-  app.get("/api/operations/fuel-types", authenticateUser, async (req, res) => {
+  app.get("/api/operations/fuel-types", authenticateUser, requirePermission('fuel:read'), async (req, res) => {
     try {
       const types = await db.query.fuelTypes.findMany({
         where: eq(fuelTypes.orgId, req.user!.orgId),
@@ -11085,13 +11143,26 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create a new fuel type
-  app.post("/api/operations/fuel-types", authenticateUser, async (req, res) => {
+  app.post("/api/operations/fuel-types", authenticateUser, requirePermission('fuel:create'), async (req, res) => {
     try {
       const typeData = insertFuelTypeSchema.parse(req.body);
       const [type] = await db.insert(fuelTypes).values({
         ...typeData,
         orgId: req.user!.orgId,
       }).returning();
+
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'create',
+        entityType: 'fuel_type',
+        entityId: type.id,
+        action: 'Create fuel type',
+        afterData: type,
+        metadata: { name: type.name, category: type.category },
+        isSuccess: true,
+      });
+
       res.json(type);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -11103,17 +11174,36 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update a fuel type
-  app.patch("/api/operations/fuel-types/:id", authenticateUser, async (req, res) => {
+  app.patch("/api/operations/fuel-types/:id", authenticateUser, requirePermission('fuel:update'), async (req, res) => {
     try {
       const updateData = updateFuelTypeSchema.parse(req.body);
+      
+      // Get existing record for audit trail
+      const [existing] = await db.select().from(fuelTypes)
+        .where(and(eq(fuelTypes.id, req.params.id), eq(fuelTypes.orgId, req.user!.orgId)));
+
+      if (!existing) {
+        return res.status(404).json({ message: "Fuel type not found" });
+      }
+
       const [updated] = await db.update(fuelTypes)
         .set({ ...updateData, updatedAt: new Date() })
         .where(and(eq(fuelTypes.id, req.params.id), eq(fuelTypes.orgId, req.user!.orgId)))
         .returning();
 
-      if (!updated) {
-        return res.status(404).json({ message: "Fuel type not found" });
-      }
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'update',
+        entityType: 'fuel_type',
+        entityId: req.params.id,
+        action: 'Update fuel type',
+        beforeData: existing,
+        afterData: updated,
+        metadata: { modifiedFields: Object.keys(updateData) },
+        isSuccess: true,
+      });
+
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -11125,7 +11215,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete a fuel type
-  app.delete("/api/operations/fuel-types/:id", authenticateUser, async (req, res) => {
+  app.delete("/api/operations/fuel-types/:id", authenticateUser, requirePermission('fuel:delete'), async (req, res) => {
     try {
       const [deleted] = await db.delete(fuelTypes)
         .where(and(eq(fuelTypes.id, req.params.id), eq(fuelTypes.orgId, req.user!.orgId)))
@@ -11134,6 +11224,19 @@ Current context: Project ${req.params.projectId}`;
       if (!deleted) {
         return res.status(404).json({ message: "Fuel type not found" });
       }
+
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'delete',
+        entityType: 'fuel_type',
+        entityId: req.params.id,
+        action: 'Delete fuel type',
+        beforeData: deleted,
+        metadata: { deletionReason: req.body?.reason || 'Not specified' },
+        isSuccess: true,
+      });
+
       res.json({ message: "Fuel type deleted successfully" });
     } catch (error) {
       console.error("Error deleting fuel type:", error);
@@ -11144,7 +11247,7 @@ Current context: Project ${req.params.projectId}`;
   // ==================== OPERATIONS - FUEL INVENTORY ROUTES ====================
 
   // Get all fuel inventory for organization
-  app.get("/api/operations/fuel-inventory", authenticateUser, async (req, res) => {
+  app.get("/api/operations/fuel-inventory", authenticateUser, requirePermission('fuel:read'), async (req, res) => {
     try {
       const inventory = await db.query.fuelInventory.findMany({
         where: eq(fuelInventory.orgId, req.user!.orgId),
@@ -11160,13 +11263,26 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create a new fuel inventory record
-  app.post("/api/operations/fuel-inventory", authenticateUser, async (req, res) => {
+  app.post("/api/operations/fuel-inventory", authenticateUser, requirePermission('fuel:create'), async (req, res) => {
     try {
       const inventoryData = insertFuelInventorySchema.parse(req.body);
       const [inventory] = await db.insert(fuelInventory).values({
         ...inventoryData,
         orgId: req.user!.orgId,
       }).returning();
+
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'create',
+        entityType: 'fuel_inventory',
+        entityId: inventory.id,
+        action: 'Create fuel inventory',
+        afterData: inventory,
+        metadata: { fuelTypeId: inventory.fuelTypeId, location: inventory.location },
+        isSuccess: true,
+      });
+
       res.json(inventory);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -11178,17 +11294,36 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update fuel inventory
-  app.patch("/api/operations/fuel-inventory/:id", authenticateUser, async (req, res) => {
+  app.patch("/api/operations/fuel-inventory/:id", authenticateUser, requirePermission('fuel:update'), async (req, res) => {
     try {
       const updateData = updateFuelInventorySchema.parse(req.body);
+      
+      // Get existing record for audit trail
+      const [existing] = await db.select().from(fuelInventory)
+        .where(and(eq(fuelInventory.id, req.params.id), eq(fuelInventory.orgId, req.user!.orgId)));
+
+      if (!existing) {
+        return res.status(404).json({ message: "Fuel inventory not found" });
+      }
+
       const [updated] = await db.update(fuelInventory)
         .set({ ...updateData, lastUpdated: new Date() })
         .where(and(eq(fuelInventory.id, req.params.id), eq(fuelInventory.orgId, req.user!.orgId)))
         .returning();
 
-      if (!updated) {
-        return res.status(404).json({ message: "Fuel inventory not found" });
-      }
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'update',
+        entityType: 'fuel_inventory',
+        entityId: req.params.id,
+        action: 'Update fuel inventory',
+        beforeData: existing,
+        afterData: updated,
+        metadata: { modifiedFields: Object.keys(updateData) },
+        isSuccess: true,
+      });
+
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -11200,7 +11335,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete fuel inventory
-  app.delete("/api/operations/fuel-inventory/:id", authenticateUser, async (req, res) => {
+  app.delete("/api/operations/fuel-inventory/:id", authenticateUser, requirePermission('fuel:delete'), async (req, res) => {
     try {
       const [deleted] = await db.delete(fuelInventory)
         .where(and(eq(fuelInventory.id, req.params.id), eq(fuelInventory.orgId, req.user!.orgId)))
@@ -11209,6 +11344,19 @@ Current context: Project ${req.params.projectId}`;
       if (!deleted) {
         return res.status(404).json({ message: "Fuel inventory not found" });
       }
+
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'delete',
+        entityType: 'fuel_inventory',
+        entityId: req.params.id,
+        action: 'Delete fuel inventory',
+        beforeData: deleted,
+        metadata: { deletionReason: req.body?.reason || 'Not specified' },
+        isSuccess: true,
+      });
+
       res.json({ message: "Fuel inventory deleted successfully" });
     } catch (error) {
       console.error("Error deleting fuel inventory:", error);
@@ -11219,7 +11367,7 @@ Current context: Project ${req.params.projectId}`;
   // ==================== OPERATIONS - FUEL DELIVERIES ROUTES ====================
 
   // Get all fuel deliveries for organization
-  app.get("/api/operations/fuel-deliveries", authenticateUser, async (req, res) => {
+  app.get("/api/operations/fuel-deliveries", authenticateUser, requirePermission('fuel:read'), async (req, res) => {
     try {
       const deliveries = await db.query.fuelDeliveries.findMany({
         where: eq(fuelDeliveries.orgId, req.user!.orgId),
@@ -11236,13 +11384,26 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create a new fuel delivery
-  app.post("/api/operations/fuel-deliveries", authenticateUser, async (req, res) => {
+  app.post("/api/operations/fuel-deliveries", authenticateUser, requirePermission('fuel:create'), async (req, res) => {
     try {
       const deliveryData = insertFuelDeliverySchema.parse(req.body);
       const [delivery] = await db.insert(fuelDeliveries).values({
         ...deliveryData,
         orgId: req.user!.orgId,
       }).returning();
+
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'create',
+        entityType: 'fuel_delivery',
+        entityId: delivery.id,
+        action: 'Create fuel delivery',
+        afterData: delivery,
+        metadata: { fuelTypeId: delivery.fuelTypeId, quantity: delivery.quantity },
+        isSuccess: true,
+      });
+
       res.json(delivery);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -11254,17 +11415,36 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update a fuel delivery
-  app.patch("/api/operations/fuel-deliveries/:id", authenticateUser, async (req, res) => {
+  app.patch("/api/operations/fuel-deliveries/:id", authenticateUser, requirePermission('fuel:update'), async (req, res) => {
     try {
       const updateData = updateFuelDeliverySchema.parse(req.body);
+      
+      // Get existing record for audit trail
+      const [existing] = await db.select().from(fuelDeliveries)
+        .where(and(eq(fuelDeliveries.id, req.params.id), eq(fuelDeliveries.orgId, req.user!.orgId)));
+
+      if (!existing) {
+        return res.status(404).json({ message: "Fuel delivery not found" });
+      }
+
       const [updated] = await db.update(fuelDeliveries)
         .set({ ...updateData, updatedAt: new Date() })
         .where(and(eq(fuelDeliveries.id, req.params.id), eq(fuelDeliveries.orgId, req.user!.orgId)))
         .returning();
 
-      if (!updated) {
-        return res.status(404).json({ message: "Fuel delivery not found" });
-      }
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'update',
+        entityType: 'fuel_delivery',
+        entityId: req.params.id,
+        action: 'Update fuel delivery',
+        beforeData: existing,
+        afterData: updated,
+        metadata: { modifiedFields: Object.keys(updateData) },
+        isSuccess: true,
+      });
+
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -11276,7 +11456,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete a fuel delivery
-  app.delete("/api/operations/fuel-deliveries/:id", authenticateUser, async (req, res) => {
+  app.delete("/api/operations/fuel-deliveries/:id", authenticateUser, requirePermission('fuel:delete'), async (req, res) => {
     try {
       const [deleted] = await db.delete(fuelDeliveries)
         .where(and(eq(fuelDeliveries.id, req.params.id), eq(fuelDeliveries.orgId, req.user!.orgId)))
@@ -11285,6 +11465,19 @@ Current context: Project ${req.params.projectId}`;
       if (!deleted) {
         return res.status(404).json({ message: "Fuel delivery not found" });
       }
+
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'delete',
+        entityType: 'fuel_delivery',
+        entityId: req.params.id,
+        action: 'Delete fuel delivery',
+        beforeData: deleted,
+        metadata: { deletionReason: req.body?.reason || 'Not specified' },
+        isSuccess: true,
+      });
+
       res.json({ message: "Fuel delivery deleted successfully" });
     } catch (error) {
       console.error("Error deleting fuel delivery:", error);
@@ -11295,7 +11488,7 @@ Current context: Project ${req.params.projectId}`;
   // ==================== OPERATIONS - FUEL PROJECTIONS ROUTES ====================
 
   // Get all fuel financial projections for organization
-  app.get("/api/operations/fuel-projections", authenticateUser, async (req, res) => {
+  app.get("/api/operations/fuel-projections", authenticateUser, requirePermission('fuel:read'), async (req, res) => {
     try {
       const projections = await db.query.fuelFinancialProjections.findMany({
         where: eq(fuelFinancialProjections.orgId, req.user!.orgId),
@@ -11309,13 +11502,26 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create a new fuel projection
-  app.post("/api/operations/fuel-projections", authenticateUser, async (req, res) => {
+  app.post("/api/operations/fuel-projections", authenticateUser, requirePermission('fuel:create'), async (req, res) => {
     try {
       const projectionData = insertFuelProjectionSchema.parse(req.body);
       const [projection] = await db.insert(fuelFinancialProjections).values({
         ...projectionData,
         orgId: req.user!.orgId,
       }).returning();
+
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'create',
+        entityType: 'fuel_projection',
+        entityId: projection.id,
+        action: 'Create fuel projection',
+        afterData: projection,
+        metadata: { year: projection.year, month: projection.month },
+        isSuccess: true,
+      });
+
       res.json(projection);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -11327,17 +11533,36 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update a fuel projection
-  app.patch("/api/operations/fuel-projections/:id", authenticateUser, async (req, res) => {
+  app.patch("/api/operations/fuel-projections/:id", authenticateUser, requirePermission('fuel:update'), async (req, res) => {
     try {
       const updateData = updateFuelProjectionSchema.parse(req.body);
+      
+      // Get existing record for audit trail
+      const [existing] = await db.select().from(fuelFinancialProjections)
+        .where(and(eq(fuelFinancialProjections.id, req.params.id), eq(fuelFinancialProjections.orgId, req.user!.orgId)));
+
+      if (!existing) {
+        return res.status(404).json({ message: "Fuel projection not found" });
+      }
+
       const [updated] = await db.update(fuelFinancialProjections)
         .set({ ...updateData, updatedAt: new Date() })
         .where(and(eq(fuelFinancialProjections.id, req.params.id), eq(fuelFinancialProjections.orgId, req.user!.orgId)))
         .returning();
 
-      if (!updated) {
-        return res.status(404).json({ message: "Fuel projection not found" });
-      }
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'update',
+        entityType: 'fuel_projection',
+        entityId: req.params.id,
+        action: 'Update fuel projection',
+        beforeData: existing,
+        afterData: updated,
+        metadata: { modifiedFields: Object.keys(updateData) },
+        isSuccess: true,
+      });
+
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -11349,7 +11574,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete a fuel projection
-  app.delete("/api/operations/fuel-projections/:id", authenticateUser, async (req, res) => {
+  app.delete("/api/operations/fuel-projections/:id", authenticateUser, requirePermission('fuel:delete'), async (req, res) => {
     try {
       const [deleted] = await db.delete(fuelFinancialProjections)
         .where(and(eq(fuelFinancialProjections.id, req.params.id), eq(fuelFinancialProjections.orgId, req.user!.orgId)))
@@ -11358,6 +11583,19 @@ Current context: Project ${req.params.projectId}`;
       if (!deleted) {
         return res.status(404).json({ message: "Fuel projection not found" });
       }
+
+      // Add audit logging
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'delete',
+        entityType: 'fuel_projection',
+        entityId: req.params.id,
+        action: 'Delete fuel projection',
+        beforeData: deleted,
+        metadata: { deletionReason: req.body?.reason || 'Not specified' },
+        isSuccess: true,
+      });
+
       res.json({ message: "Fuel projection deleted successfully" });
     } catch (error) {
       console.error("Error deleting fuel projection:", error);
@@ -11368,7 +11606,7 @@ Current context: Project ${req.params.projectId}`;
   // ==================== OPERATIONS - FUEL IMPORT LOGS ROUTES ====================
 
   // Get all fuel import logs for organization with filters
-  app.get("/api/operations/fuel-import-logs", authenticateUser, async (req, res) => {
+  app.get("/api/operations/fuel-import-logs", authenticateUser, requirePermission('fuel:read'), async (req, res) => {
     try {
       const { startDate, endDate, source, status, limit = '100', offset = '0' } = req.query;
       
@@ -11472,7 +11710,7 @@ Current context: Project ${req.params.projectId}`;
   app.use("/api/operations/fuel-integrations", authenticateUser);
 
   // Get organization's fuel integration settings
-  app.get("/api/operations/fuel-integrations", async (req: any, res) => {
+  app.get("/api/operations/fuel-integrations", requirePermission('fuel:read'), async (req: any, res) => {
     try {
       const integration = await storage.getFuelIntegration(req.user.orgId);
       
@@ -11500,7 +11738,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create new fuel integration
-  app.post("/api/operations/fuel-integrations", async (req: any, res) => {
+  app.post("/api/operations/fuel-integrations", requirePermission('fuel:integration:manage'), async (req: any, res) => {
     try {
       const data = insertFuelIntegrationSchema.parse({
         ...req.body,
@@ -11515,6 +11753,17 @@ Current context: Project ${req.params.projectId}`;
       }
 
       const integration = await storage.createFuelIntegration(data);
+
+      // Add audit logging using logFuelIntegration
+      await AuditService.logFuelIntegration(
+        req,
+        'create',
+        integration.id,
+        null,
+        integration,
+        { provider: integration.provider }
+      );
+
       res.status(201).json(integration);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -11526,7 +11775,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update fuel integration settings
-  app.patch("/api/operations/fuel-integrations/:id", async (req: any, res) => {
+  app.patch("/api/operations/fuel-integrations/:id", requirePermission('fuel:integration:manage'), async (req: any, res) => {
     try {
       const integration = await storage.getFuelIntegrationById(req.params.id);
       
@@ -11545,6 +11794,16 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ message: "Integration not found" });
       }
 
+      // Add audit logging using logFuelIntegration
+      await AuditService.logFuelIntegration(
+        req,
+        'update',
+        updated.id,
+        integration,
+        updated,
+        { provider: updated.provider, modifiedFields: Object.keys(updateData) }
+      );
+
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -11556,7 +11815,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete fuel integration
-  app.delete("/api/operations/fuel-integrations/:id", async (req: any, res) => {
+  app.delete("/api/operations/fuel-integrations/:id", requirePermission('fuel:integration:manage'), async (req: any, res) => {
     try {
       const integration = await storage.getFuelIntegrationById(req.params.id);
       
@@ -11574,6 +11833,16 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ message: "Integration not found" });
       }
 
+      // Add audit logging using logFuelIntegration
+      await AuditService.logFuelIntegration(
+        req,
+        'delete',
+        integration.id,
+        integration,
+        null,
+        { provider: integration.provider, deletionReason: req.body?.reason || 'Not specified' }
+      );
+
       res.json({ message: "Integration disconnected successfully" });
     } catch (error) {
       console.error("Error deleting fuel integration:", error);
@@ -11582,7 +11851,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Test fuel integration connection
-  app.post("/api/operations/fuel-integrations/:id/test", async (req: any, res) => {
+  app.post("/api/operations/fuel-integrations/:id/test", requirePermission('fuel:integration:manage'), async (req: any, res) => {
     try {
       const integration = await storage.getFuelIntegrationById(req.params.id);
       
@@ -11613,7 +11882,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Trigger manual sync
-  app.post("/api/operations/fuel-integrations/:id/sync", async (req: any, res) => {
+  app.post("/api/operations/fuel-integrations/:id/sync", requirePermission('fuel:integration:manage'), async (req: any, res) => {
     try {
       const integration = await storage.getFuelIntegrationById(req.params.id);
       
@@ -11624,6 +11893,16 @@ Current context: Project ${req.params.projectId}`;
       if (integration.orgId !== req.user.orgId) {
         return res.status(403).json({ message: "Unauthorized" });
       }
+
+      // Add audit logging using logFuelIntegration
+      await AuditService.logFuelIntegration(
+        req,
+        'sync',
+        integration.id,
+        null,
+        null,
+        { provider: integration.provider, syncInitiated: true }
+      );
 
       // Start sync asynchronously - don't wait for completion
       const fuelSyncService = new FuelSyncService(storage);
@@ -11654,7 +11933,7 @@ Current context: Project ${req.params.projectId}`;
   // ===== QuickBooks Export Routes =====
 
   // Preview QuickBooks export data
-  app.post("/api/operations/fuel-sales/export-quickbooks/preview", authenticateUser, async (req: any, res) => {
+  app.post("/api/operations/fuel-sales/export-quickbooks/preview", authenticateUser, requirePermission('fuel:export'), async (req: any, res) => {
     try {
       const { startDate, endDate, accountMappings, format } = req.body;
 
@@ -11684,7 +11963,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Export QuickBooks CSV
-  app.post("/api/operations/fuel-sales/export-quickbooks", authenticateUser, async (req: any, res) => {
+  app.post("/api/operations/fuel-sales/export-quickbooks", authenticateUser, requirePermission('fuel:export'), async (req: any, res) => {
     try {
       const { startDate, endDate, accountMappings, format, saveSettings } = req.body;
 
@@ -11731,6 +12010,14 @@ Current context: Project ${req.params.projectId}`;
 
       const csv = generateQuickBooksCSV(sales, accountMappings, format);
       const filename = `fuel-sales-quickbooks-${new Date().toISOString().split('T')[0]}.csv`;
+
+      // Audit log the export
+      await AuditService.logExport(
+        req,
+        'quickbooks',
+        sales.length,
+        { startDate, endDate, format, accountMappings }
+      );
 
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

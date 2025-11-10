@@ -53,7 +53,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
 };
 
-export async function getUserRole(userId: string, orgId: string): Promise<UserRole | null> {
+export async function getUserRole(userId: string, orgId: string, fallbackRole?: string): Promise<UserRole | null> {
   try {
     const roleRecord = await db
       .select()
@@ -67,9 +67,22 @@ export async function getUserRole(userId: string, orgId: string): Promise<UserRo
       )
       .limit(1);
 
-    return roleRecord.length > 0 ? (roleRecord[0].role as UserRole) : null;
+    if (roleRecord.length > 0) {
+      return roleRecord[0].role as UserRole;
+    }
+
+    // Fall back to the role set by authenticateUser middleware (for backwards compatibility)
+    if (fallbackRole && ['owner', 'admin', 'editor', 'viewer', 'auditor'].includes(fallbackRole)) {
+      return fallbackRole as UserRole;
+    }
+
+    return null;
   } catch (error) {
     console.error('Error fetching user role:', error);
+    // On database error, fall back to the middleware-provided role
+    if (fallbackRole && ['owner', 'admin', 'editor', 'viewer', 'auditor'].includes(fallbackRole)) {
+      return fallbackRole as UserRole;
+    }
     return null;
   }
 }
@@ -84,6 +97,7 @@ export function requirePermission(...permissions: Permission[]) {
     try {
       const userId = (req as any).user?.id;
       const orgId = (req as any).user?.orgId;
+      const fallbackRole = (req as any).user?.role; // From authenticateUser middleware
 
       if (!userId || !orgId) {
         return res.status(401).json({ 
@@ -92,7 +106,7 @@ export function requirePermission(...permissions: Permission[]) {
         });
       }
 
-      const userRole = await getUserRole(userId, orgId);
+      const userRole = await getUserRole(userId, orgId, fallbackRole);
 
       if (!userRole) {
         return res.status(403).json({ 
@@ -132,6 +146,7 @@ export function requireRole(...roles: UserRole[]) {
     try {
       const userId = (req as any).user?.id;
       const orgId = (req as any).user?.orgId;
+      const fallbackRole = (req as any).user?.role; // From authenticateUser middleware
 
       if (!userId || !orgId) {
         return res.status(401).json({ 
@@ -140,7 +155,7 @@ export function requireRole(...roles: UserRole[]) {
         });
       }
 
-      const userRole = await getUserRole(userId, orgId);
+      const userRole = await getUserRole(userId, orgId, fallbackRole);
 
       if (!userRole || !roles.includes(userRole)) {
         return res.status(403).json({
@@ -167,9 +182,10 @@ export function requireRole(...roles: UserRole[]) {
 export async function checkPermission(
   userId: string,
   orgId: string,
-  permission: Permission
+  permission: Permission,
+  fallbackRole?: string
 ): Promise<boolean> {
-  const userRole = await getUserRole(userId, orgId);
+  const userRole = await getUserRole(userId, orgId, fallbackRole);
   if (!userRole) return false;
   return hasPermission(userRole, permission);
 }
