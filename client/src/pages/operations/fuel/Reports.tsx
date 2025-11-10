@@ -36,11 +36,58 @@ export default function Reports() {
     queryKey: ['/api/operations/fuel-deliveries'],
   });
 
-  // Calculate summary statistics
-  const totalRevenue = transactions?.reduce((sum, tx) => sum + parseFloat(tx.totalAmount), 0) || 0;
-  const totalGallons = transactions?.reduce((sum, tx) => sum + parseFloat(tx.gallons), 0) || 0;
+  // Calculate the effective date range for filtering
+  const getDateRangeBounds = () => {
+    const now = new Date();
+    let start: Date;
+    let end: Date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    if (dateRange === "custom") {
+      if (!startDate || !endDate) {
+        return null;
+      }
+      start = new Date(startDate + "T00:00:00");
+      end = new Date(endDate + "T23:59:59");
+      
+      // Validate that start is before end
+      if (start > end) {
+        return null;
+      }
+    } else if (dateRange === "all") {
+      return null; // No filtering
+    } else {
+      const days = parseInt(dateRange);
+      start = new Date(now);
+      // Subtract (days - 1) to get exactly N days inclusive
+      // e.g., "Last 7 Days" on Nov 10 = Nov 4-10 (7 days total)
+      start.setDate(start.getDate() - (days - 1));
+      start.setHours(0, 0, 0, 0);
+    }
+
+    return { start, end };
+  };
+
+  const dateRangeBounds = getDateRangeBounds();
+
+  // Filter transactions by date range (use transactionDate consistently)
+  const filteredTransactions = transactions?.filter(tx => {
+    if (!dateRangeBounds) return true;
+    const txDate = new Date(tx.transactionDate || tx.createdAt);
+    return txDate >= dateRangeBounds.start && txDate <= dateRangeBounds.end;
+  }) || [];
+
+  // Filter deliveries by date range
+  const filteredDeliveries = deliveries?.filter(delivery => {
+    if (!dateRangeBounds) return true;
+    const deliveryDate = new Date(delivery.deliveryDate);
+    return deliveryDate >= dateRangeBounds.start && deliveryDate <= dateRangeBounds.end;
+  }) || [];
+
+  // Calculate summary statistics based on filtered data
+  const totalRevenue = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.totalAmount), 0);
+  const totalGallons = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.gallons), 0);
   const avgPricePerGallon = totalGallons > 0 ? totalRevenue / totalGallons : 0;
-  const totalTransactions = transactions?.length || 0;
+  const totalTransactions = filteredTransactions.length;
 
   const exportReport = () => {
     const csvContent = generateCSVContent();
@@ -62,9 +109,10 @@ export default function Reports() {
     switch (reportType) {
       case "transactions":
         headers = 'Date,Time,Customer Name,Fuel Type,Gallons,Price Per Gallon,Total Amount,Payment Method,Status\n';
-        rows = transactions?.map((tx) => 
-          `${new Date(tx.createdAt).toLocaleDateString()},${new Date(tx.createdAt).toLocaleTimeString()},"${tx.customerName || ''}","${tx.fuelType?.name}",${tx.gallons},${tx.pricePerGallon},${tx.totalAmount},${tx.paymentMethod},${tx.status}`
-        ).join('\n') || '';
+        rows = filteredTransactions.map((tx) => {
+          const txDate = new Date(tx.transactionDate || tx.createdAt);
+          return `${txDate.toLocaleDateString()},${txDate.toLocaleTimeString()},"${tx.customerName || ''}","${tx.fuelType?.name}",${tx.gallons},${tx.pricePerGallon},${tx.totalAmount},${tx.paymentMethod},${tx.status}`;
+        }).join('\n');
         break;
       case "inventory":
         headers = 'Fuel Type,Current Level,Capacity,Reorder Point,Reorder Quantity,Last Updated\n';
@@ -74,9 +122,9 @@ export default function Reports() {
         break;
       case "deliveries":
         headers = 'Date,Fuel Type,Quantity,Cost,Cost Per Gallon,Supplier,Invoice Number\n';
-        rows = deliveries?.map((delivery) => 
+        rows = filteredDeliveries.map((delivery) => 
           `${new Date(delivery.deliveryDate).toLocaleDateString()},"${delivery.fuelType.name}",${delivery.quantity},${delivery.cost},${(parseFloat(delivery.cost) / parseFloat(delivery.quantity)).toFixed(3)},"${delivery.supplier}","${delivery.invoiceNumber || ''}"`
-        ).join('\n') || '';
+        ).join('\n');
         break;
       case "summary":
         headers = 'Metric,Value\n';
@@ -268,7 +316,7 @@ export default function Reports() {
                 Report Preview
               </div>
               <span className="text-sm text-muted-foreground font-normal">
-                Showing {reportType === "transactions" ? transactions?.length : reportType === "inventory" ? inventory?.length : deliveries?.length} records
+                Showing {reportType === "transactions" ? filteredTransactions.length : reportType === "inventory" ? inventory?.length || 0 : filteredDeliveries.length} records
               </span>
             </CardTitle>
           </CardHeader>
@@ -287,16 +335,19 @@ export default function Reports() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {transactions?.slice(0, 50).map((tx, index) => (
-                      <tr key={tx.id} className="hover:bg-muted/30" data-testid={`tx-row-${index}`}>
-                        <td className="p-4 text-sm">{new Date(tx.createdAt).toLocaleDateString()}</td>
-                        <td className="p-4 text-sm">{tx.customerName || '—'}</td>
-                        <td className="p-4 text-sm">{tx.fuelType?.name}</td>
-                        <td className="p-4 text-sm">{parseFloat(tx.gallons).toFixed(1)}</td>
-                        <td className="p-4 text-sm">${parseFloat(tx.totalAmount).toFixed(2)}</td>
-                        <td className="p-4 text-sm">{tx.paymentMethod}</td>
-                      </tr>
-                    ))}
+                    {filteredTransactions.slice(0, 50).map((tx, index) => {
+                      const txDate = new Date(tx.transactionDate || tx.createdAt);
+                      return (
+                        <tr key={tx.id} className="hover:bg-muted/30" data-testid={`tx-row-${index}`}>
+                          <td className="p-4 text-sm">{txDate.toLocaleDateString()}</td>
+                          <td className="p-4 text-sm">{tx.customerName || '—'}</td>
+                          <td className="p-4 text-sm">{tx.fuelType?.name}</td>
+                          <td className="p-4 text-sm">{parseFloat(tx.gallons).toFixed(1)}</td>
+                          <td className="p-4 text-sm">${parseFloat(tx.totalAmount).toFixed(2)}</td>
+                          <td className="p-4 text-sm">{tx.paymentMethod}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -343,7 +394,7 @@ export default function Reports() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {deliveries?.map((delivery, index) => (
+                    {filteredDeliveries.map((delivery, index) => (
                       <tr key={delivery.id} className="hover:bg-muted/30" data-testid={`delivery-row-${index}`}>
                         <td className="p-4 text-sm">{new Date(delivery.deliveryDate).toLocaleDateString()}</td>
                         <td className="p-4 text-sm">{delivery.fuelType.name}</td>
