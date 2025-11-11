@@ -66,6 +66,7 @@ import RateCompsCompare from "@/pages/analysis/rate-comps/Compare";
 import RateCompsBulkEdit from "@/pages/analysis/rate-comps/BulkEdit";
 import RateCompsColumnManager from "@/pages/analysis/rate-comps/ColumnManager";
 import DemographicsIndex from "@/pages/analysis/demographics/Index";
+import BenchmarksIndex from "@/pages/analysis/benchmarks/Index";
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
@@ -537,6 +538,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <DemographicsIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/benchmarks">
+        {() => (
+          <UnifiedLayout>
+            <BenchmarksIndex />
           </UnifiedLayout>
         )}
       </Route>
