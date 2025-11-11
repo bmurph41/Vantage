@@ -717,20 +717,20 @@ export default function DebtScenariosIndex() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Monthly Payment</p>
-                  <p className="text-3xl font-bold">{formatCurrency(monthlyPayment)}</p>
+                  <p className="text-3xl font-bold" data-testid="text-monthly-payment">{formatCurrency(monthlyPayment)}</p>
                   {ioYears > 0 && (
-                    <p className="text-sm text-muted-foreground">IO: {formatCurrency(monthlyIOPayment)} for {ioYears} years</p>
+                    <p className="text-sm text-muted-foreground" data-testid="text-io-payment">IO: {formatCurrency(monthlyIOPayment)} for {ioYears} years</p>
                   )}
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Annual Debt Service</p>
-                  <p className="text-3xl font-bold">{formatCurrency(annualDebtService)}</p>
+                  <p className="text-3xl font-bold" data-testid="text-annual-debt-service">{formatCurrency(annualDebtService)}</p>
                   <p className="text-sm text-muted-foreground">Total yearly payment</p>
                 </div>
                 {balloonPayment > 0 && (
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">Balloon Payment</p>
-                    <p className="text-3xl font-bold text-orange-600">{formatCurrency(balloonPayment)}</p>
+                    <p className="text-3xl font-bold text-orange-600" data-testid="text-balloon-payment">{formatCurrency(balloonPayment)}</p>
                     <p className="text-sm text-muted-foreground">Due at year {loanTermYears}</p>
                   </div>
                 )}
@@ -837,21 +837,21 @@ export default function DebtScenariosIndex() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 text-sm">
                           <div>
                             <span className="text-muted-foreground">Purchase Price:</span>
-                            <p className="font-medium">{formatCurrency(scenario.purchasePrice)}</p>
+                            <p className="font-medium" data-testid={`text-purchase-price-${scenario.id}`}>{formatCurrency(scenario.purchasePrice)}</p>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Loan Amount:</span>
-                            <p className="font-medium">{formatCurrency(scenario.loanAmount)}</p>
+                            <p className="font-medium" data-testid={`text-loan-amount-${scenario.id}`}>{formatCurrency(scenario.loanAmount)}</p>
                           </div>
                           <div>
                             <span className="text-muted-foreground">LTV:</span>
-                            <p className="font-medium">
+                            <p className="font-medium" data-testid={`text-ltv-${scenario.id}`}>
                               {formatPercentage((scenario.loanAmount / scenario.purchasePrice) * 100)}
                             </p>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Base Rate:</span>
-                            <p className="font-medium">
+                            <p className="font-medium" data-testid={`text-base-rate-${scenario.id}`}>
                               {BASE_RATE_OPTIONS.find(r => r.id === scenario.baseRate)?.name || scenario.baseRate}
                             </p>
                           </div>
