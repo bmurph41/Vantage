@@ -172,6 +172,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/profit-centers", authenticateUser);
   app.use("/api/recommendations", authenticateUser);
   app.use("/api/pending-properties", authenticateUser);
+  app.use("/api/pending-contacts", authenticateUser);
+  app.use("/api/pending-companies", authenticateUser);
   app.use("/api/rate-comps", authenticateUser);
   app.use("/api/rc-columns", authenticateUser);
   app.use("/api/rc-projects", authenticateUser);
@@ -8546,6 +8548,285 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error merging pending property:", error);
       res.status(500).json({ message: "Failed to merge pending property" });
+    }
+  });
+
+  // Pending Contacts routes - Review queue for contacts created from comps or DD projects
+  app.get('/api/pending-contacts', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { status } = req.query;
+
+      const pendingContacts = await storage.getPendingContacts(orgId, status);
+      res.json(pendingContacts);
+    } catch (error) {
+      console.error("Error fetching pending contacts:", error);
+      res.status(500).json({ message: "Failed to fetch pending contacts" });
+    }
+  });
+
+  app.get('/api/pending-contacts/:id/all-duplicates', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const pending = await storage.getPendingContact(id, orgId);
+      if (!pending) {
+        return res.status(404).json({ message: "Pending contact not found" });
+      }
+
+      const allContacts = await storage.getContactsForOrg(orgId);
+
+      const similarityScores = allContacts.map(contact => {
+        let score = 0;
+        const pendingFullName = pending.fullName || `${pending.firstName || ''} ${pending.lastName || ''}`.trim();
+        const contactFullName = contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+
+        if (pendingFullName && contactFullName) {
+          const normalizedPending = pendingFullName.toLowerCase().trim();
+          const normalizedContact = contactFullName.toLowerCase().trim();
+          if (normalizedPending === normalizedContact) score += 100;
+          else if (normalizedPending.includes(normalizedContact) || normalizedContact.includes(normalizedPending)) score += 70;
+        }
+
+        if (pending.email && contact.email && pending.email.toLowerCase() === contact.email.toLowerCase()) {
+          score += 80;
+        }
+
+        if (pending.phone && contact.phone) {
+          const normalizedPendingPhone = pending.phone.replace(/\D/g, '');
+          const normalizedContactPhone = contact.phone.replace(/\D/g, '');
+          if (normalizedPendingPhone === normalizedContactPhone) score += 60;
+        }
+
+        return { contact, score };
+      }).filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score);
+
+      res.json(similarityScores);
+    } catch (error) {
+      console.error("Error finding duplicate contacts:", error);
+      res.status(500).json({ message: "Failed to find duplicate contacts" });
+    }
+  });
+
+  app.post('/api/pending-contacts/:id/accept', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const contact = await storage.acceptPendingContact(id, orgId, userId);
+      if (!contact) {
+        return res.status(404).json({ message: "Pending contact not found or already processed" });
+      }
+
+      res.json(contact);
+    } catch (error) {
+      console.error("Error accepting pending contact:", error);
+      res.status(500).json({ message: "Failed to accept pending contact" });
+    }
+  });
+
+  app.post('/api/pending-contacts/:id/reject', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const success = await storage.rejectPendingContact(id, orgId, userId);
+      if (!success) {
+        return res.status(404).json({ message: "Pending contact not found or already processed" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error rejecting pending contact:", error);
+      res.status(500).json({ message: "Failed to reject pending contact" });
+    }
+  });
+
+  app.patch('/api/pending-contacts/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const updates = req.body;
+
+      const updated = await storage.updatePendingContact(id, orgId, updates);
+      if (!updated) {
+        return res.status(404).json({ message: "Pending contact not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating pending contact:", error);
+      res.status(500).json({ message: "Failed to update pending contact" });
+    }
+  });
+
+  app.post('/api/pending-contacts/:id/merge', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { contactId } = req.body;
+
+      if (!contactId) {
+        return res.status(400).json({ message: "Contact ID is required" });
+      }
+
+      const result = await storage.mergePendingContactWithExisting(id, contactId, orgId, userId);
+      if (!result) {
+        return res.status(404).json({ message: "Pending contact or target contact not found" });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error merging pending contact:", error);
+      res.status(500).json({ message: "Failed to merge pending contact" });
+    }
+  });
+
+  // Pending Companies routes - Review queue for companies created from comps or DD projects
+  app.get('/api/pending-companies', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { status } = req.query;
+
+      const pendingCompanies = await storage.getPendingCompanies(orgId, status);
+      res.json(pendingCompanies);
+    } catch (error) {
+      console.error("Error fetching pending companies:", error);
+      res.status(500).json({ message: "Failed to fetch pending companies" });
+    }
+  });
+
+  app.get('/api/pending-companies/:id/all-duplicates', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const pending = await storage.getPendingCompany(id, orgId);
+      if (!pending) {
+        return res.status(404).json({ message: "Pending company not found" });
+      }
+
+      const allCompanies = await storage.getCompaniesForOrg(orgId);
+
+      const similarityScores = allCompanies.map(company => {
+        let score = 0;
+
+        if (pending.name && company.name) {
+          const normalizedPending = pending.name.toLowerCase().trim();
+          const normalizedCompany = company.name.toLowerCase().trim();
+          if (normalizedPending === normalizedCompany) score += 100;
+          else if (normalizedPending.includes(normalizedCompany) || normalizedCompany.includes(normalizedPending)) score += 70;
+        }
+
+        if (pending.website && company.website && pending.website.toLowerCase() === company.website.toLowerCase()) {
+          score += 60;
+        }
+
+        if (pending.phone && company.phone) {
+          const normalizedPendingPhone = pending.phone.replace(/\D/g, '');
+          const normalizedCompanyPhone = company.phone.replace(/\D/g, '');
+          if (normalizedPendingPhone === normalizedCompanyPhone) score += 50;
+        }
+
+        if (pending.city && company.city && pending.state && company.state) {
+          if (pending.city.toLowerCase() === company.city.toLowerCase() && 
+              pending.state.toLowerCase() === company.state.toLowerCase()) {
+            score += 30;
+          }
+        }
+
+        return { company, score };
+      }).filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score);
+
+      res.json(similarityScores);
+    } catch (error) {
+      console.error("Error finding duplicate companies:", error);
+      res.status(500).json({ message: "Failed to find duplicate companies" });
+    }
+  });
+
+  app.post('/api/pending-companies/:id/accept', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const company = await storage.acceptPendingCompany(id, orgId, userId);
+      if (!company) {
+        return res.status(404).json({ message: "Pending company not found or already processed" });
+      }
+
+      res.json(company);
+    } catch (error) {
+      console.error("Error accepting pending company:", error);
+      res.status(500).json({ message: "Failed to accept pending company" });
+    }
+  });
+
+  app.post('/api/pending-companies/:id/reject', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const success = await storage.rejectPendingCompany(id, orgId, userId);
+      if (!success) {
+        return res.status(404).json({ message: "Pending company not found or already processed" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error rejecting pending company:", error);
+      res.status(500).json({ message: "Failed to reject pending company" });
+    }
+  });
+
+  app.patch('/api/pending-companies/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const updates = req.body;
+
+      const updated = await storage.updatePendingCompany(id, orgId, updates);
+      if (!updated) {
+        return res.status(404).json({ message: "Pending company not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating pending company:", error);
+      res.status(500).json({ message: "Failed to update pending company" });
+    }
+  });
+
+  app.post('/api/pending-companies/:id/merge', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { companyId } = req.body;
+
+      if (!companyId) {
+        return res.status(400).json({ message: "Company ID is required" });
+      }
+
+      const result = await storage.mergePendingCompanyWithExisting(id, companyId, orgId, userId);
+      if (!result) {
+        return res.status(404).json({ message: "Pending company or target company not found" });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error merging pending company:", error);
+      res.status(500).json({ message: "Failed to merge pending company" });
     }
   });
 

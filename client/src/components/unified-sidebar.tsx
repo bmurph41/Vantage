@@ -74,7 +74,7 @@ const analysisNav = [
   { name: "Projects", href: "/analysis/projects", icon: FolderKanban },
 ];
 
-type PendingProperty = {
+type PendingItem = {
   id: string;
   status: string;
 };
@@ -92,25 +92,52 @@ export default function UnifiedSidebar() {
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Fetch pending properties count
-  const { data: pendingProperties = [] } = useQuery<PendingProperty[]>({
+  // Fetch pending items counts
+  const { data: pendingProperties = [] } = useQuery<PendingItem[]>({
     queryKey: ['/api/pending-properties'],
     refetchInterval: 60000, // Refresh every minute
   });
 
-  const pendingCount = pendingProperties.filter(p => p.status === 'pending').length;
+  const { data: pendingContacts = [] } = useQuery<PendingItem[]>({
+    queryKey: ['/api/pending-contacts'],
+    refetchInterval: 60000, // Refresh every minute
+  });
 
-  // Create dynamic CRM navigation with pending properties badge
-  // Properties is at index 6 in crmNav
+  const { data: pendingCompanies = [] } = useQuery<PendingItem[]>({
+    queryKey: ['/api/pending-companies'],
+    refetchInterval: 60000, // Refresh every minute
+  });
+
+  const pendingPropertiesCount = pendingProperties.filter(p => p.status === 'pending').length;
+  const pendingContactsCount = pendingContacts.filter(p => p.status === 'pending').length;
+  const pendingCompaniesCount = pendingCompanies.filter(p => p.status === 'pending').length;
+
+  // Create dynamic CRM navigation with pending badges
+  // Structure: Dashboard, Pipeline, Deals, Leads, Contacts (+Pending), Companies (+Pending), Properties (+Pending), Activities, Prospecting, etc.
   const dynamicCrmNav = [
-    ...crmNav.slice(0, 7), // Includes Properties at index 6
-    ...(pendingCount > 0 ? [{ 
+    ...crmNav.slice(0, 4), // Dashboard, Pipeline, Deals, Leads
+    crmNav[4], // Contacts
+    ...(pendingContactsCount > 0 ? [{ 
+      name: "Pending Contacts", 
+      href: "/crm/pending-contacts", 
+      icon: AlertCircle,
+      badge: String(pendingContactsCount)
+    }] : []),
+    crmNav[5], // Companies
+    ...(pendingCompaniesCount > 0 ? [{ 
+      name: "Pending Companies", 
+      href: "/crm/pending-companies", 
+      icon: AlertCircle,
+      badge: String(pendingCompaniesCount)
+    }] : []),
+    crmNav[6], // Properties
+    ...(pendingPropertiesCount > 0 ? [{ 
       name: "Pending Properties", 
       href: "/crm/pending-properties", 
       icon: AlertCircle,
-      badge: String(pendingCount)
+      badge: String(pendingPropertiesCount)
     }] : []),
-    ...crmNav.slice(7), // Everything after Properties (Activities, Prospecting, etc.)
+    ...crmNav.slice(7), // Activities, Prospecting, etc.
   ];
 
   const handleNavClick = () => {

@@ -21,6 +21,8 @@ import DealDetail from "@/pages/deal-detail";
 import Activities from "@/pages/activities";
 import Properties from "@/pages/properties";
 import PendingProperties from "@/pages/pending-properties";
+import PendingContacts from "@/pages/pending-contacts";
+import PendingCompanies from "@/pages/pending-companies";
 import Prospecting from "@/pages/prospecting";
 import Analytics from "@/pages/analytics";
 import Forecast from "@/pages/forecast";
@@ -306,6 +308,20 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <PendingProperties />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/crm/pending-contacts">
+        {() => (
+          <UnifiedLayout>
+            <PendingContacts />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/crm/pending-companies">
+        {() => (
+          <UnifiedLayout>
+            <PendingCompanies />
           </UnifiedLayout>
         )}
       </Route>

@@ -1484,6 +1484,75 @@ export const pendingProperties = pgTable("pending_properties", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Pending Contacts - Review queue for contacts created from sales comps or DD projects
+export const pendingContacts = pgTable("pending_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  sourceType: text("source_type").notNull(), // 'sales_comp', 'dd_project', 'manual'
+  sourceId: varchar("source_id"), // ID of the source (comp ID, project ID, etc.)
+  
+  // Contact data extracted from source
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  fullName: text("full_name"), // For cases where first/last aren't split
+  email: text("email"),
+  phone: text("phone"),
+  companyId: varchar("company_id").references(() => crmCompanies.id),
+  jobTitle: text("job_title"),
+  
+  // Review status
+  status: pendingPropertyStatusEnum("status").notNull().default("pending"),
+  
+  // Additional metadata from source for review
+  sourceMetadata: jsonb("source_metadata").default({}),
+  
+  // Suggested duplicate matches for user review
+  suggestedDuplicates: jsonb("suggested_duplicates").default([]), // Array of potential contact IDs
+  
+  // Created contact ID when accepted
+  createdContactId: varchar("created_contact_id").references(() => crmContacts.id),
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Pending Companies - Review queue for companies created from sales comps or DD projects
+export const pendingCompanies = pgTable("pending_companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  sourceType: text("source_type").notNull(), // 'sales_comp', 'dd_project', 'manual'
+  sourceId: varchar("source_id"), // ID of the source (comp ID, project ID, etc.)
+  
+  // Company data extracted from source
+  name: text("name").notNull(),
+  website: text("website"),
+  phone: text("phone"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  industry: text("industry"),
+  
+  // Review status
+  status: pendingPropertyStatusEnum("status").notNull().default("pending"),
+  
+  // Additional metadata from source for review
+  sourceMetadata: jsonb("source_metadata").default({}),
+  
+  // Suggested duplicate matches for user review
+  suggestedDuplicates: jsonb("suggested_duplicates").default([]), // Array of potential company IDs
+  
+  // Created company ID when accepted
+  createdCompanyId: varchar("created_company_id").references(() => crmCompanies.id),
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Leads table (separate from contacts for better lead management)
 
 export const crmLeads = pgTable("crm_leads", {
@@ -2905,6 +2974,26 @@ export const insertPendingPropertySchema = createInsertSchema(pendingProperties)
 });
 export type InsertPendingProperty = z.infer<typeof insertPendingPropertySchema>;
 export type PendingProperty = typeof pendingProperties.$inferSelect;
+
+// Pending Contact schema
+export const insertPendingContactSchema = createInsertSchema(pendingContacts).omit({
+  id: true,
+  createdAt: true,
+  reviewedAt: true,
+  createdContactId: true,
+});
+export type InsertPendingContact = z.infer<typeof insertPendingContactSchema>;
+export type PendingContact = typeof pendingContacts.$inferSelect;
+
+// Pending Company schema
+export const insertPendingCompanySchema = createInsertSchema(pendingCompanies).omit({
+  id: true,
+  createdAt: true,
+  reviewedAt: true,
+  createdCompanyId: true,
+});
+export type InsertPendingCompany = z.infer<typeof insertPendingCompanySchema>;
+export type PendingCompany = typeof pendingCompanies.$inferSelect;
 
 // CRM File schema
 export const insertCrmFileSchema = createInsertSchema(crmFiles).omit({

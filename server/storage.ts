@@ -4,7 +4,7 @@ import {
   contacts, projectContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
-  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, pendingProperties, crmPipelines, crmPipelineStages, crmActivities,
+  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities,
   crmImportJobs, crmImportedRecords, crmProspectingEntries,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
@@ -16,7 +16,7 @@ import {
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
-  type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type PendingProperty, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
+  type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type PendingProperty, type PendingContact, type PendingCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
@@ -30,7 +30,7 @@ import {
   type InsertDDContact, type UpdateDDContact, type InsertProjectContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
-  type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertProperty, type InsertPendingProperty, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
+  type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertProperty, type InsertPendingProperty, type InsertPendingContact, type InsertPendingCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
   type InsertCrmImportJob, type InsertCrmImportedRecord, type InsertProspectingEntry,
   type InsertEmailSequence, type InsertEmailTemplate, type InsertEmailSequenceStep, type InsertEmailSequenceEnrollment, type InsertEmailSequenceStepExecution,
   type InsertCalendarSettings,
@@ -532,6 +532,24 @@ export interface IStorage {
   rejectPendingProperty(id: string, orgId: string, userId: string): Promise<boolean>;
   updatePendingProperty(id: string, orgId: string, updates: Partial<PendingProperty>): Promise<PendingProperty | undefined>;
   mergePendingPropertyWithExisting(pendingId: string, propertyId: string, orgId: string, userId: string): Promise<Property | undefined>;
+
+  // Pending Contacts - Review queue for contacts created from sales comps or DD projects
+  getPendingContacts(orgId: string, status?: string): Promise<PendingContact[]>;
+  getPendingContact(id: string, orgId: string): Promise<PendingContact | undefined>;
+  createPendingContact(data: InsertPendingContact): Promise<PendingContact>;
+  acceptPendingContact(id: string, orgId: string, userId: string): Promise<CrmContact | undefined>;
+  rejectPendingContact(id: string, orgId: string, userId: string): Promise<boolean>;
+  updatePendingContact(id: string, orgId: string, updates: Partial<PendingContact>): Promise<PendingContact | undefined>;
+  mergePendingContactWithExisting(pendingId: string, contactId: string, orgId: string, userId: string): Promise<CrmContact | undefined>;
+
+  // Pending Companies - Review queue for companies created from sales comps or DD projects
+  getPendingCompanies(orgId: string, status?: string): Promise<PendingCompany[]>;
+  getPendingCompany(id: string, orgId: string): Promise<PendingCompany | undefined>;
+  createPendingCompany(data: InsertPendingCompany): Promise<PendingCompany>;
+  acceptPendingCompany(id: string, orgId: string, userId: string): Promise<CrmCompany | undefined>;
+  rejectPendingCompany(id: string, orgId: string, userId: string): Promise<boolean>;
+  updatePendingCompany(id: string, orgId: string, updates: Partial<PendingCompany>): Promise<PendingCompany | undefined>;
+  mergePendingCompanyWithExisting(pendingId: string, companyId: string, orgId: string, userId: string): Promise<CrmCompany | undefined>;
 
   // RateComps - Rate Comparables Operations
   getRateComps(params: {
@@ -4010,6 +4028,320 @@ export class DatabaseStorage implements IStorage {
         .where(eq(salesComps.id, pending.compId));
 
       return existingProperty;
+    });
+  }
+
+  // ============================================================================
+  // Pending Contacts - Review queue for contacts from comps/DD projects
+  // ============================================================================
+
+  async getPendingContacts(orgId: string, status?: string): Promise<PendingContact[]> {
+    const conditions = [eq(pendingContacts.orgId, orgId)];
+    if (status) {
+      conditions.push(eq(pendingContacts.status, status as any));
+    }
+    return await db.select()
+      .from(pendingContacts)
+      .where(and(...conditions))
+      .orderBy(desc(pendingContacts.createdAt));
+  }
+
+  async getPendingContact(id: string, orgId: string): Promise<PendingContact | undefined> {
+    const [contact] = await db.select()
+      .from(pendingContacts)
+      .where(and(
+        eq(pendingContacts.id, id),
+        eq(pendingContacts.orgId, orgId)
+      ));
+    return contact || undefined;
+  }
+
+  async createPendingContact(data: InsertPendingContact): Promise<PendingContact> {
+    const [created] = await db.insert(pendingContacts)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async acceptPendingContact(id: string, orgId: string, userId: string): Promise<CrmContact | undefined> {
+    return await db.transaction(async (tx) => {
+      const [pending] = await tx.select()
+        .from(pendingContacts)
+        .where(and(
+          eq(pendingContacts.id, id),
+          eq(pendingContacts.orgId, orgId),
+          eq(pendingContacts.status, 'pending' as any)
+        ))
+        .limit(1);
+
+      if (!pending) {
+        return undefined;
+      }
+
+      const [newContact] = await tx.insert(crmContacts).values({
+        firstName: pending.firstName || '',
+        lastName: pending.lastName || '',
+        fullName: pending.fullName,
+        email: pending.email,
+        phone: pending.phone,
+        companyId: pending.companyId,
+        jobTitle: pending.jobTitle,
+        ownerId: userId,
+      }).returning();
+
+      await tx.update(pendingContacts)
+        .set({
+          status: 'accepted',
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+          createdContactId: newContact.id,
+        })
+        .where(and(
+          eq(pendingContacts.id, id),
+          eq(pendingContacts.status, 'pending' as any)
+        ));
+
+      return newContact;
+    });
+  }
+
+  async rejectPendingContact(id: string, orgId: string, userId: string): Promise<boolean> {
+    const result = await db.update(pendingContacts)
+      .set({
+        status: 'rejected',
+        reviewedBy: userId,
+        reviewedAt: new Date(),
+      })
+      .where(and(
+        eq(pendingContacts.id, id),
+        eq(pendingContacts.orgId, orgId),
+        eq(pendingContacts.status, 'pending' as any)
+      ))
+      .returning();
+
+    return result.length > 0;
+  }
+
+  async updatePendingContact(id: string, orgId: string, updates: Partial<PendingContact>): Promise<PendingContact | undefined> {
+    const allowedUpdates: any = {};
+    if (updates.firstName !== undefined) allowedUpdates.firstName = updates.firstName;
+    if (updates.lastName !== undefined) allowedUpdates.lastName = updates.lastName;
+    if (updates.fullName !== undefined) allowedUpdates.fullName = updates.fullName;
+    if (updates.email !== undefined) allowedUpdates.email = updates.email;
+    if (updates.phone !== undefined) allowedUpdates.phone = updates.phone;
+    if (updates.companyId !== undefined) allowedUpdates.companyId = updates.companyId;
+    if (updates.jobTitle !== undefined) allowedUpdates.jobTitle = updates.jobTitle;
+
+    if (Object.keys(allowedUpdates).length === 0) {
+      return this.getPendingContact(id, orgId);
+    }
+
+    const result = await db.update(pendingContacts)
+      .set(allowedUpdates)
+      .where(and(
+        eq(pendingContacts.id, id),
+        eq(pendingContacts.orgId, orgId)
+      ))
+      .returning();
+
+    return result.length > 0 ? result[0] : undefined;
+  }
+
+  async mergePendingContactWithExisting(pendingId: string, contactId: string, orgId: string, userId: string): Promise<CrmContact | undefined> {
+    return await db.transaction(async (tx) => {
+      const [pending] = await tx.select()
+        .from(pendingContacts)
+        .where(and(
+          eq(pendingContacts.id, pendingId),
+          eq(pendingContacts.orgId, orgId),
+          eq(pendingContacts.status, 'pending' as any)
+        ))
+        .limit(1);
+
+      if (!pending) {
+        return undefined;
+      }
+
+      const [existingContact] = await tx.select()
+        .from(crmContacts)
+        .where(eq(crmContacts.id, contactId))
+        .limit(1);
+
+      if (!existingContact) {
+        return undefined;
+      }
+
+      await tx.update(pendingContacts)
+        .set({
+          status: 'accepted',
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+          createdContactId: contactId,
+        })
+        .where(and(
+          eq(pendingContacts.id, pendingId),
+          eq(pendingContacts.status, 'pending' as any)
+        ));
+
+      return existingContact;
+    });
+  }
+
+  // ============================================================================
+  // Pending Companies - Review queue for companies from comps/DD projects
+  // ============================================================================
+
+  async getPendingCompanies(orgId: string, status?: string): Promise<PendingCompany[]> {
+    const conditions = [eq(pendingCompanies.orgId, orgId)];
+    if (status) {
+      conditions.push(eq(pendingCompanies.status, status as any));
+    }
+    return await db.select()
+      .from(pendingCompanies)
+      .where(and(...conditions))
+      .orderBy(desc(pendingCompanies.createdAt));
+  }
+
+  async getPendingCompany(id: string, orgId: string): Promise<PendingCompany | undefined> {
+    const [company] = await db.select()
+      .from(pendingCompanies)
+      .where(and(
+        eq(pendingCompanies.id, id),
+        eq(pendingCompanies.orgId, orgId)
+      ));
+    return company || undefined;
+  }
+
+  async createPendingCompany(data: InsertPendingCompany): Promise<PendingCompany> {
+    const [created] = await db.insert(pendingCompanies)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async acceptPendingCompany(id: string, orgId: string, userId: string): Promise<CrmCompany | undefined> {
+    return await db.transaction(async (tx) => {
+      const [pending] = await tx.select()
+        .from(pendingCompanies)
+        .where(and(
+          eq(pendingCompanies.id, id),
+          eq(pendingCompanies.orgId, orgId),
+          eq(pendingCompanies.status, 'pending' as any)
+        ))
+        .limit(1);
+
+      if (!pending) {
+        return undefined;
+      }
+
+      const [newCompany] = await tx.insert(crmCompanies).values({
+        name: pending.name,
+        website: pending.website,
+        phone: pending.phone,
+        address: pending.address,
+        city: pending.city,
+        state: pending.state,
+        zipCode: pending.zipCode,
+        industry: pending.industry,
+        ownerId: userId,
+      }).returning();
+
+      await tx.update(pendingCompanies)
+        .set({
+          status: 'accepted',
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+          createdCompanyId: newCompany.id,
+        })
+        .where(and(
+          eq(pendingCompanies.id, id),
+          eq(pendingCompanies.status, 'pending' as any)
+        ));
+
+      return newCompany;
+    });
+  }
+
+  async rejectPendingCompany(id: string, orgId: string, userId: string): Promise<boolean> {
+    const result = await db.update(pendingCompanies)
+      .set({
+        status: 'rejected',
+        reviewedBy: userId,
+        reviewedAt: new Date(),
+      })
+      .where(and(
+        eq(pendingCompanies.id, id),
+        eq(pendingCompanies.orgId, orgId),
+        eq(pendingCompanies.status, 'pending' as any)
+      ))
+      .returning();
+
+    return result.length > 0;
+  }
+
+  async updatePendingCompany(id: string, orgId: string, updates: Partial<PendingCompany>): Promise<PendingCompany | undefined> {
+    const allowedUpdates: any = {};
+    if (updates.name !== undefined) allowedUpdates.name = updates.name;
+    if (updates.website !== undefined) allowedUpdates.website = updates.website;
+    if (updates.phone !== undefined) allowedUpdates.phone = updates.phone;
+    if (updates.address !== undefined) allowedUpdates.address = updates.address;
+    if (updates.city !== undefined) allowedUpdates.city = updates.city;
+    if (updates.state !== undefined) allowedUpdates.state = updates.state;
+    if (updates.zipCode !== undefined) allowedUpdates.zipCode = updates.zipCode;
+    if (updates.industry !== undefined) allowedUpdates.industry = updates.industry;
+
+    if (Object.keys(allowedUpdates).length === 0) {
+      return this.getPendingCompany(id, orgId);
+    }
+
+    const result = await db.update(pendingCompanies)
+      .set(allowedUpdates)
+      .where(and(
+        eq(pendingCompanies.id, id),
+        eq(pendingCompanies.orgId, orgId)
+      ))
+      .returning();
+
+    return result.length > 0 ? result[0] : undefined;
+  }
+
+  async mergePendingCompanyWithExisting(pendingId: string, companyId: string, orgId: string, userId: string): Promise<CrmCompany | undefined> {
+    return await db.transaction(async (tx) => {
+      const [pending] = await tx.select()
+        .from(pendingCompanies)
+        .where(and(
+          eq(pendingCompanies.id, pendingId),
+          eq(pendingCompanies.orgId, orgId),
+          eq(pendingCompanies.status, 'pending' as any)
+        ))
+        .limit(1);
+
+      if (!pending) {
+        return undefined;
+      }
+
+      const [existingCompany] = await tx.select()
+        .from(crmCompanies)
+        .where(eq(crmCompanies.id, companyId))
+        .limit(1);
+
+      if (!existingCompany) {
+        return undefined;
+      }
+
+      await tx.update(pendingCompanies)
+        .set({
+          status: 'accepted',
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+          createdCompanyId: companyId,
+        })
+        .where(and(
+          eq(pendingCompanies.id, pendingId),
+          eq(pendingCompanies.status, 'pending' as any)
+        ));
+
+      return existingCompany;
     });
   }
 
