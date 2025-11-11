@@ -2272,6 +2272,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Project-Pending-Contact Association Routes
+  app.get("/api/dd/projects/:projectId/pending-contacts", async (req: any, res) => {
+    try {
+      // Verify project access
+      const project = await storage.getProject(req.params.projectId);
+      if (!project || project.orgId !== req.user.orgId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      const projectPendingContacts = await storage.getProjectPendingContacts(req.params.projectId);
+      res.json(projectPendingContacts);
+    } catch (error) {
+      console.error("Error fetching project pending contacts:", error);
+      res.status(500).json({ error: "Failed to fetch project pending contacts" });
+    }
+  });
+
+  app.post("/api/dd/projects/:projectId/pending-contacts/quick-add", async (req: any, res) => {
+    try {
+      // Verify project access
+      const project = await storage.getProject(req.params.projectId);
+      if (!project || project.orgId !== req.user.orgId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      const { fullName, role, customRole, projectNotes, isPrimary } = req.body;
+      
+      if (!fullName || !role) {
+        return res.status(400).json({ error: "Full name and role are required" });
+      }
+
+      // Create pending contact
+      const pendingContact = await storage.createPendingContact({
+        orgId: req.user.orgId,
+        fullName,
+        sourceType: 'dd_project',
+        sourceId: req.params.projectId,
+        status: 'pending',
+        createdBy: req.user.id,
+      });
+
+      // Link to project
+      const projectPendingContact = await storage.addPendingContactToProject({
+        projectId: req.params.projectId,
+        pendingContactId: pendingContact.id,
+        role,
+        customRole: customRole || null,
+        projectNotes: projectNotes || null,
+        isPrimary: isPrimary || false,
+        createdBy: req.user.id,
+      });
+
+      res.json({ pendingContact, projectPendingContact });
+    } catch (error) {
+      console.error("Error quick-adding pending contact to project:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to quick-add contact" 
+      });
+    }
+  });
+
+  app.delete("/api/dd/projects/:projectId/pending-contacts/:pendingContactId/:role", async (req: any, res) => {
+    try {
+      // Verify project access
+      const project = await storage.getProject(req.params.projectId);
+      if (!project || project.orgId !== req.user.orgId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      await storage.removePendingContactFromProject(
+        req.params.projectId, 
+        req.params.pendingContactId, 
+        req.params.role
+      );
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing pending contact from project:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to remove pending contact from project" 
+      });
+    }
+  });
+
   // Notification Subscription Routes
   app.get("/api/dd/projects/:projectId/subscriptions", async (req: any, res) => {
     try {
