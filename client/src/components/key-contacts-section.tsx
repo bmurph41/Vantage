@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,7 @@ const roleColors: Record<string, string> = {
 };
 
 export function KeyContactsSection({ projectId }: KeyContactsSectionProps) {
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedContact, setSelectedContact] = useState<Contact | undefined>();
   const [modalMode, setModalMode] = useState<"view" | "create" | "edit">("view");
@@ -215,15 +217,31 @@ contact.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
           {/* Pending Contacts */}
           {projectPendingContacts.length > 0 && (
             <div className="space-y-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-amber-600" />
-                <h3 className="text-sm font-semibold text-amber-900">Pending Review ({projectPendingContacts.length})</h3>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  <h3 className="text-sm font-semibold text-amber-900">Pending Review ({projectPendingContacts.length})</h3>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setLocation('/pending-contacts')}
+                  className="bg-white hover:bg-amber-100"
+                  data-testid="button-review-pending-contacts"
+                >
+                  Review All
+                </Button>
               </div>
               <div className="space-y-2">
                 {projectPendingContacts.map((ppc) => (
-                  <div key={ppc.id} className="flex items-center justify-between p-2 bg-white border border-amber-200 rounded">
+                  <button
+                    key={ppc.id}
+                    onClick={() => setLocation('/pending-contacts')}
+                    className="w-full flex items-center justify-between p-2 bg-white border border-amber-200 rounded hover:border-amber-400 hover:bg-amber-50 transition-all text-left"
+                    data-testid={`pending-contact-${ppc.pendingContact.id}`}
+                  >
                     <div className="flex items-center gap-2">
-                      <Badge className={roleColors[ppc.role]} variant="outline" className="text-xs">
+                      <Badge className={`${roleColors[ppc.role]} text-xs`} variant="outline">
                         {roleLabels[ppc.role] || ppc.role}
                       </Badge>
                       <span className="text-sm font-medium text-gray-900">{ppc.pendingContact.fullName}</span>
@@ -231,11 +249,11 @@ contact.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
                     <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
                       Pending
                     </Badge>
-                  </div>
+                  </button>
                 ))}
               </div>
               <p className="text-xs text-amber-700">
-                Review these contacts on the <a href="/pending-contacts" className="underline hover:text-amber-900">Pending Contacts</a> page
+                Click any contact or "Review All" to accept or reject on the Pending Contacts page
               </p>
             </div>
           )}
