@@ -2058,6 +2058,46 @@ export const crmProspectingActivities = pgTable("crm_prospecting_activities", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Prospecting User Settings (per-user preferences)
+export const crmProspectingUserSettings = pgTable("crm_prospecting_user_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  orgId: varchar("org_id").references(() => organizations.id).notNull(),
+  
+  // Week start preference
+  weekStartDay: text("week_start_day").default('monday'), // 'sunday', 'monday', 'saturday'
+  
+  // Future settings can be added here
+  // e.g., timezone preference, notification preferences, etc.
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Prospecting Goal Templates (recurring goal templates)
+export const crmProspectingGoalTemplates = pgTable("crm_prospecting_goal_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id).notNull(),
+  
+  // Template details
+  name: text("name").notNull(), // e.g., "Weekly Call Goal", "Monthly Lead Goal"
+  description: text("description"),
+  frequency: text("frequency").notNull(), // 'weekly', 'monthly'
+  
+  // Goal content (array of goal strings)
+  goals: jsonb("goals").default([]).notNull(), // Array of string goals
+  
+  // Auto-instantiation
+  autoInstantiate: boolean("auto_instantiate").default(false), // Auto-create goals for new weeks
+  
+  // Status
+  isActive: boolean("is_active").default(true),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Email Communications (for email tracking)
 
 export const crmEmailCommunications = pgTable("crm_email_communications", {
@@ -3140,6 +3180,24 @@ export type InsertCrmProspectingEntry = z.infer<typeof insertCrmProspectingEntry
 export type ProspectingEntry = CrmProspectingEntry;
 export type InsertProspectingEntry = InsertCrmProspectingEntry;
 export const insertProspectingEntrySchema = insertCrmProspectingEntrySchema;
+
+// Prospecting User Settings Types
+export type CrmProspectingUserSettings = typeof crmProspectingUserSettings.$inferSelect;
+export const insertCrmProspectingUserSettingsSchema = createInsertSchema(crmProspectingUserSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmProspectingUserSettings = z.infer<typeof insertCrmProspectingUserSettingsSchema>;
+
+// Prospecting Goal Templates Types
+export type CrmProspectingGoalTemplate = typeof crmProspectingGoalTemplates.$inferSelect;
+export const insertCrmProspectingGoalTemplateSchema = createInsertSchema(crmProspectingGoalTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmProspectingGoalTemplate = z.infer<typeof insertCrmProspectingGoalTemplateSchema>;
 
 // ============================================================================
 // SALES COMPS / ANALYSIS MODULE
