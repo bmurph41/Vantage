@@ -1,7 +1,7 @@
 import { 
   organizations, users, projects, projectSettings, tasks, 
   projectTemplates, auditLogs, timelineNotes, projectShares, risks,
-  contacts, projectContacts, notificationSubscriptions, notificationsLog, calendarEvents,
+  contacts, projectContacts, projectPendingContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
   crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities,
@@ -13,7 +13,7 @@ import {
   fuelIntegrations, fuelImportLogs, debtScenarios,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
-  type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
+  type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type ProjectPendingContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
   type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type PendingProperty, type PendingContact, type PendingCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
@@ -27,7 +27,7 @@ import {
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
-  type InsertDDContact, type UpdateDDContact, type InsertProjectContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
+  type InsertDDContact, type UpdateDDContact, type InsertProjectContact, type InsertProjectPendingContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
   type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertProperty, type InsertPendingProperty, type InsertPendingContact, type InsertPendingCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
@@ -541,6 +541,11 @@ export interface IStorage {
   rejectPendingContact(id: string, orgId: string, userId: string): Promise<boolean>;
   updatePendingContact(id: string, orgId: string, updates: Partial<PendingContact>): Promise<PendingContact | undefined>;
   mergePendingContactWithExisting(pendingId: string, contactId: string, orgId: string, userId: string): Promise<CrmContact | undefined>;
+
+  // Project Pending Contacts - Linking pending contacts to DD projects
+  addPendingContactToProject(data: InsertProjectPendingContact): Promise<ProjectPendingContact>;
+  getProjectPendingContacts(projectId: string): Promise<Array<ProjectPendingContact & { pendingContact: PendingContact }>>;
+  removePendingContactFromProject(projectId: string, pendingContactId: string, role: string): Promise<void>;
 
   // Pending Companies - Review queue for companies created from sales comps or DD projects
   getPendingCompanies(orgId: string, status?: string): Promise<PendingCompany[]>;
@@ -4185,6 +4190,39 @@ export class DatabaseStorage implements IStorage {
 
       return existingContact;
     });
+  }
+
+  // ============================================================================
+  // Project Pending Contacts - Linking pending contacts to DD projects
+  // ============================================================================
+
+  async addPendingContactToProject(data: InsertProjectPendingContact): Promise<ProjectPendingContact> {
+    const [created] = await db.insert(projectPendingContacts)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async getProjectPendingContacts(projectId: string): Promise<Array<ProjectPendingContact & { pendingContact: PendingContact }>> {
+    const results = await db.select()
+      .from(projectPendingContacts)
+      .leftJoin(pendingContacts, eq(projectPendingContacts.pendingContactId, pendingContacts.id))
+      .where(eq(projectPendingContacts.projectId, projectId))
+      .orderBy(projectPendingContacts.role);
+
+    return results.map(row => ({
+      ...row.project_pending_contacts!,
+      pendingContact: row.pending_contacts!,
+    }));
+  }
+
+  async removePendingContactFromProject(projectId: string, pendingContactId: string, role: string): Promise<void> {
+    await db.delete(projectPendingContacts)
+      .where(and(
+        eq(projectPendingContacts.projectId, projectId),
+        eq(projectPendingContacts.pendingContactId, pendingContactId),
+        eq(projectPendingContacts.role, role as any)
+      ));
   }
 
   // ============================================================================
