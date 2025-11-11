@@ -24,6 +24,16 @@ export interface MetricResult {
   groupValue?: string;
 }
 
+export interface AgentMetrics {
+  agentName: string;
+  brokerage: string | null;
+  dealCount: number;
+  totalSales: number;
+  avgSalePrice: number;
+  avgPricePerSlip: number;
+  totalValue: number;
+}
+
 export interface ComparativeAnalysis {
   overall: {
     count: number;
@@ -40,6 +50,7 @@ export interface ComparativeAnalysis {
   byYear?: Record<string, MetricResult[]>;
   byWaterType?: Record<string, MetricResult[]>;
   byPriceRange?: Record<string, MetricResult[]>;
+  byAgent?: AgentMetrics[];
   trends?: {
     priceOverTime: Array<{ year: number; avgPrice: number; count: number }>;
     capRateOverTime: Array<{ year: number; avgCapRate: number; count: number }>;
@@ -267,12 +278,57 @@ export async function calculateMetrics(
     }
   });
 
+  // By Agent - aggregated agent sales metrics
+  const byAgentResults = await db
+    .select({
+      brokerage: salesComps.brokerage,
+      agentFirstName: salesComps.agentFirstName,
+      agentLastName: salesComps.agentLastName,
+      broker: salesComps.broker,
+      dealCount: sql<number>`COUNT(*)`,
+      totalSales: sql<number>`SUM(${salesComps.salePrice}::numeric)`,
+      avgSalePrice: sql<number>`AVG(${salesComps.salePrice}::numeric)`,
+      avgPricePerSlip: sql<number>`AVG(${salesComps.pricePerSlip}::numeric)`,
+    })
+    .from(salesComps)
+    .where(whereClause)
+    .groupBy(salesComps.brokerage, salesComps.agentFirstName, salesComps.agentLastName, salesComps.broker)
+    .orderBy(sql`SUM(${salesComps.salePrice}::numeric) DESC NULLS LAST`);
+
+  const byAgent: AgentMetrics[] = byAgentResults
+    .map((row: any) => {
+      // Create display name from available fields, prioritizing new fields over legacy
+      let agentName = '';
+      if (row.agentFirstName || row.agentLastName) {
+        agentName = [row.agentFirstName, row.agentLastName].filter(Boolean).join(' ').trim();
+      } else if (row.broker) {
+        agentName = row.broker;
+      }
+
+      // Only include records with at least some identifying information
+      if (!agentName && !row.brokerage) {
+        return null;
+      }
+
+      return {
+        agentName: agentName || 'Unknown Agent',
+        brokerage: row.brokerage || null,
+        dealCount: row.dealCount,
+        totalSales: row.totalSales || 0,
+        avgSalePrice: row.avgSalePrice || 0,
+        avgPricePerSlip: row.avgPricePerSlip || 0,
+        totalValue: row.totalSales || 0,
+      };
+    })
+    .filter((agent): agent is AgentMetrics => agent !== null);
+
   return {
     overall,
     byState,
     byYear,
     byWaterType,
     byPriceRange,
+    byAgent,
     trends: {
       priceOverTime,
       capRateOverTime,
