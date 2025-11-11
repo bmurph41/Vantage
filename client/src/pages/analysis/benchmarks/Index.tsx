@@ -140,6 +140,13 @@ function BenchmarkChart({ seriesId, name, unit, startDate }: BenchmarkChartProps
     value: parseFloat(obs.value),
   }));
 
+  // Debug logging
+  console.log(`${seriesId} - Total observations:`, data?.observations?.length);
+  console.log(`${seriesId} - Filtered chartData:`, chartData.length);
+  if (chartData.length > 0) {
+    console.log(`${seriesId} - Sample data:`, chartData.slice(0, 3));
+  }
+
   const currentValue = chartData.length > 0 ? chartData[chartData.length - 1].value : null;
   const previousValue = chartData.length > 1 ? chartData[chartData.length - 2].value : currentValue;
   const change = currentValue && previousValue ? currentValue - previousValue : 0;
@@ -183,35 +190,53 @@ function BenchmarkChart({ seriesId, name, unit, startDate }: BenchmarkChartProps
         </CardHeader>
         <CardContent>
           {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={(date) => format(new Date(date), "MMM yy")}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis
-                  domain={['auto', 'auto']}
-                  tickFormatter={(value) => `${value.toFixed(2)}%`}
-                />
-                <Tooltip
-                  labelFormatter={(date) => format(new Date(date), "MMMM dd, yyyy")}
-                  formatter={(value: any) => [`${value.toFixed(2)}%`, name]}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={false}
-                  name={name}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <div style={{ width: '100%', height: 400 }}>
+              <ResponsiveContainer>
+                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 60, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(date) => {
+                      try {
+                        return format(new Date(date), "MMM yy");
+                      } catch {
+                        return date;
+                      }
+                    }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    stroke="#666"
+                  />
+                  <YAxis
+                    domain={['dataMin - 0.1', 'dataMax + 0.1']}
+                    tickFormatter={(value) => `${Number(value).toFixed(2)}%`}
+                    stroke="#666"
+                  />
+                  <Tooltip
+                    labelFormatter={(date) => {
+                      try {
+                        return format(new Date(String(date)), "MMMM dd, yyyy");
+                      } catch {
+                        return String(date);
+                      }
+                    }}
+                    formatter={(value: any) => [`${Number(value).toFixed(2)}%`, name]}
+                    contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc' }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#8884d8"
+                    strokeWidth={2}
+                    dot={false}
+                    name={name}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-96 text-muted-foreground">
               No data available for the selected time range
