@@ -1,12 +1,18 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Calculator, TrendingUp, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts";
+import { Calculator, TrendingUp, AlertCircle, Save, Trash2, Copy } from "lucide-react";
 import { format, subYears } from "date-fns";
+import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 // FRED Series IDs for base rates
 const BASE_RATE_OPTIONS = [
@@ -23,10 +29,39 @@ const BASE_RATE_OPTIONS = [
 
 type TimeRange = "1Y" | "2Y" | "5Y" | "10Y" | "ALL";
 
+interface ScenarioInputs {
+  name: string;
+  baseRate: string;
+  spreadBps: string;
+  purchasePrice: string;
+  loanAmount: string;
+  noi: string;
+  amortizationYears: string;
+  loanTermYears: string;
+  interestOnlyYears: string;
+}
+
 export default function DebtScenariosIndex() {
-  const [baseRate, setBaseRate] = useState<string>("SOFR");
-  const [spreadBps, setSpreadBps] = useState<string>("250");
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("rates");
   const [timeRange, setTimeRange] = useState<TimeRange>("5Y");
+  
+  // Scenario inputs
+  const [inputs, setInputs] = useState<ScenarioInputs>({
+    name: "Scenario 1",
+    baseRate: "SOFR",
+    spreadBps: "250",
+    purchasePrice: "10000000",
+    loanAmount: "7000000",
+    noi: "800000",
+    amortizationYears: "25",
+    loanTermYears: "10",
+    interestOnlyYears: "0",
+  });
+
+  const updateInput = (key: keyof ScenarioInputs, value: string) => {
+    setInputs(prev => ({ ...prev, [key]: value }));
+  };
 
   const getStartDate = (range: TimeRange): string => {
     const now = new Date();
@@ -39,20 +74,104 @@ export default function DebtScenariosIndex() {
     }
   };
 
-  const spreadPercent = parseFloat(spreadBps || "0") / 100;
-  const selectedRate = BASE_RATE_OPTIONS.find(r => r.id === baseRate);
+  const selectedRate = BASE_RATE_OPTIONS.find(r => r.id === inputs.baseRate);
 
-  const { data, isLoading } = useQuery({
-    queryKey: [`/api/benchmarks/fred/${baseRate}`, getStartDate(timeRange)],
+  const { data: rateData, isLoading: rateLoading } = useQuery({
+    queryKey: [`/api/benchmarks/fred/${inputs.baseRate}`, getStartDate(timeRange)],
     queryFn: async () => {
-      const response = await fetch(`/api/benchmarks/fred/${baseRate}?startDate=${getStartDate(timeRange)}`);
+      const response = await fetch(`/api/benchmarks/fred/${inputs.baseRate}?startDate=${getStartDate(timeRange)}`);
       if (!response.ok) throw new Error("Failed to fetch data");
       return response.json();
     },
     staleTime: 1000 * 60 * 60,
   });
 
-  const observations = data?.observations?.filter((obs: any) => obs.value !== ".") || [];
+  // Calculate metrics
+  const spreadPercent = parseFloat(inputs.spreadBps || "0") / 100;
+  const observations = rateData?.observations?.filter((obs: any) => obs.value !== ".") || [];
+  const currentBaseRate = observations.length > 0 ? parseFloat(observations[observations.length - 1].value) : 0;
+  const effectiveRate = currentBaseRate + spreadPercent;
+  
+  const purchasePrice = parseFloat(inputs.purchasePrice || "0");
+  const loanAmount = parseFloat(inputs.loanAmount || "0");
+  const noi = parseFloat(inputs.noi || "0");
+  const amortYears = parseInt(inputs.amortizationYears || "25");
+  const loanTermYears = parseInt(inputs.loanTermYears || "10");
+  const ioYears = parseInt(inputs.interestOnlyYears || "0");
+  
+  const ltv = purchasePrice > 0 ? (loanAmount / purchasePrice) * 100 : 0;
+  const equity = purchasePrice - loanAmount;
+  
+  // Calculate monthly payment
+  const monthlyRate = effectiveRate / 100 / 12;
+  const amortMonths = amortYears * 12;
+  const ioMonths = ioYears * 12;
+  
+  let monthlyPayment = 0;
+  if (loanAmount > 0 && effectiveRate > 0) {
+    if (monthlyRate > 0 && amortMonths > 0) {
+      monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, amortMonths)) / (Math.pow(1 + monthlyRate, amortMonths) - 1);
+    }
+  }
+  
+  const monthlyIOPayment = loanAmount * (effectiveRate / 100 / 12);
+  const annualDebtService = ioYears > 0 
+    ? (monthlyIOPayment * 12 * ioYears + monthlyPayment * 12 * (loanTermYears - ioYears)) / loanTermYears
+    : monthlyPayment * 12;
+  
+  const dscr = noi > 0 && annualDebtService > 0 ? noi / annualDebtService : 0;
+  const debtYield = loanAmount > 0 ? (noi / loanAmount) * 100 : 0;
+  const annualCashFlow = noi - annualDebtService;
+  const cashOnCash = equity > 0 ? (annualCashFlow / equity) * 100 : 0;
+  
+  // Calculate balloon payment
+  const loanTermMonths = loanTermYears * 12;
+  let balloonPayment = 0;
+  if (loanTermMonths < amortMonths && loanAmount > 0) {
+    let balance = loanAmount;
+    for (let i = 0; i < loanTermMonths; i++) {
+      const interest = balance * monthlyRate;
+      const principal = i < ioMonths ? 0 : monthlyPayment - interest;
+      balance -= principal;
+    }
+    balloonPayment = balance;
+  }
+
+  // Generate amortization schedule
+  const generateAmortizationSchedule = () => {
+    const schedule = [];
+    let balance = loanAmount;
+    const totalMonths = Math.min(loanTermMonths, amortMonths);
+    
+    for (let year = 1; year <= Math.ceil(totalMonths / 12); year++) {
+      let yearPrincipal = 0;
+      let yearInterest = 0;
+      const startMonth = (year - 1) * 12;
+      const endMonth = Math.min(year * 12, totalMonths);
+      
+      for (let month = startMonth; month < endMonth; month++) {
+        const interest = balance * monthlyRate;
+        const principal = month < ioMonths ? 0 : monthlyPayment - interest;
+        yearPrincipal += principal;
+        yearInterest += interest;
+        balance -= principal;
+      }
+      
+      schedule.push({
+        year,
+        payment: (year <= ioYears ? monthlyIOPayment : monthlyPayment) * 12,
+        principal: yearPrincipal,
+        interest: yearInterest,
+        balance: Math.max(0, balance),
+      });
+    }
+    
+    return schedule;
+  };
+
+  const amortSchedule = generateAmortizationSchedule();
+
+  // Historical chart data
   const chartData = observations.map((obs: any) => {
     const baseValue = parseFloat(obs.value);
     return {
@@ -61,9 +180,6 @@ export default function DebtScenariosIndex() {
       effectiveRate: baseValue + spreadPercent,
     };
   });
-
-  const currentBase = chartData.length > 0 ? chartData[chartData.length - 1].baseRate : null;
-  const currentEffective = chartData.length > 0 ? chartData[chartData.length - 1].effectiveRate : null;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -75,261 +191,465 @@ export default function DebtScenariosIndex() {
           </h1>
         </div>
         <p className="text-muted-foreground" data-testid="text-debt-scenarios-description">
-          Model debt scenarios by selecting a base rate and adding a spread to calculate effective interest rates
+          Comprehensive debt modeling for marina acquisitions with underwriting metrics and amortization analysis
         </p>
       </div>
 
-      {/* Configuration Panel */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Scenario Configuration</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="rates" data-testid="tab-rates">Rate Analysis</TabsTrigger>
+          <TabsTrigger value="underwriting" data-testid="tab-underwriting">Underwriting Metrics</TabsTrigger>
+          <TabsTrigger value="scenarios" data-testid="tab-scenarios">Saved Scenarios</TabsTrigger>
+        </TabsList>
+
+        {/* Tab 1: Rate Analysis */}
+        <TabsContent value="rates" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Base Rate & Spread Configuration</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="base-rate">Base Rate</Label>
+                  <Select value={inputs.baseRate} onValueChange={(v) => updateInput("baseRate", v)}>
+                    <SelectTrigger id="base-rate" data-testid="select-base-rate">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">SOFR Rates</div>
+                      {BASE_RATE_OPTIONS.filter(r => r.category === "SOFR").map(rate => (
+                        <SelectItem key={rate.id} value={rate.id}>{rate.name}</SelectItem>
+                      ))}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Fed & Prime</div>
+                      {BASE_RATE_OPTIONS.filter(r => r.category === "Fed" || r.category === "Prime").map(rate => (
+                        <SelectItem key={rate.id} value={rate.id}>{rate.name}</SelectItem>
+                      ))}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Treasury Rates</div>
+                      {BASE_RATE_OPTIONS.filter(r => r.category === "Treasury").map(rate => (
+                        <SelectItem key={rate.id} value={rate.id}>{rate.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="spread">Spread (Basis Points)</Label>
+                  <div className="relative">
+                    <Input
+                      id="spread"
+                      type="number"
+                      value={inputs.spreadBps}
+                      onChange={(e) => updateInput("spreadBps", e.target.value)}
+                      placeholder="250"
+                      className="pr-12"
+                      data-testid="input-spread"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      bps
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {spreadPercent.toFixed(2)}% ({inputs.spreadBps} basis points)
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="time-range">Time Range</Label>
+                  <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
+                    <SelectTrigger id="time-range" data-testid="select-time-range">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1Y">1 Year</SelectItem>
+                      <SelectItem value="2Y">2 Years</SelectItem>
+                      <SelectItem value="5Y">5 Years</SelectItem>
+                      <SelectItem value="10Y">10 Years</SelectItem>
+                      <SelectItem value="ALL">All Time</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Base Rate Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="base-rate">Base Rate</Label>
-              <Select value={baseRate} onValueChange={setBaseRate}>
-                <SelectTrigger id="base-rate" data-testid="select-base-rate">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">SOFR Rates</div>
-                  {BASE_RATE_OPTIONS.filter(r => r.category === "SOFR").map(rate => (
-                    <SelectItem key={rate.id} value={rate.id}>{rate.name}</SelectItem>
-                  ))}
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Fed & Prime</div>
-                  {BASE_RATE_OPTIONS.filter(r => r.category === "Fed" || r.category === "Prime").map(rate => (
-                    <SelectItem key={rate.id} value={rate.id}>{rate.name}</SelectItem>
-                  ))}
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Treasury Rates</div>
-                  {BASE_RATE_OPTIONS.filter(r => r.category === "Treasury").map(rate => (
-                    <SelectItem key={rate.id} value={rate.id}>{rate.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Current Base Rate</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1">
+                  <p className="text-3xl font-bold" data-testid="text-current-base-rate">
+                    {currentBaseRate.toFixed(2)}%
+                  </p>
+                  <p className="text-sm text-muted-foreground">{selectedRate?.name}</p>
+                </div>
+              </CardContent>
+            </Card>
 
-            {/* Spread Input */}
-            <div className="space-y-2">
-              <Label htmlFor="spread">Spread (Basis Points)</Label>
-              <div className="relative">
-                <Input
-                  id="spread"
-                  type="number"
-                  value={spreadBps}
-                  onChange={(e) => setSpreadBps(e.target.value)}
-                  placeholder="250"
-                  className="pr-12"
-                  data-testid="input-spread"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                  bps
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {spreadPercent.toFixed(2)}% ({spreadBps} basis points)
-              </p>
-            </div>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Spread</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1">
+                  <p className="text-3xl font-bold text-primary" data-testid="text-spread-display">
+                    +{spreadPercent.toFixed(2)}%
+                  </p>
+                  <p className="text-sm text-muted-foreground">{inputs.spreadBps} basis points</p>
+                </div>
+              </CardContent>
+            </Card>
 
-            {/* Time Range */}
-            <div className="space-y-2">
-              <Label htmlFor="time-range">Time Range</Label>
-              <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
-                <SelectTrigger id="time-range" data-testid="select-time-range">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1Y">1 Year</SelectItem>
-                  <SelectItem value="2Y">2 Years</SelectItem>
-                  <SelectItem value="5Y">5 Years</SelectItem>
-                  <SelectItem value="10Y">10 Years</SelectItem>
-                  <SelectItem value="ALL">All Time</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Card className="border-primary">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Effective Interest Rate
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1">
+                  <p className="text-3xl font-bold text-primary" data-testid="text-effective-rate">
+                    {effectiveRate.toFixed(2)}%
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {currentBaseRate.toFixed(2)}% + {spreadPercent.toFixed(2)}%
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Current Rates Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Current Base Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentBase !== null ? (
-              <div className="space-y-1">
-                <p className="text-3xl font-bold" data-testid="text-current-base-rate">
-                  {currentBase.toFixed(2)}%
-                </p>
-                <p className="text-sm text-muted-foreground">{selectedRate?.name}</p>
+          <Card>
+            <CardHeader>
+              <CardTitle>Historical Rate Comparison</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {rateLoading ? (
+                <div className="flex items-center justify-center h-96">
+                  <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+                </div>
+              ) : chartData.length > 0 ? (
+                <div style={{ width: '100%', height: 400 }}>
+                  <ResponsiveContainer>
+                    <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 60, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(date) => format(new Date(date), "MMM yy")}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                        stroke="#666"
+                      />
+                      <YAxis
+                        domain={['dataMin - 0.5', 'dataMax + 0.5']}
+                        tickFormatter={(value) => `${Number(value).toFixed(2)}%`}
+                        stroke="#666"
+                      />
+                      <Tooltip
+                        labelFormatter={(date) => format(new Date(String(date)), "MMMM dd, yyyy")}
+                        formatter={(value: any, name: string) => {
+                          const label = name === "baseRate" ? "Base Rate" : "Effective Rate";
+                          return [`${Number(value).toFixed(2)}%`, label];
+                        }}
+                        contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc' }}
+                      />
+                      <Legend />
+                      <Line type="monotone" dataKey="baseRate" stroke="#8884d8" strokeWidth={2} dot={false} name="Base Rate" isAnimationActive={false} />
+                      <Line type="monotone" dataKey="effectiveRate" stroke="#82ca9d" strokeWidth={2} dot={false} name="Effective Rate" isAnimationActive={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-96 text-muted-foreground">
+                  No data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 2: Underwriting Metrics */}
+        <TabsContent value="underwriting" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Property & Loan Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="purchase-price">Purchase Price</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                    <Input
+                      id="purchase-price"
+                      type="number"
+                      value={inputs.purchasePrice}
+                      onChange={(e) => updateInput("purchasePrice", e.target.value)}
+                      className="pl-7"
+                      data-testid="input-purchase-price"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="loan-amount">Loan Amount</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                    <Input
+                      id="loan-amount"
+                      type="number"
+                      value={inputs.loanAmount}
+                      onChange={(e) => updateInput("loanAmount", e.target.value)}
+                      className="pl-7"
+                      data-testid="input-loan-amount"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">LTV: {ltv.toFixed(1)}%</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="noi">Net Operating Income (NOI)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                    <Input
+                      id="noi"
+                      type="number"
+                      value={inputs.noi}
+                      onChange={(e) => updateInput("noi", e.target.value)}
+                      className="pl-7"
+                      data-testid="input-noi"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Annual</p>
+                </div>
               </div>
-            ) : (
-              <p className="text-muted-foreground">Loading...</p>
-            )}
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Spread</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1">
-              <p className="text-3xl font-bold text-primary" data-testid="text-spread-display">
-                +{spreadPercent.toFixed(2)}%
-              </p>
-              <p className="text-sm text-muted-foreground">{spreadBps} basis points</p>
-            </div>
-          </CardContent>
-        </Card>
+              <Separator className="my-6" />
 
-        <Card className="border-primary">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Effective Interest Rate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentEffective !== null ? (
-              <div className="space-y-1">
-                <p className="text-3xl font-bold text-primary" data-testid="text-effective-rate">
-                  {currentEffective.toFixed(2)}%
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {currentBase?.toFixed(2)}% + {spreadPercent.toFixed(2)}%
-                </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="amort-years">Amortization Period</Label>
+                  <Select value={inputs.amortizationYears} onValueChange={(v) => updateInput("amortizationYears", v)}>
+                    <SelectTrigger id="amort-years" data-testid="select-amort-years">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20 Years</SelectItem>
+                      <SelectItem value="25">25 Years</SelectItem>
+                      <SelectItem value="30">30 Years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="loan-term">Loan Term</Label>
+                  <Select value={inputs.loanTermYears} onValueChange={(v) => updateInput("loanTermYears", v)}>
+                    <SelectTrigger id="loan-term" data-testid="select-loan-term">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5 Years</SelectItem>
+                      <SelectItem value="7">7 Years</SelectItem>
+                      <SelectItem value="10">10 Years</SelectItem>
+                      <SelectItem value="15">15 Years</SelectItem>
+                      <SelectItem value="20">20 Years</SelectItem>
+                      <SelectItem value="25">25 Years</SelectItem>
+                      <SelectItem value="30">30 Years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="io-years">Interest-Only Period</Label>
+                  <Select value={inputs.interestOnlyYears} onValueChange={(v) => updateInput("interestOnlyYears", v)}>
+                    <SelectTrigger id="io-years" data-testid="select-io-years">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">None</SelectItem>
+                      <SelectItem value="1">1 Year</SelectItem>
+                      <SelectItem value="2">2 Years</SelectItem>
+                      <SelectItem value="3">3 Years</SelectItem>
+                      <SelectItem value="5">5 Years</SelectItem>
+                      <SelectItem value="10">10 Years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            ) : (
-              <p className="text-muted-foreground">Loading...</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
 
-      {/* Historical Chart */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Historical Rate Comparison</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center h-96">
-              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-            </div>
-          ) : chartData.length > 0 ? (
-            <div style={{ width: '100%', height: 400 }}>
-              <ResponsiveContainer>
-                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 60, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={(date) => {
-                      try {
-                        return format(new Date(date), "MMM yy");
-                      } catch {
-                        return date;
-                      }
-                    }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={80}
-                    stroke="#666"
-                  />
-                  <YAxis
-                    domain={['dataMin - 0.5', 'dataMax + 0.5']}
-                    tickFormatter={(value) => `${Number(value).toFixed(2)}%`}
-                    stroke="#666"
-                  />
-                  <Tooltip
-                    labelFormatter={(date) => {
-                      try {
-                        return format(new Date(String(date)), "MMMM dd, yyyy");
-                      } catch {
-                        return String(date);
-                      }
-                    }}
-                    formatter={(value: any, name: string) => {
-                      const label = name === "baseRate" ? "Base Rate" : "Effective Rate";
-                      return [`${Number(value).toFixed(2)}%`, label];
-                    }}
-                    contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc' }}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="baseRate"
-                    stroke="#8884d8"
-                    strokeWidth={2}
-                    dot={false}
-                    name="Base Rate"
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="effectiveRate"
-                    stroke="#82ca9d"
-                    strokeWidth={2}
-                    dot={false}
-                    name="Effective Rate (with spread)"
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-96 text-muted-foreground">
-              No data available for the selected time range
-            </div>
+          {/* Key Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">LTV</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold" data-testid="metric-ltv">{ltv.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground mt-1">Loan-to-Value</p>
+              </CardContent>
+            </Card>
+
+            <Card className={dscr < 1.2 ? "border-yellow-500" : "border-green-500"}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">DSCR</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold" data-testid="metric-dscr">{dscr.toFixed(2)}x</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {dscr >= 1.25 ? "Strong" : dscr >= 1.2 ? "Acceptable" : "Weak"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Debt Yield</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold" data-testid="metric-debt-yield">{debtYield.toFixed(2)}%</p>
+                <p className="text-xs text-muted-foreground mt-1">NOI / Loan</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Annual Debt Service</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold" data-testid="metric-debt-service">
+                  ${(annualDebtService / 1000).toFixed(0)}k
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">${(monthlyPayment).toFixed(0)}/mo</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Cash-on-Cash</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-primary" data-testid="metric-coc">{cashOnCash.toFixed(2)}%</p>
+                <p className="text-xs text-muted-foreground mt-1">Levered Return</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Payment Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Monthly Payment</p>
+                  <p className="text-3xl font-bold">${monthlyPayment.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                  {ioYears > 0 && (
+                    <p className="text-sm text-muted-foreground">IO: ${monthlyIOPayment.toLocaleString('en-US', { maximumFractionDigits: 0 })} for {ioYears} years</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Annual Debt Service</p>
+                  <p className="text-3xl font-bold">${annualDebtService.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                  <p className="text-sm text-muted-foreground">Total yearly payment</p>
+                </div>
+                {balloonPayment > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Balloon Payment</p>
+                    <p className="text-3xl font-bold text-orange-600">${balloonPayment.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                    <p className="text-sm text-muted-foreground">Due at year {loanTermYears}</p>
+                  </div>
+                )}
+              </div>
+
+              {amortSchedule.length > 0 && (
+                <div style={{ width: '100%', height: 300 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={amortSchedule} margin={{ top: 5, right: 20, bottom: 20, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="year" label={{ value: 'Year', position: 'insideBottom', offset: -5 }} />
+                      <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
+                      <Tooltip
+                        formatter={(value: any) => `$${Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
+                        contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc' }}
+                      />
+                      <Legend />
+                      <Bar dataKey="principal" stackId="a" fill="#82ca9d" name="Principal" />
+                      <Bar dataKey="interest" stackId="a" fill="#8884d8" name="Interest" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Amortization Schedule Table */}
+          {amortSchedule.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Amortization Schedule</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Year</th>
+                        <th className="text-right p-2">Payment</th>
+                        <th className="text-right p-2">Principal</th>
+                        <th className="text-right p-2">Interest</th>
+                        <th className="text-right p-2">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {amortSchedule.map((row) => (
+                        <tr key={row.year} className="border-b">
+                          <td className="p-2">{row.year}</td>
+                          <td className="text-right p-2">${row.payment.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td className="text-right p-2">${row.principal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td className="text-right p-2">${row.interest.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td className="text-right p-2 font-medium">${row.balance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      {/* Statistics */}
-      {chartData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Rate Statistics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Current Effective</p>
-                <p className="text-lg font-bold" data-testid="stat-current-effective">
-                  {currentEffective?.toFixed(2)}%
+        {/* Tab 3: Saved Scenarios (Placeholder for Phase 3) */}
+        <TabsContent value="scenarios" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Scenario Management</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <Save className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Scenario Management Coming Soon</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  Save, compare, and manage multiple debt scenarios. Link scenarios to specific deals and projects
+                  for comprehensive acquisition analysis.
                 </p>
+                <div className="mt-6 space-y-2 text-sm text-muted-foreground">
+                  <p>• Save unlimited scenarios with custom names</p>
+                  <p>• Side-by-side comparison view</p>
+                  <p>• Link scenarios to CRM deals and DD projects</p>
+                  <p>• Export scenarios to Excel/PDF</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Highest Effective</p>
-                <p className="text-lg font-bold" data-testid="stat-high-effective">
-                  {Math.max(...chartData.map((d: any) => d.effectiveRate)).toFixed(2)}%
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Lowest Effective</p>
-                <p className="text-lg font-bold" data-testid="stat-low-effective">
-                  {Math.min(...chartData.map((d: any) => d.effectiveRate)).toFixed(2)}%
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Avg Effective</p>
-                <p className="text-lg font-bold" data-testid="stat-avg-effective">
-                  {(chartData.reduce((sum: number, d: any) => sum + d.effectiveRate, 0) / chartData.length).toFixed(2)}%
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Data Points</p>
-                <p className="text-lg font-bold" data-testid="stat-data-points">
-                  {chartData.length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Information Card */}
       <Card className="mt-6 border-blue-200 bg-blue-50">
@@ -337,13 +657,13 @@ export default function DebtScenariosIndex() {
           <div className="flex gap-3">
             <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="space-y-2 text-sm">
-              <p className="font-medium text-blue-900">How to use Debt Scenarios:</p>
+              <p className="font-medium text-blue-900">Underwriting Guidance:</p>
               <ul className="list-disc list-inside space-y-1 text-blue-800">
-                <li>Select a base rate (SOFR, Prime, or Treasury rate) that matches your loan terms</li>
-                <li>Enter the spread in basis points (100 bps = 1.00%) provided by your lender</li>
-                <li>The effective rate shows your actual interest cost (Base Rate + Spread)</li>
-                <li>Use the historical chart to understand rate volatility and trends</li>
-                <li>Adjust the time range to see long-term vs. short-term patterns</li>
+                <li><strong>DSCR 1.20-1.25x:</strong> Minimum acceptable for most lenders</li>
+                <li><strong>DSCR 1.35x+:</strong> Preferred for agency loans</li>
+                <li><strong>LTV 65-75%:</strong> Typical for marina acquisitions</li>
+                <li><strong>Debt Yield 10%+:</strong> Strong loan performance indicator</li>
+                <li><strong>Balloon Payment:</strong> Occurs when loan term is shorter than amortization period</li>
               </ul>
             </div>
           </div>
