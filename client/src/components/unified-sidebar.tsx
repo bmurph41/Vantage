@@ -60,9 +60,9 @@ const ddNav = [
   { name: "Progress Report", href: "/progress-report", icon: ClipboardList },
 ];
 
-// Modeling Navigation (placeholder for future)
+// Modeling Navigation
 const modelingNav = [
-  { name: "Coming Soon", href: "#", icon: Calculator, disabled: true },
+  { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
 ];
 
 // Analysis Navigation (Sales Comps)
