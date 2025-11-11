@@ -29,6 +29,15 @@ const BASE_RATE_OPTIONS = [
 
 type TimeRange = "1Y" | "2Y" | "5Y" | "10Y" | "ALL";
 
+// Formatting helpers
+const formatCurrency = (value: number): string => {
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+};
+
+const formatPercentage = (value: number): string => {
+  return `${value.toFixed(2)}%`;
+};
+
 interface ScenarioInputs {
   name: string;
   baseRate: string;
@@ -250,7 +259,7 @@ export default function DebtScenariosIndex() {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {spreadPercent.toFixed(2)}% ({inputs.spreadBps} basis points)
+                    {formatPercentage(spreadPercent)} ({inputs.spreadBps} basis points)
                   </p>
                 </div>
 
@@ -281,7 +290,7 @@ export default function DebtScenariosIndex() {
               <CardContent>
                 <div className="space-y-1">
                   <p className="text-3xl font-bold" data-testid="text-current-base-rate">
-                    {currentBaseRate.toFixed(2)}%
+                    {formatPercentage(currentBaseRate)}
                   </p>
                   <p className="text-sm text-muted-foreground">{selectedRate?.name}</p>
                 </div>
@@ -295,7 +304,7 @@ export default function DebtScenariosIndex() {
               <CardContent>
                 <div className="space-y-1">
                   <p className="text-3xl font-bold text-primary" data-testid="text-spread-display">
-                    +{spreadPercent.toFixed(2)}%
+                    +{formatPercentage(spreadPercent)}
                   </p>
                   <p className="text-sm text-muted-foreground">{inputs.spreadBps} basis points</p>
                 </div>
@@ -312,10 +321,10 @@ export default function DebtScenariosIndex() {
               <CardContent>
                 <div className="space-y-1">
                   <p className="text-3xl font-bold text-primary" data-testid="text-effective-rate">
-                    {effectiveRate.toFixed(2)}%
+                    {formatPercentage(effectiveRate)}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {currentBaseRate.toFixed(2)}% + {spreadPercent.toFixed(2)}%
+                    {formatPercentage(currentBaseRate)} + {formatPercentage(spreadPercent)}
                   </p>
                 </div>
               </CardContent>
@@ -408,7 +417,7 @@ export default function DebtScenariosIndex() {
                       data-testid="input-loan-amount"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">LTV: {ltv.toFixed(1)}%</p>
+                  <p className="text-xs text-muted-foreground">LTV: {formatPercentage(ltv)}</p>
                 </div>
 
                 <div className="space-y-2">
@@ -490,7 +499,7 @@ export default function DebtScenariosIndex() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">LTV</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold" data-testid="metric-ltv">{ltv.toFixed(1)}%</p>
+                <p className="text-2xl font-bold" data-testid="metric-ltv">{formatPercentage(ltv)}</p>
                 <p className="text-xs text-muted-foreground mt-1">Loan-to-Value</p>
               </CardContent>
             </Card>
@@ -512,7 +521,7 @@ export default function DebtScenariosIndex() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Debt Yield</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold" data-testid="metric-debt-yield">{debtYield.toFixed(2)}%</p>
+                <p className="text-2xl font-bold" data-testid="metric-debt-yield">{formatPercentage(debtYield)}</p>
                 <p className="text-xs text-muted-foreground mt-1">NOI / Loan</p>
               </CardContent>
             </Card>
@@ -523,9 +532,9 @@ export default function DebtScenariosIndex() {
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold" data-testid="metric-debt-service">
-                  ${(annualDebtService / 1000).toFixed(0)}k
+                  {formatCurrency(annualDebtService)}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">${(monthlyPayment).toFixed(0)}/mo</p>
+                <p className="text-xs text-muted-foreground mt-1">{formatCurrency(monthlyPayment)}/mo</p>
               </CardContent>
             </Card>
 
@@ -534,7 +543,7 @@ export default function DebtScenariosIndex() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Cash-on-Cash</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-primary" data-testid="metric-coc">{cashOnCash.toFixed(2)}%</p>
+                <p className="text-2xl font-bold text-primary" data-testid="metric-coc">{formatPercentage(cashOnCash)}</p>
                 <p className="text-xs text-muted-foreground mt-1">Levered Return</p>
               </CardContent>
             </Card>
@@ -549,20 +558,20 @@ export default function DebtScenariosIndex() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Monthly Payment</p>
-                  <p className="text-3xl font-bold">${monthlyPayment.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                  <p className="text-3xl font-bold">{formatCurrency(monthlyPayment)}</p>
                   {ioYears > 0 && (
-                    <p className="text-sm text-muted-foreground">IO: ${monthlyIOPayment.toLocaleString('en-US', { maximumFractionDigits: 0 })} for {ioYears} years</p>
+                    <p className="text-sm text-muted-foreground">IO: {formatCurrency(monthlyIOPayment)} for {ioYears} years</p>
                   )}
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Annual Debt Service</p>
-                  <p className="text-3xl font-bold">${annualDebtService.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                  <p className="text-3xl font-bold">{formatCurrency(annualDebtService)}</p>
                   <p className="text-sm text-muted-foreground">Total yearly payment</p>
                 </div>
                 {balloonPayment > 0 && (
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">Balloon Payment</p>
-                    <p className="text-3xl font-bold text-orange-600">${balloonPayment.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                    <p className="text-3xl font-bold text-orange-600">{formatCurrency(balloonPayment)}</p>
                     <p className="text-sm text-muted-foreground">Due at year {loanTermYears}</p>
                   </div>
                 )}
@@ -574,9 +583,9 @@ export default function DebtScenariosIndex() {
                     <BarChart data={amortSchedule} margin={{ top: 5, right: 20, bottom: 20, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="year" label={{ value: 'Year', position: 'insideBottom', offset: -5 }} />
-                      <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
+                      <YAxis tickFormatter={(value) => formatCurrency(value)} />
                       <Tooltip
-                        formatter={(value: any) => `$${Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
+                        formatter={(value: any) => formatCurrency(Number(value))}
                         contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc' }}
                       />
                       <Legend />
@@ -611,10 +620,10 @@ export default function DebtScenariosIndex() {
                       {amortSchedule.map((row) => (
                         <tr key={row.year} className="border-b">
                           <td className="p-2">{row.year}</td>
-                          <td className="text-right p-2">${row.payment.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
-                          <td className="text-right p-2">${row.principal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
-                          <td className="text-right p-2">${row.interest.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
-                          <td className="text-right p-2 font-medium">${row.balance.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td className="text-right p-2">{formatCurrency(row.payment)}</td>
+                          <td className="text-right p-2">{formatCurrency(row.principal)}</td>
+                          <td className="text-right p-2">{formatCurrency(row.interest)}</td>
+                          <td className="text-right p-2 font-medium">{formatCurrency(row.balance)}</td>
                         </tr>
                       ))}
                     </tbody>

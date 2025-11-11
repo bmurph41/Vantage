@@ -10,7 +10,7 @@ import {
   calendarSettings,
   salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes, scPortfolios, scPortfolioComps, scPendingPropertyProfiles, scMetricSeries, scMetricPoints, scMetricAlerts,
   rateComps, rateCompColumns, rateCompImports, rcProjects, rcProjectComps, rcAuditLog, rcRecommendationFeedback, rcOrgPreferences, rcSavedSearches, rcCustomStorageTypes, rcPortfolios, rcPortfolioComps, rcPendingPropertyProfiles, rcMetricSeries, rcMetricPoints, rcMetricAlerts,
-  fuelIntegrations, fuelImportLogs,
+  fuelIntegrations, fuelImportLogs, debtScenarios,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
@@ -23,6 +23,7 @@ import {
   type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScCustomStorageType, type ScPendingPropertyProfile, type ScMetricSeries, type ScMetricPoint, type ScMetricAlert,
   type RateComp, type RateCompColumn, type RateCompImport, type RcProject, type RcProjectComp, type RcAuditLog, type RcRecommendationFeedback, type RcOrgPreferences, type RcSavedSearch, type RcCustomStorageType, type RcPendingPropertyProfile, type RcMetricSeries, type RcMetricPoint, type RcMetricAlert,
   type FuelIntegration, type FuelImportLog,
+  type DebtScenario, type InsertDebtScenario, type UpdateDebtScenario,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
@@ -634,6 +635,13 @@ export interface IStorage {
   getFuelImportLogsByIntegration(integrationId: string, limit?: number): Promise<FuelImportLog[]>;
   createFuelImportLog(data: InsertFuelImportLog): Promise<FuelImportLog>;
   updateFuelImportLog(id: string, data: Partial<InsertFuelImportLog>): Promise<FuelImportLog | undefined>;
+
+  // Debt Scenarios
+  getDebtScenario(id: string): Promise<DebtScenario | undefined>;
+  getDebtScenariosForOrg(orgId: string): Promise<DebtScenario[]>;
+  createDebtScenario(data: InsertDebtScenario): Promise<DebtScenario>;
+  updateDebtScenario(id: string, updates: UpdateDebtScenario): Promise<DebtScenario>;
+  deleteDebtScenario(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4870,6 +4878,41 @@ export class DatabaseStorage implements IStorage {
       .where(eq(fuelImportLogs.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  // Debt Scenarios
+  async getDebtScenario(id: string): Promise<DebtScenario | undefined> {
+    const [scenario] = await db.select()
+      .from(debtScenarios)
+      .where(eq(debtScenarios.id, id));
+    return scenario || undefined;
+  }
+
+  async getDebtScenariosForOrg(orgId: string): Promise<DebtScenario[]> {
+    return await db.select()
+      .from(debtScenarios)
+      .where(eq(debtScenarios.orgId, orgId))
+      .orderBy(desc(debtScenarios.createdAt));
+  }
+
+  async createDebtScenario(data: InsertDebtScenario): Promise<DebtScenario> {
+    const [created] = await db.insert(debtScenarios)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateDebtScenario(id: string, updates: UpdateDebtScenario): Promise<DebtScenario> {
+    const [updated] = await db.update(debtScenarios)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(debtScenarios.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDebtScenario(id: string): Promise<void> {
+    await db.delete(debtScenarios)
+      .where(eq(debtScenarios.id, id));
   }
 }
 

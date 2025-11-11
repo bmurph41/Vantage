@@ -4389,6 +4389,38 @@ export const fuelImportLogs = pgTable('fuel_import_logs', {
   dateIdx: index('fuel_import_logs_date_idx').on(table.startedAt),
 }));
 
+// Debt Scenarios - Financial Modeling Module
+export const debtScenarios = pgTable('debt_scenarios', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  // Rate Configuration
+  baseRate: text('base_rate').notNull(), // FRED series ID (SOFR, DPRIME, DGS5, etc.)
+  spreadBps: integer('spread_bps').notNull().default(250), // Spread in basis points
+  // Property Details
+  purchasePrice: decimal('purchase_price', { precision: 15, scale: 2 }).notNull(),
+  loanAmount: decimal('loan_amount', { precision: 15, scale: 2 }).notNull(),
+  noi: decimal('noi', { precision: 15, scale: 2 }).notNull(), // Net Operating Income
+  // Loan Terms
+  amortizationYears: integer('amortization_years').notNull().default(25),
+  loanTermYears: integer('loan_term_years').notNull().default(10),
+  interestOnlyYears: integer('interest_only_years').notNull().default(0),
+  // Optional Relations
+  dealId: varchar('deal_id').references(() => crmDeals.id), // Link to CRM deal
+  projectId: varchar('project_id').references(() => projects.id), // Link to DD project
+  // Metadata
+  createdBy: varchar('created_by').references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('debt_scenarios_org_idx').on(table.orgId),
+  dealIdx: index('debt_scenarios_deal_idx').on(table.dealId),
+  projectIdx: index('debt_scenarios_project_idx').on(table.projectId),
+  createdByIdx: index('debt_scenarios_created_by_idx').on(table.createdBy),
+}));
+
 // ================================================================================
 // RBAC & ADVANCED COMPLIANCE SYSTEM
 // ================================================================================
@@ -4885,6 +4917,20 @@ export const insertFuelImportLogSchema = createInsertSchema(fuelImportLogs).omit
 
 export const updateFuelImportLogSchema = insertFuelImportLogSchema.partial();
 
+// Debt Scenarios
+export const insertDebtScenarioSchema = createInsertSchema(debtScenarios).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  purchasePrice: z.string().or(z.number()),
+  loanAmount: z.string().or(z.number()),
+  noi: z.string().or(z.number()),
+});
+
+export const updateDebtScenarioSchema = insertDebtScenarioSchema.partial();
+
 // RC Project profile validation (reuse same schema as SC)
 export const rcProjectProfileSchema = scProjectProfileSchema;
 export const rcWeightOverridesSchema = scWeightOverridesSchema;
@@ -4967,3 +5013,8 @@ export type UpdateFuelIntegration = z.infer<typeof updateFuelIntegrationSchema>;
 export type FuelImportLog = typeof fuelImportLogs.$inferSelect;
 export type InsertFuelImportLog = z.infer<typeof insertFuelImportLogSchema>;
 export type UpdateFuelImportLog = z.infer<typeof updateFuelImportLogSchema>;
+
+// Types for Debt Scenarios
+export type DebtScenario = typeof debtScenarios.$inferSelect;
+export type InsertDebtScenario = z.infer<typeof insertDebtScenarioSchema>;
+export type UpdateDebtScenario = z.infer<typeof updateDebtScenarioSchema>;
