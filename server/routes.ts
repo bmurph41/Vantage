@@ -6518,6 +6518,145 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ===================================================================
+  // CRM Prospecting Settings
+  // ===================================================================
+
+  // Get user prospecting settings (create default if doesn't exist)
+  app.get("/api/prospecting/settings", async (req: any, res) => {
+    try {
+      let settings = await storage.getProspectingUserSettings(req.user.id);
+      
+      // Create default settings if they don't exist
+      if (!settings) {
+        settings = await storage.createProspectingUserSettings({
+          userId: req.user.id,
+          orgId: req.user.orgId,
+          weekStartDay: 'monday'
+        });
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Failed to get prospecting settings:", error);
+      res.status(500).json({ error: "Failed to retrieve prospecting settings" });
+    }
+  });
+
+  // Update user prospecting settings
+  app.put("/api/prospecting/settings", async (req: any, res) => {
+    try {
+      const { insertCrmProspectingUserSettingsSchema } = await import("@shared/schema");
+      const validated = insertCrmProspectingUserSettingsSchema.partial().parse(req.body);
+      
+      // Check if settings exist
+      const existing = await storage.getProspectingUserSettings(req.user.id);
+      
+      let settings;
+      if (existing) {
+        settings = await storage.updateProspectingUserSettings(req.user.id, validated);
+      } else {
+        settings = await storage.createProspectingUserSettings({
+          ...validated,
+          userId: req.user.id,
+          orgId: req.user.orgId
+        });
+      }
+      
+      res.json(settings);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid settings data", details: error.errors });
+      }
+      console.error("Failed to update prospecting settings:", error);
+      res.status(500).json({ error: "Failed to update prospecting settings" });
+    }
+  });
+
+  // ===================================================================
+  // CRM Prospecting Goal Templates
+  // ===================================================================
+
+  // Get all goal templates for user
+  app.get("/api/prospecting/goal-templates", async (req: any, res) => {
+    try {
+      const templates = await storage.getProspectingGoalTemplates(req.user.id);
+      res.json(templates);
+    } catch (error) {
+      console.error("Failed to get goal templates:", error);
+      res.status(500).json({ error: "Failed to retrieve goal templates" });
+    }
+  });
+
+  // Create a new goal template
+  app.post("/api/prospecting/goal-templates", async (req: any, res) => {
+    try {
+      const { insertCrmProspectingGoalTemplateSchema } = await import("@shared/schema");
+      const validated = insertCrmProspectingGoalTemplateSchema.parse({
+        ...req.body,
+        userId: req.user.id,
+        orgId: req.user.orgId
+      });
+      
+      const template = await storage.createProspectingGoalTemplate(validated);
+      res.json(template);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid goal template data", details: error.errors });
+      }
+      console.error("Failed to create goal template:", error);
+      res.status(500).json({ error: "Failed to create goal template" });
+    }
+  });
+
+  // Update a goal template
+  app.put("/api/prospecting/goal-templates/:id", async (req: any, res) => {
+    try {
+      const template = await storage.getProspectingGoalTemplate(req.params.id);
+      
+      if (!template) {
+        return res.status(404).json({ error: "Goal template not found" });
+      }
+      
+      if (template.userId !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized to update this goal template" });
+      }
+      
+      const { insertCrmProspectingGoalTemplateSchema } = await import("@shared/schema");
+      const validated = insertCrmProspectingGoalTemplateSchema.partial().parse(req.body);
+      
+      const updated = await storage.updateProspectingGoalTemplate(req.params.id, validated);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid goal template data", details: error.errors });
+      }
+      console.error("Failed to update goal template:", error);
+      res.status(500).json({ error: "Failed to update goal template" });
+    }
+  });
+
+  // Delete a goal template
+  app.delete("/api/prospecting/goal-templates/:id", async (req: any, res) => {
+    try {
+      const template = await storage.getProspectingGoalTemplate(req.params.id);
+      
+      if (!template) {
+        return res.status(404).json({ error: "Goal template not found" });
+      }
+      
+      if (template.userId !== req.user.id) {
+        return res.status(403).json({ error: "Unauthorized to delete this goal template" });
+      }
+      
+      await storage.deleteProspectingGoalTemplate(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete goal template:", error);
+      res.status(500).json({ error: "Failed to delete goal template" });
+    }
+  });
+
+  // ===================================================================
   // CRM Route Aliases - Frontend Integration
   // Map /api/* routes to /api/crm/* for frontend compatibility
   // ===================================================================

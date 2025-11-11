@@ -5,7 +5,7 @@ import {
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
   crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities,
-  crmImportJobs, crmImportedRecords, crmProspectingEntries,
+  crmImportJobs, crmImportedRecords, crmProspectingEntries, crmProspectingUserSettings, crmProspectingGoalTemplates,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
   salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes, scPortfolios, scPortfolioComps, scPendingPropertyProfiles, scMetricSeries, scMetricPoints, scMetricAlerts,
@@ -17,7 +17,7 @@ import {
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
   type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type PendingProperty, type PendingContact, type PendingCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
-  type CrmImportJob, type CrmImportedRecord, type ProspectingEntry,
+  type CrmImportJob, type CrmImportedRecord, type ProspectingEntry, type CrmProspectingUserSettings, type CrmProspectingGoalTemplate,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
   type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScCustomStorageType, type ScPendingPropertyProfile, type ScMetricSeries, type ScMetricPoint, type ScMetricAlert,
@@ -31,7 +31,7 @@ import {
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
   type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertProperty, type InsertPendingProperty, type InsertPendingContact, type InsertPendingCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
-  type InsertCrmImportJob, type InsertCrmImportedRecord, type InsertProspectingEntry,
+  type InsertCrmImportJob, type InsertCrmImportedRecord, type InsertProspectingEntry, type InsertCrmProspectingUserSettings, type InsertCrmProspectingGoalTemplate,
   type InsertEmailSequence, type InsertEmailTemplate, type InsertEmailSequenceStep, type InsertEmailSequenceEnrollment, type InsertEmailSequenceStepExecution,
   type InsertCalendarSettings,
   type InsertSalesComp, type UpdateSalesComp, type InsertCompColumn, type UpdateCompColumn, type InsertCompImport,
@@ -379,6 +379,18 @@ export interface IStorage {
   createProspectingEntry(entry: InsertProspectingEntry): Promise<ProspectingEntry>;
   updateProspectingEntry(id: string, updates: Partial<InsertProspectingEntry>): Promise<ProspectingEntry>;
   deleteProspectingEntry(id: string): Promise<void>;
+  
+  // CRM - Prospecting Settings
+  getProspectingUserSettings(userId: string): Promise<CrmProspectingUserSettings | undefined>;
+  createProspectingUserSettings(settings: InsertCrmProspectingUserSettings): Promise<CrmProspectingUserSettings>;
+  updateProspectingUserSettings(userId: string, updates: Partial<InsertCrmProspectingUserSettings>): Promise<CrmProspectingUserSettings>;
+  
+  // CRM - Prospecting Goal Templates
+  getProspectingGoalTemplates(userId: string): Promise<CrmProspectingGoalTemplate[]>;
+  getProspectingGoalTemplate(id: string): Promise<CrmProspectingGoalTemplate | undefined>;
+  createProspectingGoalTemplate(template: InsertCrmProspectingGoalTemplate): Promise<CrmProspectingGoalTemplate>;
+  updateProspectingGoalTemplate(id: string, updates: Partial<InsertCrmProspectingGoalTemplate>): Promise<CrmProspectingGoalTemplate>;
+  deleteProspectingGoalTemplate(id: string): Promise<void>;
 
   // Marketing Automation - Email Sequences
   getEmailSequence(id: string): Promise<EmailSequence | undefined>;
@@ -2861,6 +2873,66 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProspectingEntry(id: string): Promise<void> {
     await db.delete(crmProspectingEntries).where(eq(crmProspectingEntries.id, id));
+  }
+
+  // CRM - Prospecting Settings
+  
+  async getProspectingUserSettings(userId: string): Promise<CrmProspectingUserSettings | undefined> {
+    const [settings] = await db.select().from(crmProspectingUserSettings)
+      .where(eq(crmProspectingUserSettings.userId, userId));
+    return settings || undefined;
+  }
+
+  async createProspectingUserSettings(settings: InsertCrmProspectingUserSettings): Promise<CrmProspectingUserSettings> {
+    const [created] = await db.insert(crmProspectingUserSettings).values(settings).returning();
+    return created;
+  }
+
+  async updateProspectingUserSettings(userId: string, updates: Partial<InsertCrmProspectingUserSettings>): Promise<CrmProspectingUserSettings> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmProspectingUserSettings)
+      .set(updateData)
+      .where(eq(crmProspectingUserSettings.userId, userId))
+      .returning();
+    return updated;
+  }
+
+  // CRM - Prospecting Goal Templates
+  
+  async getProspectingGoalTemplates(userId: string): Promise<CrmProspectingGoalTemplate[]> {
+    return db.select().from(crmProspectingGoalTemplates)
+      .where(and(
+        eq(crmProspectingGoalTemplates.userId, userId),
+        eq(crmProspectingGoalTemplates.isActive, true)
+      ))
+      .orderBy(desc(crmProspectingGoalTemplates.createdAt));
+  }
+
+  async getProspectingGoalTemplate(id: string): Promise<CrmProspectingGoalTemplate | undefined> {
+    const [template] = await db.select().from(crmProspectingGoalTemplates)
+      .where(eq(crmProspectingGoalTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createProspectingGoalTemplate(template: InsertCrmProspectingGoalTemplate): Promise<CrmProspectingGoalTemplate> {
+    const [created] = await db.insert(crmProspectingGoalTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateProspectingGoalTemplate(id: string, updates: Partial<InsertCrmProspectingGoalTemplate>): Promise<CrmProspectingGoalTemplate> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmProspectingGoalTemplates)
+      .set(updateData)
+      .where(eq(crmProspectingGoalTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteProspectingGoalTemplate(id: string): Promise<void> {
+    // Soft delete by marking as inactive
+    await db.update(crmProspectingGoalTemplates)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(crmProspectingGoalTemplates.id, id));
   }
 
   // Marketing Automation - Email Sequences
