@@ -310,7 +310,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/dd/projects/:id", async (req: any, res) => {
     try {
-      const project = await storage.getProject(req.params.id);
+      // Query database directly (bypassing storage method which has interception issue)
+      const { db } = await import("./db");
+      const { projects } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const [project] = await db.select().from(projects).where(eq(projects.id, req.params.id));
+      
       if (!project) {
         return res.status(404).json({ error: "Project not found" });
       }
@@ -320,6 +326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ project, settings, tasks });
     } catch (error) {
+      console.error("Error fetching project:", error);
       res.status(500).json({ error: "Failed to fetch project" });
     }
   });
