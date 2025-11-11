@@ -450,6 +450,39 @@ export class CompService {
               }
             }
 
+            // Create pending contacts for broker and seller if present
+            if (createdComp) {
+              const contactNames: Array<{ name: string; role: 'broker' | 'seller' }> = [];
+              if (transformedData.broker && transformedData.broker.trim()) {
+                contactNames.push({ name: transformedData.broker.trim(), role: 'broker' });
+              }
+              if (transformedData.seller && transformedData.seller.trim()) {
+                contactNames.push({ name: transformedData.seller.trim(), role: 'seller' });
+              }
+
+              for (const { name, role } of contactNames) {
+                try {
+                  await this.storage.createPendingContact({
+                    orgId,
+                    sourceType: 'sales_comp',
+                    sourceId: createdComp.id,
+                    fullName: name,
+                    status: 'pending',
+                    createdBy: userId,
+                    sourceMetadata: {
+                      compId: createdComp.id,
+                      marina: transformedData.marina,
+                      city: transformedData.city,
+                      state: transformedData.state,
+                      role: role,
+                    },
+                  });
+                } catch (error) {
+                  console.error(`Error creating pending contact for ${role}:`, error);
+                }
+              }
+            }
+
           } else if (planRow.action === 'update' && planRow.matchedCompId) {
             // Update existing comp
             const updateData: any = { ...compData, updatedBy: userId };
