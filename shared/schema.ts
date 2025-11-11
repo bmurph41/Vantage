@@ -3177,7 +3177,10 @@ export const salesComps = pgTable('sales_comps', {
   region: text('region'),
   saleCondition: text('sale_condition'),
   daysOnMarket: integer('days_on_market'),
-  broker: text('broker'),
+  broker: text('broker'), // Legacy field - use brokerage + agent fields instead
+  brokerage: text('brokerage'), // Brokerage company name
+  agentFirstName: text('agent_first_name'), // Agent first name
+  agentLastName: text('agent_last_name'), // Agent last name
   address: text('address'),
   zip: text('zip'),
   seller: text('seller'),
