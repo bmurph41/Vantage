@@ -47,6 +47,9 @@ const compFormSchema = z.object({
   saleCondition: z.string().optional(),
   daysOnMarket: z.union([z.string(), z.number()]).optional(),
   broker: z.string().optional(),
+  brokerage: z.string().optional(),
+  agentFirstName: z.string().optional(),
+  agentLastName: z.string().optional(),
   address: z.string().optional(),
   zip: z.string().optional(),
   seller: z.string().optional(),
@@ -170,6 +173,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       saleCondition: comp?.saleCondition || "",
       daysOnMarket: comp?.daysOnMarket || "",
       broker: comp?.broker || "",
+      brokerage: comp?.brokerage || "",
+      agentFirstName: comp?.agentFirstName || "",
+      agentLastName: comp?.agentLastName || "",
       address: comp?.address || "",
       zip: comp?.zip || "",
       seller: comp?.seller || "",
@@ -345,6 +351,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       region: data.region || undefined,
       saleCondition: data.saleCondition || undefined,
       broker: data.broker || undefined,
+      brokerage: data.brokerage || undefined,
+      agentFirstName: data.agentFirstName || undefined,
+      agentLastName: data.agentLastName || undefined,
       address: data.address || undefined,
       zip: data.zip || undefined,
       seller: data.seller || undefined,
@@ -1224,7 +1233,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         name="broker"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Broker</FormLabel>
+                            <FormLabel>Broker (Legacy)</FormLabel>
                             <FormControl>
                               <Input 
                                 {...field} 
@@ -1236,6 +1245,62 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           </FormItem>
                         )}
                       />
+                      
+                      <FormField
+                        control={form.control}
+                        name="brokerage"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Brokerage</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                placeholder="e.g., Transworld Business Advisors"
+                                data-testid="input-brokerage"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="agentFirstName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Agent First Name</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  placeholder="First name"
+                                  data-testid="input-agent-first-name"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="agentLastName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Agent Last Name</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  placeholder="Last name"
+                                  data-testid="input-agent-last-name"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
