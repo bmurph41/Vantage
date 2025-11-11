@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts";
-import { Calculator, TrendingUp, AlertCircle, Save, Trash2, Copy } from "lucide-react";
+import { Calculator, TrendingUp, AlertCircle, Save, Trash2, Copy, Upload } from "lucide-react";
 import { format, subYears } from "date-fns";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import type { DebtScenario } from "@shared/schema";
 
 // FRED Series IDs for base rates
 const BASE_RATE_OPTIONS = [
@@ -54,6 +55,7 @@ export default function DebtScenariosIndex() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("rates");
   const [timeRange, setTimeRange] = useState<TimeRange>("5Y");
+  const [currentScenarioId, setCurrentScenarioId] = useState<string | null>(null);
   
   // Scenario inputs
   const [inputs, setInputs] = useState<ScenarioInputs>({
@@ -70,6 +72,122 @@ export default function DebtScenariosIndex() {
 
   const updateInput = (key: keyof ScenarioInputs, value: string) => {
     setInputs(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Query: Load saved scenarios
+  const { data: savedScenarios = [], isLoading: scenariosLoading } = useQuery<DebtScenario[]>({
+    queryKey: ['/api/modeling/debt-scenarios'],
+  });
+
+  // Mutation: Save scenario
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const scenarioData = {
+        name: inputs.name,
+        baseRate: inputs.baseRate,
+        spreadBps: parseFloat(inputs.spreadBps),
+        purchasePrice: parseFloat(inputs.purchasePrice),
+        loanAmount: parseFloat(inputs.loanAmount),
+        noi: parseFloat(inputs.noi),
+        amortizationYears: parseInt(inputs.amortizationYears),
+        loanTermYears: parseInt(inputs.loanTermYears),
+        interestOnlyYears: parseInt(inputs.interestOnlyYears),
+        dealId: null,
+        projectId: null,
+      };
+
+      if (currentScenarioId) {
+        // Update existing
+        return await apiRequest(`/api/modeling/debt-scenarios/${currentScenarioId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(scenarioData),
+        });
+      } else {
+        // Create new
+        return await apiRequest('/api/modeling/debt-scenarios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(scenarioData),
+        });
+      }
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/debt-scenarios'] });
+      setCurrentScenarioId(data.id);
+      toast({
+        title: "Scenario Saved",
+        description: `"${data.name}" has been saved successfully.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save scenario. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation: Delete scenario
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/modeling/debt-scenarios/${id}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/debt-scenarios'] });
+      toast({
+        title: "Scenario Deleted",
+        description: "The scenario has been removed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete scenario. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Load scenario into form
+  const loadScenario = (scenario: DebtScenario) => {
+    setInputs({
+      name: scenario.name,
+      baseRate: scenario.baseRate,
+      spreadBps: scenario.spreadBps.toString(),
+      purchasePrice: scenario.purchasePrice.toString(),
+      loanAmount: scenario.loanAmount.toString(),
+      noi: scenario.noi.toString(),
+      amortizationYears: scenario.amortizationYears.toString(),
+      loanTermYears: scenario.loanTermYears.toString(),
+      interestOnlyYears: scenario.interestOnlyYears.toString(),
+    });
+    setCurrentScenarioId(scenario.id);
+    setActiveTab("rates");
+    toast({
+      title: "Scenario Loaded",
+      description: `"${scenario.name}" is now active.`,
+    });
+  };
+
+  // Create new scenario (reset form)
+  const newScenario = () => {
+    setInputs({
+      name: `New Scenario ${savedScenarios.length + 1}`,
+      baseRate: "SOFR",
+      spreadBps: "250",
+      purchasePrice: "10000000",
+      loanAmount: "7000000",
+      noi: "800000",
+      amortizationYears: "25",
+      loanTermYears: "10",
+      interestOnlyYears: "0",
+    });
+    setCurrentScenarioId(null);
+    setActiveTab("rates");
   };
 
   const getStartDate = (range: TimeRange): string => {
@@ -203,6 +321,47 @@ export default function DebtScenariosIndex() {
           Comprehensive debt modeling for marina acquisitions with underwriting metrics and amortization analysis
         </p>
       </div>
+
+      {/* Scenario Management Card */}
+      <Card className="mb-6 bg-primary/5">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <Label htmlFor="scenario-name" className="text-sm font-medium mb-1 block">
+                Scenario Name
+              </Label>
+              <Input
+                id="scenario-name"
+                value={inputs.name}
+                onChange={(e) => updateInput("name", e.target.value)}
+                placeholder="Enter scenario name"
+                data-testid="input-scenario-name"
+                className="max-w-md"
+              />
+            </div>
+            <div className="flex gap-2 pt-5">
+              <Button
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending || !inputs.name.trim()}
+                data-testid="button-save-scenario"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {currentScenarioId ? "Update Scenario" : "Save Scenario"}
+              </Button>
+              {currentScenarioId && (
+                <Button
+                  onClick={newScenario}
+                  variant="outline"
+                  data-testid="button-clear-scenario"
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  New
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
@@ -634,27 +793,104 @@ export default function DebtScenariosIndex() {
           )}
         </TabsContent>
 
-        {/* Tab 3: Saved Scenarios (Placeholder for Phase 3) */}
+        {/* Tab 3: Saved Scenarios */}
         <TabsContent value="scenarios" className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Scenario Management</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle>Saved Scenarios</CardTitle>
+              <Button onClick={newScenario} data-testid="button-new-scenario">
+                <Copy className="w-4 h-4 mr-2" />
+                New Scenario
+              </Button>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12">
-                <Save className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Scenario Management Coming Soon</h3>
-                <p className="text-muted-foreground max-w-md mx-auto">
-                  Save, compare, and manage multiple debt scenarios. Link scenarios to specific deals and projects
-                  for comprehensive acquisition analysis.
-                </p>
-                <div className="mt-6 space-y-2 text-sm text-muted-foreground">
-                  <p>• Save unlimited scenarios with custom names</p>
-                  <p>• Side-by-side comparison view</p>
-                  <p>• Link scenarios to CRM deals and DD projects</p>
-                  <p>• Export scenarios to Excel/PDF</p>
+              {scenariosLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading scenarios...</div>
+              ) : savedScenarios.length === 0 ? (
+                <div className="text-center py-12">
+                  <Save className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Saved Scenarios</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto mb-4">
+                    Create and save debt scenarios to compare different financing structures.
+                  </p>
+                  <Button onClick={newScenario} data-testid="button-create-first">
+                    <Save className="w-4 h-4 mr-2" />
+                    Create Your First Scenario
+                  </Button>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  {savedScenarios.map((scenario) => (
+                    <div
+                      key={scenario.id}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <h4 className="font-semibold text-lg">{scenario.name}</h4>
+                          {currentScenarioId === scenario.id && (
+                            <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Purchase Price:</span>
+                            <p className="font-medium">{formatCurrency(scenario.purchasePrice)}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Loan Amount:</span>
+                            <p className="font-medium">{formatCurrency(scenario.loanAmount)}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">LTV:</span>
+                            <p className="font-medium">
+                              {formatPercentage((scenario.loanAmount / scenario.purchasePrice) * 100)}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Base Rate:</span>
+                            <p className="font-medium">
+                              {BASE_RATE_OPTIONS.find(r => r.id === scenario.baseRate)?.name || scenario.baseRate}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          Last updated: {format(new Date(scenario.updatedAt), "MMM d, yyyy 'at' h:mm a")}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button
+                          onClick={() => loadScenario(scenario)}
+                          variant="outline"
+                          size="sm"
+                          data-testid={`button-load-${scenario.id}`}
+                        >
+                          <Upload className="w-4 h-4 mr-1" />
+                          Load
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            if (confirm(`Delete "${scenario.name}"?`)) {
+                              deleteMutation.mutate(scenario.id);
+                              if (currentScenarioId === scenario.id) {
+                                setCurrentScenarioId(null);
+                              }
+                            }
+                          }}
+                          variant="outline"
+                          size="sm"
+                          disabled={deleteMutation.isPending}
+                          data-testid={`button-delete-${scenario.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
