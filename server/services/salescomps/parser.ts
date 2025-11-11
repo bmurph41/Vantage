@@ -154,7 +154,28 @@ export class ParserService {
       keywords: ['broker', 'agent', 'realtor', 'representative'],
       type: 'text',
       required: false,
-      description: 'Listing broker or agent'
+      description: 'Listing broker or agent (legacy field)'
+    }],
+    ['brokerage', {
+      patterns: ['brokerage', 'brokerage_company', 'broker_company', 'brokerage_firm', 'real_estate_firm'],
+      keywords: ['brokerage', 'company', 'firm', 'broker'],
+      type: 'text',
+      required: false,
+      description: 'Brokerage company name'
+    }],
+    ['agentFirstName', {
+      patterns: ['agent_first_name', 'agent_first', 'broker_first_name', 'broker_first', 'agent_fname'],
+      keywords: ['agent', 'first', 'name', 'broker', 'fname'],
+      type: 'text',
+      required: false,
+      description: 'Agent first name'
+    }],
+    ['agentLastName', {
+      patterns: ['agent_last_name', 'agent_last', 'broker_last_name', 'broker_last', 'agent_lname'],
+      keywords: ['agent', 'last', 'name', 'broker', 'lname'],
+      type: 'text',
+      required: false,
+      description: 'Agent last name'
     }],
     ['address', {
       patterns: ['address', 'location', 'street', 'street_address', 'physical_address'],
