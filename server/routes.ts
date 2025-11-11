@@ -63,7 +63,10 @@ import {
   insertFuelImportLogSchema,
   fuelIntegrations,
   insertFuelIntegrationSchema,
-  updateFuelIntegrationSchema
+  updateFuelIntegrationSchema,
+  debtScenarios,
+  insertDebtScenarioSchema,
+  updateDebtScenarioSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -12164,6 +12167,188 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error fetching audit logs:", error);
       res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  // ===== Debt Scenarios Routes (Modeling Module) =====
+
+  // Get all debt scenarios for organization
+  app.get("/api/modeling/debt-scenarios", authenticateUser, async (req: any, res) => {
+    try {
+      const scenarios = await storage.getDebtScenariosForOrg(req.user.orgId);
+      res.json(scenarios);
+    } catch (error) {
+      console.error("Failed to fetch debt scenarios:", error);
+      res.status(500).json({ error: "Failed to fetch debt scenarios" });
+    }
+  });
+
+  // Get single debt scenario by ID
+  app.get("/api/modeling/debt-scenarios/:id", authenticateUser, async (req: any, res) => {
+    try {
+      const scenario = await storage.getDebtScenario(req.params.id);
+      
+      if (!scenario) {
+        return res.status(404).json({ error: "Scenario not found" });
+      }
+
+      // Verify org ownership
+      if (scenario.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(scenario);
+    } catch (error) {
+      console.error("Failed to fetch debt scenario:", error);
+      res.status(500).json({ error: "Failed to fetch debt scenario" });
+    }
+  });
+
+  // Create new debt scenario
+  app.post("/api/modeling/debt-scenarios", authenticateUser, async (req: any, res) => {
+    try {
+      // Parse and validate request body
+      const validatedData = insertDebtScenarioSchema.parse(req.body);
+
+      // Normalize numeric fields (convert strings to numbers)
+      const scenarioData = {
+        ...validatedData,
+        purchasePrice: typeof validatedData.purchasePrice === 'string' 
+          ? parseFloat(validatedData.purchasePrice) 
+          : validatedData.purchasePrice,
+        loanAmount: typeof validatedData.loanAmount === 'string' 
+          ? parseFloat(validatedData.loanAmount) 
+          : validatedData.loanAmount,
+        noi: typeof validatedData.noi === 'string' 
+          ? parseFloat(validatedData.noi) 
+          : validatedData.noi,
+        orgId: req.user.orgId,
+        createdBy: req.user.id,
+        updatedBy: req.user.id,
+      };
+
+      const scenario = await storage.createDebtScenario(scenarioData);
+
+      // Audit logging
+      await AuditService.logChange({
+        orgId: req.user.orgId,
+        userId: req.user.id,
+        entityType: 'debt_scenario',
+        entityId: scenario.id,
+        action: 'created',
+        changes: {},
+        before: null,
+        after: scenario,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      res.json(scenario);
+    } catch (error) {
+      console.error("Failed to create debt scenario:", error);
+      if (error instanceof Error && error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid scenario data", details: error });
+      }
+      res.status(500).json({ error: "Failed to create debt scenario" });
+    }
+  });
+
+  // Update debt scenario
+  app.put("/api/modeling/debt-scenarios/:id", authenticateUser, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Check if scenario exists and belongs to user's org
+      const existing = await storage.getDebtScenario(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Scenario not found" });
+      }
+      if (existing.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Parse and validate updates
+      const validatedData = updateDebtScenarioSchema.parse(req.body);
+
+      // Normalize numeric fields
+      const updates: any = { ...validatedData };
+      if (updates.purchasePrice !== undefined) {
+        updates.purchasePrice = typeof updates.purchasePrice === 'string' 
+          ? parseFloat(updates.purchasePrice) 
+          : updates.purchasePrice;
+      }
+      if (updates.loanAmount !== undefined) {
+        updates.loanAmount = typeof updates.loanAmount === 'string' 
+          ? parseFloat(updates.loanAmount) 
+          : updates.loanAmount;
+      }
+      if (updates.noi !== undefined) {
+        updates.noi = typeof updates.noi === 'string' 
+          ? parseFloat(updates.noi) 
+          : updates.noi;
+      }
+      updates.updatedBy = req.user.id;
+
+      const updated = await storage.updateDebtScenario(id, updates);
+
+      // Audit logging
+      await AuditService.logChange({
+        orgId: req.user.orgId,
+        userId: req.user.id,
+        entityType: 'debt_scenario',
+        entityId: id,
+        action: 'updated',
+        changes: updates,
+        before: existing,
+        after: updated,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to update debt scenario:", error);
+      if (error instanceof Error && error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid scenario data", details: error });
+      }
+      res.status(500).json({ error: "Failed to update debt scenario" });
+    }
+  });
+
+  // Delete debt scenario
+  app.delete("/api/modeling/debt-scenarios/:id", authenticateUser, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Check if scenario exists and belongs to user's org
+      const existing = await storage.getDebtScenario(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Scenario not found" });
+      }
+      if (existing.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deleteDebtScenario(id);
+
+      // Audit logging
+      await AuditService.logChange({
+        orgId: req.user.orgId,
+        userId: req.user.id,
+        entityType: 'debt_scenario',
+        entityId: id,
+        action: 'deleted',
+        changes: {},
+        before: existing,
+        after: null,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete debt scenario:", error);
+      res.status(500).json({ error: "Failed to delete debt scenario" });
     }
   });
 
