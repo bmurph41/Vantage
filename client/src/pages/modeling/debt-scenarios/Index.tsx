@@ -45,11 +45,25 @@ interface ScenarioInputs {
   spreadBps: string;
   purchasePrice: string;
   loanAmount: string;
+  ltvPercent: string;
   noi: string;
+  capRate: string;
   amortizationYears: string;
   loanTermYears: string;
   interestOnlyYears: string;
 }
+
+// Helper to format number input with commas
+const formatNumberWithCommas = (value: string): string => {
+  const num = value.replace(/,/g, '');
+  if (!num || isNaN(Number(num))) return value;
+  return Number(num).toLocaleString('en-US');
+};
+
+// Helper to parse formatted number
+const parseFormattedNumber = (value: string): number => {
+  return parseFloat(value.replace(/,/g, '')) || 0;
+};
 
 export default function DebtScenariosIndex() {
   const { toast } = useToast();
@@ -62,9 +76,11 @@ export default function DebtScenariosIndex() {
     name: "Scenario 1",
     baseRate: "SOFR",
     spreadBps: "250",
-    purchasePrice: "10000000",
-    loanAmount: "7000000",
-    noi: "800000",
+    purchasePrice: "10,000,000",
+    loanAmount: "7,000,000",
+    ltvPercent: "70",
+    noi: "800,000",
+    capRate: "8",
     amortizationYears: "25",
     loanTermYears: "10",
     interestOnlyYears: "0",
@@ -72,6 +88,110 @@ export default function DebtScenariosIndex() {
 
   const updateInput = (key: keyof ScenarioInputs, value: string) => {
     setInputs(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Bidirectional calculation handlers
+  const handlePurchasePriceChange = (value: string) => {
+    setInputs(prev => {
+      const newInputs = { ...prev, purchasePrice: value };
+      const pp = parseFormattedNumber(value);
+      const capRate = parseFloat(prev.capRate);
+      const ltvPct = parseFloat(prev.ltvPercent);
+      
+      // Auto-calculate NOI if cap rate is set
+      if (capRate > 0 && pp > 0) {
+        newInputs.noi = formatNumberWithCommas(Math.round(pp * capRate / 100).toString());
+      }
+      
+      // Auto-calculate loan amount if LTV is set
+      if (ltvPct > 0 && pp > 0) {
+        newInputs.loanAmount = formatNumberWithCommas(Math.round(pp * ltvPct / 100).toString());
+      }
+      
+      return newInputs;
+    });
+  };
+
+  const handleNoiChange = (value: string) => {
+    setInputs(prev => {
+      const newInputs = { ...prev, noi: value };
+      const noi = parseFormattedNumber(value);
+      const capRate = parseFloat(prev.capRate);
+      
+      // Auto-calculate purchase price if cap rate is set
+      if (capRate > 0 && noi > 0) {
+        const pp = noi / (capRate / 100);
+        newInputs.purchasePrice = formatNumberWithCommas(Math.round(pp).toString());
+        
+        // Also update loan amount if LTV is set
+        const ltvPct = parseFloat(prev.ltvPercent);
+        if (ltvPct > 0) {
+          newInputs.loanAmount = formatNumberWithCommas(Math.round(pp * ltvPct / 100).toString());
+        }
+      }
+      
+      return newInputs;
+    });
+  };
+
+  const handleCapRateChange = (value: string) => {
+    setInputs(prev => {
+      const newInputs = { ...prev, capRate: value };
+      const capRate = parseFloat(value);
+      const pp = parseFormattedNumber(prev.purchasePrice);
+      const noi = parseFormattedNumber(prev.noi);
+      
+      if (capRate > 0) {
+        // If we have purchase price, calculate NOI
+        if (pp > 0) {
+          newInputs.noi = formatNumberWithCommas(Math.round(pp * capRate / 100).toString());
+        }
+        // If we have NOI but not purchase price, calculate purchase price
+        else if (noi > 0) {
+          const newPP = noi / (capRate / 100);
+          newInputs.purchasePrice = formatNumberWithCommas(Math.round(newPP).toString());
+          
+          // Also update loan amount if LTV is set
+          const ltvPct = parseFloat(prev.ltvPercent);
+          if (ltvPct > 0) {
+            newInputs.loanAmount = formatNumberWithCommas(Math.round(newPP * ltvPct / 100).toString());
+          }
+        }
+      }
+      
+      return newInputs;
+    });
+  };
+
+  const handleLoanAmountChange = (value: string) => {
+    setInputs(prev => {
+      const newInputs = { ...prev, loanAmount: value };
+      const loanAmt = parseFormattedNumber(value);
+      const pp = parseFormattedNumber(prev.purchasePrice);
+      
+      // Auto-calculate LTV if purchase price is set
+      if (pp > 0 && loanAmt > 0) {
+        const ltv = (loanAmt / pp) * 100;
+        newInputs.ltvPercent = ltv.toFixed(2);
+      }
+      
+      return newInputs;
+    });
+  };
+
+  const handleLtvChange = (value: string) => {
+    setInputs(prev => {
+      const newInputs = { ...prev, ltvPercent: value };
+      const ltvPct = parseFloat(value);
+      const pp = parseFormattedNumber(prev.purchasePrice);
+      
+      // Auto-calculate loan amount if purchase price is set
+      if (pp > 0 && ltvPct > 0) {
+        newInputs.loanAmount = formatNumberWithCommas(Math.round(pp * ltvPct / 100).toString());
+      }
+      
+      return newInputs;
+    });
   };
 
   // Query: Load saved scenarios
@@ -86,9 +206,9 @@ export default function DebtScenariosIndex() {
         name: inputs.name,
         baseRate: inputs.baseRate,
         spreadBps: parseFloat(inputs.spreadBps),
-        purchasePrice: parseFloat(inputs.purchasePrice),
-        loanAmount: parseFloat(inputs.loanAmount),
-        noi: parseFloat(inputs.noi),
+        purchasePrice: parseFormattedNumber(inputs.purchasePrice),
+        loanAmount: parseFormattedNumber(inputs.loanAmount),
+        noi: parseFormattedNumber(inputs.noi),
         amortizationYears: parseInt(inputs.amortizationYears),
         loanTermYears: parseInt(inputs.loanTermYears),
         interestOnlyYears: parseInt(inputs.interestOnlyYears),
@@ -154,13 +274,21 @@ export default function DebtScenariosIndex() {
 
   // Load scenario into form
   const loadScenario = (scenario: DebtScenario) => {
+    const pp = scenario.purchasePrice;
+    const loanAmt = scenario.loanAmount;
+    const noi = scenario.noi;
+    const ltv = pp > 0 ? (loanAmt / pp) * 100 : 0;
+    const cap = pp > 0 ? (noi / pp) * 100 : 0;
+    
     setInputs({
       name: scenario.name,
       baseRate: scenario.baseRate,
       spreadBps: scenario.spreadBps.toString(),
-      purchasePrice: scenario.purchasePrice.toString(),
-      loanAmount: scenario.loanAmount.toString(),
-      noi: scenario.noi.toString(),
+      purchasePrice: formatNumberWithCommas(scenario.purchasePrice.toString()),
+      loanAmount: formatNumberWithCommas(scenario.loanAmount.toString()),
+      ltvPercent: ltv.toFixed(2),
+      noi: formatNumberWithCommas(scenario.noi.toString()),
+      capRate: cap.toFixed(2),
       amortizationYears: scenario.amortizationYears.toString(),
       loanTermYears: scenario.loanTermYears.toString(),
       interestOnlyYears: scenario.interestOnlyYears.toString(),
@@ -179,9 +307,11 @@ export default function DebtScenariosIndex() {
       name: `New Scenario ${savedScenarios.length + 1}`,
       baseRate: "SOFR",
       spreadBps: "250",
-      purchasePrice: "10000000",
-      loanAmount: "7000000",
-      noi: "800000",
+      purchasePrice: "10,000,000",
+      loanAmount: "7,000,000",
+      ltvPercent: "70",
+      noi: "800,000",
+      capRate: "8",
       amortizationYears: "25",
       loanTermYears: "10",
       interestOnlyYears: "0",
@@ -219,9 +349,9 @@ export default function DebtScenariosIndex() {
   const currentBaseRate = observations.length > 0 ? parseFloat(observations[observations.length - 1].value) : 0;
   const effectiveRate = currentBaseRate + spreadPercent;
   
-  const purchasePrice = parseFloat(inputs.purchasePrice || "0");
-  const loanAmount = parseFloat(inputs.loanAmount || "0");
-  const noi = parseFloat(inputs.noi || "0");
+  const purchasePrice = parseFormattedNumber(inputs.purchasePrice || "0");
+  const loanAmount = parseFormattedNumber(inputs.loanAmount || "0");
+  const noi = parseFormattedNumber(inputs.noi || "0");
   const amortYears = parseInt(inputs.amortizationYears || "25");
   const loanTermYears = parseInt(inputs.loanTermYears || "10");
   const ioYears = parseInt(inputs.interestOnlyYears || "0");
@@ -547,52 +677,117 @@ export default function DebtScenariosIndex() {
               <CardTitle>Property & Loan Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="purchase-price">Purchase Price</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                    <Input
-                      id="purchase-price"
-                      type="number"
-                      value={inputs.purchasePrice}
-                      onChange={(e) => updateInput("purchasePrice", e.target.value)}
-                      className="pl-7"
-                      data-testid="input-purchase-price"
-                    />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="space-y-4 p-4 bg-accent/20 rounded-lg">
+                  <h4 className="text-sm font-semibold text-muted-foreground">Property Valuation</h4>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="purchase-price">Purchase Price</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                      <Input
+                        id="purchase-price"
+                        type="text"
+                        value={inputs.purchasePrice}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/,/g, '');
+                          if (value === '' || /^\d+$/.test(value)) {
+                            handlePurchasePriceChange(formatNumberWithCommas(value));
+                          }
+                        }}
+                        className="pl-7"
+                        data-testid="input-purchase-price"
+                        placeholder="10,000,000"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground italic">Or calculate from NOI ÷ Cap Rate</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="noi">NOI (Annual)</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                        <Input
+                          id="noi"
+                          type="text"
+                          value={inputs.noi}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/,/g, '');
+                            if (value === '' || /^\d+$/.test(value)) {
+                              handleNoiChange(formatNumberWithCommas(value));
+                            }
+                          }}
+                          className="pl-7"
+                          data-testid="input-noi"
+                          placeholder="800,000"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cap-rate">Cap Rate</Label>
+                      <div className="relative">
+                        <Input
+                          id="cap-rate"
+                          type="number"
+                          step="0.01"
+                          value={inputs.capRate}
+                          onChange={(e) => handleCapRateChange(e.target.value)}
+                          className="pr-8"
+                          data-testid="input-cap-rate"
+                          placeholder="8.00"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="loan-amount">Loan Amount</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                    <Input
-                      id="loan-amount"
-                      type="number"
-                      value={inputs.loanAmount}
-                      onChange={(e) => updateInput("loanAmount", e.target.value)}
-                      className="pl-7"
-                      data-testid="input-loan-amount"
-                    />
+                <div className="space-y-4 p-4 bg-accent/20 rounded-lg">
+                  <h4 className="text-sm font-semibold text-muted-foreground">Debt Structure</h4>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="loan-amount">Loan Amount</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                      <Input
+                        id="loan-amount"
+                        type="text"
+                        value={inputs.loanAmount}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/,/g, '');
+                          if (value === '' || /^\d+$/.test(value)) {
+                            handleLoanAmountChange(formatNumberWithCommas(value));
+                          }
+                        }}
+                        className="pl-7"
+                        data-testid="input-loan-amount"
+                        placeholder="7,000,000"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground italic">Or calculate from LTV %</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">LTV: {formatPercentage(ltv)}</p>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="noi">Net Operating Income (NOI)</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                    <Input
-                      id="noi"
-                      type="number"
-                      value={inputs.noi}
-                      onChange={(e) => updateInput("noi", e.target.value)}
-                      className="pl-7"
-                      data-testid="input-noi"
-                    />
+                  <div className="space-y-2">
+                    <Label htmlFor="ltv-percent">Loan-to-Value (LTV)</Label>
+                    <div className="relative">
+                      <Input
+                        id="ltv-percent"
+                        type="number"
+                        step="0.01"
+                        value={inputs.ltvPercent}
+                        onChange={(e) => handleLtvChange(e.target.value)}
+                        className="pr-8"
+                        data-testid="input-ltv-percent"
+                        placeholder="70.00"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Equity: {formatCurrency(equity)}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">Annual</p>
                 </div>
               </div>
 
