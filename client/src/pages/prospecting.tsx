@@ -12,6 +12,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import WeekProspectingModal from "@/components/modals/week-prospecting-modal";
+import { ProspectingSettingsDialog } from "@/components/modals/prospecting-settings-dialog";
 import { useProspectingEntries, useProspectingRealTime, useWeeklyProspectingMetrics } from "@/hooks/use-prospecting";
 import type { ProspectingEntry } from "@shared/schema";
 import { format } from "date-fns";
@@ -375,6 +376,8 @@ export default function ProspectingPage() {
               <h1 className="text-2xl font-bold text-gray-900">Weekly Prospecting Tracker</h1>
             </div>
             <div className="flex items-center gap-4">
+              <ProspectingSettingsDialog />
+              
               <Button 
                 variant="outline" 
                 size="sm" 
