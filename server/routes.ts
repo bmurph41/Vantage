@@ -11939,6 +11939,45 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ===== FRED API Routes (Financial Benchmarks) =====
+
+  // Get current and historical FRED data
+  app.get("/api/benchmarks/fred/:seriesId", authenticateUser, async (req: any, res) => {
+    try {
+      const { seriesId } = req.params;
+      const { startDate } = req.query;
+
+      const FRED_API_KEY = process.env.FRED_API_KEY;
+      if (!FRED_API_KEY) {
+        return res.status(500).json({ error: "FRED API key not configured" });
+      }
+
+      const baseUrl = 'https://api.stlouisfed.org/fred';
+      const params = new URLSearchParams({
+        series_id: seriesId,
+        api_key: FRED_API_KEY,
+        file_type: 'json',
+        sort_order: 'asc'
+      });
+
+      if (startDate) {
+        params.append('observation_start', startDate);
+      }
+
+      const response = await fetch(`${baseUrl}/series/observations?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`FRED API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching FRED data:", error);
+      res.status(500).json({ error: "Failed to fetch FRED data" });
+    }
+  });
+
   // ===== QuickBooks Export Routes =====
 
   // Preview QuickBooks export data
