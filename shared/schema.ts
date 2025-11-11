@@ -407,6 +407,26 @@ export const projectContacts = pgTable("project_contacts", {
   };
 });
 
+// Project Pending Contacts (Join table for associating pending contacts with projects)
+export const projectPendingContacts = pgTable("project_pending_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  pendingContactId: varchar("pending_contact_id").notNull().references(() => pendingContacts.id),
+  role: contactRoleEnum("role").notNull(), // Pre-assigned role for when contact is accepted
+  customRole: text("custom_role"), // Custom role when role is "other"
+  projectNotes: text("project_notes"), // Project-specific notes about this contact
+  isPrimary: boolean("is_primary").notNull().default(false), // Will this be the primary contact for this role?
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    // Ensure a pending contact can only have one instance per project with the same role
+    uniqueProjectPendingContactRole: unique("unique_project_pending_contact_role").on(table.projectId, table.pendingContactId, table.role),
+    projectIdx: index("project_pending_contacts_project").on(table.projectId),
+    pendingContactIdx: index("project_pending_contacts_pending_contact").on(table.pendingContactId),
+  };
+});
+
 // Notification Subscriptions
 export const notificationSubscriptions = pgTable("notification_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1152,6 +1172,11 @@ export const insertProjectContactSchema = createInsertSchema(projectContacts).om
   createdAt: true,
 });
 
+export const insertProjectPendingContactSchema = createInsertSchema(projectPendingContacts).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertNotificationSubscriptionSchema = createInsertSchema(notificationSubscriptions).omit({
   id: true,
   createdAt: true,
@@ -1238,6 +1263,9 @@ export type UpdateDDContact = z.infer<typeof updateDDContactSchema>;
 
 export type ProjectContact = typeof projectContacts.$inferSelect;
 export type InsertProjectContact = z.infer<typeof insertProjectContactSchema>;
+
+export type ProjectPendingContact = typeof projectPendingContacts.$inferSelect;
+export type InsertProjectPendingContact = z.infer<typeof insertProjectPendingContactSchema>;
 
 export type NotificationSubscription = typeof notificationSubscriptions.$inferSelect;
 export type InsertNotificationSubscription = z.infer<typeof insertNotificationSubscriptionSchema>;
