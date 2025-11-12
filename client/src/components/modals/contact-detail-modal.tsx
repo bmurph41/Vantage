@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   User, Building, Mail, Phone, MapPin, Star, 
-  Edit, X, Clock, Save, Check, Loader2, Briefcase, Home, DollarSign
+  Edit, X, Clock, Save, Check, Loader2, Briefcase, Home, DollarSign, Thermometer
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -42,6 +42,27 @@ const leadScoreColors = {
   warm: 'bg-yellow-100 text-yellow-800',
   cold: 'bg-blue-100 text-blue-800',
   new: 'bg-gray-100 text-gray-800'
+};
+
+const contactTagColors = {
+  lead: 'bg-blue-500 text-white',
+  seller: 'bg-purple-500 text-white',
+  competitor: 'bg-slate-500 text-white',
+  broker: 'bg-emerald-500 text-white',
+  vendor: 'bg-amber-500 text-white',
+  insurance: 'bg-indigo-500 text-white',
+  lender: 'bg-cyan-500 text-white',
+  attorney: 'bg-rose-500 text-white',
+  other: 'bg-gray-500 text-white'
+};
+
+const leadStatusColors = {
+  none: 'bg-gray-100 text-gray-800',
+  new: 'bg-blue-100 text-blue-800',
+  contacted: 'bg-yellow-100 text-yellow-800',
+  qualified: 'bg-green-100 text-green-800',
+  unqualified: 'bg-red-100 text-red-800',
+  converted: 'bg-purple-100 text-purple-800'
 };
 
 const contactFormSchema = z.object({
@@ -268,12 +289,46 @@ export default function ContactDetailModal({ isOpen, onClose, contact }: Contact
                   {form.watch('firstName')} {form.watch('lastName')}
                 </DialogTitle>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <Badge className={contactTypeColors[form.watch('contactType') as keyof typeof contactTypeColors] || 'bg-gray-100 text-gray-800'}>
-                    {form.watch('contactType')}
+                  {/* Contact Tag Badge (Primary, Read-only) */}
+                  {contact?.contactTag && (
+                    <Badge 
+                      className={contactTagColors[contact.contactTag as keyof typeof contactTagColors] || 'bg-gray-500 text-white'}
+                      data-testid={`badge-contact-tag-${contact.contactTag}`}
+                    >
+                      {contact.contactTag.charAt(0).toUpperCase() + contact.contactTag.slice(1)}
+                    </Badge>
+                  )}
+                  
+                  {/* Lead Status Badge (Conditional - only when contactTag = 'lead', Read-only) */}
+                  {contact?.contactTag === 'lead' && contact?.leadStatus && (
+                    <Badge 
+                      className={`flex items-center gap-1 ${leadStatusColors[contact.leadStatus as keyof typeof leadStatusColors] || 'bg-gray-100 text-gray-800'}`}
+                      data-testid={`badge-lead-status-${contact.leadStatus}`}
+                    >
+                      <Thermometer className="h-3 w-3" />
+                      {contact.leadStatus.charAt(0).toUpperCase() + contact.leadStatus.slice(1)}
+                    </Badge>
+                  )}
+                  
+                  {/* Legacy Contact Type (De-emphasized, uses form.watch for edit mode) */}
+                  <Badge 
+                    variant="outline" 
+                    className="opacity-50 text-xs border-dashed"
+                    data-testid={`badge-legacy-type-${form.watch('contactType')}`}
+                  >
+                    Legacy: {form.watch('contactType')}
                   </Badge>
-                  <Badge className={leadScoreColors[form.watch('leadScore') as keyof typeof leadScoreColors] || 'bg-gray-100 text-gray-800'}>
-                    {form.watch('leadScore')} lead
+                  
+                  {/* Legacy Lead Score (De-emphasized, uses form.watch for edit mode) */}
+                  <Badge 
+                    variant="outline" 
+                    className="opacity-50 text-xs border-dashed"
+                    data-testid={`badge-legacy-score-${form.watch('leadScore')}`}
+                  >
+                    Legacy: {form.watch('leadScore')} lead
                   </Badge>
+                  
+                  {/* Deal Team Member Badge */}
                   {form.watch('onDealTeam') && (
                     <Badge variant="outline" className="border-blue-500 text-blue-700">
                       Deal Team Member
