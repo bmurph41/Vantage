@@ -44,6 +44,8 @@ import CalendarSettings from "@/pages/calendar-settings";
 // Operations pages
 import CustomerAnalytics from "@/pages/operations/CustomerAnalytics";
 import RentRoll from "@/pages/operations/RentRoll";
+import RentRollPortfolio from "@/pages/operations/rent-roll/Portfolio";
+import RentRollProjects from "@/pages/operations/rent-roll/Projects";
 // Operations pages - Fuel Sales
 import FuelSalesDashboard from "@/pages/operations/fuel/Dashboard";
 import FuelSalesTransactions from "@/pages/operations/fuel/Transactions";
@@ -211,6 +213,20 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <RentRoll />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/rent-roll/portfolio">
+        {() => (
+          <UnifiedLayout>
+            <RentRollPortfolio />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/rent-roll/projects">
+        {() => (
+          <UnifiedLayout>
+            <RentRollProjects />
           </UnifiedLayout>
         )}
       </Route>

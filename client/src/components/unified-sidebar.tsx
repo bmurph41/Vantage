@@ -54,6 +54,13 @@ const fuelSalesNav = [
   { name: "Settings", href: "/operations/fuel/integration-settings", icon: Settings },
 ];
 
+// Operations Navigation - Rent Roll Subcategories
+const rentRollNav = [
+  { name: "Portfolio", href: "/operations/rent-roll/portfolio", icon: Building2 },
+  { name: "Projects", href: "/operations/rent-roll/projects", icon: FolderKanban },
+  { name: "Customer Analytics", href: "/operations/customer-analytics", icon: Users },
+];
+
 // Due Diligence Navigation
 const ddNav = [
   { name: "All Projects", href: "/", icon: LayoutDashboard },
@@ -84,6 +91,7 @@ export default function UnifiedSidebar() {
   const [location] = useLocation();
   const [operationsExpanded, setOperationsExpanded] = useState(false);
   const [fuelSalesExpanded, setFuelSalesExpanded] = useState(false);
+  const [rentRollExpanded, setRentRollExpanded] = useState(false);
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [ddExpanded, setDdExpanded] = useState(false);
@@ -275,14 +283,24 @@ export default function UnifiedSidebar() {
           />
           {operationsExpanded && (
             <div className="ml-4 mt-1 mb-2">
-              <NavLink 
-                item={{ name: "Rent Roll", href: "/operations/rent-roll", icon: LayoutList }} 
-                data-testid="nav-rent-roll"
-              />
-              <NavLink 
-                item={{ name: "Customer Analytics", href: "/operations/customer-analytics", icon: Users }} 
-                data-testid="nav-customer-analytics"
-              />
+              <button
+                onClick={() => setRentRollExpanded(!rentRollExpanded)}
+                className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                data-testid="toggle-rent-roll"
+              >
+                <div className="flex items-center space-x-3">
+                  <LayoutList className="w-5 h-5" />
+                  <span>Rent Roll</span>
+                </div>
+                {rentRollExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              {rentRollExpanded && (
+                <div className="ml-4">
+                  {rentRollNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              )}
               <button
                 onClick={() => setFuelSalesExpanded(!fuelSalesExpanded)}
                 className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
