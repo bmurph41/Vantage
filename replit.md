@@ -80,7 +80,16 @@ Preferred communication style: Simple, everyday language.
     - **Permission Matrix**: Fine-grained permissions including fuel operations (read/create/update/delete/export/import), integration management, period locking, approval workflows, and audit access
     - **Security Foundation**: Supports approval workflows for sensitive operations, period locking for financial controls, and comprehensive change history
     - **Database Schema**: `organization_user_roles` table for RBAC, enhanced `audit_logs` table with full context tracking and metadata
-- **Marketing Automation**: Multi-step email sequences with templates and enrollment tracking for contacts, leads, and deals.
+- **Marketing Module**: Institutional-grade lead generation tracking, ROAS analytics, expense management, and email campaign integration for PE firms. Features include:
+  - **Campaign Management**: Multi-channel campaign tracking (email, paid ads, social media, content, events, direct mail, SEO, partnerships, referral) with status management, budget planning/actuals, UTM parameter tracking, and goal setting (leads, revenue, ROAS)
+  - **Expense Tracking**: Comprehensive expense management with vendor tracking, category classification (advertising, software, agency fees, content creation, events, sponsorships, tools), approval workflows, invoice management, GL account mapping, and PO number tracking
+  - **Lead Attribution**: Multi-touch attribution tracking (first-touch, last-touch, assisted) linking marketing campaigns to CRM contacts, leads, and deals with revenue attribution and source/medium/campaign UTM tracking
+  - **Dashboard Analytics**: Real-time KPI metrics (Total Spend, Leads Generated, ROAS, Active Campaigns) with spend trend analysis and channel distribution visualizations using recharts
+  - **Email Platform Integration**: Placeholder infrastructure for future MailChimp and Constant Contact integration with campaign sync, performance metrics (open rates, click rates, conversion rates), and automated attribution linking
+  - **Multi-Tenancy**: Organization-scoped data isolation with validation patterns from fuel and rent roll modules preventing cross-tenant data leakage
+  - **Database Schema**: Four core tables (`marketing_campaigns`, `marketing_expenses`, `lead_attribution`, `email_campaigns`) with six enums for campaign status, channels, expense categories/status, attribution types, and email platforms
+  - **Navigation**: Organized under Operations > Marketing with six sub-pages (Dashboard, Campaigns, Expenses, Attribution, Email Campaigns, Settings)
+- **CRM Marketing Automation**: Multi-step email sequences with templates and enrollment tracking for contacts, leads, and deals.
 - **File Attachment System**: Comprehensive file upload, listing, download, and deletion for CRM entities.
 - **Bulk Actions**: Multi-select, bulk delete, and CSV export for Contacts, Companies, and Deals.
 - **Task Kanban Board**: Drag-and-drop task management with status changes, inline creation, filters, and metrics.
