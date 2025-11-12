@@ -274,6 +274,10 @@ export default function UnifiedSidebar() {
           />
           {operationsExpanded && (
             <div className="ml-4 mt-1 mb-2">
+              <NavLink 
+                item={{ name: "Customer Analytics", href: "/operations/customer-analytics", icon: Users }} 
+                data-testid="nav-customer-analytics"
+              />
               <button
                 onClick={() => setFuelSalesExpanded(!fuelSalesExpanded)}
                 className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"

@@ -41,6 +41,8 @@ import NotFound from "@/pages/not-found";
 import CrmTasks from "@/pages/crm-tasks";
 import MarketingAutomation from "@/pages/marketing-automation";
 import CalendarSettings from "@/pages/calendar-settings";
+// Operations pages
+import CustomerAnalytics from "@/pages/operations/CustomerAnalytics";
 // Operations pages - Fuel Sales
 import FuelSalesDashboard from "@/pages/operations/fuel/Dashboard";
 import FuelSalesTransactions from "@/pages/operations/fuel/Transactions";
@@ -192,6 +194,15 @@ function Router() {
         {(params) => (
           <UnifiedLayout>
             <DDProgressReportPage {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      
+      {/* Operations Routes with Unified Layout */}
+      <Route path="/operations/customer-analytics">
+        {() => (
+          <UnifiedLayout>
+            <CustomerAnalytics />
           </UnifiedLayout>
         )}
       </Route>
