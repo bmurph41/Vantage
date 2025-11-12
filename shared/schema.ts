@@ -69,6 +69,7 @@ export const expenseStatusEnum = pgEnum("expense_status", ["pending", "approved"
 export const attributionTypeEnum = pgEnum("attribution_type", ["first_touch", "last_touch", "assisted"]);
 export const emailPlatformEnum = pgEnum("email_platform", ["mailchimp", "constant_contact"]);
 export const leadStatusEnum = pgEnum("lead_status", ["none", "new", "contacted", "qualified", "unqualified", "converted"]);
+export const contactTagEnum = pgEnum("contact_tag", ["lead", "seller", "competitor", "broker", "vendor", "insurance", "lender", "attorney", "other"]);
 
 // Persona and Dashboard enums
 export const personaTypeEnum = pgEnum("persona_type", ["pe_investor", "broker", "operator", "advisor"]);
@@ -1482,9 +1483,11 @@ export const crmContacts = pgTable("crm_contacts", {
   onDealTeam: boolean("on_deal_team").default(false),
   dealTeamNotes: text("deal_team_notes"),
   dealAssignment: varchar("deal_assignment").references(() => crmDeals.id), // Which deal this contact is assigned to
-  contactType: text("contact_type").default('prospect'), // prospect, vendor, buyer, seller, partner, client
+  contactType: text("contact_type").default('prospect'), // prospect, vendor, buyer, seller, partner, client (legacy field)
   photoDataUrl: text("photo_data_url"), // Base64 encoded photo
-  leadScore: text("lead_score").default('new'), // hot, warm, cold, new
+  leadScore: text("lead_score").default('new'), // hot, warm, cold, new (legacy field)
+  contactTag: contactTagEnum("contact_tag").default('lead'), // New tag system: lead, seller, competitor, broker, vendor, insurance, lender, attorney, other
+  leadStatus: leadStatusEnum("lead_status"), // Only applicable when contactTag = 'lead', must be NULL when contactTag != 'lead'
   labels: text("labels").array().default(sql`ARRAY[]::text[]`),
   companyId: varchar("company_id").references(() => crmCompanies.id), // Legacy field for backward compatibility
   ownerId: varchar("owner_id").references(() => users.id).notNull(),

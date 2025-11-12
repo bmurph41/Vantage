@@ -38,10 +38,12 @@ export type ContactPayload = {
   onDealTeam?: boolean;
   dealTeamNotes?: string;
   dealAssignment?: string; // Single deal ID assignment
-  contactType?: string; // prospect, vendor, buyer, seller, partner, client
+  contactType?: string; // prospect, vendor, buyer, seller, partner, client (legacy)
   assignedDeals?: string[]; // Array of deal IDs (legacy)
   photoDataUrl?: string; // base64 preview
-  leadScore?: string; // hot, warm, cold, new
+  leadScore?: string; // hot, warm, cold, new (legacy)
+  contactTag?: string; // lead, seller, competitor, broker, vendor, insurance, lender, attorney, other
+  leadStatus?: string; // none, new, contacted, qualified, unqualified, converted (only when contactTag = 'lead')
 };
 
 interface ContactFormModalProps {
@@ -86,6 +88,8 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
   const [dealsPopoverOpen, setDealsPopoverOpen] = useState(false);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | undefined>(contact?.photoDataUrl ?? undefined);
   const [leadScore, setLeadScore] = useState(contact?.leadScore ?? "new");
+  const [contactTag, setContactTag] = useState<string>(contact?.contactTag ?? "lead");
+  const [leadStatus, setLeadStatus] = useState<string | undefined>(contact?.leadStatus ?? undefined);
 
   const [touched, setTouched] = useState(false);
   const firstNameRef = useRef<HTMLInputElement | null>(null);
@@ -124,8 +128,19 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     setAssignedDeals([]);  // TODO: Load from contact's assigned deals when backend supports it
     setPhotoDataUrl(contact?.photoDataUrl ?? undefined);
     setLeadScore(contact?.leadScore ?? "new");
+    setContactTag(contact?.contactTag ?? "lead");
+    setLeadStatus(contact?.leadStatus ?? undefined);
     setTouched(false);
   }, [isOpen, contact]);
+
+  // Clear leadStatus when contactTag changes to non-lead
+  useEffect(() => {
+    if (contactTag !== 'lead') {
+      setLeadStatus(undefined);
+    } else if (contactTag === 'lead' && !leadStatus) {
+      setLeadStatus('new'); // Default to 'new' when switching to lead tag
+    }
+  }, [contactTag, leadStatus]);
 
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
@@ -135,9 +150,10 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     if (!phone.trim()) e.phone = "Phone is required";
     if (!company.trim()) e.company = "Company is required";
     if (!role.trim()) e.role = "Role/Title is required";
-    if (!leadScore) e.leadScore = "Lead status is required";
+    if (!contactTag) e.contactTag = "Contact tag is required";
+    if (contactTag === 'lead' && !leadStatus) e.leadStatus = "Lead status is required for leads";
     return e;
-  }, [firstName, lastName, email, phone, company, role, leadScore]);
+  }, [firstName, lastName, email, phone, company, role, contactTag, leadStatus]);
 
   const createContactMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -203,6 +219,8 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     setAssignedDeals([]);
     setPhotoDataUrl(undefined);
     setLeadScore("new");
+    setContactTag("lead");
+    setLeadStatus(undefined);
     setTouched(false);
   }
 
@@ -230,7 +248,9 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
       contactType: !onDealTeam ? contactType : undefined,
       assignedDeals: onDealTeam ? assignedDeals : [],
       photoDataUrl,
-      leadScore,
+      leadScore, // Legacy field for backward compatibility
+      contactTag,
+      leadStatus: contactTag === 'lead' ? leadStatus : undefined,
     };
 
     if (contact) {
@@ -393,47 +413,56 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="leadScore" className="flex items-center gap-2">
-                  <Thermometer className="h-4 w-4"/> Lead Status *
-                </Label>
-                <Select value={leadScore} onValueChange={setLeadScore}>
+                <Label htmlFor="contactTag">Contact Tag *</Label>
+                <Select value={contactTag} onValueChange={setContactTag}>
                   <SelectTrigger 
-                    data-testid="select-lead-score"
-                    className={classNames(touched && errors.leadScore && "border-destructive focus-visible:ring-destructive")}
+                    data-testid="select-contact-tag"
+                    className={classNames(touched && errors.contactTag && "border-destructive focus-visible:ring-destructive")}
                   >
-                    <SelectValue placeholder="Select lead status" />
+                    <SelectValue placeholder="Select contact tag" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="hot">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="destructive" className="text-xs">Hot</Badge>
-                        <span className="text-xs text-muted-foreground">High priority</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="warm">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Warm</Badge>
-                        <span className="text-xs text-muted-foreground">Medium priority</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="cold">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">Cold</Badge>
-                        <span className="text-xs text-muted-foreground">Low priority</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="new">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="default" className="text-xs">New</Badge>
-                        <span className="text-xs text-muted-foreground">Just added</span>
-                      </div>
-                    </SelectItem>
+                    <SelectItem value="lead">Lead</SelectItem>
+                    <SelectItem value="seller">Seller</SelectItem>
+                    <SelectItem value="competitor">Competitor</SelectItem>
+                    <SelectItem value="broker">Broker</SelectItem>
+                    <SelectItem value="vendor">Vendor</SelectItem>
+                    <SelectItem value="insurance">Insurance</SelectItem>
+                    <SelectItem value="lender">Lender</SelectItem>
+                    <SelectItem value="attorney">Attorney</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
-                {touched && errors.leadScore && (
-                  <p className="text-xs text-destructive">{errors.leadScore}</p>
+                {touched && errors.contactTag && (
+                  <p className="text-xs text-destructive">{errors.contactTag}</p>
                 )}
               </div>
+              {contactTag === 'lead' && (
+                <div className="space-y-2">
+                  <Label htmlFor="leadStatus" className="flex items-center gap-2">
+                    <Thermometer className="h-4 w-4"/> Lead Status *
+                  </Label>
+                  <Select value={leadStatus} onValueChange={setLeadStatus}>
+                    <SelectTrigger 
+                      data-testid="select-lead-status"
+                      className={classNames(touched && errors.leadStatus && "border-destructive focus-visible:ring-destructive")}
+                    >
+                      <SelectValue placeholder="Select lead status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="new">New</SelectItem>
+                      <SelectItem value="contacted">Contacted</SelectItem>
+                      <SelectItem value="qualified">Qualified</SelectItem>
+                      <SelectItem value="unqualified">Unqualified</SelectItem>
+                      <SelectItem value="converted">Converted</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {touched && errors.leadStatus && (
+                    <p className="text-xs text-destructive">{errors.leadStatus}</p>
+                  )}
+                </div>
+              )}
                 </div>
               </div>
             </CardContent>
