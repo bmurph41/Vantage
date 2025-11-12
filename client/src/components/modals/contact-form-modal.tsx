@@ -26,7 +26,8 @@ export type ContactPayload = {
   firstName: string;
   lastName?: string;
   email?: string;
-  phone?: string;
+  phone?: string; // Legacy field
+  phones?: PhoneType[]; // New phones array
   address?: string; // Street address
   unit?: string; // Unit/Suite/Apt
   city?: string;
@@ -284,7 +285,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
       leadScore, // Legacy field for backward compatibility
       contactTag,
       leadStatus: contactTag === 'lead' ? leadStatus : null, // Explicitly null to clear field when not lead
-    } as any;
+    };
 
     if (contact) {
       updateContactMutation.mutate(payload);
