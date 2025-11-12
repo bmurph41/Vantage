@@ -1202,7 +1202,7 @@ export default function CompsDataGrid({
                     return (
                     <TableRow 
                       key={comp.id}
-                      className={`data-table-row border-b border-border/50 ${
+                      className={`data-table-row border-b border-border/50 cursor-pointer hover:bg-primary/5 transition-colors ${
                         selectedIds.includes(comp.id) ? 'bg-primary/8 border-primary/20' : ''
                       } ${
                         comp.isChild ? 
@@ -1212,13 +1212,8 @@ export default function CompsDataGrid({
                         comp.isPortfolio ? 
                           'bg-gradient-to-r from-purple-50 via-purple-25 to-transparent border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:via-purple-900/10 dark:to-transparent font-medium hover:from-purple-100 hover:via-purple-50 hover:to-purple-25' : 
                           ''
-                      } ${
-                        isEditMode ? 'cursor-pointer hover:bg-primary/5 transition-colors' : ''
                       }`}
-                      onClick={isEditMode ? () => {
-                        setEditingComp(comp);
-                        setShowEditDialog(true);
-                      } : undefined}
+                      onClick={() => onCompClick?.(comp)}
                       data-testid={`row-comp-${comp.id}`}
                     >
                     <TableCell className="data-table-cell" onClick={(e) => e.stopPropagation()}>
@@ -1303,7 +1298,7 @@ export default function CompsDataGrid({
                               <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary cursor-pointer" />
                             )}
                           </div>
-                          {column.key === 'marina' && comp.isPortfolio && !isEditMode && (
+                          {column.key === 'marina' && comp.isPortfolio && (
                             <div className="flex gap-2 mt-1" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="outline"
@@ -1355,18 +1350,16 @@ export default function CompsDataGrid({
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          {!isEditMode && (
-                            <DropdownMenuItem 
-                              onClick={() => {
-                                setEditingComp(comp);
-                                setShowEditDialog(true);
-                              }}
-                              data-testid={`action-edit-${comp.id}`}
-                            >
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                          )}
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setEditingComp(comp);
+                              setShowEditDialog(true);
+                            }}
+                            data-testid={`action-edit-${comp.id}`}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
                           {canAddToProject && (
                             <DropdownMenuItem 
                               onClick={() => {
@@ -1585,7 +1578,6 @@ export default function CompsDataGrid({
             setEditingComp(null);
           }}
           comp={editingComp}
-          onUpdate={onCompUpdate}
         />
       )}
     </>
