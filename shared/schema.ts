@@ -68,6 +68,7 @@ export const expenseCategoryEnum = pgEnum("expense_category", ["advertising", "s
 export const expenseStatusEnum = pgEnum("expense_status", ["pending", "approved", "paid", "rejected"]);
 export const attributionTypeEnum = pgEnum("attribution_type", ["first_touch", "last_touch", "assisted"]);
 export const emailPlatformEnum = pgEnum("email_platform", ["mailchimp", "constant_contact"]);
+export const leadStatusEnum = pgEnum("lead_status", ["none", "new", "contacted", "qualified", "unqualified", "converted"]);
 
 // Persona and Dashboard enums
 export const personaTypeEnum = pgEnum("persona_type", ["pe_investor", "broker", "operator", "advisor"]);
@@ -1703,7 +1704,7 @@ export const crmLeads = pgTable("crm_leads", {
   linkedinUrl: text("linkedin_url"),
   leadScore: integer("lead_score").default(0),
   prospectStatus: text("prospect_status").notNull().default('active'), // active, target, referral, past_client, cold, nurture
-  leadStatus: text("lead_status").notNull().default('new'), // new, contacted, qualified, unqualified, converted
+  leadStatus: leadStatusEnum("lead_status").notNull().default('new'), // none, new, contacted, qualified, unqualified, converted
   
   // Enhanced Source Tracking and Attribution
   leadSource: text("lead_source").notNull().default('unknown'), // google_ads, facebook_ads, email, direct, referral, organic_search, social, phone, website_form

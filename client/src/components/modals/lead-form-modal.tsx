@@ -27,6 +27,7 @@ interface LeadFormModalProps {
 }
 
 const leadStatuses = [
+  { value: "none", label: "None" },
   { value: "new", label: "New" },
   { value: "contacted", label: "Contacted" },
   { value: "qualified", label: "Qualified" },
