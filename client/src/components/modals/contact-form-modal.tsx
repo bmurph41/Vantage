@@ -15,11 +15,11 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StateSelect } from "@/components/ui/state-select";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
-import { User, Phone, Upload, Thermometer, Check, ChevronsUpDown, X, Building2, MapPin, Plus, Star } from "lucide-react";
+import { User, Phone, Upload, Thermometer, Check, ChevronsUpDown, X, Building2, MapPin, Plus, Star, Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { insertContactSchema, type Contact, type Deal } from "@shared/schema";
+import { insertContactSchema, type Contact, type Deal, type Phone as PhoneType } from "@shared/schema";
 
 export type ContactPayload = {
   id?: string;
@@ -72,7 +72,12 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
   const [firstName, setFirstName] = useState(contact?.firstName ?? "");
   const [lastName, setLastName] = useState(contact?.lastName ?? "");
   const [email, setEmail] = useState(contact?.email ?? "");
-  const [phone, setPhone] = useState(contact?.phone ?? "");
+  const [phone, setPhone] = useState(contact?.phone ?? ""); // Legacy field
+  const [phones, setPhones] = useState<PhoneType[]>(
+    contact?.phones && Array.isArray(contact.phones) && contact.phones.length > 0
+      ? contact.phones as PhoneType[]
+      : [{ type: "office", number: "" }]
+  );
   const [address, setAddress] = useState(contact?.address ?? "");
   const [unit, setUnit] = useState(contact?.unit ?? "");
   const [city, setCity] = useState(contact?.city ?? "");
@@ -114,6 +119,11 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     setLastName(contact?.lastName ?? "");
     setEmail(contact?.email ?? "");
     setPhone(contact?.phone ?? "");
+    setPhones(
+      contact?.phones && Array.isArray(contact.phones) && contact.phones.length > 0
+        ? contact.phones as PhoneType[]
+        : [{ type: "office", number: "" }]
+    );
     setAddress(contact?.address ?? "");
     setUnit(contact?.unit ?? "");
     setCity(contact?.city ?? "");
@@ -142,18 +152,37 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     }
   }, [contactTag, leadStatus]);
 
+  // Phone management functions
+  const addPhone = () => {
+    setPhones([...phones, { type: "office", number: "" }]);
+  };
+
+  const removePhone = (index: number) => {
+    if (phones.length > 1) {
+      setPhones(phones.filter((_, i) => i !== index));
+    }
+  };
+
+  const updatePhone = (index: number, field: keyof PhoneType, value: string) => {
+    const updated = [...phones];
+    updated[index] = { ...updated[index], [field]: value };
+    setPhones(updated);
+  };
+
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
     if (!firstName.trim()) e.firstName = "First name is required";
     if (!lastName.trim()) e.lastName = "Last name is required";
     if (!email.trim()) e.email = "Email is required";
-    if (!phone.trim()) e.phone = "Phone is required";
+    // Validate phones array - at least one phone with a number
+    const hasValidPhone = phones.some(p => p.number && p.number.trim().length > 0);
+    if (!hasValidPhone) e.phones = "At least one phone number is required";
     if (!company.trim()) e.company = "Company is required";
     if (!role.trim()) e.role = "Role/Title is required";
     if (!contactTag) e.contactTag = "Contact tag is required";
     if (contactTag === 'lead' && !leadStatus) e.leadStatus = "Lead status is required for leads";
     return e;
-  }, [firstName, lastName, email, phone, company, role, contactTag, leadStatus]);
+  }, [firstName, lastName, email, phones, company, role, contactTag, leadStatus]);
 
   const createContactMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -228,12 +257,16 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     setTouched(true);
     if (Object.keys(errors).length) return;
 
+    // Filter out empty phone numbers
+    const validPhones = phones.filter(p => p.number && p.number.trim().length > 0);
+    
     const payload: ContactPayload = {
       ...(contact?.id ? { id: contact.id } : {}),
       firstName: firstName.trim(),
       lastName: lastName.trim() || undefined,
       email: email.trim(),
-      phone: phone.trim() || undefined,
+      phone: validPhones.length > 0 ? validPhones[0].number : undefined, // Legacy field - use first phone
+      phones: validPhones, // New phones array
       address: address.trim() || undefined,
       unit: unit.trim() || undefined,
       city: city.trim() || undefined,
@@ -251,7 +284,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
       leadScore, // Legacy field for backward compatibility
       contactTag,
       leadStatus: contactTag === 'lead' ? leadStatus : null, // Explicitly null to clear field when not lead
-    };
+    } as any;
 
     if (contact) {
       updateContactMutation.mutate(payload);
@@ -370,18 +403,63 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone" className="flex items-center gap-2"><Phone className="h-4 w-4"/> Phone *</Label>
-                <Input
-                  id="phone"
-                  inputMode="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(formatPhone(e.target.value))}
-                  placeholder="(555) 555-1234"
-                  className={classNames(touched && errors.phone && "border-destructive focus-visible:ring-destructive")}
-                  data-testid="input-phone"
-                />
-                {touched && errors.phone && (
-                  <p className="text-xs text-destructive">{errors.phone}</p>
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Phone className="h-4 w-4"/> Phone Numbers *
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addPhone}
+                    className="h-7 text-xs"
+                    data-testid="button-add-phone"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Phone
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {phones.map((phone, index) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <Select 
+                        value={phone.type} 
+                        onValueChange={(value) => updatePhone(index, 'type', value)}
+                      >
+                        <SelectTrigger className="w-28" data-testid={`select-phone-type-${index}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="office">Office</SelectItem>
+                          <SelectItem value="mobile">Mobile</SelectItem>
+                          <SelectItem value="home">Home</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        inputMode="tel"
+                        value={phone.number}
+                        onChange={(e) => updatePhone(index, 'number', formatPhone(e.target.value))}
+                        placeholder="(555) 555-1234"
+                        className="flex-1"
+                        data-testid={`input-phone-${index}`}
+                      />
+                      {phones.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removePhone(index)}
+                          className="h-10 w-10 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          data-testid={`button-remove-phone-${index}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {touched && errors.phones && (
+                  <p className="text-xs text-destructive">{errors.phones}</p>
                 )}
               </div>
               <div className="space-y-2">
