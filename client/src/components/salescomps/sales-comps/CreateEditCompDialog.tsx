@@ -1230,24 +1230,6 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       
                       <FormField
                         control={form.control}
-                        name="broker"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Broker (Legacy)</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="Marina Brokers International"
-                                data-testid="input-broker"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
                         name="brokerage"
                         render={({ field }) => (
                           <FormItem>
