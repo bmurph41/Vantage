@@ -69,6 +69,12 @@ export const expenseStatusEnum = pgEnum("expense_status", ["pending", "approved"
 export const attributionTypeEnum = pgEnum("attribution_type", ["first_touch", "last_touch", "assisted"]);
 export const emailPlatformEnum = pgEnum("email_platform", ["mailchimp", "constant_contact"]);
 
+// Persona and Dashboard enums
+export const personaTypeEnum = pgEnum("persona_type", ["pe_investor", "broker", "operator", "advisor"]);
+export const widgetCategoryEnum = pgEnum("widget_category", ["analytics", "pipeline", "operations", "finance", "tasks", "market_intel"]);
+export const assetStatusEnum = pgEnum("asset_status", ["under_management", "optimization", "exit"]);
+export const holdStrategyEnum = pgEnum("hold_strategy", ["core", "value_add", "opportunistic"]);
+
 // Organizations
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -105,6 +111,61 @@ export const calendarSettings = pgTable("calendar_settings", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// Persona Feature Flags - Global registry of persona capabilities
+export const personaFeatureFlags = pgTable("persona_feature_flags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  personaType: personaTypeEnum("persona_type").notNull(),
+  featureKey: text("feature_key").notNull(),
+  description: text("description"),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  uniquePersonaFeature: unique().on(table.personaType, table.featureKey),
+}));
+
+// User Persona Assignments - User-level persona configuration
+export const userPersonaAssignments = pgTable("user_persona_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  primaryPersona: personaTypeEnum("primary_persona").notNull(),
+  secondaryPersona: personaTypeEnum("secondary_persona"),
+  featureOverrides: jsonb("feature_overrides").default(sql`'{}'`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueUserOrg: unique().on(table.userId, table.orgId),
+  userOrgIdx: index("user_persona_user_org_idx").on(table.userId, table.orgId),
+}));
+
+// Dashboard Widgets - Global widget registry
+export const dashboardWidgets = pgTable("dashboard_widgets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  widgetKey: text("widget_key").notNull().unique(),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: widgetCategoryEnum("category").notNull(),
+  dataSource: text("data_source"),
+  defaultSize: jsonb("default_size").default(sql`'{"width": 1, "height": 1}'`),
+  availableToPersonas: personaTypeEnum("available_to_personas").array().default(sql`'{}'`),
+  configSchema: jsonb("config_schema").default(sql`'{}'`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// User Dashboard Layouts - Personalized dashboard configurations
+export const userDashboardLayouts = pgTable("user_dashboard_layouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  personaTemplate: personaTypeEnum("persona_template"),
+  layout: jsonb("layout").default(sql`'[]'`),
+  isDefault: boolean("is_default").notNull().default(false),
+  lastModified: timestamp("last_modified").notNull().defaultNow(),
+}, (table) => ({
+  uniqueUserOrgPersona: unique().on(table.userId, table.orgId, table.personaTemplate),
+  userOrgIdx: index("user_dashboard_user_org_idx").on(table.userId, table.orgId),
+}));
 
 // Projects
 export const projects = pgTable("projects", {
@@ -1494,6 +1555,39 @@ export const crmProperties = pgTable("crm_properties", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// Owned Assets - Acquired properties under management
+export const ownedAssets = pgTable("owned_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  propertyId: varchar("property_id").notNull().references(() => crmProperties.id),
+  projectId: varchar("project_id").references(() => projects.id),
+  acquisitionDate: date("acquisition_date").notNull(),
+  acquisitionPrice: integer("acquisition_price"),
+  status: assetStatusEnum("status").notNull().default("under_management"),
+  holdStrategy: holdStrategyEnum("hold_strategy"),
+  exitTargetDate: date("exit_target_date"),
+  keyMetrics: jsonb("key_metrics").default(sql`'{}'`),
+  notes: text("notes"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgStatusIdx: index("owned_assets_org_status_idx").on(table.orgId, table.status),
+  orgPropertyIdx: index("owned_assets_org_property_idx").on(table.orgId, table.propertyId),
+}));
+
+// Asset Performance Snapshots - Historical KPI tracking for owned assets
+export const assetPerformanceSnapshots = pgTable("asset_performance_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownedAssetId: varchar("owned_asset_id").notNull().references(() => ownedAssets.id, { onDelete: 'cascade' }),
+  snapshotDate: date("snapshot_date").notNull(),
+  metrics: jsonb("metrics").default(sql`'{}'`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueAssetDate: unique().on(table.ownedAssetId, table.snapshotDate),
+  assetDateIdx: index("asset_snapshots_asset_date_idx").on(table.ownedAssetId, table.snapshotDate),
+}));
 
 // Pending Properties - Review queue for properties created from sales comps
 export const pendingProperties = pgTable("pending_properties", {
@@ -5701,3 +5795,88 @@ export type InsertLeadAttribution = z.infer<typeof insertLeadAttributionSchema>;
 
 export type EmailCampaign = typeof emailCampaigns.$inferSelect;
 export type InsertEmailCampaign = z.infer<typeof insertEmailCampaignSchema>;
+
+// Persona Feature Flags schemas
+export const insertPersonaFeatureFlagSchema = createInsertSchema(personaFeatureFlags).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const updatePersonaFeatureFlagSchema = insertPersonaFeatureFlagSchema.partial();
+
+// User Persona Assignments schemas
+export const insertUserPersonaAssignmentSchema = createInsertSchema(userPersonaAssignments).omit({
+  id: true,
+  userId: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateUserPersonaAssignmentSchema = insertUserPersonaAssignmentSchema.partial();
+
+// Dashboard Widgets schemas
+export const insertDashboardWidgetSchema = createInsertSchema(dashboardWidgets).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const updateDashboardWidgetSchema = insertDashboardWidgetSchema.partial();
+
+// User Dashboard Layouts schemas
+export const insertUserDashboardLayoutSchema = createInsertSchema(userDashboardLayouts).omit({
+  id: true,
+  userId: true,
+  orgId: true,
+  lastModified: true,
+});
+
+export const updateUserDashboardLayoutSchema = insertUserDashboardLayoutSchema.partial();
+
+// Owned Assets schemas
+export const insertOwnedAssetSchema = createInsertSchema(ownedAssets).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  acquisitionPrice: z.string().or(z.number()).optional(),
+});
+
+export const updateOwnedAssetSchema = insertOwnedAssetSchema.partial();
+
+// Asset Performance Snapshots schemas
+export const insertAssetPerformanceSnapshotSchema = createInsertSchema(assetPerformanceSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const updateAssetPerformanceSnapshotSchema = insertAssetPerformanceSnapshotSchema.partial();
+
+// Types for Persona System
+export type PersonaFeatureFlag = typeof personaFeatureFlags.$inferSelect;
+export type InsertPersonaFeatureFlag = z.infer<typeof insertPersonaFeatureFlagSchema>;
+export type UpdatePersonaFeatureFlag = z.infer<typeof updatePersonaFeatureFlagSchema>;
+
+export type UserPersonaAssignment = typeof userPersonaAssignments.$inferSelect;
+export type InsertUserPersonaAssignment = z.infer<typeof insertUserPersonaAssignmentSchema>;
+export type UpdateUserPersonaAssignment = z.infer<typeof updateUserPersonaAssignmentSchema>;
+
+// Types for Dashboard System
+export type DashboardWidget = typeof dashboardWidgets.$inferSelect;
+export type InsertDashboardWidget = z.infer<typeof insertDashboardWidgetSchema>;
+export type UpdateDashboardWidget = z.infer<typeof updateDashboardWidgetSchema>;
+
+export type UserDashboardLayout = typeof userDashboardLayouts.$inferSelect;
+export type InsertUserDashboardLayout = z.infer<typeof insertUserDashboardLayoutSchema>;
+export type UpdateUserDashboardLayout = z.infer<typeof updateUserDashboardLayoutSchema>;
+
+// Types for Owned Assets
+export type OwnedAsset = typeof ownedAssets.$inferSelect;
+export type InsertOwnedAsset = z.infer<typeof insertOwnedAssetSchema>;
+export type UpdateOwnedAsset = z.infer<typeof updateOwnedAssetSchema>;
+
+export type AssetPerformanceSnapshot = typeof assetPerformanceSnapshots.$inferSelect;
+export type InsertAssetPerformanceSnapshot = z.infer<typeof insertAssetPerformanceSnapshotSchema>;
+export type UpdateAssetPerformanceSnapshot = z.infer<typeof updateAssetPerformanceSnapshotSchema>;

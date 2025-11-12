@@ -19,6 +19,9 @@ import { AuditService } from "./services/audit-service";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
 import { marketingService } from "./services/marketing-service";
+import { personaService } from "./services/persona-service";
+import { dashboardService } from "./services/dashboard-service";
+import { ownedAssetsService } from "./services/owned-assets-service";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
@@ -87,7 +90,16 @@ import {
   insertMarketingExpenseSchema,
   updateMarketingExpenseSchema,
   insertLeadAttributionSchema,
-  insertEmailCampaignSchema
+  insertEmailCampaignSchema,
+  insertUserPersonaAssignmentSchema,
+  updateUserPersonaAssignmentSchema,
+  insertDashboardWidgetSchema,
+  updateDashboardWidgetSchema,
+  insertUserDashboardLayoutSchema,
+  updateUserDashboardLayoutSchema,
+  insertOwnedAssetSchema,
+  updateOwnedAssetSchema,
+  insertAssetPerformanceSnapshotSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -9796,6 +9808,352 @@ Current context: Project ${req.params.projectId}`;
       }
       console.error('Failed to sync email campaign:', error);
       res.status(500).json({ error: 'Failed to sync email campaign' });
+    }
+  });
+
+  // ========================================================================
+  // PERSONA MANAGEMENT
+  // ========================================================================
+
+  // Get user's persona assignment
+  app.get('/api/personas/me', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const persona = await personaService.getUserPersona(userId, orgId);
+      
+      if (!persona) {
+        return res.status(404).json({ error: 'No persona assigned' });
+      }
+      
+      res.json(persona);
+    } catch (error) {
+      console.error('Failed to fetch user persona:', error);
+      res.status(500).json({ error: 'Failed to fetch user persona' });
+    }
+  });
+
+  // Assign or update persona for current user
+  app.post('/api/personas/me', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const data = insertUserPersonaAssignmentSchema.parse(req.body);
+      const persona = await personaService.assignPersona(userId, orgId, data);
+      res.json(persona);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to assign persona:', error);
+      res.status(500).json({ error: 'Failed to assign persona' });
+    }
+  });
+
+  // Get user's accessible features
+  app.get('/api/personas/features', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const features = await personaService.getUserFeatures(userId, orgId);
+      res.json({ features });
+    } catch (error) {
+      console.error('Failed to fetch user features:', error);
+      res.status(500).json({ error: 'Failed to fetch user features' });
+    }
+  });
+
+  // Check permission for a feature
+  app.post('/api/personas/check-permission', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { featureKey } = req.body;
+      
+      if (!featureKey) {
+        return res.status(400).json({ error: 'featureKey is required' });
+      }
+      
+      const hasPermission = await personaService.checkPermission(userId, orgId, featureKey);
+      res.json({ hasPermission });
+    } catch (error) {
+      console.error('Failed to check permission:', error);
+      res.status(500).json({ error: 'Failed to check permission' });
+    }
+  });
+
+  // ========================================================================
+  // DASHBOARD WIDGETS & LAYOUTS
+  // ========================================================================
+
+  // Get widget registry (optionally filtered by persona)
+  app.get('/api/dashboards/widgets', authenticateUser, async (req: any, res) => {
+    try {
+      const personaType = req.query.personaType;
+      const widgets = await dashboardService.getWidgetRegistry(personaType);
+      res.json(widgets);
+    } catch (error) {
+      console.error('Failed to fetch widget registry:', error);
+      res.status(500).json({ error: 'Failed to fetch widget registry' });
+    }
+  });
+
+  // Get user's dashboard layout
+  app.get('/api/dashboards/layout', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const personaTemplate = req.query.personaTemplate;
+      
+      let layout = await dashboardService.getUserDashboardLayout(userId, orgId, personaTemplate);
+      
+      // If no layout exists, return default template
+      if (!layout && personaTemplate) {
+        const defaultLayout = await dashboardService.getTemplateByPersona(personaTemplate);
+        return res.json({ layout: defaultLayout, isDefault: true });
+      }
+      
+      if (!layout) {
+        return res.status(404).json({ error: 'No dashboard layout found' });
+      }
+      
+      res.json(layout);
+    } catch (error) {
+      console.error('Failed to fetch dashboard layout:', error);
+      res.status(500).json({ error: 'Failed to fetch dashboard layout' });
+    }
+  });
+
+  // Save or update dashboard layout
+  app.put('/api/dashboards/layout', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const data = insertUserDashboardLayoutSchema.parse(req.body);
+      
+      // Validate layout structure
+      if (!dashboardService.validateLayout(data.layout as any)) {
+        return res.status(400).json({ error: 'Invalid layout structure' });
+      }
+      
+      const layout = await dashboardService.saveDashboardLayout(userId, orgId, data);
+      res.json(layout);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to save dashboard layout:', error);
+      res.status(500).json({ error: 'Failed to save dashboard layout' });
+    }
+  });
+
+  // Get default template for a persona
+  app.get('/api/dashboards/templates/:persona', authenticateUser, async (req: any, res) => {
+    try {
+      const { persona } = req.params;
+      const template = await dashboardService.getTemplateByPersona(persona);
+      res.json({ template });
+    } catch (error) {
+      console.error('Failed to fetch dashboard template:', error);
+      res.status(500).json({ error: 'Failed to fetch dashboard template' });
+    }
+  });
+
+  // Reset dashboard to default
+  app.post('/api/dashboards/reset', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { personaType } = req.body;
+      
+      if (!personaType) {
+        return res.status(400).json({ error: 'personaType is required' });
+      }
+      
+      const layout = await dashboardService.resetToDefault(userId, orgId, personaType);
+      res.json(layout);
+    } catch (error) {
+      console.error('Failed to reset dashboard:', error);
+      res.status(500).json({ error: 'Failed to reset dashboard' });
+    }
+  });
+
+  // ========================================================================
+  // OWNED ASSETS & PORTFOLIO
+  // ========================================================================
+
+  // Get all owned assets
+  app.get('/api/owned-assets', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters = {
+        status: req.query.status,
+        holdStrategy: req.query.holdStrategy,
+        propertyId: req.query.propertyId,
+      };
+      const assets = await ownedAssetsService.getOwnedAssets(orgId, filters);
+      res.json(assets);
+    } catch (error) {
+      console.error('Failed to fetch owned assets:', error);
+      res.status(500).json({ error: 'Failed to fetch owned assets' });
+    }
+  });
+
+  // Get owned asset by ID with details
+  app.get('/api/owned-assets/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const asset = await ownedAssetsService.getOwnedAssetWithDetails(req.params.id, orgId);
+      
+      if (!asset) {
+        return res.status(404).json({ error: 'Owned asset not found' });
+      }
+      
+      res.json(asset);
+    } catch (error) {
+      console.error('Failed to fetch owned asset:', error);
+      res.status(500).json({ error: 'Failed to fetch owned asset' });
+    }
+  });
+
+  // Create owned asset
+  app.post('/api/owned-assets', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const data = insertOwnedAssetSchema.parse(req.body);
+      const asset = await ownedAssetsService.createOwnedAsset(orgId, userId, data);
+      res.status(201).json(asset);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create owned asset:', error);
+      res.status(500).json({ error: 'Failed to create owned asset' });
+    }
+  });
+
+  // Update owned asset
+  app.patch('/api/owned-assets/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = updateOwnedAssetSchema.parse(req.body);
+      const asset = await ownedAssetsService.updateOwnedAsset(req.params.id, orgId, data);
+      
+      if (!asset) {
+        return res.status(404).json({ error: 'Owned asset not found' });
+      }
+      
+      res.json(asset);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update owned asset:', error);
+      res.status(500).json({ error: 'Failed to update owned asset' });
+    }
+  });
+
+  // Delete owned asset
+  app.delete('/api/owned-assets/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await ownedAssetsService.deleteOwnedAsset(req.params.id, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Owned asset not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete owned asset:', error);
+      res.status(500).json({ error: 'Failed to delete owned asset' });
+    }
+  });
+
+  // Get asset performance metrics
+  app.get('/api/owned-assets/:id/performance', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const performance = await ownedAssetsService.getAssetPerformance(req.params.id, orgId);
+      
+      if (!performance) {
+        return res.status(404).json({ error: 'Owned asset not found' });
+      }
+      
+      res.json(performance);
+    } catch (error) {
+      console.error('Failed to fetch asset performance:', error);
+      res.status(500).json({ error: 'Failed to fetch asset performance' });
+    }
+  });
+
+  // Get performance snapshots for an asset
+  app.get('/api/owned-assets/:id/snapshots', authenticateUser, async (req: any, res) => {
+    try {
+      const filters = {
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
+        limit: req.query.limit ? parseInt(req.query.limit) : undefined,
+      };
+      const snapshots = await ownedAssetsService.getAssetPerformanceSnapshots(req.params.id, filters);
+      res.json(snapshots);
+    } catch (error) {
+      console.error('Failed to fetch performance snapshots:', error);
+      res.status(500).json({ error: 'Failed to fetch performance snapshots' });
+    }
+  });
+
+  // Create performance snapshot
+  app.post('/api/owned-assets/:id/snapshots', authenticateUser, async (req: any, res) => {
+    try {
+      const data = insertAssetPerformanceSnapshotSchema.parse(req.body);
+      const snapshot = await ownedAssetsService.createPerformanceSnapshot(req.params.id, data);
+      res.status(201).json(snapshot);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create performance snapshot:', error);
+      res.status(500).json({ error: 'Failed to create performance snapshot' });
+    }
+  });
+
+  // Get portfolio summary
+  app.get('/api/owned-assets/portfolio/summary', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const summary = await ownedAssetsService.getPortfolioSummary(orgId);
+      res.json(summary);
+    } catch (error) {
+      console.error('Failed to fetch portfolio summary:', error);
+      res.status(500).json({ error: 'Failed to fetch portfolio summary' });
+    }
+  });
+
+  // Convert deal to owned asset
+  app.post('/api/owned-assets/convert-deal', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { propertyId, projectId, acquisitionPrice, acquisitionDate, holdStrategy } = req.body;
+      
+      if (!propertyId || !acquisitionDate) {
+        return res.status(400).json({ error: 'propertyId and acquisitionDate are required' });
+      }
+      
+      const asset = await ownedAssetsService.convertDealToOwnedAsset(orgId, userId, {
+        propertyId,
+        projectId,
+        acquisitionPrice,
+        acquisitionDate,
+        holdStrategy,
+      });
+      
+      res.status(201).json(asset);
+    } catch (error) {
+      console.error('Failed to convert deal to owned asset:', error);
+      res.status(500).json({ error: 'Failed to convert deal to owned asset' });
     }
   });
 
