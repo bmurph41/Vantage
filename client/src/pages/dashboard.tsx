@@ -3,6 +3,11 @@ import { LayoutGrid, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import PipelineHealthCard from "@/components/dashboard-widgets/PipelineHealthCard";
+import PortfolioKPIStrip from "@/components/dashboard-widgets/PortfolioKPIStrip";
+import TaskListWidget from "@/components/dashboard-widgets/TaskListWidget";
+import RecentDealsTable from "@/components/dashboard-widgets/RecentDealsTable";
+import MarketTrendsChart from "@/components/dashboard-widgets/MarketTrendsChart";
 
 type Widget = {
   widgetKey: string;
@@ -32,6 +37,19 @@ type DashboardLayout = {
   };
 };
 
+const WIDGET_COMPONENTS: Record<string, React.ComponentType<any>> = {
+  'pipeline_health': PipelineHealthCard,
+  'portfolio_kpi': PortfolioKPIStrip,
+  'task_list': TaskListWidget,
+  'recent_deals': RecentDealsTable,
+  'market_trends': MarketTrendsChart,
+  'asset_performance': PortfolioKPIStrip,
+  'fuel_pnl': PortfolioKPIStrip,
+  'rent_roll_occupancy': PortfolioKPIStrip,
+  'active_mandates': RecentDealsTable,
+  'commission_pipeline': PipelineHealthCard,
+};
+
 export default function Dashboard() {
   const { data: layout, isLoading: layoutLoading } = useQuery<DashboardLayout>({
     queryKey: ['/api/dashboards/layout'],
@@ -44,36 +62,28 @@ export default function Dashboard() {
   const isLoading = layoutLoading || widgetsLoading;
 
   const renderWidget = (widgetKey: string, config?: Record<string, any>) => {
-    const widget = widgets?.find((w) => w.widgetKey === widgetKey);
+    const WidgetComponent = WIDGET_COMPONENTS[widgetKey];
     
-    if (!widget) {
+    if (!WidgetComponent) {
+      const widget = widgets?.find((w) => w.widgetKey === widgetKey);
       return (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Unknown Widget</CardTitle>
+            <CardTitle className="text-sm">{widget?.title || 'Unknown Widget'}</CardTitle>
+            <CardDescription className="text-xs">{widget?.description || ''}</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-gray-500">Widget "{widgetKey}" not found</p>
+            <div className="flex items-center justify-center h-32 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+              <p className="text-xs text-gray-500">
+                Widget component not yet implemented
+              </p>
+            </div>
           </CardContent>
         </Card>
       );
     }
 
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">{widget.title}</CardTitle>
-          <CardDescription className="text-xs">{widget.description}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-32 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-            <p className="text-xs text-gray-500">
-              {widget.category} widget - Coming soon
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <WidgetComponent config={config} />;
   };
 
   if (isLoading) {
