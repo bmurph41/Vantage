@@ -659,7 +659,7 @@ export default function SalesCompsIndex() {
           )}
 
           {/* Tab Content */}
-          <TabsContent value="data" className="flex-1 min-h-0 overflow-hidden m-0 flex flex-col" data-testid="tab-content-data">
+          <TabsContent value="data" className="flex-1 min-h-0 overflow-hidden mt-0 m-0 flex flex-col" data-testid="tab-content-data">
             {/* Data Grid */}
             <div className="flex-1 min-h-0 overflow-hidden">
               <CompsDataGrid
@@ -727,13 +727,13 @@ export default function SalesCompsIndex() {
             )}
           </TabsContent>
 
-          <TabsContent value="metrics" className="flex-1 overflow-auto m-0 px-6 pb-6" data-testid="tab-content-metrics">
-            <div className="h-full">
+          <TabsContent value="metrics" className="flex-1 overflow-auto mt-0 m-0 p-0" data-testid="tab-content-metrics">
+            <div className="h-full px-6 pb-6">
               <AnalyticsWorkbench />
             </div>
           </TabsContent>
 
-          <TabsContent value="projects" className="flex-1 overflow-auto m-0 p-0" data-testid="tab-content-projects">
+          <TabsContent value="projects" className="flex-1 overflow-auto mt-0 m-0 p-0" data-testid="tab-content-projects">
             {selectedProject ? (
               <ProjectDetails
                 projectId={selectedProject.id}
