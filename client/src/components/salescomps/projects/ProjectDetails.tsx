@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
@@ -17,16 +18,23 @@ import {
   Plus,
   MoreHorizontal,
   FileText,
-  Lightbulb
+  Lightbulb,
+  Map as MapIcon,
+  Table as TableIcon
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useProject, useProjectComps, useUpdateProject, useDeleteProject, useAutoPopulateProject } from '@/hooks/salescomps/useProjects';
 import { useAuth } from "@/hooks/useAuth";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import ProjectForm from "./ProjectForm";
 import ProjectCompsTable from "./ProjectCompsTable";
 import BulkProjectCompsActions from "./BulkProjectCompsActions";
 import AddCompsToProjectDialog from "./AddCompsToProjectDialog";
 import RecommendationsDialog from "./RecommendationsDialog";
+import { MapView } from "../map-view";
+import { exportMapToPDF, downloadPDF } from "@/utils/export-map-pdf";
+import { apiRequest } from "@/lib/queryClient";
 import type { Project, UpdateProject, SalesComp, User } from "@shared/schema";
 import type { ProjectCompsResponse } from '@/lib/salescomps/api';
 
@@ -39,6 +47,8 @@ interface ProjectDetailsProps {
 export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDetailsProps) {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCompIds, setSelectedCompIds] = useState<string[]>([]);
@@ -47,12 +57,38 @@ export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDe
   const [showRecommendationsDialog, setShowRecommendationsDialog] = useState(false);
   const [sortBy, setSortBy] = useState("marina");
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>("asc");
+  const [activeTab, setActiveTab] = useState<"table" | "map">("table");
 
   const { data: project, isLoading: projectLoading } = useProject(projectId);
   const { data: projectCompsData, isLoading: compsLoading, refetch: refetchComps } = useProjectComps(projectId);
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
   const autoPopulate = useAutoPopulateProject();
+
+  // Geocoding mutation
+  const geocodeMutation = useMutation({
+    mutationFn: async (compId: string) => {
+      const response = await apiRequest(`/api/sales-comps/${compId}/geocode`, {
+        method: 'POST',
+      });
+      return response;
+    },
+    onSuccess: (data, compId) => {
+      toast({
+        title: "Geocoding successful",
+        description: `Location coordinates updated for comp`,
+      });
+      // Invalidate project comps cache to refetch updated data
+      queryClient.invalidateQueries({ queryKey: ['project-comps', projectId] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Geocoding failed",
+        description: error.message || "Failed to geocode address",
+        variant: "destructive",
+      });
+    },
+  });
 
   const canEdit: boolean = Boolean(user && ['Owner', 'Broker', 'Analyst', 'Admin'].includes((user as User).role));
   const canDelete: boolean = Boolean(user && ['Owner', 'Admin'].includes((user as User).role));
@@ -106,6 +142,63 @@ export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDe
         minScore: 0.3 
       } 
     });
+  };
+
+  const handleGeocodeComp = async (compId: string) => {
+    await geocodeMutation.mutateAsync(compId);
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      const compsForPDF = comps.map(pc => ({
+        id: pc.salesCompId,
+        marina: pc.salesComp.marina,
+        city: pc.salesComp.city || undefined,
+        state: pc.salesComp.state || undefined,
+        salePrice: pc.salesComp.salePrice || undefined,
+        saleMonth: pc.salesComp.saleMonth || undefined,
+        saleYear: pc.salesComp.saleYear || undefined,
+        wetSlips: pc.salesComp.wetSlips || undefined,
+        dryRacks: pc.salesComp.dryRacks || undefined,
+        storageTypes: pc.salesComp.storageTypes || [],
+        profitCenterStorage: pc.salesComp.profitCenterStorage,
+        profitCenterFuel: pc.salesComp.profitCenterFuel,
+        profitCenterService: pc.salesComp.profitCenterService,
+        profitCenterEvents: pc.salesComp.profitCenterEvents,
+        profitCenterFnb: pc.salesComp.profitCenterFnb,
+        profitCenterHospitality: pc.salesComp.profitCenterHospitality,
+        profitCenterShipStore: pc.salesComp.profitCenterShipStore,
+        profitCenterBoatSales: pc.salesComp.profitCenterBoatSales,
+        profitCenterBoatRentals: pc.salesComp.profitCenterBoatRentals,
+        profitCenterBoatBrokerage: pc.salesComp.profitCenterBoatBrokerage,
+        profitCenterBoatClub: pc.salesComp.profitCenterBoatClub,
+        profitCenterRvPark: pc.salesComp.profitCenterRvPark,
+        profitCenterParts: pc.salesComp.profitCenterParts,
+        profitCenterThirdPartyLeases: pc.salesComp.profitCenterThirdPartyLeases,
+        lat: pc.salesComp.lat ? parseFloat(pc.salesComp.lat) : undefined,
+        lng: pc.salesComp.lng ? parseFloat(pc.salesComp.lng) : undefined,
+      }));
+
+      const pdfBlob = await exportMapToPDF({
+        comps: compsForPDF,
+        title: `${project?.name || 'Project'} - Sales Comparables Map`,
+        compMarkerColor: '#4285F4',
+        subjectMarkerColor: '#EA4335',
+      });
+
+      downloadPDF(pdfBlob, `${project?.name || 'project'}-map.pdf`);
+      
+      toast({
+        title: "PDF exported successfully",
+        description: "Your map PDF has been downloaded",
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "Failed to generate PDF",
+        variant: "destructive",
+      });
+    }
   };
 
   // Filter comps based on search query  
@@ -240,12 +333,13 @@ export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDe
 
       {/* Comps Section */}
       <div className="flex-1 flex flex-col">
-        {/* Comps Header */}
-        <div className="border-b border-border p-4 lg:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-            <h2 className="text-lg font-semibold text-foreground">
-              Sales Comparables
-            </h2>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "table" | "map")} className="flex-1 flex flex-col">
+          {/* Comps Header */}
+          <div className="border-b border-border p-4 lg:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <h2 className="text-lg font-semibold text-foreground">
+                Sales Comparables
+              </h2>
             
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <Button
@@ -316,37 +410,75 @@ export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDe
             </div>
           </div>
 
-          {/* Search */}
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search comps..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              data-testid="input-search-comps"
-            />
-          </div>
+          {/* Tabs Selector */}
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="table" data-testid="tab-table">
+              <TableIcon className="w-4 h-4 mr-2" />
+              Table View
+            </TabsTrigger>
+            <TabsTrigger value="map" data-testid="tab-map">
+              <MapIcon className="w-4 h-4 mr-2" />
+              Map View
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Search (only shown in table view) */}
+          {activeTab === "table" && (
+            <div className="relative max-w-sm mt-4">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search comps..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="input-search-comps"
+              />
+            </div>
+          )}
         </div>
 
-        {/* Comps Table with our new component */}
-        <ProjectCompsTable
-          data={sortedComps}
-          loading={compsLoading}
-          selectedIds={selectedCompIds}
-          onSelectionChange={setSelectedCompIds}
-          sortBy={sortBy}
-          sortDir={sortDir}
-          onSort={handleSort}
-          canEdit={canEdit}
-          canDelete={canDelete}
-          projectId={projectId}
-          project={project}
-          onAutoPopulate={handleAutoPopulate}
-          onEditProject={() => setShowEditForm(true)}
-          projectName={project.name}
-        />
+        {/* Table View Tab */}
+        <TabsContent value="table" className="flex-1 mt-0">
+          <ProjectCompsTable
+            data={sortedComps}
+            loading={compsLoading}
+            selectedIds={selectedCompIds}
+            onSelectionChange={setSelectedCompIds}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={handleSort}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            projectId={projectId}
+            project={project}
+            onAutoPopulate={handleAutoPopulate}
+            onEditProject={() => setShowEditForm(true)}
+            projectName={project.name}
+          />
+        </TabsContent>
+
+        {/* Map View Tab */}
+        <TabsContent value="map" className="flex-1 mt-0 p-4 lg:p-6">
+          <MapView
+            comps={comps.map(pc => ({
+              id: pc.salesCompId,
+              marina: pc.salesComp.marina,
+              lat: pc.salesComp.lat ? parseFloat(pc.salesComp.lat) : 0,
+              lng: pc.salesComp.lng ? parseFloat(pc.salesComp.lng) : 0,
+              city: pc.salesComp.city || undefined,
+              state: pc.salesComp.state || undefined,
+              salePrice: pc.salesComp.salePrice || undefined,
+              saleMonth: pc.salesComp.saleMonth || undefined,
+              saleYear: pc.salesComp.saleYear || undefined,
+              wetSlips: pc.salesComp.wetSlips || undefined,
+              dryRacks: pc.salesComp.dryRacks || undefined,
+            }))}
+            onGeocodeComp={handleGeocodeComp}
+            onExportPDF={handleExportPDF}
+          />
+        </TabsContent>
+        </Tabs>
       </div>
 
       {/* Bulk Actions */}
