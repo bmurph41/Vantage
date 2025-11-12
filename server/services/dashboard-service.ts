@@ -278,7 +278,7 @@ export class DashboardService {
     const templates: Record<string, any[]> = {
       pe_investor: [
         {
-          widgetKey: 'portfolio_kpi_strip',
+          widgetKey: 'portfolio_kpi',
           position: { x: 0, y: 0 },
           size: { width: 4, height: 1 },
           config: {}
@@ -290,7 +290,7 @@ export class DashboardService {
           config: {}
         },
         {
-          widgetKey: 'asset_performance_grid',
+          widgetKey: 'asset_performance',
           position: { x: 2, y: 1 },
           size: { width: 2, height: 2 },
           config: {}
@@ -316,25 +316,25 @@ export class DashboardService {
           config: {}
         },
         {
-          widgetKey: 'pipeline_health',
+          widgetKey: 'commission_pipeline',
           position: { x: 2, y: 0 },
           size: { width: 2, height: 2 },
           config: {}
         },
         {
-          widgetKey: 'recent_deals',
+          widgetKey: 'pipeline_health',
           position: { x: 0, y: 2 },
-          size: { width: 2, height: 2 },
-          config: { limit: 10 }
-        },
-        {
-          widgetKey: 'commission_pipeline',
-          position: { x: 2, y: 2 },
           size: { width: 2, height: 2 },
           config: {}
         },
         {
-          widgetKey: 'market_comp_trends',
+          widgetKey: 'recent_deals',
+          position: { x: 2, y: 2 },
+          size: { width: 2, height: 2 },
+          config: { limit: 10 }
+        },
+        {
+          widgetKey: 'market_trends',
           position: { x: 0, y: 4 },
           size: { width: 4, height: 2 },
           config: {}
@@ -342,7 +342,7 @@ export class DashboardService {
       ],
       operator: [
         {
-          widgetKey: 'fuel_pnl_summary',
+          widgetKey: 'fuel_pnl',
           position: { x: 0, y: 0 },
           size: { width: 2, height: 2 },
           config: {}
@@ -356,14 +356,8 @@ export class DashboardService {
         {
           widgetKey: 'task_list',
           position: { x: 0, y: 2 },
-          size: { width: 2, height: 2 },
+          size: { width: 4, height: 2 },
           config: { limit: 15 }
-        },
-        {
-          widgetKey: 'work_orders',
-          position: { x: 2, y: 2 },
-          size: { width: 2, height: 2 },
-          config: { status: 'open' }
         }
       ],
       advisor: [
@@ -374,7 +368,7 @@ export class DashboardService {
           config: {}
         },
         {
-          widgetKey: 'portfolio_kpi_strip',
+          widgetKey: 'portfolio_kpi',
           position: { x: 0, y: 2 },
           size: { width: 4, height: 1 },
           config: {}
