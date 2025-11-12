@@ -533,7 +533,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                             <SelectItem value="any">Any</SelectItem>
                             {COASTAL_TYPES.map((type) => (
                               <SelectItem key={type} value={type}>
-                                {type === 'coastal' ? 'Coastal' : 'Lake'}
+                                {type.charAt(0).toUpperCase() + type.slice(1)}
                               </SelectItem>
                             ))}
                           </SelectContent>

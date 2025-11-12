@@ -20,6 +20,7 @@ import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
 import { RecommendationService } from "./services/salescomps/recommendationService";
+import { AICompMatchingService } from "./services/salescomps/aiCompMatchingService";
 import { calculateMetrics, generateInsights, type AnalyticsFilters } from "./services/salescomps/analyticsService";
 import { geocodingService } from "./services/geocodingService";
 import { ParserService as RcParserService } from "./services/ratecomps/parser";
@@ -196,6 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const compService = new CompService(storage, parserService);
   const filterBuilder = new FilterBuilder();
   const recommendationService = new RecommendationService(storage);
+  const aiCompMatchingService = new AICompMatchingService();
 
   // Initialize RateComps services
   const rcParserService = new RcParserService();
@@ -9678,25 +9680,82 @@ Current context: Project ${req.params.projectId}`;
       // Get configuration from request body
       const limit = req.body.limit || 30;
       const minScore = req.body.minScore || 0.3; // Only add comps with score >= 0.3
+      const useAI = req.body.useAI !== false; // Default to true, allow disabling
       
       // Get existing comps to exclude
       const projectComps = await storage.getScProjectComps(projectId, orgId);
       const excludeCompIds = projectComps.map(pc => pc.salesCompId);
 
-      // Get recommendations
+      // Get recommendations from rule-based system
       const projectProfile = (project.profile as any) || {};
       const userWeightOverrides = (project.weightOverrides as any) || undefined;
       
+      // Get larger candidate pool for AI to evaluate
+      const candidateLimit = useAI && aiCompMatchingService.isEnabled() ? 100 : limit * 2;
       const recommendations = await recommendationService.getRecommendations({
         orgId,
         projectProfile,
         userWeightOverrides,
         excludeCompIds,
-        limit: limit * 2, // Get more to ensure we have enough after filtering
+        limit: candidateLimit,
       });
 
+      let topRecommendations = recommendations;
+      let aiUsed = false;
+
+      // Enhance with AI scoring if enabled
+      if (useAI && aiCompMatchingService.isEnabled() && recommendations.length > 0) {
+        try {
+          // Take top 30 rule-based candidates for AI evaluation
+          const aiCandidates = recommendations.slice(0, 30);
+          
+          const aiScores = await aiCompMatchingService.scoreComps(
+            projectProfile,
+            aiCandidates.map(r => r.comp),
+            aiCandidates.map(r => ({ compId: r.comp.id, ruleBasedScore: r.score }))
+          );
+
+          if (aiScores && aiScores.scores.length > 0) {
+            // Combine AI and rule-based scores
+            const combinedRecs = aiCandidates.map(rec => {
+              const aiScore = aiScores.scores.find(s => s.compId === rec.comp.id);
+              if (aiScore) {
+                // 60% AI, 40% rule-based
+                const combinedScore = aiCompMatchingService.combineScores(rec.score, aiScore.aiScore, 0.6);
+                return {
+                  ...rec,
+                  score: combinedScore,
+                  aiScore: aiScore.aiScore,
+                  aiRationale: aiScore.rationale,
+                  aiKeyFactors: aiScore.keyFactors,
+                  aiConfidence: aiScore.confidence,
+                  ruleBasedScore: rec.score
+                };
+              }
+              return rec;
+            });
+
+            // Re-sort by combined score
+            combinedRecs.sort((a, b) => b.score - a.score);
+            
+            // Merge AI-enhanced top 30 with remaining rule-based candidates
+            const remainingCandidates = recommendations.slice(30);
+            topRecommendations = [...combinedRecs, ...remainingCandidates];
+            topRecommendations.sort((a, b) => b.score - a.score);
+            
+            aiUsed = true;
+            console.log(`AI scoring enhanced ${aiScores.scores.length} comps for project ${projectId}`);
+          } else {
+            console.log('AI scoring returned no scores, using rule-based only');
+          }
+        } catch (aiError) {
+          console.error('AI scoring failed, falling back to rule-based only:', aiError);
+          // Continue with rule-based scores
+        }
+      }
+
       // Filter by minimum score and take top N
-      const topRecommendations = recommendations
+      topRecommendations = topRecommendations
         .filter(rec => rec.score >= minScore)
         .slice(0, limit);
 
@@ -9716,7 +9775,14 @@ Current context: Project ${req.params.projectId}`;
           addedComps.push({
             ...projectComp,
             score: rec.score,
-            reasons: rec.reasons
+            reasons: rec.reasons,
+            ...(rec.aiScore !== undefined && {
+              aiScore: rec.aiScore,
+              aiRationale: rec.aiRationale,
+              aiKeyFactors: rec.aiKeyFactors,
+              aiConfidence: rec.aiConfidence,
+              ruleBasedScore: rec.ruleBasedScore
+            })
           });
           addedCount++;
         } catch (addError: any) {
