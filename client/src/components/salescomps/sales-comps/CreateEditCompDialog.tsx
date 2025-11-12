@@ -673,27 +673,40 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 <CardTitle className="text-lg">Identity</CardTitle>
                               </CardHeader>
                               <CardContent className="space-y-4">
-                                <FormField
-                                  control={form.control}
-                                  name="marina"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Marina Name *</FormLabel>
-                                      <FormControl>
-                                        <Input 
-                                          {...field} 
-                                          onChange={(e) => {
-                                            field.onChange(e);
-                                            updateMarinaName(tab.id, e.target.value);
-                                          }}
-                                          placeholder="Enter marina name..."
-                                          data-testid={`input-marina-${tab.id}`}
-                                        />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
+                                {tab.id === '1' ? (
+                                  <FormField
+                                    control={form.control}
+                                    name="marina"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Marina Name *</FormLabel>
+                                        <FormControl>
+                                          <Input 
+                                            {...field} 
+                                            onChange={(e) => {
+                                              field.onChange(e);
+                                              updateMarinaName(tab.id, e.target.value);
+                                            }}
+                                            placeholder="Enter marina name..."
+                                            data-testid={`input-marina-${tab.id}`}
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                ) : (
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`marina-${tab.id}`}>Marina Name *</Label>
+                                    <Input
+                                      id={`marina-${tab.id}`}
+                                      value={tab.marinaName}
+                                      onChange={(e) => updateMarinaName(tab.id, e.target.value)}
+                                      placeholder="Enter marina name..."
+                                      data-testid={`input-marina-${tab.id}`}
+                                    />
+                                  </div>
+                                )}
                               </CardContent>
                             </Card>
                           </div>
