@@ -113,7 +113,7 @@ export default function ProjectList({ onSelectProject, selectedProjectId }: Proj
   return (
     <div className="flex-1 flex flex-col h-full">
       {/* Header */}
-      <div className="border-b border-border p-6">
+      <div className="sticky top-0 z-10 bg-background border-b border-border p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Projects</h1>
