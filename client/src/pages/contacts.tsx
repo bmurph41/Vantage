@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Tag, UserPlus } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Tag, UserPlus, Thermometer } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ContactFormModal from "@/components/modals/contact-form-modal";
@@ -38,9 +38,31 @@ const contactTypeColors = {
   client: 'bg-emerald-100 text-emerald-800'
 };
 
+const contactTagColors = {
+  lead: 'bg-blue-500 text-white',
+  seller: 'bg-purple-500 text-white',
+  competitor: 'bg-slate-500 text-white',
+  broker: 'bg-emerald-500 text-white',
+  vendor: 'bg-amber-500 text-white',
+  insurance: 'bg-indigo-500 text-white',
+  lender: 'bg-cyan-500 text-white',
+  attorney: 'bg-rose-500 text-white',
+  other: 'bg-gray-500 text-white'
+};
+
+const leadStatusColors = {
+  none: 'bg-gray-100 text-gray-800',
+  new: 'bg-blue-100 text-blue-800',
+  contacted: 'bg-yellow-100 text-yellow-800',
+  qualified: 'bg-green-100 text-green-800',
+  unqualified: 'bg-red-100 text-red-800',
+  converted: 'bg-purple-100 text-purple-800'
+};
+
 export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [contactTagFilter, setContactTagFilter] = useState('all');
   const [isContactFormOpen, setIsContactFormOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
@@ -235,7 +257,7 @@ export default function Contacts() {
     toast({ title: `Exported ${selectedIds.size} contact(s)` });
   };
 
-  // Filter contacts based on search and status
+  // Filter contacts based on search, status, and contact tag
   const filteredContacts = contacts.filter(contact => {
     const matchesSearch = !searchTerm || 
       `${contact.firstName} ${contact.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -245,7 +267,9 @@ export default function Contacts() {
     const contactStatus = getContactStatus(contact);
     const matchesStatus = statusFilter === 'all' || contactStatus === statusFilter;
     
-    return matchesSearch && matchesStatus;
+    const matchesContactTag = contactTagFilter === 'all' || contact.contactTag === contactTagFilter;
+    
+    return matchesSearch && matchesStatus && matchesContactTag;
   });
 
   // Calculate metrics
@@ -277,7 +301,7 @@ export default function Contacts() {
               />
             </div>
             
-            {/* Filter */}
+            {/* Status Filter */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-36 h-10" data-testid="filter-status">
                 <SelectValue placeholder="All Status" />
@@ -288,6 +312,25 @@ export default function Contacts() {
                 <SelectItem value="customer">Customer</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {/* Contact Tag Filter */}
+            <Select value={contactTagFilter} onValueChange={setContactTagFilter}>
+              <SelectTrigger className="w-36 h-10" data-testid="filter-contact-tag">
+                <SelectValue placeholder="All Tags" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tags</SelectItem>
+                <SelectItem value="lead">Lead</SelectItem>
+                <SelectItem value="seller">Seller</SelectItem>
+                <SelectItem value="competitor">Competitor</SelectItem>
+                <SelectItem value="broker">Broker</SelectItem>
+                <SelectItem value="vendor">Vendor</SelectItem>
+                <SelectItem value="insurance">Insurance</SelectItem>
+                <SelectItem value="lender">Lender</SelectItem>
+                <SelectItem value="attorney">Attorney</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
             
@@ -556,12 +599,28 @@ export default function Contacts() {
                     
                     {/* Type */}
                     <td className="px-6 py-4">
-                      <Badge 
-                        className={contactTypeColors[contact.contactType as keyof typeof contactTypeColors] || 'bg-gray-100 text-gray-800'} 
-                        data-testid={`badge-contact-type-${contact.id}`}
-                      >
-                        {contact.contactType || 'prospect'}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {/* Contact Tag Badge (Primary) */}
+                        {contact.contactTag && (
+                          <Badge 
+                            className={contactTagColors[contact.contactTag as keyof typeof contactTagColors] || 'bg-gray-500 text-white'} 
+                            data-testid={`badge-contact-tag-${contact.id}`}
+                          >
+                            {contact.contactTag.charAt(0).toUpperCase() + contact.contactTag.slice(1)}
+                          </Badge>
+                        )}
+                        
+                        {/* Lead Status Badge (Conditional - only when contactTag = 'lead') */}
+                        {contact.contactTag === 'lead' && contact.leadStatus && (
+                          <Badge 
+                            className={`flex items-center gap-0.5 text-xs ${leadStatusColors[contact.leadStatus as keyof typeof leadStatusColors] || 'bg-gray-100 text-gray-800'}`}
+                            data-testid={`badge-lead-status-${contact.id}`}
+                          >
+                            <Thermometer className="h-3 w-3" />
+                            {contact.leadStatus.charAt(0).toUpperCase() + contact.leadStatus.slice(1)}
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     
                     {/* Actions */}
