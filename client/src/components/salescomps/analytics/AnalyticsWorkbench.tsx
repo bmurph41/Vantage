@@ -134,7 +134,7 @@ export default function AnalyticsWorkbench() {
   const insights = analyticsData?.insights || [];
 
   return (
-    <div className="flex flex-col lg:flex-row gap-3 h-full">
+    <div className="flex flex-col lg:flex-row gap-3">
       {/* Filters Sidebar */}
       <div className="w-full lg:w-80 flex-shrink-0">
         <AnalyticsFiltersPanel
@@ -147,7 +147,7 @@ export default function AnalyticsWorkbench() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1">
         <div className="space-y-2">
           {/* Header */}
           <div className="flex items-center justify-between mb-1">

@@ -373,7 +373,7 @@ export default function SalesCompsIndex() {
   }
 
   return (
-    <div className="flex flex-1 bg-background h-screen">
+    <div className="flex flex-1 bg-background min-h-screen">
       {/* Left Sidebar - Filters (Only show on All Comps tab) */}
       {!isSidebarCollapsed && activeTab === "data" && (
         <div className="w-64 bg-card border-r border-border flex flex-col flex-shrink-0">
@@ -391,7 +391,7 @@ export default function SalesCompsIndex() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
           {/* Sticky Header Container - Command Bar + Tabs */}
           <div className="sticky top-0 z-40 bg-background">
@@ -728,7 +728,7 @@ export default function SalesCompsIndex() {
           </TabsContent>
 
           <TabsContent value="metrics" className="flex-1 overflow-auto mt-0 m-0 p-0" data-testid="tab-content-metrics">
-            <div className="h-full px-6 pb-6">
+            <div className="px-6 pb-6">
               <AnalyticsWorkbench />
             </div>
           </TabsContent>
