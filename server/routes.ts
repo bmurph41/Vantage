@@ -17,6 +17,7 @@ import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { AuditService } from "./services/audit-service";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
+import { rentRollService } from "./services/rent-roll-service";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
@@ -69,7 +70,13 @@ import {
   updateFuelIntegrationSchema,
   debtScenarios,
   insertDebtScenarioSchema,
-  updateDebtScenarioSchema
+  updateDebtScenarioSchema,
+  rentRolls,
+  rentRollEntries,
+  insertRentRollSchema,
+  updateRentRollSchema,
+  insertRentRollEntrySchema,
+  updateRentRollEntrySchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -9293,6 +9300,175 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to fetch LTV distribution:', error);
       res.status(500).json({ error: 'Failed to fetch LTV distribution' });
+    }
+  });
+
+  // ========================================
+  // RENT ROLL ENDPOINTS
+  // ========================================
+
+  // Get all rent rolls
+  app.get('/api/operations/rent-rolls', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const context = req.query.context as 'operational' | 'valuation' | undefined;
+      const rolls = await rentRollService.getRentRolls(orgId, context);
+      res.json(rolls);
+    } catch (error) {
+      console.error('Failed to fetch rent rolls:', error);
+      res.status(500).json({ error: 'Failed to fetch rent rolls' });
+    }
+  });
+
+  // Get a single rent roll
+  app.get('/api/operations/rent-rolls/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const roll = await rentRollService.getRentRollById(req.params.id, orgId);
+      
+      if (!roll) {
+        return res.status(404).json({ error: 'Rent roll not found' });
+      }
+      
+      res.json(roll);
+    } catch (error) {
+      console.error('Failed to fetch rent roll:', error);
+      res.status(500).json({ error: 'Failed to fetch rent roll' });
+    }
+  });
+
+  // Create a new rent roll
+  app.post('/api/operations/rent-rolls', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = insertRentRollSchema.parse(req.body);
+      const roll = await rentRollService.createRentRoll(orgId, data);
+      res.status(201).json(roll);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create rent roll:', error);
+      res.status(500).json({ error: 'Failed to create rent roll' });
+    }
+  });
+
+  // Update a rent roll
+  app.patch('/api/operations/rent-rolls/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = updateRentRollSchema.parse(req.body);
+      const roll = await rentRollService.updateRentRoll(req.params.id, orgId, data);
+      
+      if (!roll) {
+        return res.status(404).json({ error: 'Rent roll not found' });
+      }
+      
+      res.json(roll);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update rent roll:', error);
+      res.status(500).json({ error: 'Failed to update rent roll' });
+    }
+  });
+
+  // Delete a rent roll
+  app.delete('/api/operations/rent-rolls/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await rentRollService.deleteRentRoll(req.params.id, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Rent roll not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete rent roll:', error);
+      res.status(500).json({ error: 'Failed to delete rent roll' });
+    }
+  });
+
+  // Get rent roll entries
+  app.get('/api/operations/rent-rolls/:rentRollId/entries', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const entries = await rentRollService.getRentRollEntries(req.params.rentRollId, orgId);
+      res.json(entries);
+    } catch (error) {
+      console.error('Failed to fetch rent roll entries:', error);
+      res.status(500).json({ error: 'Failed to fetch rent roll entries' });
+    }
+  });
+
+  // Create a rent roll entry
+  app.post('/api/operations/rent-rolls/:rentRollId/entries', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = insertRentRollEntrySchema.parse({
+        ...req.body,
+        rentRollId: req.params.rentRollId,
+      });
+      const entry = await rentRollService.createRentRollEntry(orgId, data);
+      res.status(201).json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create rent roll entry:', error);
+      res.status(500).json({ error: 'Failed to create rent roll entry' });
+    }
+  });
+
+  // Update a rent roll entry
+  app.patch('/api/operations/rent-roll-entries/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = updateRentRollEntrySchema.parse(req.body);
+      const entry = await rentRollService.updateRentRollEntry(req.params.id, orgId, data);
+      
+      if (!entry) {
+        return res.status(404).json({ error: 'Rent roll entry not found' });
+      }
+      
+      res.json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update rent roll entry:', error);
+      res.status(500).json({ error: 'Failed to update rent roll entry' });
+    }
+  });
+
+  // Delete a rent roll entry
+  app.delete('/api/operations/rent-roll-entries/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await rentRollService.deleteRentRollEntry(req.params.id, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Rent roll entry not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete rent roll entry:', error);
+      res.status(500).json({ error: 'Failed to delete rent roll entry' });
+    }
+  });
+
+  // Get rent roll summary statistics
+  app.get('/api/operations/rent-rolls/:rentRollId/summary', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const summary = await rentRollService.getRentRollSummary(req.params.rentRollId, orgId);
+      res.json(summary);
+    } catch (error) {
+      console.error('Failed to fetch rent roll summary:', error);
+      res.status(500).json({ error: 'Failed to fetch rent roll summary' });
     }
   });
 
