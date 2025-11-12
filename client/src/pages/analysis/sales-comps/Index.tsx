@@ -393,8 +393,10 @@ export default function SalesCompsIndex() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
-          {/* Top Actions Bar - Sticky */}
-          <div className="sticky top-0 z-40 bg-card border-b border-border px-6 py-4">
+          {/* Sticky Header Container - Command Bar + Tabs */}
+          <div className="sticky top-0 z-40 bg-background">
+            {/* Top Actions Bar */}
+            <div className="bg-card border-b border-border px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button
@@ -438,8 +440,8 @@ export default function SalesCompsIndex() {
                     </TooltipContent>
                   </Tooltip>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  <span data-testid="text-count">{total}</span> comps found
+                <div className="text-sm text-muted-foreground ml-4 px-3 py-1 bg-muted rounded-md">
+                  <span data-testid="text-count" className="font-semibold">{total.toLocaleString()}</span> comps found
                 </div>
               </div>
               
@@ -547,6 +549,25 @@ export default function SalesCompsIndex() {
                 )}
               </div>
             </div>
+            </div>
+
+            {/* Tab Navigation - Inside sticky container */}
+            <div className="px-6 border-b border-border bg-background">
+              <TabsList className="grid w-full max-w-2xl grid-cols-3" data-testid="tabs-navigation">
+                <TabsTrigger value="data" className="flex items-center gap-2" data-testid="tab-data">
+                  <Table className="h-4 w-4" />
+                  Sales Comps
+                </TabsTrigger>
+                <TabsTrigger value="metrics" className="flex items-center gap-2" data-testid="tab-metrics">
+                  <TrendingUp className="h-4 w-4" />
+                  Analytics
+                </TabsTrigger>
+                <TabsTrigger value="projects" className="flex items-center gap-2" data-testid="tab-projects">
+                  <FolderKanban className="h-4 w-4" />
+                  Projects
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </div>
 
           {/* Bulk Actions Bar */}
@@ -636,24 +657,6 @@ export default function SalesCompsIndex() {
               </div>
             </div>
           )}
-
-          {/* Tab Navigation */}
-          <div className="px-6 border-b border-border sticky top-0 z-30 bg-background">
-            <TabsList className="grid w-full max-w-2xl grid-cols-3" data-testid="tabs-navigation">
-              <TabsTrigger value="data" className="flex items-center gap-2" data-testid="tab-data">
-                <Table className="h-4 w-4" />
-                Sales Comps
-              </TabsTrigger>
-              <TabsTrigger value="metrics" className="flex items-center gap-2" data-testid="tab-metrics">
-                <TrendingUp className="h-4 w-4" />
-                Analytics
-              </TabsTrigger>
-              <TabsTrigger value="projects" className="flex items-center gap-2" data-testid="tab-projects">
-                <FolderKanban className="h-4 w-4" />
-                Projects
-              </TabsTrigger>
-            </TabsList>
-          </div>
 
           {/* Tab Content */}
           <TabsContent value="data" className="flex-1 min-h-0 overflow-hidden m-0 flex flex-col" data-testid="tab-content-data">
