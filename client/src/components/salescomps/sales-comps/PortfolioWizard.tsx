@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { X, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { salesCompsApi } from '@/lib/salescomps/api';
@@ -16,6 +17,18 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import type { SalesComp, InsertSalesComp } from "@shared/schema";
 
+// Month names for the dropdown
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+] as const;
+
+// Helper to convert month name to number (1-12)
+const monthNameToNumber = (monthName: string): number | undefined => {
+  const index = MONTH_NAMES.indexOf(monthName as typeof MONTH_NAMES[number]);
+  return index >= 0 ? index + 1 : undefined;
+};
+
 // Simplified schema for portfolio wizard - we'll use a less restrictive schema
 const marinaDataSchema = z.object({
   marinaName: z.string().min(1, "Marina name is required"),
@@ -23,7 +36,7 @@ const marinaDataSchema = z.object({
   salePrice: z.union([z.string(), z.number()]).optional(),
   capRate: z.union([z.string(), z.number()]).optional(),
   noi: z.union([z.string(), z.number()]).optional(),
-  saleMonth: z.union([z.string(), z.number()]).optional(),
+  saleMonth: z.string().optional(),
   saleYear: z.union([z.string(), z.number()]).optional(),
   city: z.string().optional(),
   state: z.string().optional(),
@@ -32,6 +45,20 @@ const marinaDataSchema = z.object({
 });
 
 type MarinaData = z.infer<typeof marinaDataSchema>;
+
+// Empty marina template - ensures all fields start blank
+const emptyMarina: MarinaData = {
+  marinaName: "",
+  salePrice: "",
+  capRate: "",
+  noi: "",
+  saleMonth: undefined,
+  saleYear: "",
+  city: "",
+  state: "",
+  wetSlips: "",
+  dryRacks: "",
+};
 
 interface PortfolioWizardProps {
   open: boolean;
@@ -47,16 +74,16 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
   const [portfolioName, setPortfolioName] = useState("");
   const [marinaCount, setMarinaCount] = useState(3);
   const [marinaDataList, setMarinaDataList] = useState<MarinaData[]>([
-    { marinaName: "" },
-    { marinaName: "" },
-    { marinaName: "" },
+    { ...emptyMarina },
+    { ...emptyMarina },
+    { ...emptyMarina },
   ]);
   const [currentMarinaIndex, setCurrentMarinaIndex] = useState(0);
   
   // Form for Step 2 (individual marina data)
   const marinaForm = useForm<MarinaData>({
     resolver: zodResolver(marinaDataSchema),
-    defaultValues: marinaDataList[currentMarinaIndex] || { marinaName: "" },
+    defaultValues: { ...emptyMarina },
   });
 
   // Reset wizard state when dialog closes
@@ -64,9 +91,9 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
     setStep(1);
     setPortfolioName("");
     setMarinaCount(3);
-    setMarinaDataList([{ marinaName: "" }, { marinaName: "" }, { marinaName: "" }]);
+    setMarinaDataList([{ ...emptyMarina }, { ...emptyMarina }, { ...emptyMarina }]);
     setCurrentMarinaIndex(0);
-    marinaForm.reset();
+    marinaForm.reset({ ...emptyMarina });
     onClose();
   };
 
@@ -81,26 +108,27 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
       return;
     }
     
-    // Initialize marina data list based on count
-    const initialMarinas = Array.from({ length: marinaCount }, () => ({ marinaName: "" }));
+    // Initialize marina data list based on count with empty marina templates
+    const initialMarinas = Array.from({ length: marinaCount }, () => ({ ...emptyMarina }));
     setMarinaDataList(initialMarinas);
     setCurrentMarinaIndex(0);
-    marinaForm.reset(initialMarinas[0]);
+    marinaForm.reset({ ...emptyMarina });
     setStep(2);
   };
 
   // Step 2: Save current marina and move to next or to review
   const handleSaveMarina = (data: MarinaData) => {
-    // Update marina data list
+    // Update marina data list - merge with emptyMarina to ensure full object
     const updated = [...marinaDataList];
-    updated[currentMarinaIndex] = data;
+    updated[currentMarinaIndex] = { ...emptyMarina, ...data };
     setMarinaDataList(updated);
 
     // Move to next marina or to review step
     if (currentMarinaIndex < marinaCount - 1) {
       const nextIndex = currentMarinaIndex + 1;
       setCurrentMarinaIndex(nextIndex);
-      marinaForm.reset(updated[nextIndex] || { marinaName: "" });
+      // Merge with emptyMarina to ensure blank fields for new marina or saved data for visited marina
+      marinaForm.reset({ ...emptyMarina, ...updated[nextIndex] });
     } else {
       setStep(3);
     }
@@ -111,7 +139,8 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
     if (currentMarinaIndex > 0) {
       const prevIndex = currentMarinaIndex - 1;
       setCurrentMarinaIndex(prevIndex);
-      marinaForm.reset(marinaDataList[prevIndex]);
+      // Merge with emptyMarina to ensure all fields are properly set
+      marinaForm.reset({ ...emptyMarina, ...marinaDataList[prevIndex] });
     } else {
       setStep(1);
     }
@@ -143,7 +172,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
             salePrice: marinaData.salePrice ? Number(marinaData.salePrice) : undefined,
             capRate: marinaData.capRate ? Number(marinaData.capRate) : undefined,
             noi: marinaData.noi ? Number(marinaData.noi) : undefined,
-            saleMonth: marinaData.saleMonth ? Number(marinaData.saleMonth) : undefined,
+            saleMonth: marinaData.saleMonth ? monthNameToNumber(marinaData.saleMonth) : undefined,
             saleYear: marinaData.saleYear ? Number(marinaData.saleYear) : undefined,
             city: marinaData.city || undefined,
             state: marinaData.state || undefined,
@@ -406,9 +435,20 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Sale Month</FormLabel>
-                              <FormControl>
-                                <Input {...field} type="number" min="1" max="12" placeholder="MM" />
-                              </FormControl>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select month..." />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {MONTH_NAMES.map((month) => (
+                                    <SelectItem key={month} value={month}>
+                                      {month}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
