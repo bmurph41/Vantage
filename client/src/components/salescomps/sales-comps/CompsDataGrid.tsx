@@ -55,9 +55,7 @@ interface CompsDataGridProps {
   columnFilters: Record<string, string[]>;
   onColumnFilterChange: (column: string, excludedValues: string[]) => void;
   columnUniqueValues: Record<string, string[]>;
-  isEditMode?: boolean;
-  onCellChange?: (compId: string, field: string, value: any) => void;
-  onCompUpdate?: (updatedComp: SalesComp) => void;
+  onCompClick?: (comp: SalesComp) => void;
 }
 
 export default function CompsDataGrid({
@@ -74,9 +72,7 @@ export default function CompsDataGrid({
   columnFilters,
   onColumnFilterChange,
   columnUniqueValues,
-  isEditMode = false,
-  onCellChange,
-  onCompUpdate,
+  onCompClick,
 }: CompsDataGridProps) {
   // Column configuration state for widths and ordering
   const [columnConfig, setColumnConfig] = useState<Record<string, { width: number; order: number }>>({});

@@ -15,6 +15,7 @@ import FiltersPanel from "@/components/salescomps/sales-comps/FiltersPanel";
 import CompsDataGrid from "@/components/salescomps/sales-comps/CompsDataGrid";
 import AnalyticsWorkbench from "@/components/salescomps/analytics/AnalyticsWorkbench";
 import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEditCompDialog";
+import ViewCompModal from "@/components/salescomps/sales-comps/ViewCompModal";
 import ColumnEditorDialog from "@/components/salescomps/sales-comps/ColumnEditorDialog";
 import BulkEdit from "./BulkEdit";
 import Upload from "./Upload";
@@ -95,14 +96,14 @@ export default function SalesCompsIndex() {
   const [showUpload, setShowUpload] = useState(false);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showProjectAssignment, setShowProjectAssignment] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editData, setEditData] = useState<any[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [viewingComp, setViewingComp] = useState<SalesComp | null>(null);
+  const [editingComp, setEditingComp] = useState<SalesComp | null>(null);
 
   // Debounce search query updates
   const debouncedSetSearch = useMemo(
@@ -265,102 +266,23 @@ export default function SalesCompsIndex() {
     URL.revokeObjectURL(url);
   };
 
-  const handleEnterEditMode = () => {
-    // Create a deep copy of the current data for editing
-    setEditData(data.map(comp => ({ ...comp })));
-    setIsEditMode(true);
+  const handleCompClick = (comp: SalesComp) => {
+    setViewingComp(comp);
   };
 
-  const handleExitEditMode = () => {
-    setIsEditMode(false);
-    setEditData([]);
+  const handleEditFromView = (comp: SalesComp) => {
+    setViewingComp(null);
+    setEditingComp(comp);
   };
 
-  const handleSaveChanges = async () => {
-    try {
-      // Find changed items by comparing with original data
-      const changedItems = editData.filter(editedComp => {
-        const originalComp = data.find(comp => comp.id === editedComp.id);
-        if (!originalComp) return false;
-        
-        // Check if any field has changed
-        return Object.keys(editedComp).some(key => {
-          const originalValue = originalComp[key as keyof typeof originalComp];
-          const editedValue = editedComp[key as keyof typeof editedComp];
-          return originalValue !== editedValue;
-        });
-      });
-
-      if (changedItems.length === 0) {
-        toast({
-          title: "No changes",
-          description: "No changes were made to save",
-        });
-        setIsEditMode(false);
-        setEditData([]);
-        return;
-      }
-
-      // Save each changed item
-      const savePromises = changedItems.map(async (changedComp) => {
-        const originalComp = data.find(comp => comp.id === changedComp.id);
-        if (!originalComp) return;
-
-        // Build update object with only changed fields
-        const updateData: Record<string, any> = {};
-        Object.keys(changedComp).forEach(key => {
-          const originalValue = originalComp[key as keyof typeof originalComp];
-          const editedValue = changedComp[key as keyof typeof changedComp];
-          if (originalValue !== editedValue) {
-            updateData[key] = editedValue;
-          }
-        });
-
-        // Make API call to update the comp
-        return salesCompsApi.updateComp(changedComp.id, updateData);
-      });
-
-      await Promise.all(savePromises);
-
-      // Invalidate and refetch data
-      queryClient.invalidateQueries({ 
-        queryKey: queryKeys.comps.all,
-      });
-      
-      toast({
-        title: "Success",
-        description: `${changedItems.length} item(s) saved successfully`,
-      });
-      
-      setIsEditMode(false);
-      setEditData([]);
-      
-    } catch (error) {
-      console.error('Error saving changes:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save changes",
-        variant: "destructive",
-      });
-    }
+  const handleCompUpdate = (updatedComp?: SalesComp) => {
+    // Refresh data after create/update
+    queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
+    setEditingComp(null);
+    setShowCreateDialog(false);
+    setIsPortfolioMode(false);
   };
 
-  const handleCellChange = (compId: string, field: string, value: any) => {
-    setEditData(prev => 
-      prev.map(comp => 
-        comp.id === compId ? { ...comp, [field]: value } : comp
-      )
-    );
-  };
-
-  const handleCompUpdate = (updatedComp: SalesComp) => {
-    // Update the editData state with the updated comp data
-    setEditData(prev => 
-      prev.map(comp => 
-        comp.id === updatedComp.id ? { ...updatedComp } : comp
-      )
-    );
-  };
 
   if (showUpload) {
     return <Upload 
@@ -420,7 +342,6 @@ export default function SalesCompsIndex() {
                       className="pl-10 w-72"
                       value={searchQuery}
                       onChange={(e) => handleSearch(e.target.value)}
-                      disabled={isEditMode}
                       data-testid="input-search"
                     />
                   </div>
@@ -446,7 +367,7 @@ export default function SalesCompsIndex() {
               </div>
               
               <div className="flex items-center gap-2 flex-wrap">
-                {canManageColumns && !isEditMode && (
+                {canManageColumns && (
                   <Button
                     variant="secondary"
                     onClick={() => setShowColumnsDialog(true)}
@@ -457,51 +378,18 @@ export default function SalesCompsIndex() {
                   </Button>
                 )}
 
-                {/* Edit/Save buttons */}
-                {!isEditMode ? (
-                  <>
-                    <Button
-                      variant="secondary"
-                      onClick={handleEnterEditMode}
-                      disabled={!data?.length}
-                      data-testid="button-edit-comps"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Comps
-                    </Button>
-                    
-                    <Button
-                      variant="secondary"
-                      onClick={handleExport}
-                      disabled={!data?.length}
-                      data-testid="button-export"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="secondary"
-                      onClick={handleExitEditMode}
-                      data-testid="button-cancel-edit"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </Button>
-                    
-                    <Button
-                      onClick={handleSaveChanges}
-                      data-testid="button-save-changes"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </Button>
-                  </>
-                )}
+                {/* Export button */}
+                <Button
+                  variant="secondary"
+                  onClick={handleExport}
+                  disabled={!data?.length}
+                  data-testid="button-export"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
 
-                {canCreate && !isEditMode && (
+                {canCreate && (
                   <>
                     <Button
                       variant="default"
@@ -571,7 +459,7 @@ export default function SalesCompsIndex() {
           </div>
 
           {/* Bulk Actions Bar */}
-          {selectedIds?.length > 0 && !isEditMode && (
+          {selectedIds?.length > 0 && (
             <div className="bg-card border-b border-border px-6 py-3">
               <div className="p-3 bg-muted rounded-md flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -663,7 +551,7 @@ export default function SalesCompsIndex() {
             {/* Data Grid */}
             <div className="flex-1 min-h-0 overflow-hidden">
               <CompsDataGrid
-                data={isEditMode ? editData : data}
+                data={data}
                 loading={compsLoading}
                 sortBy={sortBy}
                 sortDir={sortDir}
@@ -684,14 +572,12 @@ export default function SalesCompsIndex() {
                   }));
                 }}
                 columnUniqueValues={columnUniqueValues}
-                isEditMode={isEditMode}
-                onCellChange={handleCellChange}
-                onCompUpdate={handleCompUpdate}
+                onCompClick={handleCompClick}
               />
             </div>
             
             {/* Pagination Controls */}
-            {!isEditMode && total > 0 && (
+            {total > 0 && (
               <div className="border-t border-border bg-background px-6 py-3 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>
@@ -750,13 +636,19 @@ export default function SalesCompsIndex() {
       </div>
 
       {/* Dialogs */}
+      <ViewCompModal
+        open={!!viewingComp}
+        onClose={() => setViewingComp(null)}
+        comp={viewingComp}
+        onEdit={handleEditFromView}
+      />
+
       <CreateEditCompDialog
-        open={showCreateDialog}
-        onClose={() => {
-          setShowCreateDialog(false);
-          setIsPortfolioMode(false);
-        }}
+        open={showCreateDialog || !!editingComp}
+        onClose={handleCompUpdate}
+        comp={editingComp || undefined}
         isPortfolioMode={isPortfolioMode}
+        onUpdate={handleCompUpdate}
       />
 
       {canManageColumns && (
