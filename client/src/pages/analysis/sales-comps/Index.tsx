@@ -391,7 +391,7 @@ export default function SalesCompsIndex() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
           {/* Sticky Header Container - Command Bar + Tabs */}
           <div className="sticky top-0 z-40 bg-background">
