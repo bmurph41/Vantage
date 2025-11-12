@@ -16,6 +16,7 @@ import { FuelSyncService } from "./services/fuel/fuel-sync-service";
 import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/duplicate-finder";
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { AuditService } from "./services/audit-service";
+import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
@@ -9222,6 +9223,76 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error generating insights:", error);
       res.status(500).json({ message: "Failed to generate insights" });
+    }
+  });
+
+  // ========================================
+  // CUSTOMER ANALYTICS ENDPOINTS
+  // ========================================
+  
+  // Get customer analytics overview
+  app.get('/api/analytics/customers/overview', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const overview = await customerAnalyticsService.getOverview(orgId);
+      res.json(overview);
+    } catch (error) {
+      console.error('Failed to fetch customer analytics overview:', error);
+      res.status(500).json({ error: 'Failed to fetch customer analytics overview' });
+    }
+  });
+
+  // Get top customers by LTV
+  app.get('/api/analytics/customers/top', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const limit = parseInt(req.query.limit as string) || 20;
+      
+      if (limit < 1 || limit > 100) {
+        return res.status(400).json({ error: 'Limit must be between 1 and 100' });
+      }
+      
+      const topCustomers = await customerAnalyticsService.getTopCustomers(orgId, limit);
+      res.json(topCustomers);
+    } catch (error) {
+      console.error('Failed to fetch top customers:', error);
+      res.status(500).json({ error: 'Failed to fetch top customers' });
+    }
+  });
+
+  // Get customer segments
+  app.get('/api/analytics/customers/segments', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const segments = await customerAnalyticsService.getCustomerSegments(orgId);
+      res.json(segments);
+    } catch (error) {
+      console.error('Failed to fetch customer segments:', error);
+      res.status(500).json({ error: 'Failed to fetch customer segments' });
+    }
+  });
+
+  // Get customers at churn risk
+  app.get('/api/analytics/customers/churn-risk', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const churnRisk = await customerAnalyticsService.getChurnRiskCustomers(orgId);
+      res.json(churnRisk);
+    } catch (error) {
+      console.error('Failed to fetch churn risk customers:', error);
+      res.status(500).json({ error: 'Failed to fetch churn risk customers' });
+    }
+  });
+
+  // Get LTV distribution
+  app.get('/api/analytics/customers/ltv-distribution', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const distribution = await customerAnalyticsService.getLtvDistribution(orgId);
+      res.json(distribution);
+    } catch (error) {
+      console.error('Failed to fetch LTV distribution:', error);
+      res.status(500).json({ error: 'Failed to fetch LTV distribution' });
     }
   });
 

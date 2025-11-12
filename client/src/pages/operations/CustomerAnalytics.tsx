@@ -1,110 +1,106 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, DollarSign, Calendar, BarChart3 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
+import { CustomerOverviewCards } from "@/components/analytics/customer/CustomerOverviewCards";
+import { TopCustomersTable } from "@/components/analytics/customer/TopCustomersTable";
+import { LtvDistributionChart } from "@/components/analytics/customer/LtvDistributionChart";
+import { SegmentBreakdown } from "@/components/analytics/customer/SegmentBreakdown";
+import { ChurnRiskTable } from "@/components/analytics/customer/ChurnRiskTable";
+import { CUSTOMER_ANALYTICS_QUERY_KEYS } from "@/types/customer-analytics";
+import type { 
+  CustomerOverview, 
+  TopCustomer, 
+  CustomerSegment, 
+  ChurnRiskCustomer, 
+  LtvDistribution 
+} from "@/types/customer-analytics";
 
 export default function CustomerAnalytics() {
+  const overviewQuery = useQuery<CustomerOverview>({
+    queryKey: CUSTOMER_ANALYTICS_QUERY_KEYS.overview(),
+  });
+
+  const topCustomersQuery = useQuery<TopCustomer[]>({
+    queryKey: CUSTOMER_ANALYTICS_QUERY_KEYS.topCustomers(20),
+  });
+
+  const segmentsQuery = useQuery<CustomerSegment[]>({
+    queryKey: CUSTOMER_ANALYTICS_QUERY_KEYS.segments(),
+  });
+
+  const churnRiskQuery = useQuery<ChurnRiskCustomer[]>({
+    queryKey: CUSTOMER_ANALYTICS_QUERY_KEYS.churnRisk(),
+  });
+
+  const ltvDistributionQuery = useQuery<LtvDistribution[]>({
+    queryKey: CUSTOMER_ANALYTICS_QUERY_KEYS.ltvDistribution(),
+  });
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/analytics/customers'] });
+  };
+
+  const isAnyLoading = 
+    overviewQuery.isLoading || 
+    topCustomersQuery.isLoading || 
+    segmentsQuery.isLoading || 
+    churnRiskQuery.isLoading || 
+    ltvDistributionQuery.isLoading;
+
   return (
     <div className="container mx-auto p-6 space-y-6" data-testid="page-customer-analytics">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="heading-customer-analytics">
-          Customer Analytics
-        </h1>
-        <p className="text-muted-foreground" data-testid="description-customer-analytics">
-          Comprehensive analytics and insights about your marina customers, engagement patterns, and revenue metrics.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="heading-customer-analytics">
+            Customer Analytics
+          </h1>
+          <p className="text-muted-foreground" data-testid="description-customer-analytics">
+            Comprehensive analytics and insights about your marina customers, engagement patterns, and revenue metrics.
+          </p>
+        </div>
+        <Button 
+          onClick={handleRefresh} 
+          disabled={isAnyLoading}
+          variant="outline"
+          data-testid="button-refresh-analytics"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isAnyLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card data-testid="card-total-customers">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">-</div>
-            <p className="text-xs text-muted-foreground">Coming soon</p>
-          </CardContent>
-        </Card>
+      <CustomerOverviewCards 
+        data={overviewQuery.data}
+        isLoading={overviewQuery.isLoading}
+        error={overviewQuery.error}
+      />
 
-        <Card data-testid="card-active-customers">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">-</div>
-            <p className="text-xs text-muted-foreground">Coming soon</p>
-          </CardContent>
-        </Card>
+      <TopCustomersTable 
+        data={topCustomersQuery.data}
+        isLoading={topCustomersQuery.isLoading}
+        error={topCustomersQuery.error}
+      />
 
-        <Card data-testid="card-avg-revenue">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Revenue per Customer</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">-</div>
-            <p className="text-xs text-muted-foreground">Coming soon</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 md:grid-cols-2">
+        <LtvDistributionChart 
+          data={ltvDistributionQuery.data}
+          isLoading={ltvDistributionQuery.isLoading}
+          error={ltvDistributionQuery.error}
+        />
 
-        <Card data-testid="card-retention-rate">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Retention Rate</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">-</div>
-            <p className="text-xs text-muted-foreground">Coming soon</p>
-          </CardContent>
-        </Card>
+        <SegmentBreakdown 
+          data={segmentsQuery.data}
+          isLoading={segmentsQuery.isLoading}
+          error={segmentsQuery.error}
+        />
       </div>
 
-      <Card data-testid="card-analytics-placeholder">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Analytics Dashboard
-          </CardTitle>
-          <CardDescription>
-            Detailed customer analytics and reporting features
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center">
-            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">
-              Customer Analytics Coming Soon
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              This section will include customer segmentation, lifetime value analysis, 
-              engagement metrics, purchase patterns, and predictive analytics to help 
-              you better understand and serve your marina customers.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="p-4 bg-muted rounded-lg">
-              <h4 className="font-medium mb-2">Planned Features:</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Customer segmentation by demographics and behavior</li>
-                <li>• Lifetime value (LTV) calculations</li>
-                <li>• Churn prediction and retention analysis</li>
-                <li>• Revenue attribution by customer segment</li>
-              </ul>
-            </div>
-            
-            <div className="p-4 bg-muted rounded-lg">
-              <h4 className="font-medium mb-2">Analytics Capabilities:</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Real-time dashboard with key metrics</li>
-                <li>• Custom date range comparisons</li>
-                <li>• Export to CSV/PDF for reporting</li>
-                <li>• Automated insights and recommendations</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <ChurnRiskTable 
+        data={churnRiskQuery.data}
+        isLoading={churnRiskQuery.isLoading}
+        error={churnRiskQuery.error}
+      />
     </div>
   );
 }

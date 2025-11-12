@@ -54,6 +54,12 @@ export const fuelTypeEnum = pgEnum("fuel_type", ["diesel", "regular_gas", "premi
 export const paymentMethodEnum = pgEnum("payment_method", ["cash", "credit_card", "debit_card", "account_charge", "check"]);
 export const transactionStatusEnum = pgEnum("transaction_status", ["pending", "completed", "failed", "refunded"]);
 export const fuelCategoryEnum = pgEnum("fuel_category", ["regular", "premium", "diesel", "ethanol"]);
+export const customerStatusEnum = pgEnum("customer_status", ["active", "inactive", "prospect", "churned"]);
+export const accountTypeEnum = pgEnum("account_type", ["annual", "seasonal", "transient", "monthly"]);
+export const slipTypeEnum = pgEnum("slip_type", ["wet", "dry", "rack", "mooring"]);
+export const slipStatusEnum = pgEnum("slip_status", ["active", "expired", "reserved", "terminated"]);
+export const serviceTypeEnum = pgEnum("service_type", ["fuel", "maintenance", "dockage", "storage", "amenity", "other"]);
+export const contactMethodEnum = pgEnum("contact_method", ["email", "phone", "sms", "mail"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -4571,6 +4577,116 @@ export const fuelImportLogs = pgTable('fuel_import_logs', {
   dateIdx: index('fuel_import_logs_date_idx').on(table.startedAt),
 }));
 
+// ================================================================================
+// CUSTOMER ANALYTICS - Marina Customer & Tenant Management
+// ================================================================================
+
+// Marina Customers - Core customer profiles
+export const marinaCustomers = pgTable('marina_customers', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  contactId: varchar('contact_id').references(() => crmContacts.id), // Link to CRM contact (optional)
+  companyId: varchar('company_id').references(() => crmCompanies.id), // Link to CRM company (optional)
+  customerNumber: text('customer_number').notNull(), // Unique per org
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+  email: text('email'),
+  phone: text('phone'),
+  address: jsonb('address').default(sql`'{}'`), // {street, city, state, zip}
+  status: customerStatusEnum('status').notNull().default('active'),
+  accountType: accountTypeEnum('account_type').notNull().default('monthly'),
+  joinDate: date('join_date').notNull(),
+  lastActivityDate: date('last_activity_date'), // Auto-updated by triggers/app
+  lastInvoiceDate: date('last_invoice_date'),
+  preferredContactMethod: contactMethodEnum('preferred_contact_method').default('email'),
+  primaryBoatId: varchar('primary_boat_id').references(() => boatRegistry.id, { onDelete: 'set null' }), // FK to boat_registry
+  marketingConsent: boolean('marketing_consent').default(false),
+  notes: text('notes'),
+  customFields: jsonb('custom_fields').default(sql`'{}'`),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('marina_customers_org_idx').on(table.orgId),
+  statusIdx: index('marina_customers_status_idx').on(table.status),
+  joinDateIdx: index('marina_customers_join_date_idx').on(table.joinDate),
+  lastActivityIdx: index('marina_customers_last_activity_idx').on(table.lastActivityDate),
+  uniqueCustomerNumber: unique('marina_customers_org_customer_number').on(table.orgId, table.customerNumber),
+  emailIdx: index('marina_customers_email_idx').on(table.email),
+}));
+
+// Slip Assignments - Track slip rentals over time
+// NOTE: Slip overlap prevention (same slip, overlapping dates) must be handled at app level
+// or via raw SQL exclusion constraint: EXCLUDE USING gist (org_id WITH =, slip_number WITH =, daterange(start_date, end_date) WITH &&)
+export const slipAssignments = pgTable('slip_assignments', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  customerId: varchar('customer_id').notNull().references(() => marinaCustomers.id, { onDelete: 'cascade' }),
+  slipNumber: text('slip_number').notNull(),
+  slipType: slipTypeEnum('slip_type').notNull().default('wet'),
+  status: slipStatusEnum('status').notNull().default('active'),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date'), // Nullable for active assignments
+  monthlyRate: decimal('monthly_rate', { precision: 10, scale: 2 }),
+  renewalDate: date('renewal_date'),
+  autoRenew: boolean('auto_renew').default(false),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('slip_assignments_org_idx').on(table.orgId),
+  customerIdx: index('slip_assignments_customer_idx').on(table.customerId),
+  slipNumberIdx: index('slip_assignments_slip_number_idx').on(table.slipNumber),
+  statusIdx: index('slip_assignments_status_idx').on(table.status),
+  renewalDateIdx: index('slip_assignments_renewal_date_idx').on(table.renewalDate),
+}));
+
+// Boat Registry - Customer boats
+export const boatRegistry = pgTable('boat_registry', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  customerId: varchar('customer_id').notNull().references(() => marinaCustomers.id, { onDelete: 'cascade' }),
+  boatName: text('boat_name').notNull(),
+  make: text('make'),
+  model: text('model'),
+  year: integer('year'),
+  length: decimal('length', { precision: 5, scale: 2 }), // feet
+  registration: text('registration'),
+  insuranceExpiry: date('insurance_expiry'),
+  isActive: boolean('is_active').default(true).notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('boat_registry_org_idx').on(table.orgId),
+  customerIdx: index('boat_registry_customer_idx').on(table.customerId),
+  activeIdx: index('boat_registry_active_idx').on(table.isActive),
+  registrationIdx: index('boat_registry_registration_idx').on(table.registration),
+  uniqueRegistration: unique('boat_registry_org_registration').on(table.orgId, table.registration),
+}));
+
+// Service Usage - Track all customer service transactions
+export const serviceUsage = pgTable('service_usage', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  customerId: varchar('customer_id').notNull().references(() => marinaCustomers.id, { onDelete: 'cascade' }),
+  serviceType: serviceTypeEnum('service_type').notNull(),
+  serviceName: text('service_name'), // e.g., "Diesel Fuel", "Oil Change", "Monthly Dockage"
+  transactionDate: timestamp('transaction_date', { withTimezone: true }).notNull(),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  quantity: decimal('quantity', { precision: 10, scale: 2 }), // gallons, hours, etc.
+  referenceId: varchar('reference_id'), // Link to fuel_sales.id, etc.
+  referenceTable: text('reference_table'), // 'fuel_sales', etc.
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('service_usage_org_idx').on(table.orgId),
+  customerIdx: index('service_usage_customer_idx').on(table.customerId),
+  serviceTypeIdx: index('service_usage_service_type_idx').on(table.serviceType),
+  transactionDateIdx: index('service_usage_transaction_date_idx').on(table.transactionDate),
+  referenceIdx: index('service_usage_reference_idx').on(table.referenceTable, table.referenceId),
+  uniqueReference: unique('service_usage_org_reference').on(table.orgId, table.referenceTable, table.referenceId),
+}));
+
 // Debt Scenarios - Financial Modeling Module
 export const debtScenarios = pgTable('debt_scenarios', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -4676,6 +4792,65 @@ export const fuelDeliveriesRelations = relations(fuelDeliveries, ({ one }) => ({
   fuelType: one(fuelTypes, {
     fields: [fuelDeliveries.fuelTypeId],
     references: [fuelTypes.id],
+  }),
+}));
+
+// Relations for Marina Customers
+export const marinaCustomersRelations = relations(marinaCustomers, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [marinaCustomers.orgId],
+    references: [organizations.id],
+  }),
+  contact: one(crmContacts, {
+    fields: [marinaCustomers.contactId],
+    references: [crmContacts.id],
+  }),
+  company: one(crmCompanies, {
+    fields: [marinaCustomers.companyId],
+    references: [crmCompanies.id],
+  }),
+  primaryBoat: one(boatRegistry, {
+    fields: [marinaCustomers.primaryBoatId],
+    references: [boatRegistry.id],
+  }),
+  slipAssignments: many(slipAssignments),
+  boats: many(boatRegistry),
+  serviceUsage: many(serviceUsage),
+}));
+
+// Relations for Slip Assignments
+export const slipAssignmentsRelations = relations(slipAssignments, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [slipAssignments.orgId],
+    references: [organizations.id],
+  }),
+  customer: one(marinaCustomers, {
+    fields: [slipAssignments.customerId],
+    references: [marinaCustomers.id],
+  }),
+}));
+
+// Relations for Boat Registry
+export const boatRegistryRelations = relations(boatRegistry, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [boatRegistry.orgId],
+    references: [organizations.id],
+  }),
+  customer: one(marinaCustomers, {
+    fields: [boatRegistry.customerId],
+    references: [marinaCustomers.id],
+  }),
+}));
+
+// Relations for Service Usage
+export const serviceUsageRelations = relations(serviceUsage, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [serviceUsage.orgId],
+    references: [organizations.id],
+  }),
+  customer: one(marinaCustomers, {
+    fields: [serviceUsage.customerId],
+    references: [marinaCustomers.id],
   }),
 }));
 
@@ -5099,6 +5274,51 @@ export const insertFuelImportLogSchema = createInsertSchema(fuelImportLogs).omit
 
 export const updateFuelImportLogSchema = insertFuelImportLogSchema.partial();
 
+// Customer Analytics
+export const insertMarinaCustomerSchema = createInsertSchema(marinaCustomers).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateMarinaCustomerSchema = insertMarinaCustomerSchema.partial();
+
+export const insertSlipAssignmentSchema = createInsertSchema(slipAssignments).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateSlipAssignmentSchema = insertSlipAssignmentSchema.partial().omit({
+  customerId: true,
+});
+
+export const insertBoatRegistrySchema = createInsertSchema(boatRegistry).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  length: z.string().or(z.number()).optional(),
+});
+
+export const updateBoatRegistrySchema = insertBoatRegistrySchema.partial().omit({
+  customerId: true,
+});
+
+export const insertServiceUsageSchema = createInsertSchema(serviceUsage).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+}).extend({
+  amount: z.string().or(z.number()),
+  quantity: z.string().or(z.number()).optional(),
+});
+
+export const updateServiceUsageSchema = insertServiceUsageSchema.partial();
+
 // Debt Scenarios
 export const insertDebtScenarioSchema = createInsertSchema(debtScenarios).omit({
   id: true,
@@ -5195,6 +5415,23 @@ export type UpdateFuelIntegration = z.infer<typeof updateFuelIntegrationSchema>;
 export type FuelImportLog = typeof fuelImportLogs.$inferSelect;
 export type InsertFuelImportLog = z.infer<typeof insertFuelImportLogSchema>;
 export type UpdateFuelImportLog = z.infer<typeof updateFuelImportLogSchema>;
+
+// Types for Customer Analytics
+export type MarinaCustomer = typeof marinaCustomers.$inferSelect;
+export type InsertMarinaCustomer = z.infer<typeof insertMarinaCustomerSchema>;
+export type UpdateMarinaCustomer = z.infer<typeof updateMarinaCustomerSchema>;
+
+export type SlipAssignment = typeof slipAssignments.$inferSelect;
+export type InsertSlipAssignment = z.infer<typeof insertSlipAssignmentSchema>;
+export type UpdateSlipAssignment = z.infer<typeof updateSlipAssignmentSchema>;
+
+export type BoatRegistry = typeof boatRegistry.$inferSelect;
+export type InsertBoatRegistry = z.infer<typeof insertBoatRegistrySchema>;
+export type UpdateBoatRegistry = z.infer<typeof updateBoatRegistrySchema>;
+
+export type ServiceUsage = typeof serviceUsage.$inferSelect;
+export type InsertServiceUsage = z.infer<typeof insertServiceUsageSchema>;
+export type UpdateServiceUsage = z.infer<typeof updateServiceUsageSchema>;
 
 // Types for Debt Scenarios
 export type DebtScenario = typeof debtScenarios.$inferSelect;
