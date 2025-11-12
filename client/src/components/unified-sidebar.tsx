@@ -318,6 +318,11 @@ export default function UnifiedSidebar() {
       
       {/* Scrollable Navigation */}
       <nav className="flex-1 overflow-y-auto py-4" data-testid="sidebar-navigation">
+        {/* Dashboard Link */}
+        <div className="mb-4">
+          <NavLink item={{ name: "Dashboard", href: "/dashboard", icon: LayoutDashboard }} />
+        </div>
+        
         {/* Operations Section */}
         {canViewSection('operations') && (
           <div className="mb-2">
