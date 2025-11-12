@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
+import { PersonaSwitcher } from "@/components/PersonaSwitcher";
 
 // CRM Navigation
 const crmNav = [
@@ -111,6 +112,35 @@ export default function UnifiedSidebar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Fetch user persona for feature access
+  const { data: userPersona } = useQuery<any>({
+    queryKey: ['/api/personas/me'],
+  });
+
+  // Helper function to check if user can see a section based on persona
+  const canViewSection = (section: string): boolean => {
+    if (!userPersona) return true; // Default to show all if no persona assigned
+    
+    const persona = userPersona.primaryPersona;
+    const secondaryPersona = userPersona.secondaryPersona;
+    
+    // PE Investors see everything
+    if (persona === 'pe_investor') return true;
+    
+    // Check primary and secondary personas
+    const personas = [persona, secondaryPersona].filter(Boolean);
+    
+    const sectionAccess: Record<string, string[]> = {
+      crm: ['pe_investor', 'broker'],
+      operations: ['pe_investor', 'operator'],
+      due_diligence: ['pe_investor', 'broker'],
+      modeling: ['pe_investor', 'advisor'],
+      analysis: ['pe_investor', 'broker', 'advisor'],
+    };
+    
+    return personas.some(p => sectionAccess[section]?.includes(p));
+  };
 
   // Fetch pending items counts
   const { data: pendingProperties = [] } = useQuery<PendingItem[]>({
@@ -273,6 +303,9 @@ export default function UnifiedSidebar() {
             </button>
           </div>
           <div className="w-full px-4">
+            <PersonaSwitcher />
+          </div>
+          <div className="w-full px-4">
             <SmartSearch 
               onResultSelect={(result) => {
                 setSelectedEntity({ type: result.type, id: result.id });
@@ -284,15 +317,16 @@ export default function UnifiedSidebar() {
         </div>
       
       {/* Scrollable Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4">
+      <nav className="flex-1 overflow-y-auto py-4" data-testid="sidebar-navigation">
         {/* Operations Section */}
-        <div className="mb-2">
-          <SectionHeader 
-            title="Operations" 
-            expanded={operationsExpanded} 
-            onToggle={() => setOperationsExpanded(!operationsExpanded)} 
-          />
-          {operationsExpanded && (
+        {canViewSection('operations') && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="Operations" 
+              expanded={operationsExpanded} 
+              onToggle={() => setOperationsExpanded(!operationsExpanded)} 
+            />
+            {operationsExpanded && (
             <div className="ml-4 mt-1 mb-2">
               <button
                 onClick={() => setRentRollExpanded(!rentRollExpanded)}
@@ -350,70 +384,79 @@ export default function UnifiedSidebar() {
               )}
             </div>
           )}
-        </div>
+          </div>
+        )}
         
         {/* CRM Section */}
-        <div className="mb-2">
-          <SectionHeader 
-            title="CRM" 
-            expanded={crmExpanded} 
-            onToggle={() => setCrmExpanded(!crmExpanded)} 
-          />
-          {crmExpanded && dynamicCrmNav.map((item) => (
-            <NavLink key={item.name} item={item} />
-          ))}
-          {crmExpanded && (
-            <div className="ml-4 mt-1 mb-2">
-              <button
-                onClick={() => setCrmToolsExpanded(!crmToolsExpanded)}
-                className="flex items-center justify-between w-full px-4 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
-                data-testid="toggle-tools"
-              >
-                <span>Tools & Settings</span>
-                {crmToolsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-              </button>
-              {crmToolsExpanded && crmToolsNav.map((item) => (
-                <NavLink key={item.name} item={item} />
-              ))}
-            </div>
-          )}
-        </div>
+        {canViewSection('crm') && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="CRM" 
+              expanded={crmExpanded} 
+              onToggle={() => setCrmExpanded(!crmExpanded)} 
+            />
+            {crmExpanded && dynamicCrmNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
+            {crmExpanded && (
+              <div className="ml-4 mt-1 mb-2">
+                <button
+                  onClick={() => setCrmToolsExpanded(!crmToolsExpanded)}
+                  className="flex items-center justify-between w-full px-4 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                  data-testid="toggle-tools"
+                >
+                  <span>Tools & Settings</span>
+                  {crmToolsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                </button>
+                {crmToolsExpanded && crmToolsNav.map((item) => (
+                  <NavLink key={item.name} item={item} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Due Diligence Section */}
-        <div className="mb-2">
-          <SectionHeader 
-            title="Due Diligence" 
-            expanded={ddExpanded} 
-            onToggle={() => setDdExpanded(!ddExpanded)} 
-          />
-          {ddExpanded && ddNav.map((item) => (
-            <NavLink key={item.name} item={item} />
-          ))}
-        </div>
+        {canViewSection('due_diligence') && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="Due Diligence" 
+              expanded={ddExpanded} 
+              onToggle={() => setDdExpanded(!ddExpanded)} 
+            />
+            {ddExpanded && ddNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
+          </div>
+        )}
         
         {/* Modeling Section */}
-        <div className="mb-2">
-          <SectionHeader 
-            title="Modeling" 
-            expanded={modelingExpanded} 
-            onToggle={() => setModelingExpanded(!modelingExpanded)} 
-          />
-          {modelingExpanded && modelingNav.map((item) => (
-            <NavLink key={item.name} item={item} />
-          ))}
-        </div>
+        {canViewSection('modeling') && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="Modeling" 
+              expanded={modelingExpanded} 
+              onToggle={() => setModelingExpanded(!modelingExpanded)} 
+            />
+            {modelingExpanded && modelingNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
+          </div>
+        )}
         
         {/* Market Intel Section */}
-        <div className="mb-2">
-          <SectionHeader 
-            title="Market Intel" 
-            expanded={analysisExpanded} 
-            onToggle={() => setAnalysisExpanded(!analysisExpanded)} 
-          />
-          {analysisExpanded && analysisNav.map((item) => (
-            <NavLink key={item.name} item={item} />
-          ))}
-        </div>
+        {canViewSection('analysis') && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="Market Intel" 
+              expanded={analysisExpanded} 
+              onToggle={() => setAnalysisExpanded(!analysisExpanded)} 
+            />
+            {analysisExpanded && analysisNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
+          </div>
+        )}
       </nav>
       
       {/* User Profile - Fixed at bottom */}
