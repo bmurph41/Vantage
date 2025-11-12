@@ -4,8 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2, PanelLeftClose, PanelLeft, ChevronLeft, ChevronRight } from "lucide-react";
-import { Link } from "wouter";
+import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2, PanelLeftClose, PanelLeft, ChevronLeft, ChevronRight, FolderKanban } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import debounce from "lodash.debounce";
 import { salesCompsApi } from "@/lib/salescomps/api";
 import { queryKeys } from "@/lib/salescomps/queryKeys";
@@ -19,8 +19,10 @@ import ColumnEditorDialog from "@/components/salescomps/sales-comps/ColumnEditor
 import BulkEdit from "./BulkEdit";
 import Upload from "./Upload";
 import ProjectAssignmentDialog from "@/components/salescomps/projects/ProjectAssignmentDialog";
+import ProjectList from "@/components/salescomps/projects/ProjectList";
+import ProjectDetails from "@/components/salescomps/projects/ProjectDetails";
 import type { FilterState } from "@/lib/salescomps/types";
-import type { SalesComp } from "@shared/schema";
+import type { SalesComp, Project } from "@shared/schema";
 
 export default function SalesCompsIndex() {
   const { toast } = useToast();
@@ -99,6 +101,8 @@ export default function SalesCompsIndex() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [showCreateProject, setShowCreateProject] = useState(false);
 
   // Debounce search query updates
   const debouncedSetSearch = useMemo(
@@ -389,8 +393,8 @@ export default function SalesCompsIndex() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
-          {/* Top Actions Bar */}
-          <div className="bg-card border-b border-border px-6 py-4">
+          {/* Top Actions Bar - Sticky */}
+          <div className="sticky top-0 z-40 bg-card border-b border-border px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button
@@ -498,6 +502,17 @@ export default function SalesCompsIndex() {
                 {canCreate && !isEditMode && (
                   <>
                     <Button
+                      variant="default"
+                      onClick={() => setActiveTab('projects')}
+                      data-testid="button-create-project"
+                      className="bg-primary"
+                    >
+                      <FolderPlus className="h-4 w-4 mr-2" />
+                      Projects
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
                       onClick={() => {
                         setIsPortfolioMode(false);
                         setShowCreateDialog(true);
@@ -517,16 +532,16 @@ export default function SalesCompsIndex() {
                       data-testid="button-create-portfolio"
                     >
                       <Plus className="h-4 w-4 mr-2" />
-                      Create Portfolio
+                      Portfolio
                     </Button>
                     
                     <Button
-                      variant="default"
+                      variant="outline"
                       onClick={() => setShowUpload(true)}
                       data-testid="button-upload"
                     >
                       <UploadIcon className="h-4 w-4 mr-2" />
-                      Upload Comps
+                      Upload
                     </Button>
                   </>
                 )}
@@ -624,7 +639,7 @@ export default function SalesCompsIndex() {
 
           {/* Tab Navigation */}
           <div className="px-6 border-b border-border sticky top-0 z-30 bg-background">
-            <TabsList className="grid w-full max-w-md grid-cols-2" data-testid="tabs-navigation">
+            <TabsList className="grid w-full max-w-2xl grid-cols-3" data-testid="tabs-navigation">
               <TabsTrigger value="data" className="flex items-center gap-2" data-testid="tab-data">
                 <Table className="h-4 w-4" />
                 Sales Comps
@@ -632,6 +647,10 @@ export default function SalesCompsIndex() {
               <TabsTrigger value="metrics" className="flex items-center gap-2" data-testid="tab-metrics">
                 <TrendingUp className="h-4 w-4" />
                 Analytics
+              </TabsTrigger>
+              <TabsTrigger value="projects" className="flex items-center gap-2" data-testid="tab-projects">
+                <FolderKanban className="h-4 w-4" />
+                Projects
               </TabsTrigger>
             </TabsList>
           </div>
@@ -709,6 +728,20 @@ export default function SalesCompsIndex() {
             <div className="h-full">
               <AnalyticsWorkbench />
             </div>
+          </TabsContent>
+
+          <TabsContent value="projects" className="flex-1 overflow-auto m-0 p-0" data-testid="tab-content-projects">
+            {selectedProject ? (
+              <ProjectDetails
+                projectId={selectedProject.id}
+                onClose={() => setSelectedProject(null)}
+              />
+            ) : (
+              <ProjectList
+                onSelectProject={(project) => setSelectedProject(project)}
+                selectedProjectId={selectedProject?.id}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </div>
