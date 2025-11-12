@@ -18,6 +18,7 @@ import { requirePermission, requireRole } from "./middleware/rbac";
 import { AuditService } from "./services/audit-service";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
+import { marketingService } from "./services/marketing-service";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
@@ -76,7 +77,17 @@ import {
   insertRentRollSchema,
   updateRentRollSchema,
   insertRentRollEntrySchema,
-  updateRentRollEntrySchema
+  updateRentRollEntrySchema,
+  marketingCampaigns,
+  marketingExpenses,
+  leadAttribution,
+  emailCampaigns,
+  insertMarketingCampaignSchema,
+  updateMarketingCampaignSchema,
+  insertMarketingExpenseSchema,
+  updateMarketingExpenseSchema,
+  insertLeadAttributionSchema,
+  insertEmailCampaignSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -9469,6 +9480,322 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to fetch rent roll summary:', error);
       res.status(500).json({ error: 'Failed to fetch rent roll summary' });
+    }
+  });
+
+  // ========================================================================
+  // MARKETING OPERATIONS ROUTES
+  // ========================================================================
+
+  // Marketing Campaigns
+  app.get('/api/marketing/campaigns', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters = {
+        status: req.query.status,
+        channel: req.query.channel,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
+      };
+      const campaigns = await marketingService.getCampaigns(orgId, filters);
+      res.json(campaigns);
+    } catch (error) {
+      console.error('Failed to fetch marketing campaigns:', error);
+      res.status(500).json({ error: 'Failed to fetch marketing campaigns' });
+    }
+  });
+
+  app.get('/api/marketing/campaigns/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const campaign = await marketingService.getCampaignById(req.params.id, orgId);
+      
+      if (!campaign) {
+        return res.status(404).json({ error: 'Campaign not found' });
+      }
+      
+      res.json(campaign);
+    } catch (error) {
+      console.error('Failed to fetch marketing campaign:', error);
+      res.status(500).json({ error: 'Failed to fetch marketing campaign' });
+    }
+  });
+
+  app.post('/api/marketing/campaigns', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = insertMarketingCampaignSchema.parse(req.body);
+      const campaign = await marketingService.createCampaign(orgId, data);
+      res.status(201).json(campaign);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create marketing campaign:', error);
+      res.status(500).json({ error: 'Failed to create marketing campaign' });
+    }
+  });
+
+  app.patch('/api/marketing/campaigns/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = updateMarketingCampaignSchema.parse(req.body);
+      const campaign = await marketingService.updateCampaign(req.params.id, orgId, data);
+      
+      if (!campaign) {
+        return res.status(404).json({ error: 'Campaign not found' });
+      }
+      
+      res.json(campaign);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update marketing campaign:', error);
+      res.status(500).json({ error: 'Failed to update marketing campaign' });
+    }
+  });
+
+  app.delete('/api/marketing/campaigns/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await marketingService.deleteCampaign(req.params.id, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Campaign not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete marketing campaign:', error);
+      res.status(500).json({ error: 'Failed to delete marketing campaign' });
+    }
+  });
+
+  // Marketing Expenses
+  app.get('/api/marketing/expenses', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters = {
+        campaignId: req.query.campaignId,
+        status: req.query.status,
+        category: req.query.category,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
+      };
+      const expenses = await marketingService.getExpenses(orgId, filters);
+      res.json(expenses);
+    } catch (error) {
+      console.error('Failed to fetch marketing expenses:', error);
+      res.status(500).json({ error: 'Failed to fetch marketing expenses' });
+    }
+  });
+
+  app.get('/api/marketing/expenses/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const expense = await marketingService.getExpenseById(req.params.id, orgId);
+      
+      if (!expense) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      
+      res.json(expense);
+    } catch (error) {
+      console.error('Failed to fetch marketing expense:', error);
+      res.status(500).json({ error: 'Failed to fetch marketing expense' });
+    }
+  });
+
+  app.post('/api/marketing/expenses', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const data = insertMarketingExpenseSchema.parse(req.body);
+      const expense = await marketingService.createExpense(orgId, userId, data);
+      res.status(201).json(expense);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create marketing expense:', error);
+      res.status(500).json({ error: 'Failed to create marketing expense' });
+    }
+  });
+
+  app.patch('/api/marketing/expenses/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = updateMarketingExpenseSchema.parse(req.body);
+      const expense = await marketingService.updateExpense(req.params.id, orgId, data);
+      
+      if (!expense) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      
+      res.json(expense);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update marketing expense:', error);
+      res.status(500).json({ error: 'Failed to update marketing expense' });
+    }
+  });
+
+  app.post('/api/marketing/expenses/:id/approve', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const expense = await marketingService.approveExpense(req.params.id, orgId, userId);
+      
+      if (!expense) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      
+      res.json(expense);
+    } catch (error) {
+      console.error('Failed to approve marketing expense:', error);
+      res.status(500).json({ error: 'Failed to approve marketing expense' });
+    }
+  });
+
+  app.post('/api/marketing/expenses/:id/mark-paid', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { paidDate } = req.body;
+      
+      if (!paidDate) {
+        return res.status(400).json({ error: 'paidDate is required' });
+      }
+      
+      const expense = await marketingService.markExpensePaid(req.params.id, orgId, paidDate);
+      
+      if (!expense) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      
+      res.json(expense);
+    } catch (error) {
+      console.error('Failed to mark expense as paid:', error);
+      res.status(500).json({ error: 'Failed to mark expense as paid' });
+    }
+  });
+
+  app.delete('/api/marketing/expenses/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await marketingService.deleteExpense(req.params.id, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete marketing expense:', error);
+      res.status(500).json({ error: 'Failed to delete marketing expense' });
+    }
+  });
+
+  // Lead Attribution
+  app.get('/api/marketing/attribution', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters = {
+        campaignId: req.query.campaignId,
+        attributionType: req.query.attributionType,
+      };
+      const attributions = await marketingService.getAttributions(orgId, filters);
+      res.json(attributions);
+    } catch (error) {
+      console.error('Failed to fetch lead attributions:', error);
+      res.status(500).json({ error: 'Failed to fetch lead attributions' });
+    }
+  });
+
+  app.post('/api/marketing/attribution', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = insertLeadAttributionSchema.parse(req.body);
+      const attribution = await marketingService.createAttribution(orgId, data);
+      res.status(201).json(attribution);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create lead attribution:', error);
+      res.status(500).json({ error: 'Failed to create lead attribution' });
+    }
+  });
+
+  app.delete('/api/marketing/attribution/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await marketingService.deleteAttribution(req.params.id, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Attribution not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete lead attribution:', error);
+      res.status(500).json({ error: 'Failed to delete lead attribution' });
+    }
+  });
+
+  // Marketing Analytics
+  app.get('/api/marketing/campaigns/:id/metrics', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const metrics = await marketingService.getCampaignMetrics(req.params.id, orgId);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Failed to fetch campaign metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch campaign metrics' });
+    }
+  });
+
+  app.get('/api/marketing/metrics', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const metrics = await marketingService.getOrganizationMetrics(orgId);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Failed to fetch organization metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch organization metrics' });
+    }
+  });
+
+  // Email Campaigns
+  app.get('/api/marketing/email-campaigns', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters = {
+        campaignId: req.query.campaignId,
+        platform: req.query.platform,
+      };
+      const campaigns = await marketingService.getEmailCampaigns(orgId, filters);
+      res.json(campaigns);
+    } catch (error) {
+      console.error('Failed to fetch email campaigns:', error);
+      res.status(500).json({ error: 'Failed to fetch email campaigns' });
+    }
+  });
+
+  app.post('/api/marketing/email-campaigns/sync', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = insertEmailCampaignSchema.parse(req.body);
+      const campaign = await marketingService.upsertEmailCampaign(orgId, data);
+      res.json(campaign);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to sync email campaign:', error);
+      res.status(500).json({ error: 'Failed to sync email campaign' });
     }
   });
 
