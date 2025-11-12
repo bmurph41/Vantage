@@ -47,7 +47,7 @@ import {
   type InsertFuelIntegration, type UpdateFuelIntegration, type InsertFuelImportLog
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql, inArray, isNull, or, count } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count } from "drizzle-orm";
 
 export interface IStorage {
   // Organizations
@@ -3158,10 +3158,10 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`${salesComps.salePrice} <= ${filters.priceMax}`);
     }
     if (filters.disclosedOnly) {
-      conditions.push(eq(salesComps.isPriceDisclosed, true));
+      conditions.push(isNotNull(salesComps.salePrice));
     }
     if (filters.disclosedCapRateOnly) {
-      conditions.push(eq(salesComps.isCapRateDisclosed, true));
+      conditions.push(isNotNull(salesComps.capRate));
     }
     if (filters.portfoliosOnly) {
       conditions.push(eq(salesComps.isPortfolio, true));
@@ -4668,10 +4668,10 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`${rateComps.salePrice} <= ${filters.priceMax}`);
     }
     if (filters.disclosedOnly) {
-      conditions.push(eq(rateComps.isPriceDisclosed, true));
+      conditions.push(isNotNull(rateComps.salePrice));
     }
     if (filters.disclosedCapRateOnly) {
-      conditions.push(eq(rateComps.isCapRateDisclosed, true));
+      conditions.push(isNotNull(rateComps.capRate));
     }
     if (filters.portfoliosOnly) {
       conditions.push(eq(rateComps.isPortfolio, true));
