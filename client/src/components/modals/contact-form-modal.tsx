@@ -43,7 +43,7 @@ export type ContactPayload = {
   photoDataUrl?: string; // base64 preview
   leadScore?: string; // hot, warm, cold, new (legacy)
   contactTag?: string; // lead, seller, competitor, broker, vendor, insurance, lender, attorney, other
-  leadStatus?: string; // none, new, contacted, qualified, unqualified, converted (only when contactTag = 'lead')
+  leadStatus?: string | null; // none, new, contacted, qualified, unqualified, converted (only when contactTag = 'lead'), null clears field
 };
 
 interface ContactFormModalProps {
@@ -250,7 +250,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
       photoDataUrl,
       leadScore, // Legacy field for backward compatibility
       contactTag,
-      leadStatus: contactTag === 'lead' ? leadStatus : undefined,
+      leadStatus: contactTag === 'lead' ? leadStatus : null, // Explicitly null to clear field when not lead
     };
 
     if (contact) {

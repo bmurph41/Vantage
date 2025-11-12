@@ -3091,6 +3091,8 @@ export const insertCrmContactSchema = createInsertSchema(crmContacts).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  leadStatus: z.enum(["none", "new", "contacted", "qualified", "unqualified", "converted"]).nullable().optional(), // Explicitly allow null to clear when contactTag != 'lead'
 });
 export type InsertCrmContact = z.infer<typeof insertCrmContactSchema>;
 
