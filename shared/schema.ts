@@ -3241,6 +3241,8 @@ export const salesComps = pgTable('sales_comps', {
   agentLastName: text('agent_last_name'), // Agent last name
   address: text('address'),
   zip: text('zip'),
+  lat: decimal('lat', { precision: 10, scale: 7 }), // Geocoded latitude
+  lng: decimal('lng', { precision: 10, scale: 7 }), // Geocoded longitude
   seller: text('seller'),
   company: text('company'),
   owner: text('owner'),
@@ -4049,6 +4051,8 @@ export const rateComps = pgTable('rate_comps', {
   broker: text('broker'),
   address: text('address'),
   zip: text('zip'),
+  lat: decimal('lat', { precision: 10, scale: 7 }), // Geocoded latitude
+  lng: decimal('lng', { precision: 10, scale: 7 }), // Geocoded longitude
   seller: text('seller'),
   company: text('company'),
   owner: text('owner'),

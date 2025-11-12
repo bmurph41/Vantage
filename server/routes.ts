@@ -21,6 +21,7 @@ import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
 import { RecommendationService } from "./services/salescomps/recommendationService";
 import { calculateMetrics, generateInsights, type AnalyticsFilters } from "./services/salescomps/analyticsService";
+import { geocodingService } from "./services/geocodingService";
 import { ParserService as RcParserService } from "./services/ratecomps/parser";
 import { CompService as RcCompService } from "./services/ratecomps/compService";
 import { FilterBuilder as RcFilterBuilder } from "./services/ratecomps/filterBuilder";
@@ -8339,6 +8340,54 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Geocoding endpoint
+  app.post('/api/sales-comps/:id/geocode', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const comp = await storage.getCompById(id, orgId);
+      if (!comp) {
+        return res.status(404).json({ message: "Comp not found" });
+      }
+
+      const addressString = geocodingService.buildAddressString({
+        marina: comp.marina,
+        address: comp.address || undefined,
+        city: comp.city || undefined,
+        state: comp.state || undefined,
+        zip: comp.zip || undefined,
+      });
+
+      if (!addressString) {
+        return res.status(400).json({ message: "No address information available to geocode" });
+      }
+
+      const result = await geocodingService.geocodeAddress(addressString);
+
+      if ('error' in result) {
+        return res.status(400).json(result);
+      }
+
+      await compService.updateComp(
+        id,
+        { 
+          lat: result.lat.toString(),
+          lng: result.lng.toString(),
+          updatedBy: userId 
+        },
+        orgId,
+        userId
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error geocoding comp:", error);
+      res.status(500).json({ message: "Failed to geocode comp" });
+    }
+  });
+
   // Upload and Import routes
   app.post('/api/sales-comps/upload', uploadSalesComps.single('file'), async (req: any, res) => {
     try {
@@ -10302,6 +10351,54 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error bulk deleting rate comps:", error);
       res.status(500).json({ message: "Failed to bulk delete rate comps" });
+    }
+  });
+
+  // Geocoding endpoint
+  app.post('/api/rate-comps/:id/geocode', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const comp = await storage.getRateCompById(id, orgId);
+      if (!comp) {
+        return res.status(404).json({ message: "Rate comp not found" });
+      }
+
+      const addressString = geocodingService.buildAddressString({
+        marina: comp.marina,
+        address: comp.address || undefined,
+        city: comp.city || undefined,
+        state: comp.state || undefined,
+        zip: comp.zip || undefined,
+      });
+
+      if (!addressString) {
+        return res.status(400).json({ message: "No address information available to geocode" });
+      }
+
+      const result = await geocodingService.geocodeAddress(addressString);
+
+      if ('error' in result) {
+        return res.status(400).json(result);
+      }
+
+      await rcCompService.updateComp(
+        id,
+        { 
+          lat: result.lat.toString(),
+          lng: result.lng.toString(),
+          updatedBy: userId 
+        },
+        orgId,
+        userId
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error geocoding rate comp:", error);
+      res.status(500).json({ message: "Failed to geocode rate comp" });
     }
   });
 

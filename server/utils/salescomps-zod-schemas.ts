@@ -27,6 +27,8 @@ export const salesCompCreateSchema = z.object({
   broker: z.string().optional(),
   address: z.string().optional(),
   zip: z.string().optional(),
+  lat: z.string().optional(), // Geocoded latitude (stored as string in DB)
+  lng: z.string().optional(), // Geocoded longitude (stored as string in DB)
   seller: z.string().optional(),
   company: z.string().optional(),
   owner: z.string().optional(),
