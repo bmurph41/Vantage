@@ -4,9 +4,9 @@ import {
   marketingExpenses,
   leadAttribution,
   emailCampaigns,
-  contacts,
-  leads,
-  deals,
+  crmContacts,
+  crmLeads,
+  crmDeals,
 } from '@shared/schema';
 import { eq, and, desc, sql, inArray, gte, lte } from 'drizzle-orm';
 import type {
@@ -333,8 +333,8 @@ export class MarketingService {
     if (data.contactId) {
       const [contact] = await db
         .select()
-        .from(contacts)
-        .where(and(eq(contacts.id, data.contactId), eq(contacts.orgId, orgId)))
+        .from(crmContacts)
+        .where(and(eq(crmContacts.id, data.contactId), eq(crmContacts.orgId, orgId)))
         .limit(1);
       if (!contact) {
         throw new Error('Contact not found or does not belong to your organization');
@@ -344,8 +344,8 @@ export class MarketingService {
     if (data.leadId) {
       const [lead] = await db
         .select()
-        .from(leads)
-        .where(and(eq(leads.id, data.leadId), eq(leads.orgId, orgId)))
+        .from(crmLeads)
+        .where(and(eq(crmLeads.id, data.leadId), eq(crmLeads.orgId, orgId)))
         .limit(1);
       if (!lead) {
         throw new Error('Lead not found or does not belong to your organization');
@@ -355,8 +355,8 @@ export class MarketingService {
     if (data.dealId) {
       const [deal] = await db
         .select()
-        .from(deals)
-        .where(and(eq(deals.id, data.dealId), eq(deals.orgId, orgId)))
+        .from(crmDeals)
+        .where(and(eq(crmDeals.id, data.dealId), eq(crmDeals.orgId, orgId)))
         .limit(1);
       if (!deal) {
         throw new Error('Deal not found or does not belong to your organization');

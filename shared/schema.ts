@@ -4842,9 +4842,9 @@ export const leadAttribution = pgTable('lead_attribution', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   campaignId: varchar('campaign_id').references(() => marketingCampaigns.id, { onDelete: 'cascade' }),
-  contactId: varchar('contact_id').references(() => contacts.id, { onDelete: 'cascade' }), // Link to CRM contact
-  leadId: varchar('lead_id').references(() => leads.id, { onDelete: 'cascade' }), // Link to CRM lead
-  dealId: varchar('deal_id').references(() => deals.id, { onDelete: 'cascade' }), // Link to CRM deal if closed
+  contactId: varchar('contact_id').references(() => crmContacts.id, { onDelete: 'cascade' }), // Link to CRM contact
+  leadId: varchar('lead_id').references(() => crmLeads.id, { onDelete: 'cascade' }), // Link to CRM lead
+  dealId: varchar('deal_id').references(() => crmDeals.id, { onDelete: 'cascade' }), // Link to CRM deal if closed
   attributionType: attributionTypeEnum('attribution_type').notNull(),
   touchDate: timestamp('touch_date').notNull().defaultNow(),
   source: text('source'), // UTM source or manual entry
