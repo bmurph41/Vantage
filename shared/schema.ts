@@ -60,6 +60,8 @@ export const slipTypeEnum = pgEnum("slip_type", ["wet", "dry", "rack", "mooring"
 export const slipStatusEnum = pgEnum("slip_status", ["active", "expired", "reserved", "terminated"]);
 export const serviceTypeEnum = pgEnum("service_type", ["fuel", "maintenance", "dockage", "storage", "amenity", "other"]);
 export const contactMethodEnum = pgEnum("contact_method", ["email", "phone", "sms", "mail"]);
+export const rentRollContextEnum = pgEnum("rent_roll_context", ["operational", "valuation"]);
+export const rentRollEntryTypeEnum = pgEnum("rent_roll_entry_type", ["slip", "rack", "commercial", "seasonal"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -4720,6 +4722,53 @@ export const debtScenarios = pgTable('debt_scenarios', {
 }));
 
 // ================================================================================
+// RENT ROLL - Marina Occupancy & Revenue Tracking
+// ================================================================================
+
+// Rent Rolls - Master rent roll records
+export const rentRolls = pgTable('rent_rolls', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  context: rentRollContextEnum('context').notNull().default('operational'),
+  projectId: varchar('project_id').references(() => projects.id), // Link to DD project for valuation context
+  facilityId: text('facility_id'), // Custom identifier for specific marina/facility
+  name: text('name').notNull(),
+  effectiveDate: date('effective_date').notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('rent_rolls_org_idx').on(table.orgId),
+  contextIdx: index('rent_rolls_context_idx').on(table.context),
+  projectIdx: index('rent_rolls_project_idx').on(table.projectId),
+  effectiveDateIdx: index('rent_rolls_effective_date_idx').on(table.effectiveDate),
+}));
+
+// Rent Roll Entries - Individual line items in a rent roll
+export const rentRollEntries = pgTable('rent_roll_entries', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  rentRollId: varchar('rent_roll_id').notNull().references(() => rentRolls.id, { onDelete: 'cascade' }),
+  entryType: rentRollEntryTypeEnum('entry_type').notNull(),
+  unitNumber: text('unit_number').notNull(), // Slip/rack/unit number
+  tenantName: text('tenant_name'),
+  customerId: varchar('customer_id').references(() => marinaCustomers.id), // Optional FK to customer for operational data
+  monthlyRate: decimal('monthly_rate', { precision: 10, scale: 2 }).notNull(),
+  status: slipStatusEnum('status').notNull().default('active'),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('rent_roll_entries_org_idx').on(table.orgId),
+  rentRollIdx: index('rent_roll_entries_rent_roll_idx').on(table.rentRollId),
+  customerIdx: index('rent_roll_entries_customer_idx').on(table.customerId),
+  statusIdx: index('rent_roll_entries_status_idx').on(table.status),
+  entryTypeIdx: index('rent_roll_entries_entry_type_idx').on(table.entryType),
+}));
+
+// ================================================================================
 // RBAC & ADVANCED COMPLIANCE SYSTEM
 // ================================================================================
 
@@ -5437,3 +5486,35 @@ export type UpdateServiceUsage = z.infer<typeof updateServiceUsageSchema>;
 export type DebtScenario = typeof debtScenarios.$inferSelect;
 export type InsertDebtScenario = z.infer<typeof insertDebtScenarioSchema>;
 export type UpdateDebtScenario = z.infer<typeof updateDebtScenarioSchema>;
+
+// Rent Roll schemas
+export const insertRentRollSchema = createInsertSchema(rentRolls).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateRentRollSchema = insertRentRollSchema.partial();
+
+export const insertRentRollEntrySchema = createInsertSchema(rentRollEntries).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  monthlyRate: z.string().or(z.number()),
+});
+
+export const updateRentRollEntrySchema = insertRentRollEntrySchema.partial().omit({
+  rentRollId: true,
+});
+
+// Types for Rent Rolls
+export type RentRoll = typeof rentRolls.$inferSelect;
+export type InsertRentRoll = z.infer<typeof insertRentRollSchema>;
+export type UpdateRentRoll = z.infer<typeof updateRentRollSchema>;
+
+export type RentRollEntry = typeof rentRollEntries.$inferSelect;
+export type InsertRentRollEntry = z.infer<typeof insertRentRollEntrySchema>;
+export type UpdateRentRollEntry = z.infer<typeof updateRentRollEntrySchema>;
