@@ -56,6 +56,13 @@ import FuelSalesFinancialModel from "@/pages/operations/fuel/FinancialModel";
 import FuelSalesSettings from "@/pages/operations/fuel/Settings";
 import FuelSalesImportHistory from "@/pages/operations/fuel/ImportHistory";
 import FuelSalesAuditTrail from "@/pages/operations/fuel/AuditTrail";
+// Operations pages - Marketing
+import MarketingDashboard from "@/pages/operations/marketing/Dashboard";
+import MarketingCampaigns from "@/pages/operations/marketing/Campaigns";
+import MarketingExpenses from "@/pages/operations/marketing/Expenses";
+import MarketingAttribution from "@/pages/operations/marketing/Attribution";
+import MarketingEmailCampaigns from "@/pages/operations/marketing/EmailCampaigns";
+import MarketingSettings from "@/pages/operations/marketing/Settings";
 // Analysis / Sales Comps pages
 import SalesCompsIndex from "@/pages/analysis/sales-comps/Index";
 import SalesCompsDetail from "@/pages/analysis/sales-comps/Detail";
@@ -292,6 +299,50 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <FuelSalesAuditTrail />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* Operations Routes with Unified Layout - Marketing */}
+      <Route path="/operations/marketing/dashboard">
+        {() => (
+          <UnifiedLayout>
+            <MarketingDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/marketing/campaigns">
+        {() => (
+          <UnifiedLayout>
+            <MarketingCampaigns />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/marketing/expenses">
+        {() => (
+          <UnifiedLayout>
+            <MarketingExpenses />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/marketing/attribution">
+        {() => (
+          <UnifiedLayout>
+            <MarketingAttribution />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/marketing/email-campaigns">
+        {() => (
+          <UnifiedLayout>
+            <MarketingEmailCampaigns />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/marketing/settings">
+        {() => (
+          <UnifiedLayout>
+            <MarketingSettings />
           </UnifiedLayout>
         )}
       </Route>
