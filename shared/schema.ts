@@ -62,6 +62,12 @@ export const serviceTypeEnum = pgEnum("service_type", ["fuel", "maintenance", "d
 export const contactMethodEnum = pgEnum("contact_method", ["email", "phone", "sms", "mail"]);
 export const rentRollContextEnum = pgEnum("rent_roll_context", ["operational", "valuation"]);
 export const rentRollEntryTypeEnum = pgEnum("rent_roll_entry_type", ["slip", "rack", "commercial", "seasonal"]);
+export const marketingCampaignStatusEnum = pgEnum("marketing_campaign_status", ["planning", "active", "paused", "completed", "archived"]);
+export const marketingChannelEnum = pgEnum("marketing_channel", ["email", "paid_ads", "social_media", "content", "events", "direct_mail", "seo", "partnerships", "referral", "other"]);
+export const expenseCategoryEnum = pgEnum("expense_category", ["advertising", "software", "agency_fees", "content_creation", "events", "sponsorships", "tools", "other"]);
+export const expenseStatusEnum = pgEnum("expense_status", ["pending", "approved", "paid", "rejected"]);
+export const attributionTypeEnum = pgEnum("attribution_type", ["first_touch", "last_touch", "assisted"]);
+export const emailPlatformEnum = pgEnum("email_platform", ["mailchimp", "constant_contact"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -4769,6 +4775,118 @@ export const rentRollEntries = pgTable('rent_roll_entries', {
 }));
 
 // ================================================================================
+// MARKETING OPERATIONS MODULE
+// ================================================================================
+
+// Marketing Campaigns - Track all marketing initiatives
+export const marketingCampaigns = pgTable('marketing_campaigns', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  status: marketingCampaignStatusEnum('status').notNull().default('planning'),
+  channel: marketingChannelEnum('channel').notNull(),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
+  budgetPlanned: decimal('budget_planned', { precision: 12, scale: 2 }),
+  budgetActual: decimal('budget_actual', { precision: 12, scale: 2 }).default('0'),
+  goalLeads: integer('goal_leads'),
+  goalRevenue: decimal('goal_revenue', { precision: 12, scale: 2 }),
+  goalRoas: decimal('goal_roas', { precision: 5, scale: 2 }), // Target ROAS (e.g., 3.5 = 350%)
+  ownerId: varchar('owner_id').references(() => users.id), // Campaign owner
+  utmSource: text('utm_source'), // UTM tracking parameters
+  utmMedium: text('utm_medium'),
+  utmCampaign: text('utm_campaign'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('marketing_campaigns_org_idx').on(table.orgId),
+  statusIdx: index('marketing_campaigns_status_idx').on(table.status),
+  channelIdx: index('marketing_campaigns_channel_idx').on(table.channel),
+  ownerIdx: index('marketing_campaigns_owner_idx').on(table.ownerId),
+  dateIdx: index('marketing_campaigns_date_idx').on(table.startDate, table.endDate),
+}));
+
+// Marketing Expenses - Track spend with approval workflow
+export const marketingExpenses = pgTable('marketing_expenses', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  campaignId: varchar('campaign_id').references(() => marketingCampaigns.id, { onDelete: 'set null' }), // Optional campaign link
+  vendor: text('vendor').notNull(),
+  category: expenseCategoryEnum('category').notNull(),
+  description: text('description').notNull(),
+  amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
+  date: date('date').notNull(),
+  status: expenseStatusEnum('status').notNull().default('pending'),
+  invoiceUrl: text('invoice_url'), // Link to uploaded invoice
+  poNumber: text('po_number'), // Purchase order number
+  glAccount: text('gl_account'), // QuickBooks GL account
+  approvedBy: varchar('approved_by').references(() => users.id),
+  approvedAt: timestamp('approved_at'),
+  paidDate: date('paid_date'),
+  notes: text('notes'),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('marketing_expenses_org_idx').on(table.orgId),
+  campaignIdx: index('marketing_expenses_campaign_idx').on(table.campaignId),
+  statusIdx: index('marketing_expenses_status_idx').on(table.status),
+  categoryIdx: index('marketing_expenses_category_idx').on(table.category),
+  dateIdx: index('marketing_expenses_date_idx').on(table.date),
+}));
+
+// Lead Attribution - Track lead sources and revenue attribution
+export const leadAttribution = pgTable('lead_attribution', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  campaignId: varchar('campaign_id').references(() => marketingCampaigns.id, { onDelete: 'cascade' }),
+  contactId: varchar('contact_id').references(() => contacts.id, { onDelete: 'cascade' }), // Link to CRM contact
+  leadId: varchar('lead_id').references(() => leads.id, { onDelete: 'cascade' }), // Link to CRM lead
+  dealId: varchar('deal_id').references(() => deals.id, { onDelete: 'cascade' }), // Link to CRM deal if closed
+  attributionType: attributionTypeEnum('attribution_type').notNull(),
+  touchDate: timestamp('touch_date').notNull().defaultNow(),
+  source: text('source'), // UTM source or manual entry
+  medium: text('medium'), // UTM medium
+  campaign: text('campaign'), // UTM campaign
+  revenue: decimal('revenue', { precision: 12, scale: 2 }), // Attributed revenue if deal closed
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('lead_attribution_org_idx').on(table.orgId),
+  campaignIdx: index('lead_attribution_campaign_idx').on(table.campaignId),
+  contactIdx: index('lead_attribution_contact_idx').on(table.contactId),
+  leadIdx: index('lead_attribution_lead_idx').on(table.leadId),
+  dealIdx: index('lead_attribution_deal_idx').on(table.dealId),
+  typeIdx: index('lead_attribution_type_idx').on(table.attributionType),
+}));
+
+// Email Campaigns - Sync with MailChimp/Constant Contact
+export const emailCampaigns = pgTable('email_campaigns', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  campaignId: varchar('campaign_id').references(() => marketingCampaigns.id, { onDelete: 'cascade' }),
+  platform: emailPlatformEnum('platform').notNull(),
+  externalId: text('external_id').notNull(), // Platform campaign ID
+  listId: text('list_id'), // Platform list/audience ID
+  segmentId: text('segment_id'), // Platform segment ID
+  subject: text('subject').notNull(),
+  sentDate: timestamp('sent_date'),
+  recipientCount: integer('recipient_count').default(0),
+  openRate: decimal('open_rate', { precision: 5, scale: 2 }), // e.g., 23.45%
+  clickRate: decimal('click_rate', { precision: 5, scale: 2 }),
+  conversionRate: decimal('conversion_rate', { precision: 5, scale: 2 }),
+  syncedAt: timestamp('synced_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('email_campaigns_org_idx').on(table.orgId),
+  campaignIdx: index('email_campaigns_campaign_idx').on(table.campaignId),
+  platformIdx: index('email_campaigns_platform_idx').on(table.platform),
+  externalIdx: index('email_campaigns_external_idx').on(table.externalId),
+}));
+
+// ================================================================================
 // RBAC & ADVANCED COMPLIANCE SYSTEM
 // ================================================================================
 
@@ -5518,3 +5636,68 @@ export type UpdateRentRoll = z.infer<typeof updateRentRollSchema>;
 export type RentRollEntry = typeof rentRollEntries.$inferSelect;
 export type InsertRentRollEntry = z.infer<typeof insertRentRollEntrySchema>;
 export type UpdateRentRollEntry = z.infer<typeof updateRentRollEntrySchema>;
+
+// Marketing Campaign schemas
+export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaigns).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  budgetPlanned: z.string().or(z.number()).optional(),
+  budgetActual: z.string().or(z.number()).optional(),
+  goalRevenue: z.string().or(z.number()).optional(),
+  goalRoas: z.string().or(z.number()).optional(),
+});
+
+export const updateMarketingCampaignSchema = insertMarketingCampaignSchema.partial();
+
+// Marketing Expense schemas
+export const insertMarketingExpenseSchema = createInsertSchema(marketingExpenses).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  approvedBy: true,
+  approvedAt: true,
+}).extend({
+  amount: z.string().or(z.number()),
+});
+
+export const updateMarketingExpenseSchema = insertMarketingExpenseSchema.partial();
+
+// Lead Attribution schemas
+export const insertLeadAttributionSchema = createInsertSchema(leadAttribution).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+}).extend({
+  revenue: z.string().or(z.number()).optional(),
+});
+
+// Email Campaign schemas
+export const insertEmailCampaignSchema = createInsertSchema(emailCampaigns).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  syncedAt: true,
+}).extend({
+  openRate: z.string().or(z.number()).optional(),
+  clickRate: z.string().or(z.number()).optional(),
+  conversionRate: z.string().or(z.number()).optional(),
+});
+
+// Types for Marketing
+export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
+export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSchema>;
+export type UpdateMarketingCampaign = z.infer<typeof updateMarketingCampaignSchema>;
+
+export type MarketingExpense = typeof marketingExpenses.$inferSelect;
+export type InsertMarketingExpense = z.infer<typeof insertMarketingExpenseSchema>;
+export type UpdateMarketingExpense = z.infer<typeof updateMarketingExpenseSchema>;
+
+export type LeadAttribution = typeof leadAttribution.$inferSelect;
+export type InsertLeadAttribution = z.infer<typeof insertLeadAttributionSchema>;
+
+export type EmailCampaign = typeof emailCampaigns.$inferSelect;
+export type InsertEmailCampaign = z.infer<typeof insertEmailCampaignSchema>;
