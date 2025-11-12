@@ -70,6 +70,7 @@ export const attributionTypeEnum = pgEnum("attribution_type", ["first_touch", "l
 export const emailPlatformEnum = pgEnum("email_platform", ["mailchimp", "constant_contact"]);
 export const leadStatusEnum = pgEnum("lead_status", ["none", "new", "contacted", "qualified", "unqualified", "converted"]);
 export const contactTagEnum = pgEnum("contact_tag", ["lead", "seller", "competitor", "broker", "vendor", "insurance", "lender", "attorney", "other"]);
+export const phoneTypeEnum = pgEnum("phone_type", ["office", "mobile", "home"]);
 
 // Persona and Dashboard enums
 export const personaTypeEnum = pgEnum("persona_type", ["pe_investor", "broker", "operator", "advisor"]);
@@ -1471,7 +1472,8 @@ export const crmContacts = pgTable("crm_contacts", {
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),
-  phone: text("phone"),
+  phone: text("phone"), // Legacy field - kept for backward compatibility
+  phones: jsonb("phones").default(sql`'[]'`), // Array of {type: 'office'|'mobile'|'home', number: string}
   position: text("position"),
   address: text("address"), // Street address
   unit: text("unit"), // Unit/Suite/Apt number
@@ -3087,14 +3089,21 @@ export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({
 });
 export type InsertCrmLead = z.infer<typeof insertCrmLeadSchema>;
 
+export const phoneSchema = z.object({
+  type: z.enum(["office", "mobile", "home"]),
+  number: z.string().min(1, "Phone number is required"),
+});
+
 export const insertCrmContactSchema = createInsertSchema(crmContacts).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 }).extend({
   leadStatus: z.enum(["none", "new", "contacted", "qualified", "unqualified", "converted"]).nullable().optional(), // Explicitly allow null to clear when contactTag != 'lead'
+  phones: z.array(phoneSchema).optional().default([]), // Array of phone objects with type and number
 });
 export type InsertCrmContact = z.infer<typeof insertCrmContactSchema>;
+export type Phone = z.infer<typeof phoneSchema>;
 
 export const insertCrmCompanySchema = createInsertSchema(crmCompanies).omit({
   id: true,
