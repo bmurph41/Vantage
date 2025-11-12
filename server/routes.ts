@@ -8231,6 +8231,44 @@ Current context: Project ${req.params.projectId}`;
         createdBy: userId,
       }, userId);
 
+      // Auto-create pending company if buyerCompany was provided
+      if (compData.buyerCompany) {
+        try {
+          const companyResult = await storage.autoCreatePendingCompanyFromSalesComp({
+            salesCompId: comp.id,
+            orgId,
+            userId,
+            buyerCompany: compData.buyerCompany,
+            city: compData.city,
+            state: compData.state,
+          });
+          if (companyResult.created) {
+            console.log(`✅ Auto-created pending company for new comp ${comp.id}: ${companyResult.reason || 'Success'}`);
+          }
+        } catch (companyError) {
+          console.error('Error auto-creating pending company:', companyError);
+        }
+      }
+
+      // Auto-create pending contact if agent info was provided
+      if (compData.agentFirstName || compData.agentLastName) {
+        try {
+          const contactResult = await storage.autoCreatePendingContactFromSalesComp({
+            salesCompId: comp.id,
+            orgId,
+            userId,
+            agentFirstName: compData.agentFirstName,
+            agentLastName: compData.agentLastName,
+            brokerage: compData.brokerage,
+          });
+          if (contactResult.created) {
+            console.log(`✅ Auto-created pending contact for new comp ${comp.id}: ${contactResult.reason || 'Success'}`);
+          }
+        } catch (contactError) {
+          console.error('Error auto-creating pending contact:', contactError);
+        }
+      }
+
       res.status(201).json(comp);
     } catch (error) {
       console.error("Error creating comp:", error);
@@ -8287,6 +8325,49 @@ Current context: Project ${req.params.projectId}`;
       );
 
       if (!comp) return res.status(404).json({ message: "Comp not found" });
+
+      // Auto-create pending company if buyerCompany was provided
+      if (updates.buyerCompany) {
+        try {
+          const companyResult = await storage.autoCreatePendingCompanyFromSalesComp({
+            salesCompId: req.params.id,
+            orgId,
+            userId,
+            buyerCompany: updates.buyerCompany,
+            city: updates.city,
+            state: updates.state,
+          });
+          if (companyResult.created) {
+            console.log(`✅ Auto-created pending company for comp ${req.params.id}: ${companyResult.reason || 'Success'}`);
+          } else {
+            console.log(`ℹ️ Pending company not created for comp ${req.params.id}: ${companyResult.reason}`);
+          }
+        } catch (companyError) {
+          console.error('Error auto-creating pending company:', companyError);
+        }
+      }
+
+      // Auto-create pending contact if agent info was provided
+      if (updates.agentFirstName || updates.agentLastName) {
+        try {
+          const contactResult = await storage.autoCreatePendingContactFromSalesComp({
+            salesCompId: req.params.id,
+            orgId,
+            userId,
+            agentFirstName: updates.agentFirstName,
+            agentLastName: updates.agentLastName,
+            brokerage: updates.brokerage,
+          });
+          if (contactResult.created) {
+            console.log(`✅ Auto-created pending contact for comp ${req.params.id}: ${contactResult.reason || 'Success'}`);
+          } else {
+            console.log(`ℹ️ Pending contact not created for comp ${req.params.id}: ${contactResult.reason}`);
+          }
+        } catch (contactError) {
+          console.error('Error auto-creating pending contact:', contactError);
+        }
+      }
+
       res.json(comp);
     } catch (error) {
       console.error("Error updating comp:", error);

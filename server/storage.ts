@@ -568,6 +568,25 @@ export interface IStorage {
   updatePendingCompany(id: string, orgId: string, updates: Partial<PendingCompany>): Promise<PendingCompany | undefined>;
   mergePendingCompanyWithExisting(pendingId: string, companyId: string, orgId: string, userId: string): Promise<CrmCompany | undefined>;
 
+  // Auto-create pending records from sales comps with deduplication
+  autoCreatePendingCompanyFromSalesComp(params: {
+    salesCompId: string;
+    orgId: string;
+    userId: string;
+    buyerCompany: string;
+    city?: string;
+    state?: string;
+  }): Promise<{ created: boolean; pendingCompany?: PendingCompany; reason?: string }>;
+  
+  autoCreatePendingContactFromSalesComp(params: {
+    salesCompId: string;
+    orgId: string;
+    userId: string;
+    agentFirstName?: string;
+    agentLastName?: string;
+    brokerage?: string;
+  }): Promise<{ created: boolean; pendingContact?: PendingContact; reason?: string }>;
+
   // RateComps - Rate Comparables Operations
   getRateComps(params: {
     orgId: string;
@@ -4453,6 +4472,164 @@ export class DatabaseStorage implements IStorage {
 
       return existingCompany;
     });
+  }
+
+  // ============================================================================
+  // Auto-create pending records from sales comps with deduplication
+  // ============================================================================
+
+  async autoCreatePendingCompanyFromSalesComp(params: {
+    salesCompId: string;
+    orgId: string;
+    userId: string;
+    buyerCompany: string;
+    city?: string;
+    state?: string;
+  }): Promise<{ created: boolean; pendingCompany?: PendingCompany; reason?: string }> {
+    const { salesCompId, orgId, userId, buyerCompany, city, state } = params;
+
+    if (!buyerCompany || buyerCompany.trim() === '') {
+      return { created: false, reason: 'No buyer company name provided' };
+    }
+
+    const companyName = buyerCompany.trim();
+
+    // Check if ANY pending company record already exists for this sales comp (regardless of status)
+    // This prevents re-creating records that have already been accepted or rejected
+    const existingPending = await db.select()
+      .from(pendingCompanies)
+      .where(and(
+        eq(pendingCompanies.orgId, orgId),
+        eq(pendingCompanies.sourceType, 'sales_comp'),
+        eq(pendingCompanies.sourceId, salesCompId)
+      ))
+      .limit(1);
+
+    if (existingPending.length > 0) {
+      return { 
+        created: false, 
+        pendingCompany: existingPending[0],
+        reason: `Pending company already processed for this comp (status: ${existingPending[0].status})` 
+      };
+    }
+
+    // Check if similar company already exists in CRM
+    const similarCompanies = await this.findSimilarCompanies(orgId, companyName);
+    if (similarCompanies.length > 0) {
+      // Create pending company with suggested duplicates for user review
+      const pendingCompany = await this.createPendingCompany({
+        orgId,
+        sourceType: 'sales_comp',
+        sourceId: salesCompId,
+        name: companyName,
+        city,
+        state,
+        status: 'pending',
+        suggestedDuplicates: similarCompanies.map(c => c.id),
+        sourceMetadata: { salesCompId, buyerCompany },
+        createdBy: userId,
+      });
+      return { 
+        created: true, 
+        pendingCompany,
+        reason: `Created with ${similarCompanies.length} potential duplicate(s) found` 
+      };
+    }
+
+    // No duplicates found, create pending company
+    const pendingCompany = await this.createPendingCompany({
+      orgId,
+      sourceType: 'sales_comp',
+      sourceId: salesCompId,
+      name: companyName,
+      city,
+      state,
+      status: 'pending',
+      sourceMetadata: { salesCompId, buyerCompany },
+      createdBy: userId,
+    });
+
+    return { created: true, pendingCompany };
+  }
+
+  async autoCreatePendingContactFromSalesComp(params: {
+    salesCompId: string;
+    orgId: string;
+    userId: string;
+    agentFirstName?: string;
+    agentLastName?: string;
+    brokerage?: string;
+  }): Promise<{ created: boolean; pendingContact?: PendingContact; reason?: string }> {
+    const { salesCompId, orgId, userId, agentFirstName, agentLastName, brokerage } = params;
+
+    // Need at least one name field
+    if ((!agentFirstName || agentFirstName.trim() === '') && 
+        (!agentLastName || agentLastName.trim() === '')) {
+      return { created: false, reason: 'No agent name provided' };
+    }
+
+    const firstName = agentFirstName?.trim() || '';
+    const lastName = agentLastName?.trim() || '';
+    const fullName = [firstName, lastName].filter(Boolean).join(' ');
+
+    // Check if ANY pending contact record already exists for this sales comp (regardless of status)
+    // This prevents re-creating records that have already been accepted or rejected
+    const existingPending = await db.select()
+      .from(pendingContacts)
+      .where(and(
+        eq(pendingContacts.orgId, orgId),
+        eq(pendingContacts.sourceType, 'sales_comp'),
+        eq(pendingContacts.sourceId, salesCompId)
+      ))
+      .limit(1);
+
+    if (existingPending.length > 0) {
+      return { 
+        created: false, 
+        pendingContact: existingPending[0],
+        reason: `Pending contact already processed for this comp (status: ${existingPending[0].status})` 
+      };
+    }
+
+    // Check if similar contact already exists in CRM
+    const similarContacts = await this.findSimilarContacts(orgId, fullName);
+    if (similarContacts.length > 0) {
+      // Create pending contact with suggested duplicates for user review
+      const pendingContact = await this.createPendingContact({
+        orgId,
+        sourceType: 'sales_comp',
+        sourceId: salesCompId,
+        firstName,
+        lastName,
+        fullName,
+        jobTitle: brokerage ? `Agent at ${brokerage}` : 'Real Estate Agent',
+        status: 'pending',
+        suggestedDuplicates: similarContacts.map(c => c.id),
+        sourceMetadata: { salesCompId, agentFirstName, agentLastName, brokerage },
+        createdBy: userId,
+      });
+      return { 
+        created: true, 
+        pendingContact,
+        reason: `Created with ${similarContacts.length} potential duplicate(s) found` 
+      };
+    }
+
+    // No duplicates found, create pending contact
+    const pendingContact = await this.createPendingContact({
+      orgId,
+      sourceType: 'sales_comp',
+      sourceId: salesCompId,
+      firstName,
+      lastName,
+      fullName,
+      jobTitle: brokerage ? `Agent at ${brokerage}` : 'Real Estate Agent',
+      status: 'pending',
+      sourceMetadata: { salesCompId, agentFirstName, agentLastName, brokerage },
+      createdBy: userId,
+    });
+
+    return { created: true, pendingContact };
   }
 
   // ============================================================================

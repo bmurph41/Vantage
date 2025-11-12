@@ -281,9 +281,21 @@ export default function PendingCompanies() {
                       <TableCell>
                         <div className="flex items-center gap-1 text-sm" data-testid={`text-company-source-${pending.id}`}>
                           <FileText className="h-3 w-3 text-muted-foreground" />
-                          <Badge variant="outline" className="text-xs">
-                            {pending.sourceType}
-                          </Badge>
+                          {pending.sourceType === 'sales_comp' && pending.sourceId ? (
+                            <a
+                              href={`/analysis/sales-comps`}
+                              className="text-blue-600 hover:underline text-xs"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Sales Comp
+                            </a>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              {pending.sourceType === 'dd_project' ? 'DD Project' : 
+                               pending.sourceType === 'sales_comp' ? 'Sales Comp' :
+                               pending.sourceType}
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
