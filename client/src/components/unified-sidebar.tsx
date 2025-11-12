@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -275,6 +275,10 @@ export default function UnifiedSidebar() {
           />
           {operationsExpanded && (
             <div className="ml-4 mt-1 mb-2">
+              <NavLink 
+                item={{ name: "Rent Roll", href: "/operations/rent-roll", icon: LayoutList }} 
+                data-testid="nav-rent-roll"
+              />
               <NavLink 
                 item={{ name: "Customer Analytics", href: "/operations/customer-analytics", icon: Users }} 
                 data-testid="nav-customer-analytics"

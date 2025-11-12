@@ -43,6 +43,7 @@ import MarketingAutomation from "@/pages/marketing-automation";
 import CalendarSettings from "@/pages/calendar-settings";
 // Operations pages
 import CustomerAnalytics from "@/pages/operations/CustomerAnalytics";
+import RentRoll from "@/pages/operations/RentRoll";
 // Operations pages - Fuel Sales
 import FuelSalesDashboard from "@/pages/operations/fuel/Dashboard";
 import FuelSalesTransactions from "@/pages/operations/fuel/Transactions";
@@ -203,6 +204,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <CustomerAnalytics />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/rent-roll">
+        {() => (
+          <UnifiedLayout>
+            <RentRoll />
           </UnifiedLayout>
         )}
       </Route>
