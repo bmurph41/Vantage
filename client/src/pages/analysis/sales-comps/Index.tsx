@@ -397,8 +397,8 @@ export default function SalesCompsIndex() {
           <div className="sticky top-0 z-40 bg-background">
             {/* Top Actions Bar */}
             <div className="bg-card border-b border-border px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-4 flex-shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -445,7 +445,7 @@ export default function SalesCompsIndex() {
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {canManageColumns && !isEditMode && (
                   <Button
                     variant="secondary"
