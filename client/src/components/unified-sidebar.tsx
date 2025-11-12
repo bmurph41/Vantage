@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -61,6 +61,16 @@ const rentRollNav = [
   { name: "Customer Analytics", href: "/operations/customer-analytics", icon: Users },
 ];
 
+// Operations Navigation - Marketing Subcategories
+const marketingNav = [
+  { name: "Dashboard", href: "/operations/marketing/dashboard", icon: LayoutDashboard },
+  { name: "Campaigns", href: "/operations/marketing/campaigns", icon: Megaphone },
+  { name: "Expenses", href: "/operations/marketing/expenses", icon: DollarSign },
+  { name: "Attribution", href: "/operations/marketing/attribution", icon: Link2 },
+  { name: "Email Campaigns", href: "/operations/marketing/email-campaigns", icon: Mail },
+  { name: "Settings", href: "/operations/marketing/settings", icon: Settings },
+];
+
 // Due Diligence Navigation
 const ddNav = [
   { name: "All Projects", href: "/", icon: LayoutDashboard },
@@ -92,6 +102,7 @@ export default function UnifiedSidebar() {
   const [operationsExpanded, setOperationsExpanded] = useState(false);
   const [fuelSalesExpanded, setFuelSalesExpanded] = useState(false);
   const [rentRollExpanded, setRentRollExpanded] = useState(false);
+  const [marketingExpanded, setMarketingExpanded] = useState(false);
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [ddExpanded, setDdExpanded] = useState(false);
@@ -315,6 +326,24 @@ export default function UnifiedSidebar() {
               {fuelSalesExpanded && (
                 <div className="ml-4">
                   {fuelSalesNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setMarketingExpanded(!marketingExpanded)}
+                className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                data-testid="toggle-marketing"
+              >
+                <div className="flex items-center space-x-3">
+                  <Megaphone className="w-5 h-5" />
+                  <span>Marketing</span>
+                </div>
+                {marketingExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              {marketingExpanded && (
+                <div className="ml-4">
+                  {marketingNav.map((item) => (
                     <NavLink key={item.name} item={item} />
                   ))}
                 </div>
