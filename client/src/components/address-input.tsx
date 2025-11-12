@@ -25,6 +25,7 @@ interface AddressInputProps {
   required?: boolean;
   className?: string;
   testId?: string;
+  countries?: string[];
 }
 
 export function AddressInput({
@@ -37,6 +38,7 @@ export function AddressInput({
   required = false,
   className = '',
   testId = 'input-address',
+  countries = ['us'],
 }: AddressInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -54,15 +56,6 @@ export function AddressInput({
   }, [onChange, onAddressSelect]);
 
   useEffect(() => {
-    // Check if Google Maps API key is configured
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    
-    if (!apiKey) {
-      // API key not configured - component will work as regular text input
-      console.log('Google Maps API key not configured. Address autocomplete disabled.');
-      return;
-    }
-
     // Load Google Maps API
     const loadGoogleMaps = async () => {
       if (typeof google !== 'undefined' && google.maps) {
@@ -72,6 +65,24 @@ export function AddressInput({
 
       setIsLoading(true);
       try {
+        let apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+        
+        if (!apiKey) {
+          try {
+            const response = await fetch('/api/config/google-maps-key');
+            const data = await response.json();
+            apiKey = data.apiKey;
+          } catch (err) {
+            console.log('Failed to fetch Google Maps API key from backend:', err);
+          }
+        }
+        
+        if (!apiKey) {
+          console.log('Google Maps API key not configured. Address autocomplete disabled.');
+          setIsLoading(false);
+          return;
+        }
+
         const { Loader } = await import('@googlemaps/js-api-loader');
         const loader = new Loader({
           apiKey,
@@ -157,7 +168,7 @@ export function AddressInput({
     try {
       autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
         types: ['address'],
-        componentRestrictions: { country: 'us' }, // Restrict to US addresses (customize as needed)
+        componentRestrictions: { country: countries },
         fields: ['address_components', 'formatted_address', 'geometry'],
       });
 
@@ -172,7 +183,7 @@ export function AddressInput({
         google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
-  }, [apiReady, disabled, handlePlaceChanged]);
+  }, [apiReady, disabled, handlePlaceChanged, countries]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Allow manual typing even when autocomplete is active

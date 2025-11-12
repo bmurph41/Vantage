@@ -21,7 +21,7 @@ import { isUnauthorizedError } from "@/lib/ratecomps/authUtils";
 import { z } from "zod";
 import type { RateComp, InsertRateComp, UpdateRateComp } from "@shared/schema";
 import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES, US_REGIONS } from "@shared/salescomps-constants";
-import AddressAutocomplete from "@/components/ratecomps/AddressAutocomplete";
+import { AddressInput } from "@/components/address-input";
 import { useCustomStorageTypes, useCreateCustomStorageType } from "@/hooks/ratecomps/useCustomStorageTypes";
 
 const compFormSchema = z.object({
@@ -659,18 +659,19 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         name="address"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Address</FormLabel>
                             <FormControl>
-                              <AddressAutocomplete
+                              <AddressInput
                                 value={field.value || ""}
                                 onChange={field.onChange}
-                                onAddressSelect={(address) => {
-                                  form.setValue("city", address.city);
-                                  form.setValue("state", address.state);
-                                  form.setValue("zip", address.zip);
+                                onAddressSelect={(components) => {
+                                  if (components.city) form.setValue("city", components.city);
+                                  if (components.state) form.setValue("state", components.state);
+                                  if (components.zipCode) form.setValue("zip", components.zipCode);
                                 }}
+                                label="Address"
                                 placeholder="Enter full address..."
-                                data-testid="input-address"
+                                testId="input-address"
+                                countries={['us', 'ca']}
                               />
                             </FormControl>
                             <FormMessage />
