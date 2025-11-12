@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -67,6 +67,7 @@ const modelingNav = [
 
 // Analysis Navigation (Sales Comps)
 const analysisNav = [
+  { name: "DockTalk", href: "/analysis/docktalk", icon: MessageSquare },
   { name: "Sales Comps", href: "/analysis/sales-comps", icon: BarChart3 },
   { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
   { name: "Demographics", href: "/analysis/demographics", icon: Users },
