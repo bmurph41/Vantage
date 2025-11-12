@@ -58,24 +58,24 @@ export class CustomerAnalyticsService {
     const prospectCustomers = statusCounts.find(r => r.status === 'prospect')?.count || 0;
     const churnedCustomers = statusCounts.find(r => r.status === 'churned')?.count || 0;
 
-    // Calculate average LTV
+    // Calculate average LTV using CTE
+    const customerLtv = db.$with('customer_ltv').as(
+      db
+        .select({
+          customerId: serviceUsage.customerId,
+          lifetime_revenue: sql<number>`COALESCE(SUM(${serviceUsage.amount}), 0)`,
+        })
+        .from(serviceUsage)
+        .where(eq(serviceUsage.orgId, orgId))
+        .groupBy(serviceUsage.customerId)
+    );
+
     const ltvResult = await db
+      .with(customerLtv)
       .select({
         avgLtv: sql<number>`AVG(lifetime_revenue)`,
       })
-      .from(
-        db.$with('customer_ltv').as(
-          db
-            .select({
-              customerId: serviceUsage.customerId,
-              lifetime_revenue: sql<number>`COALESCE(SUM(${serviceUsage.amount}), 0)`,
-            })
-            .from(serviceUsage)
-            .where(eq(serviceUsage.orgId, orgId))
-            .groupBy(serviceUsage.customerId)
-        )
-      )
-      .from(sql`customer_ltv`);
+      .from(customerLtv);
 
     const avgLifetimeValue = Number(ltvResult[0]?.avgLtv || 0);
 
@@ -167,28 +167,28 @@ export class CustomerAnalyticsService {
    * Get customer segments (by account type and value)
    */
   async getCustomerSegments(orgId: string): Promise<CustomerSegment[]> {
-    // Segment by account type
+    // Segment by account type using CTE
+    const customerRevenue = db.$with('customer_revenue').as(
+      db
+        .select({
+          customerId: marinaCustomers.id,
+          accountType: marinaCustomers.accountType,
+          revenue: sql<number>`COALESCE(SUM(${serviceUsage.amount}), 0)`,
+        })
+        .from(marinaCustomers)
+        .leftJoin(serviceUsage, eq(serviceUsage.customerId, marinaCustomers.id))
+        .where(eq(marinaCustomers.orgId, orgId))
+        .groupBy(marinaCustomers.id, marinaCustomers.accountType)
+    );
+
     const accountTypeSegments = await db
+      .with(customerRevenue)
       .select({
-        accountType: marinaCustomers.accountType,
+        accountType: sql<string>`account_type`,
         customerCount: count(),
         totalRevenue: sql<number>`COALESCE(SUM(revenue), 0)`,
       })
-      .from(
-        db.$with('customer_revenue').as(
-          db
-            .select({
-              customerId: marinaCustomers.id,
-              accountType: marinaCustomers.accountType,
-              revenue: sql<number>`COALESCE(SUM(${serviceUsage.amount}), 0)`,
-            })
-            .from(marinaCustomers)
-            .leftJoin(serviceUsage, eq(serviceUsage.customerId, marinaCustomers.id))
-            .where(eq(marinaCustomers.orgId, orgId))
-            .groupBy(marinaCustomers.id, marinaCustomers.accountType)
-        )
-      )
-      .from(sql`customer_revenue`)
+      .from(customerRevenue)
       .groupBy(sql`account_type`)
       .orderBy(desc(sql`COALESCE(SUM(revenue), 0)`));
 

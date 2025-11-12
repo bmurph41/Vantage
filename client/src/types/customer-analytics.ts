@@ -47,9 +47,9 @@ export interface LtvDistribution {
 }
 
 export const CUSTOMER_ANALYTICS_QUERY_KEYS = {
-  overview: () => ['/api/analytics/customers', 'overview'] as const,
-  topCustomers: (limit: number = 20) => ['/api/analytics/customers', 'top', { limit }] as const,
-  segments: () => ['/api/analytics/customers', 'segments'] as const,
-  churnRisk: () => ['/api/analytics/customers', 'churn-risk'] as const,
-  ltvDistribution: () => ['/api/analytics/customers', 'ltv-distribution'] as const,
+  overview: () => ['/api/analytics/customers/overview'] as const,
+  topCustomers: (limit: number = 20) => [`/api/analytics/customers/top?limit=${limit}`] as const,
+  segments: () => ['/api/analytics/customers/segments'] as const,
+  churnRisk: () => ['/api/analytics/customers/churn-risk'] as const,
+  ltvDistribution: () => ['/api/analytics/customers/ltv-distribution'] as const,
 } as const;

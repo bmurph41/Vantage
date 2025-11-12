@@ -38,7 +38,12 @@ export default function CustomerAnalytics() {
   });
 
   const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/analytics/customers'] });
+    queryClient.invalidateQueries({ 
+      predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === 'string' && key.startsWith('/api/analytics/customers');
+      }
+    });
   };
 
   const isAnyLoading = 
