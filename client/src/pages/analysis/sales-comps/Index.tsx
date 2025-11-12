@@ -17,6 +17,7 @@ import AnalyticsWorkbench from "@/components/salescomps/analytics/AnalyticsWorkb
 import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEditCompDialog";
 import ViewCompModal from "@/components/salescomps/sales-comps/ViewCompModal";
 import ColumnEditorDialog from "@/components/salescomps/sales-comps/ColumnEditorDialog";
+import PortfolioWizard from "@/components/salescomps/sales-comps/PortfolioWizard";
 import BulkEdit from "./BulkEdit";
 import Upload from "./Upload";
 import ProjectAssignmentDialog from "@/components/salescomps/projects/ProjectAssignmentDialog";
@@ -91,7 +92,7 @@ export default function SalesCompsIndex() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("data");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [isPortfolioMode, setIsPortfolioMode] = useState(false);
+  const [showPortfolioWizard, setShowPortfolioWizard] = useState(false);
   const [showColumnsDialog, setShowColumnsDialog] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
@@ -280,7 +281,6 @@ export default function SalesCompsIndex() {
     queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
     setEditingComp(null);
     setShowCreateDialog(false);
-    setIsPortfolioMode(false);
   };
 
 
@@ -403,10 +403,7 @@ export default function SalesCompsIndex() {
                     
                     <Button
                       variant="outline"
-                      onClick={() => {
-                        setIsPortfolioMode(false);
-                        setShowCreateDialog(true);
-                      }}
+                      onClick={() => setShowCreateDialog(true)}
                       data-testid="button-add-comp"
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -415,10 +412,7 @@ export default function SalesCompsIndex() {
                     
                     <Button
                       variant="outline"
-                      onClick={() => {
-                        setIsPortfolioMode(true);
-                        setShowCreateDialog(true);
-                      }}
+                      onClick={() => setShowPortfolioWizard(true)}
                       data-testid="button-create-portfolio"
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -647,8 +641,12 @@ export default function SalesCompsIndex() {
         open={showCreateDialog || !!editingComp}
         onClose={handleCompUpdate}
         comp={editingComp || undefined}
-        isPortfolioMode={isPortfolioMode}
         onUpdate={handleCompUpdate}
+      />
+
+      <PortfolioWizard
+        open={showPortfolioWizard}
+        onClose={() => setShowPortfolioWizard(false)}
       />
 
       {canManageColumns && (
