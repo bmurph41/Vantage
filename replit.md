@@ -49,6 +49,16 @@ Preferred communication style: Simple, everyday language.
 - **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation.
 - **Due Diligence Module**: Project management with task tracking, Gantt-style timeline visualization, template management, and progress reporting. "All Projects" serves as the default landing page.
 - **CRM-DD Integration**: Ability to convert CRM deals into DD projects with automatic task creation and contact mapping.
+- **Rent Roll Module**: Comprehensive rent roll management for marina unit occupancy and rental income tracking. Features include:
+  - **Context-Aware Scenarios**: Separate operational and valuation rent rolls for current operations vs. acquisition/appraisal analysis
+  - **Unit Management**: Track slips, racks, commercial spaces, and seasonal rentals with customizable entry types
+  - **Occupancy Analytics**: Real-time summary metrics including total units, occupancy rate, monthly revenue, and average rate per unit
+  - **Entry Details**: Unit number, tenant name, monthly rate, lease dates, status (occupied/vacant/reserved), and notes
+  - **Project Linking**: Optional association with DD projects and external facility IDs for integration workflows
+  - **Multi-Tenancy**: Full org-based data isolation with comprehensive authorization checks preventing cross-tenant data leakage
+  - **CRUD Operations**: Dialog-based create, edit, and delete flows with proper validation and cache invalidation
+  - **Smart Selection**: Context switcher automatically resets selection when switching between operational and valuation scenarios
+  - **Responsive UI**: Mobile-optimized table, forms, and navigation positioned in Operations section above Customer Analytics
 - **SalesComps Module**: Marina sales comparables management with CSV import/export, project grouping, rate analysis, Google Maps address autocomplete, organization-based multi-tenancy, portfolio functionality, and customizable storage types.
 - **SalesComps-CRM Properties Integration**: Every sales comp automatically creates or links to a CRM Property record. During import, the system matches existing properties by marina name, city, and state. When no match is found, a new Property record is auto-created with marina details, status, and listing price from the comp data. This ensures every comp has a corresponding property page for CRM workflows. Legacy data backfilled successfully (1,585 comps → 1,487 properties: 1,462 created, 98 matched).
 - **Analytics/Metrics Module**: Deep-dive comparative analysis for sales comps with statistical calculations (averages, medians, percentiles), filtering by state, price point, year sold, water type, and capacity. Features trend analysis, recharts visualizations (line charts, bar charts, pie charts), automated insights generation, and metrics tracking with alert capabilities.
