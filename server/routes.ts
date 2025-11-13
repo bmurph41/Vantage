@@ -420,7 +420,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
-      const project = await storage.getProject(req.params.id);
+      // Query database directly (bypassing storage method which has interception issue)
+      const { db } = await import("./db");
+      const { projects } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const [project] = await db.select().from(projects).where(eq(projects.id, req.params.id));
+      
       if (!project) {
         return res.status(404).json({ error: "Project not found" });
       }
@@ -431,7 +437,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update project status to 'accepted'
-      const updated = await storage.updateProject(req.params.id, { status: 'accepted' });
+      const [updated] = await db
+        .update(projects)
+        .set({ status: 'accepted' })
+        .where(eq(projects.id, req.params.id))
+        .returning();
       
       res.json(updated);
     } catch (error) {
