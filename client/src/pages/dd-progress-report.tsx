@@ -791,6 +791,7 @@ function DDProgressReport({
               
               <Badge 
                 className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  project.status === 'accepted' ? 'bg-green-100 text-green-800 border border-green-300' :
                   metrics.daysRemaining > 30 ? 'bg-slate-100 text-slate-700 border border-slate-200' :
                   metrics.daysRemaining > 14 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                   'bg-red-50 text-red-700 border border-red-200'
@@ -798,7 +799,7 @@ function DDProgressReport({
                 data-testid="badge-days-remaining"
               >
                 <Clock className="h-4 w-4 mr-1" />
-                {metrics.daysRemaining} Days Left
+                {project.status === 'accepted' ? 'DD Accepted' : `${metrics.daysRemaining} Days Left`}
               </Badge>
               
               <Badge 
@@ -821,13 +822,19 @@ function DDProgressReport({
               {format(currentDate, 'MMMM yyyy').toUpperCase()}
             </div>
             <div className="bg-white bg-opacity-20 rounded-lg p-3 mb-3">
-              <div className="text-xs uppercase tracking-wide opacity-75 mb-1">Days Remaining</div>
-              <div className="text-lg font-bold">{metrics.daysRemaining}</div>
-              <div className="text-xs opacity-75">Until Closing</div>
+              <div className="text-xs uppercase tracking-wide opacity-75 mb-1">
+                {project.status === 'accepted' ? 'Status' : 'Days Remaining'}
+              </div>
+              <div className="text-lg font-bold">
+                {project.status === 'accepted' ? 'DD Accepted' : metrics.daysRemaining}
+              </div>
+              <div className="text-xs opacity-75">
+                {project.status === 'accepted' ? 'Approved' : 'Until Closing'}
+              </div>
             </div>
             <div className="bg-white bg-opacity-20 rounded-lg p-3">
               <div className="text-xs uppercase tracking-wide opacity-75 mb-1">Overall Progress</div>
-              <div className="text-2xl font-bold">{metrics.completionRate}%</div>
+              <div className="text-2xl font-bold">{project.status === 'accepted' ? '100' : metrics.completionRate}%</div>
               <div className="text-xs opacity-75">Complete</div>
             </div>
           </div>
@@ -1181,16 +1188,17 @@ function DDProgressReport({
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Overall Completion</span>
-                    <span className="text-2xl font-bold text-gray-900">{metrics.completionRate}%</span>
+                    <span className="text-2xl font-bold text-gray-900">{project.status === 'accepted' ? '100' : metrics.completionRate}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
                     <div 
                       className={`h-full rounded-full transition-all duration-500 ${
+                        project.status === 'accepted' ? 'bg-emerald-500' :
                         metrics.completionRate >= 80 ? 'bg-emerald-500' :
                         metrics.completionRate >= 60 ? 'bg-amber-500' :
                         'bg-red-500'
                       }`}
-                      style={{ width: `${metrics.completionRate}%` }}
+                      style={{ width: `${project.status === 'accepted' ? '100' : metrics.completionRate}%` }}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4 pt-4">
@@ -1232,8 +1240,12 @@ function DDProgressReport({
                       <div className="text-xs text-gray-600 uppercase tracking-wide">Days Elapsed</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-amber-600">{metrics.daysRemaining}</div>
-                      <div className="text-xs text-gray-600 uppercase tracking-wide">Days Remaining</div>
+                      <div className={`text-2xl font-bold ${project.status === 'accepted' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {project.status === 'accepted' ? 'Approved' : metrics.daysRemaining}
+                      </div>
+                      <div className="text-xs text-gray-600 uppercase tracking-wide">
+                        {project.status === 'accepted' ? 'DD Status' : 'Days Remaining'}
+                      </div>
                     </div>
                   </div>
                 </div>
