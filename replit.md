@@ -1,11 +1,9 @@
 # MarinaMatch Platform
 
 ## Overview
-
-MarinaMatch is a full-stack platform designed for managing marina acquisition projects. It integrates comprehensive CRM functionalities with Due Diligence Tracking. The platform enables deal pipeline management, lead and contact tracking, and automates the due diligence workflow within a single React-based application. It aims to streamline the acquisition process from initial lead to project completion.
+MarinaMatch is a full-stack platform designed to manage marina acquisition projects. It integrates comprehensive CRM functionalities with Due Diligence Tracking, enabling deal pipeline management, lead and contact tracking, and automated due diligence workflows. The platform, built on React, aims to streamline the acquisition process from initial lead to project completion, offering a unified solution for managing complex marina transactions.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 **Code Editing Guidelines:**
@@ -16,108 +14,62 @@ Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
-- **Framework**: React 18 with TypeScript.
-- **Routing**: Wouter.
-- **UI Components**: shadcn/ui built on Radix UI primitives.
-- **Styling**: Tailwind CSS with CSS variables.
-- **State Management**: TanStack Query (React Query) for server state.
+### Frontend
+- **Frameworks**: React 18 with TypeScript, Wouter for routing.
+- **UI/Styling**: shadcn/ui (built on Radix UI), Tailwind CSS with CSS variables, Lucide-React for icons.
+- **State Management**: TanStack Query for server state.
 - **Form Handling**: React Hook Form with Zod validation.
-- **Date Management**: date-fns library.
-- **Mobile Responsiveness**: Full optimization with responsive navigation (hamburger menu), `ResponsiveTable` component, touch-friendly shadcn forms, and mobile-optimized drag-and-drop (`@dnd-kit`).
+- **Date Management**: date-fns.
+- **Responsiveness**: Full mobile optimization with responsive components and `@dnd-kit` for drag-and-drop.
 
-### Backend Architecture
-- **Server Framework**: Express.js with TypeScript.
-- **API Design**: RESTful endpoints with consistent error handling and logging.
-- **Database Integration**: Drizzle ORM.
-- **Authentication**: Session-based with multi-tenant support.
-- **File Upload System**: Multer-based with 10MB limit, storing files in `server/uploads/crm` with metadata in `crm_files` table.
+### Backend
+- **Framework**: Express.js with TypeScript.
+- **API**: RESTful design, consistent error handling, logging.
+- **Database ORM**: Drizzle ORM.
+- **Authentication**: Session-based, multi-tenant.
+- **File Uploads**: Multer-based, 10MB limit, files stored in `server/uploads/crm` with metadata in `crm_files` table.
 
-### Data Storage Solutions
-- **Primary Database**: PostgreSQL with Neon serverless hosting.
-- **ORM**: Drizzle ORM with a schema-first approach.
-- **Schema Design**: Multi-tenant architecture for organizations, users, projects, and tasks.
-- **Migration System**: Drizzle Kit.
-- **Connection Pooling**: Neon serverless pool.
+### Data Storage
+- **Database**: PostgreSQL with Neon serverless hosting.
+- **ORM**: Drizzle ORM with schema-first approach.
+- **Schema**: Multi-tenant architecture for organizations, users, projects, tasks.
+- **Migrations**: Drizzle Kit.
 
 ### Authentication and Authorization
-- **Multi-tenancy**: Organization-based data isolation with role-based access control (Owner, Editor, Viewer).
+- **Multi-tenancy**: Organization-based data isolation, role-based access control (Owner, Editor, Viewer).
 - **Session Management**: Express sessions with PostgreSQL session store.
-- **Security**: Zod schema validation and SQL injection prevention.
+- **Security**: Zod schema validation, SQL injection prevention.
+- **Institutional-Grade Compliance & Security**: Implements Role-Based Access Control (RBAC) with granular permissions, comprehensive audit trails, and an Audit Service for SOC 2/GDPR compliance. Includes RBAC middleware for route protection and approval workflows.
 
-### Key Features Implementation
+### Key Features
 - **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation.
-- **Due Diligence Module**: Project management with task tracking, Gantt-style timeline visualization, template management, and progress reporting. "All Projects" serves as the default landing page.
-- **CRM-DD Integration**: Ability to convert CRM deals into DD projects with automatic task creation and contact mapping.
-- **Rent Roll Module**: Comprehensive rent roll management for marina unit occupancy and rental income tracking. Features include:
-  - **Context-Aware Scenarios**: Separate operational and valuation rent rolls for current operations vs. acquisition/appraisal analysis
-  - **Unit Management**: Track slips, racks, commercial spaces, and seasonal rentals with customizable entry types
-  - **Occupancy Analytics**: Real-time summary metrics including total units, occupancy rate, monthly revenue, and average rate per unit
-  - **Entry Details**: Unit number, tenant name, monthly rate, lease dates, status (occupied/vacant/reserved), and notes
-  - **Project Linking**: Optional association with DD projects and external facility IDs for integration workflows
-  - **Multi-Tenancy**: Full org-based data isolation with comprehensive authorization checks preventing cross-tenant data leakage
-  - **CRUD Operations**: Dialog-based create, edit, and delete flows with proper validation and cache invalidation
-  - **Smart Selection**: Context switcher automatically resets selection when switching between operational and valuation scenarios
-  - **Responsive UI**: Mobile-optimized table, forms, and navigation positioned in Operations section above Customer Analytics
-- **SalesComps Module**: Marina sales comparables management with CSV import/export, project grouping, rate analysis, Google Maps address autocomplete, organization-based multi-tenancy, portfolio functionality, and customizable storage types.
-- **SalesComps-CRM Properties Integration**: Every sales comp automatically creates or links to a CRM Property record. During import, the system matches existing properties by marina name, city, and state. When no match is found, a new Property record is auto-created with marina details, status, and listing price from the comp data. This ensures every comp has a corresponding property page for CRM workflows. Legacy data backfilled successfully (1,585 comps → 1,487 properties: 1,462 created, 98 matched).
-- **Portfolio Pending Properties**: When a portfolio sales comp is added, each individual comp/property within the portfolio automatically receives a "pending property" designation if no existing property match is found. The pending property workflow allows users to review, accept (create new or merge with existing), or reject each property suggestion before it's added to the CRM.
-- **Analytics/Metrics Module**: Deep-dive comparative analysis for sales comps with statistical calculations (averages, medians, percentiles), filtering by state, price point, year sold, water type, and capacity. Features trend analysis, recharts visualizations (line charts, bar charts, pie charts), automated insights generation, and metrics tracking with alert capabilities.
-- **Fuel Sales Module**: Complete fuel operations management with Dashboard, Transactions, Inventory, Analytics, Reports, and Financial Model pages. All analytics use EST timezone (America/New_York) with 5:00 PM business-day cutoff for consistent metrics.
-- **Fuel Software Integration**: Full integration architecture supporting industry-standard fuel management systems (FuelCloud, MARINAGO, Dockwa, MarinaOffice). Features include:
-  - Provider-agnostic interface pattern with registry system
-  - FuelCloud API integration with OAuth, automatic token refresh, and retry logic
-  - CSV import with drag-and-drop, field mapping, validation, and duplicate detection
-  - QuickBooks export with GL account mapping and journal entry format
-  - Integration Settings page for managing API credentials and sync configuration
-  - Import History tracking with detailed logs, error reporting, and statistics dashboard
-  - Idempotent data sync using external transaction IDs for deduplication
-  - Resilient error handling with exponential backoff and partial success support
-  - **Institutional-Grade Compliance & Security** (November 2025):
-    - **Role-Based Access Control (RBAC)**: Organization-level user roles (Owner, Admin, Editor, Viewer, Auditor) with granular permission system for fuel operations
-    - **Comprehensive Audit Trail**: Immutable event logging with before/after snapshots, change tracking, user/IP/session context capture for SOC 2/GDPR compliance
-    - **Audit Service**: Centralized logging infrastructure (`server/services/audit-service.ts`) with automatic context injection, diff calculation, and severity levels
-    - **RBAC Middleware**: Permission checking system (`server/middleware/rbac.ts`) with route protection, approval workflow enforcement, and role-based filtering
-    - **Permission Matrix**: Fine-grained permissions including fuel operations (read/create/update/delete/export/import), integration management, period locking, approval workflows, and audit access
-    - **Security Foundation**: Supports approval workflows for sensitive operations, period locking for financial controls, and comprehensive change history
-    - **Database Schema**: `organization_user_roles` table for RBAC, enhanced `audit_logs` table with full context tracking and metadata
-- **Marketing Module**: Institutional-grade lead generation tracking, ROAS analytics, expense management, and email campaign integration for PE firms. Features include:
-  - **Campaign Management**: Multi-channel campaign tracking (email, paid ads, social media, content, events, direct mail, SEO, partnerships, referral) with status management, budget planning/actuals, UTM parameter tracking, and goal setting (leads, revenue, ROAS)
-  - **Expense Tracking**: Comprehensive expense management with vendor tracking, category classification (advertising, software, agency fees, content creation, events, sponsorships, tools), approval workflows, invoice management, GL account mapping, and PO number tracking
-  - **Lead Attribution**: Multi-touch attribution tracking (first-touch, last-touch, assisted) linking marketing campaigns to CRM contacts, leads, and deals with revenue attribution and source/medium/campaign UTM tracking
-  - **Dashboard Analytics**: Real-time KPI metrics (Total Spend, Leads Generated, ROAS, Active Campaigns) with spend trend analysis and channel distribution visualizations using recharts
-  - **Email Platform Integration**: Placeholder infrastructure for future MailChimp and Constant Contact integration with campaign sync, performance metrics (open rates, click rates, conversion rates), and automated attribution linking
-  - **Multi-Tenancy**: Organization-scoped data isolation with validation patterns from fuel and rent roll modules preventing cross-tenant data leakage
-  - **Database Schema**: Four core tables (`marketing_campaigns`, `marketing_expenses`, `lead_attribution`, `email_campaigns`) with six enums for campaign status, channels, expense categories/status, attribution types, and email platforms
-  - **Navigation**: Organized under Operations > Marketing with six sub-pages (Dashboard, Campaigns, Expenses, Attribution, Email Campaigns, Settings)
-- **CRM Marketing Automation**: Multi-step email sequences with templates and enrollment tracking for contacts, leads, and deals.
-- **File Attachment System**: Comprehensive file upload, listing, download, and deletion for CRM entities.
-- **Bulk Actions**: Multi-select, bulk delete, and CSV export for Contacts, Companies, and Deals.
-- **Task Kanban Board**: Drag-and-drop task management with status changes, inline creation, filters, and metrics.
-- **Global Search**: Smart search across Contacts, Companies, and Deals with fuzzy matching and Cmd+K shortcut.
-- **Calendar Integration**: Google Calendar integration for CRM activities and DD tasks with sync capabilities, settings, and ICS export.
-- **Currency Formatting**: `CurrencyInput` component with automatic comma formatting for money input fields.
+- **Due Diligence Module**: Project management with task tracking, Gantt charts, template management.
+- **CRM-DD Integration**: Convert CRM deals to DD projects with automated task and contact mapping.
+- **Rent Roll Module**: Manages marina unit occupancy and rental income, supporting operational and valuation scenarios, occupancy analytics, and unit management.
+- **SalesComps Module**: Marina sales comparables with CSV import/export, Google Maps integration, portfolio functionality, and automatic creation/linking to CRM Property records.
+- **Modeling Projects Module**: Tracks marina valuation projects for PE firms, linking to CRM contacts, DD projects, sales comps, and offering analytics dashboards.
+- **Marketing Module**: Tracks campaigns (multi-channel), expenses, lead attribution, and integrates with email platforms, providing analytics and multi-tenancy.
+- **Fuel Sales Module**: Manages fuel operations including dashboard, transactions, inventory, analytics, and reports. Supports integration with industry-standard fuel management systems (e.g., FuelCloud) via a provider-agnostic interface and handles robust data synchronization.
+- **File Attachment System**: File upload, listing, download, and deletion for CRM entities.
+- **Bulk Actions**: Multi-select, bulk delete, and CSV export for core entities.
+- **Task Kanban Board**: Drag-and-drop task management.
+- **Global Search**: Smart search across Contacts, Companies, and Deals.
+- **Calendar Integration**: Google Calendar integration for CRM activities and DD tasks.
 - **Progress Tracking**: Automated progress bars based on effective dates.
-- **Timeline Management**: Gantt-style visualization with business day calculations.
 - **Template System**: Reusable project and task templates.
 - **CSV Import/Export**: Data interchange capabilities.
-- **Holiday Calendar Integration**: US Federal holiday support for business day calculations.
-- **Task Dependencies**: Multi-select dependency management.
-
-### Future Integration Requirements
-- **Financial Model Integration**: Transaction costs and timeline data from this platform will integrate into a Financial Model app once merged into a monorepo.
 
 ## External Dependencies
 
-### Core Runtime Dependencies
-- **@neondatabase/serverless**: Serverless PostgreSQL driver.
+### Core Runtime
+- **@neondatabase/serverless**: PostgreSQL driver.
 - **drizzle-orm**: Type-safe ORM.
 - **express**: Web framework.
 - **@tanstack/react-query**: Server state management.
 - **wouter**: Lightweight routing.
 - **react-hook-form**: Form library.
-- **multer**: Middleware for handling `multipart/form-data`.
-- **@dnd-kit**: Drag and drop toolkit for React.
+- **multer**: File upload middleware.
+- **@dnd-kit**: Drag and drop toolkit.
 
 ### UI and Component Libraries
 - **@radix-ui/react-***: Headless UI primitives.
@@ -133,11 +85,11 @@ Preferred communication style: Simple, everyday language.
 - **drizzle-kit**: Database migration and introspection.
 - **esbuild**: JavaScript bundler.
 
-### Date and Time Processing
+### Date and Time
 - **date-fns**: Date utility library.
 - **date-fns-tz**: Timezone support.
 
-### Validation and Schema Management
+### Validation and Schema
 - **zod**: TypeScript-first schema validation.
 - **drizzle-zod**: Drizzle ORM and Zod integration.
 - **@hookform/resolvers**: Validation resolvers for React Hook Form.

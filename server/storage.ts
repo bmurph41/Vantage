@@ -5950,8 +5950,12 @@ export class DatabaseStorage implements IStorage {
       ? projects.reduce((sum, p) => sum + (Number(p.ebitda) || 0), 0) / projects.length
       : 0;
     
+    // Success rate calculation: won / (won + lost + passed) - only counts closed deals
     const wonDeals = projects.filter(p => p.dealOutcome === 'won').length;
-    const successRate = totalDeals > 0 ? (wonDeals / totalDeals) * 100 : 0;
+    const lostDeals = projects.filter(p => p.dealOutcome === 'lost').length;
+    const passedDeals = projects.filter(p => p.dealOutcome === 'passed').length;
+    const closedDeals = wonDeals + lostDeals + passedDeals;
+    const successRate = closedDeals > 0 ? (wonDeals / closedDeals) * 100 : 0;
 
     // Group by outcome
     const outcomeMap = new Map<string, number>();
