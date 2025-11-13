@@ -717,6 +717,37 @@ export interface IStorage {
   createDebtScenario(data: InsertDebtScenario): Promise<DebtScenario>;
   updateDebtScenario(id: string, updates: UpdateDebtScenario): Promise<DebtScenario>;
   deleteDebtScenario(id: string): Promise<void>;
+
+  // Modeling Projects - Valuation & Financial Modeling
+  getModelingProjects(orgId: string): Promise<ModelingProject[]>;
+  getModelingProject(id: string, orgId: string): Promise<ModelingProject | undefined>;
+  getModelingProjectsByBroker(brokerId: string, orgId: string): Promise<ModelingProject[]>;
+  createModelingProject(data: InsertModelingProject): Promise<ModelingProject>;
+  updateModelingProject(id: string, data: UpdateModelingProject, orgId: string): Promise<ModelingProject | undefined>;
+  deleteModelingProject(id: string, orgId: string): Promise<boolean>;
+  
+  // Modeling Projects Analytics
+  getModelingAnalytics(orgId: string, filters?: {
+    region?: string;
+    state?: string;
+    dealOutcome?: string;
+    brokerId?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    minSize?: number;
+    maxSize?: number;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{
+    totalDeals: number;
+    totalPurchasePrice: number;
+    avgCapRate: number;
+    avgEbitda: number;
+    successRate: number;
+    dealsByOutcome: Array<{ outcome: string; count: number }>;
+    dealsByBroker: Array<{ brokerId: string; brokerName: string; count: number; totalValue: number }>;
+    dealsByRegion: Array<{ region: string; count: number; totalValue: number }>;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5790,6 +5821,199 @@ export class DatabaseStorage implements IStorage {
   async deleteDebtScenario(id: string): Promise<void> {
     await db.delete(debtScenarios)
       .where(eq(debtScenarios.id, id));
+  }
+
+  // Modeling Projects - Valuation & Financial Modeling
+  async getModelingProjects(orgId: string): Promise<ModelingProject[]> {
+    return await db.select()
+      .from(modelingProjects)
+      .where(eq(modelingProjects.orgId, orgId))
+      .orderBy(desc(modelingProjects.createdAt));
+  }
+
+  async getModelingProject(id: string, orgId: string): Promise<ModelingProject | undefined> {
+    const [project] = await db.select()
+      .from(modelingProjects)
+      .where(and(
+        eq(modelingProjects.id, id),
+        eq(modelingProjects.orgId, orgId)
+      ));
+    return project || undefined;
+  }
+
+  async getModelingProjectsByBroker(brokerId: string, orgId: string): Promise<ModelingProject[]> {
+    return await db.select()
+      .from(modelingProjects)
+      .where(and(
+        eq(modelingProjects.brokerId, brokerId),
+        eq(modelingProjects.orgId, orgId)
+      ))
+      .orderBy(desc(modelingProjects.createdAt));
+  }
+
+  async createModelingProject(data: InsertModelingProject): Promise<ModelingProject> {
+    const [created] = await db.insert(modelingProjects)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateModelingProject(id: string, data: UpdateModelingProject, orgId: string): Promise<ModelingProject | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(modelingProjects)
+      .set(updateData as any)
+      .where(and(
+        eq(modelingProjects.id, id),
+        eq(modelingProjects.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteModelingProject(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(modelingProjects)
+      .where(and(
+        eq(modelingProjects.id, id),
+        eq(modelingProjects.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getModelingAnalytics(orgId: string, filters?: {
+    region?: string;
+    state?: string;
+    dealOutcome?: string;
+    brokerId?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    minSize?: number;
+    maxSize?: number;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{
+    totalDeals: number;
+    totalPurchasePrice: number;
+    avgCapRate: number;
+    avgEbitda: number;
+    successRate: number;
+    dealsByOutcome: Array<{ outcome: string; count: number }>;
+    dealsByBroker: Array<{ brokerId: string; brokerName: string; count: number; totalValue: number }>;
+    dealsByRegion: Array<{ region: string; count: number; totalValue: number }>;
+  }> {
+    // Build WHERE conditions based on filters
+    const conditions = [eq(modelingProjects.orgId, orgId)];
+    
+    if (filters?.region) {
+      conditions.push(eq(modelingProjects.region, filters.region));
+    }
+    if (filters?.state) {
+      conditions.push(eq(modelingProjects.state, filters.state));
+    }
+    if (filters?.dealOutcome) {
+      conditions.push(eq(modelingProjects.dealOutcome, filters.dealOutcome));
+    }
+    if (filters?.brokerId) {
+      conditions.push(eq(modelingProjects.brokerId, filters.brokerId));
+    }
+    if (filters?.minPrice) {
+      conditions.push(sql`${modelingProjects.purchasePrice} >= ${filters.minPrice}`);
+    }
+    if (filters?.maxPrice) {
+      conditions.push(sql`${modelingProjects.purchasePrice} <= ${filters.maxPrice}`);
+    }
+    if (filters?.minSize) {
+      conditions.push(sql`${modelingProjects.totalStorageUnits} >= ${filters.minSize}`);
+    }
+    if (filters?.maxSize) {
+      conditions.push(sql`${modelingProjects.totalStorageUnits} <= ${filters.maxSize}`);
+    }
+    if (filters?.startDate) {
+      conditions.push(sql`${modelingProjects.createdAt} >= ${filters.startDate}`);
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${modelingProjects.createdAt} <= ${filters.endDate}`);
+    }
+
+    // Get all projects matching filters
+    const projects = await db.select()
+      .from(modelingProjects)
+      .where(and(...conditions));
+
+    // Calculate aggregate metrics
+    const totalDeals = projects.length;
+    const totalPurchasePrice = projects.reduce((sum, p) => sum + (Number(p.purchasePrice) || 0), 0);
+    const avgCapRate = projects.length > 0
+      ? projects.reduce((sum, p) => sum + (Number(p.year1CapRate) || 0), 0) / projects.length
+      : 0;
+    const avgEbitda = projects.length > 0
+      ? projects.reduce((sum, p) => sum + (Number(p.ebitda) || 0), 0) / projects.length
+      : 0;
+    
+    const wonDeals = projects.filter(p => p.dealOutcome === 'won').length;
+    const successRate = totalDeals > 0 ? (wonDeals / totalDeals) * 100 : 0;
+
+    // Group by outcome
+    const outcomeMap = new Map<string, number>();
+    projects.forEach(p => {
+      const count = outcomeMap.get(p.dealOutcome) || 0;
+      outcomeMap.set(p.dealOutcome, count + 1);
+    });
+    const dealsByOutcome = Array.from(outcomeMap.entries()).map(([outcome, count]) => ({
+      outcome,
+      count
+    }));
+
+    // Group by broker (with broker name lookup)
+    const brokerMap = new Map<string, { count: number; totalValue: number; name: string }>();
+    for (const project of projects) {
+      if (project.brokerId) {
+        const existing = brokerMap.get(project.brokerId) || { count: 0, totalValue: 0, name: '' };
+        existing.count += 1;
+        existing.totalValue += Number(project.purchasePrice) || 0;
+        
+        // Get broker name if not already fetched
+        if (!existing.name) {
+          const broker = await this.getCrmContact(project.brokerId, orgId);
+          existing.name = broker ? `${broker.firstName} ${broker.lastName}` : 'Unknown';
+        }
+        
+        brokerMap.set(project.brokerId, existing);
+      }
+    }
+    const dealsByBroker = Array.from(brokerMap.entries()).map(([brokerId, data]) => ({
+      brokerId,
+      brokerName: data.name,
+      count: data.count,
+      totalValue: data.totalValue
+    }));
+
+    // Group by region
+    const regionMap = new Map<string, { count: number; totalValue: number }>();
+    projects.forEach(p => {
+      if (p.region) {
+        const existing = regionMap.get(p.region) || { count: 0, totalValue: 0 };
+        existing.count += 1;
+        existing.totalValue += Number(p.purchasePrice) || 0;
+        regionMap.set(p.region, existing);
+      }
+    });
+    const dealsByRegion = Array.from(regionMap.entries()).map(([region, data]) => ({
+      region,
+      count: data.count,
+      totalValue: data.totalValue
+    }));
+
+    return {
+      totalDeals,
+      totalPurchasePrice,
+      avgCapRate,
+      avgEbitda,
+      successRate,
+      dealsByOutcome,
+      dealsByBroker,
+      dealsByRegion
+    };
   }
 }
 
