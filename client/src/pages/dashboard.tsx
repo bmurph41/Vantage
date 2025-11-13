@@ -55,6 +55,11 @@ const WIDGET_COMPONENTS: Record<string, React.ComponentType<any>> = {
 export default function Dashboard() {
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
 
+  const handleOpenCustomization = () => {
+    console.log('🎯 Opening dashboard customization modal');
+    setIsCustomizationOpen(true);
+  };
+
   const { data: layout, isLoading: layoutLoading } = useQuery<DashboardLayout>({
     queryKey: ['/api/dashboards/layout'],
   });
@@ -132,7 +137,7 @@ export default function Dashboard() {
               <p className="text-gray-600 mt-1">Your personalized workspace</p>
             </div>
             <Button 
-              onClick={() => setIsCustomizationOpen(true)}
+              onClick={handleOpenCustomization}
               data-testid="button-customize-dashboard"
             >
               <Settings className="w-4 h-4 mr-2" />
@@ -151,7 +156,7 @@ export default function Dashboard() {
                 Click "Customize Dashboard" to add your first widgets.
               </p>
               <Button 
-                onClick={() => setIsCustomizationOpen(true)}
+                onClick={handleOpenCustomization}
                 data-testid="button-add-widgets"
               >
                 <Settings className="w-4 h-4 mr-2" />
@@ -182,7 +187,7 @@ export default function Dashboard() {
             </p>
           </div>
           <Button 
-            onClick={() => setIsCustomizationOpen(true)}
+            onClick={handleOpenCustomization}
             data-testid="button-customize-dashboard"
           >
             <Settings className="w-4 h-4 mr-2" />
