@@ -9982,6 +9982,135 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ============================================================================
+  // MODELING PROJECTS - Valuation & Financial Modeling Tracking
+  // ============================================================================
+
+  // Get all modeling projects for organization
+  app.get('/api/modeling/projects', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const projects = await storage.getModelingProjects(orgId);
+      res.json(projects);
+    } catch (error) {
+      console.error('Failed to fetch modeling projects:', error);
+      res.status(500).json({ error: 'Failed to fetch modeling projects' });
+    }
+  });
+
+  // Get single modeling project by ID
+  app.get('/api/modeling/projects/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const project = await storage.getModelingProject(req.params.id, orgId);
+      
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      res.json(project);
+    } catch (error) {
+      console.error('Failed to fetch modeling project:', error);
+      res.status(500).json({ error: 'Failed to fetch modeling project' });
+    }
+  });
+
+  // Get modeling projects by broker
+  app.get('/api/modeling/projects/broker/:brokerId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const projects = await storage.getModelingProjectsByBroker(req.params.brokerId, orgId);
+      res.json(projects);
+    } catch (error) {
+      console.error('Failed to fetch modeling projects by broker:', error);
+      res.status(500).json({ error: 'Failed to fetch modeling projects by broker' });
+    }
+  });
+
+  // Create new modeling project
+  app.post('/api/modeling/projects', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      
+      const data = insertModelingProjectSchema.parse(req.body);
+      const project = await storage.createModelingProject({ ...data, orgId, userId });
+      
+      res.status(201).json(project);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create modeling project:', error);
+      res.status(500).json({ error: 'Failed to create modeling project' });
+    }
+  });
+
+  // Update modeling project
+  app.patch('/api/modeling/projects/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      const data = updateModelingProjectSchema.parse(req.body);
+      const project = await storage.updateModelingProject(req.params.id, data, orgId);
+      
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      res.json(project);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update modeling project:', error);
+      res.status(500).json({ error: 'Failed to update modeling project' });
+    }
+  });
+
+  // Delete modeling project
+  app.delete('/api/modeling/projects/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await storage.deleteModelingProject(req.params.id, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete modeling project:', error);
+      res.status(500).json({ error: 'Failed to delete modeling project' });
+    }
+  });
+
+  // Get modeling analytics and metrics
+  app.get('/api/modeling/analytics', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      // Parse filter parameters
+      const filters: any = {};
+      if (req.query.region) filters.region = req.query.region;
+      if (req.query.state) filters.state = req.query.state;
+      if (req.query.dealOutcome) filters.dealOutcome = req.query.dealOutcome;
+      if (req.query.brokerId) filters.brokerId = req.query.brokerId;
+      if (req.query.minPrice) filters.minPrice = parseFloat(req.query.minPrice as string);
+      if (req.query.maxPrice) filters.maxPrice = parseFloat(req.query.maxPrice as string);
+      if (req.query.minSize) filters.minSize = parseInt(req.query.minSize as string);
+      if (req.query.maxSize) filters.maxSize = parseInt(req.query.maxSize as string);
+      if (req.query.startDate) filters.startDate = new Date(req.query.startDate as string);
+      if (req.query.endDate) filters.endDate = new Date(req.query.endDate as string);
+      
+      const analytics = await storage.getModelingAnalytics(orgId, filters);
+      res.json(analytics);
+    } catch (error) {
+      console.error('Failed to fetch modeling analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch modeling analytics' });
+    }
+  });
+
   // ========================================================================
   // PERSONA MANAGEMENT
   // ========================================================================
