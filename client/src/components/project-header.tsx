@@ -182,7 +182,7 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
               ) : (
                 <CheckCircle2 className="h-4 w-4 mr-2" />
               )}
-              Mark as Accepted
+              DD Approved
             </Button>
           )}
           <Button variant="outline" onClick={handleExportCSV} data-testid="button-export-csv">
