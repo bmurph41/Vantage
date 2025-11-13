@@ -25,6 +25,7 @@ export const holidayCalendarEnum = pgEnum("holiday_calendar", ["us_federal", "no
 export const startStrategyEnum = pgEnum("start_strategy", ["fixed", "offset"]);
 export const priorityEnum = pgEnum("priority", ["low", "med", "high"]);
 export const statusEnum = pgEnum("status", ["not_started", "engaged", "scheduled", "in_progress", "completed"]);
+export const projectStatusEnum = pgEnum("project_status", ["active", "accepted", "completed"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["not_paid", "paid", "no_cost"]);
 export const shareAccessEnum = pgEnum("share_access", ["view", "comment"]);
 export const shareTypeEnum = pgEnum("share_type", ["public", "invite", "organization"]);
@@ -178,6 +179,7 @@ export const projects = pgTable("projects", {
   description: text("description"),
   city: text("city"),
   state: text("state"),
+  status: projectStatusEnum("status").notNull().default("active"),
   anchorType: anchorTypeEnum("anchor_type").notNull().default("psa"),
   psaSignedDate: date("psa_signed_date"),
   ddExpirationDate: date("dd_expiration_date"),
