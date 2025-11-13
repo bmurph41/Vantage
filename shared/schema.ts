@@ -72,6 +72,7 @@ export const emailPlatformEnum = pgEnum("email_platform", ["mailchimp", "constan
 export const leadStatusEnum = pgEnum("lead_status", ["none", "new", "contacted", "qualified", "unqualified", "converted"]);
 export const contactTagEnum = pgEnum("contact_tag", ["lead", "seller", "competitor", "broker", "vendor", "insurance", "lender", "attorney", "other"]);
 export const phoneTypeEnum = pgEnum("phone_type", ["office", "mobile", "home"]);
+export const dealOutcomeEnum = pgEnum("deal_outcome", ["won", "lost", "passed", "under_review", "active"]);
 
 // Persona and Dashboard enums
 export const personaTypeEnum = pgEnum("persona_type", ["pe_investor", "broker", "operator", "advisor"]);
@@ -4998,6 +4999,58 @@ export const emailCampaigns = pgTable('email_campaigns', {
 }));
 
 // ================================================================================
+// MODELING PROJECTS - Valuation & Financial Modeling
+// ================================================================================
+
+// Modeling Projects - Track valuation/financial modeling projects
+export const modelingProjects = pgTable('modeling_projects', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Core project information
+  marinaName: text('marina_name').notNull(),
+  purchasePrice: decimal('purchase_price', { precision: 15, scale: 2 }),
+  year1CapRate: decimal('year_1_cap_rate', { precision: 5, scale: 2 }), // e.g., 7.25%
+  totalStorageUnits: integer('total_storage_units'), // Total number of storage options (wet slips + dry racks, etc.)
+  ebitda: decimal('ebitda', { precision: 15, scale: 2 }),
+  dealOutcome: dealOutcomeEnum('deal_outcome').notNull().default('active'),
+  
+  // Broker/deal source
+  brokerId: varchar('broker_id').references(() => crmContacts.id), // Broker who introduced the deal
+  brokerCompanyId: varchar('broker_company_id').references(() => crmCompanies.id), // Broker's company
+  
+  // Linked entities
+  ddProjectId: varchar('dd_project_id').references(() => projects.id), // Link to DD project
+  salesCompId: varchar('sales_comp_id').references(() => salesComps.id), // Link to sales comp
+  rateCompId: varchar('rate_comp_id').references(() => rateComps.id), // Link to rate comp
+  propertyId: varchar('property_id').references(() => crmProperties.id), // Link to CRM property
+  companyId: varchar('company_id').references(() => crmCompanies.id), // Property owner/seller company
+  
+  // Geographic/regional data
+  city: text('city'),
+  state: text('state'),
+  region: text('region'), // e.g., "Southeast", "Great Lakes", etc.
+  
+  // Custom metrics - extensible field for user-defined metrics
+  customMetrics: jsonb('custom_metrics').default(sql`'{}'`), // Flexible structure for additional fields
+  
+  // Metadata
+  notes: text('notes'),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('modeling_projects_org_idx').on(table.orgId),
+  outcomeIdx: index('modeling_projects_outcome_idx').on(table.dealOutcome),
+  brokerIdx: index('modeling_projects_broker_idx').on(table.brokerId),
+  ddProjectIdx: index('modeling_projects_dd_project_idx').on(table.ddProjectId),
+  propertyIdx: index('modeling_projects_property_idx').on(table.propertyId),
+  stateIdx: index('modeling_projects_state_idx').on(table.state),
+  regionIdx: index('modeling_projects_region_idx').on(table.region),
+}));
+
+// ================================================================================
 // RBAC & ADVANCED COMPLIANCE SYSTEM
 // ================================================================================
 
@@ -5812,6 +5865,27 @@ export type InsertLeadAttribution = z.infer<typeof insertLeadAttributionSchema>;
 
 export type EmailCampaign = typeof emailCampaigns.$inferSelect;
 export type InsertEmailCampaign = z.infer<typeof insertEmailCampaignSchema>;
+
+// Modeling Projects schemas
+export const insertModelingProjectSchema = createInsertSchema(modelingProjects).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  createdBy: true,
+  updatedBy: true,
+}).extend({
+  purchasePrice: z.string().or(z.number()).optional(),
+  year1CapRate: z.string().or(z.number()).optional(),
+  totalStorageUnits: z.string().or(z.number()).optional(),
+  ebitda: z.string().or(z.number()).optional(),
+});
+
+export const updateModelingProjectSchema = insertModelingProjectSchema.partial();
+
+export type ModelingProject = typeof modelingProjects.$inferSelect;
+export type InsertModelingProject = z.infer<typeof insertModelingProjectSchema>;
+export type UpdateModelingProject = z.infer<typeof updateModelingProjectSchema>;
 
 // Persona Feature Flags schemas
 export const insertPersonaFeatureFlagSchema = createInsertSchema(personaFeatureFlags).omit({
