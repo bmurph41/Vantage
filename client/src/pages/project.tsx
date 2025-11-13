@@ -88,8 +88,6 @@ export default function ProjectPage() {
 
   const tabs = [
     { id: "reports", label: "Tasks & Timeline" },
-    { id: "advisor", label: "CDD Copilot" },
-    { id: "kpis", label: "KPIs" },
     { id: "templates", label: "Templates" },
     { id: "setup", label: "Deal Details" },
     { id: "owners", label: "Task Owners" },
@@ -172,15 +170,6 @@ export default function ProjectPage() {
               </div>
               <ThirdPartyReports tasks={tasks} projectId={project.id} project={project} settings={settings} />
             </>
-          )}
-          {activeTab === "advisor" && (
-            <div className="space-y-6">
-              <CddAdvisor projectId={project.id} />
-              <FindingsManager projectId={project.id} />
-            </div>
-          )}
-          {activeTab === "kpis" && (
-            <KpisOverview projectId={project.id} />
           )}
           {activeTab === "templates" && (
             <TemplatesView projectId={project.id} />
