@@ -309,6 +309,7 @@ export default function AllProjectsSummaryPage() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
                             <h3 className="text-lg font-semibold text-gray-900">{summary.project.name}</h3>
+                            {/* Badge priority: Completed > DD Accepted > DD Expired > DD Expiring Soon */}
                             {summary.completionPct === 100 ? (
                               <Badge className="bg-green-100 text-green-800 border-green-200">
                                 <CheckCircle className="h-3 w-3 mr-1" />
