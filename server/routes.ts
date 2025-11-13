@@ -10034,7 +10034,7 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       
       const data = insertModelingProjectSchema.parse(req.body);
-      const project = await storage.createModelingProject({ ...data, orgId, userId });
+      const project = await storage.createModelingProject({ ...data, orgId, createdBy: userId });
       
       res.status(201).json(project);
     } catch (error) {
@@ -10050,9 +10050,10 @@ Current context: Project ${req.params.projectId}`;
   app.patch('/api/modeling/projects/:id', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const userId = req.user.id;
       
       const data = updateModelingProjectSchema.parse(req.body);
-      const project = await storage.updateModelingProject(req.params.id, data, orgId);
+      const project = await storage.updateModelingProject(req.params.id, { ...data, updatedBy: userId }, orgId);
       
       if (!project) {
         return res.status(404).json({ error: 'Modeling project not found' });

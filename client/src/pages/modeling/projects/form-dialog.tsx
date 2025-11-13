@@ -31,7 +31,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import CurrencyInput from '@/components/CurrencyInput';
+import { CurrencyInput } from '@/components/ui/currency-input';
 
 const formSchema = z.object({
   marinaName: z.string().min(1, 'Marina name is required'),
