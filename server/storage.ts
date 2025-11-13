@@ -5897,9 +5897,19 @@ export class DatabaseStorage implements IStorage {
     avgCapRate: number;
     avgEbitda: number;
     successRate: number;
+    avgPricePerUnit: number;
+    totalUnits: number;
+    activeDealsValue: number;
+    activeDealsCount: number;
+    closedDealsThisMonth: number;
+    dealVelocity: number;
     dealsByOutcome: Array<{ outcome: string; count: number }>;
-    dealsByBroker: Array<{ brokerId: string; brokerName: string; count: number; totalValue: number }>;
+    dealsByBroker: Array<{ brokerId: string; brokerName: string; count: number; totalValue: number; wonCount: number; lostCount: number; passedCount: number; winRate: number; avgDealSize: number }>;
     dealsByRegion: Array<{ region: string; count: number; totalValue: number }>;
+    dealsByState: Array<{ state: string; count: number; totalValue: number }>;
+    dealsByMonth: Array<{ month: string; count: number; totalValue: number }>;
+    capRateDistribution: Array<{ range: string; count: number }>;
+    priceDistribution: Array<{ range: string; count: number }>;
   }> {
     // Build WHERE conditions based on filters
     const conditions = [eq(modelingProjects.orgId, orgId)];
@@ -5968,13 +5978,18 @@ export class DatabaseStorage implements IStorage {
       count
     }));
 
-    // Group by broker (with broker name lookup)
-    const brokerMap = new Map<string, { count: number; totalValue: number; name: string }>();
+    // Group by broker (with broker name lookup and performance metrics)
+    const brokerMap = new Map<string, { count: number; totalValue: number; name: string; wonCount: number; lostCount: number; passedCount: number }>();
     for (const project of projects) {
       if (project.brokerId) {
-        const existing = brokerMap.get(project.brokerId) || { count: 0, totalValue: 0, name: '' };
+        const existing = brokerMap.get(project.brokerId) || { count: 0, totalValue: 0, name: '', wonCount: 0, lostCount: 0, passedCount: 0 };
         existing.count += 1;
         existing.totalValue += Number(project.purchasePrice) || 0;
+        
+        // Track outcomes
+        if (project.dealOutcome === 'won') existing.wonCount += 1;
+        if (project.dealOutcome === 'lost') existing.lostCount += 1;
+        if (project.dealOutcome === 'passed') existing.passedCount += 1;
         
         // Get broker name if not already fetched
         if (!existing.name) {
@@ -5985,12 +6000,23 @@ export class DatabaseStorage implements IStorage {
         brokerMap.set(project.brokerId, existing);
       }
     }
-    const dealsByBroker = Array.from(brokerMap.entries()).map(([brokerId, data]) => ({
-      brokerId,
-      brokerName: data.name,
-      count: data.count,
-      totalValue: data.totalValue
-    }));
+    const dealsByBroker = Array.from(brokerMap.entries()).map(([brokerId, data]) => {
+      const closedBrokerDeals = data.wonCount + data.lostCount + data.passedCount;
+      const winRate = closedBrokerDeals > 0 ? (data.wonCount / closedBrokerDeals) * 100 : 0;
+      const avgDealSize = data.count > 0 ? data.totalValue / data.count : 0;
+      
+      return {
+        brokerId,
+        brokerName: data.name,
+        count: data.count,
+        totalValue: data.totalValue,
+        wonCount: data.wonCount,
+        lostCount: data.lostCount,
+        passedCount: data.passedCount,
+        winRate,
+        avgDealSize
+      };
+    });
 
     // Group by region
     const regionMap = new Map<string, { count: number; totalValue: number }>();
@@ -6008,15 +6034,118 @@ export class DatabaseStorage implements IStorage {
       totalValue: data.totalValue
     }));
 
+    // Group by state
+    const stateMap = new Map<string, { count: number; totalValue: number }>();
+    projects.forEach(p => {
+      if (p.state) {
+        const existing = stateMap.get(p.state) || { count: 0, totalValue: 0 };
+        existing.count += 1;
+        existing.totalValue += Number(p.purchasePrice) || 0;
+        stateMap.set(p.state, existing);
+      }
+    });
+    const dealsByState = Array.from(stateMap.entries()).map(([state, data]) => ({
+      state,
+      count: data.count,
+      totalValue: data.totalValue
+    }));
+
+    // Group by month (based on createdAt)
+    const monthMap = new Map<string, { count: number; totalValue: number }>();
+    projects.forEach(p => {
+      const date = new Date(p.createdAt);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const existing = monthMap.get(monthKey) || { count: 0, totalValue: 0 };
+      existing.count += 1;
+      existing.totalValue += Number(p.purchasePrice) || 0;
+      monthMap.set(monthKey, existing);
+    });
+    const dealsByMonth = Array.from(monthMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([month, data]) => ({
+        month,
+        count: data.count,
+        totalValue: data.totalValue
+      }));
+
+    // Cap rate distribution
+    const capRateRanges = [
+      { min: 0, max: 5, label: '0-5%' },
+      { min: 5, max: 7, label: '5-7%' },
+      { min: 7, max: 9, label: '7-9%' },
+      { min: 9, max: 11, label: '9-11%' },
+      { min: 11, max: 100, label: '11%+' }
+    ];
+    const capRateDistribution = capRateRanges.map(range => ({
+      range: range.label,
+      count: projects.filter(p => {
+        const capRate = Number(p.year1CapRate) || 0;
+        return capRate >= range.min && capRate < range.max;
+      }).length
+    })).filter(item => item.count > 0);
+
+    // Price distribution (in millions)
+    const priceRanges = [
+      { min: 0, max: 1000000, label: 'Under $1M' },
+      { min: 1000000, max: 5000000, label: '$1M-$5M' },
+      { min: 5000000, max: 10000000, label: '$5M-$10M' },
+      { min: 10000000, max: 20000000, label: '$10M-$20M' },
+      { min: 20000000, max: 1000000000, label: '$20M+' }
+    ];
+    const priceDistribution = priceRanges.map(range => ({
+      range: range.label,
+      count: projects.filter(p => {
+        const price = Number(p.purchasePrice) || 0;
+        return price >= range.min && price < range.max;
+      }).length
+    })).filter(item => item.count > 0);
+
+    // Additional metrics
+    const totalUnits = projects.reduce((sum, p) => sum + (Number(p.totalStorageUnits) || 0), 0);
+    const avgPricePerUnit = totalUnits > 0 ? totalPurchasePrice / totalUnits : 0;
+    
+    const activeProjects = projects.filter(p => p.dealOutcome === 'active');
+    const activeDealsCount = activeProjects.length;
+    const activeDealsValue = activeProjects.reduce((sum, p) => sum + (Number(p.purchasePrice) || 0), 0);
+
+    // Closed deals this month
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const closedDealsThisMonth = projects.filter(p => {
+      const createdDate = new Date(p.createdAt);
+      return (p.dealOutcome === 'won' || p.dealOutcome === 'lost' || p.dealOutcome === 'passed') &&
+        createdDate >= firstDayOfMonth;
+    }).length;
+
+    // Deal velocity (avg deals closed per month over last 6 months)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const recentClosedDeals = projects.filter(p => {
+      const createdDate = new Date(p.createdAt);
+      return (p.dealOutcome === 'won' || p.dealOutcome === 'lost' || p.dealOutcome === 'passed') &&
+        createdDate >= sixMonthsAgo;
+    }).length;
+    const dealVelocity = recentClosedDeals / 6;
+
     return {
       totalDeals,
       totalPurchasePrice,
       avgCapRate,
       avgEbitda,
       successRate,
+      avgPricePerUnit,
+      totalUnits,
+      activeDealsValue,
+      activeDealsCount,
+      closedDealsThisMonth,
+      dealVelocity,
       dealsByOutcome,
       dealsByBroker,
-      dealsByRegion
+      dealsByRegion,
+      dealsByState,
+      dealsByMonth,
+      capRateDistribution,
+      priceDistribution
     };
   }
 }
