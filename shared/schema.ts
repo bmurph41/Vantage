@@ -262,6 +262,10 @@ export const tasks = pgTable("tasks", {
   deadlineDays: integer("deadline_days"),
   deadline: date("deadline"), // Direct deadline date field
   assignee: text("assignee"),
+  // CRM Integration
+  companyId: varchar("company_id").references(() => crmCompanies.id), // Link to CRM company
+  contactId: varchar("contact_id").references(() => crmContacts.id), // Link to CRM contact (company representative)
+  // Legacy text fields (kept for backward compatibility and manual entry)
   companyHired: text("company_hired"),
   repName: text("rep_name"),
   repEmail: text("rep_email"),
