@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LayoutGrid, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import PortfolioKPIStrip from "@/components/dashboard-widgets/PortfolioKPIStrip"
 import TaskListWidget from "@/components/dashboard-widgets/TaskListWidget";
 import RecentDealsTable from "@/components/dashboard-widgets/RecentDealsTable";
 import MarketTrendsChart from "@/components/dashboard-widgets/MarketTrendsChart";
+import DashboardCustomizationModal from "@/components/modals/dashboard-customization-modal";
 
 type Widget = {
   widgetKey: string;
@@ -51,6 +53,8 @@ const WIDGET_COMPONENTS: Record<string, React.ComponentType<any>> = {
 };
 
 export default function Dashboard() {
+  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
+
   const { data: layout, isLoading: layoutLoading } = useQuery<DashboardLayout>({
     queryKey: ['/api/dashboards/layout'],
   });
@@ -127,7 +131,10 @@ export default function Dashboard() {
               <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
               <p className="text-gray-600 mt-1">Customize your workspace with widgets</p>
             </div>
-            <Button data-testid="button-customize-dashboard">
+            <Button 
+              onClick={() => setIsCustomizationOpen(true)}
+              data-testid="button-customize-dashboard"
+            >
               <Settings className="w-4 h-4 mr-2" />
               Customize Dashboard
             </Button>
@@ -143,7 +150,10 @@ export default function Dashboard() {
                 Get started by adding widgets to track your deals, assets, and KPIs.
                 Click "Customize Dashboard" to add your first widgets.
               </p>
-              <Button data-testid="button-add-widgets">
+              <Button 
+                onClick={() => setIsCustomizationOpen(true)}
+                data-testid="button-add-widgets"
+              >
                 <Settings className="w-4 h-4 mr-2" />
                 Add Widgets
               </Button>
@@ -171,7 +181,10 @@ export default function Dashboard() {
               )} workspace
             </p>
           </div>
-          <Button data-testid="button-customize-dashboard">
+          <Button 
+            onClick={() => setIsCustomizationOpen(true)}
+            data-testid="button-customize-dashboard"
+          >
             <Settings className="w-4 h-4 mr-2" />
             Customize Dashboard
           </Button>
@@ -193,6 +206,12 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      <DashboardCustomizationModal
+        open={isCustomizationOpen}
+        onClose={() => setIsCustomizationOpen(false)}
+        currentLayout={layout || null}
+      />
     </div>
   );
 }
