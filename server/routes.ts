@@ -52,6 +52,7 @@ import {
   scWeightOverridesSchema,
   scPortfolios,
   scPortfolioComps,
+  projects,
   fuelSales,
   insertFuelSaleSchema,
   updateFuelSaleSchema,
@@ -156,8 +157,9 @@ const syncToCalendarSchema = z.object({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authorization helper function to verify project ownership
+  // CRITICAL: Query database directly to avoid storage.getProject() interception issue with approved projects
   const authorizeProjectAccess = async (projectId: string, orgId: string) => {
-    const project = await storage.getProject(projectId);
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
     if (!project) {
       throw new Error("Project not found");
     }
