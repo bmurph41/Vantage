@@ -41,7 +41,7 @@ export default function BenchmarksIndex() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold" data-testid="text-benchmarks-title">Financial Benchmarks</h1>
+        <h1 className="text-3xl font-bold" data-testid="text-benchmarks-title">Capital Markets</h1>
         <p className="text-muted-foreground mt-2" data-testid="text-benchmarks-description">
           Live tracking of key interest rates and treasury yields from Federal Reserve Economic Data
         </p>
