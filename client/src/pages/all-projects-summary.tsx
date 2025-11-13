@@ -316,7 +316,7 @@ export default function AllProjectsSummaryPage() {
                                 Completed
                               </Badge>
                             ) : summary.project.status === 'accepted' ? (
-                              <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                              <Badge className="bg-green-100 text-green-800 border-green-200">
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 DD Accepted
                               </Badge>
@@ -359,8 +359,13 @@ export default function AllProjectsSummaryPage() {
                       <div>
                         <div className="text-xs text-gray-500 mb-1">Progress</div>
                         <div className="flex items-center space-x-2">
-                          <Progress value={summary.completionPct} className="flex-1" />
-                          <span className="text-sm font-medium text-gray-900">{Math.round(summary.completionPct)}%</span>
+                          <Progress 
+                            value={summary.project.status === 'accepted' ? 100 : summary.completionPct} 
+                            className={`flex-1 ${summary.project.status === 'accepted' ? '[&>div]:bg-emerald-500' : ''}`}
+                          />
+                          <span className="text-sm font-medium text-gray-900">
+                            {summary.project.status === 'accepted' ? '100' : Math.round(summary.completionPct)}%
+                          </span>
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
                           {summary.completedTasks} / {summary.totalTasks} tasks
@@ -370,14 +375,16 @@ export default function AllProjectsSummaryPage() {
                       <div>
                         <div className="text-xs text-gray-500 mb-1">DD Remaining</div>
                         <div className={`text-lg font-bold ${
+                          summary.project.status === 'accepted' ? 'text-emerald-600' :
                           summary.daysRemaining === null ? 'text-gray-400' :
                           summary.daysRemaining < 0 ? 'text-red-600' :
                           summary.daysRemaining < 5 ? 'text-amber-600' :
                           'text-gray-900'
                         }`}>
-                          {summary.daysRemaining === null ? 'N/A' : `${summary.daysRemaining}d`}
+                          {summary.project.status === 'accepted' ? 'DD Accepted' : 
+                           summary.daysRemaining === null ? 'N/A' : `${summary.daysRemaining}d`}
                         </div>
-                        {summary.project.ddExpirationDate && (
+                        {summary.project.ddExpirationDate && summary.project.status !== 'accepted' && (
                           <div className="text-xs text-gray-500 mt-1">
                             {format(parseISO(summary.project.ddExpirationDate), 'MMM dd, yyyy')}
                           </div>
