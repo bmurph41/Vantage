@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -277,6 +277,261 @@ function TaskDependenciesSelector({
   );
 }
 
+// Company Selector Component
+function CompanySelector({ value, onChange, onCompanySelect, manualValue }: { 
+  value: string; 
+  onChange: (value: string) => void;
+  onCompanySelect?: (company: any) => void;
+  manualValue?: string;
+}) {
+  // Show manual input if there's manual text but no CRM ID
+  const showManual = !value && !!manualValue;
+  const [localShowInput, setLocalShowInput] = useState(false);
+  
+  // Determine whether to show input (either from prop or local state)
+  const showInput = showManual || localShowInput;
+
+  // Fetch CRM companies
+  const { data: companies = [] } = useQuery<Array<{ id: string; name: string; address: string; phone: string }>>({
+    queryKey: ['/api/crm/companies'],
+  });
+
+  const handleSelectChange = (selectedValue: string) => {
+    if (selectedValue === "manual_entry") {
+      setLocalShowInput(true);
+      // Clear CRM ID when switching to manual entry
+      onChange("");
+      // Clear auto-populated CRM fields to prevent stale data
+      if (onCompanySelect) {
+        onCompanySelect({ name: "", address: "", phone: "" });
+      }
+    } else {
+      setLocalShowInput(false);
+      // Set CRM ID
+      onChange(selectedValue);
+      const selectedCompany = companies.find(c => c.id === selectedValue);
+      if (selectedCompany && onCompanySelect) {
+        onCompanySelect(selectedCompany);
+      }
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    // Update text field directly via callback
+    if (onCompanySelect) {
+      onCompanySelect({ name: newValue, address: "", phone: "" });
+    }
+  };
+
+  const handleClose = () => {
+    setLocalShowInput(false);
+    // If there's no manual value, show selector again
+  };
+
+  if (showInput) {
+    return (
+      <div className="relative">
+        <Input
+          value={manualValue || ""}
+          onChange={handleInputChange}
+          placeholder="Enter company name"
+          autoFocus
+          data-testid="input-company-manual"
+        />
+        <Button 
+          type="button"
+          variant="ghost" 
+          size="sm" 
+          className="absolute right-1 top-1 h-6 w-6 p-0"
+          onClick={handleClose}
+        >
+          ×
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Select value={value || ""} onValueChange={handleSelectChange}>
+      <SelectTrigger data-testid="select-company">
+        <SelectValue placeholder="Select from CRM or enter manually" />
+      </SelectTrigger>
+      <SelectContent>
+        {companies.length > 0 && (
+          <>
+            {companies.map((company) => (
+              <SelectItem key={company.id} value={company.id}>
+                {company.name}
+              </SelectItem>
+            ))}
+            <SelectItem value="manual_entry">
+              <div className="flex items-center gap-2 text-blue-600">
+                <Users className="h-4 w-4" />
+                <span>Enter manually...</span>
+              </div>
+            </SelectItem>
+          </>
+        )}
+        {companies.length === 0 && (
+          <SelectItem value="manual_entry">
+            <div className="flex items-center gap-2 text-blue-600">
+              <Users className="h-4 w-4" />
+              <span>Enter company name...</span>
+            </div>
+          </SelectItem>
+        )}
+      </SelectContent>
+    </Select>
+  );
+}
+
+// Contact Selector Component
+function ContactSelector({ companyId, value, onChange, onContactSelect, manualValue }: { 
+  companyId?: string;
+  value: string; 
+  onChange: (value: string) => void;
+  onContactSelect?: (contact: any) => void;
+  manualValue?: string;
+}) {
+  // Show manual input if there's manual text but no CRM ID
+  const showManual = !value && !!manualValue;
+  const [localShowInput, setLocalShowInput] = useState(false);
+  
+  // Determine whether to show input (either from prop or local state)
+  const showInput = showManual || localShowInput;
+
+  // Fetch CRM contacts
+  const { data: allContacts = [] } = useQuery<Array<{ 
+    id: string; 
+    firstName: string; 
+    lastName: string; 
+    email: string; 
+    phone: string;
+    phones: Array<{type: string; number: string}>;
+    companyId: string;
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  }>>({
+    queryKey: ['/api/crm/contacts'],
+  });
+
+  // Filter contacts by company if companyId is provided
+  const contacts = companyId 
+    ? allContacts.filter(c => c.companyId === companyId)
+    : allContacts;
+
+  const handleSelectChange = (selectedValue: string) => {
+    if (selectedValue === "manual_entry") {
+      setLocalShowInput(true);
+      // Clear CRM ID when switching to manual entry
+      onChange("");
+      // Clear auto-populated CRM fields to prevent stale data
+      if (onContactSelect) {
+        onContactSelect({ 
+          firstName: '', 
+          lastName: '',
+          email: '', 
+          phone: '', 
+          phones: [],
+          address: '', 
+          city: '', 
+          state: '', 
+          zipCode: '' 
+        });
+      }
+    } else {
+      setLocalShowInput(false);
+      // Set CRM ID
+      onChange(selectedValue);
+      const selectedContact = allContacts.find(c => c.id === selectedValue);
+      if (selectedContact && onContactSelect) {
+        onContactSelect(selectedContact);
+      }
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    // Update text field directly via callback
+    if (onContactSelect) {
+      onContactSelect({ 
+        firstName: newValue.split(' ')[0] || '', 
+        lastName: newValue.split(' ').slice(1).join(' ') || '',
+        email: '', 
+        phone: '', 
+        phones: [],
+        address: '', 
+        city: '', 
+        state: '', 
+        zipCode: '' 
+      });
+    }
+  };
+
+  const handleClose = () => {
+    setLocalShowInput(false);
+  };
+
+  if (showInput) {
+    return (
+      <div className="relative">
+        <Input
+          value={manualValue || ""}
+          onChange={handleInputChange}
+          placeholder="Enter contact name"
+          autoFocus
+          data-testid="input-contact-manual"
+        />
+        <Button 
+          type="button"
+          variant="ghost" 
+          size="sm" 
+          className="absolute right-1 top-1 h-6 w-6 p-0"
+          onClick={handleClose}
+        >
+          ×
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Select value={value || ""} onValueChange={handleSelectChange}>
+      <SelectTrigger data-testid="select-contact">
+        <SelectValue placeholder={companyId ? "Select rep from company" : "Select from CRM or enter manually"} />
+      </SelectTrigger>
+      <SelectContent>
+        {contacts.length > 0 && (
+          <>
+            {contacts.map((contact) => (
+              <SelectItem key={contact.id} value={contact.id}>
+                {contact.firstName} {contact.lastName}
+              </SelectItem>
+            ))}
+            <SelectItem value="manual_entry">
+              <div className="flex items-center gap-2 text-blue-600">
+                <Users className="h-4 w-4" />
+                <span>Enter manually...</span>
+              </div>
+            </SelectItem>
+          </>
+        )}
+        {contacts.length === 0 && (
+          <SelectItem value="manual_entry">
+            <div className="flex items-center gap-2 text-blue-600">
+              <Users className="h-4 w-4" />
+              <span>Enter contact name...</span>
+            </div>
+          </SelectItem>
+        )}
+      </SelectContent>
+    </Select>
+  );
+}
+
 const addTaskFormSchema = z.object({
   title: z.string().min(1, "Task title is required"),
   description: z.string().optional(),
@@ -288,6 +543,10 @@ const addTaskFormSchema = z.object({
   deadlineDays: z.number().optional(),
   deadline: z.string().optional(),
   assignee: z.string().optional(),
+  // CRM Integration
+  companyId: z.string().optional(),
+  contactId: z.string().optional(),
+  // Legacy text fields
   companyHired: z.string().optional(),
   repName: z.string().optional(),
   repEmail: z.string().optional(),
@@ -384,6 +643,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       deadlineType: "dd_expiration",
 
       assignee: "",
+      companyId: "",
+      contactId: "",
       companyHired: "",
       repName: "",
       repEmail: "",
@@ -419,6 +680,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
           deadlineType: editingTask.deadlineType || "dd_expiration",
           deadline: editingTask.deadline || "",
           assignee: editingTask.assignee || "",
+          companyId: (editingTask as any).companyId || "",
+          contactId: (editingTask as any).contactId || "",
           companyHired: editingTask.companyHired || "",
           repName: editingTask.repName || "",
           repEmail: editingTask.repEmail || "",
@@ -500,6 +763,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       startOffsetDays: template.startOffsetDays,
       deadlineType: "dd_expiration" as const,
       assignee: template.defaultAssignee || "",
+      companyId: "",
+      contactId: "",
       companyHired: "",
       repName: "",
       repEmail: "",
@@ -531,6 +796,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       startOffsetDays: 0,
       deadlineType: "dd_expiration",
       assignee: "",
+      companyId: "",
+      contactId: "",
       companyHired: "",
       repName: "",
       repEmail: "",
@@ -570,6 +837,37 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     onClose();
   };
 
+  // Handler for when a company is selected from CRM
+  const handleCompanySelect = (company: any) => {
+    // Unconditionally set all company fields (clears stale data when empty)
+    form.setValue("companyHired", company.name || "");
+    form.setValue("companyAddress", company.address || "");
+    form.setValue("repPhone", company.phone || "");
+  };
+
+  // Handler for when a contact is selected from CRM
+  const handleContactSelect = (contact: any) => {
+    // Unconditionally set all contact fields (clears stale data when empty)
+    // Build full name and ensure it's properly trimmed (avoids single space when both empty)
+    const fullName = (contact.firstName || contact.lastName)
+      ? `${contact.firstName || ""} ${contact.lastName || ""}`.trim()
+      : "";
+    form.setValue("repName", fullName);
+    form.setValue("repEmail", contact.email || "");
+    
+    // Always set phone (use first from phones array, fallback to legacy phone field, or empty)
+    const phoneNumber = (contact.phones && contact.phones.length > 0) 
+      ? contact.phones[0].number || ""
+      : contact.phone || "";
+    form.setValue("repPhone", phoneNumber);
+    
+    // Unconditionally set all address fields
+    form.setValue("companyAddress", contact.address || "");
+    form.setValue("companyCity", contact.city || "");
+    form.setValue("companyState", contact.state || "");
+    form.setValue("companyZip", contact.zipCode || "");
+  };
+
   const onSubmit = (data: z.infer<typeof addTaskFormSchema>) => {
     // Transform data for API to match backend schema expectations
     const transformedData = {
@@ -585,6 +883,9 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       startOffsetDays: data.startOffsetDays ? Number(data.startOffsetDays) : null,
       // Ensure deadlineDays is a number or null
       deadlineDays: data.deadlineDays ? Number(data.deadlineDays) : null,
+      // Convert empty string CRM IDs to null (must be UUID or null, not empty string)
+      companyId: data.companyId || null,
+      contactId: data.contactId || null,
       // Remove fields that shouldn't be sent to backend
       isInternalTask: undefined, // This field doesn't exist in backend schema
     };
@@ -893,6 +1194,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         form.setValue("isInternalTask", !!checked);
                         // Clear company fields and on-site fields when marking as internal
                         if (checked) {
+                          form.setValue("companyId", "");
+                          form.setValue("contactId", "");
                           form.setValue("companyHired", "");
                           form.setValue("repName", "");
                           form.setValue("repEmail", "");
@@ -1048,13 +1351,16 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
 
                   {!form.watch("isInternalTask") && (
                     <div>
-                      <Label htmlFor="companyHired">Company Hired</Label>
-                      <Input
-                        id="companyHired"
-                        placeholder="Third-party company"
-                        {...form.register("companyHired")}
-                        data-testid="input-company-hired"
+                      <Label htmlFor="companyHired">Company</Label>
+                      <CompanySelector 
+                        value={form.watch("companyId") || ""}
+                        onChange={(value) => form.setValue("companyId", value)}
+                        onCompanySelect={handleCompanySelect}
+                        manualValue={form.watch("companyHired") || ""}
                       />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Select from CRM or enter manually below
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1081,6 +1387,19 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       {/* Rep Contact Section */}
                       <div className="space-y-3">
                         <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Representative Contact</div>
+                        <div>
+                          <Label htmlFor="contactId">Contact</Label>
+                          <ContactSelector 
+                            companyId={form.watch("companyId") || undefined}
+                            value={form.watch("contactId") || ""}
+                            onChange={(value) => form.setValue("contactId", value)}
+                            onContactSelect={handleContactSelect}
+                            manualValue={form.watch("repName") || ""}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Select from CRM or enter manually below
+                          </p>
+                        </div>
                         <div>
                           <Label htmlFor="repName">Rep Name</Label>
                           <Input
@@ -1606,6 +1925,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                         form.setValue("isInternalTask", !!checked);
                         // Clear company fields and on-site fields when marking as internal
                         if (checked) {
+                          form.setValue("companyId", "");
+                          form.setValue("contactId", "");
                           form.setValue("companyHired", "");
                           form.setValue("repName", "");
                           form.setValue("repEmail", "");
@@ -1761,13 +2082,16 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
 
                   {!form.watch("isInternalTask") && (
                     <div>
-                      <Label htmlFor="companyHired">Company Hired</Label>
-                      <Input
-                        id="companyHired"
-                        placeholder="Third-party company"
-                        {...form.register("companyHired")}
-                        data-testid="input-company-hired"
+                      <Label htmlFor="companyHired">Company</Label>
+                      <CompanySelector 
+                        value={form.watch("companyId") || ""}
+                        onChange={(value) => form.setValue("companyId", value)}
+                        onCompanySelect={handleCompanySelect}
+                        manualValue={form.watch("companyHired") || ""}
                       />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Select from CRM or enter manually below
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1794,6 +2118,19 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       {/* Rep Contact Section */}
                       <div className="space-y-3">
                         <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Representative Contact</div>
+                        <div>
+                          <Label htmlFor="contactId">Contact</Label>
+                          <ContactSelector 
+                            companyId={form.watch("companyId") || undefined}
+                            value={form.watch("contactId") || ""}
+                            onChange={(value) => form.setValue("contactId", value)}
+                            onContactSelect={handleContactSelect}
+                            manualValue={form.watch("repName") || ""}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Select from CRM or enter manually below
+                          </p>
+                        </div>
                         <div>
                           <Label htmlFor="repName">Rep Name</Label>
                           <Input
