@@ -129,7 +129,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-gray-600 mt-1">Customize your workspace with widgets</p>
+              <p className="text-gray-600 mt-1">Your personalized workspace</p>
             </div>
             <Button 
               onClick={() => setIsCustomizationOpen(true)}
