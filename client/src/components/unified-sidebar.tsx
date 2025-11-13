@@ -80,6 +80,7 @@ const ddNav = [
 
 // Modeling Navigation
 const modelingNav = [
+  { name: "Projects", href: "/modeling/projects", icon: TrendingUp },
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
 ];
 
