@@ -46,6 +46,7 @@ export class CompService {
     });
     
     // Create pending property if no match was found
+    // This applies to ALL comps, including individual comps within a portfolio
     if (pendingPropertyId === 'pending' && compData.marina) {
       try {
         const address = [
@@ -61,7 +62,7 @@ export class CompService {
           compData.state
         );
 
-        await this.storage.createPendingProperty({
+        const pendingProperty = await this.storage.createPendingProperty({
           orgId: compData.orgId,
           compId: comp.id,
           marinaName: compData.marina,
@@ -81,6 +82,10 @@ export class CompService {
           createdBy: userId,
           reviewedBy: null,
         });
+        
+        // Log pending property creation (useful for portfolio child comps)
+        const compType = compData.isChild ? 'portfolio child comp' : compData.isPortfolio ? 'portfolio parent' : 'individual comp';
+        console.log(`📝 Created pending property for ${compType}: "${compData.marina}" (comp ID: ${comp.id}, pending property ID: ${pendingProperty.id})`);
       } catch (error) {
         console.error('Error creating pending property:', error);
       }
