@@ -452,6 +452,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Unaccept Project (Undo DD approval - for mistakes, extensions, etc.)
+  app.post("/api/dd/projects/:id/unaccept", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Query database directly (bypassing storage method which has interception issue)
+      const { db } = await import("./db");
+      const { projects } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const [project] = await db.select().from(projects).where(eq(projects.id, req.params.id));
+      
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      // Verify org access
+      if (project.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      // Update project status back to 'active'
+      const [updated] = await db
+        .update(projects)
+        .set({ status: 'active' })
+        .where(eq(projects.id, req.params.id))
+        .returning();
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error unaccepting project:", error);
+      res.status(500).json({ error: "Failed to undo DD approval" });
+    }
+  });
+
   app.patch("/api/dd/projects/:id/settings", async (req: any, res) => {
     try {
       const updates = insertProjectSettingsSchema.partial().parse(req.body);

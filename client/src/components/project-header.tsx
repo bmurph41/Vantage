@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format, parseISO, isAfter, addDays } from "date-fns";
 import { tzNow } from "@/lib/date-utils";
-import { Download, Share2, Calendar, FileText, Loader2, FileBarChart, CheckCircle2 } from "lucide-react";
+import { Download, Share2, Calendar, FileText, Loader2, FileBarChart, CheckCircle2, X } from "lucide-react";
 import type { Project, Task, ProjectSettings } from "@shared/schema";
 import { ddClient } from "@/lib/ddClient";
 import { useToast } from "@/hooks/use-toast";
@@ -146,8 +146,35 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
     },
   });
 
+  const unacceptMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', `/api/dd/projects/${project.id}/unaccept`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', project.id] });
+      toast({
+        title: "Success",
+        description: "DD approval removed",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to undo DD approval",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleAcceptProject = () => {
     acceptMutation.mutate();
+  };
+
+  const handleUnacceptProject = () => {
+    if (confirm("Are you sure you want to undo DD approval? This will change the project status back to active.")) {
+      unacceptMutation.mutate();
+    }
   };
 
 
@@ -169,7 +196,7 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
               Progress Report
             </Button>
           </a>
-          {project.status !== 'accepted' && (
+          {project.status !== 'accepted' ? (
             <Button 
               variant="default"
               className="bg-green-600 hover:bg-green-700 text-white"
@@ -183,6 +210,21 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
                 <CheckCircle2 className="h-4 w-4 mr-2" />
               )}
               DD Approved
+            </Button>
+          ) : (
+            <Button 
+              variant="outline"
+              className="border-amber-500 text-amber-700 hover:bg-amber-50"
+              onClick={handleUnacceptProject}
+              disabled={unacceptMutation.isPending}
+              data-testid="button-unaccept-project"
+            >
+              {unacceptMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <X className="h-4 w-4 mr-2" />
+              )}
+              Undo Approval
             </Button>
           )}
           <Button variant="outline" onClick={handleExportCSV} data-testid="button-export-csv">
