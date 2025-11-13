@@ -272,14 +272,14 @@ export default function ModelingAnalytics() {
           <div className="space-y-2">
             <label className="text-sm font-medium">Broker</label>
             <Select
-              value={filters.brokerId}
-              onValueChange={(value) => setFilters({ ...filters, brokerId: value })}
+              value={filters.brokerId || "all"}
+              onValueChange={(value) => setFilters({ ...filters, brokerId: value === "all" ? "" : value })}
             >
               <SelectTrigger data-testid="select-filter-broker">
                 <SelectValue placeholder="All brokers" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All brokers</SelectItem>
+                <SelectItem value="all">All brokers</SelectItem>
                 {contacts.map((contact) => (
                   <SelectItem key={contact.id} value={contact.id}>
                     {contact.firstName} {contact.lastName}
@@ -291,14 +291,14 @@ export default function ModelingAnalytics() {
           <div className="space-y-2">
             <label className="text-sm font-medium">Deal Outcome</label>
             <Select
-              value={filters.dealOutcome}
-              onValueChange={(value) => setFilters({ ...filters, dealOutcome: value })}
+              value={filters.dealOutcome || "all"}
+              onValueChange={(value) => setFilters({ ...filters, dealOutcome: value === "all" ? "" : value })}
             >
               <SelectTrigger data-testid="select-filter-outcome">
                 <SelectValue placeholder="All outcomes" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All outcomes</SelectItem>
+                <SelectItem value="all">All outcomes</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="won">Won</SelectItem>
                 <SelectItem value="lost">Lost</SelectItem>
