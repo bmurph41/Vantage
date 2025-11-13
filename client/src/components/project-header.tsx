@@ -3,12 +3,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format, parseISO, isAfter, addDays } from "date-fns";
 import { tzNow } from "@/lib/date-utils";
-import { Download, Share2, Calendar, FileText, Loader2, FileBarChart } from "lucide-react";
+import { Download, Share2, Calendar, FileText, Loader2, FileBarChart, CheckCircle2 } from "lucide-react";
 import type { Project, Task, ProjectSettings } from "@shared/schema";
 import { ddClient } from "@/lib/ddClient";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ShareProjectDialog } from "./share-project-dialog";
 import { AddToCalendarDialog } from "./add-to-calendar-dialog";
 import { generateWhitePaperPDF } from "./white-paper-export";
@@ -125,6 +125,31 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
     }
   };
 
+  const acceptMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', `/api/dd/projects/${project.id}/accept`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', project.id] });
+      toast({
+        title: "Success",
+        description: "Project marked as accepted",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to mark project as accepted",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAcceptProject = () => {
+    acceptMutation.mutate();
+  };
+
 
   return (
     <div className="mb-8" data-testid="project-header">
@@ -144,6 +169,22 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
               Progress Report
             </Button>
           </a>
+          {project.status !== 'accepted' && (
+            <Button 
+              variant="default"
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={handleAcceptProject}
+              disabled={acceptMutation.isPending}
+              data-testid="button-accept-project"
+            >
+              {acceptMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+              )}
+              Mark as Accepted
+            </Button>
+          )}
           <Button variant="outline" onClick={handleExportCSV} data-testid="button-export-csv">
             <Download className="h-4 w-4 mr-2" />
             Export CSV

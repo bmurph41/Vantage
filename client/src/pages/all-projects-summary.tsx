@@ -314,8 +314,19 @@ export default function AllProjectsSummaryPage() {
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 Completed
                               </Badge>
-                            ) : summary.daysRemaining !== null && summary.daysRemaining < 5 ? (
+                            ) : summary.project.status === 'accepted' ? (
+                              <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                DD Accepted
+                              </Badge>
+                            ) : summary.daysRemaining !== null && summary.daysRemaining < 0 ? (
+                              <Badge className="bg-red-100 text-red-800 border-red-200">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                DD Expired
+                              </Badge>
+                            ) : summary.daysRemaining !== null && summary.daysRemaining > 0 && summary.daysRemaining <= 14 ? (
                               <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                                <Clock className="h-3 w-3 mr-1" />
                                 DD Expiring Soon
                               </Badge>
                             ) : null}

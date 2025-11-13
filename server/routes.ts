@@ -413,6 +413,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Accept Project (Mark DD as accepted/completed)
+  app.post("/api/dd/projects/:id/accept", async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const project = await storage.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      // Verify org access
+      if (project.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      // Update project status to 'accepted'
+      const updated = await storage.updateProject(req.params.id, { status: 'accepted' });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error accepting project:", error);
+      res.status(500).json({ error: "Failed to accept project" });
+    }
+  });
+
   app.patch("/api/dd/projects/:id/settings", async (req: any, res) => {
     try {
       const updates = insertProjectSettingsSchema.partial().parse(req.body);
