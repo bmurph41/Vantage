@@ -214,12 +214,20 @@ export const AnalyticsPDFDocument = ({ analytics, filters }: Props) => {
               <Text style={styles.metricValue}>{formatCurrency(analytics.avgPricePerUnit)}</Text>
             </View>
             <View style={styles.metricCard}>
+              <Text style={styles.metricLabel}>Total Units</Text>
+              <Text style={styles.metricValue}>{formatNumber(analytics.totalUnits)}</Text>
+            </View>
+            <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Active Deals</Text>
               <Text style={styles.metricValue}>{analytics.activeDealsCount}</Text>
             </View>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Active Value</Text>
               <Text style={styles.metricValue}>{formatCurrency(analytics.activeDealsValue)}</Text>
+            </View>
+            <View style={styles.metricCard}>
+              <Text style={styles.metricLabel}>Closed This Month</Text>
+              <Text style={styles.metricValue}>{analytics.closedDealsThisMonth}</Text>
             </View>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Deal Velocity</Text>
@@ -247,6 +255,10 @@ export const AnalyticsPDFDocument = ({ analytics, filters }: Props) => {
               </View>
             ))}
           </View>
+        </View>
+
+        <View style={styles.footer}>
+          <Text>MarinaMatch Modeling Projects Analytics • Confidential • Page 1/3</Text>
         </View>
       </Page>
 
@@ -320,7 +332,7 @@ export const AnalyticsPDFDocument = ({ analytics, filters }: Props) => {
         </View>
 
         <View style={styles.footer}>
-          <Text>MarinaMatch Modeling Projects Analytics • Confidential</Text>
+          <Text>MarinaMatch Modeling Projects Analytics • Confidential • Page 2/3</Text>
         </View>
       </Page>
 
@@ -400,7 +412,7 @@ export const AnalyticsPDFDocument = ({ analytics, filters }: Props) => {
         )}
 
         <View style={styles.footer}>
-          <Text>MarinaMatch Modeling Projects Analytics • Confidential • Page 3</Text>
+          <Text>MarinaMatch Modeling Projects Analytics • Confidential • Page 3/3</Text>
         </View>
       </Page>
     </Document>
