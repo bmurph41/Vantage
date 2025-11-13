@@ -757,6 +757,26 @@ function DDProgressReport({
             
             {/* Status Badges */}
             <div className="flex items-center space-x-3">
+              {project.status === 'accepted' && (
+                <Badge 
+                  className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300"
+                  data-testid="badge-dd-approved"
+                >
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  DD Approved
+                </Badge>
+              )}
+              
+              {project.status !== 'accepted' && metrics.daysRemaining < 0 && (
+                <Badge 
+                  className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-300"
+                  data-testid="badge-dd-expired"
+                >
+                  <AlertTriangle className="h-4 w-4 mr-1" />
+                  DD Expired
+                </Badge>
+              )}
+              
               <Badge 
                 className={`px-3 py-1 rounded-full text-sm font-medium ${
                   metrics.completionRate >= 80 ? 'bg-slate-100 text-slate-700 border border-slate-200' :

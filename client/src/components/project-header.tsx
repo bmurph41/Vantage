@@ -134,13 +134,13 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
       queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', project.id] });
       toast({
         title: "Success",
-        description: "Project marked as accepted",
+        description: "DD marked as approved",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to mark project as accepted",
+        description: "Failed to mark DD as approved",
         variant: "destructive",
       });
     },
