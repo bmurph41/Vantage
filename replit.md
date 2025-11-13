@@ -44,7 +44,7 @@ Preferred communication style: Simple, everyday language.
 ### Key Features
 - **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation.
 - **Due Diligence Module**: Project management with task tracking, Gantt charts, template management.
-- **CRM-DD Integration**: Convert CRM deals to DD projects with automated task and contact mapping.
+- **CRM-DD Integration**: Convert CRM deals to DD projects with automated task and contact mapping. DD tasks can link to CRM companies and contacts via foreign keys, tracking which third-party firms and representatives are working on each task. Supports both CRM entity selection (with auto-population of contact details) and manual text entry for non-CRM entities.
 - **Rent Roll Module**: Manages marina unit occupancy and rental income, supporting operational and valuation scenarios, occupancy analytics, and unit management.
 - **SalesComps Module**: Marina sales comparables with CSV import/export, Google Maps integration, portfolio functionality, and automatic creation/linking to CRM Property records.
 - **Modeling Projects Module**: Tracks marina valuation projects for PE firms, linking to CRM contacts, DD projects, sales comps, and offering analytics dashboards.
