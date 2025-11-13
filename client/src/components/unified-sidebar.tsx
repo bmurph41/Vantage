@@ -144,17 +144,17 @@ export default function UnifiedSidebar() {
 
   // Fetch pending items counts
   const { data: pendingProperties = [] } = useQuery<PendingItem[]>({
-    queryKey: ['/api/pending-properties'],
+    queryKey: ['/api/crm/pending-properties'],
     refetchInterval: 60000, // Refresh every minute
   });
 
   const { data: pendingContacts = [] } = useQuery<PendingItem[]>({
-    queryKey: ['/api/pending-contacts'],
+    queryKey: ['/api/crm/pending-contacts'],
     refetchInterval: 60000, // Refresh every minute
   });
 
   const { data: pendingCompanies = [] } = useQuery<PendingItem[]>({
-    queryKey: ['/api/pending-companies'],
+    queryKey: ['/api/crm/pending-companies'],
     refetchInterval: 60000, // Refresh every minute
   });
 

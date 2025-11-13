@@ -11,78 +11,46 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Check, X, AlertTriangle, MapPin, DollarSign, Calendar, Building } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PendingPropertyDetailDialog } from "@/components/pending-property-detail-dialog";
-
-type PendingProperty = {
-  id: string;
-  orgId: string;
-  compId: string;
-  marinaName: string;
-  city: string | null;
-  state: string | null;
-  address: string | null;
-  salePrice: number | null;
-  status: 'pending' | 'accepted' | 'rejected';
-  compMetadata: {
-    saleYear?: number;
-    saleMonth?: number;
-    wetSlips?: number;
-    dryRacks?: number;
-    bodyOfWater?: string;
-  };
-  suggestedDuplicates: string[];
-  createdBy: string;
-  reviewedBy: string | null;
-  reviewedAt: string | null;
-  createdAt: string;
-};
-
-type Property = {
-  id: string;
-  title: string;
-  address?: string;
-  listingPrice?: string;
-  status: string;
-};
+import DuplicateResolutionModal from "@/components/modals/duplicate-resolution-modal";
+import type { PendingProperty, Property } from "@shared/schema";
 
 export default function PendingProperties() {
   const [selectedPending, setSelectedPending] = useState<PendingProperty | null>(null);
+  const [selectedExisting, setSelectedExisting] = useState<Property | null>(null);
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: pendingProperties = [], isLoading } = useQuery<PendingProperty[]>({
-    queryKey: ['/api/pending-properties'],
-    refetchInterval: 30000, // Refresh every 30 seconds
+    queryKey: ['/api/crm/pending-properties'],
+    refetchInterval: 30000,
   });
 
-  const { data: properties = [] } = useQuery<Property[]>({
-    queryKey: ['/api/properties'],
+  const { mutate: fetchDuplicate, isPending: isFetchingDuplicate } = useMutation({
+    mutationFn: async (propertyId: string) => {
+      const response = await fetch(`/api/properties/${propertyId}`);
+      if (!response.ok) throw new Error('Failed to fetch property');
+      return response.json() as Promise<Property>;
+    },
   });
 
   const acceptMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return await apiRequest('POST', `/api/pending-properties/${id}/accept`);
+    mutationFn: async ({ id, mode }: { id: string; mode: 'replace' | 'add_new' }) => {
+      return await apiRequest('POST', `/api/crm/pending-properties/${id}/accept`, { mode });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/pending-properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-properties'] });
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       toast({ title: "Property accepted and created successfully" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);
+      setSelectedExisting(null);
     },
     onError: () => {
       toast({ title: "Failed to accept property", variant: "destructive" });
@@ -91,41 +59,50 @@ export default function PendingProperties() {
 
   const rejectMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest('POST', `/api/pending-properties/${id}/reject`);
+      return await apiRequest('POST', `/api/crm/pending-properties/${id}/reject`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/pending-properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-properties'] });
       toast({ title: "Pending property removed" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);
+      setSelectedExisting(null);
     },
     onError: () => {
       toast({ title: "Failed to remove property", variant: "destructive" });
     },
   });
 
-  const handleAccept = (pending: PendingProperty) => {
-    // If there are suggested duplicates, show them first
-    if (pending.suggestedDuplicates && pending.suggestedDuplicates.length > 0) {
-      setSelectedPending(pending);
-      setShowDuplicatesDialog(true);
+  const handleAccept = async (pending: PendingProperty) => {
+    setSelectedPending(pending);
+    
+    if (pending.suggestedDuplicates && Array.isArray(pending.suggestedDuplicates) && pending.suggestedDuplicates.length > 0) {
+      const duplicateId = pending.suggestedDuplicates[0] as string;
+      fetchDuplicate(duplicateId, {
+        onSuccess: (existingProperty) => {
+          setSelectedExisting(existingProperty);
+          setShowDuplicatesDialog(true);
+        },
+        onError: () => {
+          setSelectedExisting(null);
+          setShowDuplicatesDialog(true);
+        },
+      });
     } else {
-      // No duplicates, accept directly
-      if (confirm(`Accept "${pending.marinaName}" as a new property?`)) {
-        acceptMutation.mutate(pending.id);
-      }
+      setSelectedExisting(null);
+      setShowDuplicatesDialog(true);
     }
   };
 
-  const handleReject = (pending: PendingProperty) => {
-    if (confirm(`Remove "${pending.marinaName}" from pending properties?`)) {
-      rejectMutation.mutate(pending.id);
-    }
-  };
-
-  const confirmAccept = () => {
+  const handleReject = () => {
     if (selectedPending) {
-      acceptMutation.mutate(selectedPending.id);
+      rejectMutation.mutate(selectedPending.id);
+    }
+  };
+
+  const handleAcceptWithMode = (mode: 'replace' | 'add_new') => {
+    if (selectedPending) {
+      acceptMutation.mutate({ id: selectedPending.id, mode });
     }
   };
 
@@ -144,10 +121,6 @@ export default function PendingProperties() {
     if (!month) return year.toString();
     const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'short' });
     return `${monthName} ${year}`;
-  };
-
-  const getSuggestedProperties = (duplicateIds: string[]) => {
-    return properties.filter(p => duplicateIds.includes(p.id));
   };
 
   const pendingCount = pendingProperties.filter(p => p.status === 'pending').length;
@@ -273,7 +246,8 @@ export default function PendingProperties() {
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleReject(pending);
+                              setSelectedPending(pending);
+                              handleReject();
                             }}
                             data-testid={`button-reject-${pending.id}`}
                           >
@@ -301,85 +275,21 @@ export default function PendingProperties() {
         </Card>
       )}
 
-      {/* Duplicates Warning Dialog */}
-      <Dialog open={showDuplicatesDialog} onOpenChange={setShowDuplicatesDialog}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
-              Potential Duplicate Properties Found
-            </DialogTitle>
-            <DialogDescription>
-              We found {selectedPending?.suggestedDuplicates?.length || 0} existing properties that might match "{selectedPending?.marinaName}". 
-              Review these before accepting.
-            </DialogDescription>
-          </DialogHeader>
+      <DuplicateResolutionModal
+        isOpen={showDuplicatesDialog}
+        onClose={() => {
+          setShowDuplicatesDialog(false);
+          setSelectedPending(null);
+          setSelectedExisting(null);
+        }}
+        entityType="property"
+        pendingEntity={selectedPending}
+        existingEntity={selectedExisting}
+        onAccept={handleAcceptWithMode}
+        onReject={handleReject}
+        isLoading={acceptMutation.isPending || rejectMutation.isPending}
+      />
 
-          <div className="space-y-4 my-4">
-            <div className="bg-muted p-4 rounded-lg">
-              <h3 className="font-semibold mb-2">New Property from Comp:</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Name:</span> {selectedPending?.marinaName}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Location:</span>{' '}
-                  {selectedPending?.city && selectedPending?.state
-                    ? `${selectedPending.city}, ${selectedPending.state}`
-                    : selectedPending?.city || selectedPending?.state || 'N/A'}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Sale Price:</span> {formatCurrency(selectedPending?.salePrice || null)}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Sale Date:</span>{' '}
-                  {formatSaleDate(selectedPending?.compMetadata?.saleMonth, selectedPending?.compMetadata?.saleYear)}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-3">Existing Properties:</h3>
-              <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                {getSuggestedProperties(selectedPending?.suggestedDuplicates || []).map((prop) => (
-                  <div key={prop.id} className="border rounded-lg p-3 bg-card">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="font-medium">{prop.title}</div>
-                        <div className="text-sm text-muted-foreground">{prop.address || 'No address'}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-medium">{prop.listingPrice ? formatCurrency(parseInt(prop.listingPrice)) : 'N/A'}</div>
-                        <Badge variant="secondary" className="text-xs">{prop.status}</Badge>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (selectedPending) {
-                  handleReject(selectedPending);
-                }
-              }}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Remove (It's a Duplicate)
-            </Button>
-            <Button onClick={confirmAccept}>
-              <Check className="h-4 w-4 mr-2" />
-              Accept Anyway (It's New)
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* New Detail Dialog */}
       <PendingPropertyDetailDialog
         pending={selectedPending}
         open={showDetailDialog}

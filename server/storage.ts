@@ -339,6 +339,27 @@ export interface IStorage {
   updateCrmProperty(id: string, updates: Partial<InsertProperty>): Promise<Property>;
   deleteCrmProperty(id: string): Promise<void>;
 
+  // CRM - Pending Contacts
+  getPendingContact(id: string): Promise<PendingContact | undefined>;
+  getPendingContactsForOrg(orgId: string): Promise<PendingContact[]>;
+  createPendingContact(contact: InsertPendingContact): Promise<PendingContact>;
+  acceptPendingContact(id: string, userId: string, mode: 'replace' | 'add_new'): Promise<CrmContact>;
+  rejectPendingContact(id: string, userId: string): Promise<void>;
+
+  // CRM - Pending Companies
+  getPendingCompany(id: string): Promise<PendingCompany | undefined>;
+  getPendingCompaniesForOrg(orgId: string): Promise<PendingCompany[]>;
+  createPendingCompany(company: InsertPendingCompany): Promise<PendingCompany>;
+  acceptPendingCompany(id: string, userId: string, mode: 'replace' | 'add_new'): Promise<CrmCompany>;
+  rejectPendingCompany(id: string, userId: string): Promise<void>;
+
+  // CRM - Pending Properties
+  getPendingProperty(id: string): Promise<PendingProperty | undefined>;
+  getPendingPropertiesForOrg(orgId: string): Promise<PendingProperty[]>;
+  createPendingProperty(property: InsertPendingProperty): Promise<PendingProperty>;
+  acceptPendingProperty(id: string, userId: string, mode: 'replace' | 'add_new'): Promise<Property>;
+  rejectPendingProperty(id: string, userId: string): Promise<void>;
+
   // CRM - Pipelines
   getCrmPipeline(id: string): Promise<CrmPipeline | undefined>;
   getCrmPipelinesForOrg(orgId: string): Promise<CrmPipeline[]>;
@@ -2689,6 +2710,243 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCrmProperty(id: string): Promise<void> {
     await db.delete(crmProperties).where(eq(crmProperties.id, id));
+  }
+
+  // CRM - Pending Contacts
+  async getPendingContact(id: string): Promise<PendingContact | undefined> {
+    const [contact] = await db.select()
+      .from(pendingContacts)
+      .where(eq(pendingContacts.id, id));
+    return contact || undefined;
+  }
+
+  async getPendingContactsForOrg(orgId: string): Promise<PendingContact[]> {
+    return await db.select()
+      .from(pendingContacts)
+      .where(and(
+        eq(pendingContacts.orgId, orgId),
+        eq(pendingContacts.status, 'pending')
+      ))
+      .orderBy(desc(pendingContacts.createdAt));
+  }
+
+  async createPendingContact(contact: InsertPendingContact): Promise<PendingContact> {
+    const [created] = await db.insert(pendingContacts).values(contact).returning();
+    return created;
+  }
+
+  async acceptPendingContact(id: string, userId: string, mode: 'replace' | 'add_new'): Promise<CrmContact> {
+    const pending = await this.getPendingContact(id);
+    if (!pending) throw new Error('Pending contact not found');
+
+    let createdContact: CrmContact;
+
+    if (mode === 'replace' && pending.suggestedDuplicates && Array.isArray(pending.suggestedDuplicates) && pending.suggestedDuplicates.length > 0) {
+      const duplicateId = pending.suggestedDuplicates[0] as string;
+      const updateData: Partial<InsertCrmContact> = {
+        firstName: pending.firstName || undefined,
+        lastName: pending.lastName || undefined,
+        email: pending.email || undefined,
+        phone: pending.phone || undefined,
+        companyId: pending.companyId || undefined,
+        jobTitle: pending.jobTitle || undefined,
+        updatedAt: new Date()
+      };
+      createdContact = await this.updateCrmContact(duplicateId, updateData);
+    } else {
+      const contactData: InsertCrmContact = {
+        ownerId: pending.orgId,
+        firstName: pending.firstName || '',
+        lastName: pending.lastName || '',
+        fullName: pending.fullName || `${pending.firstName || ''} ${pending.lastName || ''}`.trim(),
+        email: pending.email || undefined,
+        phone: pending.phone || undefined,
+        companyId: pending.companyId || undefined,
+        jobTitle: pending.jobTitle || undefined,
+        contactTag: 'other',
+        leadStatus: 'none',
+        createdBy: userId
+      };
+      createdContact = await this.createCrmContact(contactData);
+    }
+
+    await db.update(pendingContacts)
+      .set({ 
+        status: 'accepted',
+        createdContactId: createdContact.id,
+        reviewedBy: userId,
+        reviewedAt: new Date()
+      })
+      .where(eq(pendingContacts.id, id));
+
+    return createdContact;
+  }
+
+  async rejectPendingContact(id: string, userId: string): Promise<void> {
+    await db.update(pendingContacts)
+      .set({ 
+        status: 'rejected',
+        reviewedBy: userId,
+        reviewedAt: new Date()
+      })
+      .where(eq(pendingContacts.id, id));
+  }
+
+  // CRM - Pending Companies
+  async getPendingCompany(id: string): Promise<PendingCompany | undefined> {
+    const [company] = await db.select()
+      .from(pendingCompanies)
+      .where(eq(pendingCompanies.id, id));
+    return company || undefined;
+  }
+
+  async getPendingCompaniesForOrg(orgId: string): Promise<PendingCompany[]> {
+    return await db.select()
+      .from(pendingCompanies)
+      .where(and(
+        eq(pendingCompanies.orgId, orgId),
+        eq(pendingCompanies.status, 'pending')
+      ))
+      .orderBy(desc(pendingCompanies.createdAt));
+  }
+
+  async createPendingCompany(company: InsertPendingCompany): Promise<PendingCompany> {
+    const [created] = await db.insert(pendingCompanies).values(company).returning();
+    return created;
+  }
+
+  async acceptPendingCompany(id: string, userId: string, mode: 'replace' | 'add_new'): Promise<CrmCompany> {
+    const pending = await this.getPendingCompany(id);
+    if (!pending) throw new Error('Pending company not found');
+
+    let createdCompany: CrmCompany;
+
+    if (mode === 'replace' && pending.suggestedDuplicates && Array.isArray(pending.suggestedDuplicates) && pending.suggestedDuplicates.length > 0) {
+      const duplicateId = pending.suggestedDuplicates[0] as string;
+      const updateData: Partial<InsertCrmCompany> = {
+        name: pending.name,
+        website: pending.website || undefined,
+        phone: pending.phone || undefined,
+        address: pending.address || undefined,
+        city: pending.city || undefined,
+        state: pending.state || undefined,
+        zipCode: pending.zipCode || undefined,
+        industry: pending.industry || undefined,
+        updatedAt: new Date()
+      };
+      createdCompany = await this.updateCrmCompany(duplicateId, updateData);
+    } else {
+      const companyData: InsertCrmCompany = {
+        ownerId: pending.orgId,
+        name: pending.name,
+        website: pending.website || undefined,
+        phone: pending.phone || undefined,
+        address: pending.address || undefined,
+        city: pending.city || undefined,
+        state: pending.state || undefined,
+        zipCode: pending.zipCode || undefined,
+        industry: pending.industry || undefined,
+        createdBy: userId
+      };
+      createdCompany = await this.createCrmCompany(companyData);
+    }
+
+    await db.update(pendingCompanies)
+      .set({ 
+        status: 'accepted',
+        createdCompanyId: createdCompany.id,
+        reviewedBy: userId,
+        reviewedAt: new Date()
+      })
+      .where(eq(pendingCompanies.id, id));
+
+    return createdCompany;
+  }
+
+  async rejectPendingCompany(id: string, userId: string): Promise<void> {
+    await db.update(pendingCompanies)
+      .set({ 
+        status: 'rejected',
+        reviewedBy: userId,
+        reviewedAt: new Date()
+      })
+      .where(eq(pendingCompanies.id, id));
+  }
+
+  // CRM - Pending Properties
+  async getPendingProperty(id: string): Promise<PendingProperty | undefined> {
+    const [property] = await db.select()
+      .from(pendingProperties)
+      .where(eq(pendingProperties.id, id));
+    return property || undefined;
+  }
+
+  async getPendingPropertiesForOrg(orgId: string): Promise<PendingProperty[]> {
+    return await db.select()
+      .from(pendingProperties)
+      .where(and(
+        eq(pendingProperties.orgId, orgId),
+        eq(pendingProperties.status, 'pending')
+      ))
+      .orderBy(desc(pendingProperties.createdAt));
+  }
+
+  async createPendingProperty(property: InsertPendingProperty): Promise<PendingProperty> {
+    const [created] = await db.insert(pendingProperties).values(property).returning();
+    return created;
+  }
+
+  async acceptPendingProperty(id: string, userId: string, mode: 'replace' | 'add_new'): Promise<Property> {
+    const pending = await this.getPendingProperty(id);
+    if (!pending) throw new Error('Pending property not found');
+
+    let createdProperty: Property;
+
+    if (mode === 'replace' && pending.suggestedDuplicates && Array.isArray(pending.suggestedDuplicates) && pending.suggestedDuplicates.length > 0) {
+      const duplicateId = pending.suggestedDuplicates[0] as string;
+      const updateData: Partial<InsertProperty> = {
+        marinaName: pending.marinaName,
+        city: pending.city || undefined,
+        state: pending.state || undefined,
+        address: pending.address || undefined,
+        listingPrice: pending.salePrice || undefined,
+        updatedAt: new Date()
+      };
+      createdProperty = await this.updateCrmProperty(duplicateId, updateData);
+    } else {
+      const propertyData: InsertProperty = {
+        ownerId: pending.orgId,
+        marinaName: pending.marinaName,
+        city: pending.city || undefined,
+        state: pending.state || undefined,
+        address: pending.address || undefined,
+        listingPrice: pending.salePrice || undefined,
+        status: 'For Sale',
+        createdBy: userId
+      };
+      createdProperty = await this.createCrmProperty(propertyData);
+    }
+
+    await db.update(pendingProperties)
+      .set({ 
+        status: 'accepted',
+        createdPropertyId: createdProperty.id,
+        reviewedBy: userId,
+        reviewedAt: new Date()
+      })
+      .where(eq(pendingProperties.id, id));
+
+    return createdProperty;
+  }
+
+  async rejectPendingProperty(id: string, userId: string): Promise<void> {
+    await db.update(pendingProperties)
+      .set({ 
+        status: 'rejected',
+        reviewedBy: userId,
+        reviewedAt: new Date()
+      })
+      .where(eq(pendingProperties.id, id));
   }
 
   // CRM - Pipelines

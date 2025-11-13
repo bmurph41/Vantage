@@ -11,76 +11,45 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Check, X, AlertTriangle, User, Mail, Phone, Calendar, FileText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-
-type PendingContact = {
-  id: string;
-  orgId: string;
-  sourceType: string;
-  sourceId: string;
-  firstName: string | null;
-  lastName: string | null;
-  fullName: string;
-  email: string | null;
-  phone: string | null;
-  companyId: string | null;
-  jobTitle: string | null;
-  status: 'pending' | 'accepted' | 'rejected';
-  sourceMetadata: Record<string, any>;
-  suggestedDuplicates: string[];
-  createdContactId: string | null;
-  createdBy: string;
-  reviewedBy: string | null;
-  reviewedAt: string | null;
-  createdAt: string;
-};
-
-type Contact = {
-  id: string;
-  firstName: string | null;
-  lastName: string | null;
-  fullName: string;
-  email: string | null;
-  phone: string | null;
-};
+import DuplicateResolutionModal from "@/components/modals/duplicate-resolution-modal";
+import type { PendingContact, CrmContact } from "@shared/schema";
 
 export default function PendingContacts() {
   const [selectedPending, setSelectedPending] = useState<PendingContact | null>(null);
+  const [selectedExisting, setSelectedExisting] = useState<CrmContact | null>(null);
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: pendingContacts = [], isLoading } = useQuery<PendingContact[]>({
-    queryKey: ['/api/pending-contacts'],
+    queryKey: ['/api/crm/pending-contacts'],
     refetchInterval: 30000,
   });
 
-  const { data: contacts = [] } = useQuery<Contact[]>({
-    queryKey: ['/api/contacts'],
+  const { mutate: fetchDuplicate, isPending: isFetchingDuplicate } = useMutation({
+    mutationFn: async (contactId: string) => {
+      const response = await fetch(`/api/crm/contacts/${contactId}`);
+      if (!response.ok) throw new Error('Failed to fetch contact');
+      return response.json() as Promise<CrmContact>;
+    },
   });
 
   const acceptMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return await apiRequest('POST', `/api/pending-contacts/${id}/accept`);
+    mutationFn: async ({ id, mode }: { id: string; mode: 'replace' | 'add_new' }) => {
+      return await apiRequest('POST', `/api/crm/pending-contacts/${id}/accept`, { mode });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/pending-contacts'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/contacts'] });
       toast({ title: "Contact accepted and created successfully" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);
+      setSelectedExisting(null);
     },
     onError: () => {
       toast({ title: "Failed to accept contact", variant: "destructive" });
@@ -89,66 +58,51 @@ export default function PendingContacts() {
 
   const rejectMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest('POST', `/api/pending-contacts/${id}/reject`);
+      return await apiRequest('POST', `/api/crm/pending-contacts/${id}/reject`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/pending-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-contacts'] });
       toast({ title: "Pending contact removed" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);
+      setSelectedExisting(null);
     },
     onError: () => {
       toast({ title: "Failed to remove contact", variant: "destructive" });
     },
   });
 
-  const mergeMutation = useMutation({
-    mutationFn: async ({ pendingId, contactId }: { pendingId: string; contactId: string }) => {
-      return await apiRequest('POST', `/api/pending-contacts/${pendingId}/merge`, { contactId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/pending-contacts'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
-      toast({ title: "Contact merged successfully" });
-      setShowDuplicatesDialog(false);
-      setSelectedPending(null);
-    },
-    onError: () => {
-      toast({ title: "Failed to merge contact", variant: "destructive" });
-    },
-  });
-
-  const handleAccept = (pending: PendingContact) => {
-    if (pending.suggestedDuplicates && pending.suggestedDuplicates.length > 0) {
-      setSelectedPending(pending);
-      setShowDuplicatesDialog(true);
+  const handleAccept = async (pending: PendingContact) => {
+    setSelectedPending(pending);
+    
+    if (pending.suggestedDuplicates && Array.isArray(pending.suggestedDuplicates) && pending.suggestedDuplicates.length > 0) {
+      const duplicateId = pending.suggestedDuplicates[0] as string;
+      fetchDuplicate(duplicateId, {
+        onSuccess: (existingContact) => {
+          setSelectedExisting(existingContact);
+          setShowDuplicatesDialog(true);
+        },
+        onError: () => {
+          setSelectedExisting(null);
+          setShowDuplicatesDialog(true);
+        },
+      });
     } else {
-      if (confirm(`Accept "${pending.fullName}" as a new contact?`)) {
-        acceptMutation.mutate(pending.id);
-      }
+      setSelectedExisting(null);
+      setShowDuplicatesDialog(true);
     }
   };
 
-  const handleReject = (pending: PendingContact) => {
-    if (confirm(`Remove "${pending.fullName}" from pending contacts?`)) {
-      rejectMutation.mutate(pending.id);
-    }
-  };
-
-  const handleMerge = (contactId: string) => {
+  const handleReject = () => {
     if (selectedPending) {
-      mergeMutation.mutate({ pendingId: selectedPending.id, contactId });
+      rejectMutation.mutate(selectedPending.id);
     }
   };
 
-  const confirmAccept = () => {
+  const handleAcceptWithMode = (mode: 'replace' | 'add_new') => {
     if (selectedPending) {
-      acceptMutation.mutate(selectedPending.id);
+      acceptMutation.mutate({ id: selectedPending.id, mode });
     }
-  };
-
-  const getSuggestedContacts = (duplicateIds: string[]) => {
-    return contacts.filter(c => duplicateIds.includes(c.id));
   };
 
   const formatDate = (dateString: string) => {
@@ -338,89 +292,20 @@ export default function PendingContacts() {
         </Card>
       )}
 
-      <Dialog open={showDuplicatesDialog} onOpenChange={setShowDuplicatesDialog}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
-              Potential Duplicate Contacts Found
-            </DialogTitle>
-            <DialogDescription>
-              We found {selectedPending?.suggestedDuplicates?.length || 0} existing contacts that might match "{selectedPending?.fullName}". 
-              Review these before accepting.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 my-4">
-            <div className="bg-muted p-4 rounded-lg">
-              <h3 className="font-semibold mb-2">New Contact:</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Name:</span> {selectedPending?.fullName}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Email:</span> {selectedPending?.email || 'N/A'}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Phone:</span> {selectedPending?.phone || 'N/A'}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Job Title:</span> {selectedPending?.jobTitle || 'N/A'}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-3">Existing Contacts:</h3>
-              <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                {getSuggestedContacts(selectedPending?.suggestedDuplicates || []).map((contact) => (
-                  <div
-                    key={contact.id}
-                    className="border rounded-lg p-3 bg-card hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="font-medium">{contact.fullName}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {contact.email || 'No email'} • {contact.phone || 'No phone'}
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleMerge(contact.id)}
-                        disabled={mergeMutation.isPending}
-                        data-testid={`button-merge-contact-${contact.id}`}
-                      >
-                        Merge
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (selectedPending) {
-                  handleReject(selectedPending);
-                }
-              }}
-              data-testid="button-reject-dialog"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Remove (It's a Duplicate)
-            </Button>
-            <Button onClick={confirmAccept} data-testid="button-accept-dialog">
-              <Check className="h-4 w-4 mr-2" />
-              Accept Anyway (It's New)
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DuplicateResolutionModal
+        isOpen={showDuplicatesDialog}
+        onClose={() => {
+          setShowDuplicatesDialog(false);
+          setSelectedPending(null);
+          setSelectedExisting(null);
+        }}
+        entityType="contact"
+        pendingEntity={selectedPending}
+        existingEntity={selectedExisting}
+        onAccept={handleAcceptWithMode}
+        onReject={handleReject}
+        isLoading={acceptMutation.isPending || rejectMutation.isPending}
+      />
     </div>
   );
 }

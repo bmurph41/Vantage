@@ -5501,6 +5501,150 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // CRM Pending Contacts
+  app.get("/api/crm/pending-contacts", async (req: any, res) => {
+    try {
+      const pendingContacts = await storage.getPendingContactsForOrg(req.user.orgId);
+      res.json(pendingContacts);
+    } catch (error) {
+      console.error("Failed to get pending contacts:", error);
+      res.status(500).json({ error: "Failed to retrieve pending contacts" });
+    }
+  });
+
+  app.get("/api/crm/pending-contacts/:id", async (req: any, res) => {
+    try {
+      const pendingContact = await storage.getPendingContact(req.params.id);
+      if (!pendingContact) {
+        return res.status(404).json({ error: "Pending contact not found" });
+      }
+      res.json(pendingContact);
+    } catch (error) {
+      console.error("Failed to get pending contact:", error);
+      res.status(500).json({ error: "Failed to retrieve pending contact" });
+    }
+  });
+
+  app.post("/api/crm/pending-contacts/:id/accept", async (req: any, res) => {
+    try {
+      const { mode } = req.body;
+      if (!mode || !['replace', 'add_new'].includes(mode)) {
+        return res.status(400).json({ error: "Invalid mode. Must be 'replace' or 'add_new'" });
+      }
+      const contact = await storage.acceptPendingContact(req.params.id, req.user.id, mode);
+      res.json(contact);
+    } catch (error) {
+      console.error("Failed to accept pending contact:", error);
+      res.status(500).json({ error: "Failed to accept pending contact" });
+    }
+  });
+
+  app.post("/api/crm/pending-contacts/:id/reject", async (req: any, res) => {
+    try {
+      await storage.rejectPendingContact(req.params.id, req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to reject pending contact:", error);
+      res.status(500).json({ error: "Failed to reject pending contact" });
+    }
+  });
+
+  // CRM Pending Companies
+  app.get("/api/crm/pending-companies", async (req: any, res) => {
+    try {
+      const pendingCompanies = await storage.getPendingCompaniesForOrg(req.user.orgId);
+      res.json(pendingCompanies);
+    } catch (error) {
+      console.error("Failed to get pending companies:", error);
+      res.status(500).json({ error: "Failed to retrieve pending companies" });
+    }
+  });
+
+  app.get("/api/crm/pending-companies/:id", async (req: any, res) => {
+    try {
+      const pendingCompany = await storage.getPendingCompany(req.params.id);
+      if (!pendingCompany) {
+        return res.status(404).json({ error: "Pending company not found" });
+      }
+      res.json(pendingCompany);
+    } catch (error) {
+      console.error("Failed to get pending company:", error);
+      res.status(500).json({ error: "Failed to retrieve pending company" });
+    }
+  });
+
+  app.post("/api/crm/pending-companies/:id/accept", async (req: any, res) => {
+    try {
+      const { mode } = req.body;
+      if (!mode || !['replace', 'add_new'].includes(mode)) {
+        return res.status(400).json({ error: "Invalid mode. Must be 'replace' or 'add_new'" });
+      }
+      const company = await storage.acceptPendingCompany(req.params.id, req.user.id, mode);
+      res.json(company);
+    } catch (error) {
+      console.error("Failed to accept pending company:", error);
+      res.status(500).json({ error: "Failed to accept pending company" });
+    }
+  });
+
+  app.post("/api/crm/pending-companies/:id/reject", async (req: any, res) => {
+    try {
+      await storage.rejectPendingCompany(req.params.id, req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to reject pending company:", error);
+      res.status(500).json({ error: "Failed to reject pending company" });
+    }
+  });
+
+  // CRM Pending Properties
+  app.get("/api/crm/pending-properties", async (req: any, res) => {
+    try {
+      const pendingProperties = await storage.getPendingPropertiesForOrg(req.user.orgId);
+      res.json(pendingProperties);
+    } catch (error) {
+      console.error("Failed to get pending properties:", error);
+      res.status(500).json({ error: "Failed to retrieve pending properties" });
+    }
+  });
+
+  app.get("/api/crm/pending-properties/:id", async (req: any, res) => {
+    try {
+      const pendingProperty = await storage.getPendingProperty(req.params.id);
+      if (!pendingProperty) {
+        return res.status(404).json({ error: "Pending property not found" });
+      }
+      res.json(pendingProperty);
+    } catch (error) {
+      console.error("Failed to get pending property:", error);
+      res.status(500).json({ error: "Failed to retrieve pending property" });
+    }
+  });
+
+  app.post("/api/crm/pending-properties/:id/accept", async (req: any, res) => {
+    try {
+      const { mode } = req.body;
+      if (!mode || !['replace', 'add_new'].includes(mode)) {
+        return res.status(400).json({ error: "Invalid mode. Must be 'replace' or 'add_new'" });
+      }
+      const property = await storage.acceptPendingProperty(req.params.id, req.user.id, mode);
+      res.json(property);
+    } catch (error) {
+      console.error("Failed to accept pending property:", error);
+      res.status(500).json({ error: "Failed to accept pending property" });
+    }
+  });
+
+  app.post("/api/crm/pending-properties/:id/reject", async (req: any, res) => {
+    try {
+      await storage.rejectPendingProperty(req.params.id, req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to reject pending property:", error);
+      res.status(500).json({ error: "Failed to reject pending property" });
+    }
+  });
+
   // CRM Pipelines
   app.get("/api/crm/pipelines", async (req: any, res) => {
     try {

@@ -11,78 +11,45 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Check, X, AlertTriangle, Building2, MapPin, Phone, Globe, Calendar, FileText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-
-type PendingCompany = {
-  id: string;
-  orgId: string;
-  sourceType: string;
-  sourceId: string;
-  name: string;
-  website: string | null;
-  phone: string | null;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  zipCode: string | null;
-  industry: string | null;
-  status: 'pending' | 'accepted' | 'rejected';
-  sourceMetadata: Record<string, any>;
-  suggestedDuplicates: string[];
-  createdCompanyId: string | null;
-  createdBy: string;
-  reviewedBy: string | null;
-  reviewedAt: string | null;
-  createdAt: string;
-};
-
-type Company = {
-  id: string;
-  name: string;
-  website: string | null;
-  phone: string | null;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-};
+import DuplicateResolutionModal from "@/components/modals/duplicate-resolution-modal";
+import type { PendingCompany, CrmCompany } from "@shared/schema";
 
 export default function PendingCompanies() {
   const [selectedPending, setSelectedPending] = useState<PendingCompany | null>(null);
+  const [selectedExisting, setSelectedExisting] = useState<CrmCompany | null>(null);
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: pendingCompanies = [], isLoading } = useQuery<PendingCompany[]>({
-    queryKey: ['/api/pending-companies'],
+    queryKey: ['/api/crm/pending-companies'],
     refetchInterval: 30000,
   });
 
-  const { data: companies = [] } = useQuery<Company[]>({
-    queryKey: ['/api/companies'],
+  const { mutate: fetchDuplicate, isPending: isFetchingDuplicate } = useMutation({
+    mutationFn: async (companyId: string) => {
+      const response = await fetch(`/api/crm/companies/${companyId}`);
+      if (!response.ok) throw new Error('Failed to fetch company');
+      return response.json() as Promise<CrmCompany>;
+    },
   });
 
   const acceptMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return await apiRequest('POST', `/api/pending-companies/${id}/accept`);
+    mutationFn: async ({ id, mode }: { id: string; mode: 'replace' | 'add_new' }) => {
+      return await apiRequest('POST', `/api/crm/pending-companies/${id}/accept`, { mode });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/pending-companies'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/companies'] });
       toast({ title: "Company accepted and created successfully" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);
+      setSelectedExisting(null);
     },
     onError: () => {
       toast({ title: "Failed to accept company", variant: "destructive" });
@@ -91,66 +58,51 @@ export default function PendingCompanies() {
 
   const rejectMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest('POST', `/api/pending-companies/${id}/reject`);
+      return await apiRequest('POST', `/api/crm/pending-companies/${id}/reject`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/pending-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
       toast({ title: "Pending company removed" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);
+      setSelectedExisting(null);
     },
     onError: () => {
       toast({ title: "Failed to remove company", variant: "destructive" });
     },
   });
 
-  const mergeMutation = useMutation({
-    mutationFn: async ({ pendingId, companyId }: { pendingId: string; companyId: string }) => {
-      return await apiRequest('POST', `/api/pending-companies/${pendingId}/merge`, { companyId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/pending-companies'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
-      toast({ title: "Company merged successfully" });
-      setShowDuplicatesDialog(false);
-      setSelectedPending(null);
-    },
-    onError: () => {
-      toast({ title: "Failed to merge company", variant: "destructive" });
-    },
-  });
-
-  const handleAccept = (pending: PendingCompany) => {
-    if (pending.suggestedDuplicates && pending.suggestedDuplicates.length > 0) {
-      setSelectedPending(pending);
-      setShowDuplicatesDialog(true);
+  const handleAccept = async (pending: PendingCompany) => {
+    setSelectedPending(pending);
+    
+    if (pending.suggestedDuplicates && Array.isArray(pending.suggestedDuplicates) && pending.suggestedDuplicates.length > 0) {
+      const duplicateId = pending.suggestedDuplicates[0] as string;
+      fetchDuplicate(duplicateId, {
+        onSuccess: (existingCompany) => {
+          setSelectedExisting(existingCompany);
+          setShowDuplicatesDialog(true);
+        },
+        onError: () => {
+          setSelectedExisting(null);
+          setShowDuplicatesDialog(true);
+        },
+      });
     } else {
-      if (confirm(`Accept "${pending.name}" as a new company?`)) {
-        acceptMutation.mutate(pending.id);
-      }
+      setSelectedExisting(null);
+      setShowDuplicatesDialog(true);
     }
   };
 
-  const handleReject = (pending: PendingCompany) => {
-    if (confirm(`Remove "${pending.name}" from pending companies?`)) {
-      rejectMutation.mutate(pending.id);
-    }
-  };
-
-  const handleMerge = (companyId: string) => {
+  const handleReject = () => {
     if (selectedPending) {
-      mergeMutation.mutate({ pendingId: selectedPending.id, companyId });
+      rejectMutation.mutate(selectedPending.id);
     }
   };
 
-  const confirmAccept = () => {
+  const handleAcceptWithMode = (mode: 'replace' | 'add_new') => {
     if (selectedPending) {
-      acceptMutation.mutate(selectedPending.id);
+      acceptMutation.mutate({ id: selectedPending.id, mode });
     }
-  };
-
-  const getSuggestedCompanies = (duplicateIds: string[]) => {
-    return companies.filter(c => duplicateIds.includes(c.id));
   };
 
   const formatDate = (dateString: string) => {
@@ -321,7 +273,8 @@ export default function PendingCompanies() {
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleReject(pending);
+                              setSelectedPending(pending);
+                              handleReject();
                             }}
                             data-testid={`button-reject-company-${pending.id}`}
                           >
@@ -349,104 +302,20 @@ export default function PendingCompanies() {
         </Card>
       )}
 
-      <Dialog open={showDuplicatesDialog} onOpenChange={setShowDuplicatesDialog}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
-              Potential Duplicate Companies Found
-            </DialogTitle>
-            <DialogDescription>
-              We found {selectedPending?.suggestedDuplicates?.length || 0} existing companies that might match "{selectedPending?.name}". 
-              Review these before accepting.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 my-4">
-            <div className="bg-muted p-4 rounded-lg">
-              <h3 className="font-semibold mb-2">New Company:</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Name:</span> {selectedPending?.name}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Location:</span> {formatLocation(selectedPending?.city || null, selectedPending?.state || null)}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Phone:</span> {selectedPending?.phone || 'N/A'}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Website:</span> {selectedPending?.website || 'N/A'}
-                </div>
-                {selectedPending?.industry && (
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">Industry:</span> {selectedPending.industry}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-3">Existing Companies:</h3>
-              <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                {getSuggestedCompanies(selectedPending?.suggestedDuplicates || []).map((company) => (
-                  <div
-                    key={company.id}
-                    className="border rounded-lg p-3 bg-card hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="font-medium">{company.name}</div>
-                        <div className="text-sm text-muted-foreground space-y-0.5">
-                          {company.address && <div>{company.address}</div>}
-                          <div>
-                            {formatLocation(company.city, company.state)}
-                            {company.phone && ` • ${company.phone}`}
-                          </div>
-                          {company.website && (
-                            <div className="flex items-center gap-1 text-xs">
-                              <Globe className="h-3 w-3" />
-                              {company.website}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleMerge(company.id)}
-                        disabled={mergeMutation.isPending}
-                        data-testid={`button-merge-company-${company.id}`}
-                      >
-                        Merge
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (selectedPending) {
-                  handleReject(selectedPending);
-                }
-              }}
-              data-testid="button-reject-dialog"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Remove (It's a Duplicate)
-            </Button>
-            <Button onClick={confirmAccept} data-testid="button-accept-dialog">
-              <Check className="h-4 w-4 mr-2" />
-              Accept Anyway (It's New)
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DuplicateResolutionModal
+        isOpen={showDuplicatesDialog}
+        onClose={() => {
+          setShowDuplicatesDialog(false);
+          setSelectedPending(null);
+          setSelectedExisting(null);
+        }}
+        entityType="company"
+        pendingEntity={selectedPending}
+        existingEntity={selectedExisting}
+        onAccept={handleAcceptWithMode}
+        onReject={handleReject}
+        isLoading={acceptMutation.isPending || rejectMutation.isPending}
+      />
     </div>
   );
 }
