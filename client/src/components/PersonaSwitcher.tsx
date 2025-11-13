@@ -29,16 +29,13 @@ const PERSONA_DESCRIPTIONS: Record<string, string> = {
 export function PersonaSwitcher() {
   const { toast } = useToast();
 
-  const { data: persona, isLoading } = useQuery<any>({
+  const { data: persona, isLoading, error } = useQuery<any>({
     queryKey: ['/api/personas/me'],
   });
 
   const updatePersonaMutation = useMutation({
     mutationFn: async (newPersona: { primaryPersona: string; secondaryPersona?: string }) => {
-      return await apiRequest('/api/personas/me', {
-        method: 'POST',
-        body: JSON.stringify(newPersona),
-      });
+      return await apiRequest('POST', '/api/personas/me', newPersona);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/personas/me'] });
@@ -72,12 +69,51 @@ export function PersonaSwitcher() {
     });
   };
 
-  if (isLoading || !persona) {
+  if (isLoading) {
     return (
       <Button variant="ghost" size="sm" className="gap-2" disabled data-testid="persona-switcher-loading">
         <UserCircle className="h-4 w-4" />
         <span className="text-sm">Loading...</span>
       </Button>
+    );
+  }
+
+  // If no persona is assigned, show a default state instead of loading
+  if (!persona || error) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="gap-2" data-testid="persona-switcher-trigger">
+            <UserCircle className="h-4 w-4" />
+            <span className="text-sm font-medium">Select Persona</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64" data-testid="persona-switcher-menu">
+          <DropdownMenuLabel>Choose Your Persona</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          
+          <div className="px-2 py-1.5">
+            <p className="text-xs text-muted-foreground mb-2">Primary Persona</p>
+            {Object.keys(PERSONA_LABELS).map((personaKey) => (
+              <DropdownMenuItem
+                key={personaKey}
+                onClick={() => handlePersonaSwitch(personaKey)}
+                className="flex items-start gap-2 cursor-pointer"
+                data-testid={`persona-option-${personaKey}`}
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{PERSONA_LABELS[personaKey]}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {PERSONA_DESCRIPTIONS[personaKey]}
+                  </p>
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 
