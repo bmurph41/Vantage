@@ -44,8 +44,11 @@ import {
   Download,
   Zap,
   BarChart3,
-  Calendar
+  Calendar,
+  FileText
 } from 'lucide-react';
+import { pdf } from '@react-pdf/renderer';
+import { AnalyticsPDFDocument } from './analytics-pdf';
 
 type AnalyticsData = {
   totalDeals: number;
@@ -177,6 +180,24 @@ export default function ModelingAnalytics() {
     window.URL.revokeObjectURL(url);
   };
 
+  const exportToPDF = async () => {
+    if (!analytics) return;
+
+    try {
+      const doc = <AnalyticsPDFDocument analytics={analytics} filters={filters} />;
+      const asPdf = pdf(doc);
+      const blob = await asPdf.toBlob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `modeling-analytics-${new Date().toISOString().split('T')[0]}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+    }
+  };
+
   const OUTCOME_COLORS: Record<string, string> = {
     won: '#10b981',
     lost: '#ef4444',
@@ -239,16 +260,28 @@ export default function ModelingAnalytics() {
       <Card className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold">Filters</h3>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={exportToCSV}
-            disabled={!analytics}
-            data-testid="button-export-csv"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToCSV}
+              disabled={!analytics}
+              data-testid="button-export-csv"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToPDF}
+              disabled={!analytics}
+              data-testid="button-export-pdf"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Export PDF
+            </Button>
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="space-y-2">
