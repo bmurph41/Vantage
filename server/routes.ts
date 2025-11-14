@@ -10168,7 +10168,7 @@ Current context: Project ${req.params.projectId}`;
   // ============================================================================
 
   // Get all debt scenarios for organization
-  app.get('/api/debt-scenarios', authenticateUser, async (req: any, res) => {
+  app.get('/api/modeling/debt-scenarios', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       // TODO: Add to storage interface
@@ -10181,7 +10181,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get scenarios for a specific modeling project
-  app.get('/api/debt-scenarios/project/:projectId', authenticateUser, async (req: any, res) => {
+  app.get('/api/modeling/debt-scenarios/project/:projectId', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { projectId } = req.params;
@@ -10196,7 +10196,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get single debt scenario with calculated metrics
-  app.get('/api/debt-scenarios/:id', authenticateUser, async (req: any, res) => {
+  app.get('/api/modeling/debt-scenarios/:id', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
@@ -10231,7 +10231,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create new debt scenario
-  app.post('/api/debt-scenarios', authenticateUser, async (req: any, res) => {
+  app.post('/api/modeling/debt-scenarios', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const userId = req.user.id;
@@ -10272,8 +10272,8 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Update debt scenario
-  app.patch('/api/debt-scenarios/:id', authenticateUser, async (req: any, res) => {
+  // Update debt scenario handler (shared for both PATCH and PUT)
+  const updateDebtScenarioHandler = async (req: any, res: any) => {
     try {
       const orgId = req.user.orgId;
       const userId = req.user.id;
@@ -10281,7 +10281,6 @@ Current context: Project ${req.params.projectId}`;
       
       const data = updateDebtScenarioSchema.parse(req.body);
       
-      // TODO: Add to storage interface
       const existingScenario = await storage.getDebtScenario(id, orgId);
       
       if (!existingScenario) {
@@ -10302,7 +10301,6 @@ Current context: Project ${req.params.projectId}`;
         interestOnlyYears: updatedData.interestOnlyYears || 0
       });
 
-      // TODO: Add to storage interface
       const scenario = await storage.updateDebtScenario(id, {
         ...data,
         updatedBy: userId,
@@ -10326,10 +10324,14 @@ Current context: Project ${req.params.projectId}`;
       console.error('Failed to update debt scenario:', error);
       res.status(500).json({ error: 'Failed to update debt scenario' });
     }
-  });
+  };
+
+  // Update debt scenario (PATCH and PUT for compatibility)
+  app.patch('/api/modeling/debt-scenarios/:id', authenticateUser, updateDebtScenarioHandler);
+  app.put('/api/modeling/debt-scenarios/:id', authenticateUser, updateDebtScenarioHandler);
 
   // Delete debt scenario
-  app.delete('/api/debt-scenarios/:id', authenticateUser, async (req: any, res) => {
+  app.delete('/api/modeling/debt-scenarios/:id', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
@@ -10349,7 +10351,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Recalculate metrics for a scenario (useful after bulk updates or corrections)
-  app.post('/api/debt-scenarios/:id/calculate', authenticateUser, async (req: any, res) => {
+  app.post('/api/modeling/debt-scenarios/:id/calculate', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
@@ -10392,7 +10394,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Run sensitivity analysis on a scenario
-  app.post('/api/debt-scenarios/:id/sensitivity', authenticateUser, async (req: any, res) => {
+  app.post('/api/modeling/debt-scenarios/:id/sensitivity', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
