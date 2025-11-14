@@ -4,12 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, FolderLock, FileText, Users, Shield, ClipboardList, Activity, CheckSquare } from "lucide-react";
+import { ArrowLeft, FolderLock, FileText, Users, Shield, ClipboardList, Activity, CheckSquare, BarChart3 } from "lucide-react";
 import { DocumentsWorkspace } from "@/components/vdr/DocumentsWorkspace";
 import { PermissionViewer } from "@/components/vdr/PermissionViewer";
 import { ExternalUsersTab } from "@/components/vdr/ExternalUsersTab";
 import { DiligenceRequestsTab } from "@/components/vdr/DiligenceRequestsTab";
 import { AuditLogViewer } from "@/components/vdr/AuditLogViewer";
+import { AnalyticsDashboard } from "@/components/vdr/AnalyticsDashboard";
 
 export default function ProjectVDR() {
   const [, params] = useRoute("/vdr/projects/:id");
@@ -84,6 +85,10 @@ export default function ProjectVDR() {
             <FileText className="h-4 w-4 mr-2" />
             Documents
           </TabsTrigger>
+          <TabsTrigger value="analytics" data-testid="tab-analytics">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Analytics
+          </TabsTrigger>
           <TabsTrigger value="permissions" data-testid="tab-permissions">
             <Shield className="h-4 w-4 mr-2" />
             Permissions
@@ -104,6 +109,10 @@ export default function ProjectVDR() {
 
         <TabsContent value="documents" className="h-[calc(100vh-20rem)]">
           <DocumentsWorkspace projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-4">
+          <AnalyticsDashboard projectId={projectId!} />
         </TabsContent>
 
         <TabsContent value="permissions" className="space-y-4">

@@ -36,11 +36,7 @@ export function DocumentsWorkspace({ projectId }: DocumentsWorkspaceProps) {
         <DocumentList
           folderId={selectedFolderId}
           projectId={projectId}
-          onUpload={(formData) => {
-            if (selectedFolderId) {
-              vdr.uploadDocument({ folderId: selectedFolderId, formData });
-            }
-          }}
+          uploadDocumentAsync={vdr.uploadDocumentAsync}
           onDelete={(documentId) => {
             if (selectedFolderId) {
               vdr.deleteDocument({ documentId, folderId: selectedFolderId });

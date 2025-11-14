@@ -110,7 +110,7 @@ export function useVdrProject(projectId: string | undefined) {
   // Upload document mutation
   const uploadDocumentMutation = useMutation({
     mutationFn: async ({ folderId, formData }: { folderId: string; formData: FormData }) => {
-      return apiRequest(`/api/vdr/folders/${folderId}/documents/upload`, {
+      return apiRequest(`/api/vdr/folders/${folderId}/documents`, {
         method: "POST",
         body: formData,
       });

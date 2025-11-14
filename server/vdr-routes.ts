@@ -1,10 +1,13 @@
 import express, { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
+import archiver from 'archiver';
 import { vdrFileService } from './vdr-file-service';
 import { defaultStorageProvider } from './vdr-storage-provider';
 import { storage } from './storage';
 import { z } from 'zod';
-import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema } from '@shared/schema';
+import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs } from '@shared/schema';
+import { db } from './db';
+import { eq, and, desc, sql, isNotNull, inArray } from 'drizzle-orm';
 
 const router = express.Router();
 
@@ -468,6 +471,140 @@ router.delete('/documents/:documentId', requireAuth, requireVdrAccess('manage'),
   }
 });
 
+router.get('/documents/:documentId/versions', requireAuth, requireVdrAccess('view'), async (req: Request, res: Response) => {
+  const { documentId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const document = await storage.vdr.documents.getDocument(documentId, orgId);
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const rootDocumentId = document.parentDocumentId || documentId;
+    const versions = await storage.vdr.documents.getDocumentVersions(rootDocumentId, orgId);
+    
+    const currentVersion = await storage.vdr.documents.getDocument(rootDocumentId, orgId);
+    const allVersions = currentVersion ? [currentVersion, ...versions] : versions;
+
+    res.json(allVersions);
+  } catch (error: any) {
+    console.error('Error fetching document versions:', error);
+    res.status(500).json({ error: 'Failed to fetch document versions' });
+  }
+});
+
+router.post('/documents/:documentId/versions', requireAuth, requireVdrAccess('manage'), upload.single('file'), async (req: Request, res: Response) => {
+  const { documentId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    const existingDocument = await storage.vdr.documents.getDocument(documentId, orgId);
+    if (!existingDocument) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const fileInfo = await vdrFileService.processUpload(
+      req.file.path,
+      req.file.originalname,
+      req.file.mimetype,
+      req.file.size,
+      orgId,
+      existingDocument.projectId
+    );
+
+    const rootDocumentId = existingDocument.parentDocumentId || documentId;
+    const newVersion = await storage.vdr.documents.createDocumentVersion(rootDocumentId, {
+      name: req.body.name || existingDocument.name,
+      description: req.body.description || existingDocument.description,
+      filename: fileInfo.filename,
+      originalFilename: req.file.originalname,
+      mimeType: fileInfo.mimeType,
+      size: fileInfo.size,
+      storagePath: fileInfo.storagePath,
+      checksum: fileInfo.checksum,
+      uploadedBy: userId,
+      orgId
+    }, orgId);
+
+    await storage.vdr.audit.logAction({
+      projectId: existingDocument.projectId,
+      orgId,
+      userId,
+      action: 'document_version_created',
+      resourceType: 'document',
+      resourceId: newVersion.id,
+      metadata: { 
+        documentName: newVersion.name,
+        version: newVersion.version,
+        size: newVersion.size
+      }
+    });
+
+    res.status(201).json(newVersion);
+  } catch (error: any) {
+    console.error('Error creating document version:', error);
+    res.status(500).json({ error: error.message || 'Failed to create document version' });
+  }
+});
+
+router.post('/documents/:documentId/versions/:versionId/restore', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { documentId, versionId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const currentDocument = await storage.vdr.documents.getDocument(documentId, orgId);
+    if (!currentDocument) {
+      return res.status(404).json({ error: 'Current document not found' });
+    }
+
+    const versionToRestore = await storage.vdr.documents.getDocument(versionId, orgId);
+    if (!versionToRestore) {
+      return res.status(404).json({ error: 'Version not found' });
+    }
+
+    const rootDocumentId = currentDocument.parentDocumentId || documentId;
+    
+    const restoredVersion = await storage.vdr.documents.createDocumentVersion(rootDocumentId, {
+      name: versionToRestore.name,
+      description: versionToRestore.description,
+      filename: versionToRestore.filename,
+      originalFilename: versionToRestore.originalFilename,
+      mimeType: versionToRestore.mimeType,
+      size: versionToRestore.size,
+      storagePath: versionToRestore.storagePath,
+      checksum: versionToRestore.checksum,
+      uploadedBy: userId,
+      orgId
+    }, orgId);
+
+    await storage.vdr.audit.logAction({
+      projectId: currentDocument.projectId,
+      orgId,
+      userId,
+      action: 'document_version_restored',
+      resourceType: 'document',
+      resourceId: restoredVersion.id,
+      metadata: { 
+        documentName: restoredVersion.name,
+        restoredFromVersion: versionToRestore.version,
+        newVersion: restoredVersion.version
+      }
+    });
+
+    res.status(201).json(restoredVersion);
+  } catch (error: any) {
+    console.error('Error restoring document version:', error);
+    res.status(500).json({ error: error.message || 'Failed to restore document version' });
+  }
+});
+
 router.post('/permissions', requireAuth, async (req: Request, res: Response) => {
   const orgId = (req.user as any).orgId;
   const userId = (req.user as any).id;
@@ -663,6 +800,153 @@ router.get('/projects/:projectId/audit', requireAuth, async (req: Request, res: 
   } catch (error: any) {
     console.error('Error fetching audit logs:', error);
     res.status(500).json({ error: 'Failed to fetch audit logs' });
+  }
+});
+
+router.get('/projects/:projectId/analytics', requireAuth, async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const documents = await storage.vdr.documents.getDocumentsForProject(projectId, orgId);
+    const auditLogs = await storage.vdr.audit.getProjectAuditLogs(projectId, orgId);
+
+    const documentStats = await db.select({
+      documentId: vdrAuditLogs.documentId,
+      documentName: vdrDocuments.name,
+      viewCount: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.action} IN ('document_viewed', 'document_downloaded') THEN 1 END)`.as('view_count'),
+      downloadCount: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.action} = 'document_downloaded' THEN 1 END)`.as('download_count'),
+      lastAccessed: sql<Date>`MAX(${vdrAuditLogs.timestamp})`.as('last_accessed')
+    })
+      .from(vdrAuditLogs)
+      .leftJoin(vdrDocuments, eq(vdrAuditLogs.documentId, vdrDocuments.id))
+      .where(and(
+        eq(vdrDocuments.projectId, projectId),
+        eq(vdrAuditLogs.orgId, orgId),
+        isNotNull(vdrAuditLogs.documentId)
+      ))
+      .groupBy(vdrAuditLogs.documentId, vdrDocuments.name)
+      .orderBy(desc(sql`view_count`))
+      .limit(10);
+
+    const activityByDay = await db.select({
+      date: sql<string>`DATE(${vdrAuditLogs.timestamp})`.as('date'),
+      views: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.action} IN ('document_viewed', 'document_downloaded') THEN 1 END)`.as('views'),
+      downloads: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.action} = 'document_downloaded' THEN 1 END)`.as('downloads'),
+      uploads: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.action} IN ('document_uploaded', 'document_version_created') THEN 1 END)`.as('uploads')
+    })
+      .from(vdrAuditLogs)
+      .leftJoin(vdrDocuments, eq(vdrAuditLogs.documentId, vdrDocuments.id))
+      .where(and(
+        eq(vdrDocuments.projectId, projectId),
+        eq(vdrAuditLogs.orgId, orgId),
+        sql`${vdrAuditLogs.timestamp} >= CURRENT_DATE - INTERVAL '30 days'`
+      ))
+      .groupBy(sql`DATE(${vdrAuditLogs.timestamp})`)
+      .orderBy(sql`date DESC`);
+
+    const userEngagement = await storage.vdr.audit.getUserEngagementMetrics(projectId, orgId);
+
+    const totalViews = auditLogs.filter(log => 
+      log.action === 'document_viewed' || log.action === 'document_downloaded'
+    ).length;
+    const totalDownloads = auditLogs.filter(log => log.action === 'document_downloaded').length;
+    const totalUploads = auditLogs.filter(log => 
+      log.action === 'document_uploaded' || log.action === 'document_version_created'
+    ).length;
+    const uniqueUsers = new Set([
+      ...auditLogs.filter(log => log.userId).map(log => log.userId),
+      ...auditLogs.filter(log => log.externalUserId).map(log => log.externalUserId)
+    ]).size;
+
+    res.json({
+      summary: {
+        totalDocuments: documents.length,
+        totalViews,
+        totalDownloads,
+        totalUploads,
+        uniqueUsers,
+      },
+      topDocuments: documentStats,
+      activityByDay,
+      userEngagement,
+    });
+  } catch (error: any) {
+    console.error('Error fetching analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+router.post('/documents/bulk-download', requireAuth, async (req: Request, res: Response) => {
+  const { documentIds } = req.body;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  if (!Array.isArray(documentIds) || documentIds.length === 0) {
+    return res.status(400).json({ error: 'Document IDs array is required' });
+  }
+
+  try {
+    const documents = await Promise.all(
+      documentIds.map(id => storage.vdr.documents.getDocument(id, orgId))
+    );
+
+    const validDocuments = documents.filter(doc => doc !== undefined);
+    
+    if (validDocuments.length === 0) {
+      return res.status(404).json({ error: 'No valid documents found' });
+    }
+
+    for (const doc of validDocuments) {
+      const hasAccess = await storage.vdr.permissions.checkUserPermission(
+        userId,
+        'document',
+        doc.id,
+        orgId,
+        'view_download'
+      );
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: `Insufficient permissions for document: ${doc.name}` });
+      }
+    }
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    
+    archive.on('error', (err) => {
+      throw err;
+    });
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="documents_${Date.now()}.zip"`);
+
+    archive.pipe(res);
+
+    for (const doc of validDocuments) {
+      try {
+        const stream = await defaultStorageProvider.download(doc.storagePath);
+        archive.append(stream, { name: doc.filename });
+
+        await storage.vdr.audit.logAction({
+          projectId: doc.projectId,
+          orgId,
+          userId,
+          action: 'document_downloaded',
+          resourceType: 'document',
+          resourceId: doc.id,
+          metadata: { documentName: doc.name, bulkDownload: true }
+        });
+      } catch (error) {
+        console.error(`Error adding ${doc.filename} to archive:`, error);
+      }
+    }
+
+    await archive.finalize();
+  } catch (error: any) {
+    console.error('Error creating bulk download:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to create download archive' });
+    }
   }
 });
 

@@ -27,9 +27,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileText, Upload, Download, Trash2, MoreVertical, FolderOpen } from "lucide-react";
+import { FileText, Upload, Download, Trash2, MoreVertical, FolderOpen, History } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { VersionHistoryDrawer } from "./VersionHistoryDrawer";
 
 type VdrDocument = {
   id: string;
@@ -50,7 +51,7 @@ type VdrDocument = {
 type DocumentListProps = {
   folderId: string | null;
   projectId: string;
-  onUpload: (formData: FormData) => void;
+  uploadDocumentAsync: (params: { folderId: string; formData: FormData }) => Promise<any>;
   onDelete: (documentId: string) => void;
   isUploading: boolean;
   isDeleting: boolean;
@@ -59,23 +60,26 @@ type DocumentListProps = {
 export function DocumentList({
   folderId,
   projectId,
-  onUpload,
+  uploadDocumentAsync,
   onDelete,
   isUploading,
   isDeleting,
 }: DocumentListProps) {
-  const { toast } = useToast();
+  const { toast} = useToast();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
+  const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
+  const [historyDocument, setHistoryDocument] = useState<{ id: string; name: string } | null>(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
 
   const { data: documents = [], isLoading } = useQuery<VdrDocument[]>({
     queryKey: ['/api/vdr/folders', folderId, 'documents'],
     enabled: !!folderId,
   });
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
     if (!folderId) {
       toast({
@@ -86,13 +90,55 @@ export function DocumentList({
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
+    const fileArray = Array.from(files);
 
-    onUpload(formData);
+    if (fileArray.length === 1) {
+      const formData = new FormData();
+      formData.append("file", fileArray[0]);
+      try {
+        await uploadDocumentAsync({ folderId, formData });
+      } catch (error) {
+        toast({
+          title: "Upload failed",
+          description: error instanceof Error ? error.message : "Failed to upload document",
+          variant: "destructive",
+        });
+      } finally {
+        event.target.value = "";
+      }
+      return;
+    }
 
-    // Reset input
+    setBulkUploading(true);
+    
+    const uploadPromises = fileArray.map(async (file) => {
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        await uploadDocumentAsync({ folderId, formData });
+        return { success: true };
+      } catch (error) {
+        return { success: false };
+      }
+    });
+
+    const results = await Promise.all(uploadPromises);
+    
+    const succeeded = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    
+    setBulkUploading(false);
     event.target.value = "";
+    
+    if (succeeded > 0 || failed > 0) {
+      toast({
+        title: succeeded > 0 ? "Upload complete" : "Upload failed",
+        description: succeeded > 0 
+          ? `${succeeded} file${succeeded !== 1 ? 's' : ''} uploaded successfully${failed > 0 ? `, ${failed} failed` : ''}`
+          : `${failed} file${failed !== 1 ? 's' : ''} failed to upload`,
+        variant: failed > 0 && succeeded === 0 ? "destructive" : "default",
+      });
+    }
   };
 
   const handleDownload = async (documentId: string, name: string) => {
@@ -129,6 +175,11 @@ export function DocumentList({
   const handleDeleteClick = (documentId: string) => {
     setDocumentToDelete(documentId);
     setDeleteDialogOpen(true);
+  };
+
+  const handleViewHistory = (documentId: string, documentName: string) => {
+    setHistoryDocument({ id: documentId, name: documentName });
+    setHistoryDrawerOpen(true);
   };
 
   const confirmDelete = () => {
@@ -184,7 +235,7 @@ export function DocumentList({
 
   return (
     <div className="h-full bg-white flex flex-col">
-      <div className="p-6 border-b">
+      <div className="p-6 border-b space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">Documents</h2>
           <div className="flex items-center gap-2">
@@ -193,16 +244,23 @@ export function DocumentList({
               id="file-upload"
               className="hidden"
               onChange={handleFileSelect}
-              disabled={isUploading}
+              disabled={bulkUploading || isUploading}
+              multiple
             />
-            <Button asChild disabled={isUploading} data-testid="button-upload-document">
+            <Button asChild disabled={bulkUploading || isUploading} data-testid="button-upload-document">
               <label htmlFor="file-upload" className="cursor-pointer">
                 <Upload className="h-4 w-4 mr-2" />
-                {isUploading ? "Uploading..." : "Upload Document"}
+                {bulkUploading || isUploading ? "Uploading..." : "Upload Documents"}
               </label>
             </Button>
           </div>
         </div>
+        {bulkUploading && (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Upload className="h-4 w-4 animate-pulse" />
+            <span>Uploading files...</span>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -260,6 +318,13 @@ export function DocumentList({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
+                          onClick={() => handleViewHistory(doc.id, doc.name)}
+                          data-testid={`history-document-${doc.id}`}
+                        >
+                          <History className="h-4 w-4 mr-2" />
+                          View History
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           onClick={() => handleDownload(doc.id, doc.name)}
                           data-testid={`download-document-${doc.id}`}
                         >
@@ -300,6 +365,16 @@ export function DocumentList({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {historyDocument && (
+        <VersionHistoryDrawer
+          documentId={historyDocument.id}
+          documentName={historyDocument.name}
+          folderId={folderId}
+          open={historyDrawerOpen}
+          onOpenChange={setHistoryDrawerOpen}
+        />
+      )}
     </div>
   );
 }
