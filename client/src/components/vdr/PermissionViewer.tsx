@@ -68,7 +68,7 @@ export function PermissionViewer({ resourceType, resourceId, projectId }: Permis
   const [selectedUserId, setSelectedUserId] = useState<string>('');
 
   const { data: users = [] } = useQuery<any[]>({
-    queryKey: ['/api/users'],
+    queryKey: ['/api/vdr/users'],
   });
 
   const handleGrantPermission = () => {

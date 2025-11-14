@@ -92,6 +92,19 @@ const requireVdrAccess = (capability: 'view' | 'download' | 'print' | 'manage') 
   };
 };
 
+// Get users in organization for permission management
+router.get('/users', requireAuth, async (req: Request, res: Response) => {
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const users = await storage.getUsersByOrganization(orgId);
+    res.json(users);
+  } catch (error: any) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
 router.get('/projects/:projectId/folders', requireAuth, requireVdrAccess('view'), async (req: Request, res: Response) => {
   const { projectId } = req.params;
   const orgId = (req.user as any).orgId;
