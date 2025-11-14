@@ -335,6 +335,12 @@ export class VdrDocumentRepository implements IVdrDocumentRepository {
 }
 
 export class VdrPermissionRepository implements IVdrPermissionRepository {
+  private permissionService?: any;
+
+  setPermissionService(service: any) {
+    this.permissionService = service;
+  }
+
   async getPermission(id: string): Promise<VdrDocumentPermission | undefined> {
     const [permission] = await db.select()
       .from(vdrDocumentPermissions)
@@ -375,16 +381,39 @@ export class VdrPermissionRepository implements IVdrPermissionRepository {
     const [permission] = await db.insert(vdrDocumentPermissions)
       .values(data as any)
       .returning();
+    
+    if (this.permissionService) {
+      if (permission.documentId) {
+        this.permissionService.clearCacheForResource('document', permission.documentId);
+      } else if (permission.folderId) {
+        this.permissionService.clearCacheForResource('folder', permission.folderId);
+      } else if (permission.projectId) {
+        this.permissionService.clearCacheForResource('project', permission.projectId);
+      }
+    }
+    
     return permission;
   }
 
   async revokePermission(id: string, orgId: string): Promise<boolean> {
+    const permission = await this.getPermission(id);
+    
     const result = await db.delete(vdrDocumentPermissions)
       .where(and(
         eq(vdrDocumentPermissions.id, id),
         eq(vdrDocumentPermissions.orgId, orgId)
       ))
       .returning();
+    
+    if (result.length > 0 && this.permissionService && permission) {
+      if (permission.documentId) {
+        this.permissionService.clearCacheForResource('document', permission.documentId);
+      } else if (permission.folderId) {
+        this.permissionService.clearCacheForResource('folder', permission.folderId);
+      } else if (permission.projectId) {
+        this.permissionService.clearCacheForResource('project', permission.projectId);
+      }
+    }
     
     return result.length > 0;
   }
@@ -401,6 +430,10 @@ export class VdrPermissionRepository implements IVdrPermissionRepository {
         eq(vdrDocumentPermissions.orgId, orgId)
       ))
       .returning();
+    
+    if (result.length > 0 && this.permissionService) {
+      this.permissionService.clearCacheForUser(userId);
+    }
     
     return result.length > 0;
   }

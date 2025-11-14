@@ -759,9 +759,27 @@ export interface IStorage {
     dealsByBroker: Array<{ brokerId: string; brokerName: string; count: number; totalValue: number }>;
     dealsByRegion: Array<{ region: string; count: number; totalValue: number }>;
   }>;
+
+  // Virtual Data Room - Composed VDR storage access
+  vdr: import("./vdr-storage").IVdrStorage;
 }
 
 export class DatabaseStorage implements IStorage {
+  vdr: import("./vdr-storage").IVdrStorage;
+  private permissionService: import("./vdr-permission-service").VdrPermissionService;
+
+  constructor() {
+    const { VdrStorage } = require("./vdr-storage");
+    const { VdrPermissionService } = require("./vdr-permission-service");
+    
+    this.vdr = new VdrStorage();
+    this.permissionService = new VdrPermissionService(this.vdr);
+    
+    if (this.vdr.permissions && 'setPermissionService' in this.vdr.permissions) {
+      (this.vdr.permissions as any).setPermissionService(this.permissionService);
+    }
+  }
+
   async getOrganization(id: string): Promise<Organization | undefined> {
     const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
     return org || undefined;

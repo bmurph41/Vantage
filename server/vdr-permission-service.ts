@@ -36,8 +36,8 @@ export class VdrPermissionService implements IVdrPermissionService {
   private vdrStorage: VdrStorage;
   private permissionCache: Map<string, { level: PermissionLevel; expires: number }>;
 
-  constructor(vdrStorage?: VdrStorage) {
-    this.vdrStorage = vdrStorage || new VdrStorage();
+  constructor(vdrStorage: VdrStorage) {
+    this.vdrStorage = vdrStorage;
     this.permissionCache = new Map();
   }
 
@@ -120,7 +120,7 @@ export class VdrPermissionService implements IVdrPermissionService {
       if (directPermission) {
         effectivePermission = directPermission.permissionLevel;
       } else {
-        effectivePermission = 'view_only';
+        effectivePermission = 'no_access';
       }
     }
 
@@ -185,8 +185,12 @@ export class VdrPermissionService implements IVdrPermissionService {
         effectivePermission = parentPermission;
       } else {
         const projectAccess = await this.vdrStorage.externalUsers.getProjectAccessForUser(externalUserId, orgId);
-        const hasAccess = projectAccess.find(a => a.projectId === folder.projectId);
-        effectivePermission = hasAccess ? 'view_only' : 'no_access';
+        const access = projectAccess.find(a => a.projectId === folder.projectId);
+        if (access && access.canViewFolders && access.canViewFolders.includes(resourceId)) {
+          effectivePermission = 'view_only';
+        } else {
+          effectivePermission = 'no_access';
+        }
       }
     } else if (resourceType === 'project') {
       const projectPermissions = await this.vdrStorage.permissions.getPermissionsForProject(resourceId, orgId);
@@ -195,9 +199,7 @@ export class VdrPermissionService implements IVdrPermissionService {
       if (directPermission) {
         effectivePermission = directPermission.permissionLevel;
       } else {
-        const projectAccess = await this.vdrStorage.externalUsers.getProjectAccessForUser(externalUserId, orgId);
-        const hasAccess = projectAccess.find(a => a.projectId === resourceId);
-        effectivePermission = hasAccess ? 'view_only' : 'no_access';
+        effectivePermission = 'no_access';
       }
     }
 
