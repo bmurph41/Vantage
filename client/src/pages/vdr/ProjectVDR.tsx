@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, FolderLock, FileText, Users, Shield, ClipboardList, Activity } from "lucide-react";
+import { ArrowLeft, FolderLock, FileText, Users, Shield, ClipboardList, Activity, CheckSquare } from "lucide-react";
 import { DocumentsWorkspace } from "@/components/vdr/DocumentsWorkspace";
 import { PermissionViewer } from "@/components/vdr/PermissionViewer";
 import { ExternalUsersTab } from "@/components/vdr/ExternalUsersTab";
@@ -70,6 +70,12 @@ export default function ProjectVDR() {
             </div>
           </div>
         </div>
+        <Link href={`/projects/${projectId}`}>
+          <Button variant="outline" data-testid="link-dd-project">
+            <CheckSquare className="h-4 w-4 mr-2" />
+            DD Project
+          </Button>
+        </Link>
       </div>
 
       <Tabs defaultValue="documents" className="space-y-4">
