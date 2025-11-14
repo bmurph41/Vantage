@@ -2064,9 +2064,11 @@ export const vdrFolders = pgTable("vdr_folders", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete support
 }, (table) => ({
   projectIdx: index("vdr_folders_project_idx").on(table.projectId),
   parentIdx: index("vdr_folders_parent_idx").on(table.parentFolderId),
+  orgIdx: index("vdr_folders_org_idx").on(table.orgId),
 }));
 
 // VDR Documents - Core document storage with versioning support
@@ -2097,10 +2099,12 @@ export const vdrDocuments = pgTable("vdr_documents", {
   uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete support
 }, (table) => ({
   folderIdx: index("vdr_documents_folder_idx").on(table.folderId),
   projectIdx: index("vdr_documents_project_idx").on(table.projectId),
   versionIdx: index("vdr_documents_version_idx").on(table.parentDocumentId, table.version),
+  orgIdx: index("vdr_documents_org_idx").on(table.orgId),
 }));
 
 // VDR Document Permissions - Granular access control (user/role/folder/document level)
@@ -2128,6 +2132,7 @@ export const vdrDocumentPermissions = pgTable("vdr_document_permissions", {
   folderIdx: index("vdr_permissions_folder_idx").on(table.folderId),
   userIdx: index("vdr_permissions_user_idx").on(table.userId),
   externalUserIdx: index("vdr_permissions_external_user_idx").on(table.externalUserId),
+  orgIdx: index("vdr_document_permissions_org_idx").on(table.orgId),
 }));
 
 // VDR Watermarks - Dynamic/static watermark configuration
@@ -2174,6 +2179,7 @@ export const vdrAuditLogs = pgTable("vdr_audit_logs", {
   userIdx: index("vdr_audit_logs_user_idx").on(table.userId),
   externalUserIdx: index("vdr_audit_logs_external_user_idx").on(table.externalUserId),
   timestampIdx: index("vdr_audit_logs_timestamp_idx").on(table.timestamp),
+  orgIdx: index("vdr_audit_logs_org_idx").on(table.orgId),
 }));
 
 // ============================================================================
@@ -2208,10 +2214,12 @@ export const diligenceRequests = pgTable("diligence_requests", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete support
 }, (table) => ({
   projectIdx: index("diligence_requests_project_idx").on(table.projectId),
   assigneeIdx: index("diligence_requests_assignee_idx").on(table.assigneeId),
   statusIdx: index("diligence_requests_status_idx").on(table.status),
+  orgIdx: index("diligence_requests_org_idx").on(table.orgId),
 }));
 
 // Request Documents - Link documents to requests (many-to-many)
@@ -2286,6 +2294,7 @@ export const externalUsers = pgTable("external_users", {
 }, (table) => ({
   emailOrgIdx: unique("external_users_email_org_idx").on(table.email, table.orgId),
   tokenIdx: index("external_users_token_idx").on(table.invitationToken),
+  orgIdx: index("external_users_org_idx").on(table.orgId),
 }));
 
 // External User Project Access - Which projects external users can access
