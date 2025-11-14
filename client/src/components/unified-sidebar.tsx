@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -78,6 +78,11 @@ const ddNav = [
   { name: "Progress Report", href: "/progress-report", icon: ClipboardList },
 ];
 
+// VDR Navigation
+const vdrNav = [
+  { name: "Data Room", href: "/vdr", icon: FolderLock },
+];
+
 // Modeling Navigation
 const modelingNav = [
   { name: "Projects", href: "/modeling/projects", icon: TrendingUp },
@@ -108,6 +113,7 @@ export default function UnifiedSidebar() {
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [ddExpanded, setDdExpanded] = useState(false);
+  const [vdrExpanded, setVdrExpanded] = useState(false);
   const [modelingExpanded, setModelingExpanded] = useState(false);
   const [analysisExpanded, setAnalysisExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -136,6 +142,7 @@ export default function UnifiedSidebar() {
       crm: ['pe_investor', 'broker'],
       operations: ['pe_investor', 'operator'],
       due_diligence: ['pe_investor', 'broker'],
+      vdr: ['pe_investor', 'broker'],
       modeling: ['pe_investor', 'advisor'],
       analysis: ['pe_investor', 'broker', 'advisor'],
     };
@@ -431,6 +438,20 @@ export default function UnifiedSidebar() {
               onToggle={() => setDdExpanded(!ddExpanded)} 
             />
             {ddExpanded && ddNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
+          </div>
+        )}
+        
+        {/* VDR Section */}
+        {canViewSection('vdr') && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="Data Room" 
+              expanded={vdrExpanded} 
+              onToggle={() => setVdrExpanded(!vdrExpanded)} 
+            />
+            {vdrExpanded && vdrNav.map((item) => (
               <NavLink key={item.name} item={item} />
             ))}
           </div>

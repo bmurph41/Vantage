@@ -83,6 +83,9 @@ import DemographicsIndex from "@/pages/analysis/demographics/Index";
 import BenchmarksIndex from "@/pages/analysis/benchmarks/Index";
 import DebtScenariosIndex from "@/pages/modeling/debt-scenarios/Index";
 import ModelingProjectsIndex from "@/pages/modeling/projects";
+// VDR pages
+import VDRDashboard from "@/pages/vdr/Dashboard";
+import ProjectVDR from "@/pages/vdr/ProjectVDR";
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
@@ -205,6 +208,22 @@ function Router() {
         {(params) => (
           <UnifiedLayout>
             <DDProgressReportPage {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      
+      {/* VDR Routes with Unified Layout */}
+      <Route path="/vdr">
+        {() => (
+          <UnifiedLayout>
+            <VDRDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/vdr/projects/:id">
+        {() => (
+          <UnifiedLayout>
+            <ProjectVDR />
           </UnifiedLayout>
         )}
       </Route>
