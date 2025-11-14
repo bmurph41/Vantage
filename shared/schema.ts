@@ -74,6 +74,15 @@ export const contactTagEnum = pgEnum("contact_tag", ["lead", "seller", "competit
 export const phoneTypeEnum = pgEnum("phone_type", ["office", "mobile", "home"]);
 export const dealOutcomeEnum = pgEnum("deal_outcome", ["won", "lost", "passed", "under_review", "active"]);
 
+// VDR & Request Management enums
+export const vdrPermissionLevelEnum = pgEnum("vdr_permission_level", ["no_access", "view_only", "view_download", "view_download_print", "full_access"]);
+export const watermarkTypeEnum = pgEnum("watermark_type", ["static", "dynamic"]);
+export const auditEventTypeEnum = pgEnum("audit_event_type", ["view", "download", "print", "share", "edit", "delete", "permission_change"]);
+export const requestStatusEnum = pgEnum("request_status", ["pending", "in_review", "responded", "completed", "blocked"]);
+export const requestPriorityEnum = pgEnum("request_priority", ["low", "medium", "high", "critical"]);
+export const externalUserRoleEnum = pgEnum("external_user_role", ["seller", "buyer", "advisor", "auditor", "lender", "attorney", "other"]);
+export const requestCategoryEnum = pgEnum("request_category", ["financial", "legal", "hr", "it", "commercial", "environmental", "tax", "ip", "regulatory", "operational", "other"]);
+
 // Persona and Dashboard enums
 export const personaTypeEnum = pgEnum("persona_type", ["pe_investor", "broker", "operator", "advisor"]);
 export const widgetCategoryEnum = pgEnum("widget_category", ["analytics", "pipeline", "operations", "finance", "tasks", "market_intel"]);
@@ -2037,6 +2046,263 @@ export const crmFiles = pgTable("crm_files", {
   ownerId: varchar("owner_id").references(() => users.id).notNull(), // for multi-tenant access control
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ============================================================================
+// VIRTUAL DATA ROOM (VDR) - DealRoom-competitive secure document repository
+// ============================================================================
+
+// VDR Folders - Hierarchical folder structure for document organization
+export const vdrFolders = pgTable("vdr_folders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  parentFolderId: varchar("parent_folder_id"), // Self-reference for hierarchy
+  name: text("name").notNull(),
+  path: text("path").notNull(), // Full path for easy breadcrumb navigation
+  displayOrder: integer("display_order").notNull().default(0),
+  description: text("description"),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("vdr_folders_project_idx").on(table.projectId),
+  parentIdx: index("vdr_folders_parent_idx").on(table.parentFolderId),
+}));
+
+// VDR Documents - Core document storage with versioning support
+export const vdrDocuments = pgTable("vdr_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  folderId: varchar("folder_id").notNull().references(() => vdrFolders.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  filename: text("filename").notNull(), // Display name
+  originalFilename: text("original_filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(), // bytes
+  checksum: text("checksum").notNull(), // SHA-256 for integrity verification
+  storagePath: text("storage_path").notNull(), // S3 key or filesystem path
+  thumbnailPath: text("thumbnail_path"), // For images/PDFs
+  version: integer("version").notNull().default(1),
+  isCurrentVersion: boolean("is_current_version").notNull().default(true),
+  parentDocumentId: varchar("parent_document_id"), // Link to original for versions
+  // AI-extracted metadata
+  extractedText: text("extracted_text"), // OCR or PDF text extraction
+  aiCategory: text("ai_category"), // Auto-categorized by AI
+  aiTags: text("ai_tags").array().default(sql`'{}'`),
+  aiSummary: text("ai_summary"),
+  aiRiskFlags: jsonb("ai_risk_flags").default(sql`'[]'`), // Array of {flag, severity, description}
+  // User metadata
+  description: text("description"),
+  tags: text("tags").array().default(sql`'{}'`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  folderIdx: index("vdr_documents_folder_idx").on(table.folderId),
+  projectIdx: index("vdr_documents_project_idx").on(table.projectId),
+  versionIdx: index("vdr_documents_version_idx").on(table.parentDocumentId, table.version),
+}));
+
+// VDR Document Permissions - Granular access control (user/role/folder/document level)
+export const vdrDocumentPermissions = pgTable("vdr_document_permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Permission target (one of these must be set)
+  documentId: varchar("document_id").references(() => vdrDocuments.id),
+  folderId: varchar("folder_id").references(() => vdrFolders.id),
+  projectId: varchar("project_id").references(() => projects.id),
+  // Permission subject (one of these must be set)
+  userId: varchar("user_id").references(() => users.id),
+  externalUserId: varchar("external_user_id"), // References external_users (defined below)
+  roleEnum: roleEnum("role_enum"), // Apply to all users with this role
+  // Permission details
+  permissionLevel: vdrPermissionLevelEnum("permission_level").notNull(),
+  expiresAt: timestamp("expires_at"), // Time-limited access
+  ipWhitelist: text("ip_whitelist").array().default(sql`'{}'`), // Restrict to IPs
+  deviceRestrictions: jsonb("device_restrictions").default(sql`'{}'`), // {allowMobile: false, etc}
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  grantedBy: varchar("granted_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  documentIdx: index("vdr_permissions_document_idx").on(table.documentId),
+  folderIdx: index("vdr_permissions_folder_idx").on(table.folderId),
+  userIdx: index("vdr_permissions_user_idx").on(table.userId),
+  externalUserIdx: index("vdr_permissions_external_user_idx").on(table.externalUserId),
+}));
+
+// VDR Watermarks - Dynamic/static watermark configuration
+export const vdrWatermarks = pgTable("vdr_watermarks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Watermark target (apply to document, folder, or whole project)
+  documentId: varchar("document_id").references(() => vdrDocuments.id),
+  folderId: varchar("folder_id").references(() => vdrFolders.id),
+  projectId: varchar("project_id").references(() => projects.id),
+  watermarkType: watermarkTypeEnum("watermark_type").notNull(),
+  staticText: text("static_text"), // For static watermarks
+  isDynamic: boolean("is_dynamic").notNull().default(true), // Show viewer name/email/time
+  opacity: integer("opacity").notNull().default(30), // 0-100
+  position: text("position").notNull().default("diagonal"), // diagonal, center, corners, tiled
+  includeQrCode: boolean("include_qr_code").notNull().default(false),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  documentIdx: index("vdr_watermarks_document_idx").on(table.documentId),
+  folderIdx: index("vdr_watermarks_folder_idx").on(table.folderId),
+  projectIdx: index("vdr_watermarks_project_idx").on(table.projectId),
+}));
+
+// VDR Audit Logs - Comprehensive document activity tracking
+export const vdrAuditLogs = pgTable("vdr_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").references(() => vdrDocuments.id),
+  folderId: varchar("folder_id").references(() => vdrFolders.id),
+  // Actor (who performed the action)
+  userId: varchar("user_id").references(() => users.id),
+  externalUserId: varchar("external_user_id"), // References external_users
+  eventType: auditEventTypeEnum("event_type").notNull(),
+  // Event details
+  duration: integer("duration"), // Time spent viewing (seconds)
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  deviceInfo: jsonb("device_info").default(sql`'{}'`), // {browser, os, deviceType}
+  metadata: jsonb("metadata").default(sql`'{}'`), // Additional event context
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+}, (table) => ({
+  documentIdx: index("vdr_audit_logs_document_idx").on(table.documentId),
+  userIdx: index("vdr_audit_logs_user_idx").on(table.userId),
+  externalUserIdx: index("vdr_audit_logs_external_user_idx").on(table.externalUserId),
+  timestampIdx: index("vdr_audit_logs_timestamp_idx").on(table.timestamp),
+}));
+
+// ============================================================================
+// DILIGENCE REQUEST MANAGEMENT - DealRoom-style request tracking
+// ============================================================================
+
+// Diligence Requests - Document requests separate from tasks
+export const diligenceRequests = pgTable("diligence_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  taskId: varchar("task_id").references(() => tasks.id), // Optional link to DD task
+  category: requestCategoryEnum("category").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  priority: requestPriorityEnum("priority").notNull().default("medium"),
+  status: requestStatusEnum("status").notNull().default("pending"),
+  // Assignment
+  assigneeId: varchar("assignee_id").references(() => users.id),
+  externalAssigneeId: varchar("external_assignee_id"), // References external_users
+  externalAssigneeEmail: text("external_assignee_email"), // For manual entry
+  requestorId: varchar("requestor_id").notNull().references(() => users.id),
+  // Dates
+  dueDate: date("due_date"),
+  respondedAt: timestamp("responded_at"),
+  completedAt: timestamp("completed_at"),
+  // Response
+  responseText: text("response_text"),
+  // SLA tracking
+  slaHours: integer("sla_hours"), // Expected response time
+  isOverdue: boolean("is_overdue").notNull().default(false),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("diligence_requests_project_idx").on(table.projectId),
+  assigneeIdx: index("diligence_requests_assignee_idx").on(table.assigneeId),
+  statusIdx: index("diligence_requests_status_idx").on(table.status),
+}));
+
+// Request Documents - Link documents to requests (many-to-many)
+export const requestDocuments = pgTable("request_documents", {
+  requestId: varchar("request_id").notNull().references(() => diligenceRequests.id),
+  documentId: varchar("document_id").notNull().references(() => vdrDocuments.id),
+  linkedBy: varchar("linked_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.requestId, table.documentId] }),
+  requestIdx: index("request_documents_request_idx").on(table.requestId),
+  documentIdx: index("request_documents_document_idx").on(table.documentId),
+}));
+
+// Request Comments - Threaded Q&A on requests
+export const requestComments = pgTable("request_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requestId: varchar("request_id").notNull().references(() => diligenceRequests.id),
+  parentCommentId: varchar("parent_comment_id"), // For threading
+  userId: varchar("user_id").references(() => users.id),
+  externalUserId: varchar("external_user_id"), // References external_users
+  content: text("content").notNull(),
+  mentions: text("mentions").array().default(sql`'{}'`), // User IDs mentioned with @
+  isAnswer: boolean("is_answer").notNull().default(false), // Mark as official answer
+  reactions: jsonb("reactions").default(sql`'{}'`), // {👍: [userId1, userId2], ❤️: [...]}
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  requestIdx: index("request_comments_request_idx").on(table.requestId),
+  parentIdx: index("request_comments_parent_idx").on(table.parentCommentId),
+}));
+
+// Request Templates - Pre-built request lists by category
+export const requestTemplates = pgTable("request_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: requestCategoryEnum("category").notNull(),
+  isGlobal: boolean("is_global").notNull().default(false), // Available to all orgs
+  requests: jsonb("requests").notNull().default(sql`'[]'`), // Array of {title, description, priority}
+  orgId: varchar("org_id").references(() => organizations.id), // Null for global templates
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  categoryIdx: index("request_templates_category_idx").on(table.category),
+  orgIdx: index("request_templates_org_idx").on(table.orgId),
+}));
+
+// ============================================================================
+// EXTERNAL USER ACCESS - Seller/buyer/advisor portal
+// ============================================================================
+
+// External Users - Non-org users with limited access
+export const externalUsers = pgTable("external_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  name: text("name").notNull(),
+  company: text("company"),
+  role: externalUserRoleEnum("role").notNull(),
+  invitedBy: varchar("invited_by").notNull().references(() => users.id),
+  invitationToken: text("invitation_token").unique(),
+  invitationSentAt: timestamp("invitation_sent_at"),
+  acceptedAt: timestamp("accepted_at"),
+  lastLoginAt: timestamp("last_login_at"),
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+  twoFactorSecret: text("two_factor_secret"),
+  isActive: boolean("is_active").notNull().default(true),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  emailOrgIdx: unique("external_users_email_org_idx").on(table.email, table.orgId),
+  tokenIdx: index("external_users_token_idx").on(table.invitationToken),
+}));
+
+// External User Project Access - Which projects external users can access
+export const externalUserProjectAccess = pgTable("external_user_project_access", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  externalUserId: varchar("external_user_id").notNull().references(() => externalUsers.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  canViewFolders: text("can_view_folders").array().default(sql`'{}'`), // Folder IDs
+  canViewRequests: text("can_view_requests").array().default(sql`'{}'`), // Request IDs
+  expiresAt: timestamp("expires_at"),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  grantedBy: varchar("granted_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  externalUserIdx: index("external_project_access_user_idx").on(table.externalUserId),
+  projectIdx: index("external_project_access_project_idx").on(table.projectId),
+}));
 
 // Contact Roles table - defines relationships between contacts and deals
 
@@ -5975,3 +6241,161 @@ export type UpdateOwnedAsset = z.infer<typeof updateOwnedAssetSchema>;
 export type AssetPerformanceSnapshot = typeof assetPerformanceSnapshots.$inferSelect;
 export type InsertAssetPerformanceSnapshot = z.infer<typeof insertAssetPerformanceSnapshotSchema>;
 export type UpdateAssetPerformanceSnapshot = z.infer<typeof updateAssetPerformanceSnapshotSchema>;
+
+// ============================================================================
+// VDR (Virtual Data Room) Schemas and Types
+// ============================================================================
+
+// VDR Folders
+export const insertVdrFolderSchema = createInsertSchema(vdrFolders).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateVdrFolderSchema = insertVdrFolderSchema.partial();
+
+export type VdrFolder = typeof vdrFolders.$inferSelect;
+export type InsertVdrFolder = z.infer<typeof insertVdrFolderSchema>;
+export type UpdateVdrFolder = z.infer<typeof updateVdrFolderSchema>;
+
+// VDR Documents
+export const insertVdrDocumentSchema = createInsertSchema(vdrDocuments).omit({
+  id: true,
+  orgId: true,
+  uploadedBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateVdrDocumentSchema = insertVdrDocumentSchema.partial();
+
+export type VdrDocument = typeof vdrDocuments.$inferSelect;
+export type InsertVdrDocument = z.infer<typeof insertVdrDocumentSchema>;
+export type UpdateVdrDocument = z.infer<typeof updateVdrDocumentSchema>;
+
+// VDR Document Permissions
+export const insertVdrDocumentPermissionSchema = createInsertSchema(vdrDocumentPermissions).omit({
+  id: true,
+  orgId: true,
+  grantedBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateVdrDocumentPermissionSchema = insertVdrDocumentPermissionSchema.partial();
+
+export type VdrDocumentPermission = typeof vdrDocumentPermissions.$inferSelect;
+export type InsertVdrDocumentPermission = z.infer<typeof insertVdrDocumentPermissionSchema>;
+export type UpdateVdrDocumentPermission = z.infer<typeof updateVdrDocumentPermissionSchema>;
+
+// VDR Watermarks
+export const insertVdrWatermarkSchema = createInsertSchema(vdrWatermarks).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+});
+
+export const updateVdrWatermarkSchema = insertVdrWatermarkSchema.partial();
+
+export type VdrWatermark = typeof vdrWatermarks.$inferSelect;
+export type InsertVdrWatermark = z.infer<typeof insertVdrWatermarkSchema>;
+export type UpdateVdrWatermark = z.infer<typeof updateVdrWatermarkSchema>;
+
+// VDR Audit Logs
+export const insertVdrAuditLogSchema = createInsertSchema(vdrAuditLogs).omit({
+  id: true,
+  orgId: true,
+  timestamp: true,
+});
+
+export type VdrAuditLog = typeof vdrAuditLogs.$inferSelect;
+export type InsertVdrAuditLog = z.infer<typeof insertVdrAuditLogSchema>;
+
+// ============================================================================
+// Diligence Request Management Schemas and Types
+// ============================================================================
+
+// Diligence Requests
+export const insertDiligenceRequestSchema = createInsertSchema(diligenceRequests).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateDiligenceRequestSchema = insertDiligenceRequestSchema.partial();
+
+export type DiligenceRequest = typeof diligenceRequests.$inferSelect;
+export type InsertDiligenceRequest = z.infer<typeof insertDiligenceRequestSchema>;
+export type UpdateDiligenceRequest = z.infer<typeof updateDiligenceRequestSchema>;
+
+// Request Documents (junction table)
+export const insertRequestDocumentSchema = createInsertSchema(requestDocuments).omit({
+  createdAt: true,
+});
+
+export type RequestDocument = typeof requestDocuments.$inferSelect;
+export type InsertRequestDocument = z.infer<typeof insertRequestDocumentSchema>;
+
+// Request Comments
+export const insertRequestCommentSchema = createInsertSchema(requestComments).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateRequestCommentSchema = insertRequestCommentSchema.partial();
+
+export type RequestComment = typeof requestComments.$inferSelect;
+export type InsertRequestComment = z.infer<typeof insertRequestCommentSchema>;
+export type UpdateRequestComment = z.infer<typeof updateRequestCommentSchema>;
+
+// Request Templates
+export const insertRequestTemplateSchema = createInsertSchema(requestTemplates).omit({
+  id: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateRequestTemplateSchema = insertRequestTemplateSchema.partial();
+
+export type RequestTemplate = typeof requestTemplates.$inferSelect;
+export type InsertRequestTemplate = z.infer<typeof insertRequestTemplateSchema>;
+export type UpdateRequestTemplate = z.infer<typeof updateRequestTemplateSchema>;
+
+// ============================================================================
+// External User Management Schemas and Types
+// ============================================================================
+
+// External Users
+export const insertExternalUserSchema = createInsertSchema(externalUsers).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+});
+
+export const updateExternalUserSchema = insertExternalUserSchema.partial();
+
+export type ExternalUser = typeof externalUsers.$inferSelect;
+export type InsertExternalUser = z.infer<typeof insertExternalUserSchema>;
+export type UpdateExternalUser = z.infer<typeof updateExternalUserSchema>;
+
+// External User Project Access
+export const insertExternalUserProjectAccessSchema = createInsertSchema(externalUserProjectAccess).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+});
+
+export const updateExternalUserProjectAccessSchema = insertExternalUserProjectAccessSchema.partial();
+
+export type ExternalUserProjectAccess = typeof externalUserProjectAccess.$inferSelect;
+export type InsertExternalUserProjectAccess = z.infer<typeof insertExternalUserProjectAccessSchema>;
+export type UpdateExternalUserProjectAccess = z.infer<typeof updateExternalUserProjectAccessSchema>;
