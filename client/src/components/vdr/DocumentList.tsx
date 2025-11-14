@@ -27,10 +27,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileText, Upload, Download, Trash2, MoreVertical, FolderOpen, History } from "lucide-react";
+import { FileText, Upload, Download, Trash2, MoreVertical, FolderOpen, History, Search, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { VersionHistoryDrawer } from "./VersionHistoryDrawer";
+import { queryClient } from "@/lib/queryClient";
 
 type VdrDocument = {
   id: string;
@@ -71,11 +72,28 @@ export function DocumentList({
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
   const [historyDocument, setHistoryDocument] = useState<{ id: string; name: string } | null>(null);
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   const { data: documents = [], isLoading } = useQuery<VdrDocument[]>({
     queryKey: ['/api/vdr/folders', folderId, 'documents'],
-    enabled: !!folderId,
+    enabled: !!folderId && !isSearching,
   });
+
+  const { data: searchResults = [], isLoading: isSearchLoading } = useQuery<VdrDocument[]>({
+    queryKey: ['/api/vdr/projects', projectId, 'documents/search', searchQuery],
+    queryFn: async () => {
+      const res = await fetch(`/api/vdr/projects/${projectId}/documents/search?q=${encodeURIComponent(searchQuery)}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Search failed');
+      return res.json();
+    },
+    enabled: isSearching && searchQuery.trim().length > 0,
+  });
+
+  const displayDocuments = isSearching ? searchResults : documents;
+  const showLoading = isSearching ? isSearchLoading : isLoading;
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -222,7 +240,7 @@ export function DocumentList({
     );
   }
 
-  if (isLoading) {
+  if (showLoading) {
     return (
       <div className="h-full bg-white p-6 space-y-4">
         <Skeleton className="h-10 w-full" />
@@ -255,29 +273,73 @@ export function DocumentList({
             </Button>
           </div>
         </div>
+        
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search documents by name, description, or type..."
+            className="pl-10 pr-10"
+            value={searchQuery}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSearchQuery(value);
+              setIsSearching(value.trim().length > 0);
+            }}
+            data-testid="input-search-documents"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setIsSearching(false);
+                if (folderId) {
+                  queryClient.invalidateQueries({ queryKey: ['/api/vdr/folders', folderId, 'documents'] });
+                }
+              }}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              data-testid="button-clear-search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        
         {bulkUploading && (
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Upload className="h-4 w-4 animate-pulse" />
             <span>Uploading files...</span>
           </div>
         )}
+        
+        {isSearching && (
+          <div className="text-sm text-gray-600">
+            {isSearchLoading ? "Searching..." : `Found ${displayDocuments.length} document${displayDocuments.length !== 1 ? 's' : ''}`}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto p-6">
-        {documents.length === 0 ? (
+        {displayDocuments.length === 0 ? (
           <Card className="p-12">
             <div className="text-center">
               <FileText className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900">No Documents</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {isSearching ? "No Results Found" : "No Documents"}
+              </h3>
               <p className="text-gray-600 mt-1">
-                Upload your first document to this folder
+                {isSearching 
+                  ? "Try a different search term"
+                  : "Upload your first document to this folder"}
               </p>
-              <Button asChild className="mt-4" data-testid="button-upload-first-document">
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Document
-                </label>
-              </Button>
+              {!isSearching && (
+                <Button asChild className="mt-4" data-testid="button-upload-first-document">
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Document
+                  </label>
+                </Button>
+              )}
             </div>
           </Card>
         ) : (
@@ -292,7 +354,7 @@ export function DocumentList({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {documents.map((doc) => (
+              {displayDocuments.map((doc) => (
                 <TableRow key={doc.id} data-testid={`document-row-${doc.id}`}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">

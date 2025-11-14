@@ -877,6 +877,39 @@ router.get('/projects/:projectId/analytics', requireAuth, async (req: Request, r
   }
 });
 
+router.get('/projects/:projectId/documents/search', requireAuth, requireVdrAccess('view'), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const { q } = req.query;
+  const orgId = (req.user as any).orgId;
+
+  if (!q || typeof q !== 'string' || q.trim().length === 0) {
+    return res.status(400).json({ error: 'Search query is required' });
+  }
+
+  try {
+    const searchTerm = `%${q.trim()}%`;
+    
+    const documents = await db.select()
+      .from(vdrDocuments)
+      .where(and(
+        eq(vdrDocuments.projectId, projectId),
+        eq(vdrDocuments.orgId, orgId),
+        sql`(
+          ${vdrDocuments.name} ILIKE ${searchTerm} OR
+          ${vdrDocuments.originalName} ILIKE ${searchTerm} OR
+          COALESCE(${vdrDocuments.description}, '') ILIKE ${searchTerm} OR
+          ${vdrDocuments.fileType} ILIKE ${searchTerm}
+        )`
+      ))
+      .orderBy(vdrDocuments.name);
+
+    res.json(documents);
+  } catch (error: any) {
+    console.error('Error searching documents:', error);
+    res.status(500).json({ error: 'Failed to search documents' });
+  }
+});
+
 router.post('/documents/bulk-download', requireAuth, async (req: Request, res: Response) => {
   const { documentIds } = req.body;
   const orgId = (req.user as any).orgId;
