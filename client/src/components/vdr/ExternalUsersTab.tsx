@@ -31,7 +31,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { UserPlus, Mail, Building, Briefcase, Calendar } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { UserPlus, Mail, Building, Briefcase, Calendar, FolderOpen, FileText, Clock, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 
 type ProjectExternalUser = ExternalUser & { access: ExternalUserProjectAccess };
@@ -97,14 +98,21 @@ export function ExternalUsersTab({ projectId }: ExternalUsersTabProps) {
     return colors[role] || colors.other;
   };
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      active: 'bg-green-500',
-      invited: 'bg-blue-500',
-      expired: 'bg-red-500',
-      revoked: 'bg-gray-500',
+  const getAccessStatusBadge = (status: string) => {
+    const styles: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline', className: string }> = {
+      active: { variant: 'default', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
+      revoked: { variant: 'destructive', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
+      expired: { variant: 'secondary', className: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300' },
     };
-    return colors[status] || colors.invited;
+    return styles[status] || styles.active;
+  };
+
+  const isAccessExpiringSoon = (expiresAt: string | Date | null): boolean => {
+    if (!expiresAt) return false;
+    const expiryDate = new Date(expiresAt);
+    const msUntilExpiry = expiryDate.getTime() - Date.now();
+    const daysUntilExpiry = msUntilExpiry / (1000 * 60 * 60 * 24);
+    return daysUntilExpiry <= 7 && daysUntilExpiry > 0;
   };
 
   if (isLoading) {
@@ -273,40 +281,72 @@ export function ExternalUsersTab({ projectId }: ExternalUsersTabProps) {
         <div className="grid gap-4">
           {externalUsers.map((user) => (
             <Card key={user.id} className="p-4" data-testid={`card-external-user-${user.id}`}>
-              <div className="flex items-start justify-between">
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-semibold text-lg" data-testid={`text-user-name-${user.id}`}>
-                      {user.name}
-                    </h3>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadge(user.role)}`}>
-                      {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <div className={`h-2 w-2 rounded-full ${getStatusColor(user.status)}`} />
-                      <span className="text-xs text-muted-foreground capitalize">
-                        {user.status}
+              <div className="space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h3 className="font-semibold text-lg" data-testid={`text-user-name-${user.id}`}>
+                        {user.name}
+                      </h3>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadge(user.role)}`}>
+                        {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                       </span>
+                      <Badge 
+                        variant={getAccessStatusBadge(user.access.status).variant}
+                        className={getAccessStatusBadge(user.access.status).className}
+                        data-testid={`badge-access-status-${user.id}`}
+                      >
+                        <Shield className="h-3 w-3 mr-1" />
+                        {user.access.status.charAt(0).toUpperCase() + user.access.status.slice(1)}
+                      </Badge>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
-                      <Mail className="h-4 w-4" />
-                      <span data-testid={`text-user-email-${user.id}`}>{user.email}</span>
-                    </div>
-                    {user.company && (
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1.5">
-                        <Building className="h-4 w-4" />
-                        <span>{user.company}</span>
+                        <Mail className="h-4 w-4" />
+                        <span data-testid={`text-user-email-${user.id}`}>{user.email}</span>
                       </div>
-                    )}
-                  </div>
-                  {user.invitedAt && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
-                      <span>Invited {format(new Date(user.invitedAt), 'MMM d, yyyy')}</span>
+                      {user.company && (
+                        <div className="flex items-center gap-1.5">
+                          <Building className="h-4 w-4" />
+                          <span>{user.company}</span>
+                        </div>
+                      )}
                     </div>
-                  )}
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      {user.invitedAt && (
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3 w-3" />
+                          <span>Invited {format(new Date(user.invitedAt), 'MMM d, yyyy')}</span>
+                        </div>
+                      )}
+                      {user.access.expiresAt && (
+                        <div className={`flex items-center gap-1.5 ${isAccessExpiringSoon(user.access.expiresAt) ? 'text-orange-600 dark:text-orange-400 font-medium' : ''}`}>
+                          <Clock className="h-3 w-3" />
+                          <span>
+                            Expires {format(new Date(user.access.expiresAt), 'MMM d, yyyy')}
+                            {isAccessExpiringSoon(user.access.expiresAt) && ' (Soon)'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-6 pt-2 border-t border-border">
+                  <div className="flex items-center gap-2 text-sm">
+                    <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{user.access.canViewFolders?.length || 0}</span>
+                    <span className="text-muted-foreground">
+                      {user.access.canViewFolders?.length === 1 ? 'Folder' : 'Folders'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{user.access.canViewRequests?.length || 0}</span>
+                    <span className="text-muted-foreground">
+                      {user.access.canViewRequests?.length === 1 ? 'Request' : 'Requests'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </Card>
