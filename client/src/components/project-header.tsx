@@ -197,7 +197,7 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
             </Button>
           </a>
           <a href={`/vdr/projects/${project.id}`}>
-            <Button variant="outline" data-testid="link-data-room">
+            <Button variant="outline" className="border-orange-500 text-orange-700 hover:bg-orange-50" data-testid="link-data-room">
               <FolderLock className="h-4 w-4 mr-2" />
               Data Room
             </Button>

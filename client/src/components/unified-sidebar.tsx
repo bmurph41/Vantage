@@ -205,7 +205,6 @@ export default function UnifiedSidebar() {
   const NavLink = ({ item }: { item: { name: string; href: string; icon: any; badge?: string; disabled?: boolean } }) => {
     const isActive = location === item.href;
     const isDisabled = item.disabled || false;
-    const isDataRoom = item.name === "Data Room";
     
     if (isDisabled) {
       return (
@@ -225,21 +224,12 @@ export default function UnifiedSidebar() {
         href={item.href}
         onClick={handleNavClick}
         className={cn(
-          "flex items-center px-4 py-2.5 text-sm transition-colors",
-          isDataRoom 
-            ? isActive 
-              ? "bg-purple-50 border-r-3 border-purple-600 text-purple-700 font-medium"
-              : "text-purple-600 hover:bg-purple-50 hover:text-purple-700 font-medium"
-            : isActive 
-              ? "bg-blue-50 border-r-3 border-blue-600 text-blue-600 font-medium"
-              : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+          "flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors",
+          isActive && "bg-blue-50 border-r-3 border-blue-600 text-blue-600 font-medium"
         )}
         data-testid={`nav-${item.name.toLowerCase().replace(/ /g, '-')}`}
       >
-        <item.icon className={cn(
-          "w-4 h-4 mr-3 flex-shrink-0", 
-          isDataRoom ? "text-purple-600" : isActive && "text-blue-600"
-        )} />
+        <item.icon className={cn("w-4 h-4 mr-3 flex-shrink-0", isActive && "text-blue-600")} />
         <span className="truncate">{item.name}</span>
         {item.badge && (
           <span className="ml-auto text-xs bg-blue-500 text-white rounded-full px-2 py-0.5" data-testid={`badge-${item.name.toLowerCase().replace(/ /g, '-')}`}>
