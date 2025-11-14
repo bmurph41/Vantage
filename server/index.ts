@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { deadlineMonitor } from "./deadline-monitor";
 import { reconciliationService } from "./reconciliation-service";
+import { vdrFileService } from "./vdr-file-service";
 
 const app = express();
 app.use(express.json());
@@ -84,6 +85,14 @@ app.use((req, res, next) => {
       log('🚀 Document reconciliation service started');
     } catch (error) {
       log(`❌ Failed to start document reconciliation service: ${error}`);
+    }
+
+    // Initialize VDR file service directories
+    try {
+      await vdrFileService.initialize();
+      log('🚀 VDR file service initialized');
+    } catch (error) {
+      log(`❌ Failed to initialize VDR file service: ${error}`);
     }
   });
 })();

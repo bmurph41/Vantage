@@ -58,6 +58,8 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count } from "drizzle-orm";
+import { VdrStorage } from "./vdr-storage";
+import { VdrPermissionService } from "./vdr-permission-service";
 
 export interface IStorage {
   // Organizations
@@ -766,12 +768,9 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   vdr: import("./vdr-storage").IVdrStorage;
-  private permissionService: import("./vdr-permission-service").VdrPermissionService;
+  private permissionService: VdrPermissionService;
 
   constructor() {
-    const { VdrStorage } = require("./vdr-storage");
-    const { VdrPermissionService } = require("./vdr-permission-service");
-    
     this.vdr = new VdrStorage();
     this.permissionService = new VdrPermissionService(this.vdr);
     

@@ -16,6 +16,7 @@ import { FuelSyncService } from "./services/fuel/fuel-sync-service";
 import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/duplicate-finder";
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { AuditService } from "./services/audit-service";
+import vdrRouter from "./vdr-routes";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
 import { marketingService } from "./services/marketing-service";
@@ -217,6 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rc-recommendations", authenticateUser);
   app.use("/api/rc-pending-properties", authenticateUser);
   app.use("/api/debt-scenarios", authenticateUser);
+  app.use("/api/vdr", vdrRouter);
 
   // Auth endpoints
   app.get("/api/auth/me", authenticateUser, (req: any, res) => {
