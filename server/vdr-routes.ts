@@ -44,35 +44,41 @@ const requireVdrAccess = (capability: 'view' | 'download' | 'print' | 'manage') 
     const requiredLevel = capabilityToPermissionLevel[capability];
 
     try {
-      let hasAccess = false;
+      let resourceType: 'document' | 'folder' | 'project';
+      let resourceId: string;
 
       if (documentId) {
         const doc = await storage.vdr.documents.getDocument(documentId, orgId);
         if (!doc) {
           return res.status(404).json({ error: 'Document not found' });
         }
-        const userPermission = await storage.vdr.permissions.getEffectivePermission(userId, 'document', documentId, orgId);
-        hasAccess = permissionMeetsRequirement(userPermission, requiredLevel);
+        resourceType = 'document';
+        resourceId = documentId;
       } else if (folderId) {
         const folder = await storage.vdr.folders.getFolder(folderId, orgId);
         if (!folder) {
           return res.status(404).json({ error: 'Folder not found' });
         }
-        const userPermission = await storage.vdr.permissions.getEffectivePermission(userId, 'folder', folderId, orgId);
-        hasAccess = permissionMeetsRequirement(userPermission, requiredLevel);
+        resourceType = 'folder';
+        resourceId = folderId;
       } else if (projectId) {
         const project = await storage.getProject(projectId);
         if (!project || project.orgId !== orgId) {
           return res.status(404).json({ error: 'Project not found' });
         }
-        const rootFolder = await storage.vdr.folders.getFoldersByProject(projectId, orgId);
-        if (rootFolder.length > 0) {
-          const userPermission = await storage.vdr.permissions.getEffectivePermission(userId, 'folder', rootFolder[0].id, orgId);
-          hasAccess = permissionMeetsRequirement(userPermission, requiredLevel);
-        } else {
-          hasAccess = permissionMeetsRequirement('full_access', requiredLevel);
-        }
+        resourceType = 'project';
+        resourceId = projectId;
+      } else {
+        return res.status(400).json({ error: 'No resource specified' });
       }
+
+      const hasAccess = await storage.vdr.permissions.checkUserPermission(
+        userId,
+        resourceType,
+        resourceId,
+        orgId,
+        requiredLevel
+      );
 
       if (!hasAccess) {
         return res.status(403).json({ error: 'Insufficient permissions' });
