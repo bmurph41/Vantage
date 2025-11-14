@@ -15,7 +15,7 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-async function requireVdrAccess(permission: 'view' | 'download' | 'upload' | 'manage') {
+const requireVdrAccess = (permission: 'view' | 'download' | 'upload' | 'manage') => {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -47,7 +47,13 @@ async function requireVdrAccess(permission: 'view' | 'download' | 'upload' | 'ma
         if (!project || project.orgId !== orgId) {
           return res.status(404).json({ error: 'Project not found' });
         }
-        hasAccess = true;
+        const rootFolder = await storage.vdr.folders.getFoldersByProject(projectId, orgId);
+        if (rootFolder.length > 0) {
+          const userPermission = await storage.vdr.permissions.checkUserPermission(userId, rootFolder[0].id, 'folder', orgId);
+          hasAccess = permissionAllows(userPermission, permission);
+        } else {
+          hasAccess = permission === 'view' || permission === 'download';
+        }
       }
 
       if (!hasAccess) {
@@ -60,7 +66,7 @@ async function requireVdrAccess(permission: 'view' | 'download' | 'upload' | 'ma
       res.status(500).json({ error: 'Permission check failed' });
     }
   };
-}
+};
 
 function permissionAllows(userPermission: 'no_access' | 'view_only' | 'download' | 'upload' | 'manage', required: 'view' | 'download' | 'upload' | 'manage'): boolean {
   const hierarchy = {
@@ -335,6 +341,17 @@ router.post('/permissions', requireAuth, async (req: Request, res: Response) => 
       grantedBy: userId
     });
 
+    const userPermission = await storage.vdr.permissions.checkUserPermission(
+      userId, 
+      validated.resourceId, 
+      validated.resourceType, 
+      orgId
+    );
+    
+    if (userPermission !== 'manage') {
+      return res.status(403).json({ error: 'Only users with manage permission can grant permissions' });
+    }
+
     const permission = await storage.vdr.permissions.grantPermission(validated);
     res.status(201).json(permission);
   } catch (error: any) {
@@ -350,8 +367,25 @@ router.post('/permissions', requireAuth, async (req: Request, res: Response) => 
 router.delete('/permissions/:permissionId', requireAuth, async (req: Request, res: Response) => {
   const { permissionId } = req.params;
   const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
 
   try {
+    const existingPermission = await storage.vdr.permissions.getPermission(permissionId, orgId);
+    if (!existingPermission) {
+      return res.status(404).json({ error: 'Permission not found' });
+    }
+
+    const userPermission = await storage.vdr.permissions.checkUserPermission(
+      userId, 
+      existingPermission.resourceId, 
+      existingPermission.resourceType, 
+      orgId
+    );
+    
+    if (userPermission !== 'manage') {
+      return res.status(403).json({ error: 'Only users with manage permission can revoke permissions' });
+    }
+
     await storage.vdr.permissions.revokePermission(permissionId, orgId);
     res.json({ success: true });
   } catch (error: any) {
@@ -395,7 +429,7 @@ router.get('/projects/:projectId/requests', requireAuth, async (req: Request, re
   }
 });
 
-router.post('/projects/:projectId/requests', requireAuth, async (req: Request, res: Response) => {
+router.post('/projects/:projectId/requests', requireAuth, requireVdrAccess('upload'), async (req: Request, res: Response) => {
   const { projectId } = req.params;
   const orgId = (req.user as any).orgId;
   const userId = (req.user as any).id;
@@ -438,7 +472,7 @@ router.patch('/requests/:requestId', requireAuth, async (req: Request, res: Resp
   }
 });
 
-router.post('/projects/:projectId/external-users', requireAuth, async (req: Request, res: Response) => {
+router.post('/projects/:projectId/external-users', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
   const { projectId } = req.params;
   const orgId = (req.user as any).orgId;
 
