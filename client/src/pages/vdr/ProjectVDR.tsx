@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, FolderLock, FileText, Users, Shield, ClipboardList, Activity } from "lucide-react";
 import { DocumentsWorkspace } from "@/components/vdr/DocumentsWorkspace";
+import { PermissionViewer } from "@/components/vdr/PermissionViewer";
 
 export default function ProjectVDR() {
   const [, params] = useRoute("/vdr/projects/:id");
@@ -97,21 +98,11 @@ export default function ProjectVDR() {
         </TabsContent>
 
         <TabsContent value="permissions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Permission Management</CardTitle>
-              <CardDescription>
-                Control access to folders and documents
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Shield className="h-16 w-16 mx-auto text-gray-400" />
-                <h3 className="text-lg font-semibold text-gray-900 mt-4">Permission Controls</h3>
-                <p className="text-gray-600 mt-1">Configure granular access permissions</p>
-              </div>
-            </CardContent>
-          </Card>
+          <PermissionViewer 
+            resourceType="project" 
+            resourceId={projectId!} 
+            projectId={projectId!}
+          />
         </TabsContent>
 
         <TabsContent value="external-users" className="space-y-4">
