@@ -22,6 +22,7 @@ import { marketingService } from "./services/marketing-service";
 import { personaService } from "./services/persona-service";
 import { dashboardService } from "./services/dashboard-service";
 import { ownedAssetsService } from "./services/owned-assets-service";
+import { debtScenarioService } from "./debt-scenario-service";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
@@ -215,6 +216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rc-saved-searches", authenticateUser);
   app.use("/api/rc-recommendations", authenticateUser);
   app.use("/api/rc-pending-properties", authenticateUser);
+  app.use("/api/debt-scenarios", authenticateUser);
 
   // Auth endpoints
   app.get("/api/auth/me", authenticateUser, (req: any, res) => {
@@ -10158,6 +10160,305 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to fetch modeling analytics:', error);
       res.status(500).json({ error: 'Failed to fetch modeling analytics' });
+    }
+  });
+
+  // ============================================================================
+  // DEBT SCENARIOS - Debt Structure Analysis & Sensitivity Modeling
+  // ============================================================================
+
+  // Get all debt scenarios for organization
+  app.get('/api/debt-scenarios', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      // TODO: Add to storage interface
+      const scenarios = await storage.getDebtScenarios(orgId);
+      res.json(scenarios);
+    } catch (error) {
+      console.error('Failed to fetch debt scenarios:', error);
+      res.status(500).json({ error: 'Failed to fetch debt scenarios' });
+    }
+  });
+
+  // Get scenarios for a specific modeling project
+  app.get('/api/debt-scenarios/project/:projectId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      // TODO: Add to storage interface
+      const scenarios = await storage.getDebtScenariosByProject(projectId, orgId);
+      res.json(scenarios);
+    } catch (error) {
+      console.error('Failed to fetch debt scenarios for project:', error);
+      res.status(500).json({ error: 'Failed to fetch debt scenarios for project' });
+    }
+  });
+
+  // Get single debt scenario with calculated metrics
+  app.get('/api/debt-scenarios/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      
+      // TODO: Add to storage interface
+      const scenario = await storage.getDebtScenario(id, orgId);
+      
+      if (!scenario) {
+        return res.status(404).json({ error: 'Debt scenario not found' });
+      }
+
+      // Calculate metrics using the debt scenario service
+      const metrics = debtScenarioService.calculateMetrics({
+        purchasePrice: scenario.purchasePrice,
+        loanAmount: scenario.loanAmount,
+        noi: scenario.noi,
+        interestRate: scenario.baseRate + (scenario.spreadBps / 100),
+        amortizationYears: scenario.amortizationYears,
+        loanTermYears: scenario.loanTermYears,
+        interestOnlyYears: scenario.interestOnlyYears || 0
+      });
+
+      // Return scenario with calculated metrics
+      res.json({
+        ...scenario,
+        calculatedMetrics: metrics
+      });
+    } catch (error) {
+      console.error('Failed to fetch debt scenario:', error);
+      res.status(500).json({ error: 'Failed to fetch debt scenario' });
+    }
+  });
+
+  // Create new debt scenario
+  app.post('/api/debt-scenarios', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      
+      const data = insertDebtScenarioSchema.parse(req.body);
+      
+      // Calculate initial metrics
+      const metrics = debtScenarioService.calculateMetrics({
+        purchasePrice: data.purchasePrice,
+        loanAmount: data.loanAmount,
+        noi: data.noi,
+        interestRate: data.baseRate + (data.spreadBps / 100),
+        amortizationYears: data.amortizationYears,
+        loanTermYears: data.loanTermYears,
+        interestOnlyYears: data.interestOnlyYears || 0
+      });
+
+      // TODO: Add to storage interface
+      const scenario = await storage.createDebtScenario({
+        ...data,
+        orgId,
+        createdBy: userId,
+        calculatedLtv: metrics.loanToValue,
+        calculatedDscr: metrics.debtServiceCoverageRatio,
+        calculatedDebtYield: metrics.debtYield
+      });
+      
+      res.status(201).json({
+        ...scenario,
+        calculatedMetrics: metrics
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create debt scenario:', error);
+      res.status(500).json({ error: 'Failed to create debt scenario' });
+    }
+  });
+
+  // Update debt scenario
+  app.patch('/api/debt-scenarios/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { id } = req.params;
+      
+      const data = updateDebtScenarioSchema.parse(req.body);
+      
+      // TODO: Add to storage interface
+      const existingScenario = await storage.getDebtScenario(id, orgId);
+      
+      if (!existingScenario) {
+        return res.status(404).json({ error: 'Debt scenario not found' });
+      }
+
+      // Merge existing scenario with updates for metric calculation
+      const updatedData = { ...existingScenario, ...data };
+
+      // Recalculate metrics with updated values
+      const metrics = debtScenarioService.calculateMetrics({
+        purchasePrice: updatedData.purchasePrice,
+        loanAmount: updatedData.loanAmount,
+        noi: updatedData.noi,
+        interestRate: updatedData.baseRate + (updatedData.spreadBps / 100),
+        amortizationYears: updatedData.amortizationYears,
+        loanTermYears: updatedData.loanTermYears,
+        interestOnlyYears: updatedData.interestOnlyYears || 0
+      });
+
+      // TODO: Add to storage interface
+      const scenario = await storage.updateDebtScenario(id, {
+        ...data,
+        updatedBy: userId,
+        calculatedLtv: metrics.loanToValue,
+        calculatedDscr: metrics.debtServiceCoverageRatio,
+        calculatedDebtYield: metrics.debtYield
+      }, orgId);
+      
+      if (!scenario) {
+        return res.status(404).json({ error: 'Debt scenario not found' });
+      }
+      
+      res.json({
+        ...scenario,
+        calculatedMetrics: metrics
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update debt scenario:', error);
+      res.status(500).json({ error: 'Failed to update debt scenario' });
+    }
+  });
+
+  // Delete debt scenario
+  app.delete('/api/debt-scenarios/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      
+      // TODO: Add to storage interface
+      const success = await storage.deleteDebtScenario(id, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Debt scenario not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete debt scenario:', error);
+      res.status(500).json({ error: 'Failed to delete debt scenario' });
+    }
+  });
+
+  // Recalculate metrics for a scenario (useful after bulk updates or corrections)
+  app.post('/api/debt-scenarios/:id/calculate', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      
+      // TODO: Add to storage interface
+      const scenario = await storage.getDebtScenario(id, orgId);
+      
+      if (!scenario) {
+        return res.status(404).json({ error: 'Debt scenario not found' });
+      }
+
+      // Calculate comprehensive metrics
+      const metrics = debtScenarioService.calculateMetrics({
+        purchasePrice: scenario.purchasePrice,
+        loanAmount: scenario.loanAmount,
+        noi: scenario.noi,
+        interestRate: scenario.baseRate + (scenario.spreadBps / 100),
+        amortizationYears: scenario.amortizationYears,
+        loanTermYears: scenario.loanTermYears,
+        interestOnlyYears: scenario.interestOnlyYears || 0
+      });
+
+      // Generate amortization schedule
+      const amortizationSchedule = debtScenarioService.generateAmortizationSchedule(
+        scenario.loanAmount,
+        scenario.baseRate + (scenario.spreadBps / 100),
+        scenario.amortizationYears,
+        (scenario.interestOnlyYears || 0) * 12
+      );
+
+      res.json({
+        scenario,
+        metrics,
+        amortizationSchedule: amortizationSchedule.slice(0, 12) // First year only for performance
+      });
+    } catch (error) {
+      console.error('Failed to calculate debt scenario metrics:', error);
+      res.status(500).json({ error: 'Failed to calculate debt scenario metrics' });
+    }
+  });
+
+  // Run sensitivity analysis on a scenario
+  app.post('/api/debt-scenarios/:id/sensitivity', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      
+      // TODO: Add to storage interface
+      const scenario = await storage.getDebtScenario(id, orgId);
+      
+      if (!scenario) {
+        return res.status(404).json({ error: 'Debt scenario not found' });
+      }
+
+      // Parse optional sensitivity parameters from request body
+      const { rateSteps, ltvTargets } = req.body;
+
+      // Run comprehensive sensitivity analysis
+      const sensitivityAnalysis = debtScenarioService.runSensitivityAnalysis({
+        purchasePrice: scenario.purchasePrice,
+        loanAmount: scenario.loanAmount,
+        noi: scenario.noi,
+        interestRate: scenario.baseRate + (scenario.spreadBps / 100),
+        amortizationYears: scenario.amortizationYears,
+        loanTermYears: scenario.loanTermYears,
+        interestOnlyYears: scenario.interestOnlyYears || 0
+      });
+
+      // Optional: run custom sensitivity if parameters provided
+      let customRateSensitivity;
+      let customLtvSensitivity;
+
+      if (rateSteps && Array.isArray(rateSteps)) {
+        customRateSensitivity = debtScenarioService.runRateSensitivity({
+          purchasePrice: scenario.purchasePrice,
+          loanAmount: scenario.loanAmount,
+          noi: scenario.noi,
+          interestRate: scenario.baseRate + (scenario.spreadBps / 100),
+          amortizationYears: scenario.amortizationYears,
+          loanTermYears: scenario.loanTermYears,
+          interestOnlyYears: scenario.interestOnlyYears || 0
+        }, rateSteps);
+      }
+
+      if (ltvTargets && Array.isArray(ltvTargets)) {
+        customLtvSensitivity = debtScenarioService.runLTVSensitivity({
+          purchasePrice: scenario.purchasePrice,
+          loanAmount: scenario.loanAmount,
+          noi: scenario.noi,
+          interestRate: scenario.baseRate + (scenario.spreadBps / 100),
+          amortizationYears: scenario.amortizationYears,
+          loanTermYears: scenario.loanTermYears,
+          interestOnlyYears: scenario.interestOnlyYears || 0
+        }, ltvTargets);
+      }
+
+      res.json({
+        scenario: {
+          id: scenario.id,
+          name: scenario.name,
+          modelingProjectId: scenario.modelingProjectId
+        },
+        sensitivityAnalysis,
+        ...(customRateSensitivity && { customRateSensitivity }),
+        ...(customLtvSensitivity && { customLtvSensitivity })
+      });
+    } catch (error) {
+      console.error('Failed to run sensitivity analysis:', error);
+      res.status(500).json({ error: 'Failed to run sensitivity analysis' });
     }
   });
 

@@ -712,11 +712,12 @@ export interface IStorage {
   updateFuelImportLog(id: string, data: Partial<InsertFuelImportLog>): Promise<FuelImportLog | undefined>;
 
   // Debt Scenarios
-  getDebtScenario(id: string): Promise<DebtScenario | undefined>;
-  getDebtScenariosForOrg(orgId: string): Promise<DebtScenario[]>;
+  getDebtScenario(id: string, orgId: string): Promise<DebtScenario | undefined>;
+  getDebtScenarios(orgId: string): Promise<DebtScenario[]>;
+  getDebtScenariosByProject(projectId: string, orgId: string): Promise<DebtScenario[]>;
   createDebtScenario(data: InsertDebtScenario): Promise<DebtScenario>;
-  updateDebtScenario(id: string, updates: UpdateDebtScenario): Promise<DebtScenario>;
-  deleteDebtScenario(id: string): Promise<void>;
+  updateDebtScenario(id: string, updates: UpdateDebtScenario, orgId: string): Promise<DebtScenario | undefined>;
+  deleteDebtScenario(id: string, orgId: string): Promise<boolean>;
 
   // Modeling Projects - Valuation & Financial Modeling
   getModelingProjects(orgId: string): Promise<ModelingProject[]>;
@@ -5789,17 +5790,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Debt Scenarios
-  async getDebtScenario(id: string): Promise<DebtScenario | undefined> {
+  async getDebtScenario(id: string, orgId: string): Promise<DebtScenario | undefined> {
     const [scenario] = await db.select()
       .from(debtScenarios)
-      .where(eq(debtScenarios.id, id));
+      .where(and(
+        eq(debtScenarios.id, id),
+        eq(debtScenarios.orgId, orgId)
+      ));
     return scenario || undefined;
   }
 
-  async getDebtScenariosForOrg(orgId: string): Promise<DebtScenario[]> {
+  async getDebtScenarios(orgId: string): Promise<DebtScenario[]> {
     return await db.select()
       .from(debtScenarios)
       .where(eq(debtScenarios.orgId, orgId))
+      .orderBy(desc(debtScenarios.createdAt));
+  }
+
+  async getDebtScenariosByProject(projectId: string, orgId: string): Promise<DebtScenario[]> {
+    return await db.select()
+      .from(debtScenarios)
+      .where(and(
+        eq(debtScenarios.projectId, projectId),
+        eq(debtScenarios.orgId, orgId)
+      ))
       .orderBy(desc(debtScenarios.createdAt));
   }
 
@@ -5810,17 +5824,24 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateDebtScenario(id: string, updates: UpdateDebtScenario): Promise<DebtScenario> {
+  async updateDebtScenario(id: string, updates: UpdateDebtScenario, orgId: string): Promise<DebtScenario | undefined> {
     const [updated] = await db.update(debtScenarios)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(debtScenarios.id, id))
+      .where(and(
+        eq(debtScenarios.id, id),
+        eq(debtScenarios.orgId, orgId)
+      ))
       .returning();
-    return updated;
+    return updated || undefined;
   }
 
-  async deleteDebtScenario(id: string): Promise<void> {
-    await db.delete(debtScenarios)
-      .where(eq(debtScenarios.id, id));
+  async deleteDebtScenario(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(debtScenarios)
+      .where(and(
+        eq(debtScenarios.id, id),
+        eq(debtScenarios.orgId, orgId)
+      ));
+    return result.rowCount > 0;
   }
 
   // Modeling Projects - Valuation & Financial Modeling
