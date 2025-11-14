@@ -15,7 +15,16 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-const requireVdrAccess = (permission: 'view' | 'download' | 'upload' | 'manage') => {
+type PermissionLevel = 'no_access' | 'view_only' | 'view_download' | 'view_download_print' | 'full_access';
+
+function permissionMeetsRequirement(userPermission: PermissionLevel, required: PermissionLevel): boolean {
+  const hierarchy: PermissionLevel[] = ['no_access', 'view_only', 'view_download', 'view_download_print', 'full_access'];
+  const userLevel = hierarchy.indexOf(userPermission);
+  const requiredLevel = hierarchy.indexOf(required);
+  return userLevel >= requiredLevel;
+}
+
+const requireVdrAccess = (capability: 'view' | 'download' | 'print' | 'manage') => {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -25,6 +34,15 @@ const requireVdrAccess = (permission: 'view' | 'download' | 'upload' | 'manage')
     const userId = (req.user as any).id;
     const orgId = (req.user as any).orgId;
 
+    const capabilityToPermissionLevel: Record<string, PermissionLevel> = {
+      'view': 'view_only',
+      'download': 'view_download',
+      'print': 'view_download_print',
+      'manage': 'full_access'
+    };
+
+    const requiredLevel = capabilityToPermissionLevel[capability];
+
     try {
       let hasAccess = false;
 
@@ -33,15 +51,15 @@ const requireVdrAccess = (permission: 'view' | 'download' | 'upload' | 'manage')
         if (!doc) {
           return res.status(404).json({ error: 'Document not found' });
         }
-        const userPermission = await storage.vdr.permissions.checkUserPermission(userId, documentId, 'document', orgId);
-        hasAccess = permissionAllows(userPermission, permission);
+        const userPermission = await storage.vdr.permissions.getEffectivePermission(userId, 'document', documentId, orgId);
+        hasAccess = permissionMeetsRequirement(userPermission, requiredLevel);
       } else if (folderId) {
         const folder = await storage.vdr.folders.getFolder(folderId, orgId);
         if (!folder) {
           return res.status(404).json({ error: 'Folder not found' });
         }
-        const userPermission = await storage.vdr.permissions.checkUserPermission(userId, folderId, 'folder', orgId);
-        hasAccess = permissionAllows(userPermission, permission);
+        const userPermission = await storage.vdr.permissions.getEffectivePermission(userId, 'folder', folderId, orgId);
+        hasAccess = permissionMeetsRequirement(userPermission, requiredLevel);
       } else if (projectId) {
         const project = await storage.getProject(projectId);
         if (!project || project.orgId !== orgId) {
@@ -49,10 +67,10 @@ const requireVdrAccess = (permission: 'view' | 'download' | 'upload' | 'manage')
         }
         const rootFolder = await storage.vdr.folders.getFoldersByProject(projectId, orgId);
         if (rootFolder.length > 0) {
-          const userPermission = await storage.vdr.permissions.checkUserPermission(userId, rootFolder[0].id, 'folder', orgId);
-          hasAccess = permissionAllows(userPermission, permission);
+          const userPermission = await storage.vdr.permissions.getEffectivePermission(userId, 'folder', rootFolder[0].id, orgId);
+          hasAccess = permissionMeetsRequirement(userPermission, requiredLevel);
         } else {
-          hasAccess = permission === 'view' || permission === 'download';
+          hasAccess = permissionMeetsRequirement('full_access', requiredLevel);
         }
       }
 
@@ -67,25 +85,6 @@ const requireVdrAccess = (permission: 'view' | 'download' | 'upload' | 'manage')
     }
   };
 };
-
-function permissionAllows(userPermission: 'no_access' | 'view_only' | 'download' | 'upload' | 'manage', required: 'view' | 'download' | 'upload' | 'manage'): boolean {
-  const hierarchy = {
-    'no_access': 0,
-    'view_only': 1,
-    'download': 2,
-    'upload': 3,
-    'manage': 4
-  };
-  
-  const requiredMap = {
-    'view': 1,
-    'download': 2,
-    'upload': 3,
-    'manage': 4
-  };
-
-  return hierarchy[userPermission] >= requiredMap[required];
-}
 
 router.get('/projects/:projectId/folders', requireAuth, requireVdrAccess('view'), async (req: Request, res: Response) => {
   const { projectId } = req.params;
@@ -186,7 +185,7 @@ router.delete('/folders/:folderId', requireAuth, requireVdrAccess('manage'), asy
 
 const upload = multer(vdrFileService.getMulterConfig());
 
-router.post('/folders/:folderId/documents', requireAuth, requireVdrAccess('upload'), upload.single('file'), async (req: Request, res: Response) => {
+router.post('/folders/:folderId/documents', requireAuth, requireVdrAccess('manage'), upload.single('file'), async (req: Request, res: Response) => {
   const { folderId } = req.params;
   const orgId = (req.user as any).orgId;
   const userId = (req.user as any).id;
@@ -341,15 +340,15 @@ router.post('/permissions', requireAuth, async (req: Request, res: Response) => 
       grantedBy: userId
     });
 
-    const userPermission = await storage.vdr.permissions.checkUserPermission(
+    const userPermission = await storage.vdr.permissions.getEffectivePermission(
       userId, 
-      validated.resourceId, 
       validated.resourceType, 
+      validated.resourceId, 
       orgId
     );
     
-    if (userPermission !== 'manage') {
-      return res.status(403).json({ error: 'Only users with manage permission can grant permissions' });
+    if (!permissionMeetsRequirement(userPermission, 'full_access')) {
+      return res.status(403).json({ error: 'Only users with full access can grant permissions' });
     }
 
     const permission = await storage.vdr.permissions.grantPermission(validated);
@@ -375,15 +374,15 @@ router.delete('/permissions/:permissionId', requireAuth, async (req: Request, re
       return res.status(404).json({ error: 'Permission not found' });
     }
 
-    const userPermission = await storage.vdr.permissions.checkUserPermission(
+    const userPermission = await storage.vdr.permissions.getEffectivePermission(
       userId, 
-      existingPermission.resourceId, 
       existingPermission.resourceType, 
+      existingPermission.resourceId, 
       orgId
     );
     
-    if (userPermission !== 'manage') {
-      return res.status(403).json({ error: 'Only users with manage permission can revoke permissions' });
+    if (!permissionMeetsRequirement(userPermission, 'full_access')) {
+      return res.status(403).json({ error: 'Only users with full access can revoke permissions' });
     }
 
     await storage.vdr.permissions.revokePermission(permissionId, orgId);
@@ -429,7 +428,7 @@ router.get('/projects/:projectId/requests', requireAuth, async (req: Request, re
   }
 });
 
-router.post('/projects/:projectId/requests', requireAuth, requireVdrAccess('upload'), async (req: Request, res: Response) => {
+router.post('/projects/:projectId/requests', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
   const { projectId } = req.params;
   const orgId = (req.user as any).orgId;
   const userId = (req.user as any).id;

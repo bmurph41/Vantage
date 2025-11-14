@@ -40,6 +40,7 @@ Preferred communication style: Simple, everyday language.
 - **Session Management**: Express sessions with PostgreSQL session store.
 - **Security**: Zod schema validation, SQL injection prevention.
 - **Institutional-Grade Compliance & Security**: Implements Role-Based Access Control (RBAC) with granular permissions, comprehensive audit trails, and an Audit Service for SOC 2/GDPR compliance. Includes RBAC middleware for route protection and approval workflows.
+- **VDR Permission System**: Hierarchical permission inheritance (document → folder → parent folder → project → no_access). Five permission levels: no_access (blocked), view_only (read metadata), view_download (access content), view_download_print (print content), full_access (modify documents and manage permissions). Secure-by-default with 60-second cache invalidation. Permission service validates access before all operations.
 
 ### Key Features
 - **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation.
@@ -50,6 +51,7 @@ Preferred communication style: Simple, everyday language.
 - **Modeling Projects Module**: Tracks marina valuation projects for PE firms, linking to CRM contacts, DD projects, sales comps, and offering analytics dashboards.
 - **Marketing Module**: Tracks campaigns (multi-channel), expenses, lead attribution, and integrates with email platforms, providing analytics and multi-tenancy.
 - **Fuel Sales Module**: Manages fuel operations including dashboard, transactions, inventory, analytics, and reports. Supports integration with industry-standard fuel management systems (e.g., FuelCloud) via a provider-agnostic interface and handles robust data synchronization.
+- **Virtual Data Room (VDR) Module**: Enterprise-grade secure document management system with hierarchical folder structure, granular permission system, external user management, diligence request workflows, comprehensive audit logging, and file integrity validation (SHA-256). Currently uses local filesystem storage with provider abstraction for future S3 support. Multi-tenant with organization-level isolation. Backend infrastructure complete; frontend UI pending implementation.
 - **File Attachment System**: File upload, listing, download, and deletion for CRM entities.
 - **Bulk Actions**: Multi-select, bulk delete, and CSV export for core entities.
 - **Task Kanban Board**: Drag-and-drop task management.
