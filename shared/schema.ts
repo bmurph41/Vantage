@@ -81,6 +81,7 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", ["view", "download"
 export const requestStatusEnum = pgEnum("request_status", ["pending", "in_review", "responded", "completed", "blocked"]);
 export const requestPriorityEnum = pgEnum("request_priority", ["low", "medium", "high", "critical"]);
 export const externalUserRoleEnum = pgEnum("external_user_role", ["seller", "buyer", "advisor", "auditor", "lender", "attorney", "other"]);
+export const externalUserProjectAccessStatusEnum = pgEnum("external_user_project_access_status", ["active", "revoked", "expired"]);
 export const requestCategoryEnum = pgEnum("request_category", ["financial", "legal", "hr", "it", "commercial", "environmental", "tax", "ip", "regulatory", "operational", "other"]);
 
 // Persona and Dashboard enums
@@ -2307,6 +2308,7 @@ export const externalUserProjectAccess = pgTable("external_user_project_access",
   expiresAt: timestamp("expires_at"),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   grantedBy: varchar("granted_by").notNull().references(() => users.id),
+  status: externalUserProjectAccessStatusEnum("status").notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   externalUserIdx: index("external_project_access_user_idx").on(table.externalUserId),

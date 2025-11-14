@@ -610,6 +610,19 @@ router.patch('/requests/:requestId', requireAuth, async (req: Request, res: Resp
   }
 });
 
+router.get('/projects/:projectId/external-users', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const externalUsers = await storage.vdr.externalUsers.getExternalUsersForProject(projectId, orgId);
+    res.json(externalUsers);
+  } catch (error: any) {
+    console.error('Error fetching external users:', error);
+    res.status(500).json({ error: 'Failed to fetch external users' });
+  }
+});
+
 router.post('/projects/:projectId/external-users', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
   const { projectId } = req.params;
   const orgId = (req.user as any).orgId;

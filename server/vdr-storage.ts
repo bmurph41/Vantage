@@ -11,7 +11,7 @@ import {
   vdrPermissionLevelEnum
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count, notInArray, gt } from "drizzle-orm";
 
 export interface IVdrFolderRepository {
   getFolder(id: string, orgId: string, includeDeleted?: boolean): Promise<VdrFolder | undefined>;
@@ -87,6 +87,7 @@ export interface IVdrExternalUserRepository {
   getExternalUserByEmail(email: string, orgId: string): Promise<ExternalUser | undefined>;
   getExternalUserByToken(token: string): Promise<ExternalUser | undefined>;
   getExternalUsersForOrg(orgId: string): Promise<ExternalUser[]>;
+  getExternalUsersForProject(projectId: string, orgId: string): Promise<(ExternalUser & { access: ExternalUserProjectAccess })[]>;
   createExternalUser(data: InsertExternalUser): Promise<ExternalUser>;
   updateExternalUser(id: string, updates: Partial<InsertExternalUser>, orgId: string): Promise<ExternalUser | undefined>;
   grantProjectAccess(data: InsertExternalUserProjectAccess): Promise<ExternalUserProjectAccess>;
@@ -737,6 +738,31 @@ export class VdrExternalUserRepository implements IVdrExternalUserRepository {
       .orderBy(desc(externalUsers.createdAt));
   }
 
+  async getExternalUsersForProject(projectId: string, orgId: string): Promise<(ExternalUser & { access: ExternalUserProjectAccess })[]> {
+    const results = await db.select()
+      .from(externalUsers)
+      .innerJoin(
+        externalUserProjectAccess,
+        eq(externalUsers.id, externalUserProjectAccess.externalUserId)
+      )
+      .where(and(
+        eq(externalUserProjectAccess.projectId, projectId),
+        eq(externalUsers.orgId, orgId),
+        eq(externalUserProjectAccess.orgId, orgId),
+        eq(externalUserProjectAccess.status, 'active'),
+        or(
+          isNull(externalUserProjectAccess.expiresAt),
+          gt(externalUserProjectAccess.expiresAt, new Date())
+        )
+      ))
+      .orderBy(desc(externalUsers.createdAt));
+
+    return results.map(row => ({
+      ...row.external_users,
+      access: row.external_user_project_access
+    }));
+  }
+
   async createExternalUser(data: InsertExternalUser): Promise<ExternalUser> {
     const [user] = await db.insert(externalUsers)
       .values(data as any)
@@ -764,11 +790,13 @@ export class VdrExternalUserRepository implements IVdrExternalUserRepository {
   }
 
   async revokeProjectAccess(externalUserId: string, projectId: string, orgId: string): Promise<boolean> {
-    const result = await db.delete(externalUserProjectAccess)
+    const result = await db.update(externalUserProjectAccess)
+      .set({ status: 'revoked', expiresAt: new Date() })
       .where(and(
         eq(externalUserProjectAccess.externalUserId, externalUserId),
         eq(externalUserProjectAccess.projectId, projectId),
-        eq(externalUserProjectAccess.orgId, orgId)
+        eq(externalUserProjectAccess.orgId, orgId),
+        eq(externalUserProjectAccess.status, 'active')
       ))
       .returning();
     
@@ -780,7 +808,12 @@ export class VdrExternalUserRepository implements IVdrExternalUserRepository {
       .from(externalUserProjectAccess)
       .where(and(
         eq(externalUserProjectAccess.externalUserId, externalUserId),
-        eq(externalUserProjectAccess.orgId, orgId)
+        eq(externalUserProjectAccess.orgId, orgId),
+        eq(externalUserProjectAccess.status, 'active'),
+        or(
+          isNull(externalUserProjectAccess.expiresAt),
+          gt(externalUserProjectAccess.expiresAt, new Date())
+        )
       ));
   }
 

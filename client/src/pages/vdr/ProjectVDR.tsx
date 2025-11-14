@@ -7,6 +7,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, FolderLock, FileText, Users, Shield, ClipboardList, Activity } from "lucide-react";
 import { DocumentsWorkspace } from "@/components/vdr/DocumentsWorkspace";
 import { PermissionViewer } from "@/components/vdr/PermissionViewer";
+import { ExternalUsersTab } from "@/components/vdr/ExternalUsersTab";
+import { DiligenceRequestsTab } from "@/components/vdr/DiligenceRequestsTab";
+import { AuditLogViewer } from "@/components/vdr/AuditLogViewer";
 
 export default function ProjectVDR() {
   const [, params] = useRoute("/vdr/projects/:id");
@@ -106,63 +109,15 @@ export default function ProjectVDR() {
         </TabsContent>
 
         <TabsContent value="external-users" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>External Stakeholders</CardTitle>
-              <CardDescription>
-                Manage third-party access to this data room
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Users className="h-16 w-16 mx-auto text-gray-400" />
-                <h3 className="text-lg font-semibold text-gray-900 mt-4">No External Users</h3>
-                <p className="text-gray-600 mt-1">Invite external stakeholders to access documents</p>
-                <Button className="mt-4" data-testid="button-invite-external-user">
-                  Invite User
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <ExternalUsersTab projectId={projectId!} />
         </TabsContent>
 
         <TabsContent value="requests" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Diligence Requests</CardTitle>
-              <CardDescription>
-                Track document requests and fulfillment
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <ClipboardList className="h-16 w-16 mx-auto text-gray-400" />
-                <h3 className="text-lg font-semibold text-gray-900 mt-4">No Requests</h3>
-                <p className="text-gray-600 mt-1">Create document requests for external parties</p>
-                <Button className="mt-4" data-testid="button-create-request">
-                  Create Request
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <DiligenceRequestsTab projectId={projectId!} />
         </TabsContent>
 
         <TabsContent value="audit" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Audit Trail</CardTitle>
-              <CardDescription>
-                Comprehensive activity log for compliance
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Activity className="h-16 w-16 mx-auto text-gray-400" />
-                <h3 className="text-lg font-semibold text-gray-900 mt-4">No Activity Yet</h3>
-                <p className="text-gray-600 mt-1">All document activities will appear here</p>
-              </div>
-            </CardContent>
-          </Card>
+          <AuditLogViewer projectId={projectId!} />
         </TabsContent>
       </Tabs>
     </div>
