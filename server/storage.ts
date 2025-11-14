@@ -11,6 +11,9 @@ import {
   salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes, scPortfolios, scPortfolioComps, scPendingPropertyProfiles, scMetricSeries, scMetricPoints, scMetricAlerts,
   rateComps, rateCompColumns, rateCompImports, rcProjects, rcProjectComps, rcAuditLog, rcRecommendationFeedback, rcOrgPreferences, rcSavedSearches, rcCustomStorageTypes, rcPortfolios, rcPortfolioComps, rcPendingPropertyProfiles, rcMetricSeries, rcMetricPoints, rcMetricAlerts,
   fuelIntegrations, fuelImportLogs, debtScenarios, modelingProjects,
+  vdrFolders, vdrDocuments, vdrDocumentPermissions, vdrWatermarks, vdrAuditLogs,
+  diligenceRequests, requestDocuments, requestComments, requestTemplates,
+  externalUsers, externalUserProjectAccess,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type ProjectPendingContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
@@ -24,6 +27,9 @@ import {
   type RateComp, type RateCompColumn, type RateCompImport, type RcProject, type RcProjectComp, type RcAuditLog, type RcRecommendationFeedback, type RcOrgPreferences, type RcSavedSearch, type RcCustomStorageType, type RcPendingPropertyProfile, type RcMetricSeries, type RcMetricPoint, type RcMetricAlert,
   type FuelIntegration, type FuelImportLog,
   type DebtScenario, type InsertDebtScenario, type UpdateDebtScenario,
+  type VdrFolder, type VdrDocument, type VdrDocumentPermission, type VdrWatermark, type VdrAuditLog,
+  type DiligenceRequest, type RequestDocument, type RequestComment, type RequestTemplate,
+  type ExternalUser, type ExternalUserProjectAccess,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
@@ -44,7 +50,11 @@ import {
   type InsertRcRecommendationFeedback, type InsertRcOrgPreferences, type UpdateRcOrgPreferences,
   type InsertRcSavedSearch, type UpdateRcSavedSearch, type InsertRcCustomStorageType, type InsertRcPendingPropertyProfile,
   type InsertRcMetricSeries, type UpdateRcMetricSeries, type InsertRcMetricPoint, type InsertRcMetricAlert, type UpdateRcMetricAlert,
-  type InsertFuelIntegration, type UpdateFuelIntegration, type InsertFuelImportLog
+  type InsertFuelIntegration, type UpdateFuelIntegration, type InsertFuelImportLog,
+  type InsertVdrFolder, type InsertVdrDocument, type InsertVdrDocumentPermission, type InsertVdrWatermark, type InsertVdrAuditLog,
+  type InsertDiligenceRequest, type InsertRequestDocument, type InsertRequestComment, type InsertRequestTemplate,
+  type InsertExternalUser, type InsertExternalUserProjectAccess,
+  type ModelingProject, type InsertModelingProject, type UpdateModelingProject
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count } from "drizzle-orm";
