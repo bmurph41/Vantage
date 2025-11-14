@@ -144,16 +144,74 @@ router.post('/projects/:projectId/folders', requireAuth, requireVdrAccess('manag
 router.patch('/folders/:folderId', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
   const { folderId } = req.params;
   const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
 
   try {
-    const folder = await storage.vdr.folders.updateFolder(folderId, req.body, orgId);
+    const updateSchema = z.object({
+      name: z.string().min(1).max(255).optional(),
+      parentFolderId: z.string().nullable().optional(),
+      displayOrder: z.number().optional(),
+    });
+
+    const validated = updateSchema.parse(req.body);
+
+    const existingFolder = await storage.vdr.folders.getFolder(folderId, orgId);
+    if (!existingFolder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    if (validated.parentFolderId !== undefined) {
+      if (validated.parentFolderId === folderId) {
+        return res.status(400).json({ error: 'A folder cannot be its own parent' });
+      }
+
+      if (validated.parentFolderId !== null) {
+        const targetParent = await storage.vdr.folders.getFolder(validated.parentFolderId, orgId);
+        if (!targetParent) {
+          return res.status(404).json({ error: 'Target parent folder not found' });
+        }
+
+        const allFolders = await storage.vdr.folders.getFoldersByProject(existingFolder.projectId, orgId);
+        const isDescendant = (checkId: string, ancestorId: string): boolean => {
+          const folder = allFolders.find(f => f.id === checkId);
+          if (!folder || !folder.parentFolderId) return false;
+          if (folder.parentFolderId === ancestorId) return true;
+          return isDescendant(folder.parentFolderId, ancestorId);
+        };
+
+        if (isDescendant(validated.parentFolderId, folderId)) {
+          return res.status(400).json({ error: 'Cannot move folder into its own descendant' });
+        }
+      }
+    }
+
+    const folder = await storage.vdr.folders.updateFolder(folderId, validated, orgId);
     
     if (!folder) {
       return res.status(404).json({ error: 'Folder not found' });
     }
 
+    if (validated.parentFolderId !== undefined && validated.parentFolderId !== existingFolder.parentFolderId) {
+      await storage.vdr.audit.logAction({
+        projectId: folder.projectId,
+        orgId,
+        userId,
+        action: 'folder_moved',
+        resourceType: 'folder',
+        resourceId: folderId,
+        metadata: { 
+          folderName: folder.name,
+          oldParentId: existingFolder.parentFolderId,
+          newParentId: validated.parentFolderId
+        }
+      });
+    }
+
     res.json(folder);
   } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
     console.error('Error updating folder:', error);
     res.status(500).json({ error: 'Failed to update folder' });
   }
@@ -302,6 +360,68 @@ router.get('/documents/:documentId/download', requireAuth, requireVdrAccess('dow
   } catch (error: any) {
     console.error('Error downloading document:', error);
     res.status(500).json({ error: 'Failed to download document' });
+  }
+});
+
+router.patch('/documents/:documentId', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { documentId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const updateSchema = z.object({
+      name: z.string().min(1).max(255).optional(),
+      description: z.string().max(1000).nullable().optional(),
+      folderId: z.string().optional(),
+    });
+
+    const validated = updateSchema.parse(req.body);
+
+    const existingDocument = await storage.vdr.documents.getDocument(documentId, orgId);
+    if (!existingDocument) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    if (validated.folderId) {
+      const targetFolder = await storage.vdr.folders.getFolder(validated.folderId, orgId);
+      if (!targetFolder) {
+        return res.status(404).json({ error: 'Target folder not found' });
+      }
+
+      if (targetFolder.projectId !== existingDocument.projectId) {
+        return res.status(400).json({ error: 'Cannot move document to a different project' });
+      }
+    }
+
+    const document = await storage.vdr.documents.updateDocument(documentId, validated, orgId);
+    
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    if (validated.folderId && validated.folderId !== existingDocument.folderId) {
+      await storage.vdr.audit.logAction({
+        projectId: document.projectId,
+        orgId,
+        userId,
+        action: 'document_moved',
+        resourceType: 'document',
+        resourceId: documentId,
+        metadata: { 
+          documentName: document.name,
+          oldFolderId: existingDocument.folderId,
+          newFolderId: validated.folderId
+        }
+      });
+    }
+
+    res.json(document);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error updating document:', error);
+    res.status(500).json({ error: 'Failed to update document' });
   }
 });
 

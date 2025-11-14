@@ -132,6 +132,21 @@ export function useVdrProject(projectId: string | undefined) {
     },
   });
 
+  // Move document mutation
+  const moveDocumentMutation = useMutation({
+    mutationFn: async ({ documentId, folderId, oldFolderId }: { documentId: string; folderId: string; oldFolderId: string }) => {
+      return apiRequest(`/api/vdr/documents/${documentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderId }),
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vdr/folders', variables.oldFolderId, 'documents'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/vdr/folders', variables.folderId, 'documents'] });
+    },
+  });
+
   // Grant permission mutation
   const grantPermissionMutation = useMutation({
     mutationFn: async (data: {
@@ -218,6 +233,10 @@ export function useVdrProject(projectId: string | undefined) {
     deleteDocument: deleteDocumentMutation.mutate,
     deleteDocumentAsync: deleteDocumentMutation.mutateAsync,
     isDeletingDocument: deleteDocumentMutation.isPending,
+    
+    moveDocument: moveDocumentMutation.mutate,
+    moveDocumentAsync: moveDocumentMutation.mutateAsync,
+    isMovingDocument: moveDocumentMutation.isPending,
     
     grantPermission: grantPermissionMutation.mutate,
     grantPermissionAsync: grantPermissionMutation.mutateAsync,
