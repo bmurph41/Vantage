@@ -983,4 +983,122 @@ router.post('/documents/bulk-download', requireAuth, async (req: Request, res: R
   }
 });
 
+// ============================================================================
+// VDR Templates - Folder structure templates
+// ============================================================================
+
+// List available templates
+router.get('/templates', requireAuth, async (req: Request, res: Response) => {
+  const orgId = (req.user as any).orgId;
+
+  try {
+    // Get system templates (public) and org-specific templates
+    const templates = await storage.vdr.templates.listTemplates(orgId);
+    res.json(templates);
+  } catch (error: any) {
+    console.error('Error fetching templates:', error);
+    res.status(500).json({ error: 'Failed to fetch templates' });
+  }
+});
+
+// Get template with folders
+router.get('/templates/:templateId', requireAuth, async (req: Request, res: Response) => {
+  const { templateId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const template = await storage.vdr.templates.getTemplate(templateId, orgId);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    const folders = await storage.vdr.templates.getTemplateFolders(templateId);
+    res.json({ ...template, folders });
+  } catch (error: any) {
+    console.error('Error fetching template:', error);
+    res.status(500).json({ error: 'Failed to fetch template' });
+  }
+});
+
+// Apply template to project
+router.post('/projects/:projectId/apply-template', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const { templateId } = req.body;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    // Verify project access
+    const project = await storage.getProject(projectId);
+    if (!project || project.orgId !== orgId) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // Verify template exists
+    const template = await storage.vdr.templates.getTemplate(templateId, orgId);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    // Get template folders
+    const templateFolders = await storage.vdr.templates.getTemplateFolders(templateId);
+
+    // Apply template: create folders in project
+    const folderMap: Record<string, string> = {};
+
+    // First pass: create root folders (no parent)
+    for (const tf of templateFolders.filter(f => !f.parentFolderId)) {
+      const folder = await storage.vdr.folders.createFolder({
+        projectId,
+        parentFolderId: null,
+        name: tf.name,
+        path: `/${tf.name}`,
+        displayOrder: tf.displayOrder,
+        description: tf.description,
+        orgId,
+        createdBy: userId,
+      });
+      folderMap[tf.id] = folder.id;
+    }
+
+    // Second pass: create child folders
+    for (const tf of templateFolders.filter(f => f.parentFolderId)) {
+      const parentId = folderMap[tf.parentFolderId!];
+      if (!parentId) {
+        console.warn(`Parent folder not found for template folder: ${tf.name}`);
+        continue;
+      }
+
+      const parent = await storage.vdr.folders.getFolder(parentId, orgId);
+      const folder = await storage.vdr.folders.createFolder({
+        projectId,
+        parentFolderId: parentId,
+        name: tf.name,
+        path: `${parent?.path}/${tf.name}`,
+        displayOrder: tf.displayOrder,
+        description: tf.description,
+        orgId,
+        createdBy: userId,
+      });
+      folderMap[tf.id] = folder.id;
+    }
+
+    // Log template application
+    await storage.vdr.audit.logAction({
+      projectId,
+      orgId,
+      userId,
+      action: 'template_applied',
+      resourceType: 'project',
+      resourceId: projectId,
+      metadata: { templateId, templateName: template.name, folderCount: templateFolders.length }
+    });
+
+    res.json({ success: true, foldersCreated: Object.keys(folderMap).length });
+  } catch (error: any) {
+    console.error('Error applying template:', error);
+    res.status(500).json({ error: 'Failed to apply template' });
+  }
+});
+
 export default router;

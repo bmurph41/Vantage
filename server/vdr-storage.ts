@@ -2,12 +2,15 @@ import {
   vdrFolders, vdrDocuments, vdrDocumentPermissions, vdrWatermarks, vdrAuditLogs,
   diligenceRequests, requestDocuments, requestComments, requestTemplates,
   externalUsers, externalUserProjectAccess,
+  vdrTemplates, vdrTemplateFolders,
   type VdrFolder, type VdrDocument, type VdrDocumentPermission, type VdrWatermark, type VdrAuditLog,
   type DiligenceRequest, type RequestDocument, type RequestComment, type RequestTemplate,
   type ExternalUser, type ExternalUserProjectAccess,
+  type VdrTemplate, type VdrTemplateFolder,
   type InsertVdrFolder, type InsertVdrDocument, type InsertVdrDocumentPermission, type InsertVdrWatermark, type InsertVdrAuditLog,
   type InsertDiligenceRequest, type InsertRequestDocument, type InsertRequestComment, type InsertRequestTemplate,
   type InsertExternalUser, type InsertExternalUserProjectAccess,
+  type InsertVdrTemplate, type InsertVdrTemplateFolder,
   vdrPermissionLevelEnum
 } from "@shared/schema";
 import { db } from "./db";
@@ -96,6 +99,14 @@ export interface IVdrExternalUserRepository {
   getProjectAccessById(id: string, orgId: string): Promise<ExternalUserProjectAccess | undefined>;
 }
 
+export interface IVdrTemplateRepository {
+  getTemplate(id: string, orgId: string): Promise<VdrTemplate | undefined>;
+  listTemplates(orgId: string): Promise<VdrTemplate[]>;
+  getTemplateFolders(templateId: string): Promise<VdrTemplateFolder[]>;
+  createTemplate(data: InsertVdrTemplate): Promise<VdrTemplate>;
+  createTemplateFolder(data: InsertVdrTemplateFolder): Promise<VdrTemplateFolder>;
+}
+
 export interface IVdrStorage {
   folders: IVdrFolderRepository;
   documents: IVdrDocumentRepository;
@@ -103,6 +114,7 @@ export interface IVdrStorage {
   audit: IVdrAuditRepository;
   requests: IVdrRequestRepository;
   externalUsers: IVdrExternalUserRepository;
+  templates: IVdrTemplateRepository;
 }
 
 export class VdrFolderRepository implements IVdrFolderRepository {
@@ -830,6 +842,58 @@ export class VdrExternalUserRepository implements IVdrExternalUserRepository {
   }
 }
 
+export class VdrTemplateRepository implements IVdrTemplateRepository {
+  async getTemplate(id: string, orgId: string): Promise<VdrTemplate | undefined> {
+    // Templates can be system-wide (null orgId) or org-specific
+    const [template] = await db.select()
+      .from(vdrTemplates)
+      .where(and(
+        eq(vdrTemplates.id, id),
+        or(
+          eq(vdrTemplates.isPublic, true),
+          eq(vdrTemplates.orgId, orgId)
+        )
+      ))
+      .limit(1);
+    
+    return template || undefined;
+  }
+
+  async listTemplates(orgId: string): Promise<VdrTemplate[]> {
+    // Get public/system templates and org-specific templates
+    return await db.select()
+      .from(vdrTemplates)
+      .where(or(
+        eq(vdrTemplates.isPublic, true),
+        eq(vdrTemplates.orgId, orgId)
+      ))
+      .orderBy(desc(vdrTemplates.isDefault), asc(vdrTemplates.name));
+  }
+
+  async getTemplateFolders(templateId: string): Promise<VdrTemplateFolder[]> {
+    return await db.select()
+      .from(vdrTemplateFolders)
+      .where(eq(vdrTemplateFolders.templateId, templateId))
+      .orderBy(asc(vdrTemplateFolders.displayOrder), asc(vdrTemplateFolders.name));
+  }
+
+  async createTemplate(data: InsertVdrTemplate): Promise<VdrTemplate> {
+    const [template] = await db.insert(vdrTemplates)
+      .values(data)
+      .returning();
+    
+    return template;
+  }
+
+  async createTemplateFolder(data: InsertVdrTemplateFolder): Promise<VdrTemplateFolder> {
+    const [folder] = await db.insert(vdrTemplateFolders)
+      .values(data)
+      .returning();
+    
+    return folder;
+  }
+}
+
 export class VdrStorage implements IVdrStorage {
   folders: IVdrFolderRepository;
   documents: IVdrDocumentRepository;
@@ -837,6 +901,7 @@ export class VdrStorage implements IVdrStorage {
   audit: IVdrAuditRepository;
   requests: IVdrRequestRepository;
   externalUsers: IVdrExternalUserRepository;
+  templates: IVdrTemplateRepository;
 
   constructor() {
     this.folders = new VdrFolderRepository();
@@ -845,5 +910,6 @@ export class VdrStorage implements IVdrStorage {
     this.audit = new VdrAuditRepository();
     this.requests = new VdrRequestRepository();
     this.externalUsers = new VdrExternalUserRepository();
+    this.templates = new VdrTemplateRepository();
   }
 }

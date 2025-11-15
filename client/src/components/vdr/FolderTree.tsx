@@ -57,7 +57,7 @@ export function FolderTree({
   isDeleting,
 }: FolderTreeProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [creatingUnder, setCreatingUnder] = useState<string | null>(null);
+  const [creatingUnder, setCreatingUnder] = useState<string | 'root' | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -78,7 +78,7 @@ export function FolderTree({
     if (newFolderName.trim()) {
       onCreateFolder({
         name: newFolderName.trim(),
-        parentFolderId: creatingUnder || undefined,
+        parentFolderId: creatingUnder && creatingUnder !== 'root' ? creatingUnder : undefined,
       });
       setNewFolderName("");
       setCreatingUnder(null);
@@ -237,9 +237,9 @@ export function FolderTree({
 
   return (
     <div className="h-full border-r bg-gray-50 flex flex-col">
-      <div className="p-4 border-b bg-white">
+      <div className="p-4 border-b bg-white space-y-2">
         <Button
-          onClick={() => setCreatingUnder(null)}
+          onClick={() => setCreatingUnder('root')}
           className="w-full"
           size="sm"
           data-testid="button-create-root-folder"
@@ -250,7 +250,7 @@ export function FolderTree({
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
-        {creatingUnder === null && (
+        {creatingUnder === 'root' && (
           <div className="mb-2 flex items-center gap-2" data-testid="new-folder-input">
             <FolderPlus className="h-4 w-4 text-gray-400" />
             <Input
@@ -260,12 +260,17 @@ export function FolderTree({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCreateFolder();
                 if (e.key === "Escape") {
-                  setCreatingUnder('root');
                   setNewFolderName("");
+                  setCreatingUnder(null);
                 }
               }}
               onBlur={() => {
-                if (!newFolderName.trim()) setCreatingUnder('root');
+                if (newFolderName.trim()) {
+                  handleCreateFolder();
+                } else {
+                  setNewFolderName("");
+                  setCreatingUnder(null);
+                }
               }}
               className="h-6 text-sm"
               autoFocus
@@ -273,9 +278,9 @@ export function FolderTree({
           </div>
         )}
 
-        {folders.length === 0 && !creatingUnder ? (
+        {folders.length === 0 && creatingUnder !== 'root' ? (
           <div className="text-center py-8 text-gray-500 text-sm">
-            No folders yet
+            No folders yet. Click "New Folder" to create one.
           </div>
         ) : (
           <div className="space-y-0.5">

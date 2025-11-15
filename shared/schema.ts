@@ -2183,6 +2183,37 @@ export const vdrAuditLogs = pgTable("vdr_audit_logs", {
   orgIdx: index("vdr_audit_logs_org_idx").on(table.orgId),
 }));
 
+// VDR Folder Templates - Reusable folder structures for real estate deals
+export const vdrTemplates = pgTable("vdr_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default("real_estate"), // real_estate, custom, etc.
+  isDefault: boolean("is_default").notNull().default(false), // System-provided templates
+  isPublic: boolean("is_public").notNull().default(true), // Available to all orgs
+  orgId: varchar("org_id").references(() => organizations.id), // null for system templates
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  categoryIdx: index("vdr_templates_category_idx").on(table.category),
+  orgIdx: index("vdr_templates_org_idx").on(table.orgId),
+}));
+
+// VDR Template Folders - Folder definitions within templates
+export const vdrTemplateFolders = pgTable("vdr_template_folders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull().references(() => vdrTemplates.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  parentFolderId: varchar("parent_folder_id"), // Self-reference for hierarchy within template
+  displayOrder: integer("display_order").notNull().default(0),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  templateIdx: index("vdr_template_folders_template_idx").on(table.templateId),
+  parentIdx: index("vdr_template_folders_parent_idx").on(table.parentFolderId),
+}));
+
 // ============================================================================
 // DILIGENCE REQUEST MANAGEMENT - DealRoom-style request tracking
 // ============================================================================
@@ -6325,6 +6356,28 @@ export const insertVdrAuditLogSchema = createInsertSchema(vdrAuditLogs).omit({
 
 export type VdrAuditLog = typeof vdrAuditLogs.$inferSelect;
 export type InsertVdrAuditLog = z.infer<typeof insertVdrAuditLogSchema>;
+
+// VDR Templates
+export const insertVdrTemplateSchema = createInsertSchema(vdrTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateVdrTemplateSchema = insertVdrTemplateSchema.partial();
+
+export type VdrTemplate = typeof vdrTemplates.$inferSelect;
+export type InsertVdrTemplate = z.infer<typeof insertVdrTemplateSchema>;
+export type UpdateVdrTemplate = z.infer<typeof updateVdrTemplateSchema>;
+
+// VDR Template Folders
+export const insertVdrTemplateFolderSchema = createInsertSchema(vdrTemplateFolders).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type VdrTemplateFolder = typeof vdrTemplateFolders.$inferSelect;
+export type InsertVdrTemplateFolder = z.infer<typeof insertVdrTemplateFolderSchema>;
 
 // ============================================================================
 // Diligence Request Management Schemas and Types
