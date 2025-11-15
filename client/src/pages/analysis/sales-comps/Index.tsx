@@ -121,6 +121,13 @@ export default function SalesCompsIndex() {
     };
   }, [searchQuery, debouncedSetSearch]);
 
+  // Auto-close filters when switching away from Sales Comps tab
+  useEffect(() => {
+    if (activeTab !== "data") {
+      setIsSidebarCollapsed(true);
+    }
+  }, [activeTab]);
+
   const queryParams = useMemo(() => ({
     q: debouncedSearchQuery,
     ...Object.fromEntries(
