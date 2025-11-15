@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2, ChevronLeft, ChevronRight, FolderKanban, Filter, ChevronUp } from "lucide-react";
@@ -13,7 +12,6 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/salescomps/authUtils";
 import FiltersPanel from "@/components/salescomps/sales-comps/FiltersPanel";
 import CompsDataGrid from "@/components/salescomps/sales-comps/CompsDataGrid";
-import AnalyticsWorkbench from "@/components/salescomps/analytics/AnalyticsWorkbench";
 import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEditCompDialog";
 import ViewCompModal from "@/components/salescomps/sales-comps/ViewCompModal";
 import ColumnEditorDialog from "@/components/salescomps/sales-comps/ColumnEditorDialog";
@@ -21,10 +19,8 @@ import PortfolioWizard from "@/components/salescomps/sales-comps/PortfolioWizard
 import BulkEdit from "./BulkEdit";
 import Upload from "./Upload";
 import ProjectAssignmentDialog from "@/components/salescomps/projects/ProjectAssignmentDialog";
-import ProjectList from "@/components/salescomps/projects/ProjectList";
-import ProjectDetails from "@/components/salescomps/projects/ProjectDetails";
 import type { FilterState } from "@/lib/salescomps/types";
-import type { SalesComp, Project } from "@shared/schema";
+import type { SalesComp } from "@shared/schema";
 
 export default function SalesCompsIndex() {
   const { toast } = useToast();
@@ -90,7 +86,6 @@ export default function SalesCompsIndex() {
   }, [columnQueries]);
   
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState("data");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showPortfolioWizard, setShowPortfolioWizard] = useState(false);
   const [showColumnsDialog, setShowColumnsDialog] = useState(false);
@@ -101,8 +96,6 @@ export default function SalesCompsIndex() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [showCreateProject, setShowCreateProject] = useState(false);
   const [viewingComp, setViewingComp] = useState<SalesComp | null>(null);
   const [editingComp, setEditingComp] = useState<SalesComp | null>(null);
 
@@ -121,12 +114,6 @@ export default function SalesCompsIndex() {
     };
   }, [searchQuery, debouncedSetSearch]);
 
-  // Auto-close filters when switching away from Sales Comps tab
-  useEffect(() => {
-    if (activeTab !== "data") {
-      setIsSidebarCollapsed(true);
-    }
-  }, [activeTab]);
 
   const queryParams = useMemo(() => ({
     q: debouncedSearchQuery,
@@ -305,8 +292,8 @@ export default function SalesCompsIndex() {
     <div className="flex flex-1 bg-background min-h-screen">
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
-          {/* Sticky Header Container - Command Bar + Tabs */}
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* Sticky Header Container - Command Bar + Navigation */}
           <div className="sticky top-0 z-40 bg-background">
             {/* Top Actions Bar */}
             <div className="bg-card border-b border-border px-6 py-4">
@@ -370,16 +357,6 @@ export default function SalesCompsIndex() {
                 {canCreate && (
                   <>
                     <Button
-                      variant="default"
-                      onClick={() => setActiveTab('projects')}
-                      data-testid="button-create-project"
-                      className="bg-primary"
-                    >
-                      <FolderPlus className="h-4 w-4 mr-2" />
-                      Projects
-                    </Button>
-                    
-                    <Button
                       variant="outline"
                       onClick={() => setShowCreateDialog(true)}
                       data-testid="button-add-comp"
@@ -411,22 +388,28 @@ export default function SalesCompsIndex() {
             </div>
             </div>
 
-            {/* Tab Navigation - Inside sticky container */}
+            {/* Navigation Tabs - Inside sticky container */}
             <div className="px-6 border-b border-border bg-background">
-              <TabsList className="grid w-full max-w-2xl grid-cols-3" data-testid="tabs-navigation">
-                <TabsTrigger value="data" className="flex items-center gap-2" data-testid="tab-data">
-                  <Table className="h-4 w-4" />
-                  Sales Comps
-                </TabsTrigger>
-                <TabsTrigger value="metrics" className="flex items-center gap-2" data-testid="tab-metrics">
-                  <TrendingUp className="h-4 w-4" />
-                  Analytics
-                </TabsTrigger>
-                <TabsTrigger value="projects" className="flex items-center gap-2" data-testid="tab-projects">
-                  <FolderKanban className="h-4 w-4" />
-                  Projects
-                </TabsTrigger>
-              </TabsList>
+              <div className="flex items-center gap-2 py-2">
+                <Link href="/analysis/sales-comps">
+                  <Button variant="ghost" className="flex items-center gap-2 bg-muted" data-testid="nav-sales-comps">
+                    <Table className="h-4 w-4" />
+                    Sales Comps
+                  </Button>
+                </Link>
+                <Link href="/analysis/sales-comps/analytics">
+                  <Button variant="ghost" className="flex items-center gap-2" data-testid="nav-analytics">
+                    <TrendingUp className="h-4 w-4" />
+                    Analytics
+                  </Button>
+                </Link>
+                <Link href="/analysis/sales-comps/projects">
+                  <Button variant="ghost" className="flex items-center gap-2" data-testid="nav-projects">
+                    <FolderKanban className="h-4 w-4" />
+                    Projects
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
 
@@ -518,9 +501,9 @@ export default function SalesCompsIndex() {
             </div>
           )}
 
-          {/* Tab Content */}
-          <TabsContent value="data" className="flex-1 min-h-0 overflow-hidden mt-0 m-0 flex flex-col" data-testid="tab-content-data">
-            {/* Collapsible Filters Panel - Horizontal under tabs */}
+          {/* Content Area */}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {/* Collapsible Filters Panel */}
             <div className="px-6 py-4 border-b border-border">
               <div className="flex items-center justify-end mb-3">
                 <Button
@@ -617,26 +600,8 @@ export default function SalesCompsIndex() {
                 </div>
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="metrics" className="mt-0 flex-1 overflow-auto p-0" data-testid="tab-content-metrics">
-            <AnalyticsWorkbench />
-          </TabsContent>
-
-          <TabsContent value="projects" className="mt-0 flex-1 overflow-auto p-0" data-testid="tab-content-projects">
-            {selectedProject ? (
-              <ProjectDetails
-                projectId={selectedProject.id}
-                onClose={() => setSelectedProject(null)}
-              />
-            ) : (
-              <ProjectList
-                onSelectProject={(project) => setSelectedProject(project)}
-                selectedProjectId={selectedProject?.id}
-              />
-            )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </div>
 
       {/* Dialogs */}
