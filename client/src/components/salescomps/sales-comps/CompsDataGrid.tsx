@@ -533,27 +533,29 @@ export default function CompsDataGrid({
     setColumnConfig(prev => {
       const newConfig = { ...prev };
       
-      // Get all columns with their current orders
-      const allColumns = defaultColumns.map(col => ({
+      // Get all columns in their CURRENT order (not default order)
+      // This preserves all previous reordering operations
+      const currentOrderedColumns = columns.map(col => ({
         key: col.key,
-        order: newConfig[col.key]?.order ?? col.order
+        order: col.order,
+        width: col.width
       }));
       
       // Remove dragged column and insert at target position
-      const filteredColumns = allColumns.filter(col => col.key !== draggedKey);
+      const filteredColumns = currentOrderedColumns.filter(col => col.key !== draggedKey);
       const targetIndex = filteredColumns.findIndex(col => col.key === targetKey);
       
-      // Reorder all columns
+      // Reorder columns by inserting dragged column at target position
       const reorderedColumns = [
         ...filteredColumns.slice(0, targetIndex),
-        { key: draggedKey, order: targetColumn.order },
+        { key: draggedKey, order: draggedColumn.order, width: draggedColumn.width },
         ...filteredColumns.slice(targetIndex)
       ];
       
-      // Update orders
+      // Update orders sequentially to maintain consistency
       reorderedColumns.forEach((col, index) => {
         newConfig[col.key] = {
-          ...newConfig[col.key],
+          width: newConfig[col.key]?.width ?? col.width,
           order: index
         };
       });
