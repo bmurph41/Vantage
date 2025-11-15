@@ -12,7 +12,7 @@ import { eq, and, desc, sql, isNotNull, inArray } from 'drizzle-orm';
 const router = express.Router();
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (!req.isAuthenticated || !req.isAuthenticated()) {
+  if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   next();

@@ -218,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rc-recommendations", authenticateUser);
   app.use("/api/rc-pending-properties", authenticateUser);
   app.use("/api/debt-scenarios", authenticateUser);
-  app.use("/api/vdr", vdrRouter);
+  app.use("/api/vdr", authenticateUser, vdrRouter);
 
   // Auth endpoints
   app.get("/api/auth/me", authenticateUser, (req: any, res) => {
