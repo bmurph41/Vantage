@@ -296,22 +296,6 @@ export default function SalesCompsIndex() {
 
   return (
     <div className="flex flex-1 bg-background min-h-screen">
-      {/* Left Sidebar - Filters (Only show on All Comps tab) */}
-      {!isSidebarCollapsed && activeTab === "data" && (
-        <div className="w-64 bg-card border-r border-border flex flex-col flex-shrink-0">
-          <div className="px-4 py-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">Sales Comps</h2>
-          </div>
-
-          <FiltersPanel 
-            filters={filters}
-            onFiltersChange={handleFilterChange}
-            activeSavedSearchId={activeSavedSearchId}
-            onActiveSavedSearchChange={handleActiveSavedSearchChange}
-          />
-        </div>
-      )}
-
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
@@ -355,7 +339,7 @@ export default function SalesCompsIndex() {
                       <p className="text-sm">
                         <strong>Search Tips:</strong><br/>
                         • Type marina name, location, or seller<br/>
-                        • Use the sidebar filters for precise filtering<br/>
+                        • Use the filters panel for precise filtering<br/>
                         • Click column headers to filter specific values
                       </p>
                     </TooltipContent>
@@ -542,6 +526,20 @@ export default function SalesCompsIndex() {
 
           {/* Tab Content */}
           <TabsContent value="data" className="flex-1 min-h-0 overflow-hidden mt-0 m-0 flex flex-col" data-testid="tab-content-data">
+            {/* Collapsible Filters Panel - Horizontal under tabs */}
+            {!isSidebarCollapsed && (
+              <div className="bg-card border-b border-border">
+                <div className="px-6 py-4">
+                  <FiltersPanel 
+                    filters={filters}
+                    onFiltersChange={handleFilterChange}
+                    activeSavedSearchId={activeSavedSearchId}
+                    onActiveSavedSearchChange={handleActiveSavedSearchChange}
+                  />
+                </div>
+              </div>
+            )}
+            
             {/* Data Grid */}
             <div className="flex-1 min-h-0 overflow-hidden">
               <CompsDataGrid
