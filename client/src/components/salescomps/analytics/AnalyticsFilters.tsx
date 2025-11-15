@@ -4,7 +4,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Filter, X, RefreshCcw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Filter, X, RefreshCcw, ChevronDown } from "lucide-react";
 
 export interface AnalyticsFilters {
   states?: string[];
@@ -250,26 +252,48 @@ export default function AnalyticsFiltersPanel({
           </div>
         </div>
 
-        {/* States Multi-Select */}
+        {/* States Multi-Select Dropdown */}
         {availableStates.length > 0 && (
           <div className="space-y-3">
             <Label className="text-sm font-medium">States</Label>
-            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
-              {availableStates.map(state => (
-                <Badge
-                  key={state}
-                  variant={localFilters.states?.includes(state) ? "default" : "outline"}
-                  className="cursor-pointer hover:bg-primary/80"
-                  onClick={() => toggleState(state)}
-                  data-testid={`badge-state-${state}`}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-between h-9"
+                  data-testid="button-states-dropdown"
                 >
-                  {state}
-                  {localFilters.states?.includes(state) && (
-                    <X className="ml-1 h-3 w-3" />
-                  )}
-                </Badge>
-              ))}
-            </div>
+                  <span className="text-sm">
+                    {localFilters.states?.length 
+                      ? `${localFilters.states.length} state${localFilters.states.length > 1 ? 's' : ''} selected`
+                      : 'Select states'}
+                  </span>
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="start">
+                <div className="max-h-80 overflow-y-auto p-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    {[...availableStates].sort().map(state => (
+                      <div key={state} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`state-${state}`}
+                          checked={localFilters.states?.includes(state)}
+                          onCheckedChange={() => toggleState(state)}
+                          data-testid={`checkbox-state-${state}`}
+                        />
+                        <label
+                          htmlFor={`state-${state}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          {state}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         )}
 
