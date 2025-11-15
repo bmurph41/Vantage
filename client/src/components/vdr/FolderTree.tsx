@@ -2,6 +2,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -17,9 +24,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Folder, FolderOpen, FolderPlus, MoreVertical, Edit2, Trash2, ChevronRight, ChevronDown } from "lucide-react";
+import { Folder, FolderOpen, FolderPlus, MoreVertical, Edit2, Trash2, ChevronRight, ChevronDown, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+
+// Standard real estate DD folder categories
+const STANDARD_FOLDER_CATEGORIES = [
+  "Financials",
+  "Legal",
+  "Title",
+  "Environmental",
+  "Property Information",
+  "Insurance",
+  "Third Party Reports",
+  "Closing Documents",
+  "Custom"
+] as const;
 
 type VdrFolder = {
   id: string;
@@ -35,7 +56,7 @@ type FolderTreeProps = {
   isLoading: boolean;
   selectedFolderId: string | null;
   onSelectFolder: (folderId: string | null) => void;
-  onCreateFolder: (data: { name: string; parentFolderId?: string }) => void;
+  onCreateFolder: (data: { name: string; parentFolderId?: string }) => Promise<any>;
   onUpdateFolder: (data: { folderId: string; data: { name: string } }) => void;
   onDeleteFolder: (folderId: string) => void;
   isCreating: boolean;
@@ -56,9 +77,11 @@ export function FolderTree({
   isUpdating,
   isDeleting,
 }: FolderTreeProps) {
+  const { toast } = useToast();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [creatingUnder, setCreatingUnder] = useState<string | 'root' | null>(null);
-  const [newFolderName, setNewFolderName] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [customFolderName, setCustomFolderName] = useState("");
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -74,14 +97,40 @@ export function FolderTree({
     setExpandedFolders(newExpanded);
   };
 
-  const handleCreateFolder = () => {
-    if (newFolderName.trim()) {
-      onCreateFolder({
-        name: newFolderName.trim(),
-        parentFolderId: creatingUnder && creatingUnder !== 'root' ? creatingUnder : undefined,
-      });
-      setNewFolderName("");
-      setCreatingUnder(null);
+  const handleCreateFolder = async () => {
+    const folderName = selectedCategory === "Custom" ? customFolderName.trim() : selectedCategory;
+    
+    if (folderName) {
+      try {
+        await onCreateFolder({
+          name: folderName,
+          parentFolderId: creatingUnder && creatingUnder !== 'root' ? creatingUnder : undefined,
+        });
+        setSelectedCategory("");
+        setCustomFolderName("");
+        setCreatingUnder(null);
+      } catch (error: any) {
+        if (error.error === 'Duplicate folder name') {
+          toast({
+            title: "Duplicate Folder",
+            description: (
+              <div className="space-y-1">
+                <p>{error.message}</p>
+                <p className="text-sm text-muted-foreground">
+                  Location: <span className="font-mono">{error.duplicateLocation}</span>
+                </p>
+              </div>
+            ),
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: error.message || "Failed to create folder",
+            variant: "destructive",
+          });
+        }
+      }
     }
   };
 
@@ -195,23 +244,61 @@ export function FolderTree({
         </ContextMenu>
 
         {creatingUnder === folder.id && (
-          <div className="ml-8 mt-1 flex items-center gap-2" data-testid="new-folder-input">
-            <FolderPlus className="h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Folder name..."
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreateFolder();
-                if (e.key === "Escape") {
+          <div className="ml-8 mt-1 space-y-2 p-2 bg-gray-50 rounded border" data-testid="new-subfolder-input">
+            <div className="flex items-center gap-2">
+              <FolderPlus className="h-4 w-4 text-gray-400" />
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Select folder type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {STANDARD_FOLDER_CATEGORIES.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedCategory === "Custom" && (
+              <Input
+                placeholder="Enter custom folder name..."
+                value={customFolderName}
+                onChange={(e) => setCustomFolderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateFolder();
+                  if (e.key === "Escape") {
+                    setCustomFolderName("");
+                    setSelectedCategory("");
+                    setCreatingUnder(null);
+                  }
+                }}
+                className="h-8 text-sm"
+                autoFocus
+              />
+            )}
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={handleCreateFolder}
+                disabled={!selectedCategory || (selectedCategory === "Custom" && !customFolderName.trim())}
+                className="h-7 text-xs"
+              >
+                Create
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSelectedCategory("");
+                  setCustomFolderName("");
                   setCreatingUnder(null);
-                  setNewFolderName("");
-                }
-              }}
-              onBlur={handleCreateFolder}
-              className="h-6 text-sm"
-              autoFocus
-            />
+                }}
+                className="h-7 text-xs"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         )}
 
@@ -251,30 +338,61 @@ export function FolderTree({
 
       <div className="flex-1 overflow-y-auto p-2">
         {creatingUnder === 'root' && (
-          <div className="mb-2 flex items-center gap-2" data-testid="new-folder-input">
-            <FolderPlus className="h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Folder name..."
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreateFolder();
-                if (e.key === "Escape") {
-                  setNewFolderName("");
+          <div className="mb-2 space-y-2 p-2 bg-gray-50 rounded border" data-testid="new-folder-input">
+            <div className="flex items-center gap-2">
+              <FolderPlus className="h-4 w-4 text-gray-400" />
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Select folder type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {STANDARD_FOLDER_CATEGORIES.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedCategory === "Custom" && (
+              <Input
+                placeholder="Enter custom folder name..."
+                value={customFolderName}
+                onChange={(e) => setCustomFolderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateFolder();
+                  if (e.key === "Escape") {
+                    setCustomFolderName("");
+                    setSelectedCategory("");
+                    setCreatingUnder(null);
+                  }
+                }}
+                className="h-8 text-sm"
+                autoFocus
+              />
+            )}
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={handleCreateFolder}
+                disabled={!selectedCategory || (selectedCategory === "Custom" && !customFolderName.trim())}
+                className="h-7 text-xs"
+              >
+                Create
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSelectedCategory("");
+                  setCustomFolderName("");
                   setCreatingUnder(null);
-                }
-              }}
-              onBlur={() => {
-                if (newFolderName.trim()) {
-                  handleCreateFolder();
-                } else {
-                  setNewFolderName("");
-                  setCreatingUnder(null);
-                }
-              }}
-              className="h-6 text-sm"
-              autoFocus
-            />
+                }}
+                className="h-7 text-xs"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         )}
 

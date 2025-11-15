@@ -134,6 +134,32 @@ router.post('/projects/:projectId/folders', requireAuth, requireVdrAccess('manag
       createdBy: userId
     });
 
+    // Check for duplicate folder name under same parent
+    const existingFolders = await storage.vdr.folders.getFoldersByProject(projectId, orgId);
+    const duplicate = existingFolders.find(f => 
+      f.name.toLowerCase() === validated.name.toLowerCase() && 
+      f.parentFolderId === (validated.parentFolderId || null)
+    );
+
+    if (duplicate) {
+      // Build path to show where duplicate exists
+      const buildPath = (folderId: string | null): string => {
+        if (!folderId) return '/';
+        const folder = existingFolders.find(f => f.id === folderId);
+        if (!folder) return '/';
+        const parentPath = folder.parentFolderId ? buildPath(folder.parentFolderId) : '';
+        return `${parentPath}/${folder.name}`;
+      };
+
+      const duplicatePath = buildPath(duplicate.id);
+      return res.status(409).json({ 
+        error: 'Duplicate folder name',
+        message: `A folder named "${validated.name}" already exists at this location`,
+        duplicateLocation: duplicatePath,
+        duplicateId: duplicate.id
+      });
+    }
+
     const folder = await storage.vdr.folders.createFolder(validated);
     
     await storage.vdr.audit.logAction({
@@ -280,6 +306,33 @@ router.post('/folders/:folderId/documents', requireAuth, requireVdrAccess('manag
       return res.status(404).json({ error: 'Folder not found' });
     }
 
+    // Check for duplicate document name in same folder
+    const documentName = req.body.name || req.file.originalname;
+    const existingDocuments = await storage.vdr.documents.getDocumentsByFolder(folderId, orgId);
+    const duplicate = existingDocuments.find(d => 
+      d.name.toLowerCase() === documentName.toLowerCase()
+    );
+
+    if (duplicate) {
+      // Build folder path for error message
+      const buildFolderPath = async (fId: string): Promise<string> => {
+        const f = await storage.vdr.folders.getFolder(fId, orgId);
+        if (!f) return '/';
+        if (!f.parentFolderId) return `/${f.name}`;
+        const parentPath = await buildFolderPath(f.parentFolderId);
+        return `${parentPath}/${f.name}`;
+      };
+
+      const folderPath = await buildFolderPath(folderId);
+      return res.status(409).json({
+        error: 'Duplicate document name',
+        message: `A document named "${documentName}" already exists in this folder`,
+        duplicateLocation: folderPath,
+        duplicateId: duplicate.id,
+        duplicateName: duplicate.name
+      });
+    }
+
     const fileInfo = await vdrFileService.processUpload(
       req.file.path,
       req.file.originalname,
@@ -293,7 +346,7 @@ router.post('/folders/:folderId/documents', requireAuth, requireVdrAccess('manag
       folderId,
       projectId: folder.projectId,
       orgId,
-      name: req.body.name || req.file.originalname,
+      name: documentName,
       description: req.body.description || null,
       filename: fileInfo.filename,
       mimeType: fileInfo.mimeType,
@@ -988,6 +1041,107 @@ router.post('/documents/bulk-download', requireAuth, async (req: Request, res: R
 // ============================================================================
 
 // List available templates
+// Get duplicate detection report for a project
+router.get('/projects/:projectId/duplicates', requireAuth, requireVdrAccess('view'), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const folders = await storage.vdr.folders.getFoldersByProject(projectId, orgId);
+    
+    // Build folder path helper
+    const buildPath = (folderId: string | null): string => {
+      if (!folderId) return '/';
+      const folder = folders.find(f => f.id === folderId);
+      if (!folder) return '/';
+      const parentPath = folder.parentFolderId ? buildPath(folder.parentFolderId) : '';
+      return `${parentPath}/${folder.name}`;
+    };
+
+    // Find duplicate folders (same name under same parent)
+    const folderDuplicates: any[] = [];
+    const foldersByParent = new Map<string | null, typeof folders>();
+    
+    folders.forEach(folder => {
+      const parentKey = folder.parentFolderId || null;
+      if (!foldersByParent.has(parentKey)) {
+        foldersByParent.set(parentKey, []);
+      }
+      foldersByParent.get(parentKey)!.push(folder);
+    });
+
+    foldersByParent.forEach((siblings, parentId) => {
+      const nameMap = new Map<string, typeof folders>();
+      siblings.forEach(folder => {
+        const normalizedName = folder.name.toLowerCase();
+        if (!nameMap.has(normalizedName)) {
+          nameMap.set(normalizedName, []);
+        }
+        nameMap.get(normalizedName)!.push(folder);
+      });
+
+      nameMap.forEach((duplicates, name) => {
+        if (duplicates.length > 1) {
+          folderDuplicates.push({
+            type: 'folder',
+            name: duplicates[0].name,
+            count: duplicates.length,
+            items: duplicates.map(f => ({
+              id: f.id,
+              path: buildPath(f.id),
+              createdAt: f.createdAt
+            }))
+          });
+        }
+      });
+    });
+
+    // Find duplicate documents (same name in same folder)
+    const documentDuplicates: any[] = [];
+    
+    for (const folder of folders) {
+      const documents = await storage.vdr.documents.getDocumentsByFolder(folder.id, orgId);
+      const nameMap = new Map<string, typeof documents>();
+      
+      documents.forEach(doc => {
+        const normalizedName = doc.name.toLowerCase();
+        if (!nameMap.has(normalizedName)) {
+          nameMap.set(normalizedName, []);
+        }
+        nameMap.get(normalizedName)!.push(doc);
+      });
+
+      nameMap.forEach((duplicates, name) => {
+        if (duplicates.length > 1) {
+          documentDuplicates.push({
+            type: 'document',
+            name: duplicates[0].name,
+            folderPath: buildPath(folder.id),
+            folderId: folder.id,
+            count: duplicates.length,
+            items: duplicates.map(d => ({
+              id: d.id,
+              name: d.name,
+              size: d.size,
+              uploadedAt: d.uploadedAt
+            }))
+          });
+        }
+      });
+    }
+
+    res.json({
+      folders: folderDuplicates,
+      documents: documentDuplicates,
+      totalFolderDuplicates: folderDuplicates.length,
+      totalDocumentDuplicates: documentDuplicates.length
+    });
+  } catch (error: any) {
+    console.error('Error detecting duplicates:', error);
+    res.status(500).json({ error: 'Failed to detect duplicates' });
+  }
+});
+
 router.get('/templates', requireAuth, async (req: Request, res: Response) => {
   const orgId = (req.user as any).orgId;
 

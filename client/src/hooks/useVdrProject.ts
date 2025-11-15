@@ -70,11 +70,21 @@ export function useVdrProject(projectId: string | undefined) {
   // Create folder mutation
   const createFolderMutation = useMutation({
     mutationFn: async (data: { name: string; parentFolderId?: string }) => {
-      return apiRequest(`/api/vdr/projects/${projectId}/folders`, {
+      const response = await fetch(`/api/vdr/projects/${projectId}/folders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(data),
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        const error = new Error(errorData.message || 'Failed to create folder');
+        Object.assign(error, errorData);
+        throw error;
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/vdr/projects/${projectId}/folders`] });
@@ -110,10 +120,20 @@ export function useVdrProject(projectId: string | undefined) {
   // Upload document mutation
   const uploadDocumentMutation = useMutation({
     mutationFn: async ({ folderId, formData }: { folderId: string; formData: FormData }) => {
-      return apiRequest(`/api/vdr/folders/${folderId}/documents`, {
+      const response = await fetch(`/api/vdr/folders/${folderId}/documents`, {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        const error = new Error(errorData.message || 'Failed to upload document');
+        Object.assign(error, errorData);
+        throw error;
+      }
+      
+      return response.json();
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/vdr/folders', variables.folderId, 'documents'] });

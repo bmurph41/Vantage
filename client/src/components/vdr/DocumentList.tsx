@@ -115,12 +115,27 @@ export function DocumentList({
       formData.append("file", fileArray[0]);
       try {
         await uploadDocumentAsync({ folderId, formData });
-      } catch (error) {
-        toast({
-          title: "Upload failed",
-          description: error instanceof Error ? error.message : "Failed to upload document",
-          variant: "destructive",
-        });
+      } catch (error: any) {
+        if (error.error === 'Duplicate document name') {
+          toast({
+            title: "Duplicate Document",
+            description: (
+              <div className="space-y-1">
+                <p>{error.message}</p>
+                <p className="text-sm text-muted-foreground">
+                  Location: <span className="font-mono">{error.duplicateLocation}</span>
+                </p>
+              </div>
+            ),
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Upload failed",
+            description: error.message || "Failed to upload document",
+            variant: "destructive",
+          });
+        }
       } finally {
         event.target.value = "";
       }
@@ -134,9 +149,14 @@ export function DocumentList({
         const formData = new FormData();
         formData.append("file", file);
         await uploadDocumentAsync({ folderId, formData });
-        return { success: true };
-      } catch (error) {
-        return { success: false };
+        return { success: true, file: file.name };
+      } catch (error: any) {
+        return { 
+          success: false, 
+          file: file.name,
+          isDuplicate: error.error === 'Duplicate document name',
+          location: error.duplicateLocation
+        };
       }
     });
 
@@ -144,16 +164,21 @@ export function DocumentList({
     
     const succeeded = results.filter(r => r.success).length;
     const failed = results.filter(r => !r.success).length;
+    const duplicates = results.filter(r => !r.success && r.isDuplicate);
     
     setBulkUploading(false);
     event.target.value = "";
     
     if (succeeded > 0 || failed > 0) {
+      const description = succeeded > 0 
+        ? `${succeeded} file${succeeded !== 1 ? 's' : ''} uploaded successfully${failed > 0 ? `, ${failed} failed` : ''}`
+        : duplicates.length > 0
+          ? `${duplicates.length} duplicate${duplicates.length !== 1 ? 's' : ''} detected: ${duplicates.map(d => d.file).join(', ')}`
+          : `${failed} file${failed !== 1 ? 's' : ''} failed to upload`;
+      
       toast({
         title: succeeded > 0 ? "Upload complete" : "Upload failed",
-        description: succeeded > 0 
-          ? `${succeeded} file${succeeded !== 1 ? 's' : ''} uploaded successfully${failed > 0 ? `, ${failed} failed` : ''}`
-          : `${failed} file${failed !== 1 ? 's' : ''} failed to upload`,
+        description,
         variant: failed > 0 && succeeded === 0 ? "destructive" : "default",
       });
     }
