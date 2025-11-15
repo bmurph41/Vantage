@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2, PanelLeftClose, PanelLeft, ChevronLeft, ChevronRight, FolderKanban } from "lucide-react";
+import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2, ChevronLeft, ChevronRight, FolderKanban, Filter, ChevronUp } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import debounce from "lodash.debounce";
 import { salesCompsApi } from "@/lib/salescomps/api";
@@ -305,19 +305,6 @@ export default function SalesCompsIndex() {
             <div className="bg-card border-b border-border px-6 py-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-4 flex-shrink-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  className="mr-2"
-                  data-testid="button-toggle-sidebar"
-                >
-                  {isSidebarCollapsed ? (
-                    <PanelLeft className="h-4 w-4" />
-                  ) : (
-                    <PanelLeftClose className="h-4 w-4" />
-                  )}
-                </Button>
                 <div className="flex items-center gap-1">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -527,17 +514,38 @@ export default function SalesCompsIndex() {
           {/* Tab Content */}
           <TabsContent value="data" className="flex-1 min-h-0 overflow-hidden mt-0 m-0 flex flex-col" data-testid="tab-content-data">
             {/* Collapsible Filters Panel - Horizontal under tabs */}
-            {!isSidebarCollapsed && (
-              <div className="px-6 py-4">
+            <div className="px-6 py-4 border-b border-border">
+              <div className="flex items-center justify-end mb-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                  className="h-8 gap-2"
+                  data-testid="button-toggle-filters"
+                >
+                  {isSidebarCollapsed ? (
+                    <>
+                      <Filter className="h-4 w-4" />
+                      Show Filters
+                    </>
+                  ) : (
+                    <>
+                      <ChevronUp className="h-4 w-4" />
+                      Hide Filters
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              {!isSidebarCollapsed && (
                 <FiltersPanel 
                   filters={filters}
                   onFiltersChange={handleFilterChange}
                   activeSavedSearchId={activeSavedSearchId}
                   onActiveSavedSearchChange={handleActiveSavedSearchChange}
-                  onCollapse={() => setIsSidebarCollapsed(true)}
                 />
-              </div>
-            )}
+              )}
+            </div>
             
             {/* Data Grid */}
             <div className="flex-1 min-h-0 overflow-hidden">

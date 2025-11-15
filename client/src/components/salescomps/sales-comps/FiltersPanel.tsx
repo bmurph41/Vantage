@@ -25,7 +25,6 @@ interface FiltersPanelProps {
   onFiltersChange: (filters: FilterState) => void;
   activeSavedSearchId?: string | null;
   onActiveSavedSearchChange?: (id: string | null, name: string | null) => void;
-  onCollapse?: () => void;
 }
 
 export default function FiltersPanel({ 
@@ -33,7 +32,6 @@ export default function FiltersPanel({
   onFiltersChange,
   activeSavedSearchId = null,
   onActiveSavedSearchChange = () => {},
-  onCollapse,
 }: FiltersPanelProps) {
   const [capRateInputs, setCapRateInputs] = useState<{
     capRateMin: string;
@@ -261,17 +259,6 @@ export default function FiltersPanel({
             >
               <X className="h-3.5 w-3.5 mr-1.5" />
               Clear All
-            </Button>
-          )}
-          {onCollapse && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onCollapse}
-              className="h-8 w-8 p-0"
-              data-testid="button-collapse-filters"
-            >
-              <ChevronUp className="h-4 w-4" />
             </Button>
           )}
         </div>
