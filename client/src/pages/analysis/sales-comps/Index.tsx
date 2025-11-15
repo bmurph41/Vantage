@@ -1,15 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2, ChevronLeft, ChevronRight, FolderKanban, Filter, ChevronUp } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { BarChart3, FolderPlus, Trash2, ChevronLeft, ChevronRight, Filter, ChevronUp } from "lucide-react";
+import { Link } from "wouter";
 import debounce from "lodash.debounce";
 import { salesCompsApi } from "@/lib/salescomps/api";
 import { queryKeys } from "@/lib/salescomps/queryKeys";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/salescomps/authUtils";
+import SalesCompsHeader from "@/components/salescomps/sales-comps/SalesCompsHeader";
 import FiltersPanel from "@/components/salescomps/sales-comps/FiltersPanel";
 import CompsDataGrid from "@/components/salescomps/sales-comps/CompsDataGrid";
 import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEditCompDialog";
@@ -293,125 +292,19 @@ export default function SalesCompsIndex() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 flex flex-col">
-          {/* Sticky Header Container - Command Bar + Navigation */}
-          <div className="sticky top-0 z-40 bg-background">
-            {/* Top Actions Bar */}
-            <div className="bg-card border-b border-border px-6 py-4">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-4 flex-shrink-0">
-                <div className="flex items-center gap-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                    <Input
-                      placeholder="Search marina, location, seller..."
-                      className="pl-10 w-72"
-                      value={searchQuery}
-                      onChange={(e) => handleSearch(e.target.value)}
-                      data-testid="input-search"
-                    />
-                  </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p className="text-sm">
-                        <strong>Search Tips:</strong><br/>
-                        • Type marina name, location, or seller<br/>
-                        • Use the filters panel for precise filtering<br/>
-                        • Click column headers to filter specific values
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="text-sm text-muted-foreground ml-4 px-3 py-1 bg-muted rounded-md">
-                  <span data-testid="text-count" className="font-semibold">{total.toLocaleString()}</span> comps found
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 flex-wrap">
-                {canManageColumns && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowColumnsDialog(true)}
-                    data-testid="button-columns"
-                  >
-                    <Columns className="h-4 w-4 mr-2" />
-                    Columns
-                  </Button>
-                )}
-
-                {/* Export button */}
-                <Button
-                  variant="secondary"
-                  onClick={handleExport}
-                  disabled={!data?.length}
-                  data-testid="button-export"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-
-                {canCreate && (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowCreateDialog(true)}
-                      data-testid="button-add-comp"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Comp
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowPortfolioWizard(true)}
-                      data-testid="button-create-portfolio"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Portfolio
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowUpload(true)}
-                      data-testid="button-upload"
-                    >
-                      <UploadIcon className="h-4 w-4 mr-2" />
-                      Upload
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-            </div>
-
-            {/* Navigation Tabs - Inside sticky container */}
-            <div className="px-6 border-b border-border bg-background">
-              <div className="flex items-center gap-2 py-2">
-                <Link href="/analysis/sales-comps">
-                  <Button variant="ghost" className="flex items-center gap-2 bg-muted" data-testid="nav-sales-comps">
-                    <Table className="h-4 w-4" />
-                    Sales Comps
-                  </Button>
-                </Link>
-                <Link href="/analysis/sales-comps/analytics">
-                  <Button variant="ghost" className="flex items-center gap-2" data-testid="nav-analytics">
-                    <TrendingUp className="h-4 w-4" />
-                    Analytics
-                  </Button>
-                </Link>
-                <Link href="/analysis/sales-comps/projects">
-                  <Button variant="ghost" className="flex items-center gap-2" data-testid="nav-projects">
-                    <FolderKanban className="h-4 w-4" />
-                    Projects
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
+          <SalesCompsHeader 
+            searchQuery={searchQuery}
+            onSearchChange={handleSearch}
+            total={total}
+            canManageColumns={canManageColumns}
+            canCreate={canCreate}
+            onColumnsClick={() => setShowColumnsDialog(true)}
+            onExportClick={handleExport}
+            onAddCompClick={() => setShowCreateDialog(true)}
+            onPortfolioClick={() => setShowPortfolioWizard(true)}
+            onUploadClick={() => setShowUpload(true)}
+            hasData={!!data?.length}
+          />
 
           {/* Bulk Actions Bar */}
           {selectedIds?.length > 0 && (
