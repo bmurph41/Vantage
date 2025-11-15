@@ -134,7 +134,7 @@ export default function AnalyticsWorkbench() {
   const insights = analyticsData?.insights || [];
 
   return (
-    <div className="flex flex-col lg:flex-row gap-3 px-6 py-4">
+    <div className="flex flex-col lg:flex-row gap-3 px-6 pb-6">
       {/* Filters Sidebar */}
       <div className="w-full lg:w-80 flex-shrink-0">
         <AnalyticsFiltersPanel
