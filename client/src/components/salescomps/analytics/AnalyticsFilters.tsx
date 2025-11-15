@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Filter, X, RefreshCcw, ChevronDown } from "lucide-react";
+import { formatCurrencyInput, parseCurrencyInput } from "@/lib/salescomps/format";
 
 export interface AnalyticsFilters {
   states?: string[];
@@ -46,6 +47,8 @@ export default function AnalyticsFiltersPanel({
   availableProfitCenters
 }: AnalyticsFiltersProps) {
   const [localFilters, setLocalFilters] = useState<AnalyticsFilters>(filters);
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [displayValues, setDisplayValues] = useState<Record<string, string>>({});
 
   const handleApply = () => {
     onFiltersChange(localFilters);
@@ -54,6 +57,7 @@ export default function AnalyticsFiltersPanel({
   const handleReset = () => {
     const resetFilters: AnalyticsFilters = {};
     setLocalFilters(resetFilters);
+    setDisplayValues({});
     onFiltersChange(resetFilters);
   };
 
@@ -79,6 +83,36 @@ export default function AnalyticsFiltersPanel({
       ? currentPCs.filter(p => p !== pc)
       : [...currentPCs, pc];
     setLocalFilters({ ...localFilters, profitCenters: newPCs });
+  };
+
+  const handleCurrencyFocus = (field: string) => {
+    setEditingField(field);
+    const value = localFilters[field as keyof AnalyticsFilters];
+    setDisplayValues({ ...displayValues, [field]: value?.toString() || '' });
+  };
+
+  const handleCurrencyChange = (field: string, value: string) => {
+    setDisplayValues({ ...displayValues, [field]: value });
+  };
+
+  const handleCurrencyBlur = (field: string) => {
+    setEditingField(null);
+    const value = displayValues[field] || '';
+    const parsed = parseCurrencyInput(value);
+    setLocalFilters({ ...localFilters, [field]: parsed });
+    if (parsed !== undefined) {
+      setDisplayValues({ ...displayValues, [field]: formatCurrencyInput(parsed) });
+    } else {
+      setDisplayValues({ ...displayValues, [field]: '' });
+    }
+  };
+
+  const getCurrencyDisplayValue = (field: string): string => {
+    if (editingField === field) {
+      return displayValues[field] || '';
+    }
+    const value = localFilters[field as keyof AnalyticsFilters];
+    return value !== undefined ? formatCurrencyInput(value as number) : '';
   };
 
   const activeFilterCount = Object.keys(filters).filter(key => {
@@ -154,13 +188,12 @@ export default function AnalyticsFiltersPanel({
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input
-                type="number"
-                placeholder="0"
-                value={localFilters.priceMin || ""}
-                onChange={(e) => setLocalFilters({
-                  ...localFilters,
-                  priceMin: e.target.value ? parseFloat(e.target.value) : undefined
-                })}
+                type="text"
+                placeholder="$0"
+                value={getCurrencyDisplayValue('priceMin')}
+                onFocus={() => handleCurrencyFocus('priceMin')}
+                onChange={(e) => handleCurrencyChange('priceMin', e.target.value)}
+                onBlur={() => handleCurrencyBlur('priceMin')}
                 className="h-9"
                 data-testid="input-price-min"
               />
@@ -168,13 +201,12 @@ export default function AnalyticsFiltersPanel({
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Max</Label>
               <Input
-                type="number"
-                placeholder="50000000"
-                value={localFilters.priceMax || ""}
-                onChange={(e) => setLocalFilters({
-                  ...localFilters,
-                  priceMax: e.target.value ? parseFloat(e.target.value) : undefined
-                })}
+                type="text"
+                placeholder="$50,000,000"
+                value={getCurrencyDisplayValue('priceMax')}
+                onFocus={() => handleCurrencyFocus('priceMax')}
+                onChange={(e) => handleCurrencyChange('priceMax', e.target.value)}
+                onBlur={() => handleCurrencyBlur('priceMax')}
                 className="h-9"
                 data-testid="input-price-max"
               />
@@ -224,13 +256,12 @@ export default function AnalyticsFiltersPanel({
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input
-                type="number"
-                placeholder="Min"
-                value={localFilters.pricePerSlipMin || ""}
-                onChange={(e) => setLocalFilters({
-                  ...localFilters,
-                  pricePerSlipMin: e.target.value ? parseFloat(e.target.value) : undefined
-                })}
+                type="text"
+                placeholder="$0"
+                value={getCurrencyDisplayValue('pricePerSlipMin')}
+                onFocus={() => handleCurrencyFocus('pricePerSlipMin')}
+                onChange={(e) => handleCurrencyChange('pricePerSlipMin', e.target.value)}
+                onBlur={() => handleCurrencyBlur('pricePerSlipMin')}
                 className="h-9"
                 data-testid="input-price-per-slip-min"
               />
@@ -238,13 +269,12 @@ export default function AnalyticsFiltersPanel({
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Max</Label>
               <Input
-                type="number"
-                placeholder="Max"
-                value={localFilters.pricePerSlipMax || ""}
-                onChange={(e) => setLocalFilters({
-                  ...localFilters,
-                  pricePerSlipMax: e.target.value ? parseFloat(e.target.value) : undefined
-                })}
+                type="text"
+                placeholder="$100,000"
+                value={getCurrencyDisplayValue('pricePerSlipMax')}
+                onFocus={() => handleCurrencyFocus('pricePerSlipMax')}
+                onChange={(e) => handleCurrencyChange('pricePerSlipMax', e.target.value)}
+                onBlur={() => handleCurrencyBlur('pricePerSlipMax')}
                 className="h-9"
                 data-testid="input-price-per-slip-max"
               />

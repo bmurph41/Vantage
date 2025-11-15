@@ -135,3 +135,38 @@ export const isValidUrl = (url: string): boolean => {
     return false;
   }
 };
+
+// Format number for currency input display (e.g., "$1,234,567")
+export const formatCurrencyInput = (value: number | string | null | undefined): string => {
+  if (value === null || value === undefined || value === '') return '';
+  const numValue = typeof value === 'string' ? parseNumericValue(value) : value;
+  if (numValue === null) return '';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(numValue);
+};
+
+// Format number for percentage input display (e.g., "12.34%")
+export const formatPercentInput = (value: number | string | null | undefined): string => {
+  if (value === null || value === undefined || value === '') return '';
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(numValue)) return '';
+  return `${numValue.toFixed(2)}%`;
+};
+
+// Parse currency input back to number (removes $, commas, etc.)
+export const parseCurrencyInput = (value: string): number | undefined => {
+  if (!value || value.trim() === '') return undefined;
+  const parsed = parseNumericValue(value);
+  return parsed !== null ? parsed : undefined;
+};
+
+// Parse percentage input back to number (removes %)
+export const parsePercentageInput = (value: string): number | undefined => {
+  if (!value || value.trim() === '') return undefined;
+  const parsed = parsePercentValue(value);
+  return parsed !== null ? parsed : undefined;
+};

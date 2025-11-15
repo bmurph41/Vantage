@@ -13,6 +13,12 @@ import throttle from "lodash.throttle";
 import SavedSearchesMenu from "./SavedSearchesMenu";
 import { useCustomStorageTypes } from "@/hooks/salescomps/useCustomStorageTypes";
 import {
+  formatCurrencyInput,
+  parseCurrencyInput,
+  formatPercentInput,
+  parsePercentageInput
+} from "@/lib/salescomps/format";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -40,7 +46,24 @@ export default function FiltersPanel({
     capRateMin: "",
     capRateMax: ""
   });
-  
+
+  const [priceInputs, setPriceInputs] = useState<{
+    priceMin: string;
+    priceMax: string;
+  }>({
+    priceMin: "",
+    priceMax: ""
+  });
+
+  const [occupancyInputs, setOccupancyInputs] = useState<{
+    occupancyMin: string;
+    occupancyMax: string;
+  }>({
+    occupancyMin: "",
+    occupancyMax: ""
+  });
+
+  const [editingField, setEditingField] = useState<string | null>(null);
   const [isMarketBid, setIsMarketBid] = useState(false);
   const [previousPriceMin, setPreviousPriceMin] = useState("");
   
@@ -86,6 +109,24 @@ export default function FiltersPanel({
       capRateMax: filters.capRateMax ? `${parseFloat(filters.capRateMax).toFixed(2)}%` : ""
     });
   }, [filters.capRateMin, filters.capRateMax]);
+
+  useEffect(() => {
+    if (editingField !== 'priceMin' && editingField !== 'priceMax') {
+      setPriceInputs({
+        priceMin: filters.priceMin && filters.priceMin !== "Market" ? formatCurrencyInput(parseFloat(filters.priceMin)) : "",
+        priceMax: filters.priceMax ? formatCurrencyInput(parseFloat(filters.priceMax)) : ""
+      });
+    }
+  }, [filters.priceMin, filters.priceMax, editingField]);
+
+  useEffect(() => {
+    if (editingField !== 'occupancyMin' && editingField !== 'occupancyMax') {
+      setOccupancyInputs({
+        occupancyMin: filters.occupancyMin ? `${parseFloat(filters.occupancyMin).toFixed(2)}%` : "",
+        occupancyMax: filters.occupancyMax ? `${parseFloat(filters.occupancyMax).toFixed(2)}%` : ""
+      });
+    }
+  }, [filters.occupancyMin, filters.occupancyMax, editingField]);
   
   // Sync Market Bid checkbox with priceMin filter
   useEffect(() => {
@@ -182,7 +223,91 @@ export default function FiltersPanel({
     updateFilter(field, numValue.toString());
   };
 
+  // Price input handlers
+  const handlePriceFocus = (field: 'priceMin' | 'priceMax') => {
+    setEditingField(field);
+    const currentValue = filters[field];
+    setPriceInputs(prev => ({
+      ...prev,
+      [field]: currentValue && currentValue !== "Market" ? currentValue : ""
+    }));
+  };
+
+  const handlePriceChange = (field: 'priceMin' | 'priceMax', value: string) => {
+    setPriceInputs(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handlePriceBlur = (field: 'priceMin' | 'priceMax') => {
+    setEditingField(null);
+    const value = priceInputs[field];
+    if (!value || value.trim() === "") {
+      updateFilter(field, "");
+      return;
+    }
+    const parsed = parseCurrencyInput(value);
+    if (parsed !== undefined) {
+      updateFilter(field, parsed.toString());
+    } else {
+      updateFilter(field, "");
+    }
+  };
+
+  // Occupancy input handlers
+  const handleOccupancyFocus = (field: 'occupancyMin' | 'occupancyMax') => {
+    setEditingField(field);
+    const currentValue = occupancyInputs[field];
+    if (currentValue.endsWith('%')) {
+      setOccupancyInputs(prev => ({
+        ...prev,
+        [field]: currentValue.slice(0, -1)
+      }));
+    }
+  };
+
+  const handleOccupancyChange = (field: 'occupancyMin' | 'occupancyMax', value: string) => {
+    setOccupancyInputs(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleOccupancyBlur = (field: 'occupancyMin' | 'occupancyMax') => {
+    setEditingField(null);
+    const value = occupancyInputs[field];
+    if (!value || value.trim() === "") {
+      setOccupancyInputs(prev => ({
+        ...prev,
+        [field]: ""
+      }));
+      updateFilter(field, "");
+      return;
+    }
+    const cleanValue = value.replace(/[^0-9.]/g, '');
+    const numValue = parseFloat(cleanValue);
+    if (isNaN(numValue) || numValue < 0) {
+      setOccupancyInputs(prev => ({
+        ...prev,
+        [field]: ""
+      }));
+      updateFilter(field, "");
+      return;
+    }
+    const formattedDisplay = `${numValue.toFixed(2)}%`;
+    setOccupancyInputs(prev => ({
+      ...prev,
+      [field]: formattedDisplay
+    }));
+    updateFilter(field, numValue.toString());
+  };
+
   const clearAllFilters = () => {
+    setPriceInputs({ priceMin: "", priceMax: "" });
+    setOccupancyInputs({ occupancyMin: "", occupancyMax: "" });
+    setCapRateInputs({ capRateMin: "", capRateMax: "" });
+    setEditingField(null);
     onFiltersChange({
       q: "",
       state: "",
@@ -424,20 +549,24 @@ export default function FiltersPanel({
                 <div className="flex items-center gap-2">
                   <Input
                     type="text"
-                    placeholder="Min"
+                    placeholder="$0"
                     className="h-9 text-sm"
-                    value={filters.priceMin}
-                    onChange={(e) => debouncedUpdateFilter('priceMin', e.target.value)}
+                    value={priceInputs.priceMin}
+                    onChange={(e) => handlePriceChange('priceMin', e.target.value)}
+                    onFocus={() => handlePriceFocus('priceMin')}
+                    onBlur={() => handlePriceBlur('priceMin')}
                     data-testid="input-price-min"
                     disabled={isMarketBid}
                   />
                   <span className="text-muted-foreground text-xs">-</span>
                   <Input
                     type="text"
-                    placeholder="Max"
+                    placeholder="$50,000,000"
                     className="h-9 text-sm"
-                    value={filters.priceMax}
-                    onChange={(e) => debouncedUpdateFilter('priceMax', e.target.value)}
+                    value={priceInputs.priceMax}
+                    onChange={(e) => handlePriceChange('priceMax', e.target.value)}
+                    onFocus={() => handlePriceFocus('priceMax')}
+                    onBlur={() => handlePriceBlur('priceMax')}
                     data-testid="input-price-max"
                   />
                 </div>
@@ -447,20 +576,24 @@ export default function FiltersPanel({
                 <Label className="text-xs font-medium text-muted-foreground mb-2 block">Occupancy (%)</Label>
                 <div className="flex items-center gap-2">
                   <Input
-                    type="number"
-                    placeholder="Min"
+                    type="text"
+                    placeholder="0.00%"
                     className="h-9 text-sm"
-                    value={filters.occupancyMin}
-                    onChange={(e) => throttledUpdateFilter('occupancyMin', e.target.value)}
+                    value={occupancyInputs.occupancyMin}
+                    onChange={(e) => handleOccupancyChange('occupancyMin', e.target.value)}
+                    onFocus={() => handleOccupancyFocus('occupancyMin')}
+                    onBlur={() => handleOccupancyBlur('occupancyMin')}
                     data-testid="input-occupancy-min"
                   />
                   <span className="text-muted-foreground text-xs">-</span>
                   <Input
-                    type="number"
-                    placeholder="Max"
+                    type="text"
+                    placeholder="100.00%"
                     className="h-9 text-sm"
-                    value={filters.occupancyMax}
-                    onChange={(e) => throttledUpdateFilter('occupancyMax', e.target.value)}
+                    value={occupancyInputs.occupancyMax}
+                    onChange={(e) => handleOccupancyChange('occupancyMax', e.target.value)}
+                    onFocus={() => handleOccupancyFocus('occupancyMax')}
+                    onBlur={() => handleOccupancyBlur('occupancyMax')}
                     data-testid="input-occupancy-max"
                   />
                 </div>
