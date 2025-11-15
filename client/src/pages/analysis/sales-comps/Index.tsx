@@ -607,11 +607,11 @@ export default function SalesCompsIndex() {
             )}
           </TabsContent>
 
-          <TabsContent value="metrics" className="flex-1 overflow-auto mt-0 m-0 p-0" data-testid="tab-content-metrics">
+          <TabsContent value="metrics" className="mt-0 flex-1 overflow-auto p-0" data-testid="tab-content-metrics">
             <AnalyticsWorkbench />
           </TabsContent>
 
-          <TabsContent value="projects" className="flex-1 overflow-auto mt-0 m-0 p-0" data-testid="tab-content-projects">
+          <TabsContent value="projects" className="mt-0 flex-1 overflow-auto p-0" data-testid="tab-content-projects">
             {selectedProject ? (
               <ProjectDetails
                 projectId={selectedProject.id}
