@@ -291,9 +291,9 @@ export default function FiltersPanel({
               <div>
                 <Label className="text-xs font-medium text-muted-foreground mb-2 block">State/Country</Label>
                 <Select
-                  value={filters.states && filters.states.length === 1 ? filters.states[0] : ""}
+                  value={filters.states && filters.states.length === 1 ? filters.states[0] : "all"}
                   onValueChange={(value) => {
-                    if (value) {
+                    if (value && value !== "all") {
                       updateFilter('states', [value]);
                     } else {
                       updateFilter('states', []);
@@ -304,7 +304,7 @@ export default function FiltersPanel({
                     <SelectValue placeholder="All states" />
                   </SelectTrigger>
                   <SelectContent className="max-h-64">
-                    <SelectItem value="">All states</SelectItem>
+                    <SelectItem value="all">All states</SelectItem>
                     {US_STATES.map((state) => (
                       <SelectItem key={state.code} value={state.code}>
                         {state.name}
@@ -323,9 +323,9 @@ export default function FiltersPanel({
               <div>
                 <Label className="text-xs font-medium text-muted-foreground mb-2 block">Region</Label>
                 <Select
-                  value={filters.regions && filters.regions.length === 1 ? filters.regions[0] : ""}
+                  value={filters.regions && filters.regions.length === 1 ? filters.regions[0] : "all"}
                   onValueChange={(value) => {
-                    if (value) {
+                    if (value && value !== "all") {
                       updateFilter('regions', [value]);
                     } else {
                       updateFilter('regions', []);
@@ -336,7 +336,7 @@ export default function FiltersPanel({
                     <SelectValue placeholder="All regions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All regions</SelectItem>
+                    <SelectItem value="all">All regions</SelectItem>
                     {US_REGIONS.map((region) => (
                       <SelectItem key={region} value={region}>
                         {region}
