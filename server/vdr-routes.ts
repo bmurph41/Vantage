@@ -5,7 +5,7 @@ import { vdrFileService } from './vdr-file-service';
 import { defaultStorageProvider } from './vdr-storage-provider';
 import { storage } from './storage';
 import { z } from 'zod';
-import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs } from '@shared/schema';
+import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs, projects } from '@shared/schema';
 import { db } from './db';
 import { eq, and, desc, sql, isNotNull, inArray } from 'drizzle-orm';
 
@@ -65,8 +65,14 @@ const requireVdrAccess = (capability: 'view' | 'download' | 'print' | 'manage') 
         resourceType = 'folder';
         resourceId = folderId;
       } else if (projectId) {
-        const project = await storage.getProject(projectId);
-        if (!project || project.orgId !== orgId) {
+        const [project] = await db.select()
+          .from(projects)
+          .where(and(
+            eq(projects.id, projectId),
+            eq(projects.orgId, orgId)
+          ))
+          .limit(1);
+        if (!project) {
           return res.status(404).json({ error: 'Project not found' });
         }
         resourceType = 'project';
