@@ -148,9 +148,9 @@ export default function AnalyticsWorkbench() {
 
       {/* Main Content */}
       <div className="flex-1">
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {/* Header */}
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center justify-between mb-0">
             <div>
               <h2 className="text-lg font-bold text-foreground">Market Analytics</h2>
               <p className="text-xs text-muted-foreground">

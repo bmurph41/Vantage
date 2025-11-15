@@ -608,7 +608,7 @@ export default function SalesCompsIndex() {
           </TabsContent>
 
           <TabsContent value="metrics" className="flex-1 overflow-auto mt-0 m-0 p-0" data-testid="tab-content-metrics">
-            <div className="px-6 pb-6">
+            <div className="px-6 pt-3 pb-6">
               <AnalyticsWorkbench />
             </div>
           </TabsContent>
