@@ -170,17 +170,37 @@ export function DocumentList({
     event.target.value = "";
     
     if (succeeded > 0 || failed > 0) {
-      const description = succeeded > 0 
-        ? `${succeeded} file${succeeded !== 1 ? 's' : ''} uploaded successfully${failed > 0 ? `, ${failed} failed` : ''}`
-        : duplicates.length > 0
-          ? `${duplicates.length} duplicate${duplicates.length !== 1 ? 's' : ''} detected: ${duplicates.map(d => d.file).join(', ')}`
-          : `${failed} file${failed !== 1 ? 's' : ''} failed to upload`;
-      
-      toast({
-        title: succeeded > 0 ? "Upload complete" : "Upload failed",
-        description,
-        variant: failed > 0 && succeeded === 0 ? "destructive" : "default",
-      });
+      if (duplicates.length > 0) {
+        toast({
+          title: succeeded > 0 ? "Upload partially complete" : "Duplicate files detected",
+          description: (
+            <div className="space-y-2">
+              {succeeded > 0 && <p>{succeeded} file{succeeded !== 1 ? 's' : ''} uploaded successfully</p>}
+              <p className="font-medium">{duplicates.length} duplicate{duplicates.length !== 1 ? 's' : ''}:</p>
+              <ul className="list-disc list-inside space-y-1">
+                {duplicates.slice(0, 3).map((dup, idx) => (
+                  <li key={idx} className="text-sm">
+                    <span className="font-medium">{dup.file}</span>
+                    {dup.location && <span className="text-muted-foreground"> - {dup.location}</span>}
+                  </li>
+                ))}
+                {duplicates.length > 3 && (
+                  <li className="text-sm text-muted-foreground">...and {duplicates.length - 3} more</li>
+                )}
+              </ul>
+            </div>
+          ),
+          variant: succeeded === 0 ? "destructive" : "default",
+        });
+      } else {
+        toast({
+          title: succeeded > 0 ? "Upload complete" : "Upload failed",
+          description: succeeded > 0 
+            ? `${succeeded} file${succeeded !== 1 ? 's' : ''} uploaded successfully${failed > 0 ? `, ${failed} failed` : ''}`
+            : `${failed} file${failed !== 1 ? 's' : ''} failed to upload`,
+          variant: failed > 0 && succeeded === 0 ? "destructive" : "default",
+        });
+      }
     }
   };
 
