@@ -65,6 +65,8 @@ import MarketingEmailCampaigns from "@/pages/operations/marketing/EmailCampaigns
 import MarketingSettings from "@/pages/operations/marketing/Settings";
 // Analysis / Sales Comps pages
 import SalesCompsIndex from "@/pages/analysis/sales-comps/Index";
+import SalesCompsAnalytics from "@/pages/analysis/sales-comps/Analytics";
+import SalesCompsProjects from "@/pages/analysis/sales-comps/Projects";
 import SalesCompsDetail from "@/pages/analysis/sales-comps/Detail";
 import SalesCompsUpload from "@/pages/analysis/sales-comps/Upload";
 import SalesCompsCompare from "@/pages/analysis/sales-comps/Compare";
@@ -563,6 +565,20 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <SalesCompsIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/sales-comps/analytics">
+        {() => (
+          <UnifiedLayout>
+            <SalesCompsAnalytics />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/sales-comps/projects">
+        {() => (
+          <UnifiedLayout>
+            <SalesCompsProjects />
           </UnifiedLayout>
         )}
       </Route>
