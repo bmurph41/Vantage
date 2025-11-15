@@ -58,7 +58,7 @@ export default function SalesCompsIndex() {
     portfoliosOnly: false,
     columnFilters: {},
   });
-  const [sortBy, setSortBy] = useState("saleYear");
+  const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>("desc");
   const [columnUniqueValues, setColumnUniqueValues] = useState<Record<string, string[]>>({});
   const [activeSavedSearchId, setActiveSavedSearchId] = useState<string | null>(null);
