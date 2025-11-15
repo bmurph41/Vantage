@@ -99,6 +99,32 @@ export const compFiltersSchema = z.object({
   q: z.string().optional(),
   state: z.string().optional(),
   region: z.string().optional(),
+  states: z.preprocess(
+    (val) => {
+      if (typeof val === 'string') {
+        try {
+          return JSON.parse(val);
+        } catch {
+          return [];
+        }
+      }
+      return val || [];
+    },
+    z.array(z.string()).default([])
+  ),
+  regions: z.preprocess(
+    (val) => {
+      if (typeof val === 'string') {
+        try {
+          return JSON.parse(val);
+        } catch {
+          return [];
+        }
+      }
+      return val || [];
+    },
+    z.array(z.string()).default([])
+  ),
   saleYearMin: z.coerce.number().int().optional(),
   saleYearMax: z.coerce.number().int().optional(),
   priceMin: z.coerce.number().positive().optional(),
