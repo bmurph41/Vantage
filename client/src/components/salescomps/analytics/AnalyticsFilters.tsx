@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Filter, X, RefreshCcw, ChevronDown } from "lucide-react";
 import { formatCurrencyInput, parseCurrencyInput } from "@/lib/salescomps/format";
+import { US_STATES } from "@shared/salescomps-constants";
 
 export interface AnalyticsFilters {
   states?: string[];
@@ -30,14 +32,6 @@ interface AnalyticsFiltersProps {
   availableWaterTypes: string[];
   availableProfitCenters: string[];
 }
-
-const US_STATES = [
-  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-  "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
-];
 
 export default function AnalyticsFiltersPanel({
   filters,
@@ -302,26 +296,26 @@ export default function AnalyticsFiltersPanel({
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-80 p-0" align="start">
-                <div className="max-h-80 overflow-y-auto p-4">
-                  <div className="grid grid-cols-3 gap-3">
-                    {[...availableStates].sort().map(state => (
-                      <div key={state} className="flex items-center space-x-2">
+                <ScrollArea className="h-80">
+                  <div className="p-4 space-y-2">
+                    {US_STATES.map(state => (
+                      <div key={state.code} className="flex items-center space-x-2">
                         <Checkbox
-                          id={`state-${state}`}
-                          checked={localFilters.states?.includes(state)}
-                          onCheckedChange={() => toggleState(state)}
-                          data-testid={`checkbox-state-${state}`}
+                          id={`state-${state.code}`}
+                          checked={localFilters.states?.includes(state.code)}
+                          onCheckedChange={() => toggleState(state.code)}
+                          data-testid={`checkbox-state-${state.code}`}
                         />
                         <label
-                          htmlFor={`state-${state}`}
+                          htmlFor={`state-${state.code}`}
                           className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                         >
-                          {state}
+                          {state.name}
                         </label>
                       </div>
                     ))}
                   </div>
-                </div>
+                </ScrollArea>
               </PopoverContent>
             </Popover>
           </div>
