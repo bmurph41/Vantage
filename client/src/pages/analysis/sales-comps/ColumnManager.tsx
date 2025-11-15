@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Edit, Trash2, Save, X, GripVertical, Check, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCustomStorageTypes } from "@/hooks/salescomps/useCustomStorageTypes";
 
 interface ColumnManagerProps {
   onClose: () => void;
@@ -47,6 +48,7 @@ const defaultSalesCompColumns = [
 export default function ColumnManager({ onClose }: ColumnManagerProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: customStorageTypes = [] } = useCustomStorageTypes();
 
   const [editingColumn, setEditingColumn] = useState<any>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -266,6 +268,64 @@ export default function ColumnManager({ onClose }: ColumnManagerProps) {
               ))}
             </div>
           </div>
+
+          {/* Available Storage Type Columns */}
+          {customStorageTypes && customStorageTypes.length > 0 && (
+            <div className="space-y-3 mt-6">
+              <h3 className="font-semibold text-foreground">Available Storage Type Columns</h3>
+              <p className="text-sm text-muted-foreground">
+                Custom storage types that can be added as columns to track specific storage types
+              </p>
+              <div className="space-y-2">
+                {customStorageTypes.map((storageType) => (
+                  <Card key={storageType.id} className="border bg-blue-50/50">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{storageType.name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                Storage Type
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Can be added as a column to track this storage type across comps
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const columnKey = `storageType_${storageType.name.toLowerCase().replace(/\s+/g, '_')}`;
+                            const columnLabel = `${storageType.name} (Storage)`;
+                            setFormData({
+                              key: columnKey,
+                              label: columnLabel,
+                              type: 'boolean',
+                              required: false,
+                              visible: true,
+                              orderIndex: columns.length + customColumns.length,
+                            });
+                            setShowCreateForm(true);
+                            toast({
+                              title: "Storage Type Column Ready",
+                              description: `Fill in any additional details and click "Create Column" to add "${storageType.name}" as a trackable column.`,
+                            });
+                          }}
+                          data-testid={`button-add-column-${storageType.id}`}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add as Column
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Custom Columns Section */}
           <div className="space-y-3 mt-6">

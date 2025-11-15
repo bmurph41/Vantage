@@ -148,6 +148,11 @@ export function AddressInput({
       }
     });
 
+    // Update the input value with the full address
+    if (inputRef.current && components.fullAddress) {
+      inputRef.current.value = components.fullAddress;
+    }
+
     // Call onChange with full address string using latest ref
     if (onChangeRef.current) {
       onChangeRef.current(components.fullAddress || '', components);
