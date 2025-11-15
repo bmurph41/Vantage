@@ -1,23 +1,31 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Filter, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Filter, X, ChevronUp, MapPin, DollarSign, Building2, CalendarDays } from "lucide-react";
 import type { FilterState } from '@/lib/salescomps/types';
 import { STORAGE_TYPES, US_REGIONS, US_STATES, COUNTRIES } from "@shared/salescomps-constants";
 import debounce from "lodash.debounce";
 import throttle from "lodash.throttle";
 import SavedSearchesMenu from "./SavedSearchesMenu";
 import { useCustomStorageTypes } from "@/hooks/salescomps/useCustomStorageTypes";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface FiltersPanelProps {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
   activeSavedSearchId?: string | null;
   onActiveSavedSearchChange?: (id: string | null, name: string | null) => void;
+  onCollapse?: () => void;
 }
 
 export default function FiltersPanel({ 
@@ -25,8 +33,8 @@ export default function FiltersPanel({
   onFiltersChange,
   activeSavedSearchId = null,
   onActiveSavedSearchChange = () => {},
+  onCollapse,
 }: FiltersPanelProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [capRateInputs, setCapRateInputs] = useState<{
     capRateMin: string;
     capRateMax: string;
@@ -41,52 +49,6 @@ export default function FiltersPanel({
   // Fetch custom storage types
   const { data: customStorageTypes = [] } = useCustomStorageTypes();
   const allStorageTypes = [...STORAGE_TYPES, ...customStorageTypes.map(t => t.name)];
-  
-  // Collapsible sections state - all collapsed by default
-  const [openSections, setOpenSections] = useState({
-    quick: false,
-    location: false,
-    saleDetails: false,
-    marinaFeatures: false
-  });
-  
-  const toggleSection = (section: keyof typeof openSections) => {
-    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
-  
-  // Count active filters for each section
-  const getActiveFilterCount = (section: string) => {
-    let count = 0;
-    switch (section) {
-      case 'quick':
-        if (filters.disclosedOnly) count++;
-        if (filters.disclosedCapRateOnly) count++;
-        if (filters.portfoliosOnly) count++;
-        break;
-      case 'location':
-        if (filters.states && filters.states.length > 0) count += filters.states.length;
-        if (filters.regions && filters.regions.length > 0) count += filters.regions.length;
-        break;
-      case 'saleDetails':
-        if (filters.saleYearMin) count++;
-        if (filters.saleYearMax) count++;
-        if (filters.priceMin) count++;
-        if (filters.priceMax) count++;
-        if (filters.capRateMin) count++;
-        if (filters.capRateMax) count++;
-        break;
-      case 'marinaFeatures':
-        if (filters.wetSlipsMin) count++;
-        if (filters.wetSlipsMax) count++;
-        if (filters.dryRacksMin) count++;
-        if (filters.dryRacksMax) count++;
-        if (filters.occupancyMin) count++;
-        if (filters.occupancyMax) count++;
-        if (filters.ioBoth && filters.ioBoth !== 'none') count++;
-        break;
-    }
-    return count;
-  };
 
   // Immediate update for non-performance critical filters (select dropdowns, checkboxes)
   const updateFilter = (key: keyof FilterState, value: any) => {
@@ -96,7 +58,6 @@ export default function FiltersPanel({
   // Debounced update for text inputs (300ms delay after user stops typing)
   const debouncedUpdateFilter = useMemo(
     () => debounce((key: keyof FilterState, value: any) => {
-      // Compute the next state locally, then pass complete FilterState object
       const nextFilters = { ...filters, [key]: value };
       onFiltersChange(nextFilters);
     }, 300),
@@ -106,7 +67,6 @@ export default function FiltersPanel({
   // Throttled update for numeric inputs (150ms max frequency)
   const throttledUpdateFilter = useMemo(
     () => throttle((key: keyof FilterState, value: any) => {
-      // Compute the next state locally, then pass complete FilterState object
       const nextFilters = { ...filters, [key]: value };
       onFiltersChange(nextFilters);
     }, 150),
@@ -135,8 +95,6 @@ export default function FiltersPanel({
       setIsMarketBid(true);
     } else {
       setIsMarketBid(false);
-      // If priceMin changed externally (e.g., from saved search), reset previousPriceMin
-      // so we don't restore stale data
       if (filters.priceMin !== "" && filters.priceMin !== "Market") {
         setPreviousPriceMin("");
       }
@@ -147,26 +105,20 @@ export default function FiltersPanel({
   const handleMarketBidChange = (checked: boolean) => {
     setIsMarketBid(checked);
     if (checked) {
-      // Save current value before setting to "Market" (only if it's not "Market")
       if (filters.priceMin !== "Market") {
         setPreviousPriceMin(filters.priceMin);
       }
       updateFilter('priceMin', 'Market');
     } else {
-      // Restore previous value when unchecking, or clear if no previous value
       updateFilter('priceMin', previousPriceMin || '');
-      // Clear the saved value after restoring
       setPreviousPriceMin("");
     }
   };
 
   // Sanitize input value - remove everything except numbers, dots, and single %
   const sanitizeCapRateInput = (value: string): string => {
-    // Remove everything except numbers, dots, and %
     return value.replace(/[^0-9.%]/g, '')
-      // Allow only one decimal point
       .replace(/\..*\./, (match) => match.replace(/\./g, '').replace(/^/, '.'))
-      // Allow only one % at the end
       .replace(/%/g, '')
       .replace(/$/, value.includes('%') ? '%' : '');
   };
@@ -204,7 +156,6 @@ export default function FiltersPanel({
       return;
     }
     
-    // Remove % and any non-numeric except decimal
     const cleanValue = value.replace(/[^0-9.]/g, '');
     if (cleanValue === '' || cleanValue === '.') {
       setCapRateInputs(prev => ({
@@ -225,7 +176,6 @@ export default function FiltersPanel({
       return;
     }
     
-    // Format display value and store clean numeric value
     const formattedDisplay = `${numValue.toFixed(2)}%`;
     setCapRateInputs(prev => ({
       ...prev,
@@ -259,451 +209,411 @@ export default function FiltersPanel({
     });
   };
 
-  const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
-    if (key === 'q') return false; // Search is handled separately
-    if (key === 'columnFilters') {
-      return Object.keys(value as Record<string, string[]>).length > 0;
-    }
-    return value !== "" && value !== false;
-  });
+  // Count total active filters
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.states && filters.states.length > 0) count += filters.states.length;
+    if (filters.regions && filters.regions.length > 0) count += filters.regions.length;
+    if (filters.saleYearMin || filters.saleYearMax) count++;
+    if (filters.priceMin || filters.priceMax) count++;
+    if (filters.capRateMin || filters.capRateMax) count++;
+    if (filters.wetSlipsMin || filters.wetSlipsMax) count++;
+    if (filters.dryRacksMin || filters.dryRacksMax) count++;
+    if (filters.occupancyMin || filters.occupancyMax) count++;
+    if (filters.ioBoth && filters.ioBoth !== 'none') count++;
+    if (filters.disclosedOnly) count++;
+    if (filters.disclosedCapRateOnly) count++;
+    if (filters.portfoliosOnly) count++;
+    return count;
+  }, [filters]);
 
   return (
-    <div className="flex-1 overflow-y-auto pt-6 px-1">
-      {/* Quick Filters */}
-      <Collapsible open={openSections.quick} onOpenChange={() => toggleSection('quick')}>
-        <div className="mb-5">
-          <CollapsibleTrigger className="w-full group">
-            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-all cursor-pointer">
-              <div className="flex items-center gap-2.5">
-                <Filter className="h-4 w-4 text-primary" />
-                <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                  Quick Filters
-                </h3>
-                {getActiveFilterCount('quick') > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10px] font-semibold rounded-full bg-primary text-primary-foreground">
-                    {getActiveFilterCount('quick')}
-                  </span>
-                )}
-              </div>
-              {openSections.quick ? 
-                <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /> : 
-                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-              }
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
-            <div className="mt-3 px-3 space-y-3.5">
-              <div className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                <Checkbox
-                  id="disclosed-only"
-                  checked={filters.disclosedOnly}
-                  onCheckedChange={(checked) => updateFilter('disclosedOnly', checked)}
-                  data-testid="checkbox-disclosed-only"
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="disclosed-only" className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
-                  Disclosed Prices Only
-                </Label>
-              </div>
-              <div className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                <Checkbox
-                  id="disclosed-cap-rate-only"
-                  checked={filters.disclosedCapRateOnly}
-                  onCheckedChange={(checked) => updateFilter('disclosedCapRateOnly', checked)}
-                  data-testid="checkbox-disclosed-cap-rate-only"
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="disclosed-cap-rate-only" className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
-                  Disclosed Cap Rates Only
-                </Label>
-              </div>
-              <div className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                <Checkbox
-                  id="portfolios-only"
-                  checked={filters.portfoliosOnly}
-                  onCheckedChange={(checked) => updateFilter('portfoliosOnly', checked)}
-                  data-testid="checkbox-portfolios-only"
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="portfolios-only" className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
-                  Portfolios
-                </Label>
-              </div>
-            </div>
-          </CollapsibleContent>
+    <div className="bg-gradient-to-br from-card to-card/50 rounded-lg border border-border/60 shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary/10">
+            <Filter className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-base text-foreground">Filter Comps</h3>
+            {activeFilterCount > 0 && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} active
+              </p>
+            )}
+          </div>
         </div>
-      </Collapsible>
-
-      {/* Location */}
-      <Collapsible open={openSections.location} onOpenChange={() => toggleSection('location')}>
-        <div className="mb-5">
-          <CollapsibleTrigger className="w-full group">
-            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-all cursor-pointer">
-              <div className="flex items-center gap-2.5">
-                <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                  Location
-                </h3>
-                {getActiveFilterCount('location') > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10px] font-semibold rounded-full bg-primary text-primary-foreground">
-                    {getActiveFilterCount('location')}
-                  </span>
-                )}
-              </div>
-              {openSections.location ? 
-                <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /> : 
-                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-              }
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
-            <div className="mt-3 px-3 space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">State/Country</Label>
-              {filters.states && filters.states.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => updateFilter('states', [])}
-                  className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                  data-testid="button-clear-states"
-                >
-                  Clear ({filters.states.length})
-                </Button>
-              )}
-            </div>
-            <div className="max-h-64 overflow-y-auto space-y-1 border border-border rounded-md p-2">
-              {/* US States */}
-              <div className="mb-2">
-                <div className="text-xs font-semibold text-muted-foreground px-2 py-1">US States</div>
-                {US_STATES.map((state) => (
-                  <div key={state.code} className="flex items-center gap-2.5 p-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                    <Checkbox
-                      id={`state-${state.code}`}
-                      checked={filters.states?.includes(state.code) || false}
-                      onCheckedChange={(checked) => {
-                        const currentStates = filters.states || [];
-                        const newStates = checked
-                          ? [...currentStates, state.code]
-                          : currentStates.filter(s => s !== state.code);
-                        updateFilter('states', newStates);
-                      }}
-                      data-testid={`checkbox-state-${state.code.toLowerCase()}`}
-                      className="h-4 w-4"
-                    />
-                    <Label htmlFor={`state-${state.code}`} className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
-                      {state.name}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-              
-              {/* International */}
-              <div className="border-t border-border pt-2 mt-2">
-                <div className="text-xs font-semibold text-muted-foreground px-2 py-1">International</div>
-                {COUNTRIES.map((country) => (
-                  <div key={country} className="flex items-center gap-2.5 p-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                    <Checkbox
-                      id={`country-${country}`}
-                      checked={filters.states?.includes(country) || false}
-                      onCheckedChange={(checked) => {
-                        const currentStates = filters.states || [];
-                        const newStates = checked
-                          ? [...currentStates, country]
-                          : currentStates.filter(s => s !== country);
-                        updateFilter('states', newStates);
-                      }}
-                      data-testid={`checkbox-country-${country.toLowerCase().replace(/\s+/g, '-')}`}
-                      className="h-4 w-4"
-                    />
-                    <Label htmlFor={`country-${country}`} className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
-                      {country}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Region</Label>
-            <div className="space-y-3">
-              {US_REGIONS.map((region) => (
-                <div key={region} className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                  <Checkbox
-                    id={`region-${region}`}
-                    checked={filters.regions?.includes(region) || false}
-                    onCheckedChange={(checked) => {
-                      const currentRegions = filters.regions || [];
-                      const newRegions = checked
-                        ? [...currentRegions, region]
-                        : currentRegions.filter(r => r !== region);
-                      updateFilter('regions', newRegions);
-                    }}
-                    data-testid={`checkbox-region-${region.toLowerCase().replace(/\s+/g, '-')}`}
-                    className="h-4 w-4"
-                  />
-                  <Label htmlFor={`region-${region}`} className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
-                    {region}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-            </div>
-          </CollapsibleContent>
-        </div>
-      </Collapsible>
-
-      {/* Sale Details */}
-      <Collapsible open={openSections.saleDetails} onOpenChange={() => toggleSection('saleDetails')}>
-        <div className="mb-5">
-          <CollapsibleTrigger className="w-full group">
-            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-all cursor-pointer">
-              <div className="flex items-center gap-2.5">
-                <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                  Sale Details
-                </h3>
-                {getActiveFilterCount('saleDetails') > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10px] font-semibold rounded-full bg-primary text-primary-foreground">
-                    {getActiveFilterCount('saleDetails')}
-                  </span>
-                )}
-              </div>
-              {openSections.saleDetails ? 
-                <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /> : 
-                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-              }
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
-            <div className="mt-3 px-3 space-y-5">
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Sale Year</Label>
-            <div className="flex items-center gap-2.5">
-              <Input
-                type="number"
-                placeholder="2020"
-                className="flex-1 h-10"
-                value={filters.saleYearMin}
-                onChange={(e) => throttledUpdateFilter('saleYearMin', e.target.value)}
-                data-testid="input-sale-year-min"
-              />
-              <span className="text-muted-foreground text-sm font-medium">to</span>
-              <Input
-                type="number"
-                placeholder="2024"
-                className="flex-1 h-10"
-                value={filters.saleYearMax}
-                onChange={(e) => throttledUpdateFilter('saleYearMax', e.target.value)}
-                data-testid="input-sale-year-max"
-              />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Price</Label>
-              <div className="flex items-center gap-2 p-1.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                <Checkbox
-                  id="market-bid"
-                  checked={isMarketBid}
-                  onCheckedChange={handleMarketBidChange}
-                  data-testid="checkbox-market-bid"
-                  className="h-3.5 w-3.5"
-                />
-                <Label htmlFor="market-bid" className="text-xs text-foreground font-medium cursor-pointer leading-none">
-                  Market Bid
-                </Label>
-              </div>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <Input
-                type="text"
-                placeholder="$0"
-                className="flex-1 h-10"
-                value={filters.priceMin}
-                onChange={(e) => debouncedUpdateFilter('priceMin', e.target.value)}
-                data-testid="input-price-min"
-                disabled={isMarketBid}
-              />
-              <span className="text-muted-foreground text-sm font-medium">to</span>
-              <Input
-                type="text"
-                placeholder="$50M"
-                className="flex-1 h-10"
-                value={filters.priceMax}
-                onChange={(e) => debouncedUpdateFilter('priceMax', e.target.value)}
-                data-testid="input-price-max"
-              />
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Cap Rate (%)</Label>
-            <div className="flex items-center gap-2.5">
-              <Input
-                type="text"
-                placeholder="0.00%"
-                className="flex-1 h-10"
-                value={capRateInputs.capRateMin}
-                onFocus={() => handleCapRateFocus('capRateMin')}
-                onChange={(e) => handleCapRateChange('capRateMin', e.target.value)}
-                onBlur={() => handleCapRateBlur('capRateMin')}
-                data-testid="input-cap-rate-min"
-              />
-              <span className="text-muted-foreground text-sm font-medium">to</span>
-              <Input
-                type="text"
-                placeholder="15.00%"
-                className="flex-1 h-10"
-                value={capRateInputs.capRateMax}
-                onFocus={() => handleCapRateFocus('capRateMax')}
-                onChange={(e) => handleCapRateChange('capRateMax', e.target.value)}
-                onBlur={() => handleCapRateBlur('capRateMax')}
-                data-testid="input-cap-rate-max"
-              />
-            </div>
-          </div>
-            </div>
-          </CollapsibleContent>
-        </div>
-      </Collapsible>
-
-      {/* Marina Features */}
-      <Collapsible open={openSections.marinaFeatures} onOpenChange={() => toggleSection('marinaFeatures')}>
-        <div className="mb-5">
-          <CollapsibleTrigger className="w-full group">
-            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-all cursor-pointer">
-              <div className="flex items-center gap-2.5">
-                <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                  Marina Features
-                </h3>
-                {getActiveFilterCount('marinaFeatures') > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 text-[10px] font-semibold rounded-full bg-primary text-primary-foreground">
-                    {getActiveFilterCount('marinaFeatures')}
-                  </span>
-                )}
-              </div>
-              {openSections.marinaFeatures ? 
-                <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /> : 
-                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-              }
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
-            <div className="mt-3 px-3 space-y-4">
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Wet Slips</Label>
-            <div className="flex items-center gap-2.5">
-              <Input
-                type="number"
-                placeholder="Min"
-                className="flex-1 h-10"
-                value={filters.wetSlipsMin}
-                onChange={(e) => throttledUpdateFilter('wetSlipsMin', e.target.value)}
-                data-testid="input-wet-slips-min"
-              />
-              <span className="text-muted-foreground text-sm font-medium">to</span>
-              <Input
-                type="number"
-                placeholder="Max"
-                className="flex-1 h-10"
-                value={filters.wetSlipsMax}
-                onChange={(e) => throttledUpdateFilter('wetSlipsMax', e.target.value)}
-                data-testid="input-wet-slips-max"
-              />
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Dry Racks</Label>
-            <div className="flex items-center gap-2.5">
-              <Input
-                type="number"
-                placeholder="Min"
-                className="flex-1 h-10"
-                value={filters.dryRacksMin}
-                onChange={(e) => throttledUpdateFilter('dryRacksMin', e.target.value)}
-                data-testid="input-dry-racks-min"
-              />
-              <span className="text-muted-foreground text-sm font-medium">to</span>
-              <Input
-                type="number"
-                placeholder="Max"
-                className="flex-1 h-10"
-                value={filters.dryRacksMax}
-                onChange={(e) => throttledUpdateFilter('dryRacksMax', e.target.value)}
-                data-testid="input-dry-racks-max"
-              />
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Occupancy (%)</Label>
-            <div className="flex items-center gap-2.5">
-              <Input
-                type="number"
-                placeholder="Min %"
-                className="flex-1 h-10"
-                value={filters.occupancyMin}
-                onChange={(e) => throttledUpdateFilter('occupancyMin', e.target.value)}
-                data-testid="input-occupancy-min"
-              />
-              <span className="text-muted-foreground text-sm font-medium">to</span>
-              <Input
-                type="number"
-                placeholder="Max %"
-                className="flex-1 h-10"
-                value={filters.occupancyMax}
-                onChange={(e) => throttledUpdateFilter('occupancyMax', e.target.value)}
-                data-testid="input-occupancy-max"
-              />
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Storage Type</Label>
-            <Select
-              value={filters.ioBoth}
-              onValueChange={(value) => updateFilter('ioBoth', value === 'none' ? '' : value)}
-            >
-              <SelectTrigger className="w-full h-10 bg-background" data-testid="select-storage-type">
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">All Types</SelectItem>
-                {allStorageTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-            </div>
-          </CollapsibleContent>
-        </div>
-      </Collapsible>
-
-      {/* Filter Actions */}
-      <div className="mt-6 pt-5 px-3 border-t border-border/60">
-        <div className="space-y-3">
+        <div className="flex items-center gap-2">
           <SavedSearchesMenu
             filters={filters}
             onFiltersChange={onFiltersChange}
             activeSavedSearchId={activeSavedSearchId}
             onActiveSavedSearchChange={onActiveSavedSearchChange}
           />
-          {hasActiveFilters && (
+          {activeFilterCount > 0 && (
             <Button
-              variant="outline"
-              className="w-full h-10 font-medium hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all"
+              variant="ghost"
+              size="sm"
               onClick={clearAllFilters}
-              data-testid="button-clear-filters"
+              className="h-8 text-xs text-muted-foreground hover:text-foreground"
+              data-testid="button-clear-all-filters"
             >
-              <X className="h-4 w-4 mr-2" />
-              Clear All Filters
+              <X className="h-3.5 w-3.5 mr-1.5" />
+              Clear All
             </Button>
           )}
-          <div className="text-xs text-muted-foreground text-center py-2">
-            {hasActiveFilters ? 'Filters are active' : 'No filters applied'}
+          {onCollapse && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onCollapse}
+              className="h-8 w-8 p-0"
+              data-testid="button-collapse-filters"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Filter Content - Horizontal Grid Layout */}
+      <div className="p-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Location Filters */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-3">
+              <MapPin className="h-4 w-4 text-primary" />
+              <h4 className="font-semibold text-sm text-foreground">Location</h4>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground mb-2 block">State/Country</Label>
+                <Select
+                  value={filters.states && filters.states.length === 1 ? filters.states[0] : ""}
+                  onValueChange={(value) => {
+                    if (value) {
+                      updateFilter('states', [value]);
+                    } else {
+                      updateFilter('states', []);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9 text-sm" data-testid="select-state">
+                    <SelectValue placeholder="All states" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    <SelectItem value="">All states</SelectItem>
+                    {US_STATES.map((state) => (
+                      <SelectItem key={state.code} value={state.code}>
+                        {state.name}
+                      </SelectItem>
+                    ))}
+                    <Separator className="my-2" />
+                    {COUNTRIES.map((country) => (
+                      <SelectItem key={country} value={country}>
+                        {country}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground mb-2 block">Region</Label>
+                <Select
+                  value={filters.regions && filters.regions.length === 1 ? filters.regions[0] : ""}
+                  onValueChange={(value) => {
+                    if (value) {
+                      updateFilter('regions', [value]);
+                    } else {
+                      updateFilter('regions', []);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9 text-sm" data-testid="select-region">
+                    <SelectValue placeholder="All regions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All regions</SelectItem>
+                    {US_REGIONS.map((region) => (
+                      <SelectItem key={region} value={region}>
+                        {region}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Sale Details Filters */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              <h4 className="font-semibold text-sm text-foreground">Sale Details</h4>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground mb-2 block">Year</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Min"
+                    className="h-9 text-sm"
+                    value={filters.saleYearMin}
+                    onChange={(e) => throttledUpdateFilter('saleYearMin', e.target.value)}
+                    data-testid="input-sale-year-min"
+                  />
+                  <span className="text-muted-foreground text-xs">-</span>
+                  <Input
+                    type="number"
+                    placeholder="Max"
+                    className="h-9 text-sm"
+                    value={filters.saleYearMax}
+                    onChange={(e) => throttledUpdateFilter('saleYearMax', e.target.value)}
+                    data-testid="input-sale-year-max"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Cap Rate (%)</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    placeholder="Min"
+                    className="h-9 text-sm"
+                    value={capRateInputs.capRateMin}
+                    onChange={(e) => handleCapRateChange('capRateMin', e.target.value)}
+                    onFocus={() => handleCapRateFocus('capRateMin')}
+                    onBlur={() => handleCapRateBlur('capRateMin')}
+                    data-testid="input-cap-rate-min"
+                  />
+                  <span className="text-muted-foreground text-xs">-</span>
+                  <Input
+                    type="text"
+                    placeholder="Max"
+                    className="h-9 text-sm"
+                    value={capRateInputs.capRateMax}
+                    onChange={(e) => handleCapRateChange('capRateMax', e.target.value)}
+                    onFocus={() => handleCapRateFocus('capRateMax')}
+                    onBlur={() => handleCapRateBlur('capRateMax')}
+                    data-testid="input-cap-rate-max"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Price Filters */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-3">
+              <DollarSign className="h-4 w-4 text-primary" />
+              <h4 className="font-semibold text-sm text-foreground">Price</h4>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Sale Price</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Checkbox
+                      id="market-bid"
+                      checked={isMarketBid}
+                      onCheckedChange={handleMarketBidChange}
+                      data-testid="checkbox-market-bid"
+                      className="h-3.5 w-3.5"
+                    />
+                    <Label htmlFor="market-bid" className="text-xs text-foreground cursor-pointer">
+                      Market Bid
+                    </Label>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    placeholder="Min"
+                    className="h-9 text-sm"
+                    value={filters.priceMin}
+                    onChange={(e) => debouncedUpdateFilter('priceMin', e.target.value)}
+                    data-testid="input-price-min"
+                    disabled={isMarketBid}
+                  />
+                  <span className="text-muted-foreground text-xs">-</span>
+                  <Input
+                    type="text"
+                    placeholder="Max"
+                    className="h-9 text-sm"
+                    value={filters.priceMax}
+                    onChange={(e) => debouncedUpdateFilter('priceMax', e.target.value)}
+                    data-testid="input-price-max"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground mb-2 block">Occupancy (%)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Min"
+                    className="h-9 text-sm"
+                    value={filters.occupancyMin}
+                    onChange={(e) => throttledUpdateFilter('occupancyMin', e.target.value)}
+                    data-testid="input-occupancy-min"
+                  />
+                  <span className="text-muted-foreground text-xs">-</span>
+                  <Input
+                    type="number"
+                    placeholder="Max"
+                    className="h-9 text-sm"
+                    value={filters.occupancyMax}
+                    onChange={(e) => throttledUpdateFilter('occupancyMax', e.target.value)}
+                    data-testid="input-occupancy-max"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Capacity & Quick Filters */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Building2 className="h-4 w-4 text-primary" />
+              <h4 className="font-semibold text-sm text-foreground">Capacity & Options</h4>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground mb-2 block">Wet Slips</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Min"
+                    className="h-9 text-sm"
+                    value={filters.wetSlipsMin}
+                    onChange={(e) => throttledUpdateFilter('wetSlipsMin', e.target.value)}
+                    data-testid="input-wet-slips-min"
+                  />
+                  <span className="text-muted-foreground text-xs">-</span>
+                  <Input
+                    type="number"
+                    placeholder="Max"
+                    className="h-9 text-sm"
+                    value={filters.wetSlipsMax}
+                    onChange={(e) => throttledUpdateFilter('wetSlipsMax', e.target.value)}
+                    data-testid="input-wet-slips-max"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent/50 transition-colors cursor-pointer">
+                  <Checkbox
+                    id="disclosed-only"
+                    checked={filters.disclosedOnly}
+                    onCheckedChange={(checked) => updateFilter('disclosedOnly', checked)}
+                    data-testid="checkbox-disclosed-only"
+                    className="h-3.5 w-3.5"
+                  />
+                  <Label htmlFor="disclosed-only" className="text-xs text-foreground cursor-pointer flex-1">
+                    Disclosed Prices Only
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent/50 transition-colors cursor-pointer">
+                  <Checkbox
+                    id="disclosed-cap-rate-only"
+                    checked={filters.disclosedCapRateOnly}
+                    onCheckedChange={(checked) => updateFilter('disclosedCapRateOnly', checked)}
+                    data-testid="checkbox-disclosed-cap-rate-only"
+                    className="h-3.5 w-3.5"
+                  />
+                  <Label htmlFor="disclosed-cap-rate-only" className="text-xs text-foreground cursor-pointer flex-1">
+                    Disclosed Cap Rates Only
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent/50 transition-colors cursor-pointer">
+                  <Checkbox
+                    id="portfolios-only"
+                    checked={filters.portfoliosOnly}
+                    onCheckedChange={(checked) => updateFilter('portfoliosOnly', checked)}
+                    data-testid="checkbox-portfolios-only"
+                    className="h-3.5 w-3.5"
+                  />
+                  <Label htmlFor="portfolios-only" className="text-xs text-foreground cursor-pointer flex-1">
+                    Portfolios Only
+                  </Label>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Active Filters Display */}
+        {activeFilterCount > 0 && (
+          <div className="mt-5 pt-5 border-t border-border/60">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Active filters:</span>
+              {filters.states && filters.states.map((state) => (
+                <Badge key={state} variant="secondary" className="gap-1 h-6">
+                  {state}
+                  <button
+                    onClick={() => updateFilter('states', filters.states?.filter(s => s !== state) || [])}
+                    className="hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              {filters.regions && filters.regions.map((region) => (
+                <Badge key={region} variant="secondary" className="gap-1 h-6">
+                  {region}
+                  <button
+                    onClick={() => updateFilter('regions', filters.regions?.filter(r => r !== region) || [])}
+                    className="hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              {(filters.saleYearMin || filters.saleYearMax) && (
+                <Badge variant="secondary" className="gap-1 h-6">
+                  Year: {filters.saleYearMin || '∞'} - {filters.saleYearMax || '∞'}
+                  <button
+                    onClick={() => {
+                      updateFilter('saleYearMin', '');
+                      updateFilter('saleYearMax', '');
+                    }}
+                    className="hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {filters.disclosedOnly && (
+                <Badge variant="secondary" className="gap-1 h-6">
+                  Disclosed Prices
+                  <button onClick={() => updateFilter('disclosedOnly', false)} className="hover:text-foreground">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {filters.portfoliosOnly && (
+                <Badge variant="secondary" className="gap-1 h-6">
+                  Portfolios
+                  <button onClick={() => updateFilter('portfoliosOnly', false)} className="hover:text-foreground">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

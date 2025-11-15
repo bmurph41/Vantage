@@ -528,15 +528,14 @@ export default function SalesCompsIndex() {
           <TabsContent value="data" className="flex-1 min-h-0 overflow-hidden mt-0 m-0 flex flex-col" data-testid="tab-content-data">
             {/* Collapsible Filters Panel - Horizontal under tabs */}
             {!isSidebarCollapsed && (
-              <div className="bg-card border-b border-border">
-                <div className="px-6 py-4">
-                  <FiltersPanel 
-                    filters={filters}
-                    onFiltersChange={handleFilterChange}
-                    activeSavedSearchId={activeSavedSearchId}
-                    onActiveSavedSearchChange={handleActiveSavedSearchChange}
-                  />
-                </div>
+              <div className="px-6 py-4">
+                <FiltersPanel 
+                  filters={filters}
+                  onFiltersChange={handleFilterChange}
+                  activeSavedSearchId={activeSavedSearchId}
+                  onActiveSavedSearchChange={handleActiveSavedSearchChange}
+                  onCollapse={() => setIsSidebarCollapsed(true)}
+                />
               </div>
             )}
             
