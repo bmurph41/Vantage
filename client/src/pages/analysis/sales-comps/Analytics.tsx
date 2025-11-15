@@ -7,8 +7,8 @@ import AnalyticsWorkbench from "@/components/salescomps/analytics/AnalyticsWorkb
 export default function SalesCompsAnalytics() {
   // Fetch total count
   const { data: compsData } = useQuery({
-    queryKey: queryKeys.comps.list({ page: 1, pageSize: 1 }),
-    queryFn: () => salesCompsApi.getComps({ page: 1, pageSize: 1 }),
+    queryKey: queryKeys.comps.list({ page: 1, pageSize: 10 }),
+    queryFn: () => salesCompsApi.getComps({ page: 1, pageSize: 10 }),
   });
 
   const total = compsData?.total || 0;
