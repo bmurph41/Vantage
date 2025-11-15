@@ -3,17 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Filter, X, RefreshCcw } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export interface AnalyticsFilters {
   states?: string[];
@@ -53,30 +44,14 @@ export default function AnalyticsFiltersPanel({
   availableProfitCenters
 }: AnalyticsFiltersProps) {
   const [localFilters, setLocalFilters] = useState<AnalyticsFilters>(filters);
-  const [priceRange, setPriceRange] = useState<[number, number]>([
-    filters.priceMin || 0,
-    filters.priceMax || 50000000
-  ]);
-  const [yearRange, setYearRange] = useState<[number, number]>([
-    filters.yearSoldMin || 2000,
-    filters.yearSoldMax || new Date().getFullYear()
-  ]);
 
   const handleApply = () => {
-    onFiltersChange({
-      ...localFilters,
-      priceMin: priceRange[0] > 0 ? priceRange[0] : undefined,
-      priceMax: priceRange[1] < 50000000 ? priceRange[1] : undefined,
-      yearSoldMin: yearRange[0] > 2000 ? yearRange[0] : undefined,
-      yearSoldMax: yearRange[1] < new Date().getFullYear() ? yearRange[1] : undefined,
-    });
+    onFiltersChange(localFilters);
   };
 
   const handleReset = () => {
     const resetFilters: AnalyticsFilters = {};
     setLocalFilters(resetFilters);
-    setPriceRange([0, 50000000]);
-    setYearRange([2000, new Date().getFullYear()]);
     onFiltersChange(resetFilters);
   };
 
@@ -138,19 +113,34 @@ export default function AnalyticsFiltersPanel({
         {/* Year Range */}
         <div className="space-y-3">
           <Label className="text-sm font-medium">Year Range</Label>
-          <div className="space-y-2">
-            <Slider
-              value={yearRange}
-              onValueChange={setYearRange}
-              min={2000}
-              max={new Date().getFullYear()}
-              step={1}
-              className="w-full"
-              data-testid="slider-year-range"
-            />
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>{yearRange[0]}</span>
-              <span>{yearRange[1]}</span>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Min</Label>
+              <Input
+                type="number"
+                placeholder="2007"
+                value={localFilters.yearSoldMin || ""}
+                onChange={(e) => setLocalFilters({
+                  ...localFilters,
+                  yearSoldMin: e.target.value ? parseInt(e.target.value) : undefined
+                })}
+                className="h-9"
+                data-testid="input-year-min"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Max</Label>
+              <Input
+                type="number"
+                placeholder={new Date().getFullYear().toString()}
+                value={localFilters.yearSoldMax || ""}
+                onChange={(e) => setLocalFilters({
+                  ...localFilters,
+                  yearSoldMax: e.target.value ? parseInt(e.target.value) : undefined
+                })}
+                className="h-9"
+                data-testid="input-year-max"
+              />
             </div>
           </div>
         </div>
@@ -158,19 +148,34 @@ export default function AnalyticsFiltersPanel({
         {/* Price Range */}
         <div className="space-y-3">
           <Label className="text-sm font-medium">Price Range</Label>
-          <div className="space-y-2">
-            <Slider
-              value={priceRange}
-              onValueChange={setPriceRange}
-              min={0}
-              max={50000000}
-              step={100000}
-              className="w-full"
-              data-testid="slider-price-range"
-            />
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>${(priceRange[0] / 1000000).toFixed(1)}M</span>
-              <span>${(priceRange[1] / 1000000).toFixed(1)}M</span>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Min</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                value={localFilters.priceMin || ""}
+                onChange={(e) => setLocalFilters({
+                  ...localFilters,
+                  priceMin: e.target.value ? parseFloat(e.target.value) : undefined
+                })}
+                className="h-9"
+                data-testid="input-price-min"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Max</Label>
+              <Input
+                type="number"
+                placeholder="50000000"
+                value={localFilters.priceMax || ""}
+                onChange={(e) => setLocalFilters({
+                  ...localFilters,
+                  priceMax: e.target.value ? parseFloat(e.target.value) : undefined
+                })}
+                className="h-9"
+                data-testid="input-price-max"
+              />
             </div>
           </div>
         </div>
