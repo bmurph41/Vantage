@@ -316,7 +316,7 @@ export default function AddCompsToProjectDialog({
                       <Label htmlFor="saleYearMin">Sale Year (Min)</Label>
                       <Input
                         id="saleYearMin"
-                        type="number"
+                        type="text"
                         placeholder="2020"
                         value={filters.saleYearMin}
                         onChange={(e) => setFilters(prev => ({ ...prev, saleYearMin: e.target.value }))}
@@ -327,7 +327,7 @@ export default function AddCompsToProjectDialog({
                       <Label htmlFor="saleYearMax">Sale Year (Max)</Label>
                       <Input
                         id="saleYearMax"
-                        type="number"
+                        type="text"
                         placeholder="2024"
                         value={filters.saleYearMax}
                         onChange={(e) => setFilters(prev => ({ ...prev, saleYearMax: e.target.value }))}
@@ -338,7 +338,7 @@ export default function AddCompsToProjectDialog({
                       <Label htmlFor="priceMin">Price (Min)</Label>
                       <Input
                         id="priceMin"
-                        type="number"
+                        type="text"
                         placeholder="1000000"
                         value={filters.priceMin}
                         onChange={(e) => setFilters(prev => ({ ...prev, priceMin: e.target.value }))}
@@ -349,7 +349,7 @@ export default function AddCompsToProjectDialog({
                       <Label htmlFor="priceMax">Price (Max)</Label>
                       <Input
                         id="priceMax"
-                        type="number"
+                        type="text"
                         placeholder="10000000"
                         value={filters.priceMax}
                         onChange={(e) => setFilters(prev => ({ ...prev, priceMax: e.target.value }))}

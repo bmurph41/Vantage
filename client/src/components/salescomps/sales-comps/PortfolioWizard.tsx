@@ -268,9 +268,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                     <Label htmlFor="marina-count">Number of Marinas</Label>
                     <Input
                       id="marina-count"
-                      type="number"
-                      min="1"
-                      max="20"
+                      type="text"
                       value={marinaCount}
                       onChange={(e) => setMarinaCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
                       data-testid="input-marina-count"
@@ -355,7 +353,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             <FormItem>
                               <FormLabel>Wet Slips</FormLabel>
                               <FormControl>
-                                <Input {...field} type="number" placeholder="0" />
+                                <Input {...field} type="text" placeholder="0" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -369,7 +367,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             <FormItem>
                               <FormLabel>Dry Racks</FormLabel>
                               <FormControl>
-                                <Input {...field} type="number" placeholder="0" />
+                                <Input {...field} type="text" placeholder="0" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -392,7 +390,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             <FormItem>
                               <FormLabel>Sale Price</FormLabel>
                               <FormControl>
-                                <Input {...field} type="number" placeholder="0" />
+                                <Input {...field} type="text" placeholder="0" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -406,7 +404,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             <FormItem>
                               <FormLabel>Cap Rate (%)</FormLabel>
                               <FormControl>
-                                <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                                <Input {...field} type="text" placeholder="0.00" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -420,7 +418,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             <FormItem>
                               <FormLabel>NOI</FormLabel>
                               <FormControl>
-                                <Input {...field} type="number" placeholder="0" />
+                                <Input {...field} type="text" placeholder="0" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -461,7 +459,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             <FormItem>
                               <FormLabel>Sale Year</FormLabel>
                               <FormControl>
-                                <Input {...field} type="number" placeholder="YYYY" />
+                                <Input {...field} type="text" placeholder="YYYY" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

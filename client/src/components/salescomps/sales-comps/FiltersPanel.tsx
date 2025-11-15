@@ -472,7 +472,7 @@ export default function FiltersPanel({
                 <Label className="text-xs font-medium text-muted-foreground mb-2 block">Year</Label>
                 <div className="flex items-center gap-2">
                   <Input
-                    type="number"
+                    type="text"
                     placeholder="Min"
                     className="h-9 text-sm"
                     value={filters.saleYearMin}
@@ -481,7 +481,7 @@ export default function FiltersPanel({
                   />
                   <span className="text-muted-foreground text-xs">-</span>
                   <Input
-                    type="number"
+                    type="text"
                     placeholder="Max"
                     className="h-9 text-sm"
                     value={filters.saleYearMax}
@@ -613,7 +613,7 @@ export default function FiltersPanel({
                 <Label className="text-xs font-medium text-muted-foreground mb-2 block">Wet Slips</Label>
                 <div className="flex items-center gap-2">
                   <Input
-                    type="number"
+                    type="text"
                     placeholder="Min"
                     className="h-9 text-sm"
                     value={filters.wetSlipsMin}
@@ -622,7 +622,7 @@ export default function FiltersPanel({
                   />
                   <span className="text-muted-foreground text-xs">-</span>
                   <Input
-                    type="number"
+                    type="text"
                     placeholder="Max"
                     className="h-9 text-sm"
                     value={filters.wetSlipsMax}

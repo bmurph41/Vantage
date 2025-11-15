@@ -368,7 +368,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                         <FormControl>
                           <Input
                             {...field}
-                            type="number"
+                            type="text"
                             placeholder="200"
                             onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
                             value={field.value ?? ""}

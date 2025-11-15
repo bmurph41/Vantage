@@ -147,7 +147,7 @@ export default function AnalyticsFiltersPanel({
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input
-                type="number"
+                type="text"
                 placeholder="2007"
                 value={localFilters.yearSoldMin || ""}
                 onChange={(e) => setLocalFilters({
@@ -161,7 +161,7 @@ export default function AnalyticsFiltersPanel({
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Max</Label>
               <Input
-                type="number"
+                type="text"
                 placeholder={new Date().getFullYear().toString()}
                 value={localFilters.yearSoldMax || ""}
                 onChange={(e) => setLocalFilters({
@@ -215,7 +215,7 @@ export default function AnalyticsFiltersPanel({
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input
-                type="number"
+                type="text"
                 placeholder="Min"
                 value={localFilters.capacityMin || ""}
                 onChange={(e) => setLocalFilters({
@@ -229,7 +229,7 @@ export default function AnalyticsFiltersPanel({
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Max</Label>
               <Input
-                type="number"
+                type="text"
                 placeholder="Max"
                 value={localFilters.capacityMax || ""}
                 onChange={(e) => setLocalFilters({

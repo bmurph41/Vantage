@@ -913,7 +913,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormControl>
                                 <Input 
                                   {...field} 
-                                  type="number"
+                                  type="text"
                                   placeholder="156"
                                   data-testid="input-wet-slips"
                                 />
@@ -932,7 +932,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormControl>
                                 <Input 
                                   {...field} 
-                                  type="number"
+                                  type="text"
                                   placeholder="89"
                                   data-testid="input-dry-racks"
                                 />
@@ -953,8 +953,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormControl>
                                 <Input 
                                   {...field} 
-                                  type="number"
-                                  step="0.1"
+                                  type="text"
                                   placeholder="12.5"
                                   data-testid="input-acres"
                                 />
@@ -973,7 +972,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormControl>
                                 <Input 
                                   {...field} 
-                                  type="number"
+                                  type="text"
                                   placeholder="1987"
                                   data-testid="input-year-built"
                                 />
@@ -1120,7 +1119,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                   <Input 
                                     {...field}
                                     value={isPriceUndisclosed ? "N/A" : field.value}
-                                    type={isPriceUndisclosed ? "text" : "number"}
+                                    type="text"
                                     placeholder="12500000"
                                     disabled={isPriceUndisclosed}
                                     data-testid="input-sale-price"
@@ -1141,7 +1140,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormControl>
                                 <Input 
                                   {...field} 
-                                  type="number"
+                                  type="text"
                                   placeholder="13750000"
                                   data-testid="input-list-price"
                                 />
@@ -1165,7 +1164,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                   <Input 
                                     {...field}
                                     value={isNoiUndisclosed ? "N/A" : field.value}
-                                    type={isNoiUndisclosed ? "text" : "number"}
+                                    type="text"
                                     placeholder="900000"
                                     disabled={isNoiUndisclosed}
                                     data-testid="input-noi"
@@ -1189,8 +1188,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                   <Input 
                                     {...field}
                                     value={isCapRateUndisclosed ? "N/A" : field.value}
-                                    type={isCapRateUndisclosed ? "text" : "number"}
-                                    step="0.1"
+                                    type="text"
                                     placeholder="7.2"
                                     disabled={isCapRateUndisclosed}
                                     data-testid="input-cap-rate"
@@ -1213,8 +1211,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormControl>
                                 <Input 
                                   {...field} 
-                                  type="number"
-                                  step="0.1"
+                                  type="text"
                                   placeholder="94.2"
                                   data-testid="input-occupancy"
                                 />
@@ -1233,7 +1230,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormControl>
                                 <Input 
                                   {...field} 
-                                  type="number"
+                                  type="text"
                                   placeholder="127"
                                   data-testid="input-days-on-market"
                                 />
@@ -1350,7 +1347,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormControl>
                                 <Input 
                                   {...field} 
-                                  type="number"
+                                  type="text"
                                   placeholder="2024"
                                   data-testid="input-sale-year"
                                 />
