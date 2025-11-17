@@ -187,7 +187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Middleware for authentication (simplified for demo)
   const authenticateUser = (req: any, res: any, next: any) => {
     // In production, this would validate JWT tokens or session
-    req.user = { id: "user-1", orgId: "org-1", role: "owner" };
+    req.user = { id: "user-1", orgId: "org-1", role: "owner", email: "demo@marinamatch.com" };
     next();
   };
 
