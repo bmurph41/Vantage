@@ -88,6 +88,7 @@ import ModelingProjectsIndex from "@/pages/modeling/projects";
 // VDR pages
 import VDRDashboard from "@/pages/vdr/Dashboard";
 import ProjectVDR from "@/pages/vdr/ProjectVDR";
+import DataRequest from "@/pages/vdr/DataRequest";
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
@@ -226,6 +227,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <ProjectVDR />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/vdr/:projectId/data-request">
+        {() => (
+          <UnifiedLayout>
+            <DataRequest />
           </UnifiedLayout>
         )}
       </Route>
