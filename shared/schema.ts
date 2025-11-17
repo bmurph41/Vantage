@@ -83,6 +83,7 @@ export const requestPriorityEnum = pgEnum("request_priority", ["low", "medium", 
 export const externalUserRoleEnum = pgEnum("external_user_role", ["seller", "buyer", "advisor", "auditor", "lender", "attorney", "other"]);
 export const externalUserProjectAccessStatusEnum = pgEnum("external_user_project_access_status", ["active", "revoked", "expired"]);
 export const requestCategoryEnum = pgEnum("request_category", ["financial", "legal", "hr", "it", "commercial", "environmental", "tax", "ip", "regulatory", "operational", "other"]);
+export const dataRequestItemStatusEnum = pgEnum("data_request_item_status", ["outstanding", "received", "n_a"]);
 
 // Persona and Dashboard enums
 export const personaTypeEnum = pgEnum("persona_type", ["pe_investor", "broker", "operator", "advisor"]);
@@ -2300,6 +2301,53 @@ export const requestTemplates = pgTable("request_templates", {
 }, (table) => ({
   categoryIdx: index("request_templates_category_idx").on(table.category),
   orgIdx: index("request_templates_org_idx").on(table.orgId),
+}));
+
+// ============================================================================
+// VDR DATA REQUEST - Document checklist and status tracking for VDR projects
+// ============================================================================
+
+// VDR Data Request Templates - Reusable document checklist templates
+export const vdrDataRequestTemplates = pgTable("vdr_data_request_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default("real_estate"), // real_estate, financial, legal, etc.
+  isGlobal: boolean("is_global").notNull().default(false), // Available to all orgs
+  orgId: varchar("org_id").references(() => organizations.id), // Null for global templates
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  categoryIdx: index("vdr_data_request_templates_category_idx").on(table.category),
+  orgIdx: index("vdr_data_request_templates_org_idx").on(table.orgId),
+}));
+
+// VDR Data Request Items - Individual document items in a project's data request checklist
+export const vdrDataRequestItems = pgTable("vdr_data_request_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  templateId: varchar("template_id").references(() => vdrDataRequestTemplates.id), // Optional link to template
+  category: text("category").notNull(), // Financial, Legal, Operational, etc.
+  documentName: text("document_name").notNull(),
+  description: text("description"),
+  displayOrder: integer("display_order").notNull().default(0),
+  status: dataRequestItemStatusEnum("status").notNull().default("outstanding"),
+  // Link to VDR document when received
+  linkedDocumentId: varchar("linked_document_id").references(() => vdrDocuments.id),
+  isInDataRoom: boolean("is_in_data_room").notNull().default(false), // Checkbox sync with data room
+  notes: text("notes"),
+  dueDate: date("due_date"),
+  receivedDate: date("received_date"),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("vdr_data_request_items_project_idx").on(table.projectId),
+  statusIdx: index("vdr_data_request_items_status_idx").on(table.status),
+  categoryIdx: index("vdr_data_request_items_category_idx").on(table.category),
+  orgIdx: index("vdr_data_request_items_org_idx").on(table.orgId),
 }));
 
 // ============================================================================
@@ -6433,6 +6481,39 @@ export const updateRequestTemplateSchema = insertRequestTemplateSchema.partial()
 export type RequestTemplate = typeof requestTemplates.$inferSelect;
 export type InsertRequestTemplate = z.infer<typeof insertRequestTemplateSchema>;
 export type UpdateRequestTemplate = z.infer<typeof updateRequestTemplateSchema>;
+
+// ============================================================================
+// VDR Data Request Schemas and Types
+// ============================================================================
+
+// VDR Data Request Templates
+export const insertVdrDataRequestTemplateSchema = createInsertSchema(vdrDataRequestTemplates).omit({
+  id: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateVdrDataRequestTemplateSchema = insertVdrDataRequestTemplateSchema.partial();
+
+export type VdrDataRequestTemplate = typeof vdrDataRequestTemplates.$inferSelect;
+export type InsertVdrDataRequestTemplate = z.infer<typeof insertVdrDataRequestTemplateSchema>;
+export type UpdateVdrDataRequestTemplate = z.infer<typeof updateVdrDataRequestTemplateSchema>;
+
+// VDR Data Request Items
+export const insertVdrDataRequestItemSchema = createInsertSchema(vdrDataRequestItems).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateVdrDataRequestItemSchema = insertVdrDataRequestItemSchema.partial();
+
+export type VdrDataRequestItem = typeof vdrDataRequestItems.$inferSelect;
+export type InsertVdrDataRequestItem = z.infer<typeof insertVdrDataRequestItemSchema>;
+export type UpdateVdrDataRequestItem = z.infer<typeof updateVdrDataRequestItemSchema>;
 
 // ============================================================================
 // External User Management Schemas and Types
