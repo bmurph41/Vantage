@@ -56,6 +56,8 @@ import FuelSalesFinancialModel from "@/pages/operations/fuel/FinancialModel";
 import FuelSalesSettings from "@/pages/operations/fuel/Settings";
 import FuelSalesImportHistory from "@/pages/operations/fuel/ImportHistory";
 import FuelSalesAuditTrail from "@/pages/operations/fuel/AuditTrail";
+// Operations pages - Ship Store
+import ShipStoreDashboard from "@/pages/operations/ship-store/Dashboard";
 // Operations pages - Marketing
 import MarketingDashboard from "@/pages/operations/marketing/Dashboard";
 import MarketingCampaigns from "@/pages/operations/marketing/Campaigns";
@@ -329,6 +331,15 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <FuelSalesAuditTrail />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* Operations Routes with Unified Layout - Ship Store */}
+      <Route path="/operations/ship-store/dashboard">
+        {() => (
+          <UnifiedLayout>
+            <ShipStoreDashboard />
           </UnifiedLayout>
         )}
       </Route>

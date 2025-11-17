@@ -55,6 +55,15 @@ const fuelSalesNav = [
   { name: "Settings", href: "/operations/fuel/integration-settings", icon: Settings },
 ];
 
+// Operations Navigation - Ship Store Subcategories
+const shipStoreNav = [
+  { name: "Dashboard", href: "/operations/ship-store/dashboard", icon: LayoutDashboard },
+  { name: "Inventory", href: "/operations/ship-store/inventory", icon: Box },
+  { name: "Sales", href: "/operations/ship-store/sales", icon: CreditCard },
+  { name: "Analytics", href: "/operations/ship-store/analytics", icon: BarChart3 },
+  { name: "Reports", href: "/operations/ship-store/reports", icon: FileText },
+];
+
 // Operations Navigation - Rent Roll Subcategories
 const rentRollNav = [
   { name: "Portfolio", href: "/operations/rent-roll/portfolio", icon: Building2 },
@@ -108,6 +117,7 @@ export default function UnifiedSidebar() {
   const [location] = useLocation();
   const [operationsExpanded, setOperationsExpanded] = useState(false);
   const [fuelSalesExpanded, setFuelSalesExpanded] = useState(false);
+  const [shipStoreExpanded, setShipStoreExpanded] = useState(false);
   const [rentRollExpanded, setRentRollExpanded] = useState(false);
   const [marketingExpanded, setMarketingExpanded] = useState(false);
   const [crmExpanded, setCrmExpanded] = useState(false);
@@ -175,6 +185,7 @@ export default function UnifiedSidebar() {
     // Determine which section the current page belongs to
     const isOperationsPage = location.startsWith('/operations/');
     const isFuelSalesPage = location.startsWith('/operations/fuel/');
+    const isShipStorePage = location.startsWith('/operations/ship-store/');
     const isRentRollPage = location.startsWith('/operations/rent-roll/') || location === '/operations/customer-analytics';
     const isMarketingPage = location.startsWith('/operations/marketing/');
     const isCrmPage = location.startsWith('/crm/') || location === '/crm' || location.startsWith('/import-') || location === '/calendar-settings';
@@ -187,6 +198,7 @@ export default function UnifiedSidebar() {
     // Set expanded states based on current page
     setOperationsExpanded(isOperationsPage);
     setFuelSalesExpanded(isFuelSalesPage);
+    setShipStoreExpanded(isShipStorePage);
     setRentRollExpanded(isRentRollPage);
     setMarketingExpanded(isMarketingPage);
     setCrmExpanded(isCrmPage);
@@ -400,6 +412,24 @@ export default function UnifiedSidebar() {
               {fuelSalesExpanded && (
                 <div className="ml-4">
                   {fuelSalesNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setShipStoreExpanded(!shipStoreExpanded)}
+                className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                data-testid="toggle-ship-store"
+              >
+                <div className="flex items-center space-x-3">
+                  <Package className="w-5 h-5" />
+                  <span>Ship Store</span>
+                </div>
+                {shipStoreExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              {shipStoreExpanded && (
+                <div className="ml-4">
+                  {shipStoreNav.map((item) => (
                     <NavLink key={item.name} item={item} />
                   ))}
                 </div>
