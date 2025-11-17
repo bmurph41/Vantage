@@ -17,6 +17,7 @@ import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { AuditService } from "./services/audit-service";
 import vdrRouter from "./vdr-routes";
+import { shipStoreProxy, shipStoreTokenEndpoint } from "./ship-store-integration";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
 import { marketingService } from "./services/marketing-service";
@@ -219,6 +220,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rc-pending-properties", authenticateUser);
   app.use("/api/debt-scenarios", authenticateUser);
   app.use("/api/vdr", authenticateUser, vdrRouter);
+
+  // Ship Store integration endpoints
+  app.get("/api/ship-store-token", authenticateUser, shipStoreTokenEndpoint);
+  app.use("/api/ship-store", authenticateUser, shipStoreProxy);
 
   // Auth endpoints
   app.get("/api/auth/me", authenticateUser, (req: any, res) => {
