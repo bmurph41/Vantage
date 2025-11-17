@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { 
@@ -169,6 +169,33 @@ export default function UnifiedSidebar() {
   const pendingPropertiesCount = pendingProperties.filter(p => p.status === 'pending').length;
   const pendingContactsCount = pendingContacts.filter(p => p.status === 'pending').length;
   const pendingCompaniesCount = pendingCompanies.filter(p => p.status === 'pending').length;
+
+  // Auto-expand categories based on current location
+  useEffect(() => {
+    // Determine which section the current page belongs to
+    const isOperationsPage = location.startsWith('/operations/');
+    const isFuelSalesPage = location.startsWith('/operations/fuel/');
+    const isRentRollPage = location.startsWith('/operations/rent-roll/') || location === '/operations/customer-analytics';
+    const isMarketingPage = location.startsWith('/operations/marketing/');
+    const isCrmPage = location.startsWith('/crm/') || location === '/crm' || location.startsWith('/import-') || location === '/calendar-settings';
+    const isCrmToolsPage = location === '/calendar-settings' || location.startsWith('/import-');
+    const isDdPage = location === '/' || location === '/progress-report';
+    const isVdrPage = location.startsWith('/vdr');
+    const isModelingPage = location.startsWith('/modeling/');
+    const isAnalysisPage = location.startsWith('/analysis/');
+
+    // Set expanded states based on current page
+    setOperationsExpanded(isOperationsPage);
+    setFuelSalesExpanded(isFuelSalesPage);
+    setRentRollExpanded(isRentRollPage);
+    setMarketingExpanded(isMarketingPage);
+    setCrmExpanded(isCrmPage);
+    setCrmToolsExpanded(isCrmToolsPage);
+    setDdExpanded(isDdPage);
+    setVdrExpanded(isVdrPage);
+    setModelingExpanded(isModelingPage);
+    setAnalysisExpanded(isAnalysisPage);
+  }, [location]);
 
   // Create dynamic CRM navigation with pending badges
   // Structure: Dashboard, Pipeline, Deals, Leads, Contacts (+Pending), Companies (+Pending), Properties (+Pending), Activities, Prospecting, etc.
