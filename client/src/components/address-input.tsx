@@ -93,10 +93,27 @@ export function AddressInput({
         await loader.load();
         setApiReady(true);
       } catch (error) {
+        // Improved error logging
         console.error('Failed to load Google Maps API:', error);
+        
+        // Check if this is likely a referrer restriction issue
+        const errorMessage = error instanceof Error ? error.message : '';
+        const isReferrerIssue = errorMessage.includes('RefererNotAllowedMapError') || 
+                                errorMessage.includes('ApiNotActivatedMapError') ||
+                                error instanceof Event; // Script loading failures often appear as Events
+        
+        if (isReferrerIssue) {
+          console.error(
+            'Google Maps API key restriction detected. ' +
+            'Please add this domain to your API key\'s HTTP referrer restrictions in Google Cloud Console.'
+          );
+        }
+        
         toast({
           title: 'Address Autocomplete Unavailable',
-          description: 'Using manual address entry instead.',
+          description: isReferrerIssue 
+            ? 'API key restriction detected. Check console for details.'
+            : 'Using manual address entry instead.',
           variant: 'default',
         });
       } finally {
