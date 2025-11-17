@@ -4,7 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
-export const users = pgTable("users", {
+export const users = pgTable("ship_store_users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
@@ -13,14 +13,14 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const categories = pgTable("categories", {
+export const categories = pgTable("ship_store_categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const products = pgTable("products", {
+export const products = pgTable("ship_store_products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   sku: text("sku").notNull().unique(),
@@ -36,7 +36,7 @@ export const products = pgTable("products", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const transactions = pgTable("transactions", {
+export const transactions = pgTable("ship_store_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   tax: decimal("tax", { precision: 10, scale: 2 }).notNull(),
@@ -54,7 +54,7 @@ export const transactions = pgTable("transactions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const financialMetrics = pgTable("financial_metrics", {
+export const financialMetrics = pgTable("ship_store_financial_metrics", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   period: text("period").notNull(), // daily, weekly, monthly, yearly
   periodStart: timestamp("period_start").notNull(),
@@ -74,7 +74,7 @@ export const financialMetrics = pgTable("financial_metrics", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const storeSettings = pgTable("store_settings", {
+export const storeSettings = pgTable("ship_store_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   storeName: text("store_name").default("Ship Store"),
   address: text("address"),
@@ -93,7 +93,7 @@ export const storeSettings = pgTable("store_settings", {
 });
 
 // Financial modeling tables for pro forma and scenario planning
-export const scenarios = pgTable("scenarios", {
+export const scenarios = pgTable("ship_store_scenarios", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
@@ -103,7 +103,7 @@ export const scenarios = pgTable("scenarios", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const assumptions = pgTable("assumptions", {
+export const assumptions = pgTable("ship_store_assumptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   scenarioId: varchar("scenario_id").references(() => scenarios.id).notNull().unique(),
   
@@ -140,7 +140,7 @@ export const assumptions = pgTable("assumptions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const projections = pgTable("projections", {
+export const projections = pgTable("ship_store_projections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   scenarioId: varchar("scenario_id").references(() => scenarios.id).notNull(),
   
@@ -178,7 +178,7 @@ export const projections = pgTable("projections", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const historicalData = pgTable("historical_data", {
+export const historicalData = pgTable("ship_store_historical_data", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   
   dataSource: text("data_source").notNull(), // pos, import, quickbooks, manual
@@ -217,7 +217,7 @@ export const historicalData = pgTable("historical_data", {
 });
 
 // Audit log for compliance tracking
-export const auditLogs = pgTable("audit_logs", {
+export const auditLogs = pgTable("ship_store_audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id),
   entityType: text("entity_type").notNull(), // scenarios, assumptions, projections, historical_data, products, etc.
