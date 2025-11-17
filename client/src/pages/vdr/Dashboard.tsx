@@ -103,9 +103,15 @@ export default function VDRDashboard() {
                         {project.description || "No description"}
                       </CardDescription>
                     </div>
-                    <Badge variant={project.status === "active" ? "default" : "secondary"}>
-                      {project.status}
-                    </Badge>
+                    {project.status === "accepted" ? (
+                      <Badge className="bg-green-500 hover:bg-green-600 text-white">
+                        Accepted
+                      </Badge>
+                    ) : (
+                      <Badge variant={project.status === "active" ? "default" : "secondary"}>
+                        {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+                      </Badge>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="flex flex-col flex-1 justify-between space-y-4">
@@ -146,7 +152,7 @@ export default function VDRDashboard() {
                         {project.description || "No description"}
                       </CardDescription>
                     </div>
-                    <Badge variant="secondary">completed</Badge>
+                    <Badge variant="secondary">Completed</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="flex flex-col flex-1 justify-between space-y-4">
