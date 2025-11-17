@@ -99,5 +99,14 @@ task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
 
+[[workflows.workflow]]
+name = "Ship Store Service"
+mode = "sequential"
+author = 43154784
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd ship-store && npm install && npm run dev"
+
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_mem_db:1.0.0", "javascript_sendgrid:1.0.0", "google-calendar:1.0.0", "javascript_openai:1.0.0", "sendgrid:1.0.0"]
