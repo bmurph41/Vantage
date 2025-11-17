@@ -264,7 +264,8 @@ export default function PendingContacts() {
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleReject(pending);
+                              setSelectedPending(pending);
+                              handleReject();
                             }}
                             data-testid={`button-reject-contact-${pending.id}`}
                           >
