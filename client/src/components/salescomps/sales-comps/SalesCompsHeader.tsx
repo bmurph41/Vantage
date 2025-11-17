@@ -105,9 +105,9 @@ export default function SalesCompsHeader({
               <>
                 {onAddCompClick && (
                   <Button
-                    variant="outline"
                     onClick={onAddCompClick}
                     data-testid="button-add-comp"
+                    className="bg-blue-700 hover:bg-blue-800 text-white"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Comp
@@ -116,9 +116,9 @@ export default function SalesCompsHeader({
                 
                 {onPortfolioClick && (
                   <Button
-                    variant="outline"
                     onClick={onPortfolioClick}
                     data-testid="button-create-portfolio"
+                    className="bg-blue-400 hover:bg-blue-500 text-white"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Portfolio
