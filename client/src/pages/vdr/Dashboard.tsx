@@ -94,12 +94,12 @@ export default function VDRDashboard() {
           <h2 className="text-2xl font-semibold text-gray-900">Active Projects</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {activeProjects.map((project: any) => (
-              <Card key={project.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
+              <Card key={project.id} className="hover:shadow-lg transition-shadow flex flex-col h-full">
+                <CardHeader className="flex-none">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <CardTitle className="text-lg line-clamp-1">{project.name}</CardTitle>
-                      <CardDescription className="mt-1 line-clamp-2">
+                      <CardDescription className="mt-1 line-clamp-2 min-h-[2.5rem]">
                         {project.description || "No description"}
                       </CardDescription>
                     </div>
@@ -108,15 +108,15 @@ export default function VDRDashboard() {
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <FolderLock className="h-4 w-4" />
-                      <span>— folders</span>
+                <CardContent className="flex flex-col flex-1 justify-between space-y-4">
+                  <div className="grid grid-cols-2 gap-3 py-2 px-3 bg-gray-50 rounded-md border border-gray-100">
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <FolderLock className="h-3.5 w-3.5 text-gray-400" />
+                      <span className="font-medium">— folders</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <FileText className="h-4 w-4" />
-                      <span>— files</span>
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <FileText className="h-3.5 w-3.5 text-gray-400" />
+                      <span className="font-medium">— files</span>
                     </div>
                   </div>
                   <Link href={`/vdr/projects/${project.id}`}>
@@ -137,27 +137,27 @@ export default function VDRDashboard() {
           <h2 className="text-2xl font-semibold text-gray-900">Completed Projects</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {completedProjects.map((project: any) => (
-              <Card key={project.id} className="hover:shadow-lg transition-shadow opacity-75">
-                <CardHeader>
+              <Card key={project.id} className="hover:shadow-lg transition-shadow opacity-75 flex flex-col h-full">
+                <CardHeader className="flex-none">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <CardTitle className="text-lg line-clamp-1">{project.name}</CardTitle>
-                      <CardDescription className="mt-1 line-clamp-2">
+                      <CardDescription className="mt-1 line-clamp-2 min-h-[2.5rem]">
                         {project.description || "No description"}
                       </CardDescription>
                     </div>
                     <Badge variant="secondary">completed</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <FolderLock className="h-4 w-4" />
-                      <span>— folders</span>
+                <CardContent className="flex flex-col flex-1 justify-between space-y-4">
+                  <div className="grid grid-cols-2 gap-3 py-2 px-3 bg-gray-50 rounded-md border border-gray-100">
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <FolderLock className="h-3.5 w-3.5 text-gray-400" />
+                      <span className="font-medium">— folders</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <FileText className="h-4 w-4" />
-                      <span>— files</span>
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <FileText className="h-3.5 w-3.5 text-gray-400" />
+                      <span className="font-medium">— files</span>
                     </div>
                   </div>
                   <Link href={`/vdr/projects/${project.id}`}>
