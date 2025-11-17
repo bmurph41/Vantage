@@ -125,12 +125,20 @@ export default function VDRDashboard() {
                       <span className="font-medium">— Files</span>
                     </div>
                   </div>
-                  <Link href={`/vdr/projects/${project.id}`}>
-                    <Button className="w-full" data-testid={`button-open-vdr-${project.id}`}>
-                      <FolderLock className="h-4 w-4 mr-2" />
-                      Open Data Room
-                    </Button>
-                  </Link>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link href={`/vdr/projects/${project.id}`}>
+                      <Button className="w-full" data-testid={`button-open-vdr-${project.id}`}>
+                        <FolderLock className="h-4 w-4 mr-2" />
+                        Data Room
+                      </Button>
+                    </Link>
+                    <Link href={`/vdr/${project.id}/data-request`}>
+                      <Button variant="outline" className="w-full" data-testid={`button-data-request-${project.id}`}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Doc Request
+                      </Button>
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -166,12 +174,20 @@ export default function VDRDashboard() {
                       <span className="font-medium">— Files</span>
                     </div>
                   </div>
-                  <Link href={`/vdr/projects/${project.id}`}>
-                    <Button variant="outline" className="w-full" data-testid={`button-open-vdr-${project.id}`}>
-                      <FolderLock className="h-4 w-4 mr-2" />
-                      View Archive
-                    </Button>
-                  </Link>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link href={`/vdr/projects/${project.id}`}>
+                      <Button variant="outline" className="w-full" data-testid={`button-open-vdr-${project.id}`}>
+                        <FolderLock className="h-4 w-4 mr-2" />
+                        Data Room
+                      </Button>
+                    </Link>
+                    <Link href={`/vdr/${project.id}/data-request`}>
+                      <Button variant="outline" className="w-full" data-testid={`button-data-request-${project.id}`}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Doc Request
+                      </Button>
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
             ))}
