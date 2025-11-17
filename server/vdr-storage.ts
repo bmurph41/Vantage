@@ -3,14 +3,17 @@ import {
   diligenceRequests, requestDocuments, requestComments, requestTemplates,
   externalUsers, externalUserProjectAccess,
   vdrTemplates, vdrTemplateFolders,
+  vdrDataRequestTemplates, vdrDataRequestItems,
   type VdrFolder, type VdrDocument, type VdrDocumentPermission, type VdrWatermark, type VdrAuditLog,
   type DiligenceRequest, type RequestDocument, type RequestComment, type RequestTemplate,
   type ExternalUser, type ExternalUserProjectAccess,
   type VdrTemplate, type VdrTemplateFolder,
+  type VdrDataRequestTemplate, type VdrDataRequestItem,
   type InsertVdrFolder, type InsertVdrDocument, type InsertVdrDocumentPermission, type InsertVdrWatermark, type InsertVdrAuditLog,
   type InsertDiligenceRequest, type InsertRequestDocument, type InsertRequestComment, type InsertRequestTemplate,
   type InsertExternalUser, type InsertExternalUserProjectAccess,
   type InsertVdrTemplate, type InsertVdrTemplateFolder,
+  type InsertVdrDataRequestTemplate, type InsertVdrDataRequestItem,
   vdrPermissionLevelEnum
 } from "@shared/schema";
 import { db } from "./db";
@@ -107,6 +110,19 @@ export interface IVdrTemplateRepository {
   createTemplateFolder(data: InsertVdrTemplateFolder): Promise<VdrTemplateFolder>;
 }
 
+export interface IVdrDataRequestRepository {
+  getItemsByProject(projectId: string, orgId: string): Promise<VdrDataRequestItem[]>;
+  getItem(id: string, orgId: string): Promise<VdrDataRequestItem | undefined>;
+  createItem(data: InsertVdrDataRequestItem): Promise<VdrDataRequestItem>;
+  updateItem(id: string, updates: Partial<InsertVdrDataRequestItem>, orgId: string): Promise<VdrDataRequestItem | undefined>;
+  deleteItem(id: string, orgId: string): Promise<boolean>;
+  linkDocument(itemId: string, documentId: string, orgId: string): Promise<VdrDataRequestItem | undefined>;
+  unlinkDocument(itemId: string, orgId: string): Promise<VdrDataRequestItem | undefined>;
+  getTemplates(orgId: string): Promise<VdrDataRequestTemplate[]>;
+  createTemplate(data: InsertVdrDataRequestTemplate): Promise<VdrDataRequestTemplate>;
+  applyTemplate(projectId: string, templateId: string, orgId: string, userId: string): Promise<VdrDataRequestItem[]>;
+}
+
 export interface IVdrStorage {
   folders: IVdrFolderRepository;
   documents: IVdrDocumentRepository;
@@ -115,6 +131,7 @@ export interface IVdrStorage {
   requests: IVdrRequestRepository;
   externalUsers: IVdrExternalUserRepository;
   templates: IVdrTemplateRepository;
+  dataRequests: IVdrDataRequestRepository;
 }
 
 export class VdrFolderRepository implements IVdrFolderRepository {
@@ -894,6 +911,116 @@ export class VdrTemplateRepository implements IVdrTemplateRepository {
   }
 }
 
+export class VdrDataRequestRepository implements IVdrDataRequestRepository {
+  async getItemsByProject(projectId: string, orgId: string): Promise<VdrDataRequestItem[]> {
+    return await db.select()
+      .from(vdrDataRequestItems)
+      .where(and(
+        eq(vdrDataRequestItems.projectId, projectId),
+        eq(vdrDataRequestItems.orgId, orgId)
+      ))
+      .orderBy(asc(vdrDataRequestItems.category), asc(vdrDataRequestItems.displayOrder), asc(vdrDataRequestItems.documentName));
+  }
+
+  async getItem(id: string, orgId: string): Promise<VdrDataRequestItem | undefined> {
+    const [item] = await db.select()
+      .from(vdrDataRequestItems)
+      .where(and(
+        eq(vdrDataRequestItems.id, id),
+        eq(vdrDataRequestItems.orgId, orgId)
+      ))
+      .limit(1);
+    
+    return item || undefined;
+  }
+
+  async createItem(data: InsertVdrDataRequestItem): Promise<VdrDataRequestItem> {
+    const [item] = await db.insert(vdrDataRequestItems)
+      .values(data)
+      .returning();
+    
+    return item;
+  }
+
+  async updateItem(id: string, updates: Partial<InsertVdrDataRequestItem>, orgId: string): Promise<VdrDataRequestItem | undefined> {
+    const [updated] = await db.update(vdrDataRequestItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(
+        eq(vdrDataRequestItems.id, id),
+        eq(vdrDataRequestItems.orgId, orgId)
+      ))
+      .returning();
+    
+    return updated || undefined;
+  }
+
+  async deleteItem(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(vdrDataRequestItems)
+      .where(and(
+        eq(vdrDataRequestItems.id, id),
+        eq(vdrDataRequestItems.orgId, orgId)
+      ));
+    
+    return true;
+  }
+
+  async linkDocument(itemId: string, documentId: string, orgId: string): Promise<VdrDataRequestItem | undefined> {
+    const [updated] = await db.update(vdrDataRequestItems)
+      .set({ 
+        linkedDocumentId: documentId,
+        isInDataRoom: true,
+        status: 'received' as const,
+        receivedDate: new Date(),
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(vdrDataRequestItems.id, itemId),
+        eq(vdrDataRequestItems.orgId, orgId)
+      ))
+      .returning();
+    
+    return updated || undefined;
+  }
+
+  async unlinkDocument(itemId: string, orgId: string): Promise<VdrDataRequestItem | undefined> {
+    const [updated] = await db.update(vdrDataRequestItems)
+      .set({ 
+        linkedDocumentId: null,
+        isInDataRoom: false,
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(vdrDataRequestItems.id, itemId),
+        eq(vdrDataRequestItems.orgId, orgId)
+      ))
+      .returning();
+    
+    return updated || undefined;
+  }
+
+  async getTemplates(orgId: string): Promise<VdrDataRequestTemplate[]> {
+    return await db.select()
+      .from(vdrDataRequestTemplates)
+      .where(or(
+        eq(vdrDataRequestTemplates.isGlobal, true),
+        eq(vdrDataRequestTemplates.orgId, orgId)
+      ))
+      .orderBy(asc(vdrDataRequestTemplates.category), asc(vdrDataRequestTemplates.name));
+  }
+
+  async createTemplate(data: InsertVdrDataRequestTemplate): Promise<VdrDataRequestTemplate> {
+    const [template] = await db.insert(vdrDataRequestTemplates)
+      .values(data)
+      .returning();
+    
+    return template;
+  }
+
+  async applyTemplate(projectId: string, templateId: string, orgId: string, userId: string): Promise<VdrDataRequestItem[]> {
+    return [];
+  }
+}
+
 export class VdrStorage implements IVdrStorage {
   folders: IVdrFolderRepository;
   documents: IVdrDocumentRepository;
@@ -902,6 +1029,7 @@ export class VdrStorage implements IVdrStorage {
   requests: IVdrRequestRepository;
   externalUsers: IVdrExternalUserRepository;
   templates: IVdrTemplateRepository;
+  dataRequests: IVdrDataRequestRepository;
 
   constructor() {
     this.folders = new VdrFolderRepository();
@@ -911,5 +1039,6 @@ export class VdrStorage implements IVdrStorage {
     this.requests = new VdrRequestRepository();
     this.externalUsers = new VdrExternalUserRepository();
     this.templates = new VdrTemplateRepository();
+    this.dataRequests = new VdrDataRequestRepository();
   }
 }

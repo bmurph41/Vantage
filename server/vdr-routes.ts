@@ -1261,4 +1261,129 @@ router.post('/projects/:projectId/apply-template', requireAuth, requireVdrAccess
   }
 });
 
+// ============================================================================
+// DATA REQUEST ROUTES - Document checklist and status tracking
+// ============================================================================
+
+// Get all data request items for a project
+router.get('/projects/:projectId/data-requests', requireAuth, async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const items = await storage.vdr.dataRequests.getItemsByProject(projectId, orgId);
+    res.json(items);
+  } catch (error: any) {
+    console.error('Error fetching data request items:', error);
+    res.status(500).json({ error: 'Failed to fetch data request items' });
+  }
+});
+
+// Create a new data request item
+router.post('/projects/:projectId/data-requests', requireAuth, async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const itemData = {
+      ...req.body,
+      projectId,
+      orgId,
+      createdBy: userId,
+    };
+
+    const item = await storage.vdr.dataRequests.createItem(itemData);
+    res.json(item);
+  } catch (error: any) {
+    console.error('Error creating data request item:', error);
+    res.status(500).json({ error: 'Failed to create data request item' });
+  }
+});
+
+// Update a data request item
+router.patch('/data-requests/:id', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const item = await storage.vdr.dataRequests.updateItem(id, req.body, orgId);
+    res.json(item);
+  } catch (error: any) {
+    console.error('Error updating data request item:', error);
+    res.status(500).json({ error: 'Failed to update data request item' });
+  }
+});
+
+// Delete a data request item
+router.delete('/data-requests/:id', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    await storage.vdr.dataRequests.deleteItem(id, orgId);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting data request item:', error);
+    res.status(500).json({ error: 'Failed to delete data request item' });
+  }
+});
+
+// Link a document to a data request item
+router.post('/data-requests/:id/link-document', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { documentId } = req.body;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const item = await storage.vdr.dataRequests.linkDocument(id, documentId, orgId);
+    res.json(item);
+  } catch (error: any) {
+    console.error('Error linking document:', error);
+    res.status(500).json({ error: 'Failed to link document' });
+  }
+});
+
+// Unlink a document from a data request item
+router.post('/data-requests/:id/unlink-document', requireAuth, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const item = await storage.vdr.dataRequests.unlinkDocument(id, orgId);
+    res.json(item);
+  } catch (error: any) {
+    console.error('Error unlinking document:', error);
+    res.status(500).json({ error: 'Failed to unlink document' });
+  }
+});
+
+// Get data request templates
+router.get('/data-request-templates', requireAuth, async (req: Request, res: Response) => {
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const templates = await storage.vdr.dataRequests.getTemplates(orgId);
+    res.json(templates);
+  } catch (error: any) {
+    console.error('Error fetching data request templates:', error);
+    res.status(500).json({ error: 'Failed to fetch templates' });
+  }
+});
+
+// Apply a template to a project
+router.post('/projects/:projectId/apply-data-request-template/:templateId', requireAuth, async (req: Request, res: Response) => {
+  const { projectId, templateId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const items = await storage.vdr.dataRequests.applyTemplate(projectId, templateId, orgId, userId);
+    res.json({ success: true, itemsCreated: items.length, items });
+  } catch (error: any) {
+    console.error('Error applying template:', error);
+    res.status(500).json({ error: 'Failed to apply template' });
+  }
+});
+
 export default router;
