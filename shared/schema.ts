@@ -2328,6 +2328,7 @@ export const vdrDataRequestTemplates = pgTable("vdr_data_request_templates", {
 export const vdrDiligenceCategories = pgTable("vdr_diligence_categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
+  slug: text("slug").notNull(), // Stable identifier for default categories
   name: text("name").notNull(),
   description: text("description"),
   displayOrder: integer("display_order").notNull().default(0),
@@ -2337,7 +2338,7 @@ export const vdrDiligenceCategories = pgTable("vdr_diligence_categories", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   orgIdx: index("vdr_diligence_categories_org_idx").on(table.orgId),
-  nameOrgIdx: unique("vdr_diligence_categories_name_org_idx").on(table.name, table.orgId),
+  slugOrgIdx: unique("vdr_diligence_categories_slug_org_idx").on(table.slug, table.orgId),
 }));
 
 // VDR Data Request Items - Individual document items in a project's data request checklist

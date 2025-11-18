@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs, projects, externalUsers, users, externalUserProjectAccess, vdrDiligenceCategories, projectContacts, contacts } from '@shared/schema';
 import { db } from './db';
 import { eq, and, desc, sql, isNotNull, inArray } from 'drizzle-orm';
+import { ensureDefaultCategories } from './vdr-diligence-category-service';
 
 const router = express.Router();
 
@@ -1579,13 +1580,24 @@ router.get('/diligence-categories', requireAuth, async (req: Request, res: Respo
   const orgId = (req.user as any).orgId;
 
   try {
-    const categories = await db.select()
+    let categories = await db.select()
       .from(vdrDiligenceCategories)
       .where(and(
         eq(vdrDiligenceCategories.orgId, orgId),
         eq(vdrDiligenceCategories.isActive, true)
       ))
       .orderBy(vdrDiligenceCategories.displayOrder);
+
+    if (categories.length === 0) {
+      await ensureDefaultCategories(orgId);
+      categories = await db.select()
+        .from(vdrDiligenceCategories)
+        .where(and(
+          eq(vdrDiligenceCategories.orgId, orgId),
+          eq(vdrDiligenceCategories.isActive, true)
+        ))
+        .orderBy(vdrDiligenceCategories.displayOrder);
+    }
 
     res.json(categories);
   } catch (error: any) {
