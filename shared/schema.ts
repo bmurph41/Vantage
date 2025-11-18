@@ -6597,6 +6597,9 @@ export const shipStoreTransactions = pgTable("ship_store_transactions", {
   paymentMethod: text("payment_method").notNull(),
   paymentIntentId: text("payment_intent_id"),
   status: text("status").default("completed"),
+  customerId: varchar("customer_id"),
+  customerType: text("customer_type"),
+  customerName: text("customer_name"),
   items: jsonb("items").$type<Array<{
     productId: string;
     name: string;
