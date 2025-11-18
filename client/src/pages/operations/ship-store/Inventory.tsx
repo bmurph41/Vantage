@@ -25,6 +25,8 @@ export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -53,6 +55,29 @@ export default function Inventory() {
       toast({
         title: "Error",
         description: "Failed to create product",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const response = await apiRequest("PATCH", `/api/ship-store/products/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ship-store/products"] });
+      setIsEditDialogOpen(false);
+      setEditingProduct(null);
+      toast({
+        title: "Product Updated",
+        description: "Product has been successfully updated",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update product",
         variant: "destructive",
       });
     },
@@ -93,6 +118,20 @@ export default function Inventory() {
     },
   });
 
+  const editForm = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      sku: "",
+      categoryId: "",
+      price: "",
+      cost: "",
+      stock: "",
+      lowStockThreshold: "5",
+      description: "",
+    },
+  });
+
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     const productData = {
       ...values,
@@ -102,6 +141,34 @@ export default function Inventory() {
       lowStockThreshold: parseInt(values.lowStockThreshold || "5"),
     };
     createProductMutation.mutate(productData);
+  };
+
+  const onEditSubmit = (values: z.infer<typeof formSchema>) => {
+    if (!editingProduct) return;
+    
+    const productData = {
+      ...values,
+      price: values.price,
+      cost: values.cost || "0",
+      stock: parseInt(values.stock),
+      lowStockThreshold: parseInt(values.lowStockThreshold || "5"),
+    };
+    updateProductMutation.mutate({ id: editingProduct.id, data: productData });
+  };
+
+  const handleEditClick = (product: any) => {
+    setEditingProduct(product);
+    editForm.reset({
+      name: product.name,
+      sku: product.sku,
+      categoryId: product.categoryId,
+      price: product.price,
+      cost: product.cost || "0",
+      stock: product.stock.toString(),
+      lowStockThreshold: product.lowStockThreshold?.toString() || "5",
+      description: product.description || "",
+    });
+    setIsEditDialogOpen(true);
   };
 
   const filteredProducts = products?.filter((product: any) => {
@@ -367,7 +434,12 @@ export default function Inventory() {
                         </td>
                         <td className="p-3">
                           <div className="flex space-x-2">
-                            <Button size="sm" variant="outline" data-testid={`edit-${product.sku}`}>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => handleEditClick(product)}
+                              data-testid={`edit-${product.sku}`}
+                            >
                               Edit
                             </Button>
                             <Button
@@ -390,6 +462,146 @@ export default function Inventory() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Product Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter product name" {...field} data-testid="edit-product-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="sku"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SKU</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter SKU" {...field} data-testid="edit-product-sku" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="edit-product-category">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories?.map((category: any) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price</FormLabel>
+                      <FormControl>
+                        <Input placeholder="0.00" {...field} data-testid="edit-product-price" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="cost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cost</FormLabel>
+                      <FormControl>
+                        <Input placeholder="0.00" {...field} data-testid="edit-product-cost" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="stock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stock</FormLabel>
+                      <FormControl>
+                        <Input placeholder="0" {...field} data-testid="edit-product-stock" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="lowStockThreshold"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Low Stock Alert</FormLabel>
+                      <FormControl>
+                        <Input placeholder="5" {...field} data-testid="edit-product-threshold" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={editForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Product description" {...field} data-testid="edit-product-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateProductMutation.isPending} data-testid="update-product">
+                  {updateProductMutation.isPending ? "Updating..." : "Update Product"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

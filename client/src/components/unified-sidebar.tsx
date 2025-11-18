@@ -61,7 +61,7 @@ const shipStoreNav = [
   { name: "Point of Sale", href: "/operations/ship-store/pos", icon: CreditCard },
   { name: "Inventory", href: "/operations/ship-store/inventory", icon: Box },
   { name: "Transactions", href: "/operations/ship-store/transactions", icon: Receipt },
-  { name: "Reports", href: "/operations/ship-store/reports", icon: FileText },
+  { name: "Analytics", href: "/operations/ship-store/analytics", icon: BarChart3 },
 ];
 
 // Operations Navigation - Rent Roll Subcategories

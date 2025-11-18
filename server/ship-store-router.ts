@@ -366,6 +366,145 @@ router.put('/settings', requireManager, async (req: Request, res: Response) => {
   }
 });
 
+// ===== ANALYTICS =====
+
+router.get('/analytics/sales-trends', async (req: Request, res: Response) => {
+  try {
+    const days = parseInt(req.query.days as string) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const transactions = await db.select({
+      date: sql<string>`DATE(${shipStoreTransactions.createdAt})`,
+      revenue: sql<number>`SUM(CAST(${shipStoreTransactions.total} AS DECIMAL))`,
+      transactions: sql<number>`COUNT(*)`,
+    })
+    .from(shipStoreTransactions)
+    .where(gte(shipStoreTransactions.createdAt, startDate))
+    .groupBy(sql`DATE(${shipStoreTransactions.createdAt})`)
+    .orderBy(sql`DATE(${shipStoreTransactions.createdAt})`);
+
+    res.json(transactions);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching sales trends' });
+  }
+});
+
+router.get('/analytics/top-products', async (req: Request, res: Response) => {
+  try {
+    const days = parseInt(req.query.days as string) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const topProducts = await db.select({
+      productId: shipStoreTransactionItems.productId,
+      name: shipStoreTransactionItems.name,
+      quantity: sql<number>`SUM(${shipStoreTransactionItems.quantity})`,
+      revenue: sql<number>`SUM(${shipStoreTransactionItems.price} * ${shipStoreTransactionItems.quantity})`,
+    })
+    .from(shipStoreTransactionItems)
+    .innerJoin(shipStoreTransactions, eq(shipStoreTransactionItems.transactionId, shipStoreTransactions.id))
+    .where(gte(shipStoreTransactions.createdAt, startDate))
+    .groupBy(shipStoreTransactionItems.productId, shipStoreTransactionItems.name)
+    .orderBy(desc(sql<number>`SUM(${shipStoreTransactionItems.price} * ${shipStoreTransactionItems.quantity})`))
+    .limit(10);
+
+    res.json(topProducts);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching top products' });
+  }
+});
+
+router.get('/analytics/category-revenue', async (req: Request, res: Response) => {
+  try {
+    const days = parseInt(req.query.days as string) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const categoryRevenue = await db.select({
+      name: shipStoreCategories.name,
+      value: sql<number>`SUM(${shipStoreTransactionItems.price} * ${shipStoreTransactionItems.quantity})`,
+    })
+    .from(shipStoreTransactionItems)
+    .innerJoin(shipStoreTransactions, eq(shipStoreTransactionItems.transactionId, shipStoreTransactions.id))
+    .innerJoin(shipStoreProducts, eq(shipStoreTransactionItems.productId, shipStoreProducts.id))
+    .innerJoin(shipStoreCategories, eq(shipStoreProducts.categoryId, shipStoreCategories.id))
+    .where(gte(shipStoreTransactions.createdAt, startDate))
+    .groupBy(shipStoreCategories.name)
+    .orderBy(desc(sql<number>`SUM(${shipStoreTransactionItems.price} * ${shipStoreTransactionItems.quantity})`));
+
+    res.json(categoryRevenue);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching category revenue' });
+  }
+});
+
+router.get('/analytics/product-performance', async (req: Request, res: Response) => {
+  try {
+    const productStats = await db.select({
+      id: shipStoreProducts.id,
+      name: shipStoreProducts.name,
+      sku: shipStoreProducts.sku,
+      stock: shipStoreProducts.stock,
+      categoryName: shipStoreCategories.name,
+      unitsSold: sql<number>`COALESCE(SUM(${shipStoreTransactionItems.quantity}), 0)`,
+      revenue: sql<number>`COALESCE(SUM(${shipStoreTransactionItems.price} * ${shipStoreTransactionItems.quantity}), 0)`,
+      avgPrice: sql<number>`COALESCE(AVG(${shipStoreTransactionItems.price}), 0)`,
+    })
+    .from(shipStoreProducts)
+    .leftJoin(shipStoreCategories, eq(shipStoreProducts.categoryId, shipStoreCategories.id))
+    .leftJoin(shipStoreTransactionItems, eq(shipStoreProducts.id, shipStoreTransactionItems.productId))
+    .groupBy(shipStoreProducts.id, shipStoreProducts.name, shipStoreProducts.sku, shipStoreProducts.stock, shipStoreCategories.name)
+    .orderBy(desc(sql<number>`COALESCE(SUM(${shipStoreTransactionItems.quantity}), 0)`));
+
+    res.json(productStats);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching product performance' });
+  }
+});
+
+router.get('/analytics/price-history/:productId', async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+
+    // Get price history from audit logs
+    const priceChanges = await db.select({
+      date: sql<string>`DATE(${shipStoreAuditLogs.createdAt})`,
+      price: sql<number>`CAST((${shipStoreAuditLogs.afterData}->>'price') AS DECIMAL)`,
+    })
+    .from(shipStoreAuditLogs)
+    .where(
+      and(
+        eq(shipStoreAuditLogs.entityType, 'product'),
+        eq(shipStoreAuditLogs.entityId, productId),
+        eq(shipStoreAuditLogs.action, 'update'),
+        sql`${shipStoreAuditLogs.changedFields} ? 'price'`
+      )
+    )
+    .orderBy(shipStoreAuditLogs.createdAt);
+
+    // If no price changes found, get current price
+    if (priceChanges.length === 0) {
+      const [product] = await db.select({ price: shipStoreProducts.price })
+        .from(shipStoreProducts)
+        .where(eq(shipStoreProducts.id, productId));
+      
+      if (product) {
+        res.json([{
+          date: new Date().toISOString().split('T')[0],
+          price: parseFloat(product.price),
+        }]);
+      } else {
+        res.json([]);
+      }
+    } else {
+      res.json(priceChanges);
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching price history' });
+  }
+});
+
 // ===== AUDIT LOGS =====
 
 router.get('/audit-logs', requireManager, async (req: Request, res: Response) => {
