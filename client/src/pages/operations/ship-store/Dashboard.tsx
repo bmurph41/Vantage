@@ -1,12 +1,20 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LayoutDashboard, Box, CreditCard, BarChart3, DollarSign, Package, TrendingUp, ShoppingCart, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AssetSelector } from "@/components/AssetSelector";
 
 export default function ShipStoreDashboard() {
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
   // Fetch Ship Store dashboard metrics
+  const queryKey = selectedAssetId 
+    ? ['/api/ship-store/dashboard/metrics', selectedAssetId]
+    : ['/api/ship-store/dashboard/metrics'];
+    
   const { data: metrics, isLoading, error } = useQuery({
-    queryKey: ['/api/ship-store/dashboard/metrics'],
+    queryKey,
   });
 
   if (error) {
@@ -28,13 +36,20 @@ export default function ShipStoreDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="p-8 max-w-7xl mx-auto space-y-8">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">
-            Ship Store Dashboard
-          </h1>
-          <p className="text-gray-600" data-testid="page-description">
-            Manage your marina ship store inventory, sales, and analytics
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">
+              Ship Store Dashboard
+            </h1>
+            <p className="text-gray-600" data-testid="page-description">
+              Manage your marina ship store inventory, sales, and analytics
+            </p>
+          </div>
+          <AssetSelector 
+            value={selectedAssetId} 
+            onChange={setSelectedAssetId}
+            className="w-[280px]"
+          />
         </div>
 
         {/* Key Metrics */}
