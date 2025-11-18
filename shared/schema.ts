@@ -83,7 +83,8 @@ export const requestPriorityEnum = pgEnum("request_priority", ["low", "medium", 
 export const externalUserRoleEnum = pgEnum("external_user_role", ["seller", "buyer", "advisor", "auditor", "lender", "attorney", "other"]);
 export const externalUserProjectAccessStatusEnum = pgEnum("external_user_project_access_status", ["active", "revoked", "expired"]);
 export const requestCategoryEnum = pgEnum("request_category", ["financial", "legal", "hr", "it", "commercial", "environmental", "tax", "ip", "regulatory", "operational", "other"]);
-export const dataRequestItemStatusEnum = pgEnum("data_request_item_status", ["outstanding", "received", "n_a"]);
+export const dataRequestItemStatusEnum = pgEnum("data_request_item_status", ["outstanding", "in_progress", "received", "n_a"]);
+export const dataRequestPriorityEnum = pgEnum("data_request_priority", ["low", "medium", "high", "urgent"]);
 
 // Persona and Dashboard enums
 export const personaTypeEnum = pgEnum("persona_type", ["pe_investor", "broker", "operator", "advisor"]);
@@ -2333,6 +2334,10 @@ export const vdrDataRequestItems = pgTable("vdr_data_request_items", {
   description: text("description"),
   displayOrder: integer("display_order").notNull().default(0),
   status: dataRequestItemStatusEnum("status").notNull().default("outstanding"),
+  priority: dataRequestPriorityEnum("priority").notNull().default("medium"),
+  // Assignment
+  assigneeId: varchar("assignee_id").references(() => users.id), // Internal team member
+  externalAssigneeId: varchar("external_assignee_id").references(() => externalUsers.id), // External user (seller, attorney, etc.)
   // Link to VDR document when received
   linkedDocumentId: varchar("linked_document_id").references(() => vdrDocuments.id),
   isInDataRoom: boolean("is_in_data_room").notNull().default(false), // Checkbox sync with data room
@@ -2347,6 +2352,8 @@ export const vdrDataRequestItems = pgTable("vdr_data_request_items", {
   projectIdx: index("vdr_data_request_items_project_idx").on(table.projectId),
   statusIdx: index("vdr_data_request_items_status_idx").on(table.status),
   categoryIdx: index("vdr_data_request_items_category_idx").on(table.category),
+  assigneeIdx: index("vdr_data_request_items_assignee_idx").on(table.assigneeId),
+  priorityIdx: index("vdr_data_request_items_priority_idx").on(table.priority),
   orgIdx: index("vdr_data_request_items_org_idx").on(table.orgId),
 }));
 
