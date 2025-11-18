@@ -5,7 +5,7 @@ import { vdrFileService } from './vdr-file-service';
 import { defaultStorageProvider } from './vdr-storage-provider';
 import { storage } from './storage';
 import { z } from 'zod';
-import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs, projects, externalUsers } from '@shared/schema';
+import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs, projects, externalUsers, users, externalUserProjectAccess } from '@shared/schema';
 import { db } from './db';
 import { eq, and, desc, sql, isNotNull, inArray } from 'drizzle-orm';
 
@@ -1500,6 +1500,68 @@ router.post('/projects/:projectId/apply-data-request-template/:templateId', requ
   } catch (error: any) {
     console.error('Error applying template:', error);
     res.status(500).json({ error: 'Failed to apply template' });
+  }
+});
+
+// Bulk update data request items
+router.post('/projects/:projectId/data-requests/bulk-update', requireAuth, async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const { itemIds, updates } = req.body;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const results = await Promise.all(
+      itemIds.map(async (id: string) => {
+        return await storage.vdr.dataRequests.updateItem(id, updates, orgId);
+      })
+    );
+    res.json({ success: true, updated: results.length, items: results });
+  } catch (error: any) {
+    console.error('Error bulk updating data request items:', error);
+    res.status(500).json({ error: 'Failed to bulk update items' });
+  }
+});
+
+// Get team members for assignee selection
+router.get('/projects/:projectId/team-members', requireAuth, async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    // Get internal team members
+    const internalUsers = await db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      type: sql<string>`'internal'`,
+    }).from(users).where(eq(users.orgId, orgId));
+
+    // Get external users with access to this project
+    const externalUsersData = await db.select({
+      id: externalUsers.id,
+      name: externalUsers.name,
+      email: externalUsers.email,
+      role: externalUsers.role,
+      type: sql<string>`'external'`,
+    })
+    .from(externalUsers)
+    .innerJoin(
+      externalUserProjectAccess,
+      eq(externalUserProjectAccess.externalUserId, externalUsers.id)
+    )
+    .where(and(
+      eq(externalUserProjectAccess.projectId, projectId),
+      eq(externalUsers.orgId, orgId),
+      eq(externalUsers.isActive, true)
+    ));
+
+    res.json({
+      internal: internalUsers,
+      external: externalUsersData,
+    });
+  } catch (error: any) {
+    console.error('Error fetching team members:', error);
+    res.status(500).json({ error: 'Failed to fetch team members' });
   }
 });
 
