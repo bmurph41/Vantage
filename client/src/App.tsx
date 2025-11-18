@@ -61,6 +61,7 @@ import ShipStoreDashboard from "@/pages/operations/ship-store/Dashboard";
 import ShipStorePOS from "@/pages/operations/ship-store/POS";
 import ShipStoreInventory from "@/pages/operations/ship-store/Inventory";
 import ShipStoreTransactions from "@/pages/operations/ship-store/Transactions";
+import ShipStoreCheckout from "@/pages/operations/ship-store/Checkout";
 // Operations pages - Marketing
 import MarketingDashboard from "@/pages/operations/marketing/Dashboard";
 import MarketingCampaigns from "@/pages/operations/marketing/Campaigns";
@@ -364,6 +365,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <ShipStoreTransactions />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/ship-store/checkout">
+        {() => (
+          <UnifiedLayout>
+            <ShipStoreCheckout />
           </UnifiedLayout>
         )}
       </Route>
