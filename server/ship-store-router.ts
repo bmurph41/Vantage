@@ -106,13 +106,13 @@ router.get('/customers', async (req: Request, res: Response) => {
     const tenants = await db.select({
       id: rentRollEntries.id,
       name: rentRollEntries.tenantName,
-      email: sql<string>`NULL`,
-      type: sql<string>`'tenant'`,
+      email: sql<string>`NULL::text`,
+      type: sql<string>`'tenant'::text`,
     }).from(rentRollEntries)
       .where(
         and(
           eq(rentRollEntries.orgId, user.orgId),
-          sql`${rentRollEntries.tenantName} IS NOT NULL AND ${rentRollEntries.tenantName} != ''`
+          sql`${rentRollEntries.tenantName} IS NOT NULL AND ${rentRollEntries.tenantName} <> ''`
         )
       );
 

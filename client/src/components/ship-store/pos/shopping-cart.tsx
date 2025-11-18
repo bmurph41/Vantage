@@ -97,15 +97,16 @@ export default function ShoppingCart({
         
         // Find selected customer info
         const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+        const hasCustomer = selectedCustomerId && selectedCustomerId !== "none";
         
         const transactionData = {
           subtotal,
           tax,
           total,
           paymentMethod,
-          customerId: selectedCustomerId || null,
-          customerType: selectedCustomer?.type || null,
-          customerName: selectedCustomer?.name || null,
+          customerId: hasCustomer ? selectedCustomerId : null,
+          customerType: hasCustomer ? selectedCustomer?.type || null : null,
+          customerName: hasCustomer ? selectedCustomer?.name || null : null,
           items: items.map(item => ({
             productId: item.id,
             name: item.name,
@@ -210,7 +211,7 @@ export default function ShoppingCart({
                 <SelectValue placeholder="Select customer or leave blank" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No customer (Walk-in)</SelectItem>
+                <SelectItem value="none">No customer (Walk-in)</SelectItem>
                 {customers.map((customer) => (
                   <SelectItem key={customer.id} value={customer.id}>
                     {customer.name} {customer.type === 'tenant' ? '(Tenant)' : '(Contact)'}
