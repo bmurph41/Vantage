@@ -54,6 +54,7 @@ export interface IVdrPermissionRepository {
 
 export interface IVdrAuditRepository {
   createAuditLog(data: InsertVdrAuditLog): Promise<VdrAuditLog>;
+  logAction(data: { projectId: string; orgId: string; userId?: string; externalUserId?: string; action: string; resourceType: string; resourceId: string; metadata?: any }): Promise<VdrAuditLog>;
   getAuditLogsForDocument(documentId: string, orgId: string, limit?: number): Promise<VdrAuditLog[]>;
   getAuditLogsForProject(projectId: string, orgId: string, filters?: {
     userId?: string;
@@ -502,6 +503,38 @@ export class VdrAuditRepository implements IVdrAuditRepository {
       .values(data as any)
       .returning();
     return log;
+  }
+
+  async logAction(data: { 
+    projectId: string;
+    orgId: string;
+    userId?: string;
+    externalUserId?: string;
+    action: string;
+    resourceType: string;
+    resourceId: string;
+    metadata?: any;
+  }): Promise<VdrAuditLog> {
+    const auditData: any = {
+      orgId: data.orgId,
+      userId: data.userId || null,
+      externalUserId: data.externalUserId || null,
+      eventType: data.action,
+      ipAddress: null,
+      userAgent: null,
+      metadata: data.metadata ? JSON.stringify(data.metadata) : null,
+    };
+
+    // Map resourceType to the appropriate ID field
+    if (data.resourceType === 'document') {
+      auditData.documentId = data.resourceId;
+    } else if (data.resourceType === 'folder') {
+      auditData.folderId = data.resourceId;
+    } else if (data.resourceType === 'project') {
+      auditData.projectId = data.resourceId;
+    }
+
+    return await this.createAuditLog(auditData);
   }
 
   async getAuditLogsForDocument(documentId: string, orgId: string, limit = 100): Promise<VdrAuditLog[]> {
