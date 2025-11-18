@@ -131,8 +131,8 @@ export default function AllProjectsSummaryPage() {
   // Overall statistics
   const overallStats = useMemo(() => {
     const totalProjects = projectSummaries.length;
-    const activeProjects = projectSummaries.filter(ps => ps.completionPct < 100).length;
-    const completedProjects = projectSummaries.filter(ps => ps.completionPct === 100).length;
+    const completedProjects = projectSummaries.filter(ps => ps.project.status === 'accepted').length;
+    const activeProjects = totalProjects - completedProjects;
     const totalTasks = projectSummaries.reduce((sum, ps) => sum + ps.totalTasks, 0);
     const completedTasks = projectSummaries.reduce((sum, ps) => sum + ps.completedTasks, 0);
     const overallCompletionPct = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
