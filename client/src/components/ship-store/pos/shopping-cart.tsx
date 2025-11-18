@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -33,8 +35,19 @@ export default function ShoppingCart({
 }: ShoppingCartProps) {
   const [, setLocation] = useLocation();
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch customers (rent roll tenants + CRM contacts)
+  const { data: customers = [] } = useQuery<Array<{
+    id: string;
+    name: string;
+    email: string | null;
+    type: 'tenant' | 'contact';
+  }>>({
+    queryKey: ["/api/ship-store/customers"],
+  });
 
   const createTransactionMutation = useMutation({
     mutationFn: async (transactionData: any) => {
@@ -82,11 +95,17 @@ export default function ShoppingCart({
         // Simulate Square or other payment methods
         await new Promise(resolve => setTimeout(resolve, 2000));
         
+        // Find selected customer info
+        const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+        
         const transactionData = {
           subtotal,
           tax,
           total,
           paymentMethod,
+          customerId: selectedCustomerId || null,
+          customerType: selectedCustomer?.type || null,
+          customerName: selectedCustomer?.name || null,
           items: items.map(item => ({
             productId: item.id,
             name: item.name,
@@ -181,6 +200,26 @@ export default function ShoppingCart({
             <span data-testid="cart-total">${total.toFixed(2)}</span>
           </div>
         </div>
+
+        {/* Customer Selection */}
+        {items.length > 0 && (
+          <div className="mb-6 space-y-2">
+            <Label htmlFor="customer-select">Customer (Optional)</Label>
+            <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+              <SelectTrigger id="customer-select" data-testid="customer-select">
+                <SelectValue placeholder="Select customer or leave blank" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No customer (Walk-in)</SelectItem>
+                {customers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.name} {customer.type === 'tenant' ? '(Tenant)' : '(Contact)'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Payment Options */}
         <div className="space-y-3">

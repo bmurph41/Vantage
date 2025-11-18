@@ -3,12 +3,13 @@ import { db } from './db';
 import {
   categories, products, transactions, storeSettings,
   scenarios, assumptions, projections, historicalData, shipStoreAuditLogs,
+  rentRollEntries, crmContacts,
   type Category, type Product, type Transaction, type StoreSettings,
   type Scenario, type Assumption, type Projection, type HistoricalData, type ShipStoreAuditLog,
   insertCategorySchema, insertProductSchema, insertTransactionSchema, insertStoreSettingsSchema,
   insertScenarioSchema, insertAssumptionSchema, insertProjectionSchema, insertHistoricalDataSchema, insertShipStoreAuditLogSchema
 } from '@shared/schema';
-import { eq, desc, sql, and, gte, lte, like } from 'drizzle-orm';
+import { eq, desc, sql, and, gte, lte, like, or } from 'drizzle-orm';
 
 const router = Router();
 
@@ -80,6 +81,49 @@ router.post('/categories', requireManager, async (req: Request, res: Response) =
     res.json(category);
   } catch (error) {
     res.status(400).json({ message: 'Error creating category' });
+  }
+});
+
+// ===== CUSTOMERS =====
+
+router.get('/customers', async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    if (!user || !user.orgId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    // Fetch CRM contacts
+    const contacts = await db.select({
+      id: crmContacts.id,
+      name: sql<string>`${crmContacts.firstName} || ' ' || ${crmContacts.lastName}`,
+      email: crmContacts.email,
+      type: sql<string>`'contact'`,
+    }).from(crmContacts)
+      .where(eq(crmContacts.orgId, user.orgId));
+
+    // Fetch rent roll tenants
+    const tenants = await db.select({
+      id: rentRollEntries.id,
+      name: rentRollEntries.tenantName,
+      email: sql<string>`NULL`,
+      type: sql<string>`'tenant'`,
+    }).from(rentRollEntries)
+      .where(
+        and(
+          eq(rentRollEntries.orgId, user.orgId),
+          sql`${rentRollEntries.tenantName} IS NOT NULL AND ${rentRollEntries.tenantName} != ''`
+        )
+      );
+
+    // Combine and sort alphabetically
+    const allCustomers = [...contacts, ...tenants]
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    res.json(allCustomers);
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+    res.status(500).json({ message: 'Error fetching customers' });
   }
 });
 
