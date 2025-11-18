@@ -1,51 +1,22 @@
-import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LayoutDashboard, Box, CreditCard, BarChart3, DollarSign, Package, TrendingUp, ShoppingCart, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ShipStoreDashboard() {
-  const [shipStoreToken, setShipStoreToken] = useState<string | null>(null);
-
-  // Fetch Ship Store authentication token
-  const { data: tokenData, error: tokenError } = useQuery({
-    queryKey: ['/api/ship-store-token'],
-  });
-
-  useEffect(() => {
-    if (tokenData?.token) {
-      setShipStoreToken(tokenData.token);
-    }
-  }, [tokenData]);
-
   // Fetch Ship Store dashboard metrics
   const { data: metrics, isLoading, error } = useQuery({
     queryKey: ['/api/ship-store/dashboard/metrics'],
-    enabled: !!shipStoreToken,
   });
-
-  if (tokenError) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Authentication Error</AlertTitle>
-          <AlertDescription>
-            Failed to authenticate with Ship Store. Please try refreshing the page.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
 
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Ship Store Unavailable</AlertTitle>
+          <AlertTitle>Error Loading Dashboard</AlertTitle>
           <AlertDescription>
-            The Ship Store service is currently unavailable. Please ensure the Ship Store service is running on port 5001.
+            Failed to load Ship Store dashboard data. Please try refreshing the page.
             <br />
             <span className="text-xs">Error: {error instanceof Error ? error.message : 'Unknown error'}</span>
           </AlertDescription>
@@ -139,24 +110,17 @@ export default function ShipStoreDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5" />
-                Integration Status
+                Quick Actions
               </CardTitle>
-              <CardDescription>Ship Store service connection</CardDescription>
+              <CardDescription>Common ship store operations</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {!shipStoreToken ? (
-                <div className="flex items-center gap-2 text-amber-600">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">Connecting to Ship Store...</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-green-600">
-                  <div className="h-2 w-2 bg-green-600 rounded-full"></div>
-                  <span className="text-sm font-medium">Connected to Ship Store API</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2 text-green-600">
+                <div className="h-2 w-2 bg-green-600 rounded-full"></div>
+                <span className="text-sm font-medium">Ship Store Integrated</span>
+              </div>
               <p className="text-xs text-gray-500 mt-2">
-                Ship Store is running as a microservice on port 5001 with full audit trail and RBAC support.
+                Ship Store is integrated directly into MarinaMatch with full audit trail and role-based access control.
               </p>
             </CardContent>
           </Card>
