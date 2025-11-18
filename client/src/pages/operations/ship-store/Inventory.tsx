@@ -45,6 +45,7 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ship-store/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ship-store/dashboard/metrics"] });
       setIsAddDialogOpen(false);
       toast({
         title: "Product Created",
@@ -67,6 +68,7 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ship-store/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ship-store/dashboard/metrics"] });
       setIsEditDialogOpen(false);
       setEditingProduct(null);
       toast({
@@ -90,6 +92,7 @@ export default function Inventory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ship-store/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ship-store/dashboard/metrics"] });
       toast({
         title: "Product Deleted",
         description: "Product has been removed from inventory",
@@ -135,8 +138,8 @@ export default function Inventory() {
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     const productData = {
       ...values,
-      price: values.price,
-      cost: values.cost || "0",
+      price: parseFloat(values.price),
+      cost: parseFloat(values.cost || "0"),
       stock: parseInt(values.stock),
       lowStockThreshold: parseInt(values.lowStockThreshold || "5"),
     };
@@ -148,8 +151,8 @@ export default function Inventory() {
     
     const productData = {
       ...values,
-      price: values.price,
-      cost: values.cost || "0",
+      price: parseFloat(values.price),
+      cost: parseFloat(values.cost || "0"),
       stock: parseInt(values.stock),
       lowStockThreshold: parseInt(values.lowStockThreshold || "5"),
     };

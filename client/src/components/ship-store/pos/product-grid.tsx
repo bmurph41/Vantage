@@ -51,18 +51,18 @@ export default function ProductGrid({ products, loading, onAddToCart }: ProductG
           onClick={() => onAddToCart(product)}
           data-testid={`product-${product.sku}`}
         >
-          <CardContent className="p-3">
+          <CardContent className="p-3 flex flex-col h-full">
             <div className="aspect-square bg-muted/20 rounded-lg mb-3 flex items-center justify-center">
               <i className="fas fa-image text-muted-foreground text-2xl"></i>
             </div>
-            <h4 className="font-medium text-sm mb-1" title={product.name}>
+            <h4 className="font-medium text-sm mb-1 flex-grow" title={product.name}>
               {product.name.length > 20 ? `${product.name.slice(0, 20)}...` : product.name}
             </h4>
             <p className="text-xs text-muted-foreground mb-2">SKU: {product.sku}</p>
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-primary">${Number(product.price).toFixed(2)}</span>
+            <div className="flex items-center justify-between mt-auto">
+              <span className="font-bold text-primary text-base">${Number(product.price).toFixed(2)}</span>
               <span 
-                className={`text-xs ${
+                className={`text-xs font-medium ${
                   product.stock <= product.lowStockThreshold 
                     ? "text-destructive" 
                     : "text-muted-foreground"

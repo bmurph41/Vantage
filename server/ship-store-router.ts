@@ -1,11 +1,11 @@
 import { Router, type Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import {
-  categories, products, transactions, storeSettings,
-  scenarios, assumptions, projections, historicalData, shipStoreAuditLogs,
+  shipStoreCategories, shipStoreProducts, shipStoreTransactions, shipStoreSettings,
+  shipStoreScenarios, shipStoreAssumptions, shipStoreProjections, shipStoreHistoricalData, shipStoreAuditLogs, shipStoreProductHistory,
   rentRollEntries, crmContacts,
-  type Category, type Product, type Transaction, type StoreSettings,
-  type Scenario, type Assumption, type Projection, type HistoricalData, type ShipStoreAuditLog,
+  type ShipStoreCategory, type ShipStoreProduct, type ShipStoreTransaction, type ShipStoreSettings,
+  type ShipStoreScenario, type ShipStoreAssumption, type ShipStoreProjection, type ShipStoreHistoricalData, type ShipStoreAuditLog,
   insertCategorySchema, insertProductSchema, insertTransactionSchema, insertStoreSettingsSchema,
   insertScenarioSchema, insertAssumptionSchema, insertProjectionSchema, insertHistoricalDataSchema, insertShipStoreAuditLogSchema
 } from '@shared/schema';
@@ -58,7 +58,7 @@ async function logAudit(params: {
 
 router.get('/categories', async (req: Request, res: Response) => {
   try {
-    const result = await db.select().from(categories).orderBy(categories.name);
+    const result = await db.select().from(shipStoreCategories).orderBy(shipStoreCategories.name);
     res.json(result);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching categories' });
@@ -68,7 +68,7 @@ router.get('/categories', async (req: Request, res: Response) => {
 router.post('/categories', requireManager, async (req: Request, res: Response) => {
   try {
     const data = insertCategorySchema.parse(req.body);
-    const [category] = await db.insert(categories).values(data).returning();
+    const [category] = await db.insert(shipStoreCategories).values(data).returning();
     
     await logAudit({
       req,
@@ -114,15 +114,15 @@ router.get('/customers', async (req: Request, res: Response) => {
 router.get('/products', async (req: Request, res: Response) => {
   try {
     const categoryId = req.query.categoryId as string;
-    let query = db.select().from(products).where(eq(products.isActive, true));
+    let query = db.select().from(shipStoreProducts).where(eq(shipStoreProducts.isActive, true));
     
     if (categoryId) {
-      query = db.select().from(products).where(
-        and(eq(products.categoryId, categoryId), eq(products.isActive, true))
+      query = db.select().from(shipStoreProducts).where(
+        and(eq(shipStoreProducts.categoryId, categoryId), eq(shipStoreProducts.isActive, true))
       );
     }
     
-    const result = await query.orderBy(products.name);
+    const result = await query.orderBy(shipStoreProducts.name);
     res.json(result);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching products' });
@@ -131,14 +131,14 @@ router.get('/products', async (req: Request, res: Response) => {
 
 router.get('/products/low-stock', async (req: Request, res: Response) => {
   try {
-    const result = await db.select().from(products)
+    const result = await db.select().from(shipStoreProducts)
       .where(
         and(
-          eq(products.isActive, true),
-          sql`${products.stock} <= ${products.lowStockThreshold}`
+          eq(shipStoreProducts.isActive, true),
+          sql`${shipStoreProducts.stock} <= ${shipStoreProducts.lowStockThreshold}`
         )
       )
-      .orderBy(products.name);
+      .orderBy(shipStoreProducts.name);
     res.json(result);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching low stock products' });
@@ -147,7 +147,7 @@ router.get('/products/low-stock', async (req: Request, res: Response) => {
 
 router.get('/products/:id', async (req: Request, res: Response) => {
   try {
-    const [product] = await db.select().from(products).where(eq(products.id, req.params.id));
+    const [product] = await db.select().from(shipStoreProducts).where(eq(shipStoreProducts.id, req.params.id));
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
@@ -160,7 +160,7 @@ router.get('/products/:id', async (req: Request, res: Response) => {
 router.post('/products', requireManager, async (req: Request, res: Response) => {
   try {
     const data = insertProductSchema.parse(req.body);
-    const [product] = await db.insert(products).values(data).returning();
+    const [product] = await db.insert(shipStoreProducts).values(data).returning();
     
     await logAudit({
       req,
@@ -178,11 +178,11 @@ router.post('/products', requireManager, async (req: Request, res: Response) => 
 
 router.put('/products/:id', requireManager, async (req: Request, res: Response) => {
   try {
-    const [before] = await db.select().from(products).where(eq(products.id, req.params.id));
+    const [before] = await db.select().from(shipStoreProducts).where(eq(shipStoreProducts.id, req.params.id));
     const data = insertProductSchema.partial().parse(req.body);
-    const [product] = await db.update(products)
+    const [product] = await db.update(shipStoreProducts)
       .set(data)
-      .where(eq(products.id, req.params.id))
+      .where(eq(shipStoreProducts.id, req.params.id))
       .returning();
       
     if (!product) {
@@ -206,11 +206,11 @@ router.put('/products/:id', requireManager, async (req: Request, res: Response) 
 
 router.patch('/products/:id', requireManager, async (req: Request, res: Response) => {
   try {
-    const [before] = await db.select().from(products).where(eq(products.id, req.params.id));
+    const [before] = await db.select().from(shipStoreProducts).where(eq(shipStoreProducts.id, req.params.id));
     const data = insertProductSchema.partial().parse(req.body);
-    const [product] = await db.update(products)
+    const [product] = await db.update(shipStoreProducts)
       .set(data)
-      .where(eq(products.id, req.params.id))
+      .where(eq(shipStoreProducts.id, req.params.id))
       .returning();
       
     if (!product) {
@@ -234,8 +234,8 @@ router.patch('/products/:id', requireManager, async (req: Request, res: Response
 
 router.delete('/products/:id', requireManager, async (req: Request, res: Response) => {
   try {
-    const [before] = await db.select().from(products).where(eq(products.id, req.params.id));
-    const result = await db.delete(products).where(eq(products.id, req.params.id));
+    const [before] = await db.select().from(shipStoreProducts).where(eq(shipStoreProducts.id, req.params.id));
+    const result = await db.delete(shipStoreProducts).where(eq(shipStoreProducts.id, req.params.id));
     
     if ((result.rowCount ?? 0) === 0) {
       return res.status(404).json({ message: 'Product not found' });
@@ -262,8 +262,8 @@ router.get('/transactions', async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
     
-    const result = await db.select().from(transactions)
-      .orderBy(desc(transactions.createdAt))
+    const result = await db.select().from(shipStoreTransactions)
+      .orderBy(desc(shipStoreTransactions.createdAt))
       .limit(limit)
       .offset(offset);
     res.json(result);
@@ -274,7 +274,7 @@ router.get('/transactions', async (req: Request, res: Response) => {
 
 router.get('/transactions/count', async (req: Request, res: Response) => {
   try {
-    const [result] = await db.select({ count: sql<number>`count(*)` }).from(transactions);
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(shipStoreTransactions);
     res.json({ count: result?.count || 0 });
   } catch (error) {
     res.status(500).json({ message: 'Error counting transactions' });
@@ -284,8 +284,8 @@ router.get('/transactions/count', async (req: Request, res: Response) => {
 router.get('/transactions/recent', async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 10;
-    const result = await db.select().from(transactions)
-      .orderBy(desc(transactions.createdAt))
+    const result = await db.select().from(shipStoreTransactions)
+      .orderBy(desc(shipStoreTransactions.createdAt))
       .limit(limit);
     res.json(result);
   } catch (error) {
@@ -296,17 +296,17 @@ router.get('/transactions/recent', async (req: Request, res: Response) => {
 router.post('/transactions', async (req: Request, res: Response) => {
   try {
     const data = insertTransactionSchema.parse(req.body);
-    const [transaction] = await db.insert(transactions).values(data).returning();
+    const [transaction] = await db.insert(shipStoreTransactions).values(data).returning();
     
     // Update product stock if needed
     if (data.items && Array.isArray(data.items)) {
       for (const item of data.items) {
         if (item.productId) {
-          await db.update(products)
+          await db.update(shipStoreProducts)
             .set({
-              stock: sql`${products.stock} - ${item.quantity}`
+              stock: sql`${shipStoreProducts.stock} - ${item.quantity}`
             })
-            .where(eq(products.id, item.productId));
+            .where(eq(shipStoreProducts.id, item.productId));
         }
       }
     }
@@ -332,20 +332,20 @@ router.get('/dashboard/metrics', async (req: Request, res: Response) => {
   try {
     // Calculate basic metrics
     const [totalRevenueResult] = await db.select({
-      totalRevenue: sql<number>`COALESCE(SUM(${transactions.total}), 0)`
-    }).from(transactions);
+      totalRevenue: sql<number>`COALESCE(SUM(${shipStoreTransactions.total}), 0)`
+    }).from(shipStoreTransactions);
     
     const [transactionCountResult] = await db.select({
       count: sql<number>`count(*)`
-    }).from(transactions);
+    }).from(shipStoreTransactions);
     
     const [activeProductsResult] = await db.select({
       count: sql<number>`count(*)`
-    }).from(products).where(eq(products.isActive, true));
+    }).from(shipStoreProducts).where(eq(shipStoreProducts.isActive, true));
     
     const [inventoryValueResult] = await db.select({
-      value: sql<number>`COALESCE(SUM(${products.stock} * ${products.cost}), 0)`
-    }).from(products).where(eq(products.isActive, true));
+      value: sql<number>`COALESCE(SUM(${shipStoreProducts.stock} * ${shipStoreProducts.cost}), 0)`
+    }).from(shipStoreProducts).where(eq(shipStoreProducts.isActive, true));
     
     res.json({
       totalRevenue: totalRevenueResult?.totalRevenue || 0,
@@ -362,7 +362,7 @@ router.get('/dashboard/metrics', async (req: Request, res: Response) => {
 
 router.get('/settings', async (req: Request, res: Response) => {
   try {
-    const [settings] = await db.select().from(storeSettings).limit(1);
+    const [settings] = await db.select().from(shipStoreSettings).limit(1);
     res.json(settings || {});
   } catch (error) {
     res.status(500).json({ message: 'Error fetching settings' });
@@ -374,18 +374,18 @@ router.put('/settings', requireManager, async (req: Request, res: Response) => {
     const data = insertStoreSettingsSchema.partial().parse(req.body);
     
     // Get existing settings
-    const [existing] = await db.select().from(storeSettings).limit(1);
+    const [existing] = await db.select().from(shipStoreSettings).limit(1);
     
     let settings;
     if (existing) {
       // Update existing
-      [settings] = await db.update(storeSettings)
+      [settings] = await db.update(shipStoreSettings)
         .set(data)
-        .where(eq(storeSettings.id, existing.id))
+        .where(eq(shipStoreSettings.id, existing.id))
         .returning();
     } else {
       // Create new
-      [settings] = await db.insert(storeSettings).values(data).returning();
+      [settings] = await db.insert(shipStoreSettings).values(data).returning();
     }
     
     res.json(settings);
@@ -401,18 +401,25 @@ router.get('/analytics/sales-trends', async (req: Request, res: Response) => {
     const days = parseInt(req.query.days as string) || 30;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
+    const endDate = new Date();
 
-    const transactions = await db.select({
-      date: sql<string>`DATE(${shipStoreTransactions.createdAt})`,
-      revenue: sql<number>`SUM(CAST(${shipStoreTransactions.total} AS DECIMAL))`,
-      transactions: sql<number>`COUNT(*)`,
-    })
-    .from(shipStoreTransactions)
-    .where(gte(shipStoreTransactions.createdAt, startDate))
-    .groupBy(sql`DATE(${shipStoreTransactions.createdAt})`)
-    .orderBy(sql`DATE(${shipStoreTransactions.createdAt})`);
+    // Use date series to ensure all days are included, even with zero transactions
+    const transactions = await db.execute(sql`
+      SELECT 
+        d::date as date,
+        COALESCE(SUM(CAST(t.total AS DECIMAL)), 0) as revenue,
+        COALESCE(COUNT(t.id), 0) as transactions
+      FROM generate_series(
+        ${startDate.toISOString().split('T')[0]}::date,
+        ${endDate.toISOString().split('T')[0]}::date,
+        '1 day'::interval
+      ) d
+      LEFT JOIN ship_store_transactions t ON DATE(t.created_at) = d::date
+      GROUP BY d
+      ORDER BY d
+    `);
 
-    res.json(transactions);
+    res.json(transactions.rows);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching sales trends' });
   }
@@ -424,20 +431,22 @@ router.get('/analytics/top-products', async (req: Request, res: Response) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const topProducts = await db.select({
-      productId: shipStoreTransactionItems.productId,
-      name: shipStoreTransactionItems.name,
-      quantity: sql<number>`SUM(${shipStoreTransactionItems.quantity})`,
-      revenue: sql<number>`SUM(${shipStoreTransactionItems.price} * ${shipStoreTransactionItems.quantity})`,
-    })
-    .from(shipStoreTransactionItems)
-    .innerJoin(shipStoreTransactions, eq(shipStoreTransactionItems.transactionId, shipStoreTransactions.id))
-    .where(gte(shipStoreTransactions.createdAt, startDate))
-    .groupBy(shipStoreTransactionItems.productId, shipStoreTransactionItems.name)
-    .orderBy(desc(sql<number>`SUM(${shipStoreTransactionItems.price} * ${shipStoreTransactionItems.quantity})`))
-    .limit(10);
+    // Use PostgreSQL JSONB functions to extract and aggregate items
+    const topProducts = await db.execute(sql`
+      SELECT 
+        item->>'productId' as "productId",
+        item->>'name' as name,
+        SUM((item->>'quantity')::numeric) as quantity,
+        SUM((item->>'price')::numeric * (item->>'quantity')::numeric) as revenue
+      FROM ship_store_transactions t,
+      jsonb_array_elements(t.items) as item
+      WHERE t.created_at >= ${startDate.toISOString()}
+      GROUP BY item->>'productId', item->>'name'
+      ORDER BY revenue DESC
+      LIMIT 10
+    `);
 
-    res.json(topProducts);
+    res.json(topProducts.rows);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching top products' });
   }
@@ -449,19 +458,22 @@ router.get('/analytics/category-revenue', async (req: Request, res: Response) =>
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const categoryRevenue = await db.select({
-      name: shipStoreCategories.name,
-      value: sql<number>`SUM(${shipStoreTransactionItems.price} * ${shipStoreTransactionItems.quantity})`,
-    })
-    .from(shipStoreTransactionItems)
-    .innerJoin(shipStoreTransactions, eq(shipStoreTransactionItems.transactionId, shipStoreTransactions.id))
-    .innerJoin(shipStoreProducts, eq(shipStoreTransactionItems.productId, shipStoreProducts.id))
-    .innerJoin(shipStoreCategories, eq(shipStoreProducts.categoryId, shipStoreCategories.id))
-    .where(gte(shipStoreTransactions.createdAt, startDate))
-    .groupBy(shipStoreCategories.name)
-    .orderBy(desc(sql<number>`SUM(${shipStoreTransactionItems.price} * ${shipStoreTransactionItems.quantity})`));
+    // Use PostgreSQL JSONB functions with lateral join to get category revenue
+    const categoryRevenue = await db.execute(sql`
+      SELECT 
+        c.name,
+        SUM((item->>'price')::numeric * (item->>'quantity')::numeric) as value
+      FROM ship_store_transactions t,
+      jsonb_array_elements(t.items) as item
+      LEFT JOIN ship_store_products p ON p.id = (item->>'productId')
+      LEFT JOIN ship_store_categories c ON c.id = p.category_id
+      WHERE t.created_at >= ${startDate.toISOString()}
+        AND c.name IS NOT NULL
+      GROUP BY c.name
+      ORDER BY value DESC
+    `);
 
-    res.json(categoryRevenue);
+    res.json(categoryRevenue.rows);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching category revenue' });
   }
@@ -469,23 +481,27 @@ router.get('/analytics/category-revenue', async (req: Request, res: Response) =>
 
 router.get('/analytics/product-performance', async (req: Request, res: Response) => {
   try {
-    const productStats = await db.select({
-      id: shipStoreProducts.id,
-      name: shipStoreProducts.name,
-      sku: shipStoreProducts.sku,
-      stock: shipStoreProducts.stock,
-      categoryName: shipStoreCategories.name,
-      unitsSold: sql<number>`COALESCE(SUM(${shipStoreTransactionItems.quantity}), 0)`,
-      revenue: sql<number>`COALESCE(SUM(${shipStoreTransactionItems.price} * ${shipStoreTransactionItems.quantity}), 0)`,
-      avgPrice: sql<number>`COALESCE(AVG(${shipStoreTransactionItems.price}), 0)`,
-    })
-    .from(shipStoreProducts)
-    .leftJoin(shipStoreCategories, eq(shipStoreProducts.categoryId, shipStoreCategories.id))
-    .leftJoin(shipStoreTransactionItems, eq(shipStoreProducts.id, shipStoreTransactionItems.productId))
-    .groupBy(shipStoreProducts.id, shipStoreProducts.name, shipStoreProducts.sku, shipStoreProducts.stock, shipStoreCategories.name)
-    .orderBy(desc(sql<number>`COALESCE(SUM(${shipStoreTransactionItems.quantity}), 0)`));
+    // Use PostgreSQL JSONB functions to aggregate product performance
+    const productStats = await db.execute(sql`
+      SELECT 
+        p.id,
+        p.name,
+        p.sku,
+        p.stock,
+        c.name as "categoryName",
+        COALESCE(SUM((item->>'quantity')::numeric), 0) as "unitsSold",
+        COALESCE(SUM((item->>'price')::numeric * (item->>'quantity')::numeric), 0) as revenue,
+        COALESCE(AVG((item->>'price')::numeric), 0) as "avgPrice"
+      FROM ship_store_products p
+      LEFT JOIN ship_store_categories c ON c.id = p.category_id
+      LEFT JOIN ship_store_transactions t ON true
+      LEFT JOIN LATERAL jsonb_array_elements(t.items) as item ON (item->>'productId') = p.id
+      WHERE p.is_active = true
+      GROUP BY p.id, p.name, p.sku, p.stock, c.name
+      ORDER BY "unitsSold" DESC
+    `);
 
-    res.json(productStats);
+    res.json(productStats.rows);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching product performance' });
   }

@@ -24,7 +24,15 @@ export default function POS() {
   const queryClient = useQueryClient();
 
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["/api/ship-store/products", selectedCategory],
+    queryKey: ['/api/ship-store/products', selectedCategory || 'all'],
+    queryFn: async () => {
+      const url = selectedCategory 
+        ? `/api/ship-store/products?categoryId=${selectedCategory}`
+        : '/api/ship-store/products';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
   });
 
   const { data: categories } = useQuery({
