@@ -414,7 +414,7 @@ router.post('/folders/:folderId/documents', requireAuth, requireVdrAccess('manag
       resourceType: 'document',
       resourceId: document.id,
       metadata: { 
-        documentName: document.name,
+        documentName: document.filename,
         size: document.size,
         mimeType: document.mimeType
       }
@@ -466,7 +466,7 @@ router.get('/documents/:documentId/download', requireAuth, requireVdrAccess('dow
       action: 'document_downloaded',
       resourceType: 'document',
       resourceId: documentId,
-      metadata: { documentName: document.name }
+      metadata: { documentName: document.filename }
     });
 
     res.setHeader('Content-Type', document.mimeType);
@@ -525,7 +525,7 @@ router.patch('/documents/:documentId', requireAuth, requireVdrAccess('manage'), 
         resourceType: 'document',
         resourceId: documentId,
         metadata: { 
-          documentName: document.name,
+          documentName: document.filename,
           oldFolderId: existingDocument.folderId,
           newFolderId: validated.folderId
         }
@@ -562,7 +562,7 @@ router.delete('/documents/:documentId', requireAuth, requireVdrAccess('manage'),
       action: 'document_deleted',
       resourceType: 'document',
       resourceId: documentId,
-      metadata: { documentName: document.name }
+      metadata: { documentName: document.filename }
     });
 
     res.json({ success: true });

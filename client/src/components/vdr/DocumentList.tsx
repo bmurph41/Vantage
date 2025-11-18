@@ -406,17 +406,17 @@ export function DocumentList({
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-gray-400" />
-                      {doc.name}
+                      {doc.filename}
                     </div>
                   </TableCell>
                   <TableCell className="text-gray-600">
-                    {doc.fileType.toUpperCase()}
+                    {doc.mimeType.toUpperCase()}
                   </TableCell>
                   <TableCell className="text-gray-600">
                     {formatFileSize(doc.size)}
                   </TableCell>
                   <TableCell className="text-gray-600">
-                    {formatDate(doc.uploadedAt)}
+                    {formatDate(doc.createdAt)}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -427,14 +427,14 @@ export function DocumentList({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onClick={() => handleViewHistory(doc.id, doc.name)}
+                          onClick={() => handleViewHistory(doc.id, doc.filename)}
                           data-testid={`history-document-${doc.id}`}
                         >
                           <History className="h-4 w-4 mr-2" />
                           View History
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => handleDownload(doc.id, doc.name)}
+                          onClick={() => handleDownload(doc.id, doc.filename)}
                           data-testid={`download-document-${doc.id}`}
                         >
                           <Download className="h-4 w-4 mr-2" />
@@ -478,7 +478,7 @@ export function DocumentList({
       {historyDocument && (
         <VersionHistoryDrawer
           documentId={historyDocument.id}
-          documentName={historyDocument.name}
+          documentName={historyDocument.filename}
           folderId={folderId}
           open={historyDrawerOpen}
           onOpenChange={setHistoryDrawerOpen}

@@ -16,16 +16,16 @@ type VdrDocument = {
   id: string;
   folderId: string;
   projectId: string;
-  name: string;
-  originalName: string;
-  fileType: string;
+  filename: string;
+  originalFilename: string;
+  mimeType: string;
   size: number;
   checksum: string;
   description: string | null;
   version: number;
   orgId: string;
   uploadedBy: string;
-  uploadedAt: string;
+  createdAt: string;
 };
 
 type VdrPermission = {
