@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { TransactionsResponse } from "@/types/fuel-api";
 import { getBusinessDay, formatBusinessDay } from "@/lib/fuel-utils";
+import { AssetSelector } from "@/components/AssetSelector";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -19,9 +20,22 @@ import {
 export default function Analytics() {
   const [timeRange, setTimeRange] = useState("30");
   const [metricType, setMetricType] = useState("revenue");
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  const transactionsKey = selectedAssetId
+    ? ['/api/operations/fuel-sales', selectedAssetId]
+    : ['/api/operations/fuel-sales'];
 
   const { data: transactions = [], isLoading } = useQuery<TransactionsResponse>({
-    queryKey: ['/api/operations/fuel-sales'],
+    queryKey: transactionsKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-sales?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-sales';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      return response.json();
+    },
   });
 
   const fuelTypeColors = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))'];
@@ -108,6 +122,16 @@ export default function Analytics() {
         title="Fuel Sales Analytics"
         subtitle="Analyze sales performance, trends, and insights"
       />
+
+      <div className="px-6 pt-4 border-b border-border">
+        <div className="flex justify-end pb-4">
+          <AssetSelector 
+            value={selectedAssetId} 
+            onChange={setSelectedAssetId}
+            className="w-[280px]"
+          />
+        </div>
+      </div>
 
       <div className="p-6 space-y-6">
         {/* Analytics Controls */}

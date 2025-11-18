@@ -14,6 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import type { TransactionsResponse, TransactionWithFuelType } from "@/types/fuel-api";
 import { CalendarIcon, Download, Filter, Search, X, Upload } from "lucide-react";
 import { format } from "date-fns";
+import { AssetSelector } from "@/components/AssetSelector";
 
 export default function Transactions() {
   const [isNewSaleModalOpen, setIsNewSaleModalOpen] = useState(false);
@@ -25,13 +26,38 @@ export default function Transactions() {
   const [fuelTypeFilter, setFuelTypeFilter] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  const transactionsKey = selectedAssetId
+    ? ['/api/operations/fuel-sales', selectedAssetId]
+    : ['/api/operations/fuel-sales'];
 
   const { data: transactions = [], isLoading } = useQuery<TransactionsResponse>({
-    queryKey: ['/api/operations/fuel-sales'],
+    queryKey: transactionsKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-sales?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-sales';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      return response.json();
+    },
   });
 
+  const fuelTypesKey = selectedAssetId
+    ? ['/api/operations/fuel-types', selectedAssetId]
+    : ['/api/operations/fuel-types'];
+
   const { data: fuelTypes = [] } = useQuery({
-    queryKey: ['/api/operations/fuel-types'],
+    queryKey: fuelTypesKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-types?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-types';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch fuel types');
+      return response.json();
+    },
   });
 
   const getPaymentMethodBadge = (method: string) => {
@@ -122,6 +148,16 @@ export default function Transactions() {
         title="Sales Transactions"
         subtitle="Track and manage all fuel sales transactions"
       />
+
+      <div className="px-6 pt-4 border-b border-border">
+        <div className="flex justify-end pb-4">
+          <AssetSelector 
+            value={selectedAssetId} 
+            onChange={setSelectedAssetId}
+            className="w-[280px]"
+          />
+        </div>
+      </div>
 
       <div className="p-6 space-y-6">
         {/* Actions */}

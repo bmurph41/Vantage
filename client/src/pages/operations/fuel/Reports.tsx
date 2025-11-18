@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuickBooksExportDialog } from "@/components/fuel/quickbooks-export-dialog";
 import type { TransactionsResponse, InventoryResponse, DeliveriesResponse } from "@/types/fuel-api";
+import { AssetSelector } from "@/components/AssetSelector";
 import { 
   FileText, 
   Download, 
@@ -23,17 +24,54 @@ export default function Reports() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [showQuickBooksDialog, setShowQuickBooksDialog] = useState(false);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  const transactionsKey = selectedAssetId
+    ? ['/api/operations/fuel-sales', selectedAssetId]
+    : ['/api/operations/fuel-sales'];
 
   const { data: transactions, isLoading: transactionsLoading } = useQuery<TransactionsResponse>({
-    queryKey: ['/api/operations/fuel-sales'],
+    queryKey: transactionsKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-sales?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-sales';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      return response.json();
+    },
   });
+
+  const inventoryKey = selectedAssetId
+    ? ['/api/operations/fuel-inventory', selectedAssetId]
+    : ['/api/operations/fuel-inventory'];
 
   const { data: inventory } = useQuery<InventoryResponse>({
-    queryKey: ['/api/operations/fuel-inventory'],
+    queryKey: inventoryKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-inventory?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-inventory';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch inventory');
+      return response.json();
+    },
   });
 
+  const deliveriesKey = selectedAssetId
+    ? ['/api/operations/fuel-deliveries', selectedAssetId]
+    : ['/api/operations/fuel-deliveries'];
+
   const { data: deliveries } = useQuery<DeliveriesResponse>({
-    queryKey: ['/api/operations/fuel-deliveries'],
+    queryKey: deliveriesKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-deliveries?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-deliveries';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch deliveries');
+      return response.json();
+    },
   });
 
   // Calculate the effective date range for filtering
@@ -155,6 +193,16 @@ export default function Reports() {
         title="Fuel Sales Reports"
         subtitle="Generate and export detailed sales and inventory reports"
       />
+
+      <div className="px-6 pt-4 border-b border-border">
+        <div className="flex justify-end pb-4">
+          <AssetSelector 
+            value={selectedAssetId} 
+            onChange={setSelectedAssetId}
+            className="w-[280px]"
+          />
+        </div>
+      </div>
 
       <div className="p-6 space-y-6">
         {/* Report Configuration */}

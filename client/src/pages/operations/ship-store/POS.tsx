@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import ProductGrid from "@/components/ship-store/pos/product-grid";
 import ShoppingCart from "@/components/ship-store/pos/shopping-cart";
 import { apiRequest } from "@/lib/queryClient";
+import { AssetSelector } from "@/components/AssetSelector";
 
 interface CartItem {
   id: string;
@@ -20,15 +21,21 @@ export default function POS() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [barcodeInput, setBarcodeInput] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ['/api/ship-store/products', selectedCategory || 'all'],
+    queryKey: selectedAssetId 
+      ? ['/api/ship-store/products', selectedCategory || 'all', selectedAssetId]
+      : ['/api/ship-store/products', selectedCategory || 'all'],
     queryFn: async () => {
-      const url = selectedCategory 
+      let url = selectedCategory 
         ? `/api/ship-store/products?categoryId=${selectedCategory}`
         : '/api/ship-store/products';
+      if (selectedAssetId) {
+        url += (url.includes('?') ? '&' : '?') + `assetId=${selectedAssetId}`;
+      }
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch products');
       return response.json();
@@ -100,9 +107,16 @@ export default function POS() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold" data-testid="pos-title">Point of Sale</h2>
-        <p className="text-muted-foreground">Process customer transactions and manage cart</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold" data-testid="pos-title">Point of Sale</h2>
+          <p className="text-muted-foreground">Process customer transactions and manage cart</p>
+        </div>
+        <AssetSelector 
+          value={selectedAssetId} 
+          onChange={setSelectedAssetId}
+          className="w-[280px]"
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

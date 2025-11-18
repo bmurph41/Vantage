@@ -5,21 +5,48 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { AssetSelector } from "@/components/AssetSelector";
 
 export default function Transactions() {
   const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const limit = 20;
 
+  const queryKey = selectedAssetId
+    ? ["/api/ship-store/transactions", limit, (currentPage - 1) * limit, selectedAssetId]
+    : ["/api/ship-store/transactions", limit, (currentPage - 1) * limit];
+
   const { data: transactions, isLoading } = useQuery({
-    queryKey: ["/api/ship-store/transactions", limit, (currentPage - 1) * limit],
+    queryKey,
+    queryFn: async () => {
+      let url = `/api/ship-store/transactions?limit=${limit}&offset=${(currentPage - 1) * limit}`;
+      if (selectedAssetId) {
+        url += `&assetId=${selectedAssetId}`;
+      }
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      return response.json();
+    },
   });
 
+  const countQueryKey = selectedAssetId
+    ? ["/api/ship-store/transactions/count", selectedAssetId]
+    : ["/api/ship-store/transactions/count"];
+
   const { data: transactionCount } = useQuery({
-    queryKey: ["/api/ship-store/transactions/count"],
+    queryKey: countQueryKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/ship-store/transactions/count?assetId=${selectedAssetId}`
+        : '/api/ship-store/transactions/count';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch transaction count');
+      return response.json();
+    },
   });
 
   const totalPages = Math.ceil((transactionCount?.count || 0) / limit);
@@ -54,11 +81,18 @@ export default function Transactions() {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold" data-testid="transactions-title">Transaction History</h2>
           <p className="text-muted-foreground">Complete record of all store transactions</p>
         </div>
+        <AssetSelector 
+          value={selectedAssetId} 
+          onChange={setSelectedAssetId}
+          className="w-[280px]"
+        />
+      </div>
+      <div className="mb-6 flex justify-end">
         <div className="flex space-x-2">
           <Input
             type="date"

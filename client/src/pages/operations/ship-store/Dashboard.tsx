@@ -13,8 +13,16 @@ export default function ShipStoreDashboard() {
     ? ['/api/ship-store/dashboard/metrics', selectedAssetId]
     : ['/api/ship-store/dashboard/metrics'];
     
-  const { data: metrics, isLoading, error } = useQuery({
+  const { data: metrics, isLoading, error} = useQuery({
     queryKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/ship-store/dashboard/metrics?assetId=${selectedAssetId}`
+        : '/api/ship-store/dashboard/metrics';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch metrics');
+      return response.json();
+    },
   });
 
   if (error) {

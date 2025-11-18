@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { getBusinessDay } from "@/lib/fuel-utils";
 import type { InventoryResponse, DeliveriesResponse, TransactionsResponse } from "@/types/fuel-api";
+import { AssetSelector } from "@/components/AssetSelector";
 import { 
   Package, 
   AlertTriangle, 
@@ -28,19 +29,56 @@ export default function Inventory() {
   const [isAddDeliveryModalOpen, setIsAddDeliveryModalOpen] = useState(false);
   const [editingInventory, setEditingInventory] = useState<string | null>(null);
   const [newLevel, setNewLevel] = useState("");
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const inventoryKey = selectedAssetId
+    ? ['/api/operations/fuel-inventory', selectedAssetId]
+    : ['/api/operations/fuel-inventory'];
+
   const { data: inventory = [], isLoading: inventoryLoading } = useQuery<InventoryResponse>({
-    queryKey: ['/api/operations/fuel-inventory'],
+    queryKey: inventoryKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-inventory?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-inventory';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch inventory');
+      return response.json();
+    },
   });
+
+  const deliveriesKey = selectedAssetId
+    ? ['/api/operations/fuel-deliveries', selectedAssetId]
+    : ['/api/operations/fuel-deliveries'];
 
   const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery<DeliveriesResponse>({
-    queryKey: ['/api/operations/fuel-deliveries'],
+    queryKey: deliveriesKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-deliveries?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-deliveries';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch deliveries');
+      return response.json();
+    },
   });
 
+  const transactionsKey = selectedAssetId
+    ? ['/api/operations/fuel-sales', selectedAssetId]
+    : ['/api/operations/fuel-sales'];
+
   const { data: transactions = [] } = useQuery<TransactionsResponse>({
-    queryKey: ['/api/operations/fuel-sales'],
+    queryKey: transactionsKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-sales?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-sales';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      return response.json();
+    },
   });
 
   // Calculate consumption rates by fuel type over last 30 days using EST timezone
@@ -132,6 +170,16 @@ export default function Inventory() {
         title="Fuel Inventory Management"
         subtitle="Monitor fuel tank levels and manage inventory"
       />
+
+      <div className="px-6 pt-4 border-b border-border">
+        <div className="flex justify-end pb-4">
+          <AssetSelector 
+            value={selectedAssetId} 
+            onChange={setSelectedAssetId}
+            className="w-[280px]"
+          />
+        </div>
+      </div>
 
       <div className="p-6 space-y-6">
         {/* Action Buttons */}

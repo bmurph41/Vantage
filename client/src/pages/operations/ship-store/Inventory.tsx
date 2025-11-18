@@ -13,6 +13,7 @@ import { insertProductSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { AssetSelector } from "@/components/AssetSelector";
 
 const formSchema = insertProductSchema.extend({
   price: z.string().min(1, "Price is required"),
@@ -24,14 +25,31 @@ const formSchema = insertProductSchema.extend({
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const categoryFilter = selectedCategory === "all" ? "" : selectedCategory;
+  const queryKey = selectedAssetId 
+    ? ["/api/ship-store/products", categoryFilter, selectedAssetId]
+    : ["/api/ship-store/products", categoryFilter];
+
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["/api/ship-store/products", selectedCategory === "all" ? "" : selectedCategory],
+    queryKey,
+    queryFn: async () => {
+      let url = categoryFilter 
+        ? `/api/ship-store/products?categoryId=${categoryFilter}`
+        : '/api/ship-store/products';
+      if (selectedAssetId) {
+        url += (url.includes('?') ? '&' : '?') + `assetId=${selectedAssetId}`;
+      }
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
   });
 
   const { data: categories } = useQuery({
@@ -189,12 +207,18 @@ export default function Inventory() {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold" data-testid="inventory-title">Inventory Management</h2>
           <p className="text-muted-foreground">Manage products, categories, and stock levels</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <div className="flex items-center gap-2">
+          <AssetSelector 
+            value={selectedAssetId} 
+            onChange={setSelectedAssetId}
+            className="w-[280px]"
+          />
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button data-testid="add-product-button">
               <i className="fas fa-plus mr-2"></i>
@@ -297,6 +321,7 @@ export default function Inventory() {
             </Form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Inventory Stats */}

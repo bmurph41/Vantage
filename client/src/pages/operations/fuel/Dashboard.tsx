@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { DashboardStats, TransactionsResponse } from "@/types/fuel-api";
 import { getBusinessDay } from "@/lib/fuel-utils";
+import { AssetSelector } from "@/components/AssetSelector";
 import { 
   DollarSign, 
   Fuel, 
@@ -23,21 +24,70 @@ import {
 export default function Dashboard() {
   const [isNewSaleModalOpen, setIsNewSaleModalOpen] = useState(false);
   const [isAddDeliveryModalOpen, setIsAddDeliveryModalOpen] = useState(false);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  const statsKey = selectedAssetId
+    ? ['/api/operations/fuel-sales/stats/summary', selectedAssetId]
+    : ['/api/operations/fuel-sales/stats/summary'];
 
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
-    queryKey: ['/api/operations/fuel-sales/stats/summary'],
+    queryKey: statsKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-sales/stats/summary?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-sales/stats/summary';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      return response.json();
+    },
   });
+
+  const transactionsKey = selectedAssetId
+    ? ['/api/operations/fuel-sales', selectedAssetId]
+    : ['/api/operations/fuel-sales'];
 
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<TransactionsResponse>({
-    queryKey: ['/api/operations/fuel-sales'],
+    queryKey: transactionsKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-sales?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-sales';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      return response.json();
+    },
   });
+
+  const inventoryKey = selectedAssetId
+    ? ['/api/operations/fuel-inventory', selectedAssetId]
+    : ['/api/operations/fuel-inventory'];
 
   const { data: inventory = [] } = useQuery({
-    queryKey: ['/api/operations/fuel-inventory'],
+    queryKey: inventoryKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-inventory?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-inventory';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch inventory');
+      return response.json();
+    },
   });
 
+  const projectionsKey = selectedAssetId
+    ? ['/api/operations/fuel-projections', selectedAssetId]
+    : ['/api/operations/fuel-projections'];
+
   const { data: projections = [] } = useQuery({
-    queryKey: ['/api/operations/fuel-projections'],
+    queryKey: projectionsKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/operations/fuel-projections?assetId=${selectedAssetId}`
+        : '/api/operations/fuel-projections';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch projections');
+      return response.json();
+    },
   });
 
   // Calculate yesterday's data for comparison using EST timezone with 5pm cutoff
@@ -141,6 +191,16 @@ export default function Dashboard() {
         title="Fuel Sales Dashboard"
         subtitle="Welcome back! Here's what's happening with your fuel sales."
       />
+
+      <div className="px-6 pt-4 border-b border-border">
+        <div className="flex justify-end pb-4">
+          <AssetSelector 
+            value={selectedAssetId} 
+            onChange={setSelectedAssetId}
+            className="w-[280px]"
+          />
+        </div>
+      </div>
 
       <div className="p-6 space-y-6">
         {/* Action Buttons */}

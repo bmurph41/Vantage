@@ -4,58 +4,140 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import { AssetSelector } from "@/components/AssetSelector";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
 export default function Analytics() {
   const [dateRange, setDateRange] = useState("30");
   const [selectedProduct, setSelectedProduct] = useState("");
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  const salesTrendsKey = selectedAssetId 
+    ? ["/api/ship-store/analytics/sales-trends", dateRange, selectedAssetId]
+    : ["/api/ship-store/analytics/sales-trends", dateRange];
 
   const { data: salesTrends, isLoading: trendsLoading } = useQuery({
-    queryKey: ["/api/ship-store/analytics/sales-trends", dateRange],
+    queryKey: salesTrendsKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/ship-store/analytics/sales-trends?days=${dateRange}&assetId=${selectedAssetId}`
+        : `/api/ship-store/analytics/sales-trends?days=${dateRange}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch sales trends');
+      return response.json();
+    },
   });
+
+  const topProductsKey = selectedAssetId
+    ? ["/api/ship-store/analytics/top-products", dateRange, selectedAssetId]
+    : ["/api/ship-store/analytics/top-products", dateRange];
 
   const { data: topProducts, isLoading: topProductsLoading } = useQuery({
-    queryKey: ["/api/ship-store/analytics/top-products", dateRange],
+    queryKey: topProductsKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/ship-store/analytics/top-products?days=${dateRange}&assetId=${selectedAssetId}`
+        : `/api/ship-store/analytics/top-products?days=${dateRange}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch top products');
+      return response.json();
+    },
   });
+
+  const categoryRevenueKey = selectedAssetId
+    ? ["/api/ship-store/analytics/category-revenue", dateRange, selectedAssetId]
+    : ["/api/ship-store/analytics/category-revenue", dateRange];
 
   const { data: categoryRevenue, isLoading: categoryLoading } = useQuery({
-    queryKey: ["/api/ship-store/analytics/category-revenue", dateRange],
+    queryKey: categoryRevenueKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/ship-store/analytics/category-revenue?days=${dateRange}&assetId=${selectedAssetId}`
+        : `/api/ship-store/analytics/category-revenue?days=${dateRange}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch category revenue');
+      return response.json();
+    },
   });
+
+  const performanceKey = selectedAssetId
+    ? ["/api/ship-store/analytics/product-performance", selectedAssetId]
+    : ["/api/ship-store/analytics/product-performance"];
 
   const { data: productPerformance, isLoading: performanceLoading } = useQuery({
-    queryKey: ["/api/ship-store/analytics/product-performance"],
+    queryKey: performanceKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/ship-store/analytics/product-performance?assetId=${selectedAssetId}`
+        : '/api/ship-store/analytics/product-performance';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch product performance');
+      return response.json();
+    },
   });
+
+  const productsKey = selectedAssetId
+    ? ["/api/ship-store/products", selectedAssetId]
+    : ["/api/ship-store/products"];
 
   const { data: products } = useQuery({
-    queryKey: ["/api/ship-store/products"],
+    queryKey: productsKey,
+    queryFn: async () => {
+      const url = selectedAssetId
+        ? `/api/ship-store/products?assetId=${selectedAssetId}`
+        : '/api/ship-store/products';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
   });
 
+  const priceHistoryKey = selectedAssetId
+    ? ["/api/ship-store/analytics/price-history", selectedProduct, selectedAssetId]
+    : ["/api/ship-store/analytics/price-history", selectedProduct];
+
   const { data: priceHistory, isLoading: priceHistoryLoading } = useQuery({
-    queryKey: ["/api/ship-store/analytics/price-history", selectedProduct],
+    queryKey: priceHistoryKey,
     enabled: !!selectedProduct,
+    queryFn: async () => {
+      let url = `/api/ship-store/analytics/price-history?productId=${selectedProduct}`;
+      if (selectedAssetId) {
+        url += `&assetId=${selectedAssetId}`;
+      }
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch price history');
+      return response.json();
+    },
   });
 
   const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold" data-testid="analytics-title">Product Analytics</h2>
           <p className="text-muted-foreground">Sales trends, product performance, and pricing history</p>
         </div>
-        <Select value={dateRange} onValueChange={setDateRange}>
-          <SelectTrigger className="w-48" data-testid="date-range-filter">
-            <SelectValue placeholder="Select date range" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Last 7 Days</SelectItem>
-            <SelectItem value="30">Last 30 Days</SelectItem>
-            <SelectItem value="90">Last 90 Days</SelectItem>
-            <SelectItem value="365">Last Year</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <AssetSelector 
+            value={selectedAssetId} 
+            onChange={setSelectedAssetId}
+            className="w-[280px]"
+          />
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger className="w-48" data-testid="date-range-filter">
+              <SelectValue placeholder="Select date range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 Days</SelectItem>
+              <SelectItem value="30">Last 30 Days</SelectItem>
+              <SelectItem value="90">Last 90 Days</SelectItem>
+              <SelectItem value="365">Last Year</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Sales Trends Chart */}
