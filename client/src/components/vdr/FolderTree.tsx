@@ -47,6 +47,7 @@ type VdrFolder = {
   name: string;
   projectId: string;
   parentFolderId: string | null;
+  documentCount?: number;
   children?: VdrFolder[];
 };
 
@@ -210,7 +211,12 @@ export function FolderTree({
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <span className="text-sm flex-1 truncate">{folder.name}</span>
+                <span className="text-sm flex-1 truncate">
+                  {folder.name}
+                  {folder.documentCount !== undefined && (
+                    <span className="text-gray-500 ml-1">({folder.documentCount})</span>
+                  )}
+                </span>
               )}
             </div>
           </ContextMenuTrigger>

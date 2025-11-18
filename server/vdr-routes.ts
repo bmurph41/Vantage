@@ -120,7 +120,19 @@ router.get('/projects/:projectId/folders', requireAuth, requireVdrAccess('view')
 
   try {
     const folders = await storage.vdr.folders.getFoldersForProject(projectId, orgId);
-    res.json(folders);
+    
+    // Fetch document counts for each folder
+    const foldersWithCounts = await Promise.all(
+      folders.map(async (folder) => {
+        const documents = await storage.vdr.documents.getDocumentsForFolder(folder.id, orgId);
+        return {
+          ...folder,
+          documentCount: documents.length
+        };
+      })
+    );
+    
+    res.json(foldersWithCounts);
   } catch (error: any) {
     console.error('Error fetching folders:', error);
     res.status(500).json({ error: 'Failed to fetch folders' });
