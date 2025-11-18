@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -58,9 +58,9 @@ const fuelSalesNav = [
 // Operations Navigation - Ship Store Subcategories
 const shipStoreNav = [
   { name: "Dashboard", href: "/operations/ship-store/dashboard", icon: LayoutDashboard },
+  { name: "Point of Sale", href: "/operations/ship-store/pos", icon: CreditCard },
   { name: "Inventory", href: "/operations/ship-store/inventory", icon: Box },
-  { name: "Sales", href: "/operations/ship-store/sales", icon: CreditCard },
-  { name: "Analytics", href: "/operations/ship-store/analytics", icon: BarChart3 },
+  { name: "Transactions", href: "/operations/ship-store/transactions", icon: Receipt },
   { name: "Reports", href: "/operations/ship-store/reports", icon: FileText },
 ];
 
