@@ -5,10 +5,11 @@ import { vdrFileService } from './vdr-file-service';
 import { defaultStorageProvider } from './vdr-storage-provider';
 import { storage } from './storage';
 import { z } from 'zod';
-import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs, projects, externalUsers, users, externalUserProjectAccess, vdrDiligenceCategories, projectContacts, contacts } from '@shared/schema';
+import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs, projects, externalUsers, users, externalUserProjectAccess, vdrDiligenceCategories, vdrDueDatePresets, projectContacts, contacts } from '@shared/schema';
 import { db } from './db';
 import { eq, and, desc, sql, isNotNull, inArray } from 'drizzle-orm';
 import { ensureDefaultCategories } from './vdr-diligence-category-service';
+import { ensureDefaultDueDatePresets } from './vdr-due-date-preset-service';
 
 const router = express.Router();
 
@@ -1603,6 +1604,37 @@ router.get('/diligence-categories', requireAuth, async (req: Request, res: Respo
   } catch (error: any) {
     console.error('Error fetching diligence categories:', error);
     res.status(500).json({ error: 'Failed to fetch diligence categories' });
+  }
+});
+
+// Get due date presets for the organization
+router.get('/due-date-presets', requireAuth, async (req: Request, res: Response) => {
+  const orgId = (req.user as any).orgId;
+
+  try {
+    let presets = await db.select()
+      .from(vdrDueDatePresets)
+      .where(and(
+        eq(vdrDueDatePresets.orgId, orgId),
+        eq(vdrDueDatePresets.isActive, true)
+      ))
+      .orderBy(vdrDueDatePresets.displayOrder);
+
+    if (presets.length === 0) {
+      await ensureDefaultDueDatePresets(orgId);
+      presets = await db.select()
+        .from(vdrDueDatePresets)
+        .where(and(
+          eq(vdrDueDatePresets.orgId, orgId),
+          eq(vdrDueDatePresets.isActive, true)
+        ))
+        .orderBy(vdrDueDatePresets.displayOrder);
+    }
+
+    res.json(presets);
+  } catch (error: any) {
+    console.error('Error fetching due date presets:', error);
+    res.status(500).json({ error: 'Failed to fetch due date presets' });
   }
 });
 

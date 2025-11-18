@@ -2341,6 +2341,23 @@ export const vdrDiligenceCategories = pgTable("vdr_diligence_categories", {
   slugOrgIdx: unique("vdr_diligence_categories_slug_org_idx").on(table.slug, table.orgId),
 }));
 
+// VDR Due Date Presets - Organization-specific quick-select due date presets
+export const vdrDueDatePresets = pgTable("vdr_due_date_presets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  slug: text("slug").notNull(), // Stable identifier for default presets
+  name: text("name").notNull(), // e.g., "One Week", "Two Weeks", "One Month"
+  days: integer("days").notNull(), // Number of days to add to today
+  displayOrder: integer("display_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("vdr_due_date_presets_org_idx").on(table.orgId),
+  slugOrgIdx: unique("vdr_due_date_presets_slug_org_idx").on(table.slug, table.orgId),
+}));
+
 // VDR Data Request Items - Individual document items in a project's data request checklist
 export const vdrDataRequestItems = pgTable("vdr_data_request_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
