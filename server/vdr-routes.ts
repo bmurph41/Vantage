@@ -133,18 +133,13 @@ router.post('/projects/:projectId/folders', requireAuth, requireVdrAccess('manag
   const userId = (req.user as any).id;
 
   try {
-    const validated = insertVdrFolderSchema.parse({
-      ...req.body,
-      projectId,
-      orgId,
-      createdBy: userId
-    });
-
+    const { name, parentFolderId } = req.body;
+    
     // Check for duplicate folder name under same parent
     const existingFolders = await storage.vdr.folders.getFoldersForProject(projectId, orgId);
     const duplicate = existingFolders.find(f => 
-      f.name.toLowerCase() === validated.name.toLowerCase() && 
-      f.parentFolderId === (validated.parentFolderId || null)
+      f.name.toLowerCase() === name.toLowerCase() && 
+      f.parentFolderId === (parentFolderId || null)
     );
 
     if (duplicate) {
@@ -160,11 +155,33 @@ router.post('/projects/:projectId/folders', requireAuth, requireVdrAccess('manag
       const duplicatePath = buildPath(duplicate.id);
       return res.status(409).json({ 
         error: 'Duplicate folder name',
-        message: `A folder named "${validated.name}" already exists at this location`,
+        message: `A folder named "${name}" already exists at this location`,
         duplicateLocation: duplicatePath,
         duplicateId: duplicate.id
       });
     }
+
+    // Build the path for the new folder
+    let path = '/';
+    if (parentFolderId) {
+      const parentFolder = existingFolders.find(f => f.id === parentFolderId);
+      if (parentFolder) {
+        path = `${parentFolder.path}/${name}`;
+      } else {
+        path = `/${name}`;
+      }
+    } else {
+      path = `/${name}`;
+    }
+
+    const validated = insertVdrFolderSchema.parse({
+      name,
+      parentFolderId,
+      path,
+      projectId,
+      orgId,
+      createdBy: userId
+    });
 
     const folder = await storage.vdr.folders.createFolder(validated);
     
