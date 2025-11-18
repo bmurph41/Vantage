@@ -136,6 +136,7 @@ export default function Transactions() {
                 <tr className="border-b border-border">
                   <th className="text-left p-3 font-medium text-muted-foreground">Transaction ID</th>
                   <th className="text-left p-3 font-medium text-muted-foreground">Date & Time</th>
+                  <th className="text-left p-3 font-medium text-muted-foreground">Customer</th>
                   <th className="text-left p-3 font-medium text-muted-foreground">Items</th>
                   <th className="text-left p-3 font-medium text-muted-foreground">Subtotal</th>
                   <th className="text-left p-3 font-medium text-muted-foreground">Tax</th>
@@ -148,13 +149,13 @@ export default function Transactions() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={9} className="p-4 text-center text-muted-foreground">
+                    <td colSpan={10} className="p-4 text-center text-muted-foreground">
                       Loading transactions...
                     </td>
                   </tr>
                 ) : filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-4 text-center text-muted-foreground">
+                    <td colSpan={10} className="p-4 text-center text-muted-foreground">
                       No transactions found
                     </td>
                   </tr>
@@ -168,6 +169,18 @@ export default function Transactions() {
                       <td className="p-3 font-mono text-sm">#{transaction.id.slice(-8)}</td>
                       <td className="p-3 text-sm">
                         {new Date(transaction.createdAt).toLocaleDateString()} {new Date(transaction.createdAt).toLocaleTimeString()}
+                      </td>
+                      <td className="p-3">
+                        {transaction.customerName ? (
+                          <div>
+                            <div className="text-sm font-medium">{transaction.customerName}</div>
+                            <Badge variant="outline" className="text-xs capitalize mt-1">
+                              {transaction.customerType || "guest"}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Walk-in</span>
+                        )}
                       </td>
                       <td className="p-3">
                         <div className="text-sm">{transaction.items.length} items</div>
