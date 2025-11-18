@@ -6544,3 +6544,292 @@ export const updateExternalUserProjectAccessSchema = insertExternalUserProjectAc
 export type ExternalUserProjectAccess = typeof externalUserProjectAccess.$inferSelect;
 export type InsertExternalUserProjectAccess = z.infer<typeof insertExternalUserProjectAccessSchema>;
 export type UpdateExternalUserProjectAccess = z.infer<typeof updateExternalUserProjectAccessSchema>;
+
+// ============================================================================
+// Ship Store Module - Product Inventory and POS
+// ============================================================================
+
+export const shipStoreCategories = pgTable("ship_store_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const shipStoreProducts = pgTable("ship_store_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  sku: text("sku").notNull().unique(),
+  categoryId: varchar("category_id").references(() => shipStoreCategories.id),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  cost: decimal("cost", { precision: 10, scale: 2 }),
+  stock: integer("stock").default(0),
+  lowStockThreshold: integer("low_stock_threshold").default(5),
+  barcode: text("barcode"),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCategorySchema = createInsertSchema(shipStoreCategories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertProductSchema = createInsertSchema(shipStoreProducts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ShipStoreCategory = typeof shipStoreCategories.$inferSelect;
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
+
+export type ShipStoreProduct = typeof shipStoreProducts.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+
+export const shipStoreTransactions = pgTable("ship_store_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  tax: decimal("tax", { precision: 10, scale: 2 }).notNull(),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method").notNull(),
+  paymentIntentId: text("payment_intent_id"),
+  status: text("status").default("completed"),
+  items: jsonb("items").$type<Array<{
+    productId: string;
+    name: string;
+    price: number;
+    quantity: number;
+    sku: string;
+  }>>().notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTransactionSchema = createInsertSchema(shipStoreTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ShipStoreTransaction = typeof shipStoreTransactions.$inferSelect;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
+export const shipStoreFinancialMetrics = pgTable("ship_store_financial_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  period: text("period").notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  totalRevenue: decimal("total_revenue", { precision: 12, scale: 2 }),
+  totalTransactions: integer("total_transactions"),
+  averageOrderValue: decimal("average_order_value", { precision: 10, scale: 2 }),
+  grossMargin: decimal("gross_margin", { precision: 5, scale: 2 }),
+  operatingCosts: decimal("operating_costs", { precision: 10, scale: 2 }),
+  netProfit: decimal("net_profit", { precision: 10, scale: 2 }),
+  topCategories: jsonb("top_categories").$type<Array<{
+    categoryId: string;
+    name: string;
+    revenue: number;
+    percentage: number;
+  }>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const shipStoreSettings = pgTable("ship_store_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  storeName: text("store_name").default("Ship Store"),
+  address: text("address"),
+  phone: text("phone"),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 4 }).default("8.25"),
+  currency: text("currency").default("USD"),
+  lowStockThreshold: integer("low_stock_threshold").default(5),
+  autoSync: boolean("auto_sync").default(true),
+  emailReceipts: boolean("email_receipts").default(false),
+  lowStockAlerts: boolean("low_stock_alerts").default(true),
+  stripePublishableKey: text("stripe_publishable_key"),
+  stripeSecretKey: text("stripe_secret_key"),
+  squareApplicationId: text("square_application_id"),
+  quickbooksConnected: boolean("quickbooks_connected").default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const shipStoreScenarios = pgTable("ship_store_scenarios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  scenarioType: text("scenario_type").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const shipStoreAssumptions = pgTable("ship_store_assumptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scenarioId: varchar("scenario_id").references(() => shipStoreScenarios.id).notNull().unique(),
+  revenueGrowthRate: decimal("revenue_growth_rate", { precision: 5, scale: 2 }),
+  monthlyRevenueGrowth: decimal("monthly_revenue_growth", { precision: 5, scale: 2 }),
+  seasonalityFactors: jsonb("seasonality_factors").$type<{
+    [month: number]: number;
+  }>(),
+  cogsPercentage: decimal("cogs_percentage", { precision: 5, scale: 2 }),
+  operatingExpenseGrowth: decimal("opex_growth", { precision: 5, scale: 2 }),
+  fixedCosts: decimal("fixed_costs", { precision: 10, scale: 2 }),
+  targetGrossMargin: decimal("target_gross_margin", { precision: 5, scale: 2 }),
+  targetOperatingMargin: decimal("target_operating_margin", { precision: 5, scale: 2 }),
+  newProductLaunchImpact: jsonb("new_product_impact").$type<Array<{
+    month: number;
+    year: number;
+    revenueIncrease: number;
+    description: string;
+  }>>(),
+  categoryGrowthRates: jsonb("category_growth_rates").$type<{
+    [categoryId: string]: number;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const shipStoreProjections = pgTable("ship_store_projections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scenarioId: varchar("scenario_id").references(() => shipStoreScenarios.id).notNull(),
+  period: text("period").notNull(),
+  periodYear: integer("period_year").notNull(),
+  periodMonth: integer("period_month"),
+  periodQuarter: integer("period_quarter"),
+  projectedRevenue: decimal("projected_revenue", { precision: 12, scale: 2 }),
+  projectedCOGS: decimal("projected_cogs", { precision: 12, scale: 2 }),
+  projectedGrossProfit: decimal("projected_gross_profit", { precision: 12, scale: 2 }),
+  projectedOpex: decimal("projected_opex", { precision: 12, scale: 2 }),
+  projectedNetIncome: decimal("projected_net_income", { precision: 12, scale: 2 }),
+  grossMarginPercent: decimal("gross_margin_percent", { precision: 5, scale: 2 }),
+  operatingMarginPercent: decimal("operating_margin_percent", { precision: 5, scale: 2 }),
+  netMarginPercent: decimal("net_margin_percent", { precision: 5, scale: 2 }),
+  categoryBreakdown: jsonb("category_breakdown").$type<Array<{
+    categoryId: string;
+    categoryName: string;
+    revenue: number;
+    percentage: number;
+  }>>(),
+  calculationMetadata: jsonb("calculation_metadata").$type<{
+    basedOnHistorical: boolean;
+    dataPoints: number;
+    confidence: string;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const shipStoreHistoricalData = pgTable("ship_store_historical_data", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dataSource: text("data_source").notNull(),
+  period: text("period").notNull(),
+  periodYear: integer("period_year").notNull(),
+  periodMonth: integer("period_month"),
+  periodQuarter: integer("period_quarter"),
+  revenue: decimal("revenue", { precision: 12, scale: 2 }),
+  cogs: decimal("cogs", { precision: 12, scale: 2 }),
+  grossProfit: decimal("gross_profit", { precision: 12, scale: 2 }),
+  operatingExpenses: decimal("operating_expenses", { precision: 12, scale: 2 }),
+  netIncome: decimal("net_income", { precision: 12, scale: 2 }),
+  transactionCount: integer("transaction_count"),
+  averageOrderValue: decimal("average_order_value", { precision: 10, scale: 2 }),
+  categoryData: jsonb("category_data").$type<Array<{
+    categoryId?: string;
+    categoryName: string;
+    revenue: number;
+    units: number;
+  }>>(),
+  importMetadata: jsonb("import_metadata").$type<{
+    fileName?: string;
+    importedAt?: string;
+    mappings?: { [key: string]: string };
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const shipStoreAuditLogs = pgTable("ship_store_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
+  entityType: text("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  action: text("action").notNull(),
+  beforeData: jsonb("before_data"),
+  afterData: jsonb("after_data"),
+  changedFields: jsonb("changed_fields").$type<string[]>(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  metadata: jsonb("metadata").$type<{
+    reason?: string;
+    source?: string;
+    recordCount?: number;
+    [key: string]: any;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Insert schemas for remaining tables
+export const insertStoreSettingsSchema = createInsertSchema(shipStoreSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const insertScenarioSchema = createInsertSchema(shipStoreScenarios).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAssumptionSchema = createInsertSchema(shipStoreAssumptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProjectionSchema = createInsertSchema(shipStoreProjections).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertHistoricalDataSchema = createInsertSchema(shipStoreHistoricalData).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertShipStoreAuditLogSchema = createInsertSchema(shipStoreAuditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Types for remaining tables
+export type ShipStoreFinancialMetric = typeof shipStoreFinancialMetrics.$inferSelect;
+export type ShipStoreSettings = typeof shipStoreSettings.$inferSelect;
+export type InsertStoreSettings = z.infer<typeof insertStoreSettingsSchema>;
+export type ShipStoreScenario = typeof shipStoreScenarios.$inferSelect;
+export type InsertScenario = z.infer<typeof insertScenarioSchema>;
+export type ShipStoreAssumption = typeof shipStoreAssumptions.$inferSelect;
+export type InsertAssumption = z.infer<typeof insertAssumptionSchema>;
+export type ShipStoreProjection = typeof shipStoreProjections.$inferSelect;
+export type InsertProjection = z.infer<typeof insertProjectionSchema>;
+export type ShipStoreHistoricalData = typeof shipStoreHistoricalData.$inferSelect;
+export type InsertHistoricalData = z.infer<typeof insertHistoricalDataSchema>;
+export type ShipStoreAuditLog = typeof shipStoreAuditLogs.$inferSelect;
+export type InsertShipStoreAuditLog = z.infer<typeof insertShipStoreAuditLogSchema>;
+
+// Backward compatibility aliases for server/ship-store-router.ts
+// Note: auditLogs alias omitted to avoid conflict with main app audit logs
+export { shipStoreCategories as categories };
+export { shipStoreProducts as products };
+export { shipStoreTransactions as transactions };
+export { shipStoreSettings as storeSettings };
+export { shipStoreScenarios as scenarios };
+export { shipStoreAssumptions as assumptions };
+export { shipStoreProjections as projections };
+export { shipStoreHistoricalData as historicalData };
+
+export type Category = ShipStoreCategory;
+export type Product = ShipStoreProduct;
+export type Transaction = ShipStoreTransaction;
+export type StoreSettings = ShipStoreSettings;
+export type Scenario = ShipStoreScenario;
+export type Assumption = ShipStoreAssumption;
+export type Projection = ShipStoreProjection;
+export type HistoricalData = ShipStoreHistoricalData;

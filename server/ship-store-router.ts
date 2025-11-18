@@ -2,12 +2,12 @@ import { Router, type Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import {
   categories, products, transactions, storeSettings,
-  scenarios, assumptions, projections, historicalData, auditLogs,
+  scenarios, assumptions, projections, historicalData, shipStoreAuditLogs,
   type Category, type Product, type Transaction, type StoreSettings,
-  type Scenario, type Assumption, type Projection, type HistoricalData, type AuditLog,
+  type Scenario, type Assumption, type Projection, type HistoricalData, type ShipStoreAuditLog,
   insertCategorySchema, insertProductSchema, insertTransactionSchema, insertStoreSettingsSchema,
-  insertScenarioSchema, insertAssumptionSchema, insertProjectionSchema, insertHistoricalDataSchema
-} from '../ship-store/shared/schema';
+  insertScenarioSchema, insertAssumptionSchema, insertProjectionSchema, insertHistoricalDataSchema, insertShipStoreAuditLogSchema
+} from '@shared/schema';
 import { eq, desc, sql, and, gte, lte, like } from 'drizzle-orm';
 
 const router = Router();
@@ -42,7 +42,7 @@ async function logAudit(params: {
   metadata?: any;
 }) {
   const user = (params.req as any).user;
-  await db.insert(auditLogs).values({
+  await db.insert(shipStoreAuditLogs).values({
     userId: user?.id || 'unknown',
     entityType: params.entityType,
     entityId: params.entityId,
@@ -50,7 +50,6 @@ async function logAudit(params: {
     beforeData: params.beforeData,
     afterData: params.afterData,
     metadata: params.metadata,
-    timestamp: new Date(),
   });
 }
 
@@ -347,8 +346,8 @@ router.get('/audit-logs', requireManager, async (req: Request, res: Response) =>
     const limit = parseInt(req.query.limit as string) || 100;
     const offset = parseInt(req.query.offset as string) || 0;
     
-    const result = await db.select().from(auditLogs)
-      .orderBy(desc(auditLogs.timestamp))
+    const result = await db.select().from(shipStoreAuditLogs)
+      .orderBy(desc(shipStoreAuditLogs.createdAt))
       .limit(limit)
       .offset(offset);
     res.json(result);
@@ -360,14 +359,14 @@ router.get('/audit-logs', requireManager, async (req: Request, res: Response) =>
 router.get('/audit-logs/:entityType/:entityId', requireManager, async (req: Request, res: Response) => {
   try {
     const { entityType, entityId } = req.params;
-    const result = await db.select().from(auditLogs)
+    const result = await db.select().from(shipStoreAuditLogs)
       .where(
         and(
-          eq(auditLogs.entityType, entityType),
-          eq(auditLogs.entityId, entityId)
+          eq(shipStoreAuditLogs.entityType, entityType),
+          eq(shipStoreAuditLogs.entityId, entityId)
         )
       )
-      .orderBy(desc(auditLogs.timestamp));
+      .orderBy(desc(shipStoreAuditLogs.createdAt));
     res.json(result);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching audit logs' });
