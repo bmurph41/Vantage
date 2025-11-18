@@ -921,22 +921,17 @@ router.get('/statistics', requireAuth, async (req: Request, res: Response) => {
   const orgId = (req.user as any).orgId;
 
   try {
-    // Get all projects for the org
-    const allProjects = await storage.getProjectsForOrganization(orgId);
-    
-    // Count total documents across all projects
-    let totalDocuments = 0;
-    for (const project of allProjects) {
-      const documents = await storage.vdr.documents.getDocumentsForProject(project.id, orgId);
-      totalDocuments += documents.length;
-    }
+    // Count total documents across all projects using direct database query
+    const documentCount = await db.select({ count: sql<number>`count(*)::int` })
+      .from(vdrDocuments)
+      .where(eq(vdrDocuments.orgId, orgId));
 
-    // Count external users (active status only)
-    const activeExternalUsers = await db.select()
+    // Count external users (active only)
+    const activeExternalUsers = await db.select({ count: sql<number>`count(*)::int` })
       .from(externalUsers)
       .where(and(
         eq(externalUsers.orgId, orgId),
-        eq(externalUsers.status, 'active')
+        eq(externalUsers.isActive, true)
       ));
 
     // Count recent activity (last 24 hours)
@@ -949,8 +944,8 @@ router.get('/statistics', requireAuth, async (req: Request, res: Response) => {
       ));
 
     res.json({
-      totalDocuments,
-      externalUsers: activeExternalUsers.length,
+      totalDocuments: documentCount[0]?.count || 0,
+      externalUsers: activeExternalUsers[0]?.count || 0,
       recentActivity: recentActivity[0]?.count || 0,
     });
   } catch (error: any) {
