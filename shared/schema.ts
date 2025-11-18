@@ -77,7 +77,7 @@ export const dealOutcomeEnum = pgEnum("deal_outcome", ["won", "lost", "passed", 
 // VDR & Request Management enums
 export const vdrPermissionLevelEnum = pgEnum("vdr_permission_level", ["no_access", "view_only", "view_download", "view_download_print", "full_access"]);
 export const watermarkTypeEnum = pgEnum("watermark_type", ["static", "dynamic"]);
-export const auditEventTypeEnum = pgEnum("audit_event_type", ["view", "download", "print", "share", "edit", "delete", "permission_change", "folder_created", "folder_updated", "folder_deleted"]);
+export const auditEventTypeEnum = pgEnum("audit_event_type", ["view", "download", "print", "share", "edit", "delete", "permission_change", "folder_created", "folder_updated", "folder_deleted", "document_uploaded", "document_updated", "document_deleted"]);
 export const requestStatusEnum = pgEnum("request_status", ["pending", "in_review", "responded", "completed", "blocked"]);
 export const requestPriorityEnum = pgEnum("request_priority", ["low", "medium", "high", "critical"]);
 export const externalUserRoleEnum = pgEnum("external_user_role", ["seller", "buyer", "advisor", "auditor", "lender", "attorney", "other"]);
