@@ -83,9 +83,9 @@ export default function ShoppingCart({
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         const transactionData = {
-          subtotal: subtotal.toFixed(2),
-          tax: tax.toFixed(2),
-          total: total.toFixed(2),
+          subtotal,
+          tax,
+          total,
           paymentMethod,
           items: items.map(item => ({
             productId: item.id,
