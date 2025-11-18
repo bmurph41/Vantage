@@ -174,16 +174,22 @@ router.post('/projects/:projectId/folders', requireAuth, requireVdrAccess('manag
       path = `/${name}`;
     }
 
+    // Validate the input
     const validated = insertVdrFolderSchema.parse({
       name,
       parentFolderId,
       path,
       projectId,
-      orgId,
-      createdBy: userId
     });
 
-    const folder = await storage.vdr.folders.createFolder(validated);
+    // Add the fields that are auto-filled and omitted from schema
+    const folderData = {
+      ...validated,
+      orgId,
+      createdBy: userId
+    };
+
+    const folder = await storage.vdr.folders.createFolder(folderData as any);
     
     await storage.vdr.audit.logAction({
       projectId,
