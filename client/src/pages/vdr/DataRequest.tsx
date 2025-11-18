@@ -89,6 +89,10 @@ export default function DataRequest() {
     enabled: !!projectId,
   });
 
+  const { data: categories = [] } = useQuery<Array<{ id: string; name: string; description: string }>>({
+    queryKey: ['/api/vdr/diligence-categories'],
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       return apiRequest(`/api/vdr/projects/${projectId}/data-requests`, {
@@ -200,7 +204,7 @@ export default function DataRequest() {
     updateMutation.mutate({ id: item.id, status });
   };
 
-  const categories = Array.from(new Set(items.map(item => item.category)));
+  const usedCategories = Array.from(new Set(items.map(item => item.category)));
   
   const filteredItems = items.filter(item => {
     // Category filter
@@ -308,13 +312,18 @@ export default function DataRequest() {
                 <div className="space-y-4 py-4">
                   <div>
                     <Label htmlFor="category">Category *</Label>
-                    <Input
-                      id="category"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder="e.g., Financial, Legal, Operational"
-                      data-testid="input-category"
-                    />
+                    <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                      <SelectTrigger data-testid="select-category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.name}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label htmlFor="documentName">Document Name *</Label>
@@ -632,7 +641,7 @@ export default function DataRequest() {
             >
               All Categories
             </Button>
-            {categories.map(category => (
+            {usedCategories.map(category => (
               <Button
                 key={category}
                 variant={selectedCategory === category ? "default" : "outline"}

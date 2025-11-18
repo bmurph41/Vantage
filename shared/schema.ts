@@ -2324,6 +2324,22 @@ export const vdrDataRequestTemplates = pgTable("vdr_data_request_templates", {
   orgIdx: index("vdr_data_request_templates_org_idx").on(table.orgId),
 }));
 
+// VDR Diligence Categories - Organization-specific diligence categories
+export const vdrDiligenceCategories = pgTable("vdr_diligence_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  displayOrder: integer("display_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("vdr_diligence_categories_org_idx").on(table.orgId),
+  nameOrgIdx: unique("vdr_diligence_categories_name_org_idx").on(table.name, table.orgId),
+}));
+
 // VDR Data Request Items - Individual document items in a project's data request checklist
 export const vdrDataRequestItems = pgTable("vdr_data_request_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

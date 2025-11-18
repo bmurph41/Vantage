@@ -5,7 +5,7 @@ import { vdrFileService } from './vdr-file-service';
 import { defaultStorageProvider } from './vdr-storage-provider';
 import { storage } from './storage';
 import { z } from 'zod';
-import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs, projects, externalUsers, users, externalUserProjectAccess } from '@shared/schema';
+import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs, projects, externalUsers, users, externalUserProjectAccess, vdrDiligenceCategories, projectContacts, contacts } from '@shared/schema';
 import { db } from './db';
 import { eq, and, desc, sql, isNotNull, inArray } from 'drizzle-orm';
 
@@ -1522,19 +1522,28 @@ router.post('/projects/:projectId/data-requests/bulk-update', requireAuth, async
   }
 });
 
-// Get team members for assignee selection
+// Get team members for assignee selection (Deal Team only)
 router.get('/projects/:projectId/team-members', requireAuth, async (req: Request, res: Response) => {
   const { projectId } = req.params;
   const orgId = (req.user as any).orgId;
 
   try {
-    // Get internal team members
-    const internalUsers = await db.select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
+    // Get internal users from projectContacts who are on the deal team
+    const dealTeamContacts = await db.select({
+      id: contacts.id,
+      name: contacts.name,
+      email: contacts.email,
+      role: projectContacts.role,
+      customRole: projectContacts.customRole,
       type: sql<string>`'internal'`,
-    }).from(users).where(eq(users.orgId, orgId));
+    })
+    .from(projectContacts)
+    .innerJoin(contacts, eq(projectContacts.contactId, contacts.id))
+    .where(and(
+      eq(projectContacts.projectId, projectId),
+      eq(contacts.orgId, orgId),
+      eq(contacts.onDealTeam, true)
+    ));
 
     // Get external users with access to this project
     const externalUsersData = await db.select({
@@ -1556,12 +1565,32 @@ router.get('/projects/:projectId/team-members', requireAuth, async (req: Request
     ));
 
     res.json({
-      internal: internalUsers,
+      internal: dealTeamContacts,
       external: externalUsersData,
     });
   } catch (error: any) {
     console.error('Error fetching team members:', error);
     res.status(500).json({ error: 'Failed to fetch team members' });
+  }
+});
+
+// Get diligence categories for the organization
+router.get('/diligence-categories', requireAuth, async (req: Request, res: Response) => {
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const categories = await db.select()
+      .from(vdrDiligenceCategories)
+      .where(and(
+        eq(vdrDiligenceCategories.orgId, orgId),
+        eq(vdrDiligenceCategories.isActive, true)
+      ))
+      .orderBy(vdrDiligenceCategories.displayOrder);
+
+    res.json(categories);
+  } catch (error: any) {
+    console.error('Error fetching diligence categories:', error);
+    res.status(500).json({ error: 'Failed to fetch diligence categories' });
   }
 });
 
