@@ -81,6 +81,10 @@ export default function ShoppingCart({
         });
         const { clientSecret } = await response.json();
         
+        // Find selected customer info
+        const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+        const hasCustomer = selectedCustomerId && selectedCustomerId !== "none";
+        
         // Store cart data for checkout page
         sessionStorage.setItem("checkoutData", JSON.stringify({
           clientSecret,
@@ -88,6 +92,9 @@ export default function ShoppingCart({
           subtotal,
           tax,
           total,
+          customerId: hasCustomer ? selectedCustomerId : null,
+          customerType: hasCustomer ? selectedCustomer?.type || null : null,
+          customerName: hasCustomer ? selectedCustomer?.name || null : null,
         }));
         
         setLocation("/operations/ship-store/checkout");
