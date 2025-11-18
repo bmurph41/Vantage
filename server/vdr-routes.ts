@@ -916,6 +916,31 @@ router.get('/projects/:projectId/audit', requireAuth, async (req: Request, res: 
   }
 });
 
+// Get project statistics (folder and document counts)
+router.get('/projects/:projectId/statistics', requireAuth, async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const folders = await storage.vdr.folders.getFoldersForProject(projectId, orgId);
+    
+    // Get total document count across all folders
+    let totalDocuments = 0;
+    for (const folder of folders) {
+      const documents = await storage.vdr.documents.getDocumentsForFolder(folder.id, orgId);
+      totalDocuments += documents.length;
+    }
+
+    res.json({
+      folderCount: folders.length,
+      documentCount: totalDocuments,
+    });
+  } catch (error: any) {
+    console.error('Error fetching project statistics:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
 router.get('/projects/:projectId/analytics', requireAuth, async (req: Request, res: Response) => {
   const { projectId } = req.params;
   const orgId = (req.user as any).orgId;

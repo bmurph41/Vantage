@@ -6,6 +6,41 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FolderLock, FileText, Users, Clock, Plus } from "lucide-react";
 
+// Component to fetch and display project statistics
+function ProjectStats({ projectId }: { projectId: string }) {
+  const { data: stats, isLoading } = useQuery<{ folderCount: number; documentCount: number }>({
+    queryKey: [`/api/vdr/projects/${projectId}/statistics`],
+  });
+
+  if (isLoading) {
+    return (
+      <>
+        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+          <FolderLock className="h-3.5 w-3.5 text-gray-400" />
+          <span className="font-medium">...</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+          <FileText className="h-3.5 w-3.5 text-gray-400" />
+          <span className="font-medium">...</span>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-1.5 text-sm text-gray-600">
+        <FolderLock className="h-3.5 w-3.5 text-gray-400" />
+        <span className="font-medium">{stats?.folderCount || 0} Folders</span>
+      </div>
+      <div className="flex items-center gap-1.5 text-sm text-gray-600">
+        <FileText className="h-3.5 w-3.5 text-gray-400" />
+        <span className="font-medium">{stats?.documentCount || 0} Files</span>
+      </div>
+    </>
+  );
+}
+
 export default function VDRDashboard() {
   const { data: projects, isLoading } = useQuery({
     queryKey: ["/api/dd/projects"],
@@ -116,14 +151,7 @@ export default function VDRDashboard() {
                 </CardHeader>
                 <CardContent className="flex flex-col flex-1 justify-between space-y-4">
                   <div className="grid grid-cols-2 gap-3 py-2 px-3 bg-gray-50 rounded-md border border-gray-100">
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                      <FolderLock className="h-3.5 w-3.5 text-gray-400" />
-                      <span className="font-medium">— Folders</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                      <FileText className="h-3.5 w-3.5 text-gray-400" />
-                      <span className="font-medium">— Files</span>
-                    </div>
+                    <ProjectStats projectId={project.id} />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <Link href={`/vdr/projects/${project.id}`}>
@@ -165,14 +193,7 @@ export default function VDRDashboard() {
                 </CardHeader>
                 <CardContent className="flex flex-col flex-1 justify-between space-y-4">
                   <div className="grid grid-cols-2 gap-3 py-2 px-3 bg-gray-50 rounded-md border border-gray-100">
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                      <FolderLock className="h-3.5 w-3.5 text-gray-400" />
-                      <span className="font-medium">— Folders</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                      <FileText className="h-3.5 w-3.5 text-gray-400" />
-                      <span className="font-medium">— Files</span>
-                    </div>
+                    <ProjectStats projectId={project.id} />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <Link href={`/vdr/projects/${project.id}`}>
