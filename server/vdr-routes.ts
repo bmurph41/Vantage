@@ -337,7 +337,7 @@ router.post('/folders/:folderId/documents', requireAuth, requireVdrAccess('manag
 
     // Check for duplicate document name in same folder
     const documentName = req.body.name || req.file.originalname;
-    const existingDocuments = await storage.vdr.documents.getDocumentsByFolder(folderId, orgId);
+    const existingDocuments = await storage.vdr.documents.getDocumentsForFolder(folderId, orgId);
     const duplicate = existingDocuments.find(d => 
       d.name.toLowerCase() === documentName.toLowerCase()
     );
@@ -1129,7 +1129,7 @@ router.get('/projects/:projectId/duplicates', requireAuth, requireVdrAccess('vie
     const documentDuplicates: any[] = [];
     
     for (const folder of folders) {
-      const documents = await storage.vdr.documents.getDocumentsByFolder(folder.id, orgId);
+      const documents = await storage.vdr.documents.getDocumentsForFolder(folder.id, orgId);
       const nameMap = new Map<string, typeof documents>();
       
       documents.forEach(doc => {
