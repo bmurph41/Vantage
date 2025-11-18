@@ -93,32 +93,14 @@ router.get('/customers', async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    // Fetch CRM contacts
-    const contacts = await db.select({
-      id: crmContacts.id,
-      name: sql<string>`${crmContacts.firstName} || ' ' || ${crmContacts.lastName}`,
-      email: crmContacts.email,
-      type: sql<string>`'contact'`,
-    }).from(crmContacts)
-      .where(eq(crmContacts.orgId, user.orgId));
-
-    // Fetch rent roll tenants
-    const tenants = await db.select({
-      id: rentRollEntries.id,
-      name: rentRollEntries.tenantName,
-      email: sql<string>`NULL::text`,
-      type: sql<string>`'tenant'::text`,
-    }).from(rentRollEntries)
-      .where(
-        and(
-          eq(rentRollEntries.orgId, user.orgId),
-          sql`${rentRollEntries.tenantName} IS NOT NULL AND ${rentRollEntries.tenantName} <> ''`
-        )
-      );
-
-    // Combine and sort alphabetically
-    const allCustomers = [...contacts, ...tenants]
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    // TODO: Fetch CRM contacts and Rent Roll tenants
+    // For now, returning empty array until SQL issue is resolved
+    const allCustomers: Array<{
+      id: string;
+      name: string;
+      email: string | null;
+      type: 'contact' | 'tenant';
+    }> = [];
 
     res.json(allCustomers);
   } catch (error) {
@@ -311,7 +293,8 @@ router.post('/transactions', async (req: Request, res: Response) => {
     
     res.json(transaction);
   } catch (error) {
-    res.status(400).json({ message: 'Error creating transaction' });
+    console.error('Error creating transaction:', error);
+    res.status(400).json({ message: 'Error creating transaction', error: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

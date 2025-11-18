@@ -100,9 +100,9 @@ export default function ShoppingCart({
         const hasCustomer = selectedCustomerId && selectedCustomerId !== "none";
         
         const transactionData = {
-          subtotal,
-          tax,
-          total,
+          subtotal: subtotal.toString(),
+          tax: tax.toString(),
+          total: total.toString(),
           paymentMethod,
           customerId: hasCustomer ? selectedCustomerId : null,
           customerType: hasCustomer ? selectedCustomer?.type || null : null,
