@@ -204,6 +204,34 @@ router.put('/products/:id', requireManager, async (req: Request, res: Response) 
   }
 });
 
+router.patch('/products/:id', requireManager, async (req: Request, res: Response) => {
+  try {
+    const [before] = await db.select().from(products).where(eq(products.id, req.params.id));
+    const data = insertProductSchema.partial().parse(req.body);
+    const [product] = await db.update(products)
+      .set(data)
+      .where(eq(products.id, req.params.id))
+      .returning();
+      
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    
+    await logAudit({
+      req,
+      entityType: 'products',
+      entityId: product.id,
+      action: 'update',
+      beforeData: before,
+      afterData: product,
+    });
+    
+    res.json(product);
+  } catch (error) {
+    res.status(400).json({ message: 'Error updating product' });
+  }
+});
+
 router.delete('/products/:id', requireManager, async (req: Request, res: Response) => {
   try {
     const [before] = await db.select().from(products).where(eq(products.id, req.params.id));
