@@ -120,7 +120,7 @@ export class VdrPermissionService implements IVdrPermissionService {
       if (directPermission) {
         effectivePermission = directPermission.permissionLevel;
       } else {
-        const rootFolders = await this.vdrStorage.folders.getFoldersByProject(resourceId, orgId);
+        const rootFolders = await this.vdrStorage.folders.getFoldersForProject(resourceId, orgId);
         const rootFoldersWithoutParent = rootFolders.filter(f => !f.parentFolderId);
         
         let maxPermission: PermissionLevel = 'no_access';

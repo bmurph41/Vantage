@@ -48,6 +48,8 @@ export interface IVdrPermissionRepository {
   grantPermission(data: InsertVdrDocumentPermission): Promise<VdrDocumentPermission>;
   revokePermission(id: string, orgId: string): Promise<boolean>;
   revokePermissionsForUser(userId: string, resourceId: string, orgId: string): Promise<boolean>;
+  checkUserPermission(userId: string, resourceType: 'document' | 'folder' | 'project', resourceId: string, orgId: string, requiredLevel: string): Promise<boolean>;
+  getEffectivePermission(userId: string, resourceType: 'document' | 'folder' | 'project', resourceId: string, orgId: string): Promise<string>;
 }
 
 export interface IVdrAuditRepository {
@@ -466,6 +468,31 @@ export class VdrPermissionRepository implements IVdrPermissionRepository {
     }
     
     return result.length > 0;
+  }
+
+  async checkUserPermission(
+    userId: string,
+    resourceType: 'document' | 'folder' | 'project',
+    resourceId: string,
+    orgId: string,
+    requiredLevel: string
+  ): Promise<boolean> {
+    if (!this.permissionService) {
+      return true;
+    }
+    return await this.permissionService.checkUserPermission(userId, resourceType, resourceId, orgId, requiredLevel);
+  }
+
+  async getEffectivePermission(
+    userId: string,
+    resourceType: 'document' | 'folder' | 'project',
+    resourceId: string,
+    orgId: string
+  ): Promise<string> {
+    if (!this.permissionService) {
+      return 'full_access';
+    }
+    return await this.permissionService.getEffectivePermission(userId, resourceType, resourceId, orgId);
   }
 }
 
