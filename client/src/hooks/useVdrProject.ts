@@ -62,7 +62,14 @@ export function useVdrProject(projectId: string | undefined) {
   // Fetch permissions for a resource
   const usePermissions = (resourceType: 'project' | 'folder' | 'document', resourceId: string | undefined) => {
     return useQuery<VdrPermission[]>({
-      queryKey: [`/api/vdr/permissions/${resourceType}/${resourceId}`],
+      queryKey: [`/api/vdr/resources/${resourceId}/permissions`, resourceType],
+      queryFn: async () => {
+        const res = await fetch(`/api/vdr/resources/${resourceId}/permissions?resourceType=${resourceType}`, {
+          credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to fetch permissions');
+        return res.json();
+      },
       enabled: !!resourceId,
     });
   };

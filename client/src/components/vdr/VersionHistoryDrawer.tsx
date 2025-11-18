@@ -211,7 +211,7 @@ export function VersionHistoryDrawer({
                   <div className="col-span-2">
                     <span className="text-gray-600">Last Updated:</span>
                     <span className="ml-2 font-medium">
-                      {format(new Date(currentVersion.uploadedAt), "MMM d, yyyy HH:mm")}
+                      {currentVersion.uploadedAt ? format(new Date(currentVersion.uploadedAt), "MMM d, yyyy HH:mm") : "N/A"}
                     </span>
                   </div>
                 </div>
@@ -279,7 +279,7 @@ export function VersionHistoryDrawer({
                             </div>
                           </TableCell>
                           <TableCell className="text-sm text-gray-600">
-                            {format(new Date(version.uploadedAt), "MMM d, yyyy HH:mm")}
+                            {version.uploadedAt ? format(new Date(version.uploadedAt), "MMM d, yyyy HH:mm") : "N/A"}
                           </TableCell>
                           <TableCell className="text-sm text-gray-600">
                             {formatFileSize(version.size)}
