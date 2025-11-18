@@ -119,7 +119,7 @@ router.get('/projects/:projectId/folders', requireAuth, requireVdrAccess('view')
   const orgId = (req.user as any).orgId;
 
   try {
-    const folders = await storage.vdr.folders.getFoldersByProject(projectId, orgId);
+    const folders = await storage.vdr.folders.getFoldersForProject(projectId, orgId);
     res.json(folders);
   } catch (error: any) {
     console.error('Error fetching folders:', error);
@@ -141,7 +141,7 @@ router.post('/projects/:projectId/folders', requireAuth, requireVdrAccess('manag
     });
 
     // Check for duplicate folder name under same parent
-    const existingFolders = await storage.vdr.folders.getFoldersByProject(projectId, orgId);
+    const existingFolders = await storage.vdr.folders.getFoldersForProject(projectId, orgId);
     const duplicate = existingFolders.find(f => 
       f.name.toLowerCase() === validated.name.toLowerCase() && 
       f.parentFolderId === (validated.parentFolderId || null)
@@ -219,7 +219,7 @@ router.patch('/folders/:folderId', requireAuth, requireVdrAccess('manage'), asyn
           return res.status(404).json({ error: 'Target parent folder not found' });
         }
 
-        const allFolders = await storage.vdr.folders.getFoldersByProject(existingFolder.projectId, orgId);
+        const allFolders = await storage.vdr.folders.getFoldersForProject(existingFolder.projectId, orgId);
         const isDescendant = (checkId: string, ancestorId: string): boolean => {
           const folder = allFolders.find(f => f.id === checkId);
           if (!folder || !folder.parentFolderId) return false;
@@ -1053,7 +1053,7 @@ router.get('/projects/:projectId/duplicates', requireAuth, requireVdrAccess('vie
   const orgId = (req.user as any).orgId;
 
   try {
-    const folders = await storage.vdr.folders.getFoldersByProject(projectId, orgId);
+    const folders = await storage.vdr.folders.getFoldersForProject(projectId, orgId);
     
     // Build folder path helper
     const buildPath = (folderId: string | null): string => {
