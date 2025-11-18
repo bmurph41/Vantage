@@ -12,6 +12,10 @@ export function DocumentsWorkspace({ projectId }: DocumentsWorkspaceProps) {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const vdr = useVdrProject(projectId);
 
+  const selectedFolder = selectedFolderId 
+    ? vdr.folders?.find((f: any) => f.id === selectedFolderId)
+    : null;
+
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
       <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
@@ -35,6 +39,7 @@ export function DocumentsWorkspace({ projectId }: DocumentsWorkspaceProps) {
       <ResizablePanel defaultSize={70}>
         <DocumentList
           folderId={selectedFolderId}
+          folderName={selectedFolder?.name}
           projectId={projectId}
           uploadDocumentAsync={vdr.uploadDocumentAsync}
           onDelete={(documentId) => {

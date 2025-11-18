@@ -51,6 +51,7 @@ type VdrDocument = {
 
 type DocumentListProps = {
   folderId: string | null;
+  folderName?: string;
   projectId: string;
   uploadDocumentAsync: (params: { folderId: string; formData: FormData }) => Promise<any>;
   onDelete: (documentId: string) => void;
@@ -60,6 +61,7 @@ type DocumentListProps = {
 
 export function DocumentList({
   folderId,
+  folderName,
   projectId,
   uploadDocumentAsync,
   onDelete,
@@ -300,7 +302,7 @@ export function DocumentList({
     <div className="h-full bg-white flex flex-col">
       <div className="p-6 border-b space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Documents</h2>
+          <h2 className="text-xl font-semibold text-gray-900">{folderName || "Documents"}</h2>
           <div className="flex items-center gap-2">
             <Input
               type="file"

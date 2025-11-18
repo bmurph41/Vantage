@@ -171,7 +171,7 @@ export function FolderTree({
             <div
               className={cn(
                 "flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-gray-100 transition-colors",
-                isSelected && "bg-blue-50 hover:bg-blue-100",
+                isSelected && "bg-blue-100 hover:bg-blue-200 border-l-4 border-blue-600 font-semibold",
                 level > 0 && "ml-4"
               )}
               onClick={() => {
