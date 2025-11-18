@@ -27,7 +27,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileText, Upload, Download, Trash2, MoreVertical, FolderOpen, History, Search, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { FileText, Upload, Download, Trash2, MoreVertical, FolderOpen, History, Search, X, Eye } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { VersionHistoryDrawer } from "./VersionHistoryDrawer";
@@ -76,6 +82,8 @@ export function DocumentList({
   const [bulkUploading, setBulkUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [documentToView, setDocumentToView] = useState<{ id: string; filename: string } | null>(null);
 
   const { data: documents = [], isLoading } = useQuery<VdrDocument[]>({
     queryKey: ['/api/vdr/folders', folderId, 'documents'],
@@ -204,6 +212,11 @@ export function DocumentList({
         });
       }
     }
+  };
+
+  const handleView = (documentId: string, filename: string) => {
+    setDocumentToView({ id: documentId, filename });
+    setViewerOpen(true);
   };
 
   const handleDownload = async (documentId: string, name: string) => {
@@ -404,7 +417,11 @@ export function DocumentList({
               {displayDocuments.map((doc) => (
                 <TableRow key={doc.id} data-testid={`document-row-${doc.id}`}>
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
+                    <div 
+                      className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
+                      onClick={() => handleView(doc.id, doc.filename)}
+                      data-testid={`view-document-${doc.id}`}
+                    >
                       <FileText className="h-4 w-4 text-gray-400" />
                       {doc.filename}
                     </div>
@@ -426,6 +443,13 @@ export function DocumentList({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleView(doc.id, doc.filename)}
+                          data-testid={`view-document-${doc.id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleViewHistory(doc.id, doc.filename)}
                           data-testid={`history-document-${doc.id}`}
@@ -484,6 +508,23 @@ export function DocumentList({
           onOpenChange={setHistoryDrawerOpen}
         />
       )}
+
+      <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
+        <DialogContent className="max-w-6xl h-[90vh] p-0">
+          <DialogHeader className="p-6 pb-4 border-b">
+            <DialogTitle>{documentToView?.filename || "Document Viewer"}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 p-0 h-full">
+            {documentToView && (
+              <iframe
+                src={`/api/vdr/documents/${documentToView.id}/download`}
+                className="w-full h-[calc(90vh-80px)] border-0"
+                title={documentToView.filename}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
