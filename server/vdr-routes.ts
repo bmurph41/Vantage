@@ -5,7 +5,7 @@ import { vdrFileService } from './vdr-file-service';
 import { defaultStorageProvider } from './vdr-storage-provider';
 import { storage } from './storage';
 import { z } from 'zod';
-import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs, projects } from '@shared/schema';
+import { insertVdrFolderSchema, insertVdrDocumentSchema, insertVdrDocumentPermissionSchema, insertDiligenceRequestSchema, insertExternalUserSchema, vdrDocuments, vdrAuditLogs, projects, externalUsers } from '@shared/schema';
 import { db } from './db';
 import { eq, and, desc, sql, isNotNull, inArray } from 'drizzle-orm';
 
@@ -913,6 +913,49 @@ router.get('/projects/:projectId/audit', requireAuth, async (req: Request, res: 
   } catch (error: any) {
     console.error('Error fetching audit logs:', error);
     res.status(500).json({ error: 'Failed to fetch audit logs' });
+  }
+});
+
+// Get organization-wide VDR statistics
+router.get('/statistics', requireAuth, async (req: Request, res: Response) => {
+  const orgId = (req.user as any).orgId;
+
+  try {
+    // Get all projects for the org
+    const allProjects = await storage.getProjectsForOrganization(orgId);
+    
+    // Count total documents across all projects
+    let totalDocuments = 0;
+    for (const project of allProjects) {
+      const documents = await storage.vdr.documents.getDocumentsForProject(project.id, orgId);
+      totalDocuments += documents.length;
+    }
+
+    // Count external users (active status only)
+    const activeExternalUsers = await db.select()
+      .from(externalUsers)
+      .where(and(
+        eq(externalUsers.orgId, orgId),
+        eq(externalUsers.status, 'active')
+      ));
+
+    // Count recent activity (last 24 hours)
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentActivity = await db.select({ count: sql<number>`count(*)::int` })
+      .from(vdrAuditLogs)
+      .where(and(
+        eq(vdrAuditLogs.orgId, orgId),
+        sql`${vdrAuditLogs.timestamp} >= ${twentyFourHoursAgo}`
+      ));
+
+    res.json({
+      totalDocuments,
+      externalUsers: activeExternalUsers.length,
+      recentActivity: recentActivity[0]?.count || 0,
+    });
+  } catch (error: any) {
+    console.error('Error fetching VDR statistics:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
   }
 });
 

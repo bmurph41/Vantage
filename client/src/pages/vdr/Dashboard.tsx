@@ -46,6 +46,10 @@ export default function VDRDashboard() {
     queryKey: ["/api/dd/projects"],
   });
 
+  const { data: stats } = useQuery<{ totalDocuments: number; externalUsers: number; recentActivity: number }>({
+    queryKey: ["/api/vdr/statistics"],
+  });
+
   if (isLoading) {
     return (
       <div className="p-8 space-y-6">
@@ -92,7 +96,7 @@ export default function VDRDashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">—</div>
+            <div className="text-2xl font-bold">{stats?.totalDocuments ?? '—'}</div>
             <p className="text-xs text-muted-foreground">
               Across all projects
             </p>
@@ -104,7 +108,7 @@ export default function VDRDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">—</div>
+            <div className="text-2xl font-bold">{stats?.externalUsers ?? '—'}</div>
             <p className="text-xs text-muted-foreground">
               Stakeholder access
             </p>
@@ -116,7 +120,7 @@ export default function VDRDashboard() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">—</div>
+            <div className="text-2xl font-bold">{stats?.recentActivity ?? '—'}</div>
             <p className="text-xs text-muted-foreground">
               Last 24 hours
             </p>
