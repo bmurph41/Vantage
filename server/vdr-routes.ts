@@ -320,6 +320,25 @@ router.delete('/folders/:folderId', requireAuth, requireVdrAccess('manage'), asy
 
 const upload = multer(vdrFileService.getMulterConfig());
 
+// Get documents for a folder
+router.get('/folders/:folderId/documents', requireAuth, requireVdrAccess('view'), async (req: Request, res: Response) => {
+  const { folderId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const folder = await storage.vdr.folders.getFolder(folderId, orgId);
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    const documents = await storage.vdr.documents.getDocumentsForFolder(folderId, orgId);
+    res.json(documents);
+  } catch (error: any) {
+    console.error('Error fetching documents:', error);
+    res.status(500).json({ error: 'Failed to fetch documents' });
+  }
+});
+
 router.post('/folders/:folderId/documents', requireAuth, requireVdrAccess('manage'), upload.single('file'), async (req: Request, res: Response) => {
   const { folderId } = req.params;
   const orgId = (req.user as any).orgId;
