@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { 
   CheckCircle2, Circle, XCircle, Plus, Edit2, Trash2, Link as LinkIcon, 
-  ExternalLink, FileText, ArrowLeft, Download, Folder, AlertCircle
+  ExternalLink, FileText, ArrowLeft, Download, Folder, AlertCircle, LayoutGrid, List
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -53,6 +53,7 @@ export default function DataRequest() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DataRequestItem | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [formData, setFormData] = useState({
     category: "",
     documentName: "",
@@ -413,39 +414,227 @@ export default function DataRequest() {
           </Card>
         </div>
 
-        {/* Category Filter */}
-        <div className="flex gap-2 mb-6">
-          <Button
-            variant={selectedCategory === "all" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedCategory("all")}
-            data-testid="button-filter-all"
-          >
-            All Categories
-          </Button>
-          {categories.map(category => (
+        {/* Category Filter and View Toggle */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex gap-2">
             <Button
-              key={category}
-              variant={selectedCategory === category ? "default" : "outline"}
+              variant={selectedCategory === "all" ? "default" : "outline"}
               size="sm"
-              onClick={() => setSelectedCategory(category)}
-              data-testid={`button-filter-${category.toLowerCase().replace(/\s/g, '-')}`}
+              onClick={() => setSelectedCategory("all")}
+              data-testid="button-filter-all"
             >
-              {category}
+              All Categories
             </Button>
-          ))}
+            {categories.map(category => (
+              <Button
+                key={category}
+                variant={selectedCategory === category ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedCategory(category)}
+                data-testid={`button-filter-${category.toLowerCase().replace(/\s/g, '-')}`}
+              >
+                {category}
+              </Button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              data-testid="button-view-list"
+            >
+              <List className="w-4 h-4 mr-2" />
+              List View
+            </Button>
+            <Button
+              variant={viewMode === 'board' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('board')}
+              data-testid="button-view-board"
+            >
+              <LayoutGrid className="w-4 h-4 mr-2" />
+              Kanban Board
+            </Button>
+          </div>
         </div>
 
         {/* Document Checklist */}
         {isLoading ? (
           <div className="text-center py-12">Loading...</div>
-        ) : Object.keys(groupedItems).length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <AlertCircle className="w-12 h-12 mx-auto text-gray-400 mb-4" />
               <p className="text-gray-600">No document requests yet. Click "Add Document Request" to get started.</p>
             </CardContent>
           </Card>
+        ) : viewMode === 'board' ? (
+          <div className="grid grid-cols-4 gap-4">
+            {/* Outstanding Column */}
+            <div className="flex flex-col">
+              <div className="bg-red-50 border-2 border-red-200 rounded-t-lg p-3">
+                <h3 className="font-semibold text-red-800 flex items-center gap-2">
+                  <Circle className="w-4 h-4" />
+                  Outstanding ({filteredItems.filter(i => i.status === 'outstanding').length})
+                </h3>
+              </div>
+              <div className="bg-gray-50 border border-t-0 rounded-b-lg p-3 space-y-2 min-h-96">
+                {filteredItems.filter(i => i.status === 'outstanding').map(item => (
+                  <Card key={item.id} className="p-3 hover:shadow-md transition-shadow cursor-pointer" data-testid={`board-item-${item.id}`}>
+                    <div className="space-y-2">
+                      <div className="font-medium text-sm">{item.documentName}</div>
+                      <div className="flex gap-1 flex-wrap">
+                        {getPriorityBadge(item.priority)}
+                        {item.isInDataRoom && (
+                          <Badge variant="outline" className="text-xs">
+                            <Folder className="w-3 h-3 mr-1" />
+                            In VDR
+                          </Badge>
+                        )}
+                      </div>
+                      {(item.assigneeId || item.externalAssigneeId) && (
+                        <p className="text-xs text-gray-600 truncate">
+                          {getAssigneeName(item)}
+                        </p>
+                      )}
+                      {item.dueDate && (
+                        <p className="text-xs text-gray-500">Due: {new Date(item.dueDate).toLocaleDateString()}</p>
+                      )}
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} className="h-7 text-xs">
+                          <Edit2 className="w-3 h-3" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleStatusChange(item, 'in_progress')}
+                          className="h-7 text-xs flex-1"
+                        >
+                          Start
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* In Progress Column */}
+            <div className="flex flex-col">
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-t-lg p-3">
+                <h3 className="font-semibold text-blue-800 flex items-center gap-2">
+                  <Circle className="w-4 h-4" />
+                  In Progress ({filteredItems.filter(i => i.status === 'in_progress').length})
+                </h3>
+              </div>
+              <div className="bg-gray-50 border border-t-0 rounded-b-lg p-3 space-y-2 min-h-96">
+                {filteredItems.filter(i => i.status === 'in_progress').map(item => (
+                  <Card key={item.id} className="p-3 hover:shadow-md transition-shadow cursor-pointer" data-testid={`board-item-${item.id}`}>
+                    <div className="space-y-2">
+                      <div className="font-medium text-sm">{item.documentName}</div>
+                      <div className="flex gap-1 flex-wrap">
+                        {getPriorityBadge(item.priority)}
+                        {item.isInDataRoom && (
+                          <Badge variant="outline" className="text-xs">
+                            <Folder className="w-3 h-3 mr-1" />
+                            In VDR
+                          </Badge>
+                        )}
+                      </div>
+                      {(item.assigneeId || item.externalAssigneeId) && (
+                        <p className="text-xs text-gray-600 truncate">
+                          {getAssigneeName(item)}
+                        </p>
+                      )}
+                      {item.dueDate && (
+                        <p className="text-xs text-gray-500">Due: {new Date(item.dueDate).toLocaleDateString()}</p>
+                      )}
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} className="h-7 text-xs">
+                          <Edit2 className="w-3 h-3" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleStatusChange(item, 'received')}
+                          className="h-7 text-xs flex-1"
+                        >
+                          Complete
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* Received Column */}
+            <div className="flex flex-col">
+              <div className="bg-green-50 border-2 border-green-200 rounded-t-lg p-3">
+                <h3 className="font-semibold text-green-800 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Received ({filteredItems.filter(i => i.status === 'received').length})
+                </h3>
+              </div>
+              <div className="bg-gray-50 border border-t-0 rounded-b-lg p-3 space-y-2 min-h-96">
+                {filteredItems.filter(i => i.status === 'received').map(item => (
+                  <Card key={item.id} className="p-3 hover:shadow-md transition-shadow cursor-pointer" data-testid={`board-item-${item.id}`}>
+                    <div className="space-y-2">
+                      <div className="font-medium text-sm">{item.documentName}</div>
+                      <div className="flex gap-1 flex-wrap">
+                        {getPriorityBadge(item.priority)}
+                        {item.isInDataRoom && (
+                          <Badge variant="outline" className="text-xs">
+                            <Folder className="w-3 h-3 mr-1" />
+                            In VDR
+                          </Badge>
+                        )}
+                      </div>
+                      {(item.assigneeId || item.externalAssigneeId) && (
+                        <p className="text-xs text-gray-600 truncate">
+                          {getAssigneeName(item)}
+                        </p>
+                      )}
+                      {item.receivedDate && (
+                        <p className="text-xs text-gray-500">Received: {new Date(item.receivedDate).toLocaleDateString()}</p>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} className="h-7 text-xs w-full">
+                        <Edit2 className="w-3 h-3 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* N/A Column */}
+            <div className="flex flex-col">
+              <div className="bg-gray-100 border-2 border-gray-300 rounded-t-lg p-3">
+                <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                  <XCircle className="w-4 h-4" />
+                  N/A ({filteredItems.filter(i => i.status === 'n_a').length})
+                </h3>
+              </div>
+              <div className="bg-gray-50 border border-t-0 rounded-b-lg p-3 space-y-2 min-h-96">
+                {filteredItems.filter(i => i.status === 'n_a').map(item => (
+                  <Card key={item.id} className="p-3 hover:shadow-md transition-shadow cursor-pointer opacity-60" data-testid={`board-item-${item.id}`}>
+                    <div className="space-y-2">
+                      <div className="font-medium text-sm">{item.documentName}</div>
+                      <div className="flex gap-1 flex-wrap">
+                        {getPriorityBadge(item.priority)}
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} className="h-7 text-xs w-full">
+                        <Edit2 className="w-3 h-3 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : (
           Object.entries(groupedItems).map(([category, categoryItems]) => (
             <Card key={category} className="mb-6">
