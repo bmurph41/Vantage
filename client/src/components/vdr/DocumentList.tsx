@@ -84,6 +84,8 @@ export function DocumentList({
   const [isSearching, setIsSearching] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [documentToView, setDocumentToView] = useState<{ id: string; filename: string } | null>(null);
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null);
+  const [isLoadingDocument, setIsLoadingDocument] = useState(false);
 
   const { data: documents = [], isLoading } = useQuery<VdrDocument[]>({
     queryKey: ['/api/vdr/folders', folderId, 'documents'],
@@ -214,9 +216,34 @@ export function DocumentList({
     }
   };
 
-  const handleView = (documentId: string, filename: string) => {
+  const handleView = async (documentId: string, filename: string) => {
     setDocumentToView({ id: documentId, filename });
     setViewerOpen(true);
+    setIsLoadingDocument(true);
+
+    try {
+      const response = await fetch(`/api/vdr/documents/${documentId}/download`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load document");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      setDocumentUrl(url);
+    } catch (error) {
+      console.error("Error loading document:", error);
+      toast({
+        title: "Failed to load document",
+        description: "Could not load the document for viewing",
+        variant: "destructive",
+      });
+      setViewerOpen(false);
+    } finally {
+      setIsLoadingDocument(false);
+    }
   };
 
   const handleDownload = async (documentId: string, name: string) => {
@@ -509,19 +536,36 @@ export function DocumentList({
         />
       )}
 
-      <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
+      <Dialog 
+        open={viewerOpen} 
+        onOpenChange={(open) => {
+          setViewerOpen(open);
+          if (!open && documentUrl) {
+            window.URL.revokeObjectURL(documentUrl);
+            setDocumentUrl(null);
+            setDocumentToView(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-6xl h-[90vh] p-0">
           <DialogHeader className="p-6 pb-4 border-b">
             <DialogTitle>{documentToView?.filename || "Document Viewer"}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 p-0 h-full">
-            {documentToView && (
+            {isLoadingDocument ? (
+              <div className="flex items-center justify-center h-[calc(90vh-80px)]">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading document...</p>
+                </div>
+              </div>
+            ) : documentUrl ? (
               <iframe
-                src={`/api/vdr/documents/${documentToView.id}/download`}
+                src={documentUrl}
                 className="w-full h-[calc(90vh-80px)] border-0"
-                title={documentToView.filename}
+                title={documentToView?.filename || "Document"}
               />
-            )}
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
