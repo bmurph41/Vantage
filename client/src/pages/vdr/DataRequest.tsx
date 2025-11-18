@@ -10,9 +10,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   CheckCircle2, Circle, XCircle, Plus, Edit2, Trash2, Link as LinkIcon, 
-  ExternalLink, FileText, ArrowLeft, Download, Folder, AlertCircle, LayoutGrid, List
+  ExternalLink, FileText, ArrowLeft, Download, Folder, AlertCircle, LayoutGrid, List,
+  Filter, CheckSquare, Square, Users, Flag, Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -54,6 +56,10 @@ export default function DataRequest() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DataRequestItem | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [filterAssignee, setFilterAssignee] = useState<string>("all");
+  const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [formData, setFormData] = useState({
     category: "",
     documentName: "",
@@ -137,6 +143,20 @@ export default function DataRequest() {
     },
   });
 
+  const bulkUpdateMutation = useMutation({
+    mutationFn: async (updates: any) => {
+      return apiRequest(`/api/vdr/projects/${projectId}/data-requests/bulk-update`, {
+        method: 'POST',
+        body: JSON.stringify({ itemIds: selectedItems, updates }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vdr/projects', projectId, 'data-requests'] });
+      setSelectedItems([]);
+      toast({ title: "Success", description: "Items updated successfully" });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       category: "",
@@ -181,9 +201,26 @@ export default function DataRequest() {
   };
 
   const categories = Array.from(new Set(items.map(item => item.category)));
-  const filteredItems = selectedCategory === "all" 
-    ? items 
-    : items.filter(item => item.category === selectedCategory);
+  
+  const filteredItems = items.filter(item => {
+    // Category filter
+    if (selectedCategory !== "all" && item.category !== selectedCategory) return false;
+    
+    // Assignee filter
+    if (filterAssignee !== "all") {
+      if (filterAssignee === "unassigned" && (item.assigneeId || item.externalAssigneeId)) return false;
+      if (filterAssignee.startsWith("internal:") && item.assigneeId !== filterAssignee.replace("internal:", "")) return false;
+      if (filterAssignee.startsWith("external:") && item.externalAssigneeId !== filterAssignee.replace("external:", "")) return false;
+    }
+    
+    // Priority filter
+    if (filterPriority !== "all" && item.priority !== filterPriority) return false;
+    
+    // Status filter
+    if (filterStatus !== "all" && item.status !== filterStatus) return false;
+    
+    return true;
+  });
 
   const groupedItems = filteredItems.reduce((acc, item) => {
     if (!acc[item.category]) {
@@ -412,6 +449,176 @@ export default function DataRequest() {
               <div className="text-sm text-gray-600">N/A</div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Filter Toolbar */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <Select value={filterAssignee} onValueChange={setFilterAssignee}>
+                <SelectTrigger className="w-48" data-testid="filter-assignee">
+                  <SelectValue placeholder="Filter by assignee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Assignees</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {teamMembers?.internal && teamMembers.internal.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Internal Team</div>
+                      {teamMembers.internal.map(member => (
+                        <SelectItem key={member.id} value={`internal:${member.id}`}>
+                          {member.name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {teamMembers?.external && teamMembers.external.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">External Users</div>
+                      {teamMembers.external.map(member => (
+                        <SelectItem key={member.id} value={`external:${member.id}`}>
+                          {member.name} ({member.role})
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+              <Select value={filterPriority} onValueChange={setFilterPriority}>
+                <SelectTrigger className="w-40" data-testid="filter-priority">
+                  <SelectValue placeholder="Filter by priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priorities</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-40" data-testid="filter-status">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="outstanding">Outstanding</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="received">Received</SelectItem>
+                  <SelectItem value="n_a">N/A</SelectItem>
+                </SelectContent>
+              </Select>
+              {(filterAssignee !== "all" || filterPriority !== "all" || filterStatus !== "all") && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setFilterAssignee("all");
+                    setFilterPriority("all");
+                    setFilterStatus("all");
+                  }}
+                  data-testid="button-clear-filters"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+            {selectedItems.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">{selectedItems.length} selected</span>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid="button-bulk-assign">
+                      <Users className="w-4 h-4 mr-2" />
+                      Assign
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Bulk Assign</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Label>Assign to</Label>
+                      <Select 
+                        onValueChange={(value) => {
+                          if (value === "unassigned") {
+                            bulkUpdateMutation.mutate({ assigneeId: null, externalAssigneeId: null });
+                          } else if (value.startsWith("internal:")) {
+                            bulkUpdateMutation.mutate({ assigneeId: value.replace("internal:", ""), externalAssigneeId: null });
+                          } else if (value.startsWith("external:")) {
+                            bulkUpdateMutation.mutate({ assigneeId: null, externalAssigneeId: value.replace("external:", "") });
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select assignee" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {teamMembers?.internal && teamMembers.internal.length > 0 && (
+                            <>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Internal Team</div>
+                              {teamMembers.internal.map(member => (
+                                <SelectItem key={member.id} value={`internal:${member.id}`}>
+                                  {member.name}
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
+                          {teamMembers?.external && teamMembers.external.length > 0 && (
+                            <>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">External Users</div>
+                              {teamMembers.external.map(member => (
+                                <SelectItem key={member.id} value={`external:${member.id}`}>
+                                  {member.name}
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid="button-bulk-priority">
+                      <Flag className="w-4 h-4 mr-2" />
+                      Set Priority
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Bulk Set Priority</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Label>Priority</Label>
+                      <Select onValueChange={(value) => bulkUpdateMutation.mutate({ priority: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setSelectedItems([])}
+                  data-testid="button-clear-selection"
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Category Filter and View Toggle */}
@@ -645,7 +852,18 @@ export default function DataRequest() {
               <CardContent>
                 <div className="space-y-3">
                   {categoryItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50" data-testid={`item-${item.id}`}>
+                    <div key={item.id} className="flex items-center gap-3 p-4 border rounded-lg hover:bg-gray-50" data-testid={`item-${item.id}`}>
+                      <Checkbox
+                        checked={selectedItems.includes(item.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedItems([...selectedItems, item.id]);
+                          } else {
+                            setSelectedItems(selectedItems.filter(id => id !== item.id));
+                          }
+                        }}
+                        data-testid={`checkbox-${item.id}`}
+                      />
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <div className="font-medium">{item.documentName}</div>
