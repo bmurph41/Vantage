@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-type DataRequestStatus = 'outstanding' | 'received' | 'n_a';
+type DataRequestStatus = 'outstanding' | 'in_progress' | 'received' | 'n_a';
+type DataRequestPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 interface DataRequestItem {
   id: string;
@@ -26,6 +27,9 @@ interface DataRequestItem {
   description: string | null;
   displayOrder: number;
   status: DataRequestStatus;
+  priority: DataRequestPriority;
+  assigneeId: string | null;
+  externalAssigneeId: string | null;
   linkedDocumentId: string | null;
   isInDataRoom: boolean;
   notes: string | null;
@@ -33,6 +37,14 @@ interface DataRequestItem {
   receivedDate: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  type: 'internal' | 'external';
+  role?: string;
 }
 
 export default function DataRequest() {
@@ -46,6 +58,9 @@ export default function DataRequest() {
     documentName: "",
     description: "",
     dueDate: "",
+    priority: "medium" as DataRequestPriority,
+    assigneeId: "",
+    externalAssigneeId: "",
   });
 
   const { data: project } = useQuery<any>({
@@ -59,6 +74,11 @@ export default function DataRequest() {
 
   const { data: documents = [] } = useQuery<any[]>({
     queryKey: ['/api/vdr/projects', projectId, 'documents'],
+    enabled: !!projectId,
+  });
+
+  const { data: teamMembers } = useQuery<{ internal: TeamMember[]; external: TeamMember[] }>({
+    queryKey: ['/api/vdr/projects', projectId, 'team-members'],
     enabled: !!projectId,
   });
 
@@ -122,6 +142,9 @@ export default function DataRequest() {
       documentName: "",
       description: "",
       dueDate: "",
+      priority: "medium",
+      assigneeId: "",
+      externalAssigneeId: "",
     });
   };
 
@@ -145,6 +168,9 @@ export default function DataRequest() {
       documentName: item.documentName,
       description: item.description || "",
       dueDate: item.dueDate || "",
+      priority: item.priority || "medium",
+      assigneeId: item.assigneeId || "",
+      externalAssigneeId: item.externalAssigneeId || "",
     });
     setIsAddDialogOpen(true);
   };
@@ -169,6 +195,7 @@ export default function DataRequest() {
   const stats = {
     total: items.length,
     received: items.filter(i => i.status === 'received').length,
+    inProgress: items.filter(i => i.status === 'in_progress').length,
     outstanding: items.filter(i => i.status === 'outstanding').length,
     na: items.filter(i => i.status === 'n_a').length,
   };
@@ -177,11 +204,38 @@ export default function DataRequest() {
     switch (status) {
       case 'received':
         return <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="w-3 h-3 mr-1" />Received</Badge>;
+      case 'in_progress':
+        return <Badge className="bg-blue-500 hover:bg-blue-600"><Circle className="w-3 h-3 mr-1" />In Progress</Badge>;
       case 'outstanding':
         return <Badge variant="destructive"><Circle className="w-3 h-3 mr-1" />Outstanding</Badge>;
       case 'n_a':
         return <Badge variant="secondary"><XCircle className="w-3 h-3 mr-1" />N/A</Badge>;
     }
+  };
+
+  const getPriorityBadge = (priority: DataRequestPriority) => {
+    switch (priority) {
+      case 'urgent':
+        return <Badge className="bg-red-600 hover:bg-red-700 text-white">Urgent</Badge>;
+      case 'high':
+        return <Badge className="bg-orange-500 hover:bg-orange-600 text-white">High</Badge>;
+      case 'medium':
+        return <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Medium</Badge>;
+      case 'low':
+        return <Badge className="bg-gray-400 hover:bg-gray-500 text-white">Low</Badge>;
+    }
+  };
+
+  const getAssigneeName = (item: DataRequestItem) => {
+    if (item.assigneeId && teamMembers?.internal) {
+      const assignee = teamMembers.internal.find(u => u.id === item.assigneeId);
+      return assignee?.name || 'Unknown';
+    }
+    if (item.externalAssigneeId && teamMembers?.external) {
+      const assignee = teamMembers.external.find(u => u.id === item.externalAssigneeId);
+      return assignee ? `${assignee.name} (${assignee.role || 'External'})` : 'Unknown';
+    }
+    return 'Unassigned';
   };
 
   return (
@@ -255,6 +309,62 @@ export default function DataRequest() {
                       data-testid="input-due-date"
                     />
                   </div>
+                  <div>
+                    <Label htmlFor="priority">Priority</Label>
+                    <Select value={formData.priority} onValueChange={(value: DataRequestPriority) => setFormData({ ...formData, priority: value })}>
+                      <SelectTrigger data-testid="select-priority">
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="assignee">Assignee</Label>
+                    <Select 
+                      value={formData.assigneeId || formData.externalAssigneeId || "unassigned"} 
+                      onValueChange={(value) => {
+                        if (value === "unassigned") {
+                          setFormData({ ...formData, assigneeId: "", externalAssigneeId: "" });
+                        } else if (value.startsWith("internal:")) {
+                          setFormData({ ...formData, assigneeId: value.replace("internal:", ""), externalAssigneeId: "" });
+                        } else if (value.startsWith("external:")) {
+                          setFormData({ ...formData, assigneeId: "", externalAssigneeId: value.replace("external:", "") });
+                        }
+                      }}
+                    >
+                      <SelectTrigger data-testid="select-assignee">
+                        <SelectValue placeholder="Select assignee" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {teamMembers?.internal && teamMembers.internal.length > 0 && (
+                          <>
+                            <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Internal Team</div>
+                            {teamMembers.internal.map(member => (
+                              <SelectItem key={member.id} value={`internal:${member.id}`}>
+                                {member.name} ({member.email})
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                        {teamMembers?.external && teamMembers.external.length > 0 && (
+                          <>
+                            <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">External Users</div>
+                            {teamMembers.external.map(member => (
+                              <SelectItem key={member.id} value={`external:${member.id}`}>
+                                {member.name} - {member.role || 'External'} ({member.email})
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} data-testid="button-cancel">Cancel</Button>
@@ -270,7 +380,7 @@ export default function DataRequest() {
 
       {/* Stats */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold">{stats.total}</div>
@@ -281,6 +391,12 @@ export default function DataRequest() {
             <CardContent className="pt-6">
               <div className="text-2xl font-bold text-green-600">{stats.received}</div>
               <div className="text-sm text-gray-600">Received</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-600">{stats.inProgress}</div>
+              <div className="text-sm text-gray-600">In Progress</div>
             </CardContent>
           </Card>
           <Card>
@@ -342,9 +458,10 @@ export default function DataRequest() {
                   {categoryItems.map((item) => (
                     <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50" data-testid={`item-${item.id}`}>
                       <div className="flex-1">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 mb-2">
                           <div className="font-medium">{item.documentName}</div>
                           {getStatusBadge(item.status)}
+                          {getPriorityBadge(item.priority)}
                           {item.isInDataRoom && (
                             <Badge variant="outline" className="text-blue-600 border-blue-600">
                               <Folder className="w-3 h-3 mr-1" />
@@ -355,17 +472,25 @@ export default function DataRequest() {
                         {item.description && (
                           <p className="text-sm text-gray-600 mt-1">{item.description}</p>
                         )}
-                        {item.dueDate && (
-                          <p className="text-xs text-gray-500 mt-1">Due: {new Date(item.dueDate).toLocaleDateString()}</p>
-                        )}
+                        <div className="flex items-center gap-4 mt-1">
+                          {item.dueDate && (
+                            <p className="text-xs text-gray-500">Due: {new Date(item.dueDate).toLocaleDateString()}</p>
+                          )}
+                          {(item.assigneeId || item.externalAssigneeId) && (
+                            <p className="text-xs text-gray-600">
+                              <span className="font-medium">Assigned to:</span> {getAssigneeName(item)}
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Select value={item.status} onValueChange={(value) => handleStatusChange(item, value as DataRequestStatus)}>
-                          <SelectTrigger className="w-32" data-testid={`select-status-${item.id}`}>
+                          <SelectTrigger className="w-36" data-testid={`select-status-${item.id}`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="outstanding">Outstanding</SelectItem>
+                            <SelectItem value="in_progress">In Progress</SelectItem>
                             <SelectItem value="received">Received</SelectItem>
                             <SelectItem value="n_a">N/A</SelectItem>
                           </SelectContent>
