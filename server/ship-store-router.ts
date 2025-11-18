@@ -296,9 +296,35 @@ router.get('/transactions/recent', async (req: Request, res: Response) => {
 router.post('/transactions', async (req: Request, res: Response) => {
   try {
     const data = insertTransactionSchema.parse(req.body);
+    
+    // Validate stock availability before creating transaction
+    if (data.items && Array.isArray(data.items)) {
+      for (const item of data.items) {
+        if (item.productId) {
+          const [product] = await db.select()
+            .from(shipStoreProducts)
+            .where(eq(shipStoreProducts.id, item.productId))
+            .limit(1);
+          
+          if (!product) {
+            return res.status(400).json({ 
+              message: `Product ${item.name} not found` 
+            });
+          }
+          
+          if (product.stock < item.quantity) {
+            return res.status(400).json({ 
+              message: `Insufficient stock for ${item.name}. Available: ${product.stock}, Requested: ${item.quantity}` 
+            });
+          }
+        }
+      }
+    }
+    
+    // Create transaction
     const [transaction] = await db.insert(shipStoreTransactions).values(data).returning();
     
-    // Update product stock if needed
+    // Update product stock
     if (data.items && Array.isArray(data.items)) {
       for (const item of data.items) {
         if (item.productId) {
