@@ -339,7 +339,7 @@ router.post('/folders/:folderId/documents', requireAuth, requireVdrAccess('manag
     const documentName = req.body.name || req.file.originalname;
     const existingDocuments = await storage.vdr.documents.getDocumentsForFolder(folderId, orgId);
     const duplicate = existingDocuments.find(d => 
-      d.name.toLowerCase() === documentName.toLowerCase()
+      d.filename.toLowerCase() === documentName.toLowerCase()
     );
 
     if (duplicate) {
@@ -358,7 +358,7 @@ router.post('/folders/:folderId/documents', requireAuth, requireVdrAccess('manag
         message: `A document named "${documentName}" already exists in this folder`,
         duplicateLocation: folderPath,
         duplicateId: duplicate.id,
-        duplicateName: duplicate.name
+        duplicateName: duplicate.filename
       });
     }
 
