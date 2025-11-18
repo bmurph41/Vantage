@@ -908,7 +908,7 @@ router.get('/projects/:projectId/audit', requireAuth, async (req: Request, res: 
   const orgId = (req.user as any).orgId;
 
   try {
-    const auditLogs = await storage.vdr.audit.getProjectAuditLogs(projectId, orgId);
+    const auditLogs = await storage.vdr.audit.getAuditLogsForProject(projectId, orgId);
     res.json(auditLogs);
   } catch (error: any) {
     console.error('Error fetching audit logs:', error);
@@ -922,13 +922,13 @@ router.get('/projects/:projectId/analytics', requireAuth, async (req: Request, r
 
   try {
     const documents = await storage.vdr.documents.getDocumentsForProject(projectId, orgId);
-    const auditLogs = await storage.vdr.audit.getProjectAuditLogs(projectId, orgId);
+    const auditLogs = await storage.vdr.audit.getAuditLogsForProject(projectId, orgId);
 
     const documentStats = await db.select({
       documentId: vdrAuditLogs.documentId,
-      documentName: vdrDocuments.name,
-      viewCount: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.action} IN ('document_viewed', 'document_downloaded') THEN 1 END)`.as('view_count'),
-      downloadCount: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.action} = 'document_downloaded' THEN 1 END)`.as('download_count'),
+      documentName: vdrDocuments.filename,
+      viewCount: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.eventType} IN ('document_viewed', 'document_downloaded') THEN 1 END)`.as('view_count'),
+      downloadCount: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.eventType} = 'document_downloaded' THEN 1 END)`.as('download_count'),
       lastAccessed: sql<Date>`MAX(${vdrAuditLogs.timestamp})`.as('last_accessed')
     })
       .from(vdrAuditLogs)
@@ -938,15 +938,15 @@ router.get('/projects/:projectId/analytics', requireAuth, async (req: Request, r
         eq(vdrAuditLogs.orgId, orgId),
         isNotNull(vdrAuditLogs.documentId)
       ))
-      .groupBy(vdrAuditLogs.documentId, vdrDocuments.name)
+      .groupBy(vdrAuditLogs.documentId, vdrDocuments.filename)
       .orderBy(desc(sql`view_count`))
       .limit(10);
 
     const activityByDay = await db.select({
       date: sql<string>`DATE(${vdrAuditLogs.timestamp})`.as('date'),
-      views: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.action} IN ('document_viewed', 'document_downloaded') THEN 1 END)`.as('views'),
-      downloads: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.action} = 'document_downloaded' THEN 1 END)`.as('downloads'),
-      uploads: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.action} IN ('document_uploaded', 'document_version_created') THEN 1 END)`.as('uploads')
+      views: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.eventType} IN ('document_viewed', 'document_downloaded') THEN 1 END)`.as('views'),
+      downloads: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.eventType} = 'document_downloaded' THEN 1 END)`.as('downloads'),
+      uploads: sql<number>`COUNT(CASE WHEN ${vdrAuditLogs.eventType} IN ('document_uploaded', 'document_version_created') THEN 1 END)`.as('uploads')
     })
       .from(vdrAuditLogs)
       .leftJoin(vdrDocuments, eq(vdrAuditLogs.documentId, vdrDocuments.id))
@@ -961,11 +961,11 @@ router.get('/projects/:projectId/analytics', requireAuth, async (req: Request, r
     const userEngagement = await storage.vdr.audit.getUserEngagementMetrics(projectId, orgId);
 
     const totalViews = auditLogs.filter(log => 
-      log.action === 'document_viewed' || log.action === 'document_downloaded'
+      log.eventType === 'document_viewed' || log.eventType === 'document_downloaded'
     ).length;
-    const totalDownloads = auditLogs.filter(log => log.action === 'document_downloaded').length;
+    const totalDownloads = auditLogs.filter(log => log.eventType === 'document_downloaded').length;
     const totalUploads = auditLogs.filter(log => 
-      log.action === 'document_uploaded' || log.action === 'document_version_created'
+      log.eventType === 'document_uploaded' || log.eventType === 'document_version_created'
     ).length;
     const uniqueUsers = new Set([
       ...auditLogs.filter(log => log.userId).map(log => log.userId),
