@@ -86,26 +86,26 @@ export interface IStorage {
   getSourceDistribution(): Promise<{ source: string; count: number; type: 'rss' | 'scraped' }[]>;
   
   // Saved Filters methods
-  getSavedFilters(userId: string): Promise<SavedFilter[]>;
+  getSavedFilters(userId: string, orgId: string): Promise<SavedFilter[]>;
   createSavedFilter(filter: InsertSavedFilter): Promise<SavedFilter>;
-  getSavedFilterById(id: string, userId: string): Promise<SavedFilter | undefined>;
-  updateSavedFilter(id: string, userId: string, filter: Partial<InsertSavedFilter>): Promise<SavedFilter | null>;
-  deleteSavedFilter(id: string, userId: string): Promise<boolean>;
+  getSavedFilterById(id: string, userId: string, orgId: string): Promise<SavedFilter | undefined>;
+  updateSavedFilter(id: string, userId: string, orgId: string, filter: Partial<InsertSavedFilter>): Promise<SavedFilter | null>;
+  deleteSavedFilter(id: string, userId: string, orgId: string): Promise<boolean>;
   
   // Portfolio Companies methods
-  getPortfolioCompanies(userId: string): Promise<PortfolioCompany[]>;
+  getPortfolioCompanies(userId: string, orgId: string): Promise<PortfolioCompany[]>;
   createPortfolioCompany(company: InsertPortfolioCompany): Promise<PortfolioCompany>;
-  getPortfolioCompanyById(id: string, userId: string): Promise<PortfolioCompany | undefined>;
-  updatePortfolioCompany(id: string, userId: string, company: Partial<InsertPortfolioCompany>): Promise<PortfolioCompany | null>;
-  deletePortfolioCompany(id: string, userId: string): Promise<boolean>;
-  getArticlesForPortfolioCompany(companyId: string, userId: string, limit?: number): Promise<Article[]>;
+  getPortfolioCompanyById(id: string, userId: string, orgId: string): Promise<PortfolioCompany | undefined>;
+  updatePortfolioCompany(id: string, userId: string, orgId: string, company: Partial<InsertPortfolioCompany>): Promise<PortfolioCompany | null>;
+  deletePortfolioCompany(id: string, userId: string, orgId: string): Promise<boolean>;
+  getArticlesForPortfolioCompany(companyId: string, userId: string, orgId: string, limit?: number): Promise<Article[]>;
   
   // Saved Searches methods
-  getSavedSearches(userId: string): Promise<SavedSearch[]>;
+  getSavedSearches(userId: string, orgId: string): Promise<SavedSearch[]>;
   createSavedSearch(search: InsertSavedSearch): Promise<SavedSearch>;
-  getSavedSearchById(id: string, userId: string): Promise<SavedSearch | undefined>;
-  updateSavedSearch(id: string, userId: string, search: Partial<InsertSavedSearch>): Promise<SavedSearch | null>;
-  deleteSavedSearch(id: string, userId: string): Promise<boolean>;
+  getSavedSearchById(id: string, userId: string, orgId: string): Promise<SavedSearch | undefined>;
+  updateSavedSearch(id: string, userId: string, orgId: string, search: Partial<InsertSavedSearch>): Promise<SavedSearch | null>;
+  deleteSavedSearch(id: string, userId: string, orgId: string): Promise<boolean>;
   updateLastAlertSent(id: string): Promise<void>;
   getActiveSearchesForAlerts(frequency: string): Promise<SavedSearch[]>;
   
@@ -123,7 +123,7 @@ export interface IStorage {
   
   // Notification methods
   createNotification(notification: InsertNotification): Promise<Notification>;
-  getNotificationsByUser(userId: string, limit?: number): Promise<Notification[]>;
+  getNotificationsByUser(userId: string, orgId: string, limit?: number): Promise<Notification[]>;
   getNotificationsBySavedSearch(savedSearchId: string, limit?: number): Promise<Notification[]>;
   
   // Deduplication methods
@@ -135,11 +135,11 @@ export interface IStorage {
   createArticleDuplicate(duplicate: { canonicalArticleId: number; duplicateTitle: string; duplicateUrl: string; duplicateSource: string; duplicatePublishedAt: Date | null; duplicateContent: string | null; similarityScore: number; suppressionReason: string }): Promise<void>;
   getDuplicatesByCanonicalId(canonicalArticleId: number): Promise<Array<{ id: number; duplicateTitle: string; duplicateUrl: string; duplicateSource: string; similarityScore: number; createdAt: Date }>>;
   
-  getUserNotificationPreferences(userId: string): Promise<UserNotificationPreferences | undefined>;
+  getUserNotificationPreferences(userId: string, orgId: string): Promise<UserNotificationPreferences | undefined>;
   createUserNotificationPreferences(prefs: InsertUserNotificationPreferences): Promise<UserNotificationPreferences>;
-  updateUserNotificationPreferences(userId: string, prefs: Partial<InsertUserNotificationPreferences>): Promise<UserNotificationPreferences | undefined>;
+  updateUserNotificationPreferences(userId: string, orgId: string, prefs: Partial<InsertUserNotificationPreferences>): Promise<UserNotificationPreferences | undefined>;
   
-  getUserFilterPreferences(userId: string): Promise<UserFilterPreferences | undefined>;
+  getUserFilterPreferences(userId: string, orgId: string): Promise<UserFilterPreferences | undefined>;
   saveUserFilterPreferences(userId: string, orgId: string, preferences: InsertUserFilterPreferences): Promise<UserFilterPreferences>;
   
   // Entity methods
@@ -164,14 +164,14 @@ export interface IStorage {
   
   // Watchlist methods
   createWatchlist(watchlist: InsertWatchlist): Promise<Watchlist>;
-  getWatchlistsByUser(userId: string): Promise<Watchlist[]>;
-  getWatchlistById(id: string, userId: string): Promise<Watchlist | undefined>;
-  updateWatchlist(id: string, userId: string, updates: Partial<InsertWatchlist>): Promise<Watchlist | undefined>;
-  deleteWatchlist(id: string, userId: string): Promise<boolean>;
-  addEntityToWatchlist(watchlistId: string, entityId: number, userId: string): Promise<boolean>;
-  removeEntityFromWatchlist(watchlistId: string, entityId: number, userId: string): Promise<boolean>;
-  getWatchlistEntities(watchlistId: string, userId: string): Promise<Entity[]>;
-  getArticlesByWatchlist(watchlistId: string, userId: string, limit?: number, offset?: number): Promise<Article[]>;
+  getWatchlistsByUser(userId: string, orgId: string): Promise<Watchlist[]>;
+  getWatchlistById(id: string, userId: string, orgId: string): Promise<Watchlist | undefined>;
+  updateWatchlist(id: string, userId: string, orgId: string, updates: Partial<InsertWatchlist>): Promise<Watchlist | undefined>;
+  deleteWatchlist(id: string, userId: string, orgId: string): Promise<boolean>;
+  addEntityToWatchlist(watchlistId: string, entityId: number, userId: string, orgId: string): Promise<boolean>;
+  removeEntityFromWatchlist(watchlistId: string, entityId: number, userId: string, orgId: string): Promise<boolean>;
+  getWatchlistEntities(watchlistId: string, userId: string, orgId: string): Promise<Entity[]>;
+  getArticlesByWatchlist(watchlistId: string, userId: string, orgId: string, limit?: number, offset?: number): Promise<Article[]>;
   
   // Deal methods
   createDeal(deal: InsertDeal): Promise<Deal>;
@@ -560,11 +560,11 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => ({ ...r, type: 'rss' as const }));
   }
 
-  async getSavedFilters(userId: string): Promise<SavedFilter[]> {
+  async getSavedFilters(userId: string, orgId: string): Promise<SavedFilter[]> {
     return await db
       .select()
       .from(savedFilters)
-      .where(eq(savedFilters.userId, userId))
+      .where(and(eq(savedFilters.userId, userId), eq(savedFilters.orgId, orgId)))
       .orderBy(desc(savedFilters.createdAt));
   }
 
@@ -573,36 +573,36 @@ export class DatabaseStorage implements IStorage {
     return newFilter;
   }
 
-  async getSavedFilterById(id: string, userId: string): Promise<SavedFilter | undefined> {
+  async getSavedFilterById(id: string, userId: string, orgId: string): Promise<SavedFilter | undefined> {
     const [filter] = await db
       .select()
       .from(savedFilters)
-      .where(and(eq(savedFilters.id, id), eq(savedFilters.userId, userId)));
+      .where(and(eq(savedFilters.id, id), eq(savedFilters.userId, userId), eq(savedFilters.orgId, orgId)));
     return filter || undefined;
   }
 
-  async updateSavedFilter(id: string, userId: string, filter: Partial<InsertSavedFilter>): Promise<SavedFilter | null> {
+  async updateSavedFilter(id: string, userId: string, orgId: string, filter: Partial<InsertSavedFilter>): Promise<SavedFilter | null> {
     const [updatedFilter] = await db
       .update(savedFilters)
       .set({ ...filter, updatedAt: new Date() })
-      .where(and(eq(savedFilters.id, id), eq(savedFilters.userId, userId)))
+      .where(and(eq(savedFilters.id, id), eq(savedFilters.userId, userId), eq(savedFilters.orgId, orgId)))
       .returning();
     return updatedFilter || null;
   }
 
-  async deleteSavedFilter(id: string, userId: string): Promise<boolean> {
+  async deleteSavedFilter(id: string, userId: string, orgId: string): Promise<boolean> {
     const result = await db
       .delete(savedFilters)
-      .where(and(eq(savedFilters.id, id), eq(savedFilters.userId, userId)))
+      .where(and(eq(savedFilters.id, id), eq(savedFilters.userId, userId), eq(savedFilters.orgId, orgId)))
       .returning();
     return result.length > 0;
   }
 
-  async getPortfolioCompanies(userId: string): Promise<PortfolioCompany[]> {
+  async getPortfolioCompanies(userId: string, orgId: string): Promise<PortfolioCompany[]> {
     return await db
       .select()
       .from(portfolioCompanies)
-      .where(and(eq(portfolioCompanies.userId, userId), eq(portfolioCompanies.isActive, true)))
+      .where(and(eq(portfolioCompanies.userId, userId), eq(portfolioCompanies.orgId, orgId), eq(portfolioCompanies.isActive, true)))
       .orderBy(desc(portfolioCompanies.createdAt));
   }
 
@@ -611,38 +611,39 @@ export class DatabaseStorage implements IStorage {
     return newCompany;
   }
 
-  async getPortfolioCompanyById(id: string, userId: string): Promise<PortfolioCompany | undefined> {
+  async getPortfolioCompanyById(id: string, userId: string, orgId: string): Promise<PortfolioCompany | undefined> {
     const [company] = await db
       .select()
       .from(portfolioCompanies)
       .where(and(
         eq(portfolioCompanies.id, id),
         eq(portfolioCompanies.userId, userId),
+        eq(portfolioCompanies.orgId, orgId),
         eq(portfolioCompanies.isActive, true)
       ));
     return company || undefined;
   }
 
-  async updatePortfolioCompany(id: string, userId: string, company: Partial<InsertPortfolioCompany>): Promise<PortfolioCompany | null> {
+  async updatePortfolioCompany(id: string, userId: string, orgId: string, company: Partial<InsertPortfolioCompany>): Promise<PortfolioCompany | null> {
     const [updatedCompany] = await db
       .update(portfolioCompanies)
       .set({ ...company, updatedAt: new Date() })
-      .where(and(eq(portfolioCompanies.id, id), eq(portfolioCompanies.userId, userId)))
+      .where(and(eq(portfolioCompanies.id, id), eq(portfolioCompanies.userId, userId), eq(portfolioCompanies.orgId, orgId)))
       .returning();
     return updatedCompany || null;
   }
 
-  async deletePortfolioCompany(id: string, userId: string): Promise<boolean> {
+  async deletePortfolioCompany(id: string, userId: string, orgId: string): Promise<boolean> {
     const [deleted] = await db
       .update(portfolioCompanies)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(and(eq(portfolioCompanies.id, id), eq(portfolioCompanies.userId, userId)))
+      .where(and(eq(portfolioCompanies.id, id), eq(portfolioCompanies.userId, userId), eq(portfolioCompanies.orgId, orgId)))
       .returning();
     return !!deleted;
   }
 
-  async getArticlesForPortfolioCompany(companyId: string, userId: string, limit: number = 50): Promise<Article[]> {
-    const company = await this.getPortfolioCompanyById(companyId, userId);
+  async getArticlesForPortfolioCompany(companyId: string, userId: string, orgId: string, limit: number = 50): Promise<Article[]> {
+    const company = await this.getPortfolioCompanyById(companyId, userId, orgId);
     if (!company) return [];
 
     const searchTerms = [
@@ -664,11 +665,11 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  async getSavedSearches(userId: string): Promise<SavedSearch[]> {
+  async getSavedSearches(userId: string, orgId: string): Promise<SavedSearch[]> {
     return await db
       .select()
       .from(savedSearches)
-      .where(and(eq(savedSearches.userId, userId), eq(savedSearches.isActive, true)))
+      .where(and(eq(savedSearches.userId, userId), eq(savedSearches.orgId, orgId), eq(savedSearches.isActive, true)))
       .orderBy(desc(savedSearches.createdAt));
   }
 
@@ -677,32 +678,33 @@ export class DatabaseStorage implements IStorage {
     return newSearch;
   }
 
-  async getSavedSearchById(id: string, userId: string): Promise<SavedSearch | undefined> {
+  async getSavedSearchById(id: string, userId: string, orgId: string): Promise<SavedSearch | undefined> {
     const [search] = await db
       .select()
       .from(savedSearches)
       .where(and(
         eq(savedSearches.id, id),
         eq(savedSearches.userId, userId),
+        eq(savedSearches.orgId, orgId),
         eq(savedSearches.isActive, true)
       ));
     return search || undefined;
   }
 
-  async updateSavedSearch(id: string, userId: string, search: Partial<InsertSavedSearch>): Promise<SavedSearch | null> {
+  async updateSavedSearch(id: string, userId: string, orgId: string, search: Partial<InsertSavedSearch>): Promise<SavedSearch | null> {
     const [updatedSearch] = await db
       .update(savedSearches)
       .set({ ...search, updatedAt: new Date() })
-      .where(and(eq(savedSearches.id, id), eq(savedSearches.userId, userId)))
+      .where(and(eq(savedSearches.id, id), eq(savedSearches.userId, userId), eq(savedSearches.orgId, orgId)))
       .returning();
     return updatedSearch || null;
   }
 
-  async deleteSavedSearch(id: string, userId: string): Promise<boolean> {
+  async deleteSavedSearch(id: string, userId: string, orgId: string): Promise<boolean> {
     const [deleted] = await db
       .update(savedSearches)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(and(eq(savedSearches.id, id), eq(savedSearches.userId, userId)))
+      .where(and(eq(savedSearches.id, id), eq(savedSearches.userId, userId), eq(savedSearches.orgId, orgId)))
       .returning();
     return !!deleted;
   }
@@ -783,11 +785,11 @@ export class DatabaseStorage implements IStorage {
     return newNotification;
   }
 
-  async getNotificationsByUser(userId: string, limit: number = 50): Promise<Notification[]> {
+  async getNotificationsByUser(userId: string, orgId: string, limit: number = 50): Promise<Notification[]> {
     return await db
       .select()
       .from(notifications)
-      .where(eq(notifications.userId, userId))
+      .where(and(eq(notifications.userId, userId), eq(notifications.orgId, orgId)))
       .orderBy(desc(notifications.sentAt))
       .limit(limit);
   }
@@ -896,11 +898,11 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getUserNotificationPreferences(userId: string): Promise<UserNotificationPreferences | undefined> {
+  async getUserNotificationPreferences(userId: string, orgId: string): Promise<UserNotificationPreferences | undefined> {
     const [prefs] = await db
       .select()
       .from(userNotificationPreferences)
-      .where(eq(userNotificationPreferences.userId, userId));
+      .where(and(eq(userNotificationPreferences.userId, userId), eq(userNotificationPreferences.orgId, orgId)));
     return prefs || undefined;
   }
 
@@ -912,11 +914,11 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateUserNotificationPreferences(userId: string, prefs: Partial<InsertUserNotificationPreferences>): Promise<UserNotificationPreferences | undefined> {
+  async updateUserNotificationPreferences(userId: string, orgId: string, prefs: Partial<InsertUserNotificationPreferences>): Promise<UserNotificationPreferences | undefined> {
     const [updated] = await db
       .update(userNotificationPreferences)
       .set({ ...prefs, updatedAt: new Date() })
-      .where(eq(userNotificationPreferences.userId, userId))
+      .where(and(eq(userNotificationPreferences.userId, userId), eq(userNotificationPreferences.orgId, orgId)))
       .returning();
     return updated || undefined;
   }
@@ -1000,11 +1002,11 @@ export class DatabaseStorage implements IStorage {
     return { shouldRemove: false };
   }
 
-  async getUserFilterPreferences(userId: string): Promise<UserFilterPreferences | undefined> {
+  async getUserFilterPreferences(userId: string, orgId: string): Promise<UserFilterPreferences | undefined> {
     const [prefs] = await db
       .select()
       .from(userFilterPreferences)
-      .where(eq(userFilterPreferences.userId, userId));
+      .where(and(eq(userFilterPreferences.userId, userId), eq(userFilterPreferences.orgId, orgId)));
     return prefs || undefined;
   }
 
@@ -1316,31 +1318,31 @@ export class DatabaseStorage implements IStorage {
     return watchlist;
   }
 
-  async getWatchlistsByUser(userId: string): Promise<Watchlist[]> {
-    return db.select().from(watchlists).where(eq(watchlists.userId, userId)).orderBy(desc(watchlists.createdAt));
+  async getWatchlistsByUser(userId: string, orgId: string): Promise<Watchlist[]> {
+    return db.select().from(watchlists).where(and(eq(watchlists.userId, userId), eq(watchlists.orgId, orgId))).orderBy(desc(watchlists.createdAt));
   }
 
-  async getWatchlistById(id: string, userId: string): Promise<Watchlist | undefined> {
-    const [watchlist] = await db.select().from(watchlists).where(and(eq(watchlists.id, id), eq(watchlists.userId, userId)));
+  async getWatchlistById(id: string, userId: string, orgId: string): Promise<Watchlist | undefined> {
+    const [watchlist] = await db.select().from(watchlists).where(and(eq(watchlists.id, id), eq(watchlists.userId, userId), eq(watchlists.orgId, orgId)));
     return watchlist || undefined;
   }
 
-  async updateWatchlist(id: string, userId: string, updates: Partial<InsertWatchlist>): Promise<Watchlist | undefined> {
+  async updateWatchlist(id: string, userId: string, orgId: string, updates: Partial<InsertWatchlist>): Promise<Watchlist | undefined> {
     const [watchlist] = await db
       .update(watchlists)
       .set({ ...updates, updatedAt: new Date() })
-      .where(and(eq(watchlists.id, id), eq(watchlists.userId, userId)))
+      .where(and(eq(watchlists.id, id), eq(watchlists.userId, userId), eq(watchlists.orgId, orgId)))
       .returning();
     return watchlist || undefined;
   }
 
-  async deleteWatchlist(id: string, userId: string): Promise<boolean> {
-    const result = await db.delete(watchlists).where(and(eq(watchlists.id, id), eq(watchlists.userId, userId)));
+  async deleteWatchlist(id: string, userId: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(watchlists).where(and(eq(watchlists.id, id), eq(watchlists.userId, userId), eq(watchlists.orgId, orgId)));
     return result.rowCount !== null && result.rowCount > 0;
   }
 
-  async addEntityToWatchlist(watchlistId: string, entityId: number, userId: string): Promise<boolean> {
-    const watchlist = await this.getWatchlistById(watchlistId, userId);
+  async addEntityToWatchlist(watchlistId: string, entityId: number, userId: string, orgId: string): Promise<boolean> {
+    const watchlist = await this.getWatchlistById(watchlistId, userId, orgId);
     if (!watchlist) {
       return false;
     }
@@ -1354,8 +1356,8 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async removeEntityFromWatchlist(watchlistId: string, entityId: number, userId: string): Promise<boolean> {
-    const watchlist = await this.getWatchlistById(watchlistId, userId);
+  async removeEntityFromWatchlist(watchlistId: string, entityId: number, userId: string, orgId: string): Promise<boolean> {
+    const watchlist = await this.getWatchlistById(watchlistId, userId, orgId);
     if (!watchlist) {
       return false;
     }
@@ -1364,8 +1366,8 @@ export class DatabaseStorage implements IStorage {
     return result.rowCount !== null && result.rowCount > 0;
   }
 
-  async getWatchlistEntities(watchlistId: string, userId: string): Promise<Entity[]> {
-    const watchlist = await this.getWatchlistById(watchlistId, userId);
+  async getWatchlistEntities(watchlistId: string, userId: string, orgId: string): Promise<Entity[]> {
+    const watchlist = await this.getWatchlistById(watchlistId, userId, orgId);
     if (!watchlist) {
       return [];
     }
@@ -1392,8 +1394,8 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
-  async getArticlesByWatchlist(watchlistId: string, userId: string, limit: number = 50, offset: number = 0): Promise<Article[]> {
-    const watchlist = await this.getWatchlistById(watchlistId, userId);
+  async getArticlesByWatchlist(watchlistId: string, userId: string, orgId: string, limit: number = 50, offset: number = 0): Promise<Article[]> {
+    const watchlist = await this.getWatchlistById(watchlistId, userId, orgId);
     if (!watchlist) {
       return [];
     }

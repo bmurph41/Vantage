@@ -6,7 +6,7 @@ import { startCronJobs, triggerManualFetch } from "./cron-jobs";
 import bcrypt from "bcrypt";
 import { initializeWebSocket } from "./websocket";
 import type { User } from "@shared/docktalk-schema";
-import { requireAuth, requireAdmin, requireRole, requireAnalystOrHigher, requirePro } from "./middleware/auth";
+import { requireMarinaMatchAuth, type DockTalkRequest } from "./middleware/auth";
 import {
   generateCategorySummary,
   generateAllCategorySummaries,
@@ -280,7 +280,12 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         return res.status(401).json({ error: "Not authenticated" });
       }
       
-      const filters = await dockTalkStorage.getSavedFilters(req.session.user.id);
+      const user = await dockTalkStorage.getUser(req.session.user.id);
+      if (!user || !user.orgId) {
+        return res.status(403).json({ error: "User organization not found" });
+      }
+      
+      const filters = await dockTalkStorage.getSavedFilters(req.session.user.id, user.orgId);
       res.json(filters);
     } catch (error) {
       console.error("Error fetching saved filters:", error);
@@ -323,9 +328,14 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         return res.status(401).json({ error: "Not authenticated" });
       }
       
+      const user = await dockTalkStorage.getUser(req.session.user.id);
+      if (!user || !user.orgId) {
+        return res.status(403).json({ error: "User organization not found" });
+      }
+      
       const id = req.params.id;
       const body = SavedFilterSchema.partial().parse(req.body);
-      const filter = await dockTalkStorage.updateSavedFilter(id, req.session.user.id, body);
+      const filter = await dockTalkStorage.updateSavedFilter(id, req.session.user.id, user.orgId, body);
       
       if (!filter) {
         return res.status(404).json({ error: "Saved filter not found" });
@@ -347,8 +357,13 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         return res.status(401).json({ error: "Not authenticated" });
       }
       
+      const user = await dockTalkStorage.getUser(req.session.user.id);
+      if (!user || !user.orgId) {
+        return res.status(403).json({ error: "User organization not found" });
+      }
+      
       const id = req.params.id;
-      const deleted = await dockTalkStorage.deleteSavedFilter(id, req.session.user.id);
+      const deleted = await dockTalkStorage.deleteSavedFilter(id, req.session.user.id, user.orgId);
       
       if (!deleted) {
         return res.status(404).json({ error: "Saved filter not found" });
@@ -642,7 +657,12 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Historical backfill endpoint (admin only)
-  app.post("/api/docktalk/admin/backfill", requireAdmin, async (req, res) => {
+  app.post("/api/docktalk/admin/backfill", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Admin role check
+    if (req.dockTalkUser?.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
     try {
       const { backfillHistoricalArticles } = await import("./services/backfill");
       
@@ -679,7 +699,12 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Manual summary generation (admin only)
-  app.post("/api/docktalk/admin/generate-summaries", requireAdmin, async (req, res) => {
+  app.post("/api/docktalk/admin/generate-summaries", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Admin role check
+    if (req.dockTalkUser?.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
     try {
       const SummaryOptionsSchema = z.object({
         period: z.enum(["daily", "weekly"]).optional(),
@@ -762,7 +787,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Deal extraction backfill - extract deals from existing articles
-  app.post("/api/docktalk/deals/backfill-from-articles", requireAuth, async (req, res) => {
+  app.post("/api/docktalk/deals/backfill-from-articles", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const { enrichArticle } = await import("./services/ai-enrichment");
       
@@ -1070,7 +1095,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Remove article with reason for AI learning (requires auth)
-  app.post("/api/docktalk/articles/:id/remove", requireAuth, async (req, res) => {
+  app.post("/api/docktalk/articles/:id/remove", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const RemovalSchema = z.object({
         reason: z.string().min(10, "Removal reason must be at least 10 characters"),
@@ -1079,11 +1104,8 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const id = parseInt(req.params.id);
       const { reason } = RemovalSchema.parse(req.body);
       
-      // Get userId from authenticated session (guaranteed by requireAuth middleware)
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-      const userId = req.session.user.id;
+      // Get userId from authenticated session (guaranteed by requireMarinaMatchAuth middleware)
+      const userId = req.dockTalkUser!.id;
 
       await dockTalkStorage.removeArticle(id, reason, userId);
       
@@ -1101,7 +1123,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Get removal patterns for review
-  app.get("/api/docktalk/articles/removal-patterns", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/articles/removal-patterns", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const patterns = await dockTalkStorage.getRemovalPatterns();
       res.json(patterns);
@@ -1112,7 +1134,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Entity Extraction & Tracking endpoints (Institutional Intelligence - Protected)
-  app.get("/api/docktalk/entities", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/entities", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const typeParam = req.query.type as string | undefined;
       const limitParam = req.query.limit as string | undefined;
@@ -1135,7 +1157,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/entities/search", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/entities/search", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const query = req.query.q as string;
       const typeParam = req.query.type as string | undefined;
@@ -1160,7 +1182,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/entities/:id/articles", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/entities/:id/articles", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const entityId = parseInt(req.params.id, 10);
       const limitParam = req.query.limit as string | undefined;
@@ -1183,7 +1205,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/articles/:id/entities", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/articles/:id/entities", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const articleId = parseInt(req.params.id, 10);
       
@@ -1209,13 +1231,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
 
   const WatchlistUpdateSchema = WatchlistSchema.partial();
 
-  app.get("/api/docktalk/watchlists", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/watchlists", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const watchlists = await dockTalkStorage.getWatchlistsByUser(req.session.user.id);
+      const watchlists = await dockTalkStorage.getWatchlistsByUser(req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       res.json(watchlists);
     } catch (error) {
       console.error("Error fetching watchlists:", error);
@@ -1223,13 +1241,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.post("/api/docktalk/watchlists", requireAuth, async (req, res) => {
+  app.post("/api/docktalk/watchlists", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const user = await dockTalkStorage.getUser(req.session.user.id);
+      const user = await dockTalkStorage.getUser(req.dockTalkUser!.id);
       if (!user || !user.orgId) {
         return res.status(403).json({ error: "User organization not found" });
       }
@@ -1237,7 +1251,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const data = WatchlistSchema.parse(req.body);
       const watchlist = await dockTalkStorage.createWatchlist({
         ...data,
-        userId: req.session.user.id,
+        userId: req.dockTalkUser!.id,
         orgId: user.orgId,
       });
 
@@ -1251,13 +1265,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/watchlists/:id", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/watchlists/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const watchlist = await dockTalkStorage.getWatchlistById(req.params.id, req.session.user.id);
+      const watchlist = await dockTalkStorage.getWatchlistById(req.params.id, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       if (!watchlist) {
         return res.status(404).json({ error: "Watchlist not found" });
       }
@@ -1269,14 +1279,10 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.patch("/api/docktalk/watchlists/:id", requireAuth, async (req, res) => {
+  app.patch("/api/docktalk/watchlists/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
       const data = WatchlistUpdateSchema.parse(req.body);
-      const watchlist = await dockTalkStorage.updateWatchlist(req.params.id, req.session.user.id, data);
+      const watchlist = await dockTalkStorage.updateWatchlist(req.params.id, req.dockTalkUser!.id, req.dockTalkUser!.orgId, data);
 
       if (!watchlist) {
         return res.status(404).json({ error: "Watchlist not found" });
@@ -1292,13 +1298,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.delete("/api/docktalk/watchlists/:id", requireAuth, async (req, res) => {
+  app.delete("/api/docktalk/watchlists/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const deleted = await dockTalkStorage.deleteWatchlist(req.params.id, req.session.user.id);
+      const deleted = await dockTalkStorage.deleteWatchlist(req.params.id, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       if (!deleted) {
         return res.status(404).json({ error: "Watchlist not found" });
       }
@@ -1310,18 +1312,14 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.post("/api/docktalk/watchlists/:id/entities/:entityId", requireAuth, async (req, res) => {
+  app.post("/api/docktalk/watchlists/:id/entities/:entityId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
       const entityId = parseInt(req.params.entityId, 10);
       if (isNaN(entityId) || entityId < 1) {
         return res.status(400).json({ error: "Invalid entity ID" });
       }
 
-      const added = await dockTalkStorage.addEntityToWatchlist(req.params.id, entityId, req.session.user.id);
+      const added = await dockTalkStorage.addEntityToWatchlist(req.params.id, entityId, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       if (!added) {
         return res.status(404).json({ error: "Watchlist not found or entity already added" });
       }
@@ -1333,18 +1331,14 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.delete("/api/docktalk/watchlists/:id/entities/:entityId", requireAuth, async (req, res) => {
+  app.delete("/api/docktalk/watchlists/:id/entities/:entityId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
       const entityId = parseInt(req.params.entityId, 10);
       if (isNaN(entityId) || entityId < 1) {
         return res.status(400).json({ error: "Invalid entity ID" });
       }
 
-      const removed = await dockTalkStorage.removeEntityFromWatchlist(req.params.id, entityId, req.session.user.id);
+      const removed = await dockTalkStorage.removeEntityFromWatchlist(req.params.id, entityId, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       if (!removed) {
         return res.status(404).json({ error: "Watchlist or entity not found" });
       }
@@ -1356,13 +1350,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/watchlists/:id/entities", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/watchlists/:id/entities", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const entities = await dockTalkStorage.getWatchlistEntities(req.params.id, req.session.user.id);
+      const entities = await dockTalkStorage.getWatchlistEntities(req.params.id, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       res.json(entities);
     } catch (error) {
       console.error("Error fetching watchlist entities:", error);
@@ -1370,16 +1360,12 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/watchlists/:id/articles", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/watchlists/:id/articles", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
       const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
       const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
 
-      const articles = await dockTalkStorage.getArticlesByWatchlist(req.params.id, req.session.user.id, limit, offset);
+      const articles = await dockTalkStorage.getArticlesByWatchlist(req.params.id, req.dockTalkUser!.id, req.dockTalkUser!.orgId, limit, offset);
       res.json(articles);
     } catch (error) {
       console.error("Error fetching watchlist articles:", error);
@@ -1388,7 +1374,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Entity endpoints
-  app.get("/api/docktalk/entities/:id", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/entities/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const entity = await dockTalkStorage.getEntityById(id);
@@ -1404,7 +1390,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/entities/:id/analytics", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/entities/:id/analytics", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const analytics = await dockTalkStorage.getEntityAnalytics(id);
@@ -1415,7 +1401,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/entities/:id/deals", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/entities/:id/deals", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const role = req.query.role as 'buyer' | 'seller' | undefined;
@@ -1470,7 +1456,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/entities/:id/articles", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/entities/:id/articles", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
@@ -1483,7 +1469,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Deal endpoints
-  app.get("/api/docktalk/deals/analytics", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/deals/analytics", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       // Parse filters (subset of DealQuerySchema)
       const filters: {
@@ -1518,7 +1504,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/deals", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/deals", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const params = DealQuerySchema.parse(req.query);
       
@@ -1594,7 +1580,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/deals/:id", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/deals/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const dealId = parseInt(req.params.id, 10);
       if (isNaN(dealId) || dealId < 1) {
@@ -1623,7 +1609,12 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     confidence: z.number().min(0).max(100).optional(),
   });
 
-  app.patch("/api/docktalk/deals/:id", requireRole("admin", "analyst", "partner"), async (req, res) => {
+  app.patch("/api/docktalk/deals/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Role check for admin, analyst, or partner
+    if (!['admin', 'analyst', 'partner'].includes(req.dockTalkUser!.role)) {
+      return res.status(403).json({ error: "Admin, Analyst, or Partner access required" });
+    }
+    
     try {
       const dealId = parseInt(req.params.id, 10);
       if (isNaN(dealId) || dealId < 1) {
@@ -1653,7 +1644,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/articles/:id/deals", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/articles/:id/deals", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const articleId = parseInt(req.params.id, 10);
       if (isNaN(articleId) || articleId < 1) {
@@ -1679,13 +1670,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
 
   const PortfolioCompanyUpdateSchema = PortfolioCompanySchema.partial();
 
-  app.get("/api/docktalk/portfolio-companies", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/portfolio-companies", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const companies = await dockTalkStorage.getPortfolioCompanies(req.session.user.id);
+      const companies = await dockTalkStorage.getPortfolioCompanies(req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       res.json(companies);
     } catch (error) {
       console.error("Error fetching portfolio companies:", error);
@@ -1693,13 +1680,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.post("/api/docktalk/portfolio-companies", requireAuth, async (req, res) => {
+  app.post("/api/docktalk/portfolio-companies", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const user = await dockTalkStorage.getUser(req.session.user.id);
+      const user = await dockTalkStorage.getUser(req.dockTalkUser!.id);
       if (!user || !user.orgId) {
         return res.status(403).json({ error: "User organization not found" });
       }
@@ -1707,7 +1690,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const data = PortfolioCompanySchema.parse(req.body);
       const company = await dockTalkStorage.createPortfolioCompany({
         ...data,
-        userId: req.session.user.id,
+        userId: req.dockTalkUser!.id,
         orgId: user.orgId,
       });
 
@@ -1721,13 +1704,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/portfolio-companies/:id", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/portfolio-companies/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const company = await dockTalkStorage.getPortfolioCompanyById(req.params.id, req.session.user.id);
+      const company = await dockTalkStorage.getPortfolioCompanyById(req.params.id, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       if (!company) {
         return res.status(404).json({ error: "Portfolio company not found" });
       }
@@ -1739,14 +1718,10 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.patch("/api/docktalk/portfolio-companies/:id", requireAuth, async (req, res) => {
+  app.patch("/api/docktalk/portfolio-companies/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
       const data = PortfolioCompanyUpdateSchema.parse(req.body);
-      const company = await dockTalkStorage.updatePortfolioCompany(req.params.id, req.session.user.id, data);
+      const company = await dockTalkStorage.updatePortfolioCompany(req.params.id, req.dockTalkUser!.id, req.dockTalkUser!.orgId, data);
 
       if (!company) {
         return res.status(404).json({ error: "Portfolio company not found" });
@@ -1762,13 +1737,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.delete("/api/docktalk/portfolio-companies/:id", requireAuth, async (req, res) => {
+  app.delete("/api/docktalk/portfolio-companies/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const success = await dockTalkStorage.deletePortfolioCompany(req.params.id, req.session.user.id);
+      const success = await dockTalkStorage.deletePortfolioCompany(req.params.id, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       if (!success) {
         return res.status(404).json({ error: "Portfolio company not found" });
       }
@@ -1780,16 +1751,13 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/portfolio-companies/:id/articles", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/portfolio-companies/:id/articles", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
       const articles = await dockTalkStorage.getArticlesForPortfolioCompany(
         req.params.id,
-        req.session.user.id,
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId,
         limit
       );
 
@@ -1809,13 +1777,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
 
   const SavedSearchUpdateSchema = SavedSearchSchema.partial();
 
-  app.get("/api/docktalk/saved-searches", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/saved-searches", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const searches = await dockTalkStorage.getSavedSearches(req.session.user.id);
+      const searches = await dockTalkStorage.getSavedSearches(req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       res.json(searches);
     } catch (error) {
       console.error("Error fetching saved searches:", error);
@@ -1823,13 +1787,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.post("/api/docktalk/saved-searches", requireAuth, async (req, res) => {
+  app.post("/api/docktalk/saved-searches", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const user = await dockTalkStorage.getUser(req.session.user.id);
+      const user = await dockTalkStorage.getUser(req.dockTalkUser!.id);
       if (!user || !user.orgId) {
         return res.status(403).json({ error: "User organization not found" });
       }
@@ -1837,7 +1797,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const data = SavedSearchSchema.parse(req.body);
       const search = await dockTalkStorage.createSavedSearch({
         ...data,
-        userId: req.session.user.id,
+        userId: req.dockTalkUser!.id,
         orgId: user.orgId,
       });
 
@@ -1851,13 +1811,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/saved-searches/:id", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/saved-searches/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const search = await dockTalkStorage.getSavedSearchById(req.params.id, req.session.user.id);
+      const search = await dockTalkStorage.getSavedSearchById(req.params.id, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       if (!search) {
         return res.status(404).json({ error: "Saved search not found" });
       }
@@ -1869,14 +1825,10 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.patch("/api/docktalk/saved-searches/:id", requireAuth, async (req, res) => {
+  app.patch("/api/docktalk/saved-searches/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
       const data = SavedSearchUpdateSchema.parse(req.body);
-      const search = await dockTalkStorage.updateSavedSearch(req.params.id, req.session.user.id, data);
+      const search = await dockTalkStorage.updateSavedSearch(req.params.id, req.dockTalkUser!.id, req.dockTalkUser!.orgId, data);
 
       if (!search) {
         return res.status(404).json({ error: "Saved search not found" });
@@ -1892,13 +1844,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.delete("/api/docktalk/saved-searches/:id", requireAuth, async (req, res) => {
+  app.delete("/api/docktalk/saved-searches/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const success = await dockTalkStorage.deleteSavedSearch(req.params.id, req.session.user.id);
+      const success = await dockTalkStorage.deleteSavedSearch(req.params.id, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       if (!success) {
         return res.status(404).json({ error: "Saved search not found" });
       }
@@ -1911,7 +1859,12 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // User Management (Admin only)
-  app.get("/api/docktalk/users", requireAdmin, async (req, res) => {
+  app.get("/api/docktalk/users", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Admin role check
+    if (req.dockTalkUser?.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
     try {
       const users = await dockTalkStorage.getAllUsers();
       const safeUsers = users.map(({ password, ...user }) => user);
@@ -1928,7 +1881,12 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     isActive: z.boolean().optional(),
   });
 
-  app.patch("/api/docktalk/users/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/docktalk/users/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Admin role check
+    if (req.dockTalkUser?.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
     try {
       const data = UserUpdateSchema.parse(req.body);
       const user = await dockTalkStorage.updateUser(req.params.id, data);
@@ -1944,7 +1902,12 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.delete("/api/docktalk/users/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/docktalk/users/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Admin role check
+    if (req.dockTalkUser?.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
     try {
       await dockTalkStorage.deactivateUser(req.params.id);
       res.status(204).send();
@@ -1955,18 +1918,14 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Current user endpoints
-  app.get("/api/docktalk/user/current", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/user/current", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const user = await dockTalkStorage.getUser(req.session.user.id);
+      const user = await dockTalkStorage.getUser(req.dockTalkUser!.id);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
-      const prefs = await dockTalkStorage.getUserNotificationPreferences(user.id);
+      const prefs = await dockTalkStorage.getUserNotificationPreferences(user.id, user.orgId!);
       const { password, ...safeUser } = user;
       
       res.json({
@@ -1988,13 +1947,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     enabled: z.boolean().default(true),
   });
 
-  app.patch("/api/docktalk/user/notification-preferences", requireAuth, async (req, res) => {
+  app.patch("/api/docktalk/user/notification-preferences", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const user = await dockTalkStorage.getUser(req.session.user.id);
+      const user = await dockTalkStorage.getUser(req.dockTalkUser!.id);
       if (!user || !user.orgId) {
         return res.status(403).json({ error: "User organization not found" });
       }
@@ -2002,11 +1957,11 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const data = NotificationPreferencesSchema.parse(req.body);
       
       // Check if preferences exist
-      const existing = await dockTalkStorage.getUserNotificationPreferences(req.session.user.id);
+      const existing = await dockTalkStorage.getUserNotificationPreferences(req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       
       let prefs;
       if (existing) {
-        prefs = await dockTalkStorage.updateUserNotificationPreferences(req.session.user.id, {
+        prefs = await dockTalkStorage.updateUserNotificationPreferences(req.dockTalkUser!.id, req.dockTalkUser!.orgId, {
           emailAddress: data.email,
           categories: data.categories,
           frequency: data.frequency,
@@ -2016,7 +1971,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         });
       } else {
         prefs = await dockTalkStorage.createUserNotificationPreferences({
-          userId: req.session.user.id,
+          userId: req.dockTalkUser!.id,
           orgId: user.orgId,
           emailAddress: data.email,
           categories: data.categories,
@@ -2038,13 +1993,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Filter Preferences endpoints
-  app.get("/api/docktalk/user/filter-preferences", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/user/filter-preferences", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const prefs = await dockTalkStorage.getUserFilterPreferences(req.session.user.id);
+      const prefs = await dockTalkStorage.getUserFilterPreferences(req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       res.json(prefs || null);
     } catch (error) {
       console.error("Error fetching filter preferences:", error);
@@ -2061,19 +2012,15 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     sortBy: z.string().optional(),
   });
 
-  app.put("/api/docktalk/user/filter-preferences", requireAuth, async (req, res) => {
+  app.put("/api/docktalk/user/filter-preferences", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const user = await dockTalkStorage.getUser(req.session.user.id);
+      const user = await dockTalkStorage.getUser(req.dockTalkUser!.id);
       if (!user || !user.orgId) {
         return res.status(403).json({ error: "User organization not found" });
       }
 
       const data = FilterPreferencesSchema.parse(req.body);
-      const prefs = await dockTalkStorage.saveUserFilterPreferences(req.session.user.id, user.orgId, data);
+      const prefs = await dockTalkStorage.saveUserFilterPreferences(req.dockTalkUser!.id, user.orgId, data);
       res.json(prefs);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2084,13 +2031,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/notifications", requireAuth, async (req, res) => {
+  app.get("/api/docktalk/notifications", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
-      const notifications = await dockTalkStorage.getNotificationsByUser(req.session.user.id, 50);
+      const notifications = await dockTalkStorage.getNotificationsByUser(req.dockTalkUser!.id, req.dockTalkUser!.orgId, 50);
       res.json(notifications);
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -2113,7 +2056,17 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     period: z.enum(["daily", "weekly"])
   });
 
-  app.get("/api/docktalk/summaries", requireAuth, requirePro, async (req, res) => {
+  app.get("/api/docktalk/summaries", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Pro tier check
+    if (req.dockTalkUser?.subscriptionTier !== 'pro' && req.dockTalkUser?.role !== 'admin') {
+      return res.status(403).json({ 
+        error: "Pro subscription required",
+        message: "This feature requires a Pro subscription. Upgrade to access AI-powered category summaries and advanced analytics.",
+        currentTier: req.dockTalkUser?.subscriptionTier,
+        requiredTier: "pro"
+      });
+    }
+    
     try {
       const { period } = SummaryQuerySchema.parse(req.query);
       const summaries = await getLatestSummaries(period);
@@ -2127,7 +2080,16 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.post("/api/docktalk/summaries/generate", requireAuth, requireRole("admin", "analyst"), async (req, res) => {
+  app.post("/api/docktalk/summaries/generate", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Role check for admin or analyst
+    if (!['admin', 'analyst'].includes(req.dockTalkUser!.role)) {
+      return res.status(403).json({ 
+        error: "Insufficient permissions",
+        required: ['admin', 'analyst'],
+        current: req.dockTalkUser!.role
+      });
+    }
+    
     try {
       const { category, period } = GenerateSummarySchema.parse(req.body);
       const summary = await generateCategorySummary(category, period);
@@ -2146,7 +2108,16 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.post("/api/docktalk/summaries/generate-all", requireAuth, requireRole("admin", "analyst"), async (req, res) => {
+  app.post("/api/docktalk/summaries/generate-all", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Role check for admin or analyst
+    if (!['admin', 'analyst'].includes(req.dockTalkUser!.role)) {
+      return res.status(403).json({ 
+        error: "Insufficient permissions",
+        required: ['admin', 'analyst'],
+        current: req.dockTalkUser!.role
+      });
+    }
+    
     try {
       const { period } = z.object({ period: z.enum(["daily", "weekly"]) }).parse(req.body);
       const summaries = await generateAllCategorySummaries(period);
@@ -2160,19 +2131,24 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.patch("/api/docktalk/summaries/:id", requireAuth, requireRole("admin", "analyst", "partner"), async (req, res) => {
+  app.patch("/api/docktalk/summaries/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Role check for admin, analyst, or partner
+    if (!['admin', 'analyst', 'partner'].includes(req.dockTalkUser!.role)) {
+      return res.status(403).json({ 
+        error: "Insufficient permissions",
+        required: ['admin', 'analyst', 'partner'],
+        current: req.dockTalkUser!.role
+      });
+    }
+    
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
       const summaryId = parseInt(req.params.id);
       if (isNaN(summaryId)) {
         return res.status(400).json({ error: "Invalid summary ID" });
       }
 
       const { summaryText, editReason } = SummaryEditSchema.parse(req.body);
-      const updated = await editSummary(summaryId, req.session.user.id, summaryText, editReason);
+      const updated = await editSummary(summaryId, req.dockTalkUser!.id, summaryText, editReason);
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2184,16 +2160,17 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Daily Digest Preview Email (admin only)
-  app.post("/api/docktalk/test-digest", requireAuth, requireRole("admin"), async (req, res) => {
+  app.post("/api/docktalk/test-digest", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Admin role check
+    if (req.dockTalkUser?.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
       const { client, fromEmail } = await getUncachableResendClient();
       
       // Get user's notification preferences for email address
-      const prefs = await dockTalkStorage.getUserNotificationPreferences(req.session.user.id);
+      const prefs = await dockTalkStorage.getUserNotificationPreferences(req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       const testEmail = prefs?.emailAddress || req.body.email;
       
       if (!testEmail) {
@@ -2206,7 +2183,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-      const sampleArticles = await dockTalkStorage.getArticles(req.session.user.id, {
+      const sampleArticles = await dockTalkStorage.getArticles(req.dockTalkUser!.id, {
         fromDate: oneWeekAgo,
         limit: 10,
         sortBy: "newest",
@@ -2280,16 +2257,17 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Test email notification endpoint (admin only)
-  app.post("/api/docktalk/test-email", requireAuth, requireRole("admin"), async (req, res) => {
+  app.post("/api/docktalk/test-email", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    // Admin role check
+    if (req.dockTalkUser?.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
     try {
-      if (!req.session.user) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-
       const { client, fromEmail } = await getUncachableResendClient();
       
       // Get user's notification preferences for email address
-      const prefs = await dockTalkStorage.getUserNotificationPreferences(req.session.user.id);
+      const prefs = await dockTalkStorage.getUserNotificationPreferences(req.dockTalkUser!.id, req.dockTalkUser!.orgId);
       const testEmail = prefs?.emailAddress || req.body.email;
       
       if (!testEmail) {
