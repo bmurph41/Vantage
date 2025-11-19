@@ -72,18 +72,12 @@ export default function Properties() {
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [showPendingBanner, setShowPendingBanner] = useState(true);
   const [showPortfolioWizard, setShowPortfolioWizard] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: properties = [], isLoading } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
-  });
-
-  const { data: pendingProfiles = [] } = useQuery<PendingPropertyProfile[]>({
-    queryKey: ['/api/sales-comps/pending-property-profiles'],
-    enabled: showPendingBanner,
   });
 
   const deletePropertyMutation = useMutation({
@@ -216,46 +210,8 @@ export default function Properties() {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  const pendingCount = pendingProfiles.filter((p: PendingPropertyProfile) => p.status === 'pending').length;
-
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
-      {/* Pending Property Profiles Banner */}
-      {showPendingBanner && pendingCount > 0 && (
-        <Alert className="rounded-none border-x-0 border-t-0 bg-blue-50 border-blue-200" data-testid="pending-profiles-banner">
-          <AlertCircle className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-blue-900">
-                <strong>{pendingCount}</strong> sales comp{pendingCount !== 1 ? 's' : ''} need property profile{pendingCount !== 1 ? 's' : ''}
-              </span>
-              <Button 
-                variant="link" 
-                className="h-auto p-0 text-sm text-blue-600 hover:text-blue-800 underline"
-                onClick={() => {
-                  toast({
-                    title: "Property profiles needed",
-                    description: `${pendingCount} sales comp${pendingCount !== 1 ? 's' : ''} waiting for property profile creation. Property form coming soon.`,
-                  });
-                }}
-                data-testid="button-complete-profiles"
-              >
-                View pending
-              </Button>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-100"
-              onClick={() => setShowPendingBanner(false)}
-              data-testid="button-dismiss-banner"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Clean Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">

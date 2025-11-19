@@ -12,6 +12,7 @@ import UserSettingsPage from "@/pages/user-settings";
 import AuditLogsPage from "@/pages/audit-logs";
 import CRMDashboard from "@/pages/crm-dashboard";
 import UnifiedSidebar from "@/components/unified-sidebar";
+import PendingNotificationsBanner from "@/components/pending-notifications-banner";
 import Pipeline from "@/pages/pipeline";
 import Leads from "@/pages/leads";
 import Contacts from "@/pages/contacts";
@@ -104,9 +105,12 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-gray-50">
       <UnifiedSidebar />
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <PendingNotificationsBanner />
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
