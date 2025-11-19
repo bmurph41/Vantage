@@ -98,9 +98,17 @@ const modelingNav = [
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
 ];
 
+// DockTalk Navigation Subcategories
+const dockTalkNav = [
+  { name: "Dashboard", href: "/docktalk", icon: LayoutDashboard },
+  { name: "Market Intelligence", href: "/docktalk/market-intelligence", icon: BarChart3 },
+  { name: "M&A Spotlight", href: "/docktalk/deals", icon: Handshake },
+  { name: "Saved Articles", href: "/docktalk/saved", icon: Bell },
+  { name: "Admin Dashboard", href: "/docktalk/admin", icon: Settings },
+];
+
 // Analysis Navigation (Sales Comps)
 const analysisNav = [
-  { name: "DockTalk", href: "/docktalk", icon: MessageSquare },
   { name: "Sales Comps", href: "/analysis/sales-comps", icon: BarChart3 },
   { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
   { name: "Demographics", href: "/analysis/demographics", icon: Users },
@@ -126,6 +134,7 @@ export default function UnifiedSidebar() {
   const [vdrExpanded, setVdrExpanded] = useState(false);
   const [modelingExpanded, setModelingExpanded] = useState(false);
   const [analysisExpanded, setAnalysisExpanded] = useState(false);
+  const [dockTalkExpanded, setDockTalkExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -204,6 +213,7 @@ export default function UnifiedSidebar() {
     const isVdrPage = location.startsWith('/vdr');
     const isModelingPage = location.startsWith('/modeling/');
     const isAnalysisPage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
+    const isDockTalkPage = location.startsWith('/docktalk');
 
     // Set expanded states - only expand the active section, collapse all others
     setOperationsExpanded(isOperationsPage);
@@ -217,6 +227,7 @@ export default function UnifiedSidebar() {
     setVdrExpanded(isVdrPage);
     setModelingExpanded(isModelingPage);
     setAnalysisExpanded(isAnalysisPage);
+    setDockTalkExpanded(isDockTalkPage);
   }, [location]);
 
   // Create dynamic CRM navigation with pending badges
@@ -584,11 +595,44 @@ export default function UnifiedSidebar() {
               onToggle={() => setAnalysisExpanded(!analysisExpanded)}
               isActive={location.startsWith('/analysis/') || location.startsWith('/docktalk')}
             />
-            {analysisExpanded && analysisNav
-              .filter(item => item.name !== "DockTalk" || isDockTalkEnabled)
-              .map((item) => (
-                <NavLink key={item.name} item={item} />
-              ))}
+            {analysisExpanded && (
+              <div className="ml-4 mt-1 mb-2">
+                {/* DockTalk Subcategory */}
+                {isDockTalkEnabled && (
+                  <>
+                    <button
+                      onClick={() => setDockTalkExpanded(!dockTalkExpanded)}
+                      className={cn(
+                        "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                        location.startsWith('/docktalk')
+                          ? "bg-blue-600 text-white hover:bg-blue-700"
+                          : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                      )}
+                      data-testid="toggle-docktalk"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <MessageSquare className="w-5 h-5" />
+                        <span>DockTalk</span>
+                      </div>
+                      {dockTalkExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </button>
+                    {dockTalkExpanded && (
+                      <div className="ml-4">
+                        {dockTalkNav.map((item) => (
+                          <NavLink key={item.name} item={item} />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                {/* Other Analysis Pages */}
+                <div className={isDockTalkEnabled ? "mt-2" : ""}>
+                  {analysisNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </nav>
