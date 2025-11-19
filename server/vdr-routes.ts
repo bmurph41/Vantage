@@ -1410,6 +1410,9 @@ router.post('/projects/:projectId/data-requests', requireAuth, async (req: Reque
       projectId,
       orgId,
       createdBy: userId,
+      assigneeId: req.body.assigneeId || null,
+      externalAssigneeId: req.body.externalAssigneeId || null,
+      dueDate: req.body.dueDate || null,
     };
 
     const item = await storage.vdr.dataRequests.createItem(itemData);
@@ -1426,7 +1429,13 @@ router.patch('/data-requests/:id', requireAuth, async (req: Request, res: Respon
   const orgId = (req.user as any).orgId;
 
   try {
-    const item = await storage.vdr.dataRequests.updateItem(id, req.body, orgId);
+    const updateData = {
+      ...req.body,
+      assigneeId: req.body.assigneeId || null,
+      externalAssigneeId: req.body.externalAssigneeId || null,
+      dueDate: req.body.dueDate || null,
+    };
+    const item = await storage.vdr.dataRequests.updateItem(id, updateData, orgId);
     res.json(item);
   } catch (error: any) {
     console.error('Error updating data request item:', error);
