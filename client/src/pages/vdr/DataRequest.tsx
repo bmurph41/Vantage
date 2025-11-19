@@ -99,16 +99,33 @@ export default function DataRequest() {
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest(`/api/vdr/projects/${projectId}/data-requests`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      console.log('Mutation function called with:', data);
+      try {
+        const result = await apiRequest(`/api/vdr/projects/${projectId}/data-requests`, {
+          method: 'POST',
+          body: JSON.stringify(data),
+        });
+        console.log('Mutation result:', result);
+        return result;
+      } catch (error) {
+        console.error('Mutation error:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
+      console.log('Mutation success');
       queryClient.invalidateQueries({ queryKey: ['/api/vdr/projects', projectId, 'data-requests'] });
       setIsAddDialogOpen(false);
       resetForm();
       toast({ title: "Success", description: "Document request added" });
+    },
+    onError: (error: any) => {
+      console.error('Mutation onError:', error);
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to create request", 
+        variant: "destructive" 
+      });
     },
   });
 
