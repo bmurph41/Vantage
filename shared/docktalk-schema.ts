@@ -6,25 +6,53 @@ import { z } from "zod";
 export const userRoleEnum = pgEnum("docktalk_user_role", ["admin", "analyst", "partner", "viewer"]);
 export const subscriptionTierEnum = pgEnum("docktalk_subscription_tier", ["free", "pro"]);
 export const regionEnum = pgEnum("docktalk_region", ["US/Domestic", "International"]);
+export const featureTierEnum = pgEnum("docktalk_feature_tier", ["docktalk_free", "docktalk_pro"]);
 
+// Organization Features - tracks which organizations have DockTalk enabled
+export const organizationFeatures = pgTable("organization_features", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().unique(), // References MarinaMatch organizations.id (not enforced by FK to avoid circular dependency)
+  feature: text("feature").notNull().default("docktalk"), // Feature identifier
+  tier: featureTierEnum("tier").notNull().default("docktalk_free"),
+  activatedAt: timestamp("activated_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at"), // null = no expiration
+  isActive: boolean("is_active").notNull().default(true),
+  billingMetadata: jsonb("billing_metadata"), // For future billing integration
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  byOrg: index("idx_org_features_org").on(table.orgId),
+  byFeature: index("idx_org_features_feature").on(table.feature),
+}));
+
+// DockTalk Users - shadow records linked to MarinaMatch users
 export const users = pgTable("docktalk_users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  // Link to MarinaMatch user (null for standalone DockTalk users if we ever support that)
+  marinaUserId: varchar("marina_user_id"), // References MarinaMatch users.id
+  orgId: varchar("org_id"), // References MarinaMatch organizations.id
+  // Standalone DockTalk credentials (nullable for MarinaMatch users)
+  username: text("username").unique(),
+  password: text("password"),
   email: text("email"),
+  // DockTalk-specific fields
   role: userRoleEnum("role").notNull().default("viewer"),
   subscriptionTier: subscriptionTierEnum("subscription_tier").notNull().default("free"),
   isActive: boolean("is_active").default(true),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  byMarinaUser: index("idx_docktalk_users_marina").on(table.marinaUserId),
+  byOrg: index("idx_docktalk_users_org").on(table.orgId),
+}));
 
 export const alertFrequencyEnum = pgEnum("docktalk_alert_frequency", ["none", "immediate", "daily", "weekly"]);
 
 export const userNotificationPreferences = pgTable("docktalk_user_notification_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(), // Organization scope for multi-tenancy
   emailAddress: text("email_address").notNull(),
   categories: text("categories").array().notNull(),
   frequency: alertFrequencyEnum("frequency").notNull().default("none"),
@@ -37,6 +65,7 @@ export const userNotificationPreferences = pgTable("docktalk_user_notification_p
 }, (table) => ({
   byUser: index("idx_docktalk_notification_prefs_user").on(table.userId),
   byFrequency: index("idx_docktalk_notification_prefs_frequency").on(table.frequency),
+  byOrg: index("idx_docktalk_notification_prefs_org").on(table.orgId),
 }));
 
 export const articles = pgTable("docktalk_articles", {
@@ -160,6 +189,7 @@ export const articleEntities = pgTable("docktalk_article_entities", {
 export const watchlists = pgTable("docktalk_watchlists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(), // Organization scope for multi-tenancy
   name: text("name").notNull(),
   description: text("description"),
   alertFrequency: alertFrequencyEnum("alert_frequency").notNull().default("none"),
@@ -169,6 +199,7 @@ export const watchlists = pgTable("docktalk_watchlists", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   byUser: index("idx_docktalk_watchlists_user").on(table.userId),
+  byOrg: index("idx_docktalk_watchlists_org").on(table.orgId),
 }));
 
 export const watchlistEntities = pgTable("docktalk_watchlist_entities", {
@@ -243,15 +274,20 @@ export const systemStats = pgTable("docktalk_system_stats", {
 export const savedFilters = pgTable("docktalk_saved_filters", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull(), // Organization scope for multi-tenancy
   name: text("name").notNull(),
   criteria: text("criteria").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  byUser: index("idx_docktalk_saved_filters_user").on(table.userId),
+  byOrg: index("idx_docktalk_saved_filters_org").on(table.orgId),
+}));
 
 export const savedSearches = pgTable("docktalk_saved_searches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull(), // Organization scope for multi-tenancy
   name: text("name").notNull(),
   criteria: jsonb("criteria").notNull(),
   alertFrequency: text("alert_frequency").notNull().default("none"),
@@ -261,11 +297,13 @@ export const savedSearches = pgTable("docktalk_saved_searches", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   byUser: index("idx_docktalk_saved_searches_user").on(table.userId),
+  byOrg: index("idx_docktalk_saved_searches_org").on(table.orgId),
 }));
 
 export const userArticleAnnotations = pgTable("docktalk_user_article_annotations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull(), // Organization scope for multi-tenancy
   articleId: integer("article_id").notNull().references(() => articles.id),
   customTags: text("custom_tags").array(),
   privateNotes: text("private_notes"),
@@ -274,12 +312,14 @@ export const userArticleAnnotations = pgTable("docktalk_user_article_annotations
 }, (table) => ({
   byUser: index("idx_docktalk_annotations_user").on(table.userId),
   byArticle: index("idx_docktalk_annotations_article").on(table.articleId),
+  byOrg: index("idx_docktalk_annotations_org").on(table.orgId),
   uniqueUserArticle: index("idx_docktalk_annotations_user_article").on(table.userId, table.articleId),
 }));
 
 export const portfolioCompanies = pgTable("docktalk_portfolio_companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull(), // Organization scope for multi-tenancy
   companyName: text("company_name").notNull(),
   aliases: text("aliases").array(),
   sector: text("sector"),
@@ -291,6 +331,7 @@ export const portfolioCompanies = pgTable("docktalk_portfolio_companies", {
 }, (table) => ({
   byUser: index("idx_docktalk_portfolio_user").on(table.userId),
   byCompany: index("idx_docktalk_portfolio_company").on(table.companyName),
+  byOrg: index("idx_docktalk_portfolio_org").on(table.orgId),
 }));
 
 export const notificationSourceEnum = pgEnum("docktalk_notification_source", ["saved_search", "category_alert"]);
@@ -298,6 +339,7 @@ export const notificationSourceEnum = pgEnum("docktalk_notification_source", ["s
 export const notifications = pgTable("docktalk_notifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull(), // Organization scope for multi-tenancy
   source: notificationSourceEnum("source").notNull().default("saved_search"),
   savedSearchId: varchar("saved_search_id").references(() => savedSearches.id),
   categories: text("categories").array(),
@@ -312,6 +354,7 @@ export const notifications = pgTable("docktalk_notifications", {
   sentAt: timestamp("sent_at").defaultNow(),
 }, (table) => ({
   byUser: index("idx_docktalk_notifications_user").on(table.userId),
+  byOrg: index("idx_docktalk_notifications_org").on(table.orgId),
   bySavedSearch: index("idx_docktalk_notifications_search").on(table.savedSearchId),
   bySource: index("idx_docktalk_notifications_source").on(table.source),
   bySentAt: index("idx_docktalk_notifications_sent_at").on(table.sentAt),
@@ -320,6 +363,7 @@ export const notifications = pgTable("docktalk_notifications", {
 export const userFilterPreferences = pgTable("docktalk_user_filter_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(), // Organization scope for multi-tenancy
   categories: text("categories").array(),
   sources: text("sources").array(),
   regions: text("regions").array(),
@@ -330,6 +374,7 @@ export const userFilterPreferences = pgTable("docktalk_user_filter_preferences",
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   byUser: index("idx_docktalk_filter_prefs_user").on(table.userId),
+  byOrg: index("idx_docktalk_filter_prefs_org").on(table.orgId),
 }));
 
 export const summaryPeriodEnum = pgEnum("docktalk_summary_period", ["daily", "weekly"]);
