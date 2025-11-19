@@ -5682,7 +5682,7 @@ Current context: Project ${req.params.projectId}`;
   // CRM Pending Properties
   app.get("/api/crm/pending-properties", async (req: any, res) => {
     try {
-      const pendingProperties = await storage.getPendingPropertiesForOrg(req.user.orgId);
+      const pendingProperties = await storage.getPendingProperties(req.user.orgId, 'pending');
       res.json(pendingProperties);
     } catch (error) {
       console.error("Failed to get pending properties:", error);
