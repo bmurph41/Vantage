@@ -18,7 +18,6 @@ import Contacts from "@/pages/contacts";
 import Companies from "@/pages/companies";
 import Deals from "@/pages/deals";
 import DealDetail from "@/pages/deal-detail";
-import Activities from "@/pages/activities";
 import Properties from "@/pages/properties";
 import PendingProperties from "@/pages/pending-properties";
 import PendingContacts from "@/pages/pending-contacts";
@@ -518,13 +517,6 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <DealDetail />
-          </UnifiedLayout>
-        )}
-      </Route>
-      <Route path="/crm/activities">
-        {() => (
-          <UnifiedLayout>
-            <Activities />
           </UnifiedLayout>
         )}
       </Route>

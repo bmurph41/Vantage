@@ -21,7 +21,6 @@ const crmNav = [
   { name: "Contacts", href: "/crm/contacts", icon: Users },
   { name: "Companies", href: "/crm/companies", icon: Building },
   { name: "Properties", href: "/crm/properties", icon: Home },
-  { name: "Activities", href: "/crm/activities", icon: Calendar },
   { name: "Prospecting", href: "/crm/prospecting", icon: Target },
   { name: "Marketing", href: "/crm/marketing-automation", icon: Send },
   { name: "Analytics", href: "/crm/analytics", icon: PieChart },
@@ -211,7 +210,7 @@ export default function UnifiedSidebar() {
   }, [location]);
 
   // Create dynamic CRM navigation with pending badges
-  // Structure: Dashboard, Pipeline, Deals, Leads, Contacts (+Pending), Companies (+Pending), Properties (+Pending), Activities, Prospecting, etc.
+  // Structure: Dashboard, Pipeline, Deals, Leads, Contacts (+Pending), Companies (+Pending), Properties (+Pending), Prospecting, etc.
   const dynamicCrmNav = [
     ...crmNav.slice(0, 4), // Dashboard, Pipeline, Deals, Leads
     crmNav[4], // Contacts
@@ -235,7 +234,7 @@ export default function UnifiedSidebar() {
       icon: AlertCircle,
       badge: String(pendingPropertiesCount)
     }] : []),
-    ...crmNav.slice(7), // Activities, Prospecting, etc.
+    ...crmNav.slice(7), // Prospecting, Marketing, Analytics, etc.
   ];
 
   const handleNavClick = () => {

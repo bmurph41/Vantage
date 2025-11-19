@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Activity as CRMActivity, ActivityTemplate } from "@shared/schema";
-import { format, isToday, isSameDay } from "date-fns";
+import { format, isToday, isSameDay, startOfDay } from "date-fns";
 import { ActivityComposerModal } from "./activity-composer-modal";
 
 interface DailyActivitiesModalProps {
@@ -152,7 +152,10 @@ export function DailyActivitiesModal({
   // Filter activities for this specific day
   const dayActivities = allActivities.filter(activity => {
     if (!activity.scheduledAt) return false;
-    return isSameDay(new Date(activity.scheduledAt), date);
+    // Compare dates at the start of day to avoid timezone issues
+    const activityDate = startOfDay(new Date(activity.scheduledAt));
+    const targetDate = startOfDay(date);
+    return activityDate.getTime() === targetDate.getTime();
   });
 
   // Generate activity boxes based on target (minimum 16 boxes as shown in image)

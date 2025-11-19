@@ -48,7 +48,18 @@ export function ActivityComposerModal({
       direction: "outbound",
       entityType: "general",
       entityId: undefined,
-      scheduledAt: defaultDate ? new Date(defaultDate).toISOString().slice(0, 16) : "",
+      scheduledAt: defaultDate ? (() => {
+        // Set time to noon to avoid timezone boundary issues
+        const d = new Date(defaultDate);
+        d.setHours(12, 0, 0, 0);
+        // Format for datetime-local input (YYYY-MM-DDTHH:MM)
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+      })() : "",
     },
   });
 
