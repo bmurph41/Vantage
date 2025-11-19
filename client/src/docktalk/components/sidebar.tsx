@@ -79,9 +79,9 @@ export default function Sidebar({
     {
       label: "M&A Spotlight",
       icon: "fas fa-handshake",
-      href: "/docktalk/deals",
-      active: location === "/docktalk/deals",
-      testId: "nav-deals"
+      href: "/docktalk/m&a-spotlight",
+      active: location === "/docktalk/m&a-spotlight",
+      testId: "nav-m&a-spotlight"
     },
     {
       label: "High Relevance",

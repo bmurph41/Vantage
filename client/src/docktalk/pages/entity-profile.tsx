@@ -269,7 +269,7 @@ export default function EntityProfile() {
                   The entity you're looking for doesn't exist or has been removed
                 </p>
                 <Button asChild className="mt-4">
-                  <Link href="/docktalk/deals">Back to Deals</Link>
+                  <Link href="/docktalk/m&a-spotlight">Back to M&A Spotlight</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -292,7 +292,7 @@ export default function EntityProfile() {
               <BreadcrumbSeparator />
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link href="/docktalk/deals" data-testid="link-entities">Entities</Link>
+                  <Link href="/docktalk/m&a-spotlight" data-testid="link-entities">Entities</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
