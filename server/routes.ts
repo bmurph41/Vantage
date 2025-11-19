@@ -5719,7 +5719,7 @@ Current context: Project ${req.params.projectId}`;
 
   app.post("/api/crm/pending-properties/:id/reject", async (req: any, res) => {
     try {
-      await storage.rejectPendingProperty(req.params.id, req.user.id);
+      await storage.rejectPendingProperty(req.params.id, req.user.orgId, req.user.id);
       res.json({ success: true });
     } catch (error) {
       console.error("Failed to reject pending property:", error);
