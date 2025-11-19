@@ -1,4 +1,4 @@
-import { users, articles, rssSources, systemStats, savedFilters, savedSearches, userArticleAnnotations, portfolioCompanies, notifications, articleFingerprints, articleDuplicates, userNotificationPreferences, articleRemovalPatterns, userFilterPreferences, entities, articleEntities, watchlists, watchlistEntities, deals, type User, type InsertUser, type Article, type InsertArticle, type RssSource, type InsertRssSource, type SystemStats, type SavedFilter, type InsertSavedFilter, type SavedSearch, type InsertSavedSearch, type UserArticleAnnotation, type InsertUserArticleAnnotation, type PortfolioCompany, type InsertPortfolioCompany, type Notification, type InsertNotification, type UserNotificationPreferences, type InsertUserNotificationPreferences, type ArticleRemovalPattern, type InsertArticleRemovalPattern, type UserFilterPreferences, type InsertUserFilterPreferences, type Entity, type InsertEntity, type ArticleEntity, type InsertArticleEntity, type Watchlist, type InsertWatchlist, type WatchlistEntity, type InsertWatchlistEntity, type Deal, type InsertDeal } from "@shared/docktalk-schema";
+import { users, articles, rssSources, systemStats, savedFilters, savedSearches, userArticleAnnotations, portfolioCompanies, notifications, articleFingerprints, articleDuplicates, userNotificationPreferences, articleRemovalPatterns, userFilterPreferences, entities, articleEntities, watchlists, watchlistEntities, deals, organizationFeatures, type User, type InsertUser, type Article, type InsertArticle, type RssSource, type InsertRssSource, type SystemStats, type SavedFilter, type InsertSavedFilter, type SavedSearch, type InsertSavedSearch, type UserArticleAnnotation, type InsertUserArticleAnnotation, type PortfolioCompany, type InsertPortfolioCompany, type Notification, type InsertNotification, type UserNotificationPreferences, type InsertUserNotificationPreferences, type ArticleRemovalPattern, type InsertArticleRemovalPattern, type UserFilterPreferences, type InsertUserFilterPreferences, type Entity, type InsertEntity, type ArticleEntity, type InsertArticleEntity, type Watchlist, type InsertWatchlist, type WatchlistEntity, type InsertWatchlistEntity, type Deal, type InsertDeal } from "@shared/docktalk-schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, gte, lte, sql, count, inArray } from "drizzle-orm";
 
@@ -114,6 +114,12 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   deactivateUser(id: string): Promise<void>;
+  
+  // MarinaMatch Integration methods
+  getOrganizationFeature(orgId: string): Promise<{ id: string; orgId: string; feature: string; tier: string; isActive: boolean; activatedAt: Date; expiresAt: Date | null } | undefined>;
+  createOrganizationFeature(data: { orgId: string; feature?: string; tier?: string; isActive?: boolean }): Promise<{ id: string; orgId: string; feature: string; tier: string; isActive: boolean; activatedAt: Date; expiresAt: Date | null }>;
+  getDockTalkUserByMarinaUserId(marinaUserId: string): Promise<User | undefined>;
+  createDockTalkUserFromMarinaUser(data: { marinaUserId: string; orgId: string; email: string | null; role: string; subscriptionTier: string; isActive: boolean }): Promise<User>;
   
   // Notification methods
   createNotification(notification: InsertNotification): Promise<Notification>;
@@ -1646,6 +1652,79 @@ export class DatabaseStorage implements IStorage {
       monthlyDeals,
       recentDealsCount,
     };
+  }
+
+  // MarinaMatch Integration methods
+  async getOrganizationFeature(orgId: string): Promise<{ id: string; orgId: string; feature: string; tier: string; isActive: boolean; activatedAt: Date; expiresAt: Date | null } | undefined> {
+    const [feature] = await db
+      .select()
+      .from(organizationFeatures)
+      .where(and(
+        eq(organizationFeatures.orgId, orgId),
+        eq(organizationFeatures.feature, 'docktalk')
+      ));
+    
+    if (!feature) return undefined;
+    
+    return {
+      id: feature.id,
+      orgId: feature.orgId,
+      feature: feature.feature,
+      tier: feature.tier,
+      isActive: feature.isActive,
+      activatedAt: feature.activatedAt,
+      expiresAt: feature.expiresAt,
+    };
+  }
+
+  async createOrganizationFeature(data: { orgId: string; feature?: string; tier?: string; isActive?: boolean }): Promise<{ id: string; orgId: string; feature: string; tier: string; isActive: boolean; activatedAt: Date; expiresAt: Date | null }> {
+    const [feature] = await db
+      .insert(organizationFeatures)
+      .values({
+        orgId: data.orgId,
+        feature: data.feature || 'docktalk',
+        tier: data.tier || 'docktalk_free',
+        isActive: data.isActive !== undefined ? data.isActive : true,
+      })
+      .returning();
+    
+    return {
+      id: feature.id,
+      orgId: feature.orgId,
+      feature: feature.feature,
+      tier: feature.tier,
+      isActive: feature.isActive,
+      activatedAt: feature.activatedAt,
+      expiresAt: feature.expiresAt,
+    };
+  }
+
+  async getDockTalkUserByMarinaUserId(marinaUserId: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.marinaUserId, marinaUserId));
+    
+    return user || undefined;
+  }
+
+  async createDockTalkUserFromMarinaUser(data: { marinaUserId: string; orgId: string; email: string | null; role: string; subscriptionTier: string; isActive: boolean }): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values({
+        marinaUserId: data.marinaUserId,
+        orgId: data.orgId,
+        email: data.email,
+        // username and password remain null for MarinaMatch users
+        username: null,
+        password: null,
+        role: data.role,
+        subscriptionTier: data.subscriptionTier,
+        isActive: data.isActive,
+      })
+      .returning();
+    
+    return user;
   }
 }
 
