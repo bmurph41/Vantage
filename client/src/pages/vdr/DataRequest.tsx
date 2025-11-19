@@ -93,6 +93,10 @@ export default function DataRequest() {
     queryKey: ['/api/vdr/diligence-categories'],
   });
 
+  const { data: dueDatePresets = [] } = useQuery<Array<{ id: string; slug: string; name: string; days: number; displayOrder: number }>>({
+    queryKey: ['/api/vdr/due-date-presets'],
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       return apiRequest(`/api/vdr/projects/${projectId}/data-requests`, {
@@ -347,7 +351,29 @@ export default function DataRequest() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="dueDate">Due Date</Label>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label htmlFor="dueDate">Due Date</Label>
+                      <div className="flex gap-1">
+                        {dueDatePresets.map(preset => (
+                          <Button
+                            key={preset.id}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              const today = new Date();
+                              today.setDate(today.getDate() + preset.days);
+                              const formattedDate = today.toISOString().split('T')[0];
+                              setFormData({ ...formData, dueDate: formattedDate });
+                            }}
+                            data-testid={`button-preset-${preset.name.toLowerCase().replace(/\s/g, '-')}`}
+                          >
+                            {preset.name}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
                     <Input
                       id="dueDate"
                       type="date"
