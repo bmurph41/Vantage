@@ -19,7 +19,7 @@ export default function DockTalkRouter() {
             <Route path="/" component={Dashboard} />
             <Route path="/admin" component={AdminPage} />
             <Route path="/market-intelligence" component={MarketIntelligence} />
-            <Route path="/deals" component={DealsPage} />
+            <Route path="/m&a-spotlight" component={DealsPage} />
             <Route path="/entities/:id" component={EntityProfile} />
             <Route path="/saved" component={SavedArticles} />
             <Route component={NotFound} />

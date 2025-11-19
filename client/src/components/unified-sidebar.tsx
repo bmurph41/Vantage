@@ -102,7 +102,7 @@ const modelingNav = [
 const dockTalkNav = [
   { name: "Dashboard", href: "/docktalk", icon: LayoutDashboard },
   { name: "Market Intelligence", href: "/docktalk/market-intelligence", icon: BarChart3 },
-  { name: "M&A Spotlight", href: "/docktalk/deals", icon: Handshake },
+  { name: "M&A Spotlight", href: "/docktalk/m&a-spotlight", icon: Handshake },
   { name: "Saved Articles", href: "/docktalk/saved", icon: Bell },
   { name: "Admin Dashboard", href: "/docktalk/admin", icon: Settings },
 ];
