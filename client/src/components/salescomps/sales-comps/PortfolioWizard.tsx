@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { X, ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { X, ArrowLeft, ArrowRight, Check, Plus } from "lucide-react";
 import { salesCompsApi } from '@/lib/salescomps/api';
 import { queryKeys } from '@/lib/salescomps/queryKeys';
 import { useToast } from "@/hooks/use-toast";
@@ -95,6 +95,11 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
     setCurrentMarinaIndex(0);
     marinaForm.reset({ ...emptyMarina });
     onClose();
+  };
+
+  // Add a new marina to the count
+  const handleAddMarina = () => {
+    setMarinaCount(prev => Math.min(20, prev + 1));
   };
 
   // Step 1: Continue to Step 2
@@ -266,15 +271,28 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                   
                   <div className="space-y-2">
                     <Label htmlFor="marina-count">Number of Marinas</Label>
-                    <Input
-                      id="marina-count"
-                      type="text"
-                      value={marinaCount}
-                      onChange={(e) => setMarinaCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
-                      data-testid="input-marina-count"
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="marina-count"
+                        type="text"
+                        value={marinaCount}
+                        onChange={(e) => setMarinaCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+                        data-testid="input-marina-count"
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleAddMarina}
+                        disabled={marinaCount >= 20}
+                        data-testid="button-add-marina"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Marina
+                      </Button>
+                    </div>
                     <p className="text-sm text-muted-foreground">
-                      You can add details for each marina in the next step
+                      You can add details for each marina in the next step (max 20)
                     </p>
                   </div>
                 </CardContent>
