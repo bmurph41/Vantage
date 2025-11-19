@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Router } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { dockTalkQueryClient } from "./lib/queryClient";
 import { AuthProvider } from "./hooks/use-auth";
@@ -14,15 +14,17 @@ export default function DockTalkRouter() {
   return (
     <QueryClientProvider client={dockTalkQueryClient}>
       <AuthProvider>
-        <Switch>
-          <Route path="/docktalk" component={Dashboard} />
-          <Route path="/docktalk/admin" component={AdminPage} />
-          <Route path="/docktalk/market-intelligence" component={MarketIntelligence} />
-          <Route path="/docktalk/deals" component={DealsPage} />
-          <Route path="/docktalk/entities/:id" component={EntityProfile} />
-          <Route path="/docktalk/saved" component={SavedArticles} />
-          <Route component={NotFound} />
-        </Switch>
+        <Router base="/docktalk">
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/admin" component={AdminPage} />
+            <Route path="/market-intelligence" component={MarketIntelligence} />
+            <Route path="/deals" component={DealsPage} />
+            <Route path="/entities/:id" component={EntityProfile} />
+            <Route path="/saved" component={SavedArticles} />
+            <Route component={NotFound} />
+          </Switch>
+        </Router>
       </AuthProvider>
     </QueryClientProvider>
   );
