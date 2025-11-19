@@ -572,6 +572,20 @@ export interface IStorage {
   
   // Pending Properties - Review queue for properties created from comps
   getPendingProperties(orgId: string, status?: string): Promise<PendingProperty[]>;
+
+  // DockTalk M&A Spotlight - Deal Tracking
+  getDocktalkDeals(params: {
+    orgId: string;
+    origin?: 'marinaMatch' | 'aiExtraction';
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ deals: DocktalkDeal[]; total: number }>;
+  getDocktalkDeal(id: string, orgId: string): Promise<DocktalkDeal | undefined>;
+  getDocktalkDealByExternalId(externalId: string, orgId: string): Promise<DocktalkDeal | undefined>;
+  createDocktalkDeal(deal: InsertDocktalkDeal): Promise<DocktalkDeal>;
+  updateDocktalkDeal(id: string, deal: UpdateDocktalkDeal, orgId: string): Promise<DocktalkDeal | undefined>;
+  deleteDocktalkDeal(id: string, orgId: string): Promise<boolean>;
+  upsertDocktalkDealByExternalId(externalId: string, orgId: string, deal: InsertDocktalkDeal): Promise<DocktalkDeal>;
   getPendingProperty(id: string, orgId: string): Promise<PendingProperty | undefined>;
   createPendingProperty(data: InsertPendingProperty): Promise<PendingProperty>;
   acceptPendingProperty(id: string, orgId: string, userId: string): Promise<Property | undefined>;
@@ -4119,6 +4133,103 @@ export class DatabaseStorage implements IStorage {
       .where(eq(scPendingPropertyProfiles.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  // ============================================================================
+  // DOCKTALK M&A SPOTLIGHT METHODS
+  // ============================================================================
+
+  async getDocktalkDeals(params: {
+    orgId: string;
+    origin?: 'marinaMatch' | 'aiExtraction';
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ deals: DocktalkDeal[]; total: number }> {
+    const { orgId, origin, page = 1, pageSize = 25 } = params;
+    
+    const conditions = [
+      eq(docktalkDeals.orgId, orgId),
+      isNull(docktalkDeals.deletedAt)
+    ];
+    
+    if (origin) {
+      conditions.push(eq(docktalkDeals.origin, origin));
+    }
+
+    const [{ total }] = await db.select({ total: count() })
+      .from(docktalkDeals)
+      .where(and(...conditions));
+
+    const deals = await db.select().from(docktalkDeals)
+      .where(and(...conditions))
+      .orderBy(desc(docktalkDeals.dealDate))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    return { deals, total };
+  }
+
+  async getDocktalkDeal(id: string, orgId: string): Promise<DocktalkDeal | undefined> {
+    const [deal] = await db.select()
+      .from(docktalkDeals)
+      .where(and(
+        eq(docktalkDeals.id, id),
+        eq(docktalkDeals.orgId, orgId),
+        isNull(docktalkDeals.deletedAt)
+      ));
+    return deal || undefined;
+  }
+
+  async getDocktalkDealByExternalId(externalId: string, orgId: string): Promise<DocktalkDeal | undefined> {
+    const [deal] = await db.select()
+      .from(docktalkDeals)
+      .where(and(
+        eq(docktalkDeals.externalId, externalId),
+        eq(docktalkDeals.orgId, orgId),
+        isNull(docktalkDeals.deletedAt)
+      ));
+    return deal || undefined;
+  }
+
+  async createDocktalkDeal(deal: InsertDocktalkDeal): Promise<DocktalkDeal> {
+    const [created] = await db.insert(docktalkDeals)
+      .values(deal as any)
+      .returning();
+    return created;
+  }
+
+  async updateDocktalkDeal(id: string, deal: UpdateDocktalkDeal, orgId: string): Promise<DocktalkDeal | undefined> {
+    const updateData = { ...deal, updatedAt: new Date() };
+    const [updated] = await db.update(docktalkDeals)
+      .set(updateData)
+      .where(and(
+        eq(docktalkDeals.id, id),
+        eq(docktalkDeals.orgId, orgId),
+        isNull(docktalkDeals.deletedAt)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteDocktalkDeal(id: string, orgId: string): Promise<boolean> {
+    const [deleted] = await db.update(docktalkDeals)
+      .set({ deletedAt: new Date() })
+      .where(and(
+        eq(docktalkDeals.id, id),
+        eq(docktalkDeals.orgId, orgId)
+      ))
+      .returning();
+    return !!deleted;
+  }
+
+  async upsertDocktalkDealByExternalId(externalId: string, orgId: string, deal: InsertDocktalkDeal): Promise<DocktalkDeal> {
+    const existing = await this.getDocktalkDealByExternalId(externalId, orgId);
+    if (existing) {
+      const updated = await this.updateDocktalkDeal(existing.id, deal, orgId);
+      return updated!;
+    } else {
+      return await this.createDocktalkDeal({ ...deal, externalId, orgId });
+    }
   }
 
   async findPropertyByLocation(orgId: string, marina: string, city?: string, state?: string): Promise<Property | undefined> {
