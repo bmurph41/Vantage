@@ -11,7 +11,7 @@ import { useAuth } from "../hooks/use-auth";
 import { AuthDialog } from "../components/auth/auth-dialog";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "../lib/queryClient";
 import { 
   TrendingUp, 
   Sparkles, 

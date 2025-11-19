@@ -10,7 +10,7 @@ import { Filter, Building2, ChevronDown, Check, Save, Globe } from "lucide-react
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest } from "../lib/queryClient";
 
 interface CategoryDistribution {
   category: string;
