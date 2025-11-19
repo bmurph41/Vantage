@@ -173,8 +173,8 @@ export default function DataRequest() {
   };
 
   const handleSubmit = () => {
-    if (!formData.category || !formData.documentName) {
-      toast({ title: "Error", description: "Please fill in required fields", variant: "destructive" });
+    if (!formData.category || !formData.documentName || !formData.dueDate || !formData.priority || (!formData.assigneeId && !formData.externalAssigneeId)) {
+      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
       return;
     }
 
@@ -347,7 +347,7 @@ export default function DataRequest() {
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <Label htmlFor="dueDate">Due Date</Label>
+                      <Label htmlFor="dueDate">Due Date *</Label>
                       <div className="flex gap-1">
                         {dueDatePresets.map(preset => (
                           <Button
@@ -378,7 +378,7 @@ export default function DataRequest() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="priority">Priority</Label>
+                    <Label htmlFor="priority">Priority *</Label>
                     <Select value={formData.priority} onValueChange={(value: DataRequestPriority) => setFormData({ ...formData, priority: value })}>
                       <SelectTrigger data-testid="select-priority">
                         <SelectValue placeholder="Select priority" />
@@ -392,7 +392,7 @@ export default function DataRequest() {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="assignee">Assignee</Label>
+                    <Label htmlFor="assignee">Assignee *</Label>
                     <Select 
                       value={formData.assigneeId || formData.externalAssigneeId || "unassigned"} 
                       onValueChange={(value) => {
