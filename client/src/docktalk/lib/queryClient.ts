@@ -33,7 +33,13 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey.join("/") as string;
+    // Prefix all DockTalk API calls with /api/docktalk
+    const fullUrl = url.startsWith('/api/') && !url.startsWith('/api/docktalk/')
+      ? url.replace('/api/', '/api/docktalk/')
+      : url;
+      
+    const res = await fetch(fullUrl, {
       credentials: "include",
     });
 

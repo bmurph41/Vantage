@@ -244,7 +244,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   app.get("/api/docktalk/auth/me", (req, res) => {
-    if (req.session.user) {
+    if (req.session && req.session.user) {
       res.json({ user: { 
         id: req.session.user.id, 
         username: req.session.user.username,

@@ -48,7 +48,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function Sidebar({ 
-  selectedCategories, 
+  selectedCategories = [], 
   onCategoryToggle,
   onClearCategories,
   showBookmarked, 

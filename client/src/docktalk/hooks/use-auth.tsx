@@ -29,7 +29,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     error,
   } = useQuery({
     queryKey: ["/api/docktalk/auth/me"],
-    queryFn: () => apiRequest("/api/docktalk/auth/me"),
+    queryFn: async () => {
+      try {
+        return await apiRequest("/api/docktalk/auth/me");
+      } catch (err: any) {
+        // If 401, return null (not authenticated) instead of throwing
+        if (err.message?.includes('401')) {
+          return null;
+        }
+        throw err;
+      }
+    },
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

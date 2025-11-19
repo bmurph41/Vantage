@@ -628,7 +628,10 @@ function Router() {
         )}
       </Route>
 
-      {/* DockTalk 2.0 Full Application - Standalone Router */}
+      {/* DockTalk Full Application - Standalone Router */}
+      <Route path="/docktalk">
+        {() => <DockTalkRouter />}
+      </Route>
       <Route path="/docktalk/:rest*">
         {() => <DockTalkRouter />}
       </Route>
