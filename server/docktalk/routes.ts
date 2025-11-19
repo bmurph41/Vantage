@@ -136,8 +136,8 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   // Authentication is handled by MarinaMatch's central auth system
   // Use MarinaMatch's requireAuth middleware for protected routes
 
-  // Articles endpoints (public for browsing, bookmark requires auth)
-  app.get("/api/docktalk/articles", async (req, res) => {
+  // Authentication endpoints
+  app.post("/api/docktalk/auth/signup", async (req, res) => {
     try {
       const { username, password } = SignupSchema.parse(req.body);
       
