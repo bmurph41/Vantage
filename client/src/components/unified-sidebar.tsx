@@ -100,7 +100,7 @@ const modelingNav = [
 
 // Analysis Navigation (Sales Comps)
 const analysisNav = [
-  { name: "DockTalk 2.0", href: "/docktalk", icon: MessageSquare },
+  { name: "DockTalk", href: "/docktalk", icon: MessageSquare },
   { name: "Sales Comps", href: "/analysis/sales-comps", icon: BarChart3 },
   { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
   { name: "Demographics", href: "/analysis/demographics", icon: Users },
