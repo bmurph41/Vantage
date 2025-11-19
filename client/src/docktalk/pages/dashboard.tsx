@@ -3,7 +3,7 @@ import DockTalkHeader from "../components/DockTalkHeader";
 import DockTalkTabs from "../components/DockTalkTabs";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSystemStats } from "../lib/api";
-import { useAuth } from "../hooks/use-auth";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Dashboard() {
   const [newArticlesCount, setNewArticlesCount] = useState(0);
