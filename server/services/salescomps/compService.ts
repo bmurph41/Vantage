@@ -153,12 +153,10 @@ export class CompService {
     const contactsToCreate: Array<{ firstName: string; lastName: string; brokerage?: string }> = [];
     
     // Check if broker contact needs to be created as pending
-    if (compData.agentFirstName && compData.agentLastName && 
+    // Skip pending creation if broker is already linked via agentContactId
+    if (!compData.agentContactId && 
+        compData.agentFirstName && compData.agentLastName && 
         compData.agentFirstName.trim() && compData.agentLastName.trim()) {
-      // Note: Sales comps may have buyerContactId/sellerContactId, but broker is separate
-      // We're checking if there's an agent already linked via direct reference fields
-      // For now, always create pending since we don't have a specific agentContactId field
-      // This can be enhanced when schema is extended to include explicit broker contact linkage
       contactsToCreate.push({
         firstName: compData.agentFirstName.trim(),
         lastName: compData.agentLastName.trim(),

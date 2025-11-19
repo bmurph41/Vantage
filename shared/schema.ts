@@ -3766,6 +3766,7 @@ export const salesComps = pgTable('sales_comps', {
   brokerage: text('brokerage'), // Brokerage company name
   agentFirstName: text('agent_first_name'), // Agent first name
   agentLastName: text('agent_last_name'), // Agent last name
+  agentContactId: varchar('agent_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }), // Link to CRM contact for broker/agent
   address: text('address'),
   zip: text('zip'),
   lat: decimal('lat', { precision: 10, scale: 7 }), // Geocoded latitude
