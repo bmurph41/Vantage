@@ -4376,6 +4376,19 @@ export class DatabaseStorage implements IStorage {
     if (updates.state !== undefined) allowedUpdates.state = updates.state;
     if (updates.address !== undefined) allowedUpdates.address = updates.address;
     if (updates.salePrice !== undefined) allowedUpdates.salePrice = updates.salePrice;
+    
+    // Deep merge compMetadata to preserve existing fields
+    if (updates.compMetadata !== undefined) {
+      const current = await this.getPendingProperty(id, orgId);
+      if (current) {
+        allowedUpdates.compMetadata = {
+          ...(current.compMetadata || {}),
+          ...updates.compMetadata,
+        };
+      } else {
+        allowedUpdates.compMetadata = updates.compMetadata;
+      }
+    }
 
     if (Object.keys(allowedUpdates).length === 0) {
       // No valid updates
