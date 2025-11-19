@@ -3,9 +3,9 @@ import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserMenu } from "@/components/user-menu";
-import NotificationPreferences from "@/components/notification-preferences";
-import { useAuth } from "@/hooks/use-auth";
+import { UserMenu } from "./user-menu";
+import NotificationPreferences from "./notification-preferences";
+import { useAuth } from "../hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Settings } from "lucide-react";
 
@@ -36,7 +36,7 @@ export default function Navigation({ searchQuery, onSearchChange }: NavigationPr
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4">
-            <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+            <Link href="/docktalk" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
               <i className="fas fa-anchor text-primary text-2xl"></i>
               <h1 className="text-xl font-bold text-foreground">DockTalk 2.0</h1>
             </Link>
@@ -58,7 +58,7 @@ export default function Navigation({ searchQuery, onSearchChange }: NavigationPr
               <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"></i>
             </div>
             
-            <Link href="/admin">
+            <Link href="/docktalk/admin">
               <Button 
                 variant="ghost" 
                 size="icon"

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { updateBookmarkStatus } from "@/lib/api";
-import { Article } from "@/types/article";
+import { updateBookmarkStatus } from "../lib/api";
+import { Article } from "../types/article";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";

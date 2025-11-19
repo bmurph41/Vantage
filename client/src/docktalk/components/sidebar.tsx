@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchCategoryDistribution } from "@/lib/api";
+import { fetchCategoryDistribution } from "../lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -65,43 +65,43 @@ export default function Sidebar({
     {
       label: "All Articles",
       icon: "fas fa-home",
-      href: "/",
-      active: location === "/" && selectedCategories.length === 0 && !showBookmarked,
+      href: "/docktalk",
+      active: location === "/docktalk" && selectedCategories.length === 0 && !showBookmarked,
       testId: "nav-all-articles"
     },
     {
       label: "Market Intelligence",
       icon: "fas fa-chart-line",
-      href: "/market-intelligence",
-      active: location === "/market-intelligence",
+      href: "/docktalk/market-intelligence",
+      active: location === "/docktalk/market-intelligence",
       testId: "nav-market-intelligence"
     },
     {
       label: "M&A Spotlight",
       icon: "fas fa-handshake",
-      href: "/deals",
-      active: location === "/deals",
+      href: "/docktalk/deals",
+      active: location === "/docktalk/deals",
       testId: "nav-deals"
     },
     {
       label: "High Relevance",
       icon: "fas fa-star",
-      href: "/?filter=high-relevance",
+      href: "/docktalk?filter=high-relevance",
       active: false,
       testId: "nav-high-relevance"
     },
     {
       label: "Recent Updates",
       icon: "fas fa-clock",
-      href: "/?filter=recent",
+      href: "/docktalk?filter=recent",
       active: false,
       testId: "nav-recent"
     },
     {
       label: "Saved Articles",
       icon: "fas fa-bookmark",
-      href: "/saved",
-      active: location === "/saved",
+      href: "/docktalk/saved",
+      active: location === "/docktalk/saved",
       testId: "nav-saved"
     }
   ];

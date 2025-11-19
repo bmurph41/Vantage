@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import Navigation from "@/components/navigation";
-import Sidebar from "@/components/sidebar";
+import Navigation from "../components/navigation";
+import Sidebar from "../components/sidebar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/hooks/use-auth";
-import { AuthDialog } from "@/components/auth/auth-dialog";
+import { useAuth } from "../hooks/use-auth";
+import { AuthDialog } from "../components/auth/auth-dialog";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";

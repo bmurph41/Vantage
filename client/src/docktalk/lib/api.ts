@@ -1,4 +1,4 @@
-import { Article, SystemStats, TrendingTopic, CategoryDistribution, SourceDistribution, ArticleFilters } from "@/types/article";
+import { Article, SystemStats, TrendingTopic, CategoryDistribution, SourceDistribution, ArticleFilters } from "../types/article";
 
 const API_BASE = "/api";
 

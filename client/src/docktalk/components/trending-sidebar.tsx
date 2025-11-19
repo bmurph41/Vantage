@@ -1,4 +1,4 @@
-import { Article } from "@/types/article";
+import { Article } from "../types/article";
 import { formatDistanceToNow } from "date-fns";
 import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";

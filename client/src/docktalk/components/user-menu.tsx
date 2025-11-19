@@ -9,8 +9,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { User, LogOut, Settings, BookOpen } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
-import { AuthDialog } from "@/components/auth/auth-dialog";
+import { useAuth } from "../hooks/use-auth";
+import { AuthDialog } from "./auth/auth-dialog";
 import { useToast } from "@/hooks/use-toast";
 
 export function UserMenu() {

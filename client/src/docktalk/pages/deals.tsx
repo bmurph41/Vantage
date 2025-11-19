@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "../hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,10 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar, DollarSign, TrendingUp, Building2, Users, ExternalLink, Filter, X, BarChart3, Activity, Globe, Download, Share2 } from "lucide-react";
 import { format, parse } from "date-fns";
 import { Link } from "wouter";
-import Sidebar from "@/components/sidebar";
-import Navigation from "@/components/navigation";
+import Sidebar from "../components/sidebar";
+import Navigation from "../components/navigation";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { exportDealsToCSV, type DealExportData } from "@/lib/csv-export";
+import { exportDealsToCSV, type DealExportData } from "../lib/csv-export";
 import { useToast } from "@/hooks/use-toast";
 
 interface Deal {

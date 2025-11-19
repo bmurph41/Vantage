@@ -18,8 +18,8 @@ import {
   removeArticle,
   type RssSource,
   type PreviewArticle,
-} from "@/lib/api";
-import { Article } from "@/types/article";
+} from "../lib/api";
+import { Article } from "../types/article";
 import {
   Table,
   TableBody,
@@ -396,7 +396,7 @@ export default function AdminPage() {
               <Settings className="h-6 w-6 text-primary" />
               <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
             </div>
-            <Link href="/">
+            <Link href="/docktalk">
               <Button variant="outline" data-testid="button-home">
                 <Home className="h-4 w-4 mr-2" />
                 Back to Home

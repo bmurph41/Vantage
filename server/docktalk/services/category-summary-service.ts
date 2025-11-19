@@ -1,8 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "../db";
-import { articles, categorySummaries, summaryEdits } from "../../shared/schema";
+import { articles, categorySummaries, summaryEdits } from "@shared/docktalk-schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
-import type { CategorySummary, InsertCategorySummary } from "../../shared/schema";
+import type { CategorySummary, InsertCategorySummary } from "@shared/docktalk-schema";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY_ENV_VAR || "";
 

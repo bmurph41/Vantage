@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchTrendingTopics, fetchSourceDistribution, triggerManualFetch } from "@/lib/api";
-import { SystemStats } from "@/types/article";
+import { fetchTrendingTopics, fetchSourceDistribution, triggerManualFetch } from "../lib/api";
+import { SystemStats } from "../types/article";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";

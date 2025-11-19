@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "../hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,11 +10,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Calendar, DollarSign, TrendingUp, Building2, Users, ExternalLink, BarChart3, Activity, Globe, MapPin, Download } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
-import Sidebar from "@/components/sidebar";
-import Navigation from "@/components/navigation";
-import ArticleCard from "@/components/article-card";
+import Sidebar from "../components/sidebar";
+import Navigation from "../components/navigation";
+import ArticleCard from "../components/article-card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { exportDealsToCSV, type DealExportData } from "@/lib/csv-export";
+import { exportDealsToCSV, type DealExportData } from "../lib/csv-export";
 import { useToast } from "@/hooks/use-toast";
 
 interface Entity {
@@ -294,7 +294,7 @@ export default function EntityProfile() {
                   The entity you're looking for doesn't exist or has been removed
                 </p>
                 <Button asChild className="mt-4">
-                  <Link href="/deals">Back to Deals</Link>
+                  <Link href="/docktalk/deals">Back to Deals</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -323,13 +323,13 @@ export default function EntityProfile() {
             <BreadcrumbList>
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link href="/" data-testid="link-home">Home</Link>
+                  <Link href="/docktalk" data-testid="link-home">Home</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
                 <BreadcrumbLink asChild>
-                  <Link href="/deals" data-testid="link-entities">Entities</Link>
+                  <Link href="/docktalk/deals" data-testid="link-entities">Entities</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />

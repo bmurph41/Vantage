@@ -6959,3 +6959,10 @@ export type Scenario = ShipStoreScenario;
 export type Assumption = ShipStoreAssumption;
 export type Projection = ShipStoreProjection;
 export type HistoricalData = ShipStoreHistoricalData;
+
+// ============================================================================
+// DockTalk 2.0 Schema Integration
+// Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
+// This makes them discoverable to Drizzle migrations while keeping schemas modular
+// ============================================================================
+export * from "./docktalk-schema";

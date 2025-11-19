@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ArticleFilters, SourceDistribution } from "@/types/article";
+import { ArticleFilters, SourceDistribution } from "../types/article";
 import { formatDistanceToNow } from "date-fns";
 import { Filter, Building2, ChevronDown, Check, Save, Globe } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";

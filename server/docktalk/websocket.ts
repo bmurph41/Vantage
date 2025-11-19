@@ -1,6 +1,6 @@
 import { WebSocket, WebSocketServer } from "ws";
 import type { Server } from "http";
-import type { Article } from "../shared/schema";
+import type { Article } from "@shared/docktalk-schema";
 
 let wss: WebSocketServer | null = null;
 

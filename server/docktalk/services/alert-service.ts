@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-import type { SavedSearch, Article } from "../../shared/schema";
+import type { SavedSearch, Article } from "@shared/docktalk-schema";
 import { getUncachableResendClient } from "../lib/resend-client";
 import { toZonedTime, format as formatTZ } from "date-fns-tz";
 
