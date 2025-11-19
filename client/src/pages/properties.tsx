@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, AlertCircle, X } from "lucide-react";
+import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, AlertCircle, X, FolderPlus } from "lucide-react";
 import { FileUpload } from "@/components/file-upload";
 import PropertyDetailModal from "@/components/modals/property-detail-modal";
+import PortfolioWizard from "@/components/salescomps/sales-comps/PortfolioWizard";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -72,6 +73,7 @@ export default function Properties() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showPendingBanner, setShowPendingBanner] = useState(true);
+  const [showPortfolioWizard, setShowPortfolioWizard] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -315,6 +317,18 @@ export default function Properties() {
             >
               <Upload className="h-4 w-4 mr-1" />
               Import
+            </Button>
+            
+            {/* Create Portfolio Button */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowPortfolioWizard(true)}
+              className="h-9 text-sm"
+              data-testid="create-portfolio-button"
+            >
+              <FolderPlus className="h-4 w-4 mr-1" />
+              Portfolio
             </Button>
             
             {/* Add Property Button */}
@@ -565,6 +579,11 @@ export default function Properties() {
             setSelectedProperty(null);
           }}
           property={selectedProperty}
+        />
+
+        <PortfolioWizard
+          open={showPortfolioWizard}
+          onClose={() => setShowPortfolioWizard(false)}
         />
       </main>
     </div>
