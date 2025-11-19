@@ -169,6 +169,7 @@ export class CompService {
   /**
    * Find a matching portfolio for auto-assignment based on buyer/seller company
    * Returns the portfolio if exactly one match is found, null otherwise
+   * Matches portfolios by ownerCompanyId AND ownershipRole (buyer portfolios for buyer comps, seller portfolios for seller comps)
    */
   private async findMatchingPortfolio(
     orgId: string,
@@ -179,28 +180,34 @@ export class CompService {
       return null;
     }
 
-    // Query portfolios owned by buyer company (prioritize buyer)
+    // Query portfolios owned by buyer company with buyer role (prioritize buyer)
     const buyerPortfolios = buyerCompanyId
-      ? await this.storage.findPortfoliosByOwner(orgId, buyerCompanyId)
+      ? await this.storage.findPortfoliosByOwner(orgId, buyerCompanyId, 'buyer')
       : [];
 
-    // Query portfolios owned by seller company
+    // Validate buyer portfolios are actually portfolios
+    const validBuyerPortfolios = buyerPortfolios.filter(p => p.isPortfolio === true);
+
+    // Query portfolios owned by seller company with seller role
     const sellerPortfolios = sellerCompanyId
-      ? await this.storage.findPortfoliosByOwner(orgId, sellerCompanyId)
+      ? await this.storage.findPortfoliosByOwner(orgId, sellerCompanyId, 'seller')
       : [];
+
+    // Validate seller portfolios are actually portfolios
+    const validSellerPortfolios = sellerPortfolios.filter(p => p.isPortfolio === true);
 
     // If buyer has exactly one portfolio, use it
-    if (buyerPortfolios.length === 1) {
-      return buyerPortfolios[0];
+    if (validBuyerPortfolios.length === 1) {
+      return validBuyerPortfolios[0];
     }
 
     // If buyer has multiple or zero, try seller
-    if (sellerPortfolios.length === 1) {
-      return sellerPortfolios[0];
+    if (validSellerPortfolios.length === 1) {
+      return validSellerPortfolios[0];
     }
 
     // If both have multiple or neither has any, skip auto-assignment
-    if (buyerPortfolios.length > 1 || sellerPortfolios.length > 1) {
+    if (validBuyerPortfolios.length > 1 || validSellerPortfolios.length > 1) {
       console.log(`⚠️  Multiple portfolios found for buyer/seller companies - skipping auto-assignment`);
     }
 
