@@ -222,7 +222,7 @@ export function DocumentList({
     setIsLoadingDocument(true);
 
     try {
-      const response = await fetch(`/api/vdr/documents/${documentId}/download`, {
+      const response = await fetch(`/api/vdr/documents/${documentId}/preview`, {
         credentials: "include",
       });
 

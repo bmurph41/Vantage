@@ -459,6 +459,43 @@ router.get('/documents/:documentId', requireAuth, requireVdrAccess('view'), asyn
   }
 });
 
+router.get('/documents/:documentId/preview', requireAuth, requireVdrAccess('view'), async (req: Request, res: Response) => {
+  const { documentId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const document = await storage.vdr.documents.getDocument(documentId, orgId);
+    
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const stream = await defaultStorageProvider.download(document.storagePath);
+    
+    await storage.vdr.audit.logAction({
+      projectId: document.projectId,
+      orgId,
+      userId,
+      action: 'document_viewed',
+      resourceType: 'document',
+      resourceId: documentId,
+      metadata: { documentName: document.filename, previewMode: true }
+    });
+
+    // Set headers for inline preview (not download)
+    res.setHeader('Content-Type', document.mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${document.filename}"`);
+    res.setHeader('Content-Length', document.size);
+    res.setHeader('Cache-Control', 'private, max-age=300'); // 5-minute cache
+    
+    stream.pipe(res);
+  } catch (error: any) {
+    console.error('Error previewing document:', error);
+    res.status(500).json({ error: 'Failed to preview document' });
+  }
+});
+
 router.get('/documents/:documentId/download', requireAuth, requireVdrAccess('download'), async (req: Request, res: Response) => {
   const { documentId } = req.params;
   const orgId = (req.user as any).orgId;

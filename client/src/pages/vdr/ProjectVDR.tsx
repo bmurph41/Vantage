@@ -67,7 +67,7 @@ export default function ProjectVDR() {
             <FolderLock className="h-8 w-8 text-blue-600" />
             <div>
               <h1 className="text-3xl font-bold text-gray-900" data-testid="text-project-name">{project.name}</h1>
-              <p className="text-gray-600">{project.description || "No description"}</p>
+              <p className="text-gray-600">{project.description || `${project.name} Data Room`}</p>
             </div>
           </div>
         </div>

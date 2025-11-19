@@ -65,8 +65,10 @@ export class CompService {
     });
     
     // Create pending property if no match was found
-    // This applies to ALL comps, including individual comps within a portfolio
-    if (pendingPropertyId === 'pending' && compData.marina) {
+    // IMPORTANT: Skip pending property creation for portfolio parent comps
+    // Only child comps and individual comps should create properties
+    const isPortfolioParent = compData.isPortfolio === true;
+    if (pendingPropertyId === 'pending' && compData.marina && !isPortfolioParent) {
       try {
         const address = [
           compData.address,
@@ -102,11 +104,97 @@ export class CompService {
           reviewedBy: null,
         });
         
-        // Log pending property creation (useful for portfolio child comps)
-        const compType = compData.isChild ? 'portfolio child comp' : compData.isPortfolio ? 'portfolio parent' : 'individual comp';
+        const compType = compData.isChild ? 'portfolio child comp' : 'individual comp';
         console.log(`📝 Created pending property for ${compType}: "${compData.marina}" (comp ID: ${comp.id}, pending property ID: ${pendingProperty.id})`);
       } catch (error) {
         console.error('Error creating pending property:', error);
+      }
+    } else if (isPortfolioParent) {
+      console.log(`⏭️  Skipped pending property for portfolio parent: "${compData.marina}" (comp ID: ${comp.id})`);
+    }
+    
+    // Create pending companies from buyer/seller company data (if not already linked to CRM)
+    // Note: The 'company' field typically represents the buyer/current owner
+    // The 'seller' field represents the seller name/company
+    const companiesToCreate: Array<{ name: string; role: 'buyer' | 'seller' }> = [];
+    
+    // Check if buyer company needs to be created as pending
+    // Using 'company' field as buyer company (common convention in sales comps)
+    if (!compData.buyerCompanyId && compData.company && compData.company.trim()) {
+      companiesToCreate.push({ name: compData.company.trim(), role: 'buyer' });
+    }
+    
+    // Check if seller company needs to be created as pending
+    if (!compData.sellerCompanyId && compData.seller && compData.seller.trim()) {
+      companiesToCreate.push({ name: compData.seller.trim(), role: 'seller' });
+    }
+    
+    for (const { name, role } of companiesToCreate) {
+      try {
+        // Check for similar companies to suggest duplicates
+        const similarCompanies = await this.storage.findSimilarCompanies(compData.orgId, name);
+        
+        await this.storage.createPendingCompany({
+          orgId: compData.orgId,
+          name,
+          status: 'pending',
+          suggestedDuplicates: similarCompanies.map(c => c.id),
+          sourceMetadata: { salesCompId: comp.id, role },
+          createdBy: userId,
+        });
+        console.log(`📝 Created pending company for ${role}: "${name}" (comp ID: ${comp.id})`);
+      } catch (error) {
+        console.error(`Error creating pending company for ${role}:`, error);
+      }
+    }
+    
+    // Create pending contacts from broker/agent data (if not already linked to CRM)
+    // Only create pending contact if agent data exists and is not already linked to a CRM contact
+    const contactsToCreate: Array<{ firstName: string; lastName: string; brokerage?: string }> = [];
+    
+    // Check if broker contact needs to be created as pending
+    if (compData.agentFirstName && compData.agentLastName && 
+        compData.agentFirstName.trim() && compData.agentLastName.trim()) {
+      // Note: Sales comps may have buyerContactId/sellerContactId, but broker is separate
+      // We're checking if there's an agent already linked via direct reference fields
+      // For now, always create pending since we don't have a specific agentContactId field
+      // This can be enhanced when schema is extended to include explicit broker contact linkage
+      contactsToCreate.push({
+        firstName: compData.agentFirstName.trim(),
+        lastName: compData.agentLastName.trim(),
+        brokerage: compData.brokerage?.trim(),
+      });
+    }
+    
+    for (const contact of contactsToCreate) {
+      try {
+        const fullName = `${contact.firstName} ${contact.lastName}`;
+        
+        // Check for similar contacts to suggest duplicates
+        const similarContacts = await this.storage.findSimilarContacts(
+          compData.orgId,
+          contact.firstName,
+          contact.lastName
+        );
+        
+        await this.storage.createPendingContact({
+          orgId: compData.orgId,
+          sourceType: 'sales_comp',
+          sourceId: comp.id,
+          fullName,
+          status: 'pending',
+          suggestedDuplicates: similarContacts.map(c => c.id),
+          sourceMetadata: {
+            salesCompId: comp.id,
+            agentFirstName: contact.firstName,
+            agentLastName: contact.lastName,
+            brokerage: contact.brokerage,
+          },
+          createdBy: userId,
+        });
+        console.log(`📝 Created pending contact for broker: "${fullName}" (comp ID: ${comp.id})`);
+      } catch (error) {
+        console.error('Error creating pending contact for broker:', error);
       }
     }
     

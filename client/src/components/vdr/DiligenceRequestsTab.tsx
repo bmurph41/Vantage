@@ -168,12 +168,12 @@ export function DiligenceRequestsTab({ projectId }: DiligenceRequestsTabProps) {
                 <FormField
                   control={form.control}
                   name="category"
-                  render={({ field }) => (
+                  render={({ field, fieldState }) => (
                     <FormItem>
-                      <FormLabel>Category</FormLabel>
+                      <FormLabel className={fieldState.error ? 'text-destructive' : ''}>Category</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-request-category">
+                          <SelectTrigger data-testid="select-request-category" className={fieldState.error ? 'border-destructive ring-destructive' : ''}>
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
@@ -193,14 +193,15 @@ export function DiligenceRequestsTab({ projectId }: DiligenceRequestsTabProps) {
                 <FormField
                   control={form.control}
                   name="title"
-                  render={({ field }) => (
+                  render={({ field, fieldState }) => (
                     <FormItem>
-                      <FormLabel>Title</FormLabel>
+                      <FormLabel className={fieldState.error ? 'text-destructive' : ''}>Title</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           placeholder="e.g., Last 3 years of audited financials"
                           data-testid="input-request-title"
+                          className={fieldState.error ? 'border-destructive ring-destructive' : ''}
                         />
                       </FormControl>
                       <FormMessage />
@@ -230,12 +231,12 @@ export function DiligenceRequestsTab({ projectId }: DiligenceRequestsTabProps) {
                   <FormField
                     control={form.control}
                     name="priority"
-                    render={({ field }) => (
+                    render={({ field, fieldState }) => (
                       <FormItem>
-                        <FormLabel>Priority</FormLabel>
+                        <FormLabel className={fieldState.error ? 'text-destructive' : ''}>Priority</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-request-priority">
+                            <SelectTrigger data-testid="select-request-priority" className={fieldState.error ? 'border-destructive ring-destructive' : ''}>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
