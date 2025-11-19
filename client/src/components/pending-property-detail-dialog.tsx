@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -304,8 +305,8 @@ export function PendingPropertyDetailDialog({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="details" className="flex-1 overflow-y-auto mt-4 space-y-6">
-              <div className="flex items-center justify-between">
+            <TabsContent value="details" className="flex-1 overflow-y-auto mt-4">
+              <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold">Property Information</h3>
                 {!isEditing ? (
                   <Button
@@ -342,115 +343,397 @@ export function PendingPropertyDetailDialog({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="marinaName">Marina Name</Label>
-                  {isEditing ? (
-                    <Input
-                      id="marinaName"
-                      value={currentData.marinaName}
-                      onChange={(e) => setEditedData({ ...editedData, marinaName: e.target.value })}
-                      data-testid="input-marinaName"
-                    />
-                  ) : (
-                    <div className="p-2 bg-muted rounded">{currentData.marinaName}</div>
-                  )}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Left Column */}
+                <div className="space-y-6">
+                  {/* Identity Section */}
+                  <Card>
+                    <div className="p-4 border-b border-border">
+                      <h4 className="font-semibold">Identity</h4>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="marinaName">Marina Name *</Label>
+                        {isEditing ? (
+                          <Input
+                            id="marinaName"
+                            value={currentData.marinaName}
+                            onChange={(e) => setEditedData({ ...editedData, marinaName: e.target.value })}
+                            placeholder="Enter marina name..."
+                            data-testid="input-marinaName"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{currentData.marinaName}</div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="address">Address</Label>
+                        {isEditing ? (
+                          <Input
+                            id="address"
+                            value={currentData.address || ''}
+                            onChange={(e) => setEditedData({ ...editedData, address: e.target.value })}
+                            placeholder="Enter full address..."
+                            data-testid="input-address"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{currentData.address || 'N/A'}</div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="city">City</Label>
+                          {isEditing ? (
+                            <Input
+                              id="city"
+                              value={currentData.city || ''}
+                              onChange={(e) => setEditedData({ ...editedData, city: e.target.value })}
+                              placeholder="San Diego"
+                              data-testid="input-city"
+                            />
+                          ) : (
+                            <div className="p-2 bg-muted rounded text-sm">{currentData.city || 'N/A'}</div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="state">State</Label>
+                          {isEditing ? (
+                            <Input
+                              id="state"
+                              value={currentData.state || ''}
+                              onChange={(e) => setEditedData({ ...editedData, state: e.target.value })}
+                              placeholder="CA"
+                              data-testid="input-state"
+                            />
+                          ) : (
+                            <div className="p-2 bg-muted rounded text-sm">{currentData.state || 'N/A'}</div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="zip">Zip</Label>
+                          {isEditing ? (
+                            <Input
+                              id="zip"
+                              value={(editedData.compMetadata as any)?.zip || currentData.compMetadata?.zip || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, zip: e.target.value } })}
+                              placeholder="92101"
+                              data-testid="input-zip"
+                            />
+                          ) : (
+                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.zip || 'N/A'}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Physical Characteristics */}
+                  <Card>
+                    <div className="p-4 border-b border-border">
+                      <h4 className="font-semibold">Physical Characteristics</h4>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Wet Slips</Label>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              value={(editedData.compMetadata as any)?.wetSlips || currentData.compMetadata?.wetSlips || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, wetSlips: parseInt(e.target.value) || undefined } })}
+                              placeholder="156"
+                              data-testid="input-wetSlips"
+                            />
+                          ) : (
+                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.wetSlips || 'N/A'}</div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Dry Racks</Label>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              value={(editedData.compMetadata as any)?.dryRacks || currentData.compMetadata?.dryRacks || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, dryRacks: parseInt(e.target.value) || undefined } })}
+                              placeholder="89"
+                              data-testid="input-dryRacks"
+                            />
+                          ) : (
+                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.dryRacks || 'N/A'}</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Acres</Label>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={(editedData.compMetadata as any)?.acres || currentData.compMetadata?.acres || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, acres: parseFloat(e.target.value) || undefined } })}
+                              placeholder="12.5"
+                              data-testid="input-acres"
+                            />
+                          ) : (
+                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.acres || 'N/A'}</div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Year Built</Label>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              value={(editedData.compMetadata as any)?.yearBuilt || currentData.compMetadata?.yearBuilt || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, yearBuilt: parseInt(e.target.value) || undefined } })}
+                              placeholder="1987"
+                              data-testid="input-yearBuilt"
+                            />
+                          ) : (
+                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.yearBuilt || 'N/A'}</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Occupancy (%)</Label>
+                        {isEditing ? (
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={(editedData.compMetadata as any)?.occupancy || currentData.compMetadata?.occupancy || ''}
+                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, occupancy: parseInt(e.target.value) || undefined } })}
+                            placeholder="95"
+                            data-testid="input-occupancy"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.occupancy ? `${currentData.compMetadata.occupancy}%` : 'N/A'}</div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Body of Water</Label>
+                        {isEditing ? (
+                          <Input
+                            value={(editedData.compMetadata as any)?.bodyOfWater || currentData.compMetadata?.bodyOfWater || ''}
+                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, bodyOfWater: e.target.value } })}
+                            placeholder="Pacific Ocean"
+                            data-testid="input-bodyOfWater"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.bodyOfWater || 'N/A'}</div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="address">Address</Label>
-                  {isEditing ? (
-                    <Input
-                      id="address"
-                      value={currentData.address || ''}
-                      onChange={(e) => setEditedData({ ...editedData, address: e.target.value })}
-                      data-testid="input-address"
-                    />
-                  ) : (
-                    <div className="p-2 bg-muted rounded">{currentData.address || 'N/A'}</div>
-                  )}
-                </div>
+                {/* Right Column */}
+                <div className="space-y-6">
+                  {/* Financial Information */}
+                  <Card>
+                    <div className="p-4 border-b border-border">
+                      <h4 className="font-semibold">Financial Information</h4>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="salePrice">Sale Price</Label>
+                        {isEditing ? (
+                          <Input
+                            id="salePrice"
+                            type="number"
+                            value={currentData.salePrice || ''}
+                            onChange={(e) => setEditedData({ ...editedData, salePrice: parseInt(e.target.value) || null })}
+                            placeholder="5000000"
+                            data-testid="input-salePrice"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{formatCurrency(currentData.salePrice)}</div>
+                        )}
+                      </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  {isEditing ? (
-                    <Input
-                      id="city"
-                      value={currentData.city || ''}
-                      onChange={(e) => setEditedData({ ...editedData, city: e.target.value })}
-                      data-testid="input-city"
-                    />
-                  ) : (
-                    <div className="p-2 bg-muted rounded">{currentData.city || 'N/A'}</div>
-                  )}
-                </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="listPrice">List Price</Label>
+                        {isEditing ? (
+                          <Input
+                            id="listPrice"
+                            type="number"
+                            value={(editedData.compMetadata as any)?.listPrice || currentData.compMetadata?.listPrice || ''}
+                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, listPrice: parseInt(e.target.value) || undefined } })}
+                            placeholder="5500000"
+                            data-testid="input-listPrice"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{formatCurrency(currentData.compMetadata?.listPrice)}</div>
+                        )}
+                      </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
-                  {isEditing ? (
-                    <Input
-                      id="state"
-                      value={currentData.state || ''}
-                      onChange={(e) => setEditedData({ ...editedData, state: e.target.value })}
-                      data-testid="input-state"
-                    />
-                  ) : (
-                    <div className="p-2 bg-muted rounded">{currentData.state || 'N/A'}</div>
-                  )}
-                </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="noi">NOI</Label>
+                        {isEditing ? (
+                          <Input
+                            id="noi"
+                            type="number"
+                            value={(editedData.compMetadata as any)?.noi || currentData.compMetadata?.noi || ''}
+                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, noi: parseInt(e.target.value) || undefined } })}
+                            placeholder="450000"
+                            data-testid="input-noi"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{formatCurrency(currentData.compMetadata?.noi)}</div>
+                        )}
+                      </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="salePrice">Sale Price</Label>
-                  {isEditing ? (
-                    <Input
-                      id="salePrice"
-                      type="number"
-                      value={currentData.salePrice || ''}
-                      onChange={(e) => setEditedData({ ...editedData, salePrice: parseInt(e.target.value) || null })}
-                      data-testid="input-salePrice"
-                    />
-                  ) : (
-                    <div className="p-2 bg-muted rounded">{formatCurrency(currentData.salePrice)}</div>
-                  )}
-                </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="capRate">Cap Rate (%)</Label>
+                        {isEditing ? (
+                          <Input
+                            id="capRate"
+                            type="number"
+                            step="0.01"
+                            value={(editedData.compMetadata as any)?.capRate || currentData.compMetadata?.capRate || ''}
+                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, capRate: parseFloat(e.target.value) || undefined } })}
+                            placeholder="9.0"
+                            data-testid="input-capRate"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.capRate ? `${currentData.compMetadata.capRate}%` : 'N/A'}</div>
+                        )}
+                      </div>
 
-                <div className="space-y-2">
-                  <Label>Sale Date</Label>
-                  <div className="p-2 bg-muted rounded">
-                    {formatSaleDate(currentData.compMetadata?.saleMonth, currentData.compMetadata?.saleYear)}
-                  </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Sale Month</Label>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              min="1"
+                              max="12"
+                              value={(editedData.compMetadata as any)?.saleMonth || currentData.compMetadata?.saleMonth || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleMonth: parseInt(e.target.value) || undefined } })}
+                              placeholder="6"
+                              data-testid="input-saleMonth"
+                            />
+                          ) : (
+                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.saleMonth || 'N/A'}</div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Sale Year</Label>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              value={(editedData.compMetadata as any)?.saleYear || currentData.compMetadata?.saleYear || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleYear: parseInt(e.target.value) || undefined } })}
+                              placeholder="2023"
+                              data-testid="input-saleYear"
+                            />
+                          ) : (
+                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.saleYear || 'N/A'}</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="daysOnMarket">Days on Market</Label>
+                        {isEditing ? (
+                          <Input
+                            id="daysOnMarket"
+                            type="number"
+                            value={(editedData.compMetadata as any)?.daysOnMarket || currentData.compMetadata?.daysOnMarket || ''}
+                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, daysOnMarket: parseInt(e.target.value) || undefined } })}
+                            placeholder="120"
+                            data-testid="input-daysOnMarket"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.daysOnMarket || 'N/A'}</div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Transaction Details */}
+                  <Card>
+                    <div className="p-4 border-b border-border">
+                      <h4 className="font-semibold">Transaction Details</h4>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="saleCondition">Sale Condition</Label>
+                        {isEditing ? (
+                          <Input
+                            id="saleCondition"
+                            value={(editedData.compMetadata as any)?.saleCondition || currentData.compMetadata?.saleCondition || ''}
+                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleCondition: e.target.value } })}
+                            placeholder="As-is"
+                            data-testid="input-saleCondition"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.saleCondition || 'N/A'}</div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="broker">Broker</Label>
+                        {isEditing ? (
+                          <Input
+                            id="broker"
+                            value={(editedData.compMetadata as any)?.broker || currentData.compMetadata?.broker || ''}
+                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, broker: e.target.value } })}
+                            placeholder="ABC Realty"
+                            data-testid="input-broker"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.broker || 'N/A'}</div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="seller">Seller</Label>
+                        {isEditing ? (
+                          <Input
+                            id="seller"
+                            value={(editedData.compMetadata as any)?.seller || currentData.compMetadata?.seller || ''}
+                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, seller: e.target.value } })}
+                            placeholder="John Doe"
+                            data-testid="input-seller"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.seller || 'N/A'}</div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="buyer">Buyer</Label>
+                        {isEditing ? (
+                          <Input
+                            id="buyer"
+                            value={(editedData.compMetadata as any)?.buyer || currentData.compMetadata?.buyer || ''}
+                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, buyer: e.target.value } })}
+                            placeholder="XYZ Corp"
+                            data-testid="input-buyer"
+                          />
+                        ) : (
+                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.buyer || 'N/A'}</div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="my-6" />
 
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Comp Details</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Wet Slips</Label>
-                    <div className="p-2 bg-muted rounded">
-                      {currentData.compMetadata?.wetSlips || 'N/A'}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Dry Racks</Label>
-                    <div className="p-2 bg-muted rounded">
-                      {currentData.compMetadata?.dryRacks || 'N/A'}
-                    </div>
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label>Body of Water</Label>
-                    <div className="p-2 bg-muted rounded">
-                      {currentData.compMetadata?.bodyOfWater || 'N/A'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between pt-4">
+              <div className="flex items-center justify-between">
                 <Button
                   variant="outline"
                   onClick={() => rejectMutation.mutate(pending.id)}
