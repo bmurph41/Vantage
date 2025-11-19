@@ -203,9 +203,9 @@ export default function UnifiedSidebar() {
     const isDdPage = location === '/' || location === '/progress-report';
     const isVdrPage = location.startsWith('/vdr');
     const isModelingPage = location.startsWith('/modeling/');
-    const isAnalysisPage = location.startsWith('/analysis/');
+    const isAnalysisPage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
 
-    // Set expanded states based on current page
+    // Set expanded states - only expand the active section, collapse all others
     setOperationsExpanded(isOperationsPage);
     setFuelSalesExpanded(isFuelSalesPage);
     setShipStoreExpanded(isShipStorePage);
@@ -292,15 +292,22 @@ export default function UnifiedSidebar() {
   const SectionHeader = ({ 
     title, 
     expanded, 
-    onToggle 
+    onToggle,
+    isActive = false
   }: { 
     title: string; 
     expanded: boolean; 
     onToggle: () => void;
+    isActive?: boolean;
   }) => (
     <button
       onClick={onToggle}
-      className="flex items-center justify-between w-full px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700 transition-colors"
+      className={cn(
+        "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors",
+        isActive 
+          ? "bg-blue-600 text-white hover:bg-blue-700" 
+          : "text-gray-500 hover:text-gray-700"
+      )}
       data-testid={`toggle-${title.toLowerCase()}`}
     >
       <span>{title}</span>
@@ -386,13 +393,19 @@ export default function UnifiedSidebar() {
             <SectionHeader 
               title="Operations" 
               expanded={operationsExpanded} 
-              onToggle={() => setOperationsExpanded(!operationsExpanded)} 
+              onToggle={() => setOperationsExpanded(!operationsExpanded)}
+              isActive={location.startsWith('/operations/')}
             />
             {operationsExpanded && (
             <div className="ml-4 mt-1 mb-2">
               <button
                 onClick={() => setRentRollExpanded(!rentRollExpanded)}
-                className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                  (location.startsWith('/operations/rent-roll/') || location === '/operations/customer-analytics')
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                )}
                 data-testid="toggle-rent-roll"
               >
                 <div className="flex items-center space-x-3">
@@ -410,7 +423,12 @@ export default function UnifiedSidebar() {
               )}
               <button
                 onClick={() => setFuelSalesExpanded(!fuelSalesExpanded)}
-                className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                  location.startsWith('/operations/fuel/')
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                )}
                 data-testid="toggle-fuel-sales"
               >
                 <div className="flex items-center space-x-3">
@@ -428,7 +446,12 @@ export default function UnifiedSidebar() {
               )}
               <button
                 onClick={() => setShipStoreExpanded(!shipStoreExpanded)}
-                className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                  location.startsWith('/operations/ship-store/')
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                )}
                 data-testid="toggle-ship-store"
               >
                 <div className="flex items-center space-x-3">
@@ -446,7 +469,12 @@ export default function UnifiedSidebar() {
               )}
               <button
                 onClick={() => setMarketingExpanded(!marketingExpanded)}
-                className="flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                  location.startsWith('/operations/marketing/')
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                )}
                 data-testid="toggle-marketing"
               >
                 <div className="flex items-center space-x-3">
@@ -473,7 +501,8 @@ export default function UnifiedSidebar() {
             <SectionHeader 
               title="CRM" 
               expanded={crmExpanded} 
-              onToggle={() => setCrmExpanded(!crmExpanded)} 
+              onToggle={() => setCrmExpanded(!crmExpanded)}
+              isActive={location.startsWith('/crm/') || location === '/crm' || location.startsWith('/import-') || location === '/calendar-settings'}
             />
             {crmExpanded && dynamicCrmNav.map((item) => (
               <NavLink key={item.name} item={item} />
@@ -482,7 +511,12 @@ export default function UnifiedSidebar() {
               <div className="ml-4 mt-1 mb-2">
                 <button
                   onClick={() => setCrmToolsExpanded(!crmToolsExpanded)}
-                  className="flex items-center justify-between w-full px-4 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                  className={cn(
+                    "flex items-center justify-between w-full px-4 py-1.5 text-xs font-medium transition-colors rounded-lg",
+                    (location === '/calendar-settings' || location.startsWith('/import-'))
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "text-gray-500 hover:text-gray-700"
+                  )}
                   data-testid="toggle-tools"
                 >
                   <span>Tools & Settings</span>
@@ -502,7 +536,8 @@ export default function UnifiedSidebar() {
             <SectionHeader 
               title="Due Diligence" 
               expanded={ddExpanded} 
-              onToggle={() => setDdExpanded(!ddExpanded)} 
+              onToggle={() => setDdExpanded(!ddExpanded)}
+              isActive={location === '/' || location === '/progress-report'}
             />
             {ddExpanded && ddNav.map((item) => (
               <NavLink key={item.name} item={item} />
@@ -516,7 +551,8 @@ export default function UnifiedSidebar() {
             <SectionHeader 
               title="Data Room" 
               expanded={vdrExpanded} 
-              onToggle={() => setVdrExpanded(!vdrExpanded)} 
+              onToggle={() => setVdrExpanded(!vdrExpanded)}
+              isActive={location.startsWith('/vdr')}
             />
             {vdrExpanded && vdrNav.map((item) => (
               <NavLink key={item.name} item={item} />
@@ -530,7 +566,8 @@ export default function UnifiedSidebar() {
             <SectionHeader 
               title="Modeling" 
               expanded={modelingExpanded} 
-              onToggle={() => setModelingExpanded(!modelingExpanded)} 
+              onToggle={() => setModelingExpanded(!modelingExpanded)}
+              isActive={location.startsWith('/modeling/')}
             />
             {modelingExpanded && modelingNav.map((item) => (
               <NavLink key={item.name} item={item} />
@@ -544,7 +581,8 @@ export default function UnifiedSidebar() {
             <SectionHeader 
               title="Market Intel" 
               expanded={analysisExpanded} 
-              onToggle={() => setAnalysisExpanded(!analysisExpanded)} 
+              onToggle={() => setAnalysisExpanded(!analysisExpanded)}
+              isActive={location.startsWith('/analysis/') || location.startsWith('/docktalk')}
             />
             {analysisExpanded && analysisNav
               .filter(item => item.name !== "DockTalk" || isDockTalkEnabled)
