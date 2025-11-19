@@ -56,6 +56,7 @@ import {
   type InsertExternalUser, type InsertExternalUserProjectAccess,
   type ModelingProject, type InsertModelingProject, type UpdateModelingProject
 } from "@shared/schema";
+import { organizationFeatures, type OrganizationFeature } from "@shared/docktalk-schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count } from "drizzle-orm";
 import { VdrStorage } from "./vdr-storage";
@@ -65,6 +66,7 @@ export interface IStorage {
   // Organizations
   getOrganization(id: string): Promise<Organization | undefined>;
   createOrganization(org: InsertOrganization): Promise<Organization>;
+  getOrganizationFeatures(orgId: string): Promise<OrganizationFeature[]>;
 
   // Users
   getUser(id: string): Promise<User | undefined>;
@@ -802,6 +804,18 @@ export class DatabaseStorage implements IStorage {
   async createOrganization(org: InsertOrganization): Promise<Organization> {
     const [created] = await db.insert(organizations).values(org).returning();
     return created;
+  }
+
+  async getOrganizationFeatures(orgId: string): Promise<OrganizationFeature[]> {
+    return db
+      .select()
+      .from(organizationFeatures)
+      .where(
+        and(
+          eq(organizationFeatures.orgId, orgId),
+          eq(organizationFeatures.isActive, true)
+        )
+      );
   }
 
   async getUser(id: string): Promise<User | undefined> {

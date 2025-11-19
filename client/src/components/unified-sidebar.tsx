@@ -135,6 +135,16 @@ export default function UnifiedSidebar() {
     queryKey: ['/api/personas/me'],
   });
 
+  // Fetch organization features for add-on access control
+  const { data: orgFeatures = [] } = useQuery<any[]>({
+    queryKey: ['/api/organization/features'],
+  });
+
+  // Check if DockTalk is enabled for the organization
+  const isDockTalkEnabled = orgFeatures.some(
+    (feature: any) => feature.feature === 'docktalk' && feature.isActive
+  );
+
   // Helper function to check if user can see a section based on persona
   const canViewSection = (section: string): boolean => {
     if (!userPersona) return true; // Default to show all if no persona assigned
@@ -536,9 +546,11 @@ export default function UnifiedSidebar() {
               expanded={analysisExpanded} 
               onToggle={() => setAnalysisExpanded(!analysisExpanded)} 
             />
-            {analysisExpanded && analysisNav.map((item) => (
-              <NavLink key={item.name} item={item} />
-            ))}
+            {analysisExpanded && analysisNav
+              .filter(item => item.name !== "DockTalk" || isDockTalkEnabled)
+              .map((item) => (
+                <NavLink key={item.name} item={item} />
+              ))}
           </div>
         )}
       </nav>

@@ -232,6 +232,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Organization features endpoint
+  app.get("/api/organization/features", authenticateUser, async (req: any, res) => {
+    try {
+      const features = await storage.getOrganizationFeatures(req.user.orgId);
+      res.json(features);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch organization features" });
+    }
+  });
+
   // Initialize SalesComps services
   const parserService = new ParserService();
   const compService = new CompService(storage, parserService);
