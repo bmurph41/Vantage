@@ -161,6 +161,10 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       });
       
       // Create session (store only safe user data, no password)
+      if (!req.session) {
+        return res.status(500).json({ error: "Session not available" });
+      }
+      
       req.session.user = { 
         id: newUser.id, 
         username: newUser.username, 
@@ -209,6 +213,10 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       await dockTalkStorage.updateUserLastLogin(user.id);
       
       // Create session (store only safe user data, no password)
+      if (!req.session) {
+        return res.status(500).json({ error: "Session not available" });
+      }
+      
       req.session.user = { 
         id: user.id, 
         username: user.username, 
@@ -233,6 +241,10 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   app.post("/api/docktalk/auth/logout", (req, res) => {
+    if (!req.session) {
+      return res.status(500).json({ error: "Session not available" });
+    }
+    
     req.session.destroy((err) => {
       if (err) {
         console.error("Logout error: Session destruction failed");
@@ -347,7 +359,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   app.get("/api/docktalk/articles", async (req, res) => {
     try {
       const filters = ArticleQuerySchema.parse(req.query);
-      const userId = req.session.user?.id || null;
+      const userId = req.session && req.session.user ? req.session.user.id : null;
       const articles = await dockTalkStorage.getArticles(userId, {
         ...filters,
         fromDate: filters.fromDate ? new Date(filters.fromDate) : undefined,
@@ -357,6 +369,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       res.json(articles);
     } catch (error) {
       console.error("Error fetching articles:", error);
+      if (error instanceof z.ZodError) {
+        console.error("Validation errors:", error.errors);
+      }
       res.status(400).json({ error: "Invalid query parameters" });
     }
   });
