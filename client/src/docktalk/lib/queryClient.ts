@@ -8,11 +8,17 @@ async function throwIfResNotOk(res: Response) {
 }
 
 // Updated apiRequest function with URL-first signature for consistency
+// Automatically prefixes DockTalk API calls with /api/docktalk
 export async function apiRequest(
   url: string,
   options?: RequestInit
 ): Promise<any> {
-  const res = await fetch(url, {
+  // Prefix all DockTalk API calls with /api/docktalk
+  const fullUrl = url.startsWith('/api/') && !url.startsWith('/api/docktalk/')
+    ? url.replace('/api/', '/api/docktalk/')
+    : url;
+
+  const res = await fetch(fullUrl, {
     ...options,
     credentials: "include",
   });
@@ -39,7 +45,7 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
-export const queryClient = new QueryClient({
+export const dockTalkQueryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
@@ -53,3 +59,6 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Export as both names for backwards compatibility
+export const queryClient = dockTalkQueryClient;

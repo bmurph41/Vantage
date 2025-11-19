@@ -81,8 +81,8 @@ import SalesCompsBulkEdit from "@/pages/analysis/sales-comps/BulkEdit";
 import SalesCompsColumnManager from "@/pages/analysis/sales-comps/ColumnManager";
 import ScProjectsIndex from "@/pages/analysis/projects/Index";
 import ScProjectsReport from "@/pages/analysis/projects/Report";
-// Analysis / DockTalk pages
-import DockTalkIndex from "@/pages/analysis/docktalk/Index";
+// Analysis / DockTalk 2.0 Full Application
+import DockTalkRouter from "@/docktalk/DockTalkRouter";
 // Analysis / Rate Comps pages
 import RateCompsIndex from "@/pages/analysis/rate-comps/Index";
 import RateCompsDetail from "@/pages/analysis/rate-comps/Detail";
@@ -628,13 +628,9 @@ function Router() {
         )}
       </Route>
 
-      {/* Analysis / DockTalk Routes */}
-      <Route path="/analysis/docktalk">
-        {() => (
-          <UnifiedLayout>
-            <DockTalkIndex />
-          </UnifiedLayout>
-        )}
+      {/* DockTalk 2.0 Full Application - Standalone Router */}
+      <Route path="/docktalk/:rest*">
+        {() => <DockTalkRouter />}
       </Route>
 
       {/* Analysis / Sales Comps Routes */}

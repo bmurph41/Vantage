@@ -4,6 +4,9 @@ import { setupVite, serveStatic, log } from "./vite";
 import { deadlineMonitor } from "./deadline-monitor";
 import { reconciliationService } from "./reconciliation-service";
 import { vdrFileService } from "./vdr-file-service";
+import { registerDockTalkRoutes } from "./docktalk/routes";
+import { startDockTalkCronJobs } from "./docktalk/cron-jobs";
+import { DatabaseStorage as DockTalkStorage } from "./docktalk/storage";
 
 const app = express();
 app.use(express.json());
@@ -41,6 +44,10 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
+
+  // Initialize DockTalk storage and register routes
+  const dockTalkStorage = new DockTalkStorage();
+  registerDockTalkRoutes(app, dockTalkStorage);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -93,6 +100,14 @@ app.use((req, res, next) => {
       log('🚀 VDR file service initialized');
     } catch (error) {
       log(`❌ Failed to initialize VDR file service: ${error}`);
+    }
+
+    // Start DockTalk background jobs (RSS fetching, AI enrichment, etc.)
+    try {
+      startDockTalkCronJobs(dockTalkStorage);
+      log('🚀 DockTalk background jobs started');
+    } catch (error) {
+      log(`❌ Failed to start DockTalk background jobs: ${error}`);
     }
   });
 })();
