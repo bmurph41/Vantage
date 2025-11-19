@@ -341,18 +341,44 @@ export default function AllProjectsSummaryPage() {
                             </p>
                           )}
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          data-testid={`button-view-report-${summary.project.id}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            window.location.href = `/projects/${summary.project.id}/progress-report`;
-                          }}
-                        >
-                          View Full Report
-                        </Button>
+                        <div className="flex flex-col gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            data-testid={`button-view-report-${summary.project.id}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              window.location.href = `/projects/${summary.project.id}/progress-report`;
+                            }}
+                          >
+                            View Full Report
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            data-testid={`button-data-room-${summary.project.id}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              window.location.href = `/vdr/projects/${summary.project.id}`;
+                            }}
+                          >
+                            Data Room
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            data-testid={`button-dd-request-${summary.project.id}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              window.location.href = `/vdr/projects/${summary.project.id}?tab=requests`;
+                            }}
+                          >
+                            DD Request
+                          </Button>
+                        </div>
                       </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
