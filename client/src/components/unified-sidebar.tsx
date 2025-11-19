@@ -597,15 +597,13 @@ export default function UnifiedSidebar() {
                     href="/docktalk"
                     onClick={handleNavClick}
                     className={cn(
-                      "flex items-center px-4 py-2 text-sm rounded-lg transition-colors",
-                      location.startsWith('/docktalk')
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                      "flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors",
+                      location.startsWith('/docktalk') && "bg-blue-50 border-r-3 border-blue-600 text-blue-600 font-medium"
                     )}
                     data-testid="nav-docktalk"
                   >
-                    <MessageSquare className="w-5 h-5 mr-3" />
-                    <span>DockTalk</span>
+                    <MessageSquare className={cn("w-4 h-4 mr-3 flex-shrink-0", location.startsWith('/docktalk') && "text-blue-600")} />
+                    <span className="truncate">DockTalk</span>
                   </Link>
                 )}
                 {/* Other Analysis Pages */}
