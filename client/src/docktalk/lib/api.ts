@@ -1,6 +1,6 @@
 import { Article, SystemStats, TrendingTopic, CategoryDistribution, SourceDistribution, ArticleFilters } from "../types/article";
 
-const API_BASE = "/api";
+const API_BASE = "/api/docktalk";
 
 export async function fetchArticles(filters: ArticleFilters): Promise<Article[]> {
   const params = new URLSearchParams();
