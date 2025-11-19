@@ -4088,6 +4088,65 @@ export const scPortfolioComps = pgTable('sc_portfolio_comps', {
   uniquePortfolioComp: unique('sc_portfolio_comps_unique_idx').on(table.orgId, table.portfolioId, table.salesCompId),
 }));
 
+// ============================================================================
+// DOCKTALK M&A SPOTLIGHT
+// ============================================================================
+
+// Enum for deal origin
+export const dealOriginEnum = pgEnum("deal_origin", ["marinaMatch", "aiExtraction"]);
+
+// DockTalk deals - M&A transaction tracking
+export const docktalkDeals = pgTable('docktalk_deals', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+  
+  // Origin tracking - Primary vs AI-discovered deals
+  origin: dealOriginEnum('origin').notNull().default('aiExtraction'),
+  externalId: varchar('external_id'), // MarinaMatch Sales Comp UUID for sync
+  sourceReference: text('source_reference'), // Link back to MarinaMatch record or news article
+  
+  // Deal parties
+  buyer: text('buyer'), // Buyer company/entity name
+  seller: text('seller'), // Seller company/entity name
+  buyerCompanyId: varchar('buyer_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  sellerCompanyId: varchar('seller_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  
+  // Transaction details
+  marinaName: text('marina_name'), // Property/Marina name
+  propertyId: varchar('property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
+  transactionSize: integer('transaction_size'), // Deal value in USD
+  dealDate: date('deal_date'), // Transaction close date
+  announcedDate: date('announced_date'), // Date deal was announced
+  
+  // Location
+  city: text('city'),
+  state: text('state'),
+  region: text('region'), // "US/Domestic" or "International"
+  
+  // Marina details (from Sales Comps or AI extraction)
+  wetSlips: integer('wet_slips'),
+  dryRacks: integer('dry_racks'),
+  
+  // Metadata
+  confidence: integer('confidence'), // AI confidence score (0-100) for AI-extracted deals
+  notes: text('notes'),
+  articleUrls: text('article_urls').array().default(sql`'{}'`), // Source article links
+  
+  // Flexible data storage
+  custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
+}, (table) => ({
+  orgIdx: index('docktalk_deals_org_idx').on(table.orgId),
+  orgOriginIdx: index('docktalk_deals_org_origin_idx').on(table.orgId, table.origin),
+  orgDateIdx: index('docktalk_deals_org_date_idx').on(table.orgId, table.dealDate),
+  externalIdIdx: index('docktalk_deals_external_id_idx').on(table.externalId),
+  uniqueExternalId: unique('docktalk_deals_unique_external_idx').on(table.orgId, table.externalId),
+}));
+
 // Relations
 export const salesCompsRelations = relations(salesComps, ({ one, many }) => ({
   organization: one(organizations, {
@@ -4401,6 +4460,25 @@ export const insertScPendingPropertyProfileSchema = createInsertSchema(scPending
   createdAt: true,
 });
 export type InsertScPendingPropertyProfile = z.infer<typeof insertScPendingPropertyProfileSchema>;
+
+// ============================================================================
+// DOCKTALK M&A SPOTLIGHT - Types and Schemas
+// ============================================================================
+
+export const insertDocktalkDealSchema = createInsertSchema(docktalkDeals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateDocktalkDealSchema = insertDocktalkDealSchema.partial().omit({
+  orgId: true,
+  createdBy: true,
+});
+
+export type DocktalkDeal = typeof docktalkDeals.$inferSelect;
+export type InsertDocktalkDeal = z.infer<typeof insertDocktalkDealSchema>;
+export type UpdateDocktalkDeal = z.infer<typeof updateDocktalkDealSchema>;
 
 // Analytics/Metrics Tables
 export const scMetricSeries = pgTable('sc_metric_series', {
