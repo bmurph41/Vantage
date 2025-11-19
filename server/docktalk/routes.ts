@@ -294,9 +294,15 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         return res.status(401).json({ error: "Not authenticated" });
       }
       
+      const user = await dockTalkStorage.getUser(req.session.user.id);
+      if (!user || !user.orgId) {
+        return res.status(403).json({ error: "User organization not found" });
+      }
+      
       const { name, criteria } = SavedFilterSchema.parse(req.body);
       const filter = await dockTalkStorage.createSavedFilter({
         userId: req.session.user.id,
+        orgId: user.orgId,
         name,
         criteria,
       });
@@ -1223,10 +1229,16 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         return res.status(401).json({ error: "Not authenticated" });
       }
 
+      const user = await dockTalkStorage.getUser(req.session.user.id);
+      if (!user || !user.orgId) {
+        return res.status(403).json({ error: "User organization not found" });
+      }
+
       const data = WatchlistSchema.parse(req.body);
       const watchlist = await dockTalkStorage.createWatchlist({
         ...data,
         userId: req.session.user.id,
+        orgId: user.orgId,
       });
 
       res.status(201).json(watchlist);
@@ -1687,10 +1699,16 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         return res.status(401).json({ error: "Not authenticated" });
       }
 
+      const user = await dockTalkStorage.getUser(req.session.user.id);
+      if (!user || !user.orgId) {
+        return res.status(403).json({ error: "User organization not found" });
+      }
+
       const data = PortfolioCompanySchema.parse(req.body);
       const company = await dockTalkStorage.createPortfolioCompany({
         ...data,
         userId: req.session.user.id,
+        orgId: user.orgId,
       });
 
       res.status(201).json(company);
@@ -1811,10 +1829,16 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         return res.status(401).json({ error: "Not authenticated" });
       }
 
+      const user = await dockTalkStorage.getUser(req.session.user.id);
+      if (!user || !user.orgId) {
+        return res.status(403).json({ error: "User organization not found" });
+      }
+
       const data = SavedSearchSchema.parse(req.body);
       const search = await dockTalkStorage.createSavedSearch({
         ...data,
         userId: req.session.user.id,
+        orgId: user.orgId,
       });
 
       res.status(201).json(search);
@@ -1970,6 +1994,11 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         return res.status(401).json({ error: "Not authenticated" });
       }
 
+      const user = await dockTalkStorage.getUser(req.session.user.id);
+      if (!user || !user.orgId) {
+        return res.status(403).json({ error: "User organization not found" });
+      }
+
       const data = NotificationPreferencesSchema.parse(req.body);
       
       // Check if preferences exist
@@ -1988,6 +2017,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       } else {
         prefs = await dockTalkStorage.createUserNotificationPreferences({
           userId: req.session.user.id,
+          orgId: user.orgId,
           emailAddress: data.email,
           categories: data.categories,
           frequency: data.frequency,
@@ -2037,8 +2067,13 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         return res.status(401).json({ error: "Not authenticated" });
       }
 
+      const user = await dockTalkStorage.getUser(req.session.user.id);
+      if (!user || !user.orgId) {
+        return res.status(403).json({ error: "User organization not found" });
+      }
+
       const data = FilterPreferencesSchema.parse(req.body);
-      const prefs = await dockTalkStorage.saveUserFilterPreferences(req.session.user.id, data);
+      const prefs = await dockTalkStorage.saveUserFilterPreferences(req.session.user.id, user.orgId, data);
       res.json(prefs);
     } catch (error) {
       if (error instanceof z.ZodError) {

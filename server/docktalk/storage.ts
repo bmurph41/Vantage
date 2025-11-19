@@ -140,7 +140,7 @@ export interface IStorage {
   updateUserNotificationPreferences(userId: string, prefs: Partial<InsertUserNotificationPreferences>): Promise<UserNotificationPreferences | undefined>;
   
   getUserFilterPreferences(userId: string): Promise<UserFilterPreferences | undefined>;
-  saveUserFilterPreferences(userId: string, preferences: InsertUserFilterPreferences): Promise<UserFilterPreferences>;
+  saveUserFilterPreferences(userId: string, orgId: string, preferences: InsertUserFilterPreferences): Promise<UserFilterPreferences>;
   
   // Entity methods
   getEntityById(id: number): Promise<Entity | undefined>;
@@ -1008,12 +1008,13 @@ export class DatabaseStorage implements IStorage {
     return prefs || undefined;
   }
 
-  async saveUserFilterPreferences(userId: string, preferences: InsertUserFilterPreferences): Promise<UserFilterPreferences> {
+  async saveUserFilterPreferences(userId: string, orgId: string, preferences: InsertUserFilterPreferences): Promise<UserFilterPreferences> {
     const [result] = await db
       .insert(userFilterPreferences)
       .values({
         ...preferences,
         userId,
+        orgId,
       })
       .onConflictDoUpdate({
         target: userFilterPreferences.userId,
