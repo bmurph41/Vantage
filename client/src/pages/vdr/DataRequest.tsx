@@ -99,28 +99,16 @@ export default function DataRequest() {
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log('Mutation function called with:', data);
-      try {
-        const result = await apiRequest(`/api/vdr/projects/${projectId}/data-requests`, {
-          method: 'POST',
-          body: JSON.stringify(data),
-        });
-        console.log('Mutation result:', result);
-        return result;
-      } catch (error) {
-        console.error('Mutation error:', error);
-        throw error;
-      }
+      const result = await apiRequest('POST', `/api/vdr/projects/${projectId}/data-requests`, data);
+      return result.json();
     },
     onSuccess: () => {
-      console.log('Mutation success');
       queryClient.invalidateQueries({ queryKey: ['/api/vdr/projects', projectId, 'data-requests'] });
       setIsAddDialogOpen(false);
       resetForm();
       toast({ title: "Success", description: "Document request added" });
     },
     onError: (error: any) => {
-      console.error('Mutation onError:', error);
       toast({ 
         title: "Error", 
         description: error.message || "Failed to create request", 
@@ -131,10 +119,8 @@ export default function DataRequest() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: any) => {
-      return apiRequest(`/api/vdr/data-requests/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      });
+      const result = await apiRequest('PATCH', `/api/vdr/data-requests/${id}`, data);
+      return result.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vdr/projects', projectId, 'data-requests'] });
@@ -145,9 +131,7 @@ export default function DataRequest() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/vdr/data-requests/${id}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/vdr/data-requests/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vdr/projects', projectId, 'data-requests'] });
@@ -157,10 +141,7 @@ export default function DataRequest() {
 
   const linkDocumentMutation = useMutation({
     mutationFn: async ({ itemId, documentId }: { itemId: string; documentId: string }) => {
-      return apiRequest(`/api/vdr/data-requests/${itemId}/link-document`, {
-        method: 'POST',
-        body: JSON.stringify({ documentId }),
-      });
+      return apiRequest('POST', `/api/vdr/data-requests/${itemId}/link-document`, { documentId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vdr/projects', projectId, 'data-requests'] });
@@ -170,10 +151,7 @@ export default function DataRequest() {
 
   const bulkUpdateMutation = useMutation({
     mutationFn: async (updates: any) => {
-      return apiRequest(`/api/vdr/projects/${projectId}/data-requests/bulk-update`, {
-        method: 'POST',
-        body: JSON.stringify({ itemIds: selectedItems, updates }),
-      });
+      return apiRequest('POST', `/api/vdr/projects/${projectId}/data-requests/bulk-update`, { itemIds: selectedItems, updates });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vdr/projects', projectId, 'data-requests'] });
@@ -195,14 +173,11 @@ export default function DataRequest() {
   };
 
   const handleSubmit = () => {
-    console.log('handleSubmit called', formData);
     if (!formData.category || !formData.documentName) {
-      console.log('Validation failed - missing required fields');
       toast({ title: "Error", description: "Please fill in required fields", variant: "destructive" });
       return;
     }
 
-    console.log('Submitting data...');
     if (editingItem) {
       updateMutation.mutate({ id: editingItem.id, ...formData });
     } else {
