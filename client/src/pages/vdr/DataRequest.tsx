@@ -178,11 +178,14 @@ export default function DataRequest() {
   };
 
   const handleSubmit = () => {
+    console.log('handleSubmit called', formData);
     if (!formData.category || !formData.documentName) {
+      console.log('Validation failed - missing required fields');
       toast({ title: "Error", description: "Please fill in required fields", variant: "destructive" });
       return;
     }
 
+    console.log('Submitting data...');
     if (editingItem) {
       updateMutation.mutate({ id: editingItem.id, ...formData });
     } else {
@@ -309,7 +312,7 @@ export default function DataRequest() {
                   Add Document Request
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingItem ? 'Edit Document Request' : 'Add Document Request'}</DialogTitle>
                 </DialogHeader>
