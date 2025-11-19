@@ -4122,7 +4122,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findPropertyByLocation(orgId: string, marina: string, city?: string, state?: string): Promise<Property | undefined> {
-    const conditions = [eq(crmProperties.ownerId, orgId)];
+    const conditions = [eq(crmProperties.orgId, orgId)];
     
     // Normalize marina name for comparison (case-insensitive, trim whitespace)
     const normalizedMarina = marina.trim().toLowerCase();
@@ -4167,9 +4167,9 @@ export class DatabaseStorage implements IStorage {
     
     const similarityCondition = or(...titleConditions);
     
-    // Base conditions
+    // Base conditions - FIXED: Use orgId instead of ownerId
     const conditions = [
-      eq(crmProperties.ownerId, orgId),
+      eq(crmProperties.orgId, orgId),
       similarityCondition
     ];
     
