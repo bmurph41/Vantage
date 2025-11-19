@@ -4315,7 +4315,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async acceptPendingProperty(id: string, orgId: string, userId: string): Promise<Property | undefined> {
-    // Use transaction to ensure atomicity across 3 table updates
+    // Use transaction to ensure atomicity across all updates
     return await db.transaction(async (tx) => {
       // Get and lock the pending property with concurrency check
       const [pending] = await tx.select()
@@ -4330,6 +4330,12 @@ export class DatabaseStorage implements IStorage {
       if (!pending) {
         return undefined; // Already processed or not found
       }
+
+      // Get the sales comp to extract company/contact data
+      const [comp] = await tx.select()
+        .from(salesComps)
+        .where(eq(salesComps.id, pending.compId))
+        .limit(1);
 
       // Create the actual property
       const address = [
@@ -4364,6 +4370,91 @@ export class DatabaseStorage implements IStorage {
       await tx.update(salesComps)
         .set({ propertyId: newProperty.id })
         .where(eq(salesComps.id, pending.compId));
+
+      // Create pending companies and contacts from comp data
+      if (comp) {
+        // Create pending company from buyer company data (company field)
+        if (comp.company && comp.company.trim() && !comp.buyerCompanyId) {
+          try {
+            const similarCompanies = await this.findSimilarCompanies(orgId, comp.company.trim());
+            await tx.insert(pendingCompanies).values({
+              orgId,
+              sourceType: 'sales_comp',
+              sourceId: comp.id,
+              companyName: comp.company.trim(),
+              status: 'pending',
+              suggestedDuplicates: similarCompanies.map(c => c.id),
+              sourceMetadata: {
+                salesCompId: comp.id,
+                propertyId: newProperty.id,
+                role: 'buyer',
+              },
+              createdBy: userId,
+            });
+            console.log(`📝 Created pending company for buyer: "${comp.company.trim()}" (property ID: ${newProperty.id})`);
+          } catch (error) {
+            console.error('Error creating pending company for buyer:', error);
+          }
+        }
+
+        // Create pending company from seller data (seller field)
+        if (comp.seller && comp.seller.trim() && !comp.sellerCompanyId) {
+          try {
+            const similarCompanies = await this.findSimilarCompanies(orgId, comp.seller.trim());
+            await tx.insert(pendingCompanies).values({
+              orgId,
+              sourceType: 'sales_comp',
+              sourceId: comp.id,
+              companyName: comp.seller.trim(),
+              status: 'pending',
+              suggestedDuplicates: similarCompanies.map(c => c.id),
+              sourceMetadata: {
+                salesCompId: comp.id,
+                propertyId: newProperty.id,
+                role: 'seller',
+              },
+              createdBy: userId,
+            });
+            console.log(`📝 Created pending company for seller: "${comp.seller.trim()}" (property ID: ${newProperty.id})`);
+          } catch (error) {
+            console.error('Error creating pending company for seller:', error);
+          }
+        }
+
+        // Create pending contact from broker/agent data
+        if (comp.agentFirstName && comp.agentLastName && 
+            comp.agentFirstName.trim() && comp.agentLastName.trim() &&
+            !comp.agentContactId) {
+          try {
+            const fullName = `${comp.agentFirstName.trim()} ${comp.agentLastName.trim()}`;
+            const similarContacts = await this.findSimilarContacts(
+              orgId,
+              comp.agentFirstName.trim(),
+              comp.agentLastName.trim()
+            );
+            await tx.insert(pendingContacts).values({
+              orgId,
+              sourceType: 'sales_comp',
+              sourceId: comp.id,
+              fullName,
+              status: 'pending',
+              suggestedDuplicates: similarContacts.map(c => c.id),
+              sourceMetadata: {
+                salesCompId: comp.id,
+                propertyId: newProperty.id,
+                agentFirstName: comp.agentFirstName.trim(),
+                agentLastName: comp.agentLastName.trim(),
+                brokerage: comp.brokerage?.trim(),
+                role: 'broker',
+              },
+              createdBy: userId,
+            });
+            console.log(`📝 Created pending contact for broker: "${fullName}" (property ID: ${newProperty.id})`);
+          } catch (error) {
+            console.error('Error creating pending contact for broker:', error);
+          }
+        }
+      }
 
       return newProperty;
     });
