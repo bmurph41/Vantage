@@ -98,13 +98,9 @@ const modelingNav = [
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
 ];
 
-// DockTalk Navigation Subcategories
+// DockTalk Navigation - Single Entry Point
 const dockTalkNav = [
-  { name: "Dashboard", href: "/docktalk", icon: LayoutDashboard },
-  { name: "Market Intelligence", href: "/docktalk/market-intelligence", icon: BarChart3 },
-  { name: "M&A Spotlight", href: "/docktalk/m&a-spotlight", icon: Handshake },
-  { name: "Saved Articles", href: "/docktalk/saved", icon: Bell },
-  { name: "Admin Dashboard", href: "/docktalk/admin", icon: Settings },
+  { name: "DockTalk", href: "/docktalk", icon: MessageSquare },
 ];
 
 // Analysis Navigation (Sales Comps)
@@ -134,7 +130,6 @@ export default function UnifiedSidebar() {
   const [vdrExpanded, setVdrExpanded] = useState(false);
   const [modelingExpanded, setModelingExpanded] = useState(false);
   const [analysisExpanded, setAnalysisExpanded] = useState(false);
-  const [dockTalkExpanded, setDockTalkExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -227,7 +222,6 @@ export default function UnifiedSidebar() {
     setVdrExpanded(isVdrPage);
     setModelingExpanded(isModelingPage);
     setAnalysisExpanded(isAnalysisPage);
-    setDockTalkExpanded(isDockTalkPage);
   }, [location]);
 
   // Create dynamic CRM navigation with pending badges
@@ -597,33 +591,22 @@ export default function UnifiedSidebar() {
             />
             {analysisExpanded && (
               <div className="ml-4 mt-1 mb-2">
-                {/* DockTalk Subcategory */}
+                {/* DockTalk Direct Link */}
                 {isDockTalkEnabled && (
-                  <>
-                    <button
-                      onClick={() => setDockTalkExpanded(!dockTalkExpanded)}
-                      className={cn(
-                        "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                        location.startsWith('/docktalk')
-                          ? "bg-blue-600 text-white hover:bg-blue-700"
-                          : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                      )}
-                      data-testid="toggle-docktalk"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <MessageSquare className="w-5 h-5" />
-                        <span>DockTalk</span>
-                      </div>
-                      {dockTalkExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                    </button>
-                    {dockTalkExpanded && (
-                      <div className="ml-4">
-                        {dockTalkNav.map((item) => (
-                          <NavLink key={item.name} item={item} />
-                        ))}
-                      </div>
+                  <Link 
+                    href="/docktalk"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center px-4 py-2 text-sm rounded-lg transition-colors",
+                      location.startsWith('/docktalk')
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
                     )}
-                  </>
+                    data-testid="nav-docktalk"
+                  >
+                    <MessageSquare className="w-5 h-5 mr-3" />
+                    <span>DockTalk</span>
+                  </Link>
                 )}
                 {/* Other Analysis Pages */}
                 <div className={isDockTalkEnabled ? "mt-2" : ""}>
