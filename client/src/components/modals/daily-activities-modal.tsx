@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { 
   Dialog, 
   DialogContent, 
@@ -27,9 +28,18 @@ import {
   Activity,
   Clock,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Phone,
+  Mail,
+  MessageSquare,
+  Video,
+  FileText,
+  XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import type { Activity as CRMActivity, ActivityTemplate } from "@shared/schema";
+import { format, isToday, isSameDay } from "date-fns";
+import { ActivityComposerModal } from "./activity-composer-modal";
 
 interface DailyActivitiesModalProps {
   open: boolean;
@@ -51,6 +61,63 @@ interface DailyActivitiesModalProps {
   isBoxClickable: (activityIndex: number) => boolean;
 }
 
+const activityTypeIcons: Record<string, any> = {
+  call: Phone,
+  email: Mail,
+  sms: MessageSquare,
+  meeting: Video,
+  note: FileText,
+  showing: Calendar,
+};
+
+function ActivityCard({ activity }: { activity: CRMActivity }) {
+  const Icon = activityTypeIcons[activity.type] || FileText;
+  
+  return (
+    <Card className="mb-2" data-testid={`card-activity-${activity.id}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Icon className="h-4 w-4 text-primary" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium" data-testid={`text-activity-subject-${activity.id}`}>
+                {activity.subject || activity.type}
+              </h4>
+              {activity.status === "completed" && (
+                <CheckCircle className="h-4 w-4 text-green-600" data-testid={`icon-completed-${activity.id}`} />
+              )}
+              {activity.status === "cancelled" && (
+                <XCircle className="h-4 w-4 text-red-600" data-testid={`icon-cancelled-${activity.id}`} />
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1" data-testid={`text-activity-description-${activity.id}`}>
+              {activity.description}
+            </p>
+            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+              {activity.scheduledAt && (
+                <span className="flex items-center gap-1" data-testid={`text-scheduled-${activity.id}`}>
+                  <Clock className="h-3 w-3" />
+                  {format(new Date(activity.scheduledAt), "MMM d, yyyy h:mm a")}
+                </span>
+              )}
+              {activity.direction && (
+                <span className="capitalize" data-testid={`text-direction-${activity.id}`}>
+                  {activity.direction}
+                </span>
+              )}
+              {activity.duration && (
+                <span data-testid={`text-duration-${activity.id}`}>{activity.duration} min</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function DailyActivitiesModal({
   open,
   onOpenChange,
@@ -68,6 +135,25 @@ export function DailyActivitiesModal({
   const [selectedBox, setSelectedBox] = useState<number | null>(null);
   const [showPastDayWarning, setShowPastDayWarning] = useState(false);
   const [pendingBoxIndex, setPendingBoxIndex] = useState<number | null>(null);
+  const [showActivityComposer, setShowActivityComposer] = useState(false);
+
+  // Fetch CRM activities
+  const { data: allActivities = [] } = useQuery<CRMActivity[]>({
+    queryKey: ['/api/activities'],
+    enabled: open,
+  });
+
+  // Fetch activity templates
+  const { data: templates = [] } = useQuery<ActivityTemplate[]>({
+    queryKey: ['/api/activity-templates'],
+    enabled: open,
+  });
+
+  // Filter activities for this specific day
+  const dayActivities = allActivities.filter(activity => {
+    if (!activity.scheduledAt) return false;
+    return isSameDay(new Date(activity.scheduledAt), date);
+  });
 
   // Generate activity boxes based on target (minimum 16 boxes as shown in image)
   const totalBoxes = Math.max(16, targetActivities);
@@ -399,8 +485,54 @@ export function DailyActivitiesModal({
               </CardContent>
             </Card>
           )}
+
+          {/* CRM Activities Section */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-blue-600" />
+                  {dayName}'s Activities
+                </CardTitle>
+                <Button
+                  size="sm"
+                  onClick={() => setShowActivityComposer(true)}
+                  data-testid="button-create-activity"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Activity
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent data-testid="section-day-activities">
+              {dayActivities.length === 0 ? (
+                <div className="text-center py-8">
+                  <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    No activities for {dayName} yet
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Start tracking your prospecting activities above
+                  </p>
+                </div>
+              ) : (
+                dayActivities.map((activity) => (
+                  <ActivityCard key={activity.id} activity={activity} />
+                ))
+              )}
+            </CardContent>
+          </Card>
         </div>
       </DialogContent>
+
+      {/* Activity Composer Dialog */}
+      <Dialog open={showActivityComposer} onOpenChange={setShowActivityComposer}>
+        <ActivityComposerModal 
+          templates={templates} 
+          onClose={() => setShowActivityComposer(false)}
+          defaultDate={date}
+        />
+      </Dialog>
 
       {/* Past Day Warning Dialog */}
       <AlertDialog open={showPastDayWarning} onOpenChange={setShowPastDayWarning}>
