@@ -8,8 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar, DollarSign, TrendingUp, Building2, Users, ExternalLink, Filter, X, BarChart3, Activity, Globe, Download, Share2 } from "lucide-react";
 import { format, parse } from "date-fns";
 import { Link } from "wouter";
-import Sidebar from "../components/sidebar";
-import Navigation from "../components/navigation";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { exportDealsToCSV, type DealExportData } from "../lib/csv-export";
 import { useToast } from "@/hooks/use-toast";
@@ -226,19 +224,8 @@ export default function DealsPage() {
   const activeFiltersCount = [transactionTypeFilter, statusFilter, regionFilter].filter(f => f).length;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-      
-      <div className="flex">
-        <Sidebar 
-          selectedCategories={[]}
-          onCategoryToggle={() => {}}
-          onClearCategories={() => {}}
-          showBookmarked={false}
-          onBookmarkedChange={() => {}}
-        />
-
-        <main className="flex-1 p-8">
+    <div className="h-full bg-background overflow-auto p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-foreground mb-2" data-testid="text-page-title">
@@ -665,8 +652,7 @@ export default function DealsPage() {
               ))}
             </div>
           )}
-        </main>
-      </div>
+        </div>
     </div>
   );
 }

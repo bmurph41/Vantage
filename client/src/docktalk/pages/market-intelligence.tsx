@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import Navigation from "../components/navigation";
-import Sidebar from "../components/sidebar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -349,20 +347,8 @@ export default function MarketIntelligence() {
   const displaySummaries = summaries || [];
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Navigation searchQuery="" onSearchChange={() => {}} />
-      
-      <div className="flex flex-1">
-        <Sidebar 
-          selectedCategories={[]} 
-          onCategoryToggle={() => {}} 
-          onClearCategories={() => {}}
-          showBookmarked={false}
-          onBookmarkedChange={() => {}}
-        />
-        
-        <main className="flex-1 p-6">
-          <div className="max-w-7xl mx-auto">
+    <div className="h-full bg-background overflow-auto p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-6">
               <div className="flex items-center justify-between mb-4">
@@ -559,9 +545,7 @@ export default function MarketIntelligence() {
                 ))}
               </div>
             )}
-          </div>
-        </main>
-      </div>
+        </div>
     </div>
   );
 }

@@ -2,8 +2,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchArticles, fetchSystemStats, triggerManualFetch } from "../lib/api";
 import { ArticleFilters } from "../types/article";
-import Navigation from "../components/navigation";
-import Sidebar from "../components/sidebar";
 import FilterBar from "../components/filter-bar";
 import ArticleCard from "../components/article-card";
 import HeroArticle from "../components/hero-article";
@@ -181,35 +179,8 @@ export default function SavedArticles() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <Navigation 
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        data-testid="main-navigation"
-      />
-      
-      <div className="flex">
-        <Sidebar 
-          selectedCategories={filters.categories || []}
-          onCategoryToggle={(category) => {
-            const currentCategories = filters.categories || [];
-            const newCategories = currentCategories.includes(category)
-              ? currentCategories.filter(c => c !== category)
-              : [...currentCategories, category];
-            
-            handleFilterChange({ 
-              categories: newCategories.length > 0 ? newCategories : undefined 
-            });
-          }}
-          onClearCategories={() => {
-            handleFilterChange({ categories: undefined });
-          }}
-          showBookmarked={showBookmarked}
-          onBookmarkedChange={setShowBookmarked}
-          data-testid="sidebar"
-        />
-        
-        <div className="flex-1 p-6 lg:p-8">
+    <div className="h-full bg-gray-50 dark:bg-gray-950">
+      <div className="h-full overflow-auto p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
             {/* Action Bar with Fetch Button */}
             <div className="flex items-center justify-between mb-4">
@@ -337,7 +308,6 @@ export default function SavedArticles() {
             )}
           </div>
         </div>
-      </div>
     </div>
   );
 }

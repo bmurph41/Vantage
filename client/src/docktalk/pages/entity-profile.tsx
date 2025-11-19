@@ -10,8 +10,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Calendar, DollarSign, TrendingUp, Building2, Users, ExternalLink, BarChart3, Activity, Globe, MapPin, Download } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
-import Sidebar from "../components/sidebar";
-import Navigation from "../components/navigation";
 import ArticleCard from "../components/article-card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { exportDealsToCSV, type DealExportData } from "../lib/csv-export";
@@ -246,26 +244,14 @@ export default function EntityProfile() {
 
   if (entityLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Navigation searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-        
-        <div className="flex">
-          <Sidebar 
-            selectedCategories={[]}
-            onCategoryToggle={() => {}}
-            onClearCategories={() => {}}
-            showBookmarked={false}
-            onBookmarkedChange={() => {}}
-          />
-
-          <main className="flex-1 p-8">
+      <div className="h-full bg-background overflow-auto p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
             <Skeleton className="h-8 w-64 mb-8" />
             <Skeleton className="h-12 w-96 mb-4" />
             <Skeleton className="h-24 w-full mb-8" />
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
               {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
             </div>
-          </main>
         </div>
       </div>
     );
@@ -273,19 +259,8 @@ export default function EntityProfile() {
 
   if (!entity) {
     return (
-      <div className="min-h-screen bg-background">
-        <Navigation searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-        
-        <div className="flex">
-          <Sidebar 
-            selectedCategories={[]}
-            onCategoryToggle={() => {}}
-            onClearCategories={() => {}}
-            showBookmarked={false}
-            onBookmarkedChange={() => {}}
-          />
-
-          <main className="flex-1 p-8">
+      <div className="h-full bg-background overflow-auto p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
             <Card>
               <CardContent className="py-12 text-center">
                 <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -298,26 +273,14 @@ export default function EntityProfile() {
                 </Button>
               </CardContent>
             </Card>
-          </main>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-      
-      <div className="flex">
-        <Sidebar 
-          selectedCategories={[]}
-          onCategoryToggle={() => {}}
-          onClearCategories={() => {}}
-          showBookmarked={false}
-          onBookmarkedChange={() => {}}
-        />
-
-        <main className="flex-1 p-8">
+    <div className="h-full bg-background overflow-auto p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto">
           {/* Breadcrumb Navigation */}
           <Breadcrumb className="mb-6" data-testid="breadcrumb-navigation">
             <BreadcrumbList>
@@ -788,7 +751,6 @@ export default function EntityProfile() {
               )}
             </CardContent>
           </Card>
-        </main>
       </div>
     </div>
   );

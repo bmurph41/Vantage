@@ -632,12 +632,20 @@ function Router() {
         )}
       </Route>
 
-      {/* DockTalk Full Application - Standalone Router */}
+      {/* DockTalk Full Application - Uses Unified Layout */}
       <Route path="/docktalk">
-        {() => <DockTalkRouter />}
+        {() => (
+          <UnifiedLayout>
+            <DockTalkRouter />
+          </UnifiedLayout>
+        )}
       </Route>
       <Route path="/docktalk/:rest*">
-        {() => <DockTalkRouter />}
+        {() => (
+          <UnifiedLayout>
+            <DockTalkRouter />
+          </UnifiedLayout>
+        )}
       </Route>
 
       {/* Analysis / Sales Comps Routes */}
