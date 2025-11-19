@@ -7,6 +7,7 @@ import { vdrFileService } from "./vdr-file-service";
 import { registerDockTalkRoutes } from "./docktalk/routes";
 import { startDockTalkCronJobs } from "./docktalk/cron-jobs";
 import { DatabaseStorage as DockTalkStorage } from "./docktalk/storage";
+import { initializeWebSocket } from "./docktalk/websocket";
 
 const app = express();
 app.use(express.json());
@@ -108,6 +109,14 @@ app.use((req, res, next) => {
       log('🚀 DockTalk background jobs started');
     } catch (error) {
       log(`❌ Failed to start DockTalk background jobs: ${error}`);
+    }
+
+    // Initialize DockTalk WebSocket for real-time article updates
+    try {
+      initializeWebSocket(server);
+      log('🚀 DockTalk WebSocket initialized');
+    } catch (error) {
+      log(`❌ Failed to initialize DockTalk WebSocket: ${error}`);
     }
   });
 })();
