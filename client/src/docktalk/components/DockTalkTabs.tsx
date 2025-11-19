@@ -17,9 +17,9 @@ export default function DockTalkTabs() {
           <span>Market Intelligence</span>
         </TabsTrigger>
         <TabsTrigger 
-          value="deals" 
+          value="m&a-spotlight" 
           className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-3"
-          data-testid="tab-deals"
+          data-testid="tab-m&a-spotlight"
         >
           <Handshake className="w-4 h-4" />
           <span>M&A Spotlight</span>
@@ -38,7 +38,7 @@ export default function DockTalkTabs() {
         <MarketIntelligencePage />
       </TabsContent>
 
-      <TabsContent value="deals" className="mt-0">
+      <TabsContent value="m&a-spotlight" className="mt-0">
         <DealsPage />
       </TabsContent>
 
