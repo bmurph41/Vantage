@@ -483,6 +483,7 @@ export interface IStorage {
   deleteSalesComp(id: string, orgId: string, deletedBy: string): Promise<boolean>;
   bulkUpdateSalesComps(ids: string[], updates: UpdateSalesComp, orgId: string): Promise<number>;
   bulkDeleteSalesComps(ids: string[], orgId: string, deletedBy: string): Promise<number>;
+  findPortfoliosByOwner(orgId: string, ownerCompanyId: string): Promise<SalesComp[]>;
 
   // SalesComps - Columns Management
   getCompColumns(orgId: string): Promise<CompColumn[]>;
@@ -3640,6 +3641,17 @@ export class DatabaseStorage implements IStorage {
     }
     
     return totalDeleted;
+  }
+
+  async findPortfoliosByOwner(orgId: string, ownerCompanyId: string): Promise<SalesComp[]> {
+    return await db.select().from(salesComps)
+      .where(and(
+        eq(salesComps.orgId, orgId),
+        eq(salesComps.isPortfolio, true),
+        eq(salesComps.ownerCompanyId, ownerCompanyId),
+        isNull(salesComps.deletedAt)
+      ))
+      .orderBy(desc(salesComps.createdAt));
   }
 
   // Columns Operations

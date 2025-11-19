@@ -3816,6 +3816,8 @@ export const salesComps = pgTable('sales_comps', {
   // Portfolio functionality
   isPortfolio: boolean('is_portfolio').default(false),
   parentPortfolioId: varchar('parent_portfolio_id').references((): any => salesComps.id, { onDelete: 'cascade' }),
+  ownerCompanyId: varchar('owner_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  ownershipRole: varchar('ownership_role', { length: 20 }), // 'buyer' | 'seller' - which role the owner played
 
   // Link to CRM Property
   propertyId: varchar('property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
@@ -3836,6 +3838,7 @@ export const salesComps = pgTable('sales_comps', {
   orgCoastalIdx: index('sales_comps_org_coastal_idx').on(table.orgId, table.coastalType),
   orgMarinaIdx: index('sales_comps_org_marina_idx').on(table.orgId, table.marina),
   orgRegionIdx: index('sales_comps_org_region_idx').on(table.orgId, table.region),
+  orgOwnerPortfolioIdx: index('sales_comps_org_owner_portfolio_idx').on(table.orgId, table.ownerCompanyId, table.isPortfolio),
 }));
 
 // Custom storage types table - per-organization customizable storage types

@@ -40,9 +40,28 @@ export class CompService {
       }
     }
 
+    // Auto-assign to portfolio based on buyer/seller company match
+    let parentPortfolioId = compData.parentPortfolioId;
+    if (!parentPortfolioId && !compData.isPortfolio && (compData.buyerCompanyId || compData.sellerCompanyId)) {
+      try {
+        const matchingPortfolio = await this.findMatchingPortfolio(
+          compData.orgId,
+          compData.buyerCompanyId,
+          compData.sellerCompanyId
+        );
+        if (matchingPortfolio) {
+          parentPortfolioId = matchingPortfolio.id;
+          console.log(`✨ Auto-assigned comp "${compData.marina}" to portfolio "${matchingPortfolio.marina}" (owner: ${matchingPortfolio.ownerCompanyId})`);
+        }
+      } catch (error) {
+        console.error('Error auto-assigning to portfolio:', error);
+      }
+    }
+
     const comp = await this.storage.createComp({
       ...compData,
       propertyId,
+      parentPortfolioId,
     });
     
     // Create pending property if no match was found
@@ -145,6 +164,47 @@ export class CompService {
     }
 
     return success;
+  }
+
+  /**
+   * Find a matching portfolio for auto-assignment based on buyer/seller company
+   * Returns the portfolio if exactly one match is found, null otherwise
+   */
+  private async findMatchingPortfolio(
+    orgId: string,
+    buyerCompanyId?: string | null,
+    sellerCompanyId?: string | null
+  ): Promise<SalesComp | null> {
+    if (!buyerCompanyId && !sellerCompanyId) {
+      return null;
+    }
+
+    // Query portfolios owned by buyer company (prioritize buyer)
+    const buyerPortfolios = buyerCompanyId
+      ? await this.storage.findPortfoliosByOwner(orgId, buyerCompanyId)
+      : [];
+
+    // Query portfolios owned by seller company
+    const sellerPortfolios = sellerCompanyId
+      ? await this.storage.findPortfoliosByOwner(orgId, sellerCompanyId)
+      : [];
+
+    // If buyer has exactly one portfolio, use it
+    if (buyerPortfolios.length === 1) {
+      return buyerPortfolios[0];
+    }
+
+    // If buyer has multiple or zero, try seller
+    if (sellerPortfolios.length === 1) {
+      return sellerPortfolios[0];
+    }
+
+    // If both have multiple or neither has any, skip auto-assignment
+    if (buyerPortfolios.length > 1 || sellerPortfolios.length > 1) {
+      console.log(`⚠️  Multiple portfolios found for buyer/seller companies - skipping auto-assignment`);
+    }
+
+    return null;
   }
 
   async bulkUpdateComps(ids: string[], updates: UpdateSalesComp, orgId: string, userId: string): Promise<number> {
