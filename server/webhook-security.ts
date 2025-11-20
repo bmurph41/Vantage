@@ -247,39 +247,9 @@ class RedisIdempotencyManager {
   }
 
   private initializeRedis(): void {
-    try {
-      if (this.redisConfig?.url) {
-        this.redis = new Redis(this.redisConfig.url);
-      } else if (this.redisConfig?.host) {
-        this.redis = new Redis({
-          host: this.redisConfig.host,
-          port: this.redisConfig.port || 6379,
-          password: this.redisConfig.password,
-          db: this.redisConfig.db || 0,
-        });
-      } else {
-        // Try to connect to default Redis
-        this.redis = new Redis({
-          host: 'localhost',
-          port: 6379,
-          lazyConnect: true,
-          maxRetriesPerRequest: 3,
-        });
-      }
-
-      this.redis.on('error', (err) => {
-        console.warn('Redis connection failed, falling back to in-memory storage:', err.message);
-        this.redis = null;
-        this.setupFallbackCleanup();
-      });
-
-      this.redis.on('connect', () => {
-        console.log('Redis connected for webhook idempotency');
-      });
-    } catch (error) {
-      console.warn('Failed to initialize Redis, using in-memory fallback:', error);
-      this.setupFallbackCleanup();
-    }
+    // Use in-memory storage only (no Redis connection)
+    this.redis = null;
+    this.setupFallbackCleanup();
   }
 
   private setupFallbackCleanup(): void {
