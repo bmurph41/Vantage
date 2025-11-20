@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,34 +7,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { User, LogOut, Settings, BookOpen } from "lucide-react";
-import { useAuth } from "../hooks/use-auth";
-import { AuthDialog } from "./auth/auth-dialog";
-import { useToast } from "@/hooks/use-toast";
+import { User, Settings, BookOpen } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export function UserMenu() {
-  const { user, logout, isAuthenticated, isLoading } = useAuth();
-  const { toast } = useToast();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  const handleLogout = async () => {
-    try {
-      setIsLoggingOut(true);
-      await logout();
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to logout. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -43,28 +19,8 @@ export function UserMenu() {
     );
   }
 
-  if (!isAuthenticated || !user) {
-    return (
-      <div className="flex items-center space-x-2">
-        <AuthDialog defaultMode="login">
-          <Button 
-            variant="ghost" 
-            size="sm"
-            data-testid="button-login"
-          >
-            Sign In
-          </Button>
-        </AuthDialog>
-        <AuthDialog defaultMode="signup">
-          <Button 
-            size="sm"
-            data-testid="button-signup"
-          >
-            Sign Up
-          </Button>
-        </AuthDialog>
-      </div>
-    );
+  if (!user) {
+    return null;
   }
 
   return (
@@ -77,7 +33,7 @@ export function UserMenu() {
         >
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-blue-500 text-white">
-              {user.username.charAt(0).toUpperCase()}
+              {(user.name || user.email || 'U').charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
         </Button>
@@ -86,10 +42,10 @@ export function UserMenu() {
         <div className="flex items-center justify-start gap-2 p-2">
           <div className="flex flex-col space-y-1 leading-none">
             <p className="font-medium" data-testid="text-username">
-              {user.username}
+              {user.name || user.email}
             </p>
             <p className="text-xs text-muted-foreground">
-              Marina Industry Professional
+              {user.email}
             </p>
           </div>
         </div>
@@ -114,16 +70,6 @@ export function UserMenu() {
         >
           <Settings className="mr-2 h-4 w-4" />
           Preferences
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="cursor-pointer text-red-600 focus:text-red-600"
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-          data-testid="menu-item-logout"
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          {isLoggingOut ? "Signing out..." : "Sign Out"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserMenu } from "./user-menu";
 import NotificationPreferences from "./notification-preferences";
-import { useAuth } from "../hooks/use-auth";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Settings } from "lucide-react";
 
@@ -16,19 +16,9 @@ interface NavigationProps {
 
 export default function Navigation({ searchQuery, onSearchChange }: NavigationProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const { isAuthenticated } = useAuth();
-  const { toast } = useToast();
 
   const handleBellClick = () => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to manage your notification preferences. Click 'Sign In' in the top right.",
-        duration: 5000,
-      });
-    } else {
-      setNotificationsOpen(true);
-    }
+    setNotificationsOpen(true);
   };
 
   return (
