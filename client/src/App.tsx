@@ -633,6 +633,13 @@ function Router() {
       </Route>
 
       {/* DockTalk Full Application - Uses Unified Layout */}
+      <Route path="/docktalk">
+        {() => (
+          <UnifiedLayout>
+            <DockTalkRouter />
+          </UnifiedLayout>
+        )}
+      </Route>
       <Route path="/docktalk/:rest*">
         {() => (
           <UnifiedLayout>
