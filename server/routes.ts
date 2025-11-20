@@ -3689,17 +3689,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WEBHOOK ENDPOINT FOR DOCUMENT EVENTS
   // =============================================================================
 
-  // Initialize webhook security (this would typically be configured with environment variables)
+  // Initialize webhook security (uses in-memory storage for idempotency)
   const webhookSecurity = new WebhookSecurity({
     secret: process.env.WEBHOOK_SECRET || "default-webhook-secret-key",
     timestampToleranceMinutes: 5,
     requireIdempotencyKey: true,
-    redis: {
-      // Redis configuration - would be from environment variables in production
-      host: process.env.REDIS_HOST || "localhost",
-      port: parseInt(process.env.REDIS_PORT || "6379"),
-      password: process.env.REDIS_PASSWORD,
-    }
   });
 
   // Raw body parser middleware for webhook verification
