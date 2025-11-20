@@ -134,10 +134,11 @@ const BookmarkSchema = z.object({
 export async function registerDockTalkRoutes(app: Express, dockTalkStorage: IStorage): Promise<void> {
   // Note: DockTalk routes are integrated into MarinaMatch
   // Authentication is handled by MarinaMatch's central auth system
-  // Use MarinaMatch's requireAuth middleware for protected routes
+  // All routes use requireMarinaMatchAuth middleware
 
-  // Authentication endpoints
-  app.post("/api/docktalk/auth/signup", async (req, res) => {
+  // Legacy Standalone Authentication Endpoints - DISABLED in integrated version
+  // These endpoints are not used when DockTalk is integrated into MarinaMatch
+  /* app.post("/api/docktalk/auth/signup", async (req, res) => {
     try {
       const { username, password } = SignupSchema.parse(req.body);
       
@@ -266,7 +267,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     } else {
       res.status(401).json({ error: "Not authenticated" });
     }
-  });
+  }); */
 
   // Saved Filters endpoints
   const SavedFilterSchema = z.object({
@@ -274,18 +275,13 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     criteria: z.string(),
   });
 
-  app.get("/api/docktalk/saved-filters", async (req, res) => {
+  app.get("/api/docktalk/saved-filters", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
+      if (!req.dockTalkUser) {
         return res.status(401).json({ error: "Not authenticated" });
       }
       
-      const user = await dockTalkStorage.getUser(req.session.user.id);
-      if (!user || !user.orgId) {
-        return res.status(403).json({ error: "User organization not found" });
-      }
-      
-      const filters = await dockTalkStorage.getSavedFilters(req.session.user.id, user.orgId);
+      const filters = await dockTalkStorage.getSavedFilters(req.dockTalkUser.id, req.dockTalkUser.orgId);
       res.json(filters);
     } catch (error) {
       console.error("Error fetching saved filters:", error);
@@ -293,21 +289,16 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.post("/api/docktalk/saved-filters", async (req, res) => {
+  app.post("/api/docktalk/saved-filters", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
+      if (!req.dockTalkUser) {
         return res.status(401).json({ error: "Not authenticated" });
-      }
-      
-      const user = await dockTalkStorage.getUser(req.session.user.id);
-      if (!user || !user.orgId) {
-        return res.status(403).json({ error: "User organization not found" });
       }
       
       const { name, criteria } = SavedFilterSchema.parse(req.body);
       const filter = await dockTalkStorage.createSavedFilter({
-        userId: req.session.user.id,
-        orgId: user.orgId,
+        userId: req.dockTalkUser.id,
+        orgId: req.dockTalkUser.orgId,
         name,
         criteria,
       });
@@ -322,20 +313,15 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.patch("/api/docktalk/saved-filters/:id", async (req, res) => {
+  app.patch("/api/docktalk/saved-filters/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
+      if (!req.dockTalkUser) {
         return res.status(401).json({ error: "Not authenticated" });
-      }
-      
-      const user = await dockTalkStorage.getUser(req.session.user.id);
-      if (!user || !user.orgId) {
-        return res.status(403).json({ error: "User organization not found" });
       }
       
       const id = req.params.id;
       const body = SavedFilterSchema.partial().parse(req.body);
-      const filter = await dockTalkStorage.updateSavedFilter(id, req.session.user.id, user.orgId, body);
+      const filter = await dockTalkStorage.updateSavedFilter(id, req.dockTalkUser.id, req.dockTalkUser.orgId, body);
       
       if (!filter) {
         return res.status(404).json({ error: "Saved filter not found" });
@@ -351,19 +337,14 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.delete("/api/docktalk/saved-filters/:id", async (req, res) => {
+  app.delete("/api/docktalk/saved-filters/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
-      if (!req.session.user) {
+      if (!req.dockTalkUser) {
         return res.status(401).json({ error: "Not authenticated" });
       }
       
-      const user = await dockTalkStorage.getUser(req.session.user.id);
-      if (!user || !user.orgId) {
-        return res.status(403).json({ error: "User organization not found" });
-      }
-      
       const id = req.params.id;
-      const deleted = await dockTalkStorage.deleteSavedFilter(id, req.session.user.id, user.orgId);
+      const deleted = await dockTalkStorage.deleteSavedFilter(id, req.dockTalkUser.id, req.dockTalkUser.orgId);
       
       if (!deleted) {
         return res.status(404).json({ error: "Saved filter not found" });
@@ -377,10 +358,10 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Articles endpoints
-  app.get("/api/docktalk/articles", async (req, res) => {
+  app.get("/api/docktalk/articles", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const filters = ArticleQuerySchema.parse(req.query);
-      const userId = req.session && req.session.user ? req.session.user.id : null;
+      const userId = req.dockTalkUser?.id || null;
       const articles = await dockTalkStorage.getArticles(userId, {
         ...filters,
         fromDate: filters.fromDate ? new Date(filters.fromDate) : undefined,
@@ -397,7 +378,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/articles/:id", async (req, res) => {
+  app.get("/api/docktalk/articles/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const article = await dockTalkStorage.getArticleById(id);
@@ -413,7 +394,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.patch("/api/docktalk/articles/:id/bookmark", async (req, res) => {
+  app.patch("/api/docktalk/articles/:id/bookmark", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const { isBookmarked } = BookmarkSchema.parse(req.body);
@@ -430,7 +411,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Analytics endpoints - sentiment trends
-  app.get("/api/docktalk/sentiment/trends", async (req, res) => {
+  app.get("/api/docktalk/sentiment/trends", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const days = parseInt(req.query.days as string) || 30;
       const trends = await dockTalkStorage.getSentimentTrends(days);
@@ -443,7 +424,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Analytics endpoints
-  app.get("/api/docktalk/analytics/stats", async (req, res) => {
+  app.get("/api/docktalk/analytics/stats", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const stats = await dockTalkStorage.getSystemStats();
       res.json(stats || {
@@ -462,7 +443,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/analytics/trending", async (req, res) => {
+  app.get("/api/docktalk/analytics/trending", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const trending = await dockTalkStorage.getTrendingTopics();
       res.json(trending);
@@ -472,7 +453,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/analytics/categories", async (req, res) => {
+  app.get("/api/docktalk/analytics/categories", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const categories = await dockTalkStorage.getCategoryDistribution();
       res.json(categories);
@@ -482,7 +463,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.get("/api/docktalk/analytics/sources", async (req, res) => {
+  app.get("/api/docktalk/analytics/sources", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       // Get sources from actual articles (dynamically updates as articles are added)
       const sources = await dockTalkStorage.getSourceDistribution();
@@ -494,7 +475,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // RSS Sources endpoints
-  app.get("/api/docktalk/rss-sources", async (req, res) => {
+  app.get("/api/docktalk/rss-sources", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const sources = await dockTalkStorage.getRssSources();
       res.json(sources);
@@ -505,7 +486,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Manual RSS fetch trigger
-  app.post("/api/docktalk/rss-sources/fetch", async (req, res) => {
+  app.post("/api/docktalk/rss-sources/fetch", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const newArticles = await triggerManualFetch();
       res.json({ 
@@ -519,8 +500,8 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  // RSS Source Management
-  app.get("/api/docktalk/rss-sources", async (req, res) => {
+  // RSS Source Management - Admin endpoint
+  app.get("/api/docktalk/admin/rss-sources", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const sources = await dockTalkStorage.getAllRssSources();
       res.json(sources);
@@ -530,7 +511,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.post("/api/docktalk/rss-sources", async (req, res) => {
+  app.post("/api/docktalk/rss-sources", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const RssSourceSchema = z.object({
         name: z.string().min(1, "Name is required"),
@@ -556,7 +537,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.patch("/api/docktalk/rss-sources/:id", async (req, res) => {
+  app.patch("/api/docktalk/rss-sources/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const RssSourceUpdateSchema = z.object({
         name: z.string().min(1).optional(),
@@ -583,7 +564,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  app.delete("/api/docktalk/rss-sources/:id", async (req, res) => {
+  app.delete("/api/docktalk/rss-sources/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       await dockTalkStorage.deleteRssSource(id);
@@ -595,7 +576,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Preview RSS feed or web scrape before adding
-  app.post("/api/docktalk/rss-sources/preview", async (req, res) => {
+  app.post("/api/docktalk/rss-sources/preview", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const { url, sourceType = "rss" } = req.body;
       const { scoreArticle } = await import("./services/scoring");
@@ -646,7 +627,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Manual fetch trigger
-  app.post("/api/docktalk/fetch", async (req, res) => {
+  app.post("/api/docktalk/fetch", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const count = await triggerManualFetch();
       res.json({ message: `Successfully fetched ${count} new articles` });
@@ -747,7 +728,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Batch recategorization endpoints
-  app.post("/api/docktalk/articles/recategorize-batch", async (req, res) => {
+  app.post("/api/docktalk/articles/recategorize-batch", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const { categorizeAndTag } = await import("./services/categorizer");
       const articles = await dockTalkStorage.getArticles(null, { limit: 1000, offset: 0 });
@@ -978,7 +959,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Manual category correction
-  app.patch("/api/docktalk/articles/:id/category", async (req, res) => {
+  app.patch("/api/docktalk/articles/:id/category", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const CategoryUpdateSchema = z.object({
         categories: z.array(z.enum(VALID_CATEGORIES))
@@ -1016,7 +997,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Manual region correction
-  app.patch("/api/docktalk/articles/:id/region", async (req, res) => {
+  app.patch("/api/docktalk/articles/:id/region", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const RegionUpdateSchema = z.object({
         region: z.enum(["US/Domestic", "International"]).nullable()
@@ -1046,7 +1027,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Auto-recategorize using updated AI logic
-  app.post("/api/docktalk/articles/:id/recategorize", async (req, res) => {
+  app.post("/api/docktalk/articles/:id/recategorize", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const { categorizeAndTag } = await import("./services/categorizer");
       const id = parseInt(req.params.id);
@@ -1071,7 +1052,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // Export training data
-  app.get("/api/docktalk/training/export", async (req, res) => {
+  app.get("/api/docktalk/training/export", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const manuallyReviewedArticles = await dockTalkStorage.getManuallyReviewedArticles();
       
