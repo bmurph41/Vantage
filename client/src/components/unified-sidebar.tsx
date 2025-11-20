@@ -607,7 +607,7 @@ export default function UnifiedSidebar() {
                   </Link>
                 )}
                 {/* Other Analysis Pages */}
-                <div className={isDockTalkEnabled ? "mt-2" : ""}>
+                <div>
                   {analysisNav.map((item) => (
                     <NavLink key={item.name} item={item} />
                   ))}
