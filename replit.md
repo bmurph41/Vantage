@@ -34,7 +34,7 @@ Preferred communication style: Simple, everyday language.
 - **ORM**: Drizzle ORM with schema-first approach.
 - **Schema**: Multi-tenant architecture for organizations, users, projects, tasks.
 - **Migrations**: Drizzle Kit.
-- **Redis**: Installed via Nix packages for webhook idempotency. Application uses automatic fallback to in-memory storage when Redis is unavailable. The "Redis connection failed" log messages are informational warnings - the app continues to function normally using the built-in fallback mechanism.
+- **Webhook Idempotency**: Uses in-memory storage to prevent duplicate webhook processing. Retention period is 24 hours with automatic cleanup.
 
 ### Authentication and Authorization
 - **Multi-tenancy**: Organization-based data isolation, role-based access control (Owner, Editor, Viewer).
