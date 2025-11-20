@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
-import { AuthDialog } from "../components/auth/auth-dialog";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "../lib/queryClient";
@@ -400,28 +399,16 @@ export default function MarketIntelligence() {
               )}
             </div>
 
-            {/* Authentication Required */}
+            {/* Authentication Required - Note: Now handled by MarinaMatch auth */}
             {!isAuthenticated && (
               <Card className="p-12 text-center" data-testid="card-auth-required">
                 <Lock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-foreground mb-2">
-                  Sign in required
+                  Access Required
                 </h3>
-                <p className="text-muted-foreground mb-6">
-                  Market Intelligence is an institutional-grade feature. Please sign in to access AI-powered category summaries.
+                <p className="text-muted-foreground">
+                  Market Intelligence is an institutional-grade feature. Please sign in to MarinaMatch to access AI-powered category summaries.
                 </p>
-                <div className="flex items-center justify-center gap-3">
-                  <AuthDialog defaultMode="login">
-                    <Button data-testid="button-signin">
-                      Sign In
-                    </Button>
-                  </AuthDialog>
-                  <AuthDialog defaultMode="signup">
-                    <Button variant="outline" data-testid="button-signup">
-                      Sign Up
-                    </Button>
-                  </AuthDialog>
-                </div>
               </Card>
             )}
 
