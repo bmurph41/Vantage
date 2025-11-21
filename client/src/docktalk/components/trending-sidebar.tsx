@@ -20,7 +20,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function TrendingSidebar({ articles }: TrendingSidebarProps) {
-  const topArticles = articles.slice(0, 10);
+  const topArticles = articles?.slice(0, 10) || [];
 
   return (
     <aside 
