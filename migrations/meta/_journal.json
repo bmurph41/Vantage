@@ -29,6 +29,13 @@
       "when": 1762556783243,
       "tag": "0003_pale_quasimodo",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1763749180800,
+      "tag": "0004_add_docktalk_pe_features",
+      "breakpoints": true
     }
   ]
 }
