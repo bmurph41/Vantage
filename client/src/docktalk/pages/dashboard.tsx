@@ -5,11 +5,12 @@ import DockTalkTabs from "../components/DockTalkTabs";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSystemStats } from "../lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import PreferencesPage from "./preferences";
 
 export default function Dashboard() {
   const [newArticlesCount, setNewArticlesCount] = useState(0);
   const { user } = useAuth();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
   // Determine active tab from URL
   const getActiveTab = () => {
@@ -17,6 +18,9 @@ export default function Dashboard() {
     if (location === "/docktalk/m&a-spotlight") return "m&a-spotlight";
     if (location === "/docktalk/saved") return "saved";
     if (location === "/docktalk/portfolio") return "portfolio";
+    if (location === "/docktalk/saved-searches") return "saved-searches";
+    if (location === "/docktalk/watchlists") return "watchlists";
+    if (location === "/docktalk/preferences") return "preferences";
     return "all-articles"; // default
   };
 
@@ -33,9 +37,24 @@ export default function Dashboard() {
   };
 
   const handleSettingsClick = () => {
-    // Settings functionality - can be expanded later
-    console.log('Settings clicked');
+    setLocation('/docktalk/preferences');
   };
+
+  // Show preferences page if on /docktalk/preferences route
+  if (location === "/docktalk/preferences") {
+    return (
+      <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
+        <DockTalkHeader
+          newArticlesCount={systemStats?.newArticlesToday || 0}
+          onNotificationClick={handleNotificationClick}
+          onSettingsClick={handleSettingsClick}
+        />
+        <div className="flex-1 overflow-auto p-6">
+          <PreferencesPage />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">

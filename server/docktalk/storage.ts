@@ -1573,11 +1573,11 @@ export class DatabaseStorage implements IStorage {
     // Get all deals with article region using LEFT JOIN
     let query = db
       .select({
-        id: deals.id,
-        transactionType: deals.transactionType,
-        dealStatus: deals.dealStatus,
-        announcedDate: deals.announcedDate,
-        articleId: deals.articleId,
+        id: docktalkDeals.id,
+        transactionType: docktalkDeals.transactionType,
+        dealStatus: docktalkDeals.dealStatus,
+        announcedDate: docktalkDeals.announcedDate,
+        articleId: docktalkDeals.articleId,
         region: sql<string>`COALESCE(${articles.region}, 'Unknown')`.as('region'),
       })
       .from(docktalkDeals)

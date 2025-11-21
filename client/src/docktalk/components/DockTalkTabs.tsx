@@ -1,11 +1,13 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Handshake, Bookmark, Newspaper, Building2 } from "lucide-react";
+import { BarChart3, Handshake, Bookmark, Newspaper, Building2, Search, Eye } from "lucide-react";
 import { Link } from "wouter";
 import AllArticlesPage from "../pages/all-articles";
 import MarketIntelligencePage from "../pages/market-intelligence";
 import DealsPage from "../pages/deals";
 import SavedArticlesPage from "../pages/saved";
 import PortfolioCompaniesPage from "../pages/portfolio";
+import SavedSearchesPage from "../pages/saved-searches";
+import WatchlistsPage from "../pages/watchlists";
 
 interface DockTalkTabsProps {
   activeTab: string;
@@ -65,6 +67,26 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
             <span>Portfolio Companies</span>
           </TabsTrigger>
         </Link>
+        <Link href="/docktalk/saved-searches">
+          <TabsTrigger 
+            value="saved-searches" 
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-3"
+            data-testid="tab-saved-searches"
+          >
+            <Search className="w-4 h-4" />
+            <span>Saved Searches</span>
+          </TabsTrigger>
+        </Link>
+        <Link href="/docktalk/watchlists">
+          <TabsTrigger 
+            value="watchlists" 
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-3"
+            data-testid="tab-watchlists"
+          >
+            <Eye className="w-4 h-4" />
+            <span>Watchlists</span>
+          </TabsTrigger>
+        </Link>
       </TabsList>
 
       <TabsContent value="all-articles" className="mt-0">
@@ -85,6 +107,14 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
 
       <TabsContent value="portfolio" className="mt-0">
         <PortfolioCompaniesPage />
+      </TabsContent>
+
+      <TabsContent value="saved-searches" className="mt-0">
+        <SavedSearchesPage />
+      </TabsContent>
+
+      <TabsContent value="watchlists" className="mt-0">
+        <WatchlistsPage />
       </TabsContent>
     </Tabs>
   );
