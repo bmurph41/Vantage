@@ -133,7 +133,7 @@ export default function DealsPage() {
   queryParams.append("offset", offset.toString());
 
   const queryString = queryParams.toString();
-  const apiUrl = `/api/deals${queryString ? `?${queryString}` : ''}`;
+  const apiUrl = `/api/docktalk/deals${queryString ? `?${queryString}` : ''}`;
 
   const { data, isLoading } = useQuery<DealsResponse>({
     queryKey: [apiUrl],
@@ -147,7 +147,7 @@ export default function DealsPage() {
   if (regionFilter) analyticsParams.append("region", regionFilter);
   
   const analyticsQueryString = analyticsParams.toString();
-  const analyticsUrl = `/api/deals/analytics${analyticsQueryString ? `?${analyticsQueryString}` : ''}`;
+  const analyticsUrl = `/api/docktalk/deals/analytics${analyticsQueryString ? `?${analyticsQueryString}` : ''}`;
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery<DealAnalytics>({
     queryKey: [analyticsUrl],
