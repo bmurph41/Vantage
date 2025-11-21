@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import DockTalkHeader from "../components/DockTalkHeader";
 import DockTalkTabs from "../components/DockTalkTabs";
 import { useQuery } from "@tanstack/react-query";
@@ -8,6 +9,15 @@ import { useAuth } from "@/hooks/useAuth";
 export default function Dashboard() {
   const [newArticlesCount, setNewArticlesCount] = useState(0);
   const { user } = useAuth();
+  const [location] = useLocation();
+
+  // Determine active tab from URL
+  const getActiveTab = () => {
+    if (location === "/docktalk/market-intelligence") return "market-intelligence";
+    if (location === "/docktalk/m&a-spotlight") return "m&a-spotlight";
+    if (location === "/docktalk/saved") return "saved";
+    return "all-articles"; // default
+  };
 
   // Fetch system stats for notification count
   const { data: systemStats } = useQuery({
@@ -37,7 +47,7 @@ export default function Dashboard() {
 
       {/* Tabbed Navigation */}
       <div className="flex-1 overflow-hidden">
-        <DockTalkTabs />
+        <DockTalkTabs activeTab={getActiveTab()} />
       </div>
     </div>
   );
