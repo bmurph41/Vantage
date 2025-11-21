@@ -49,7 +49,7 @@ export default function AllArticles() {
 
   // Fetch articles data
   const { 
-    data: articles = [], 
+    data: articlesData = [], 
     isLoading: articlesLoading,
     error: articlesError,
     refetch: refetchArticles
@@ -58,6 +58,9 @@ export default function AllArticles() {
     queryFn: () => fetchArticles(filters),
     refetchInterval: 5 * 60 * 1000,
   });
+
+  // Handle both array and paginated response formats
+  const articles = Array.isArray(articlesData) ? articlesData : (articlesData as any).items || [];
 
   // WebSocket connection for real-time updates
   useEffect(() => {
