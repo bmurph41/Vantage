@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Plus, Trash2, FileText, Bell, BellOff } from "lucide-react";
+import { Building2, Plus, Trash2, FileText, Bell, BellOff, ChevronDown, ChevronRight } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 
 interface PortfolioCompany {
@@ -47,6 +47,15 @@ interface PortfolioCompany {
   updatedAt: string;
 }
 
+interface Article {
+  id: number;
+  title: string;
+  source: string;
+  url: string;
+  publishedAt: string;
+  categories: string[];
+}
+
 export default function PortfolioCompaniesPage() {
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -55,10 +64,25 @@ export default function PortfolioCompaniesPage() {
   const [sector, setSector] = useState("");
   const [region, setRegion] = useState("");
   const [notes, setNotes] = useState("");
+  const [expandedCompany, setExpandedCompany] = useState<string | null>(null);
 
   // Fetch portfolio companies
   const { data: companies = [], isLoading } = useQuery<PortfolioCompany[]>({
     queryKey: ['/api/docktalk/portfolio-companies'],
+  });
+
+  // Fetch articles for expanded company
+  const { data: companyArticles = [] } = useQuery<Article[]>({
+    queryKey: ['/api/docktalk/portfolio-companies', expandedCompany, 'articles'],
+    queryFn: async () => {
+      if (!expandedCompany) return [];
+      const response = await fetch(`/api/docktalk/portfolio-companies/${expandedCompany}/articles?limit=20`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch articles');
+      return response.json();
+    },
+    enabled: !!expandedCompany,
   });
 
   // Create portfolio company mutation
@@ -95,6 +119,36 @@ export default function PortfolioCompaniesPage() {
       toast({
         title: "Error",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update portfolio company mutation (for alert toggle)
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<PortfolioCompany> }) => {
+      const response = await fetch(`/api/docktalk/portfolio-companies/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update portfolio company');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/portfolio-companies'] });
+      toast({
+        title: "Settings Updated",
+        description: "Portfolio company alert settings have been updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update portfolio company",
         variant: "destructive",
       });
     },
@@ -155,9 +209,9 @@ export default function PortfolioCompaniesPage() {
     createMutation.mutate({
       companyName: companyName.trim(),
       aliases: aliasesArray.length > 0 ? aliasesArray : undefined,
-      sector: sector.trim() || undefined,
-      region: region.trim() || undefined,
-      notes: notes.trim() || undefined,
+      sector: sector.trim() ? sector.trim() : null,
+      region: region.trim() ? region.trim() : null,
+      notes: notes.trim() ? notes.trim() : null,
     });
   };
 
@@ -336,7 +390,24 @@ export default function PortfolioCompaniesPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2" data-testid={`alert-toggle-${company.id}`}>
+                      <Label htmlFor={`alert-${company.id}`} className="text-sm cursor-pointer">
+                        {company.isActive ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
+                      </Label>
+                      <Switch
+                        id={`alert-${company.id}`}
+                        checked={company.isActive}
+                        onCheckedChange={(checked) => {
+                          updateMutation.mutate({
+                            id: company.id,
+                            data: { isActive: checked },
+                          });
+                        }}
+                        disabled={updateMutation.isPending}
+                        data-testid={`switch-alert-${company.id}`}
+                      />
+                    </div>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -350,31 +421,83 @@ export default function PortfolioCompaniesPage() {
                 </div>
               </CardHeader>
 
-              {(company.aliases.length > 0 || company.notes) && (
-                <CardContent className="space-y-3">
-                  {company.aliases.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">Aliases:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {company.aliases.map((alias, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs" data-testid={`badge-alias-${company.id}-${idx}`}>
-                            {alias}
-                          </Badge>
-                        ))}
-                      </div>
+              <CardContent className="space-y-3">
+                {company.aliases.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Aliases:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {company.aliases.map((alias, idx) => (
+                        <Badge key={idx} variant="outline" className="text-xs" data-testid={`badge-alias-${company.id}-${idx}`}>
+                          {alias}
+                        </Badge>
+                      ))}
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {company.notes && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">Notes:</p>
-                      <p className="text-sm text-foreground" data-testid={`text-notes-${company.id}`}>
-                        {company.notes}
-                      </p>
+                {company.notes && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Notes:</p>
+                    <p className="text-sm text-foreground" data-testid={`text-notes-${company.id}`}>
+                      {company.notes}
+                    </p>
+                  </div>
+                )}
+
+                <div className="border-t pt-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setExpandedCompany(expandedCompany === company.id ? null : company.id)}
+                    className="w-full justify-start text-sm font-medium text-muted-foreground hover:text-foreground"
+                    data-testid={`button-toggle-articles-${company.id}`}
+                  >
+                    {expandedCompany === company.id ? (
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 mr-2" />
+                    )}
+                    <FileText className="h-4 w-4 mr-2" />
+                    Related Articles ({expandedCompany === company.id ? companyArticles.length : '...'})
+                  </Button>
+
+                  {expandedCompany === company.id && (
+                    <div className="mt-3 space-y-2" data-testid={`articles-list-${company.id}`}>
+                      {companyArticles.length === 0 ? (
+                        <p className="text-sm text-muted-foreground px-4 py-2">
+                          No articles mentioning this company yet
+                        </p>
+                      ) : (
+                        companyArticles.map((article) => (
+                          <a
+                            key={article.id}
+                            href={article.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block p-3 rounded-md border hover:bg-muted/50 transition-colors"
+                            data-testid={`article-${article.id}`}
+                          >
+                            <h4 className="text-sm font-medium text-foreground line-clamp-2">
+                              {article.title}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                              <span>{article.source}</span>
+                              <span>•</span>
+                              <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
+                              {article.categories.length > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span>{article.categories[0]}</span>
+                                </>
+                              )}
+                            </div>
+                          </a>
+                        ))
+                      )}
                     </div>
                   )}
-                </CardContent>
-              )}
+                </div>
+              </CardContent>
             </Card>
           ))}
         </div>
