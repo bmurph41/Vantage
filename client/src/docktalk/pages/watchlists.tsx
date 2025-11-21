@@ -29,7 +29,12 @@ import { queryClient } from "@/lib/queryClient";
 interface Watchlist {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
+  criteria?: {
+    entities?: string[];
+    categories?: string[];
+    locations?: string[];
+  } | null;
   alertFrequency: 'none' | 'immediate' | 'daily' | 'weekly';
   isActive: boolean;
   createdAt: string;
@@ -94,7 +99,8 @@ export default function WatchlistsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: data.name,
-          description: data.description,
+          description: data.description ?? null,
+          criteria: data.criteria ?? null,
           alertFrequency: data.alertFrequency,
           isActive: data.isActive ?? true,
         }),
@@ -218,16 +224,28 @@ export default function WatchlistsPage() {
       .map(l => l.trim())
       .filter(Boolean);
 
+    // Build criteria object with arrays for non-empty inputs
+    const criteriaObj: { entities?: string[]; categories?: string[]; locations?: string[] } = {};
+    
+    if (entitiesArray.length > 0) {
+      criteriaObj.entities = entitiesArray;
+    }
+    if (categoriesArray.length > 0) {
+      criteriaObj.categories = categoriesArray;
+    }
+    if (locationsArray.length > 0) {
+      criteriaObj.locations = locationsArray;
+    }
+
+    // Only include criteria if at least one field has data
+    const hasCriteria = Object.keys(criteriaObj).length > 0;
+
     createMutation.mutate({
       name: watchlistName.trim(),
       description: description.trim() || undefined,
       alertFrequency: emailAlerts ? (alertFrequency as 'none' | 'immediate' | 'daily' | 'weekly') : 'none',
       isActive: true,
-      criteria: {
-        entities: entitiesArray.length > 0 ? entitiesArray : undefined,
-        categories: categoriesArray.length > 0 ? categoriesArray : undefined,
-        locations: locationsArray.length > 0 ? locationsArray : undefined,
-      },
+      criteria: hasCriteria ? criteriaObj : undefined,
     });
   };
 
@@ -484,6 +502,32 @@ export default function WatchlistsPage() {
                 </CardHeader>
 
                 <CardContent className="space-y-3">
+                  {/* Display saved criteria */}
+                  {watchlist.criteria && (watchlist.criteria.entities || watchlist.criteria.categories || watchlist.criteria.locations) && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium text-muted-foreground">Tracking Criteria:</h4>
+                      <div className="space-y-1 text-sm">
+                        {watchlist.criteria.entities && watchlist.criteria.entities.length > 0 && (
+                          <div className="flex gap-2">
+                            <span className="text-muted-foreground font-medium">Entities:</span>
+                            <span className="text-foreground">{watchlist.criteria.entities.join(', ')}</span>
+                          </div>
+                        )}
+                        {watchlist.criteria.categories && watchlist.criteria.categories.length > 0 && (
+                          <div className="flex gap-2">
+                            <span className="text-muted-foreground font-medium">Categories:</span>
+                            <span className="text-foreground">{watchlist.criteria.categories.join(', ')}</span>
+                          </div>
+                        )}
+                        {watchlist.criteria.locations && watchlist.criteria.locations.length > 0 && (
+                          <div className="flex gap-2">
+                            <span className="text-muted-foreground font-medium">Locations:</span>
+                            <span className="text-foreground">{watchlist.criteria.locations.join(', ')}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <div className="border-t pt-3">
                     <Button
                       variant="ghost"
