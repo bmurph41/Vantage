@@ -1,7 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
+import type { User } from "@shared/schema";
 
 // Extended Request type with DockTalk user
 export interface DockTalkRequest extends Request {
+  user?: User;  // MarinaMatch user from req.user
   dockTalkUser?: {
     id: string;
     marinaUserId: string;
@@ -14,12 +16,12 @@ export interface DockTalkRequest extends Request {
 // Unified auth middleware - bridges MarinaMatch and DockTalk authentication
 export async function requireMarinaMatchAuth(req: DockTalkRequest, res: Response, next: NextFunction) {
   try {
-    // Check MarinaMatch session
-    if (!req.session || !req.session.user) {
+    // Check MarinaMatch authentication - MarinaMatch uses req.user, not req.session.user
+    if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    const marinaUser = req.session.user;
+    const marinaUser = req.user;
     const { storage } = await import("../storage");
 
     // Check if organization has DockTalk feature enabled
