@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -27,9 +28,9 @@ import { queryClient } from "@/lib/queryClient";
 
 interface Watchlist {
   id: string;
-  entityType: string;
-  entityName: string;
-  emailAlerts: boolean;
+  name: string;
+  description?: string;
+  alertFrequency: 'none' | 'immediate' | 'daily' | 'weekly';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -47,9 +48,13 @@ interface Article {
 export default function WatchlistsPage() {
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [entityType, setEntityType] = useState("company");
-  const [entityName, setEntityName] = useState("");
+  const [watchlistName, setWatchlistName] = useState("");
+  const [description, setDescription] = useState("");
+  const [entities, setEntities] = useState("");
+  const [categories, setCategories] = useState("");
+  const [locations, setLocations] = useState("");
   const [emailAlerts, setEmailAlerts] = useState(false);
+  const [alertFrequency, setAlertFrequency] = useState("daily");
   const [expandedWatchlist, setExpandedWatchlist] = useState<string | null>(null);
 
   // Fetch watchlists
@@ -74,14 +79,25 @@ export default function WatchlistsPage() {
   // Create watchlist mutation
   const createMutation = useMutation({
     mutationFn: async (data: {
-      entityType: string;
-      entityName: string;
-      emailAlerts?: boolean;
+      name: string;
+      description?: string;
+      alertFrequency: 'none' | 'immediate' | 'daily' | 'weekly';
+      isActive?: boolean;
+      criteria?: {
+        entities?: string[];
+        categories?: string[];
+        locations?: string[];
+      };
     }) => {
       const response = await fetch('/api/docktalk/watchlists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          name: data.name,
+          description: data.description,
+          alertFrequency: data.alertFrequency,
+          isActive: data.isActive ?? true,
+        }),
         credentials: 'include',
       });
       if (!response.ok) {
@@ -95,7 +111,7 @@ export default function WatchlistsPage() {
       resetForm();
       toast({
         title: "Watchlist Created",
-        description: "Entity has been added to your watchlist.",
+        description: "Your watchlist has been created successfully.",
       });
     },
     onError: () => {
@@ -165,43 +181,70 @@ export default function WatchlistsPage() {
   });
 
   const resetForm = () => {
-    setEntityType("company");
-    setEntityName("");
+    setWatchlistName("");
+    setDescription("");
+    setEntities("");
+    setCategories("");
+    setLocations("");
     setEmailAlerts(false);
+    setAlertFrequency("daily");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!entityName.trim()) {
+    if (!watchlistName.trim()) {
       toast({
         title: "Validation Error",
-        description: "Entity name is required",
+        description: "Watchlist name is required",
         variant: "destructive",
       });
       return;
     }
 
+    // Parse comma-separated inputs
+    const entitiesArray = entities
+      .split(',')
+      .map(e => e.trim())
+      .filter(Boolean);
+
+    const categoriesArray = categories
+      .split(',')
+      .map(c => c.trim())
+      .filter(Boolean);
+
+    const locationsArray = locations
+      .split(',')
+      .map(l => l.trim())
+      .filter(Boolean);
+
     createMutation.mutate({
-      entityType,
-      entityName: entityName.trim(),
-      emailAlerts,
+      name: watchlistName.trim(),
+      description: description.trim() || undefined,
+      alertFrequency: emailAlerts ? (alertFrequency as 'none' | 'immediate' | 'daily' | 'weekly') : 'none',
+      isActive: true,
+      criteria: {
+        entities: entitiesArray.length > 0 ? entitiesArray : undefined,
+        categories: categoriesArray.length > 0 ? categoriesArray : undefined,
+        locations: locationsArray.length > 0 ? locationsArray : undefined,
+      },
     });
   };
 
   const handleDelete = (watchlist: Watchlist) => {
-    if (window.confirm(`Are you sure you want to remove "${watchlist.entityName}" from your watchlist?`)) {
+    if (window.confirm(`Are you sure you want to delete the watchlist "${watchlist.name}"?`)) {
       deleteMutation.mutate(watchlist.id);
     }
   };
 
-  const getEntityTypeBadge = (type: string) => {
-    const types: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
-      company: { label: "Company", variant: "default" },
-      person: { label: "Person", variant: "secondary" },
-      location: { label: "Location", variant: "outline" },
+  const getAlertFrequencyBadge = (frequency: string) => {
+    const frequencies: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
+      none: { label: "No Alerts", variant: "outline" },
+      immediate: { label: "Immediate", variant: "default" },
+      daily: { label: "Daily", variant: "secondary" },
+      weekly: { label: "Weekly", variant: "outline" },
     };
-    return types[type] || { label: type, variant: "outline" };
+    return frequencies[frequency] || { label: frequency, variant: "outline" };
   };
 
   return (
@@ -219,48 +262,90 @@ export default function WatchlistsPage() {
         </Button>
 
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl">
             <form onSubmit={handleSubmit}>
               <DialogHeader>
-                <DialogTitle>Add Entity to Watchlist</DialogTitle>
+                <DialogTitle>Create Watchlist</DialogTitle>
                 <DialogDescription>
-                  Track companies, people, or locations mentioned in marina industry news
+                  Define criteria to track and receive alerts when matching content appears in marina industry news
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="entityType">Entity Type *</Label>
-                  <select
-                    id="entityType"
-                    value={entityType}
-                    onChange={(e) => setEntityType(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    data-testid="select-entity-type"
-                  >
-                    <option value="company">Company</option>
-                    <option value="person">Person</option>
-                    <option value="location">Location</option>
-                  </select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="entityName">Entity Name *</Label>
+                  <Label htmlFor="watchlistName">Watchlist Name *</Label>
                   <Input
-                    id="entityName"
-                    data-testid="input-entity-name"
-                    placeholder="e.g., Safe Harbor Marinas"
-                    value={entityName}
-                    onChange={(e) => setEntityName(e.target.value)}
+                    id="watchlistName"
+                    data-testid="input-watchlist-name"
+                    placeholder="e.g., Southeast Marina M&A Activity"
+                    value={watchlistName}
+                    onChange={(e) => setWatchlistName(e.target.value)}
                     required
                   />
                 </div>
 
-                <div className="border-t pt-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    data-testid="input-description"
+                    placeholder="Optional description of what this watchlist tracks..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+
+                <div className="border-t pt-4 space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium mb-3">Search Criteria</h4>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Add multiple criteria to track specific entities, categories, or locations (comma-separated)
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="entities">Entities</Label>
+                    <Input
+                      id="entities"
+                      data-testid="input-entities"
+                      placeholder="e.g., Safe Harbor, Suntex, IGY Marinas"
+                      value={entities}
+                      onChange={(e) => setEntities(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Companies, people, or organizations (comma-separated)</p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="categories">Categories</Label>
+                    <Input
+                      id="categories"
+                      data-testid="input-categories"
+                      placeholder="e.g., M&A, Transactions, Financing"
+                      value={categories}
+                      onChange={(e) => setCategories(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Article categories to track (comma-separated)</p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="locations">Locations</Label>
+                    <Input
+                      id="locations"
+                      data-testid="input-locations"
+                      placeholder="e.g., Florida, Southeast, Gulf Coast"
+                      value={locations}
+                      onChange={(e) => setLocations(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Geographic regions to monitor (comma-separated)</p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="emailAlerts">Email Alerts</Label>
                       <p className="text-xs text-muted-foreground">
-                        Receive notifications when this entity is mentioned
+                        Receive notifications when matching articles are published
                       </p>
                     </div>
                     <Switch
@@ -270,6 +355,23 @@ export default function WatchlistsPage() {
                       data-testid="switch-email-alerts"
                     />
                   </div>
+
+                  {emailAlerts && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="alertFrequency">Alert Frequency</Label>
+                      <select
+                        id="alertFrequency"
+                        value={alertFrequency}
+                        onChange={(e) => setAlertFrequency(e.target.value)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        data-testid="select-alert-frequency"
+                      >
+                        <option value="daily">Daily Digest</option>
+                        <option value="weekly">Weekly Summary</option>
+                        <option value="immediate">Immediate</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
               <DialogFooter>
@@ -289,7 +391,7 @@ export default function WatchlistsPage() {
                   disabled={createMutation.isPending}
                   data-testid="button-submit-add"
                 >
-                  {createMutation.isPending ? "Adding..." : "Add to Watchlist"}
+                  {createMutation.isPending ? "Creating..." : "Create Watchlist"}
                 </Button>
               </DialogFooter>
             </form>
@@ -324,7 +426,7 @@ export default function WatchlistsPage() {
       ) : (
         <div className="space-y-4">
           {watchlists.map((watchlist) => {
-            const typeBadge = getEntityTypeBadge(watchlist.entityType);
+            const frequencyBadge = getAlertFrequencyBadge(watchlist.alertFrequency);
             return (
               <Card key={watchlist.id} data-testid={`card-watchlist-${watchlist.id}`}>
                 <CardHeader>
@@ -332,27 +434,36 @@ export default function WatchlistsPage() {
                     <div className="flex-1">
                       <CardTitle className="text-xl flex items-center gap-2">
                         <Eye className="h-5 w-5 text-primary" />
-                        {watchlist.entityName}
+                        {watchlist.name}
                       </CardTitle>
+                      {watchlist.description && (
+                        <p className="text-sm text-muted-foreground mt-1">{watchlist.description}</p>
+                      )}
                       <div className="flex items-center gap-2 mt-2">
-                        <Badge variant={typeBadge.variant} data-testid={`badge-type-${watchlist.id}`}>
-                          {typeBadge.label}
+                        <Badge variant={frequencyBadge.variant} data-testid={`badge-frequency-${watchlist.id}`}>
+                          <Bell className="h-3 w-3 mr-1" />
+                          {frequencyBadge.label}
                         </Badge>
+                        {watchlist.isActive ? (
+                          <Badge variant="outline">Active</Badge>
+                        ) : (
+                          <Badge variant="secondary">Inactive</Badge>
+                        )}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2" data-testid={`alert-toggle-${watchlist.id}`}>
                         <Label htmlFor={`alert-${watchlist.id}`} className="text-sm cursor-pointer">
-                          {watchlist.emailAlerts ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
+                          {watchlist.alertFrequency !== 'none' ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
                         </Label>
                         <Switch
                           id={`alert-${watchlist.id}`}
-                          checked={watchlist.emailAlerts}
+                          checked={watchlist.alertFrequency !== 'none'}
                           onCheckedChange={(checked) => {
                             updateMutation.mutate({
                               id: watchlist.id,
-                              data: { emailAlerts: checked },
+                              data: { alertFrequency: checked ? 'daily' : 'none' },
                             });
                           }}
                           disabled={updateMutation.isPending}

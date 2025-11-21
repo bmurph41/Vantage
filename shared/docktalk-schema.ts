@@ -192,6 +192,7 @@ export const watchlists = pgTable("docktalk_watchlists", {
   orgId: varchar("org_id").notNull(), // Organization scope for multi-tenancy
   name: text("name").notNull(),
   description: text("description"),
+  criteria: jsonb("criteria").$type<{ entities?: string[]; categories?: string[]; locations?: string[] }>(),
   alertFrequency: alertFrequencyEnum("alert_frequency").notNull().default("none"),
   lastAlertSent: timestamp("last_alert_sent"),
   isActive: boolean("is_active").default(true),

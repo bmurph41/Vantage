@@ -1206,6 +1206,11 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   const WatchlistSchema = z.object({
     name: z.string().min(1).max(100),
     description: z.string().optional(),
+    criteria: z.object({
+      entities: z.array(z.string()).optional(),
+      categories: z.array(z.string()).optional(),
+      locations: z.array(z.string()).optional(),
+    }).optional(),
     alertFrequency: z.enum(['none', 'immediate', 'daily', 'weekly']).default('none'),
     isActive: z.boolean().default(true),
   });
