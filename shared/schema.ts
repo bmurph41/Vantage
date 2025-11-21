@@ -4,6 +4,12 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
+// Import DockTalk enums from docktalk-schema for reuse
+import { 
+  alertFrequencyEnum as docktalkAlertFrequencyEnum,
+  entityTypeEnum as docktalkEntityTypeEnum
+} from "./docktalk-schema";
+
 // Custom vector type for pgvector
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
@@ -4096,11 +4102,6 @@ export const scPortfolioComps = pgTable('sc_portfolio_comps', {
 export const dealOriginEnum = pgEnum("deal_origin", ["marinaMatch", "aiExtraction"]);
 export const docktalkTransactionTypeEnum = pgEnum("docktalk_transaction_type", ["M&A", "Financing", "Partnership", "Asset Sale", "Lease", "Other"]);
 export const docktalkDealStatusEnum = pgEnum("docktalk_deal_status", ["Announced", "Pending", "Closed", "Terminated"]);
-
-// Enums for DockTalk intelligence features
-export const docktalkAlertFrequencyEnum = pgEnum("docktalk_alert_frequency", ["none", "immediate", "daily", "weekly"]);
-export const docktalkSubscriptionTierEnum = pgEnum("docktalk_subscription_tier", ["free", "pro", "enterprise"]);
-export const docktalkEntityTypeEnum = pgEnum("docktalk_entity_type", ["company", "person", "location", "asset"]);
 
 // DockTalk deals - M&A transaction tracking
 export const docktalkDeals = pgTable('docktalk_deals', {
