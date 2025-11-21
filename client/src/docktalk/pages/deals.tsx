@@ -116,7 +116,7 @@ export default function DealsPage() {
     if (regionFilter) params.set("region", regionFilter);
     
     const newSearch = params.toString();
-    const newUrl = `/deals${newSearch ? `?${newSearch}` : ''}`;
+    const newUrl = `/docktalk/m&a-spotlight${newSearch ? `?${newSearch}` : ''}`;
     
     // Only update if URL actually changed to avoid infinite loops
     if (window.location.pathname + window.location.search !== newUrl) {
