@@ -1,4 +1,5 @@
-import { users, articles, rssSources, systemStats, savedFilters, savedSearches, userArticleAnnotations, portfolioCompanies, notifications, articleFingerprints, articleDuplicates, userNotificationPreferences, articleRemovalPatterns, userFilterPreferences, entities, articleEntities, watchlists, watchlistEntities, deals, organizationFeatures, type User, type InsertUser, type Article, type InsertArticle, type RssSource, type InsertRssSource, type SystemStats, type SavedFilter, type InsertSavedFilter, type SavedSearch, type InsertSavedSearch, type UserArticleAnnotation, type InsertUserArticleAnnotation, type PortfolioCompany, type InsertPortfolioCompany, type Notification, type InsertNotification, type UserNotificationPreferences, type InsertUserNotificationPreferences, type ArticleRemovalPattern, type InsertArticleRemovalPattern, type UserFilterPreferences, type InsertUserFilterPreferences, type Entity, type InsertEntity, type ArticleEntity, type InsertArticleEntity, type Watchlist, type InsertWatchlist, type WatchlistEntity, type InsertWatchlistEntity, type Deal, type InsertDeal } from "@shared/docktalk-schema";
+import { users, articles, rssSources, systemStats, savedFilters, savedSearches, userArticleAnnotations, portfolioCompanies, notifications, articleFingerprints, articleDuplicates, userNotificationPreferences, articleRemovalPatterns, userFilterPreferences, entities, articleEntities, watchlists, watchlistEntities, organizationFeatures, type User, type InsertUser, type Article, type InsertArticle, type RssSource, type InsertRssSource, type SystemStats, type SavedFilter, type InsertSavedFilter, type SavedSearch, type InsertSavedSearch, type UserArticleAnnotation, type InsertUserArticleAnnotation, type PortfolioCompany, type InsertPortfolioCompany, type Notification, type InsertNotification, type UserNotificationPreferences, type InsertUserNotificationPreferences, type ArticleRemovalPattern, type InsertArticleRemovalPattern, type UserFilterPreferences, type InsertUserFilterPreferences, type Entity, type InsertEntity, type ArticleEntity, type InsertArticleEntity, type Watchlist, type InsertWatchlist, type WatchlistEntity, type InsertWatchlistEntity } from "@shared/docktalk-schema";
+import { docktalkDeals, type DocktalkDeal, type InsertDocktalkDeal } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, gte, lte, sql, count, inArray } from "drizzle-orm";
 
@@ -160,7 +161,7 @@ export interface IStorage {
     recentActivity: number;
     geographicFocus: Array<{ region: string; count: number }>;
   }>;
-  getDealsByEntity(entityId: number, role?: 'buyer' | 'seller'): Promise<Deal[]>;
+  getDealsByEntity(entityId: number, role?: 'buyer' | 'seller'): Promise<DocktalkDeal[]>;
   
   // Watchlist methods
   createWatchlist(watchlist: InsertWatchlist): Promise<Watchlist>;
@@ -174,7 +175,7 @@ export interface IStorage {
   getArticlesByWatchlist(watchlistId: string, userId: string, orgId: string, limit?: number, offset?: number): Promise<Article[]>;
   
   // Deal methods
-  createDeal(deal: InsertDeal): Promise<Deal>;
+  createDeal(deal: InsertDocktalkDeal): Promise<DocktalkDeal>;
   getDeals(filters: {
     transactionType?: string;
     dealStatus?: string;
@@ -183,10 +184,10 @@ export interface IStorage {
     toDate?: Date;
     limit?: number;
     offset?: number;
-  }): Promise<Deal[]>;
-  getDealById(id: number): Promise<Deal | undefined>;
-  updateDeal(id: number, updates: Partial<InsertDeal>): Promise<Deal | undefined>;
-  getDealsByArticle(articleId: number): Promise<Deal[]>;
+  }): Promise<DocktalkDeal[]>;
+  getDealById(id: number): Promise<DocktalkDeal | undefined>;
+  updateDeal(id: number, updates: Partial<InsertDocktalkDeal>): Promise<DocktalkDeal | undefined>;
+  getDealsByArticle(articleId: number): Promise<DocktalkDeal[]>;
   getDealAnalytics(filters?: {
     transactionType?: string;
     dealStatus?: string;
@@ -1237,11 +1238,11 @@ export class DatabaseStorage implements IStorage {
         sellerEntityId: deals.sellerEntityId,
         articleId: deals.articleId,
       })
-      .from(deals)
+      .from(docktalkDeals)
       .where(
         or(
-          eq(deals.buyerEntityId, entityId),
-          eq(deals.sellerEntityId, entityId)
+          eq(docktalkDeals.buyerEntityId, entityId),
+          eq(docktalkDeals.sellerEntityId, entityId)
         )
       );
 
@@ -1294,23 +1295,23 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getDealsByEntity(entityId: number, role?: 'buyer' | 'seller'): Promise<Deal[]> {
-    let query = db.select().from(deals);
+  async getDealsByEntity(entityId: number, role?: 'buyer' | 'seller'): Promise<DocktalkDeal[]> {
+    let query = db.select().from(docktalkDeals);
 
     if (role === 'buyer') {
-      query = query.where(eq(deals.buyerEntityId, entityId)) as any;
+      query = query.where(eq(docktalkDeals.buyerEntityId, entityId)) as any;
     } else if (role === 'seller') {
-      query = query.where(eq(deals.sellerEntityId, entityId)) as any;
+      query = query.where(eq(docktalkDeals.sellerEntityId, entityId)) as any;
     } else {
       query = query.where(
         or(
-          eq(deals.buyerEntityId, entityId),
-          eq(deals.sellerEntityId, entityId)
+          eq(docktalkDeals.buyerEntityId, entityId),
+          eq(docktalkDeals.sellerEntityId, entityId)
         )
       ) as any;
     }
 
-    return query.orderBy(desc(deals.announcedDate));
+    return query.orderBy(desc(docktalkDeals.announcedDate));
   }
 
   async createWatchlist(insertWatchlist: InsertWatchlist): Promise<Watchlist> {
@@ -1454,7 +1455,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Deal methods implementation
-  async createDeal(deal: InsertDeal): Promise<Deal> {
+  async createDeal(deal: InsertDocktalkDeal): Promise<DocktalkDeal> {
     const [newDeal] = await db.insert(deals).values(deal).returning();
     return newDeal;
   }
@@ -1467,15 +1468,15 @@ export class DatabaseStorage implements IStorage {
     toDate?: Date;
     limit?: number;
     offset?: number;
-  }): Promise<Deal[]> {
+  }): Promise<DocktalkDeal[]> {
     const conditions = [];
 
     if (filters.transactionType) {
-      conditions.push(eq(deals.transactionType, filters.transactionType as any));
+      conditions.push(eq(docktalkDeals.transactionType, filters.transactionType as any));
     }
 
     if (filters.dealStatus) {
-      conditions.push(eq(deals.dealStatus, filters.dealStatus as any));
+      conditions.push(eq(docktalkDeals.dealStatus, filters.dealStatus as any));
     }
 
     if (filters.entityId) {
@@ -1485,48 +1486,48 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (filters.fromDate) {
-      conditions.push(gte(deals.announcedDate, filters.fromDate));
+      conditions.push(gte(docktalkDeals.announcedDate, filters.fromDate));
     }
 
     if (filters.toDate) {
-      conditions.push(lte(deals.announcedDate, filters.toDate));
+      conditions.push(lte(docktalkDeals.announcedDate, filters.toDate));
     }
 
-    let query = db.select().from(deals);
+    let query = db.select().from(docktalkDeals);
 
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;
     }
 
     const results = await query
-      .orderBy(desc(deals.announcedDate), desc(deals.createdAt))
+      .orderBy(desc(docktalkDeals.announcedDate), desc(docktalkDeals.createdAt))
       .limit(filters.limit || 100)
       .offset(filters.offset || 0);
 
     return results;
   }
 
-  async getDealById(id: number): Promise<Deal | undefined> {
-    const [deal] = await db.select().from(deals).where(eq(deals.id, id));
+  async getDealById(id: number): Promise<DocktalkDeal | undefined> {
+    const [deal] = await db.select().from(docktalkDeals).where(eq(docktalkDeals.id, id));
     return deal || undefined;
   }
 
-  async updateDeal(id: number, updates: Partial<InsertDeal>): Promise<Deal | undefined> {
+  async updateDeal(id: number, updates: Partial<InsertDocktalkDeal>): Promise<DocktalkDeal | undefined> {
     const [updated] = await db
-      .update(deals)
+      .update(docktalkDeals)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(deals.id, id))
+      .where(eq(docktalkDeals.id, id))
       .returning();
     return updated || undefined;
   }
 
 
-  async getDealsByArticle(articleId: number): Promise<Deal[]> {
+  async getDealsByArticle(articleId: number): Promise<DocktalkDeal[]> {
     const results = await db
       .select()
-      .from(deals)
-      .where(eq(deals.articleId, articleId))
-      .orderBy(desc(deals.createdAt));
+      .from(docktalkDeals)
+      .where(eq(docktalkDeals.articleId, articleId))
+      .orderBy(desc(docktalkDeals.createdAt));
 
     return results;
   }
@@ -1549,19 +1550,19 @@ export class DatabaseStorage implements IStorage {
     const conditions = [];
 
     if (filters?.transactionType) {
-      conditions.push(eq(deals.transactionType, filters.transactionType as any));
+      conditions.push(eq(docktalkDeals.transactionType, filters.transactionType as any));
     }
 
     if (filters?.dealStatus) {
-      conditions.push(eq(deals.dealStatus, filters.dealStatus as any));
+      conditions.push(eq(docktalkDeals.dealStatus, filters.dealStatus as any));
     }
 
     if (filters?.fromDate) {
-      conditions.push(gte(deals.announcedDate, filters.fromDate));
+      conditions.push(gte(docktalkDeals.announcedDate, filters.fromDate));
     }
 
     if (filters?.toDate) {
-      conditions.push(lte(deals.announcedDate, filters.toDate));
+      conditions.push(lte(docktalkDeals.announcedDate, filters.toDate));
     }
 
     // Add region filter if specified (join with articles table)
@@ -1579,8 +1580,8 @@ export class DatabaseStorage implements IStorage {
         articleId: deals.articleId,
         region: sql<string>`COALESCE(${articles.region}, 'Unknown')`.as('region'),
       })
-      .from(deals)
-      .leftJoin(articles, eq(deals.articleId, articles.id));
+      .from(docktalkDeals)
+      .leftJoin(articles, eq(docktalkDeals.articleId, articles.id));
 
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;

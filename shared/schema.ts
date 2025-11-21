@@ -4092,8 +4092,10 @@ export const scPortfolioComps = pgTable('sc_portfolio_comps', {
 // DOCKTALK M&A SPOTLIGHT
 // ============================================================================
 
-// Enum for deal origin
+// Enums for DockTalk deals
 export const dealOriginEnum = pgEnum("deal_origin", ["marinaMatch", "aiExtraction"]);
+export const docktalkTransactionTypeEnum = pgEnum("docktalk_transaction_type", ["M&A", "Financing", "Partnership", "Asset Sale", "Lease", "Other"]);
+export const docktalkDealStatusEnum = pgEnum("docktalk_deal_status", ["Announced", "Pending", "Closed", "Terminated"]);
 
 // DockTalk deals - M&A transaction tracking
 export const docktalkDeals = pgTable('docktalk_deals', {
@@ -4109,6 +4111,18 @@ export const docktalkDeals = pgTable('docktalk_deals', {
   origin: dealOriginEnum('origin').notNull().default('aiExtraction'),
   externalId: varchar('external_id'), // MarinaMatch Sales Comp UUID for sync
   sourceReference: text('source_reference'), // Link back to MarinaMatch record or news article
+  articleId: integer('article_id'), // Optional link to docktalk_articles for AI-extracted deals
+  
+  // DockTalk-specific fields
+  transactionType: docktalkTransactionTypeEnum('transaction_type'), // Deal type
+  dealStatus: docktalkDealStatusEnum('deal_status'), // Deal status
+  buyerEntityId: integer('buyer_entity_id'), // DockTalk entity ID
+  sellerEntityId: integer('seller_entity_id'), // DockTalk entity ID
+  assetDescription: text('asset_description'), // Asset/property description
+  dealSize: text('deal_size'), // Deal size as text (for AI extraction)
+  valuation: text('valuation'), // Property valuation
+  equityStake: text('equity_stake'), // Equity stake percentage
+  closingDate: timestamp('closing_date'), // Deal closing date
   
   // Deal parties
   buyer: text('buyer'), // Buyer company/entity name
@@ -4144,6 +4158,9 @@ export const docktalkDeals = pgTable('docktalk_deals', {
   orgOriginIdx: index('docktalk_deals_org_origin_idx').on(table.orgId, table.origin),
   orgDateIdx: index('docktalk_deals_org_date_idx').on(table.orgId, table.dealDate),
   externalIdIdx: index('docktalk_deals_external_id_idx').on(table.externalId),
+  articleIdIdx: index('docktalk_deals_article_id_idx').on(table.articleId),
+  transactionTypeIdx: index('docktalk_deals_transaction_type_idx').on(table.transactionType),
+  dealStatusIdx: index('docktalk_deals_deal_status_idx').on(table.dealStatus),
   uniqueExternalId: unique('docktalk_deals_unique_external_idx').on(table.orgId, table.externalId),
 }));
 
