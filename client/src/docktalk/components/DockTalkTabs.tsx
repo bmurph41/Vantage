@@ -1,10 +1,11 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Handshake, Bookmark, Newspaper } from "lucide-react";
+import { BarChart3, Handshake, Bookmark, Newspaper, Building2 } from "lucide-react";
 import { Link } from "wouter";
 import AllArticlesPage from "../pages/all-articles";
 import MarketIntelligencePage from "../pages/market-intelligence";
 import DealsPage from "../pages/deals";
 import SavedArticlesPage from "../pages/saved";
+import PortfolioCompaniesPage from "../pages/portfolio";
 
 interface DockTalkTabsProps {
   activeTab: string;
@@ -54,6 +55,16 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
             <span>Saved Articles</span>
           </TabsTrigger>
         </Link>
+        <Link href="/docktalk/portfolio">
+          <TabsTrigger 
+            value="portfolio" 
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-3"
+            data-testid="tab-portfolio"
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Portfolio Companies</span>
+          </TabsTrigger>
+        </Link>
       </TabsList>
 
       <TabsContent value="all-articles" className="mt-0">
@@ -70,6 +81,10 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
 
       <TabsContent value="saved" className="mt-0">
         <SavedArticlesPage />
+      </TabsContent>
+
+      <TabsContent value="portfolio" className="mt-0">
+        <PortfolioCompaniesPage />
       </TabsContent>
     </Tabs>
   );
