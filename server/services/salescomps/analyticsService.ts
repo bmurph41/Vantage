@@ -14,6 +14,10 @@ export interface AnalyticsFilters {
   profitCenters?: string[];
   capacityMin?: number;
   capacityMax?: number;
+  coastalType?: string[];
+  region?: string[];
+  broker?: string[];
+  isPortfolio?: boolean | null;
 }
 
 export interface MetricResult {
@@ -108,6 +112,22 @@ function applyFilters(orgId: string, filters: AnalyticsFilters) {
       sql`${salesComps.profitCenters} @> ARRAY[${pc}]::text[]`
     );
     conditions.push(sql`(${sql.join(profitCenterConditions, sql` OR `)})`);
+  }
+
+  if (filters.coastalType && filters.coastalType.length > 0) {
+    conditions.push(inArray(salesComps.coastalType, filters.coastalType));
+  }
+
+  if (filters.region && filters.region.length > 0) {
+    conditions.push(inArray(salesComps.region, filters.region));
+  }
+
+  if (filters.broker && filters.broker.length > 0) {
+    conditions.push(inArray(salesComps.brokerage, filters.broker));
+  }
+
+  if (filters.isPortfolio !== undefined && filters.isPortfolio !== null) {
+    conditions.push(eq(salesComps.isPortfolio, filters.isPortfolio));
   }
 
   return and(...conditions);

@@ -23,6 +23,10 @@ export interface AnalyticsFilters {
   profitCenters?: string[];
   capacityMin?: number;
   capacityMax?: number;
+  coastalType?: string[];
+  region?: string[];
+  broker?: string[];
+  isPortfolio?: boolean | null;
 }
 
 interface AnalyticsFiltersProps {
