@@ -56,7 +56,6 @@ export default function Dashboard() {
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
 
   const handleOpenCustomization = () => {
-    console.log('🎯 Opening dashboard customization modal');
     setIsCustomizationOpen(true);
   };
 

@@ -183,7 +183,6 @@ class UTMTracker {
       // Store the attribution data
       this.storeAttribution();
       
-      console.log('UTM Tracker initialized:', this.attribution);
     } catch (error) {
       console.error('UTM Tracker initialization failed:', error);
     }

@@ -25,7 +25,6 @@ class GeocodingService {
   constructor() {
     this.apiKey = process.env.GOOGLE_MAPS_API_KEY || '';
     if (!this.apiKey) {
-      console.warn('⚠️ GOOGLE_MAPS_API_KEY not configured. Geocoding will fail.');
     }
   }
 

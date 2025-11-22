@@ -27,7 +27,6 @@ import { User, Phone, Upload } from "lucide-react";
  *   open={open}
  *   onClose={() => { setOpen(false); setEditing(null) }}
  *   initialData={editing ?? undefined}
- *   onSave={(data) => { console.log(data); setOpen(false) }}
  * />
  */
 

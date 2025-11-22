@@ -26,7 +26,6 @@ export class NotificationTestSuite {
    * Run comprehensive notification system tests
    */
   async runAllTests(): Promise<{ passed: number; failed: number; results: Array<{ name: string; result: TestResult }> }> {
-    console.log('🧪 Starting comprehensive notification system tests...\n');
 
     const scenarios: TestScenario[] = [
       {
@@ -66,20 +65,15 @@ export class NotificationTestSuite {
     let failed = 0;
 
     for (const scenario of scenarios) {
-      console.log(`🔍 Testing: ${scenario.name}`);
-      console.log(`   ${scenario.description}`);
       
       try {
         const result = await scenario.execute();
         results.push({ name: scenario.name, result });
         
         if (result.success) {
-          console.log(`   ✅ PASSED: ${result.message}`);
           passed++;
         } else {
-          console.log(`   ❌ FAILED: ${result.message}`);
           if (result.details) {
-            console.log(`   Details:`, result.details);
           }
           failed++;
         }
@@ -90,17 +84,11 @@ export class NotificationTestSuite {
           details: error
         };
         results.push({ name: scenario.name, result });
-        console.log(`   ❌ ERROR: ${error instanceof Error ? error.message : String(error)}`);
         failed++;
       }
       
-      console.log(''); // Empty line for readability
     }
 
-    console.log('📊 Test Results Summary:');
-    console.log(`   ✅ Passed: ${passed}`);
-    console.log(`   ❌ Failed: ${failed}`);
-    console.log(`   📈 Success Rate: ${((passed / (passed + failed)) * 100).toFixed(1)}%`);
 
     return { passed, failed, results };
   }

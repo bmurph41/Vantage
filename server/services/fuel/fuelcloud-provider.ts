@@ -123,7 +123,6 @@ export class FuelCloudProvider implements FuelProvider {
           ? parseInt(retryAfter) * 1000 
           : Math.pow(2, retryCount) * 1000;
         
-        console.log(`Rate limited. Waiting ${waitMs}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitMs));
         return this.apiRequest<T>(endpoint, options, retryCount + 1);
       }
@@ -131,7 +130,6 @@ export class FuelCloudProvider implements FuelProvider {
       // Handle 5xx errors with exponential backoff
       if (response.status >= 500 && retryCount < maxRetries) {
         const waitMs = Math.pow(2, retryCount) * 1000;
-        console.log(`Server error ${response.status}. Retrying in ${waitMs}ms...`);
         await new Promise(resolve => setTimeout(resolve, waitMs));
         return this.apiRequest<T>(endpoint, options, retryCount + 1);
       }
@@ -145,7 +143,6 @@ export class FuelCloudProvider implements FuelProvider {
       // Network errors - retry with exponential backoff
       if (error instanceof TypeError && error.message.includes('fetch') && retryCount < maxRetries) {
         const waitMs = Math.pow(2, retryCount) * 1000;
-        console.log(`Network error. Retrying in ${waitMs}ms...`);
         await new Promise(resolve => setTimeout(resolve, waitMs));
         return this.apiRequest<T>(endpoint, options, retryCount + 1);
       }

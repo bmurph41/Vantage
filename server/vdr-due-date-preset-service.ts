@@ -19,7 +19,6 @@ export async function ensureDefaultDueDatePresets(orgId: string, fallbackUserId?
         .limit(1);
 
       if (!firstUser.length) {
-        console.warn(`No users found for org ${orgId}, skipping due date preset seeding for now`);
         return;
       }
       

@@ -17,18 +17,15 @@ export function connectWebSocket(onMessage: MessageHandler): WebSocketController
       const wsPath = import.meta.env.VITE_WS_PATH || "/ws";
       const wsUrl = `${protocol}//${window.location.host}${wsPath}`;
       
-      console.log("Connecting to WebSocket:", wsUrl);
       
       socket = new WebSocket(wsUrl);
 
       socket.onopen = () => {
-        console.log("WebSocket connected");
       };
 
       socket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log("WebSocket message received:", message);
           onMessage(message);
         } catch (error) {
           console.error("Failed to parse WebSocket message:", error);
@@ -40,11 +37,9 @@ export function connectWebSocket(onMessage: MessageHandler): WebSocketController
       };
 
       socket.onclose = () => {
-        console.log("WebSocket disconnected");
         
         // Only attempt to reconnect if not intentionally stopped
         if (shouldReconnect) {
-          console.log("Will attempt to reconnect in 5s");
           reconnectTimer = setTimeout(() => {
             if (shouldReconnect) {
               connect();
@@ -75,7 +70,6 @@ export function connectWebSocket(onMessage: MessageHandler): WebSocketController
         socket.close();
         socket = null;
       }
-      console.log("WebSocket controller stopped");
     }
   };
 }

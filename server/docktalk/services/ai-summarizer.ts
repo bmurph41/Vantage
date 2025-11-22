@@ -36,7 +36,6 @@ Text: ${text.slice(0, 6000)}`;
 
       return response.choices[0]?.message?.content || "Summary unavailable";
     } catch (error) {
-      console.warn("OpenAI summarization failed:", error);
     }
   }
 
@@ -68,7 +67,6 @@ Text: ${text.slice(0, 6000)}`;
         return data.content?.[0]?.text || "Summary unavailable";
       }
     } catch (error) {
-      console.warn("Anthropic summarization failed:", error);
     }
   }
 
@@ -125,7 +123,6 @@ Text: ${text.slice(0, 4000)}`;
       };
     }
   } catch (error) {
-    console.warn("Sentiment analysis failed:", error);
   }
 
   return {

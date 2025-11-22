@@ -389,7 +389,6 @@ export default function ColumnMapper({
     });
     
     // Could trigger next step in upload process
-    console.log('Mapping approved:', state.mapping);
   };
 
   const handleDeclineMapping = () => {

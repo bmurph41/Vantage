@@ -809,7 +809,6 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
             const notes = await response.json();
             return { taskId, count: Array.isArray(notes) ? notes.length : 0 };
           } catch (error) {
-            console.warn(`Failed to fetch notes for task ${taskId}:`, error);
             return { taskId, count: 0 };
           }
         })
@@ -865,7 +864,6 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
       
       return calculateUnifiedCriticalPath(tasks, project, settings, options);
     } catch (error) {
-      console.warn('Critical path calculation failed:', error);
       
       // Fallback: try legacy mode if enhanced mode fails
       try {

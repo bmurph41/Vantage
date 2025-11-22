@@ -24,7 +24,6 @@ class WebSocketManager {
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
-        console.log('WebSocket connected');
         this.reconnectAttempts = 0;
         this.notifyListeners('connection', { status: 'connected' });
       };
@@ -40,7 +39,6 @@ class WebSocketManager {
       };
 
       this.ws.onclose = () => {
-        console.log('WebSocket disconnected');
         this.notifyListeners('connection', { status: 'disconnected' });
         this.attemptReconnect();
       };
@@ -60,7 +58,6 @@ class WebSocketManager {
       this.reconnectAttempts++;
       const delay = Math.pow(2, this.reconnectAttempts) * 1000; // Exponential backoff
       
-      console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
       
       this.reconnectTimeout = setTimeout(() => {
         this.connect();
@@ -111,7 +108,6 @@ class WebSocketManager {
       };
       this.ws.send(JSON.stringify(message));
     } else {
-      console.warn('WebSocket is not connected');
     }
   }
 

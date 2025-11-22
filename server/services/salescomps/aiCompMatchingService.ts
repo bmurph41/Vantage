@@ -27,7 +27,6 @@ export class AICompMatchingService {
       });
       this.enabled = true;
     } else {
-      console.warn('OPENAI_API_KEY not set - AI comp matching will be disabled');
       this.enabled = false;
     }
   }
@@ -57,7 +56,6 @@ export class AICompMatchingService {
     // Limit batch size to prevent token overflow and slow responses
     const BATCH_SIZE = 12;
     if (comps.length > BATCH_SIZE) {
-      console.warn(`Batch size ${comps.length} exceeds recommended ${BATCH_SIZE}, truncating`);
       comps = comps.slice(0, BATCH_SIZE);
       existingScores = existingScores.slice(0, BATCH_SIZE);
     }

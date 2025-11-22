@@ -114,7 +114,6 @@ export class ReconciliationService {
       ...config,
     };
 
-    console.log('🔧 ReconciliationService initialized with config:', this.config);
   }
 
   /**
@@ -138,12 +137,9 @@ export class ReconciliationService {
         if (!docReqExists) missing.push('document_requirements');
         if (!projIntExists) missing.push('project_integrations');
         
-        console.warn(`⚠️ ReconciliationService startup blocked: Missing required tables: ${missing.join(', ')}`);
-        console.warn('ℹ️ Please run database migrations or create the missing tables manually');
         return false;
       }
       
-      console.log('✅ Required database tables exist: document_requirements, project_integrations');
       return true;
     } catch (error) {
       console.error('❌ Failed to check database table existence:', error);
@@ -156,17 +152,13 @@ export class ReconciliationService {
    */
   async start(): Promise<void> {
     if (this.isRunning) {
-      console.warn('⚠️ ReconciliationService is already running');
       return;
     }
 
-    console.log('🚀 Starting ReconciliationService...');
 
     // Check if required database tables exist before starting
     const tablesExist = await this.checkRequiredTablesExist();
     if (!tablesExist) {
-      console.warn('⚠️ ReconciliationService startup aborted: Required database tables are missing');
-      console.warn('ℹ️ Service will remain stopped until tables are created');
       return;
     }
 
@@ -191,7 +183,6 @@ export class ReconciliationService {
       });
     }, this.config.healthCheckIntervalMs);
 
-    console.log(`✅ ReconciliationService started (sync interval: ${this.config.syncIntervalMinutes} minutes)`);
   }
 
   /**
@@ -214,7 +205,6 @@ export class ReconciliationService {
       this.healthCheckIntervalId = null;
     }
 
-    console.log('⏹️ ReconciliationService stopped');
   }
 
   /**
@@ -258,11 +248,9 @@ export class ReconciliationService {
     
     // Check if sync is already running for this integration
     if (this.activeSyncs.has(integrationKey)) {
-      console.log(`⏭️ Sync already running for ${integrationKey}`);
       return await this.activeSyncs.get(integrationKey)!;
     }
 
-    console.log(`🔧 Manual sync triggered for ${integrationKey}`);
     return await this.syncProjectIntegration(projectId, provider);
   }
 
@@ -271,7 +259,6 @@ export class ReconciliationService {
    */
   private async performPeriodicSync(): Promise<void> {
     try {
-      console.log('🔍 Starting periodic reconciliation sync...', new Date().toISOString());
 
       // Get all active project integrations
       const allProjects = await storage.getAllActiveProjects();
@@ -282,10 +269,8 @@ export class ReconciliationService {
         integrations.push(...projectIntegrations.filter(i => this.isDocumentProvider(i.provider)));
       }
 
-      console.log(`📊 Found ${integrations.length} document integrations to sync`);
 
       if (integrations.length === 0) {
-        console.log('ℹ️ No document integrations found, skipping sync cycle');
         return;
       }
 
@@ -304,7 +289,6 @@ export class ReconciliationService {
         await Promise.all(syncPromises);
       }
 
-      console.log('✅ Periodic reconciliation sync completed');
     } catch (error) {
       console.error('❌ Periodic reconciliation sync failed:', error);
     }
@@ -358,7 +342,6 @@ export class ReconciliationService {
       try {
         this.totalSyncAttempts++;
         
-        console.log(`🔄 Syncing ${integrationKey} (attempt ${retryCount + 1}/${this.config.maxRetries + 1})`);
         
         const result = await this.performSingleSync(projectId, provider);
         
@@ -371,7 +354,6 @@ export class ReconciliationService {
         status.documentsProcessed += result.documentsProcessed;
         this.syncStatuses.set(integrationKey, status);
 
-        console.log(`✅ Sync completed for ${integrationKey}: ${result.documentsProcessed} documents processed`);
         return result;
 
       } catch (error: any) {
@@ -393,7 +375,6 @@ export class ReconciliationService {
           const nextRetryAt = addMinutes(new Date(), delayMs / (1000 * 60));
           status.nextRetryAt = nextRetryAt;
           
-          console.log(`⏰ Will retry ${integrationKey} in ${Math.round(delayMs / 1000)}s (attempt ${retryCount + 1}/${this.config.maxRetries + 1})`);
           
           // Wait before retrying
           await this.sleep(delayMs);
@@ -427,18 +408,15 @@ export class ReconciliationService {
     const config = integration.config as any;
     const lastSyncCursor = config.lastSyncCursor || '';
     
-    console.log(`📡 Fetching documents from ${provider} for project ${projectId} (cursor: ${lastSyncCursor || 'initial'})`);
 
     try {
       // Call external document application API
       const response = await this.fetchDocumentsFromExternalApp(provider, config, lastSyncCursor);
       
       if (response.documents.length === 0) {
-        console.log(`📭 No new documents found for ${projectId}:${provider}`);
         return { success: true, documentsProcessed: 0, nextCursor: response.nextCursor };
       }
 
-      console.log(`📄 Processing ${response.documents.length} documents for ${projectId}:${provider}`);
 
       // Process documents in batches
       const batches = this.chunkArray(response.documents, this.config.batchSize);
@@ -452,7 +430,6 @@ export class ReconciliationService {
       // Update cursor for successful sync
       if (response.nextCursor && response.nextCursor !== lastSyncCursor) {
         await storage.updateLastSyncCursor(projectId, provider, response.nextCursor);
-        console.log(`📌 Updated sync cursor for ${projectId}:${provider} to: ${response.nextCursor}`);
       }
 
       return {
@@ -579,7 +556,6 @@ export class ReconciliationService {
               lastSynced: new Date().toISOString(),
             },
           });
-          console.log(`📝 Updated document requirement: ${doc.name}`);
         } else {
           // Create new document requirement
           const requirement: Partial<InsertDocumentRequirement> = {
@@ -600,7 +576,6 @@ export class ReconciliationService {
           };
 
           await storage.createDocumentRequirement(requirement as InsertDocumentRequirement);
-          console.log(`📋 Created new document requirement: ${doc.name}`);
         }
 
         processed++;
@@ -656,12 +631,10 @@ export class ReconciliationService {
       this.lastHealthCheck = new Date();
       const healthStatus = this.getHealthStatus();
       
-      console.log(`🏥 Health check: ${healthStatus.healthyIntegrations}/${healthStatus.totalIntegrations} healthy, ${healthStatus.activeSyncs} active syncs, ${healthStatus.errorRate}% error rate`);
       
       // Log unhealthy integrations
       const unhealthyStatuses = this.getSyncStatuses().filter(s => !s.lastSyncSuccess && s.lastError);
       if (unhealthyStatuses.length > 0) {
-        console.warn(`⚠️ Unhealthy integrations:`, unhealthyStatuses.map(s => `${s.projectId}:${s.provider} - ${s.lastError}`));
       }
     } catch (error) {
       console.error('❌ Health check failed:', error);
@@ -689,7 +662,6 @@ export class ReconciliationService {
   resetSyncStatus(projectId: string, provider: string): void {
     const integrationKey = `${projectId}:${provider}`;
     this.syncStatuses.delete(integrationKey);
-    console.log(`🔄 Reset sync status for ${integrationKey}`);
   }
 
   /**
@@ -704,7 +676,6 @@ export class ReconciliationService {
    */
   updateConfig(newConfig: Partial<ReconciliationConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    console.log('🔧 Configuration updated:', newConfig);
   }
 }
 
@@ -717,7 +688,6 @@ if (process.env.NODE_ENV === 'production' || process.env.AUTO_START_RECONCILIATI
   setTimeout(() => {
     try {
       reconciliationService.start();
-      console.log('🚀 ReconciliationService auto-started');
     } catch (error) {
       console.error('❌ Failed to auto-start ReconciliationService:', error);
     }

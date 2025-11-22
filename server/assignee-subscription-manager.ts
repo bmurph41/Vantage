@@ -22,7 +22,6 @@ export class AssigneeSubscriptionManager {
       const recipient = await resolveRecipient(db, 'user', assigneeId, orgId);
       
       if (!recipient) {
-        console.warn(`Could not resolve assignee ${assigneeId} for task ${taskId}`);
         return;
       }
 
@@ -35,7 +34,6 @@ export class AssigneeSubscriptionManager {
       );
 
       if (hasExistingSubscription) {
-        console.log(`Subscription already exists for assignee ${assigneeId} on task ${taskId}`);
         return;
       }
 
@@ -57,7 +55,6 @@ export class AssigneeSubscriptionManager {
         active: true,
       });
 
-      console.log(`Setup notification subscriptions for assignee ${assigneeId} on task ${taskId}`);
     } catch (error) {
       console.error(`Failed to setup assignee subscriptions for task ${taskId}:`, error);
       // Don't throw - subscription setup shouldn't block task operations
@@ -85,7 +82,6 @@ export class AssigneeSubscriptionManager {
         await this.setupAssigneeSubscriptions(projectId, taskId, newAssigneeId, orgId);
       }
 
-      console.log(`Handled assignee change for task ${taskId}: ${oldAssigneeId} → ${newAssigneeId}`);
     } catch (error) {
       console.error(`Failed to handle assignee change for task ${taskId}:`, error);
       // Don't throw - subscription management shouldn't block task operations
@@ -115,7 +111,6 @@ export class AssigneeSubscriptionManager {
       }
 
       if (assigneeSubscriptions.length > 0) {
-        console.log(`Removed ${assigneeSubscriptions.length} subscriptions for assignee ${assigneeId} on task ${taskId}`);
       }
     } catch (error) {
       console.error(`Failed to remove assignee subscriptions for task ${taskId}:`, error);
@@ -136,7 +131,6 @@ export class AssigneeSubscriptionManager {
       }
 
       if (subscriptions.length > 0) {
-        console.log(`Cleaned up ${subscriptions.length} subscriptions for deleted task ${taskId}`);
       }
     } catch (error) {
       console.error(`Failed to cleanup subscriptions for task ${taskId}:`, error);
@@ -162,7 +156,6 @@ export class AssigneeSubscriptionManager {
         );
       }
       
-      console.log(`Bulk setup subscriptions for ${taskAssignments.length} task assignments`);
     } catch (error) {
       console.error('Failed to bulk setup assignee subscriptions:', error);
       // Don't throw - subscription setup shouldn't block bulk operations

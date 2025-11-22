@@ -2886,10 +2886,6 @@ export const generateWhitePaperPDF = async (
   settings?: ProjectSettings | null
 ): Promise<void> => {
   try {
-    console.log('Starting comprehensive risk analysis PDF generation for project:', project.name);
-    console.log('Number of tasks:', tasks.length);
-    console.log('Number of risks:', risks.length);
-    console.log('Risk analytics:', riskAnalytics);
     
     const doc = <WhitePaperDocument 
       project={project} 
@@ -2898,13 +2894,10 @@ export const generateWhitePaperPDF = async (
       riskAnalytics={riskAnalytics} 
       settings={settings} 
     />;
-    console.log('Comprehensive risk analysis PDF document created');
     
     const asPdf = pdf(doc);
-    console.log('PDF instance created');
     
     const blob = await asPdf.toBlob();
-    console.log('PDF blob generated:', blob.size, 'bytes');
     
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -2913,7 +2906,6 @@ export const generateWhitePaperPDF = async (
     link.click();
     
     URL.revokeObjectURL(url);
-    console.log('Comprehensive risk analysis PDF download initiated successfully');
   } catch (error) {
     console.error('Detailed PDF generation error:', error);
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');

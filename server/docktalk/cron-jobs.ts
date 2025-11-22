@@ -11,7 +11,6 @@ export function startDockTalkCronJobs(storage: IStorage): void {
   dockTalkStorage = storage;
   if (isInitialized) return;
   
-  console.log("Starting DockTalk cron jobs...");
   
   // Initialize default RSS sources on startup
   initializeDefaultRssSources().catch(console.error);
@@ -20,15 +19,12 @@ export function startDockTalkCronJobs(storage: IStorage): void {
   const cronSchedule = process.env.CRON_SCHEDULE || "*/5 * * * *";
   
   cron.schedule(cronSchedule, async () => {
-    console.log("⏰ CRON: Starting scheduled RSS fetch...");
     try {
       const newArticles = await fetchRssFeeds();
       await updateSystemStats(newArticles);
-      console.log(`✅ CRON complete. New articles: ${newArticles}`);
       
       // Process immediate alerts after successful RSS fetch (when new articles exist)
       if (newArticles > 0) {
-        console.log("🔔 Processing immediate alerts after RSS fetch...");
         await processImmediateAlerts();
       }
     } catch (error) {
@@ -76,9 +72,7 @@ export function startDockTalkCronJobs(storage: IStorage): void {
   // Generate daily AI summaries at midnight every day
   cron.schedule("0 0 * * *", async () => {
     try {
-      console.log("🤖 Generating daily AI category summaries...");
       const summaries = await generateAllCategorySummaries("daily");
-      console.log(`✅ Generated ${summaries.length} daily summaries`);
     } catch (error) {
       console.error("❌ Daily summary generation error:", error);
     }
@@ -87,24 +81,19 @@ export function startDockTalkCronJobs(storage: IStorage): void {
   // Generate weekly AI summaries every Monday at midnight
   cron.schedule("0 0 * * 1", async () => {
     try {
-      console.log("🤖 Generating weekly AI category summaries...");
       const summaries = await generateAllCategorySummaries("weekly");
-      console.log(`✅ Generated ${summaries.length} weekly summaries`);
     } catch (error) {
       console.error("❌ Weekly summary generation error:", error);
     }
   });
 
   isInitialized = true;
-  console.log("DockTalk cron jobs started successfully");
 }
 
 export async function triggerManualFetch(): Promise<number> {
-  console.log("🚀 Manual fetch triggered...");
   try {
     const newArticles = await fetchRssFeeds();
     await updateSystemStats(newArticles);
-    console.log(`✅ Manual fetch complete. New articles: ${newArticles}`);
     return newArticles;
   } catch (error) {
     console.error("❌ Manual fetch error:", error);
@@ -168,7 +157,6 @@ async function cleanupOldArticles(): Promise<void> {
     // Delete articles older than 1 year, but preserve bookmarked articles
     const deletedCount = await dockTalkStorage.deleteOldArticles(oneYearAgo);
     
-    console.log(`Cleanup complete. Deleted ${deletedCount} articles older than ${oneYearAgo.toISOString()} (preserved bookmarked articles)`);
   } catch (error) {
     console.error("Error during cleanup:", error);
   }

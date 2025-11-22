@@ -73,12 +73,10 @@ export function AddressInput({
             const data = await response.json();
             apiKey = data.apiKey;
           } catch (err) {
-            console.log('Failed to fetch Google Maps API key from backend:', err);
           }
         }
         
         if (!apiKey) {
-          console.log('Google Maps API key not configured. Address autocomplete disabled.');
           setIsLoading(false);
           return;
         }

@@ -343,7 +343,6 @@ This task is critically overdue and may impact project deadlines.`
     try {
       // Check if SendGrid is configured
       if (!process.env.SENDGRID_API_KEY) {
-        console.warn('SendGrid API key not configured - notification not sent');
         return { success: false, error: 'SendGrid not configured' };
       }
 
@@ -360,7 +359,6 @@ This task is critically overdue and may impact project deadlines.`
         );
 
         if (isDuplicate) {
-          console.log(`Duplicate notification prevented: ${type} for ${context.recipient.email}`);
           return { success: false, error: 'Duplicate notification' };
         }
       }
@@ -412,7 +410,6 @@ This task is critically overdue and may impact project deadlines.`
         });
       }
 
-      console.log(`Notification sent successfully: ${type} to ${context.recipient.email}`);
       return { success: true, messageId };
 
     } catch (error) {
@@ -568,7 +565,6 @@ This task is critically overdue and may impact project deadlines.`
       // Note: This would typically be more efficient with database queries
       // For now, we'll implement a basic version
       
-      console.log('Processing deadline notifications...');
       // TODO: Implement more sophisticated deadline monitoring
       // This would typically run as a scheduled job
       

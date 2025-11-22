@@ -38,12 +38,10 @@ export class DeadlineMonitor {
    */
   start(): void {
     if (this.isRunning) {
-      console.warn('Deadline monitor is already running');
       return;
     }
 
     this.isRunning = true;
-    console.log('🚀 Starting deadline monitoring service...');
 
     // Run initial check
     this.checkDeadlines().catch(error => {
@@ -57,7 +55,6 @@ export class DeadlineMonitor {
       });
     }, 60 * 60 * 1000); // 1 hour
 
-    console.log('✅ Deadline monitoring service started');
   }
 
   /**
@@ -74,7 +71,6 @@ export class DeadlineMonitor {
       this.intervalId = null;
     }
 
-    console.log('⏹️ Deadline monitoring service stopped');
   }
 
   /**
@@ -92,7 +88,6 @@ export class DeadlineMonitor {
    */
   private async checkDeadlines(): Promise<void> {
     try {
-      console.log('🔍 Checking deadlines...', new Date().toISOString());
 
       // Get all active projects (in a real implementation, this would be paginated)
       const projects = await this.getAllActiveProjects();
@@ -104,14 +99,12 @@ export class DeadlineMonitor {
         deadlineAlerts.push(...projectAlerts);
       }
 
-      console.log(`📧 Found ${deadlineAlerts.length} deadline alerts to process`);
 
       // Process deadline alerts
       for (const alert of deadlineAlerts) {
         await this.processDeadlineAlert(alert);
       }
 
-      console.log('✅ Deadline check completed');
     } catch (error) {
       console.error('❌ Deadline check failed:', error);
     }
@@ -125,7 +118,6 @@ export class DeadlineMonitor {
     try {
       // Get all projects that have active tasks with deadlines
       const activeProjects = await storage.getAllActiveProjects();
-      console.log(`📊 Found ${activeProjects.length} active projects for deadline monitoring`);
       return activeProjects;
     } catch (error) {
       console.error('Failed to get active projects:', error);
@@ -250,7 +242,6 @@ export class DeadlineMonitor {
         subscription.leadTimesDays.includes(leadOffsetDays)
       );
 
-      console.log(`📬 Processing ${relevantSubscriptions.length} subscription(s) for task: ${task.title}`);
 
       // Send notifications to each subscriber
       for (const subscription of relevantSubscriptions) {
@@ -280,7 +271,6 @@ export class DeadlineMonitor {
       );
 
       if (!recipient) {
-        console.warn(`Could not resolve recipient: ${subscription.recipientType}:${subscription.recipientId}`);
         return;
       }
 
@@ -297,13 +287,11 @@ export class DeadlineMonitor {
       );
 
       if (isDuplicate) {
-        console.log(`⏭️  Skipping duplicate notification: ${alertType} for ${recipient.email}`);
         return;
       }
 
       // Check quiet hours and weekend preferences
       if (await this.isQuietTime(project, recipient)) {
-        console.log(`🔇 Skipping notification due to quiet hours: ${recipient.email}`);
         return;
       }
 
@@ -326,7 +314,6 @@ export class DeadlineMonitor {
       );
 
       if (result.success) {
-        console.log(`✅ Sent ${alertType} notification to ${recipient.email} for task: ${task.title}`);
       } else {
         console.error(`❌ Failed to send ${alertType} notification to ${recipient.email}:`, result.error);
       }
@@ -370,7 +357,6 @@ export class DeadlineMonitor {
    * Manual trigger for deadline checks (useful for testing)
    */
   async triggerDeadlineCheck(): Promise<void> {
-    console.log('🔧 Manual deadline check triggered');
     await this.checkDeadlines();
   }
 

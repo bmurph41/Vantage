@@ -13,16 +13,13 @@ export interface AlertNotification {
 
 export async function checkAndSendAlerts(frequency: "immediate" | "daily" | "weekly"): Promise<void> {
   try {
-    console.log(`🔔 Checking ${frequency} alerts...`);
     
     const searches = await storage.getActiveSearchesForAlerts(frequency);
     
     if (searches.length === 0) {
-      console.log(`No ${frequency} searches to process`);
       return;
     }
 
-    console.log(`Found ${searches.length} ${frequency} search(es), filtering by timezone...`);
     
     let processedCount = 0;
 
@@ -32,7 +29,6 @@ export async function checkAndSendAlerts(frequency: "immediate" | "daily" | "wee
         if (frequency === "daily" || frequency === "weekly") {
           const shouldSend = await shouldSendAlertNow(search.userId, frequency);
           if (!shouldSend) {
-            console.log(`Skipping "${search.name}" - not the right time for user's timezone`);
             continue;
           }
         }
@@ -44,7 +40,6 @@ export async function checkAndSendAlerts(frequency: "immediate" | "daily" | "wee
       }
     }
 
-    console.log(`✅ ${frequency} alerts processed: ${processedCount}/${searches.length} sent`);
   } catch (error) {
     console.error(`Error checking ${frequency} alerts:`, error);
   }
@@ -54,7 +49,6 @@ async function shouldSendAlertNow(userId: string, frequency: "daily" | "weekly")
   try {
     const preferences = await storage.getUserNotificationPreferences(userId);
     if (!preferences) {
-      console.log(`No preferences found for user ${userId}`);
       return false;
     }
 
@@ -98,7 +92,6 @@ async function shouldSendAlertNow(userId: string, frequency: "daily" | "weekly")
     }
     
     if (isWithinWindow) {
-      console.log(`✓ Sending alert to user ${userId} - local time ${formatTZ(userLocalTime, 'HH:mm', { timeZone: timezone })} matches target ${deliveryTime} in ${timezone}`);
     }
     
     return isWithinWindow;
@@ -126,7 +119,6 @@ async function processSearchAlert(search: SavedSearch): Promise<void> {
   });
 
   if (articles.length === 0) {
-    console.log(`No new articles for search "${search.name}"`);
     return;
   }
 
@@ -142,14 +134,10 @@ async function processSearchAlert(search: SavedSearch): Promise<void> {
   
   await storage.updateLastAlertSent(search.id);
   
-  console.log(`✉️  Alert sent for "${search.name}": ${articles.length} new article(s)`);
 }
 
 async function sendNotification(notification: AlertNotification, search: SavedSearch): Promise<void> {
-  console.log(`📧 ALERT: ${notification.searchName} - ${notification.newCount} new articles`);
-  console.log(`   Top articles:`);
   notification.articles.slice(0, 3).forEach((article, idx) => {
-    console.log(`   ${idx + 1}. ${article.title}`);
   });
 
   // Get user for email address
@@ -218,7 +206,6 @@ async function sendNotification(notification: AlertNotification, search: SavedSe
         `,
       });
 
-      console.log(`✅ Email sent to ${preferences.emailAddress}`);
       deliveryMethod = "email";
       deliveryStatus = "sent";
     } catch (error) {
@@ -247,7 +234,6 @@ async function sendNotification(notification: AlertNotification, search: SavedSe
       deliveryMethod,
       deliveryStatus,
     });
-    console.log(`💾 Notification persisted to database`);
   } catch (error) {
     console.error(`Failed to persist notification:`, error);
   }

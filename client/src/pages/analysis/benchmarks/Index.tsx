@@ -141,10 +141,7 @@ function BenchmarkChart({ seriesId, name, unit, startDate }: BenchmarkChartProps
   }));
 
   // Debug logging
-  console.log(`${seriesId} - Total observations:`, data?.observations?.length);
-  console.log(`${seriesId} - Filtered chartData:`, chartData.length);
   if (chartData.length > 0) {
-    console.log(`${seriesId} - Sample data:`, chartData.slice(0, 3));
   }
 
   const currentValue = chartData.length > 0 ? chartData[chartData.length - 1].value : null;

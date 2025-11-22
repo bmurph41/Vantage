@@ -138,7 +138,6 @@ Respond ONLY with valid JSON matching this schema:
         entities: result.entities || []
       };
     } catch (openaiError) {
-      console.warn("OpenAI enrichment failed, trying Anthropic fallback:", openaiError);
       
       // Fallback to Anthropic Claude
       const message = await anthropic.messages.create({

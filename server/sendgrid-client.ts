@@ -103,5 +103,4 @@ Due Diligence Tracker`,
   };
 
   await client.send(msg);
-  console.log(`📧 Task poke email sent to ${params.toEmail} for task: ${params.taskTitle}`);
 }

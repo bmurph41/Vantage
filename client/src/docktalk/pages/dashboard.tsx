@@ -33,7 +33,6 @@ export default function Dashboard() {
 
   const handleNotificationClick = () => {
     // Notification functionality - can be expanded later
-    console.log('Notifications clicked');
   };
 
   const handleSettingsClick = () => {

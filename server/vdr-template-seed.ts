@@ -4,7 +4,6 @@ import { eq } from "drizzle-orm";
 
 // Default real estate deal folder structure
 export async function seedDefaultVdrTemplates() {
-  console.log("Seeding default VDR templates...");
 
   // Check if template already exists
   const existing = await db.select().from(vdrTemplates).where(
@@ -12,7 +11,6 @@ export async function seedDefaultVdrTemplates() {
   );
 
   if (existing.length > 0) {
-    console.log("Default template already exists, skipping seed");
     return existing[0].id;
   }
 
@@ -27,7 +25,6 @@ export async function seedDefaultVdrTemplates() {
     createdBy: null,
   }).returning();
 
-  console.log(`Created template: ${template.id}`);
 
   // Define folder structure with hierarchy
   const folderDefinitions = [
@@ -93,14 +90,12 @@ export async function seedDefaultVdrTemplates() {
     }).returning();
     
     folderMap[def.name] = folder.id;
-    console.log(`Created root folder: ${def.name}`);
   }
 
   // Second pass: create subfolders
   for (const def of folderDefinitions.filter(f => f.parent !== null)) {
     const parentId = folderMap[def.parent!];
     if (!parentId) {
-      console.warn(`Parent folder not found: ${def.parent}`);
       continue;
     }
 
@@ -112,9 +107,7 @@ export async function seedDefaultVdrTemplates() {
       description: null,
     }).returning();
     
-    console.log(`Created subfolder: ${def.name} under ${def.parent}`);
   }
 
-  console.log("✓ Default VDR template seeded successfully");
   return template.id;
 }

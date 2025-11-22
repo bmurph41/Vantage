@@ -30,18 +30,15 @@ interface CRMContact {
 const CRMIntegration = {
   // TODO: Implement these when connecting to actual CRM
   syncContactToCRM: async (contact: Contact): Promise<void> => {
-    console.log('CRM Sync placeholder - Contact would be synced to CRM:', contact.name);
     // Future implementation will send contact data to external CRM
   },
   
   searchCRMContacts: async (searchTerm: string): Promise<Contact[]> => {
-    console.log('CRM Search placeholder - Would search CRM for:', searchTerm);
     // Future implementation will search external CRM and return results
     return [];
   },
   
   importFromCRM: async (crmContactId: string): Promise<Contact | null> => {
-    console.log('CRM Import placeholder - Would import contact:', crmContactId);
     // Future implementation will import contact from external CRM
     return null;
   }
@@ -358,7 +355,6 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
           <Button 
             variant="outline" 
             onClick={() => {
-              console.log('CRM Search clicked - Future CRM integration point');
               // TODO: Implement CRM search when connecting to external CRM
             }}
             className="border-2 hover:bg-purple-50 border-purple-200 text-purple-700" 

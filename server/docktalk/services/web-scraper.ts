@@ -64,7 +64,6 @@ export async function fetchArticleBody(url: string): Promise<string> {
     return content.length > 200 ? content : '';
 
   } catch (error) {
-    console.warn(`Failed to fetch article body from ${url}:`, error);
     return '';
   }
 }
@@ -253,7 +252,6 @@ export async function scrapeWebPage(url: string): Promise<ScrapedArticle[]> {
       });
     }
 
-    console.log(`Scraped ${articles.length} articles from ${url}`);
     return articles;
 
   } catch (error) {

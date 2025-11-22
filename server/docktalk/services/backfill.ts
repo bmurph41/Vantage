@@ -56,7 +56,6 @@ export async function backfillHistoricalArticles(options: BackfillOptions = {}):
       return true;
     });
 
-    console.log(`Starting backfill for ${sourcesToProcess.length} sources (${monthsBack} months back)`);
 
     for (const source of sourcesToProcess) {
       const result: BackfillResult = {
@@ -70,14 +69,12 @@ export async function backfillHistoricalArticles(options: BackfillOptions = {}):
       try {
         if (source.sourceType === 'web_scrape') {
           // For web scraping sources, scrape archive pages
-          console.log(`Backfilling web scrape source: ${source.name}`);
           const backfillResult = await backfillWebScrapeSource(source, cutoffDate, maxArticlesPerSource);
           result.newArticles = backfillResult.newArticles;
           result.duplicates = backfillResult.duplicates;
           result.errors = backfillResult.errors;
         } else {
           // For RSS feeds, try RSS first, then fall back to web scraping
-          console.log(`Backfilling RSS source: ${source.name}`);
           const rssResult = await backfillRssSource(source, cutoffDate, maxArticlesPerSource);
           result.newArticles = rssResult.newArticles;
           result.duplicates = rssResult.duplicates;
@@ -85,7 +82,6 @@ export async function backfillHistoricalArticles(options: BackfillOptions = {}):
           
           // If RSS didn't yield many articles, try web scraping archives
           if (rssResult.newArticles < 10) {
-            console.log(`RSS feed for ${source.name} has limited history, trying web scraping fallback...`);
             const webResult = await backfillWebScrapeSource(source, cutoffDate, maxArticlesPerSource - rssResult.newArticles);
             result.newArticles += webResult.newArticles;
             result.duplicates += webResult.duplicates;
@@ -136,7 +132,6 @@ async function backfillRssSource(
     const feed = await parser.parseURL(source.url);
     const items = feed.items || [];
     
-    console.log(`Found ${items.length} items in RSS feed for ${source.name}`);
 
     // Process items (most RSS feeds only have recent items)
     for (const item of items.slice(0, maxArticles)) {
@@ -159,7 +154,6 @@ async function backfillRssSource(
                            new Date();
         
         if (publishedAt < cutoffDate) {
-          console.log(`Skipping article older than cutoff date: ${item.title}`);
           continue;
         }
 
@@ -185,7 +179,6 @@ async function backfillRssSource(
         try {
           summary = await summarizeArticle(`${title}\n\n${content}`);
         } catch (error) {
-          console.warn("Failed to generate AI summary:", error);
         }
 
         // Enrich with sentiment analysis
@@ -199,7 +192,6 @@ async function backfillRssSource(
           dealMetadata = enrichment.dealMetadata;
           geography = enrichment.geography;
         } catch (error) {
-          console.warn("Failed to enrich article:", error);
         }
 
         // Create search text
@@ -216,7 +208,6 @@ async function backfillRssSource(
         const { shouldRemove } = await storage.checkArticleAgainstRemovalPatterns(title, content);
         
         if (shouldRemove) {
-          console.log(`Article matches removal patterns, skipping: "${title}"`);
           continue;
         }
 
@@ -239,7 +230,6 @@ async function backfillRssSource(
         );
         
         if (duplicateCheck.isDuplicate && duplicateCheck.canonicalArticle) {
-          console.log(`Duplicate detected: "${title}" (${duplicateCheck.suppressionReason})`);
           // Record the duplicate
           await storage.createArticleDuplicate({
             canonicalArticleId: duplicateCheck.canonicalArticle.id,
@@ -307,7 +297,6 @@ async function backfillWebScrapeSource(
     // Try to scrape archive pages
     const archiveUrls = await discoverArchiveUrls(source.url, source.name);
     
-    console.log(`Found ${archiveUrls.length} archive URLs for ${source.name}`);
 
     for (const archiveUrl of archiveUrls.slice(0, 10)) { // Limit to 10 archive pages
       try {
@@ -352,7 +341,6 @@ async function backfillWebScrapeSource(
           try {
             summary = await summarizeArticle(`${title}\n\n${content}`);
           } catch (error) {
-            console.warn("Failed to generate AI summary:", error);
           }
 
           // Enrich with sentiment analysis
@@ -366,7 +354,6 @@ async function backfillWebScrapeSource(
             dealMetadata = enrichment.dealMetadata;
             geography = enrichment.geography;
           } catch (error) {
-            console.warn("Failed to enrich article:", error);
           }
 
           // Create search text
@@ -383,7 +370,6 @@ async function backfillWebScrapeSource(
           const { shouldRemove } = await storage.checkArticleAgainstRemovalPatterns(title, content);
           
           if (shouldRemove) {
-            console.log(`Article matches removal patterns, skipping: "${title}"`);
             continue;
           }
 
@@ -406,7 +392,6 @@ async function backfillWebScrapeSource(
           );
           
           if (duplicateCheck.isDuplicate && duplicateCheck.canonicalArticle) {
-            console.log(`Duplicate detected: "${title}" (${duplicateCheck.suppressionReason})`);
             // Record the duplicate
             await storage.createArticleDuplicate({
               canonicalArticleId: duplicateCheck.canonicalArticle.id,

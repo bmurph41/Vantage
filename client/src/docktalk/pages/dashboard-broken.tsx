@@ -25,7 +25,6 @@ export default function Dashboard() {
 
   const handleViewArticle = (notification: any) => {
     // TODO: Navigate to article or open in new tab
-    console.log("View article:", notification);
   };
 
   return (

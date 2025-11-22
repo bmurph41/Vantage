@@ -327,7 +327,6 @@ export class ParserService {
       data = parseResult.data as Record<string, any>[];
     }
 
-    console.log(`Raw parsed data: ${data.length} rows`);
 
     // More lenient filtering - only remove rows that are completely empty or have no meaningful data
     const filteredData = data.filter(row => {
@@ -343,7 +342,6 @@ export class ParserService {
       return nonEmptyValues.length > 0;
     });
 
-    console.log(`After filtering empty rows: ${filteredData.length} rows (${data.length - filteredData.length} removed)`);
 
     return filteredData;
   }

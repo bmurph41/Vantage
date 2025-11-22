@@ -767,9 +767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Automatically sync calendar event for new task
       try {
-        console.log('🗓️ Attempting to sync calendar event for new task:', task.id, 'with deadline:', task.deadline);
         const calendarEvent = await storage.syncTaskCalendarEvent(task);
-        console.log('🗓️ Calendar event sync result for new task:', calendarEvent ? 'created' : 'no event needed');
       } catch (calendarError) {
         console.error('❌ Failed to sync calendar event for new task:', calendarError);
         // Don't fail the request if calendar sync fails
@@ -1007,9 +1005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Automatically sync calendar event for updated task
       try {
-        console.log('🗓️ Attempting to sync calendar event for updated task:', updated.id, 'with deadline:', updated.deadline);
         const calendarEvent = await storage.syncTaskCalendarEvent(updated);
-        console.log('🗓️ Calendar event sync result for updated task:', calendarEvent ? 'updated/created' : 'no event needed');
       } catch (calendarError) {
         console.error('❌ Failed to sync calendar event for updated task:', calendarError);
         // Don't fail the request if calendar sync fails
@@ -1532,7 +1528,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         await fs.unlink(file.storagePath);
       } catch (unlinkError) {
-        console.warn('File not found on disk, continuing with database deletion:', unlinkError);
       }
 
       // Delete file record from database
@@ -2788,7 +2783,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Integration not found" });
       }
       
-      console.log(`🔧 Manual sync triggered for ${projectId}:${provider} by user ${req.user.id}`);
       
       // Trigger sync (this is async but we respond immediately)
       const syncResult = await reconciliationService.triggerSync(projectId, provider);
@@ -2828,7 +2822,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Integration not found" });
       }
       
-      console.log(`🔄 Sync status reset for ${projectId}:${provider} by user ${req.user.id}`);
       
       reconciliationService.resetSyncStatus(projectId, provider);
       
@@ -3743,7 +3736,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           break;
           
         default:
-          console.warn("Unknown webhook event type:", (webhookEvent as any).event);
       }
 
       res.json({ 
@@ -3759,7 +3751,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Helper function to process document events
   async function processDocumentEvent(event: WebhookEvent) {
-    console.log("Processing document event:", event.event, event.data);
     
     // Here you would implement the actual document processing logic
     // For example, updating task status, creating notifications, etc.
@@ -3792,7 +3783,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Helper function to process task events
   async function processTaskEvent(event: WebhookEvent) {
-    console.log("Processing task event:", event.event, event.data);
     
     // Type guard for task events
     if (
@@ -3817,7 +3807,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Helper function to process project events
   async function processProjectEvent(event: WebhookEvent) {
-    console.log("Processing project event:", event.event, event.data);
     
     // Type guard for project events
     if (event.event === 'project.created') {
@@ -4574,7 +4563,6 @@ Current context: Project ${req.params.projectId}`;
             const toolName = toolCall.function.name;
             const toolArgs = JSON.parse(toolCall.function.arguments);
 
-            console.log(`Executing tool: ${toolName}`, toolArgs);
 
             // Execute the tool with context
             const toolResult = await executeAdvisorTool(
@@ -8373,13 +8361,11 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.orgId;
       
-      console.log('🔧 Starting property backfill for org:', orgId);
       
       const result = await storage.getComps({ orgId, pageSize: 10000 });
       const comps = result.comps;
       const compsWithoutProperty = comps.filter(comp => !comp.propertyId && comp.marina);
       
-      console.log(`📊 Found ${compsWithoutProperty.length} comps without properties out of ${comps.length} total comps`);
       
       let created = 0;
       let matched = 0;
@@ -8399,7 +8385,6 @@ Current context: Project ${req.params.projectId}`;
           if (matchedProperty) {
             propertyId = matchedProperty.id;
             matched++;
-            console.log(`✅ Matched comp "${comp.marina}" to existing property`);
           } else {
             const address = [
               comp.address,
@@ -8418,7 +8403,6 @@ Current context: Project ${req.params.projectId}`;
             
             propertyId = newProperty.id;
             created++;
-            console.log(`✨ Created new property for comp "${comp.marina}"`);
           }
           
           if (propertyId) {
@@ -8437,7 +8421,6 @@ Current context: Project ${req.params.projectId}`;
         failed,
       };
       
-      console.log('✅ Property backfill completed:', summary);
       
       res.json(summary);
     } catch (error) {
@@ -8451,7 +8434,6 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.orgId;
 
-      console.log('🔍 POST /api/sales-comps - Request body profit centers:', {
         profitCenterStorage: req.body.profitCenterStorage,
         profitCenterEvents: req.body.profitCenterEvents,
         profitCenterService: req.body.profitCenterService,
@@ -8470,7 +8452,6 @@ Current context: Project ${req.params.projectId}`;
 
       const compData = salesCompCreateSchema.parse(req.body);
       
-      console.log('🔍 POST /api/sales-comps - After Zod parse profit centers:', {
         profitCenterStorage: compData.profitCenterStorage,
         profitCenterEvents: compData.profitCenterEvents,
         profitCenterService: compData.profitCenterService,
@@ -8505,7 +8486,6 @@ Current context: Project ${req.params.projectId}`;
             state: compData.state,
           });
           if (companyResult.created) {
-            console.log(`✅ Auto-created pending company for new comp ${comp.id}: ${companyResult.reason || 'Success'}`);
           }
         } catch (companyError) {
           console.error('Error auto-creating pending company:', companyError);
@@ -8524,7 +8504,6 @@ Current context: Project ${req.params.projectId}`;
             brokerage: compData.brokerage,
           });
           if (contactResult.created) {
-            console.log(`✅ Auto-created pending contact for new comp ${comp.id}: ${contactResult.reason || 'Success'}`);
           }
         } catch (contactError) {
           console.error('Error auto-creating pending contact:', contactError);
@@ -8543,7 +8522,6 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.orgId;
 
-      console.log('🔍 PATCH /api/sales-comps/:id - Request body profit centers:', {
         profitCenterStorage: req.body.profitCenterStorage,
         profitCenterEvents: req.body.profitCenterEvents,
         profitCenterService: req.body.profitCenterService,
@@ -8562,7 +8540,6 @@ Current context: Project ${req.params.projectId}`;
 
       const updates = salesCompUpdateSchema.parse(req.body);
       
-      console.log('🔍 PATCH /api/sales-comps/:id - After Zod parse profit centers:', {
         profitCenterStorage: updates.profitCenterStorage,
         profitCenterEvents: updates.profitCenterEvents,
         profitCenterService: updates.profitCenterService,
@@ -8600,9 +8577,7 @@ Current context: Project ${req.params.projectId}`;
             state: updates.state,
           });
           if (companyResult.created) {
-            console.log(`✅ Auto-created pending company for comp ${req.params.id}: ${companyResult.reason || 'Success'}`);
           } else {
-            console.log(`ℹ️ Pending company not created for comp ${req.params.id}: ${companyResult.reason}`);
           }
         } catch (companyError) {
           console.error('Error auto-creating pending company:', companyError);
@@ -8621,9 +8596,7 @@ Current context: Project ${req.params.projectId}`;
             brokerage: updates.brokerage,
           });
           if (contactResult.created) {
-            console.log(`✅ Auto-created pending contact for comp ${req.params.id}: ${contactResult.reason || 'Success'}`);
           } else {
-            console.log(`ℹ️ Pending contact not created for comp ${req.params.id}: ${contactResult.reason}`);
           }
         } catch (contactError) {
           console.error('Error auto-creating pending contact:', contactError);
@@ -8746,7 +8719,6 @@ Current context: Project ${req.params.projectId}`;
       const analysis = await parserService.analyzeFile(req.file);
       const fullData = await parserService.parseFullFile(req.file);
       
-      console.log(`Parsed ${fullData.length} rows from file ${req.file.originalname}`);
       
       const importRecord = await storage.createImport({
         orgId,
@@ -8820,7 +8792,6 @@ Current context: Project ${req.params.projectId}`;
 
       const { mapping, normalization, excludedRows = [], parentPortfolioId, importMode = 'upsert', updateBlankValues = false } = req.body;
       
-      console.log(`Starting import for ${req.params.importId} with mapping:`, mapping, 'mode:', importMode);
       
       const result = await compService.processImport(
         req.params.importId,
@@ -8834,7 +8805,6 @@ Current context: Project ${req.params.projectId}`;
         updateBlankValues
       );
       
-      console.log(`Import completed for ${req.params.importId}:`, result);
 
       res.json(result);
     } catch (error) {
@@ -10975,7 +10945,6 @@ Current context: Project ${req.params.projectId}`;
       const hasValidCriteria = Object.keys(normalizedProfile).length > 0;
       
       if (hasValidCriteria) {
-        console.log(`🔍 Auto-adding comps for new SC project "${project.name}" with profile:`, normalizedProfile);
         try {
           const projectProfile = normalizedProfile as ProjectProfile;
           const userWeightOverrides = (project.weightOverrides as any) || undefined;
@@ -11012,7 +10981,6 @@ Current context: Project ${req.params.projectId}`;
           // Don't fail project creation if recommendations fail
         }
       } else {
-        console.log(`ℹ️  No profile criteria provided for SC project "${project.name}", skipping auto-add`);
       }
 
       res.status(201).json({ project, recommendations, addedCount });
@@ -11419,9 +11387,7 @@ Current context: Project ${req.params.projectId}`;
             topRecommendations.sort((a, b) => b.score - a.score);
             
             aiUsed = true;
-            console.log(`AI scoring enhanced ${aiScores.scores.length} comps for project ${projectId}`);
           } else {
-            console.log('AI scoring returned no scores, using rule-based only');
           }
         } catch (aiError) {
           console.error('AI scoring failed, falling back to rule-based only:', aiError);
@@ -11864,13 +11830,11 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.orgId;
       
-      console.log('🔧 Starting property backfill for rate comps in org:', orgId);
       
       const result = await storage.getRateComps({ orgId, pageSize: 10000 });
       const comps = result.comps;
       const compsWithoutProperty = comps.filter(comp => !comp.propertyId && comp.marina);
       
-      console.log(`📊 Found ${compsWithoutProperty.length} rate comps without properties out of ${comps.length} total comps`);
       
       let created = 0;
       let matched = 0;
@@ -11890,7 +11854,6 @@ Current context: Project ${req.params.projectId}`;
           if (matchedProperty) {
             propertyId = matchedProperty.id;
             matched++;
-            console.log(`✅ Matched rate comp "${comp.marina}" to existing property`);
           } else {
             const address = [
               comp.address,
@@ -11909,7 +11872,6 @@ Current context: Project ${req.params.projectId}`;
             
             propertyId = newProperty.id;
             created++;
-            console.log(`✨ Created new property for rate comp "${comp.marina}"`);
           }
           
           if (propertyId) {
@@ -11928,7 +11890,6 @@ Current context: Project ${req.params.projectId}`;
         failed,
       };
       
-      console.log('✅ Property backfill completed:', summary);
       
       res.json(summary);
     } catch (error) {
@@ -11942,7 +11903,6 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.orgId;
 
-      console.log('🔍 POST /api/rate-comps - Request body profit centers:', {
         profitCenterStorage: req.body.profitCenterStorage,
         profitCenterEvents: req.body.profitCenterEvents,
         profitCenterService: req.body.profitCenterService,
@@ -11961,7 +11921,6 @@ Current context: Project ${req.params.projectId}`;
 
       const compData = salesCompCreateSchema.parse(req.body);
       
-      console.log('🔍 POST /api/rate-comps - After Zod parse profit centers:', {
         profitCenterStorage: compData.profitCenterStorage,
         profitCenterEvents: compData.profitCenterEvents,
         profitCenterService: compData.profitCenterService,
@@ -11996,7 +11955,6 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       const orgId = req.user.orgId;
 
-      console.log('🔍 PATCH /api/rate-comps/:id - Request body profit centers:', {
         profitCenterStorage: req.body.profitCenterStorage,
         profitCenterEvents: req.body.profitCenterEvents,
         profitCenterService: req.body.profitCenterService,
@@ -12015,7 +11973,6 @@ Current context: Project ${req.params.projectId}`;
 
       const updates = salesCompUpdateSchema.parse(req.body);
       
-      console.log('🔍 PATCH /api/rate-comps/:id - After Zod parse profit centers:', {
         profitCenterStorage: updates.profitCenterStorage,
         profitCenterEvents: updates.profitCenterEvents,
         profitCenterService: updates.profitCenterService,
@@ -12156,7 +12113,6 @@ Current context: Project ${req.params.projectId}`;
       const analysis = await rcParserService.analyzeFile(req.file);
       const fullData = await rcParserService.parseFullFile(req.file);
       
-      console.log(`Parsed ${fullData.length} rows from rate comp file ${req.file.originalname}`);
       
       const importRecord = await storage.createRateCompImport({
         orgId,
@@ -12209,7 +12165,6 @@ Current context: Project ${req.params.projectId}`;
 
       const { mapping, normalization, excludedRows = [], parentPortfolioId } = req.body;
       
-      console.log(`Starting rate comp import for ${req.params.importId} with mapping:`, mapping);
       
       const result = await rcCompService.processImport(
         req.params.importId,
@@ -12221,7 +12176,6 @@ Current context: Project ${req.params.projectId}`;
         parentPortfolioId
       );
       
-      console.log(`Rate comp import completed for ${req.params.importId}:`, result);
 
       res.json(result);
     } catch (error) {
@@ -12651,7 +12605,6 @@ Current context: Project ${req.params.projectId}`;
       const hasValidCriteria = Object.keys(normalizedProfile).length > 0;
       
       if (hasValidCriteria) {
-        console.log(`🔍 Auto-adding comps for new RC project "${project.name}" with profile:`, normalizedProfile);
         try {
           const projectProfile = normalizedProfile as ProjectProfile;
           const userWeightOverrides = (project.weightOverrides as any) || undefined;
@@ -12688,7 +12641,6 @@ Current context: Project ${req.params.projectId}`;
           // Don't fail project creation if recommendations fail
         }
       } else {
-        console.log(`ℹ️  No profile criteria provided for RC project "${project.name}", skipping auto-add`);
       }
 
       res.status(201).json({ project, recommendations, addedCount });
@@ -14270,7 +14222,6 @@ Current context: Project ${req.params.projectId}`;
       // Run sync in background
       fuelSyncService.syncIntegration(integration.id, req.user.id)
         .then(result => {
-          console.log('Sync completed:', result);
         })
         .catch(error => {
           console.error('Sync failed:', error);

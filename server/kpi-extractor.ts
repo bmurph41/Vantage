@@ -206,7 +206,6 @@ Return JSON:
       const validated = JSON.parse(content);
       
       if (validated.valid === false) {
-        console.log(`KPI validation failed: ${validated.reason}`);
         return { ...kpi, confidence: 'low' };
       }
 

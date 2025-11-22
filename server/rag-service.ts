@@ -118,7 +118,6 @@ export class RAGService {
     const chunks = this.chunkText(page.text, page.id, page.pageNo, page.documentId);
     
     if (chunks.length === 0) {
-      console.log(`No chunks created for page ${page.pageNo} of document ${page.documentId}`);
       return [];
     }
 

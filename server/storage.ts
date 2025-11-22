@@ -4518,7 +4518,6 @@ export class DatabaseStorage implements IStorage {
               },
               createdBy: userId,
             });
-            console.log(`📝 Created pending company for buyer: "${comp.company.trim()}" (property ID: ${newProperty.id})`);
           } catch (error) {
             console.error('Error creating pending company for buyer:', error);
           }
@@ -4542,7 +4541,6 @@ export class DatabaseStorage implements IStorage {
               },
               createdBy: userId,
             });
-            console.log(`📝 Created pending company for seller: "${comp.seller.trim()}" (property ID: ${newProperty.id})`);
           } catch (error) {
             console.error('Error creating pending company for seller:', error);
           }
@@ -4576,7 +4574,6 @@ export class DatabaseStorage implements IStorage {
               },
               createdBy: userId,
             });
-            console.log(`📝 Created pending contact for broker: "${fullName}" (property ID: ${newProperty.id})`);
           } catch (error) {
             console.error('Error creating pending contact for broker:', error);
           }

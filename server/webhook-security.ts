@@ -282,7 +282,6 @@ class RedisIdempotencyManager {
         const record = JSON.parse(result);
         return record.status || null;
       } catch (error) {
-        console.warn('Redis get failed, checking fallback map:', error);
         this.redis = null; // Mark redis as failed
         this.setupFallbackCleanup();
       }
@@ -351,7 +350,6 @@ class RedisIdempotencyManager {
         if (error instanceof WebhookIdempotencyError) {
           throw error; // Re-throw idempotency errors
         }
-        console.warn('Redis set failed, using fallback map:', error);
         this.redis = null;
         this.setupFallbackCleanup();
       }
@@ -378,7 +376,6 @@ class RedisIdempotencyManager {
       try {
         const existingRecord = await this.redis.get(redisKey);
         if (!existingRecord) {
-          console.warn(`Attempted to mark non-existent idempotency key as completed: ${key}`);
           return;
         }
         
@@ -390,7 +387,6 @@ class RedisIdempotencyManager {
         await this.redis.set(redisKey, JSON.stringify(record), 'EX', ttlSeconds);
         return;
       } catch (error) {
-        console.warn('Redis update failed, using fallback map:', error);
         this.redis = null;
         this.setupFallbackCleanup();
       }
@@ -412,7 +408,6 @@ class RedisIdempotencyManager {
         await this.redis.del(redisKey);
         return;
       } catch (error) {
-        console.warn('Redis delete failed, using fallback map:', error);
         this.redis = null;
         this.setupFallbackCleanup();
       }
@@ -438,7 +433,6 @@ class RedisIdempotencyManager {
       try {
         await this.redis.quit();
       } catch (error) {
-        console.warn('Error closing Redis connection:', error);
       }
       this.redis = null;
     }
@@ -678,7 +672,6 @@ export class WebhookSecurity {
         try {
           await this.idempotencyManager.releaseProcessing(idempotencyKey);
         } catch (releaseError) {
-          console.warn('Failed to release idempotency key after verification failure:', releaseError);
         }
       }
 
@@ -739,17 +732,14 @@ export class WebhookSecurity {
           if (statusCode >= 200 && statusCode < 300) {
             // 2xx responses indicate success
             req.idempotency.finalizeSuccess().catch((err: any) => {
-              console.warn('Failed to auto-finalize idempotency key as success:', err);
             });
           } else if (statusCode >= 500 && statusCode < 600) {
             // 5xx responses are retriable failures - release key to allow retries
             req.idempotency.finalizeFailure().catch((err: any) => {
-              console.warn('Failed to auto-release idempotency key for retriable failure:', err);
             });
           } else {
             // 4xx responses are permanent failures - mark as done to prevent retries
             req.idempotency.finalizeSuccess().catch((err: any) => {
-              console.warn('Failed to auto-finalize idempotency key for permanent failure:', err);
             });
           }
           finalized = true;
@@ -762,7 +752,6 @@ export class WebhookSecurity {
         if (!finalized && headers.idempotencyKey) {
           // Response errors are retriable failures - release key
           req.idempotency.finalizeFailure().catch((err: any) => {
-            console.warn('Failed to auto-release idempotency key on response error:', err);
           });
           finalized = true;
         }

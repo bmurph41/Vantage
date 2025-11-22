@@ -53,7 +53,6 @@ function getEventId(payload: WebhookEvent): string {
  * Handle document creation webhook
  */
 async function handleDocumentCreated(payload: DocumentCreatedEvent): Promise<void> {
-  console.log('📄 Document created:', payload.data.fileName);
   
   // Example: Update database with new document info
   // await storage.createDocumentRequirement({
@@ -66,14 +65,12 @@ async function handleDocumentCreated(payload: DocumentCreatedEvent): Promise<voi
   //   metadata: payload.data.metadata || {},
   // });
   
-  console.log(`✅ Processed document creation for project ${payload.data.projectId}`);
 }
 
 /**
  * Handle task status change webhook
  */
 async function handleTaskStatusChanged(payload: TaskStatusChangedEvent): Promise<void> {
-  console.log(`📋 Task status changed: ${payload.data.previousStatus} → ${payload.data.newStatus}`);
   
   // Example: Update task status in database
   // await storage.updateTask(payload.data.taskId, {
@@ -81,14 +78,12 @@ async function handleTaskStatusChanged(payload: TaskStatusChangedEvent): Promise
   //   updatedAt: new Date(payload.data.changeDate),
   // });
   
-  console.log(`✅ Processed task status change for task ${payload.data.taskId}`);
 }
 
 /**
  * Central webhook event handler
  */
 async function handleWebhookEvent(payload: WebhookEvent): Promise<void> {
-  console.log(`🔔 Processing webhook event: ${payload.event}`);
   
   try {
     switch (payload.event) {
@@ -97,19 +92,15 @@ async function handleWebhookEvent(payload: WebhookEvent): Promise<void> {
         break;
         
       case 'document.tagged':
-        console.log(`🏷️ Document tagged: ${payload.data.documentId} with tags: ${payload.data.tags.join(', ')}`);
         break;
         
       case 'document.verified':
-        console.log(`✅ Document verified: ${payload.data.documentId} status: ${payload.data.verificationStatus}`);
         break;
         
       case 'document.rejected':
-        console.log(`❌ Document rejected: ${payload.data.documentId} reason: ${payload.data.reason}`);
         break;
         
       case 'document.deleted':
-        console.log(`🗑️ Document deleted: ${payload.data.documentId}`);
         break;
         
       case 'task.status_changed':
@@ -117,15 +108,12 @@ async function handleWebhookEvent(payload: WebhookEvent): Promise<void> {
         break;
         
       case 'task.assigned':
-        console.log(`👤 Task assigned: ${payload.data.taskId} to ${payload.data.assignedTo}`);
         break;
         
       case 'project.created':
-        console.log(`🚀 Project created: ${payload.data.name} (${payload.data.projectId})`);
         break;
         
       default:
-        console.log(`⚠️ Unknown event type: ${(payload as any).event}`);
     }
   } catch (error) {
     console.error(`❌ Error processing webhook event ${payload.event}:`, error);
@@ -230,7 +218,6 @@ export function registerWebhookRoutes(app: Express): void {
  * Test webhook signature generation and verification
  */
 export async function testWebhookSecurity(): Promise<void> {
-  console.log('🧪 Testing webhook security system...');
   
   try {
     // Create test payload
@@ -270,10 +257,7 @@ export async function testWebhookSecurity(): Promise<void> {
     const result = await webhookSecurity.verifyWebhook(mockReq, payloadString);
     
     if (result.isValid) {
-      console.log('✅ Webhook verification test PASSED');
-      console.log('📄 Parsed payload:', result.parsedPayload?.event);
     } else {
-      console.log('❌ Webhook verification test FAILED:', result.error);
     }
     
   } catch (error) {
@@ -285,7 +269,6 @@ export async function testWebhookSecurity(): Promise<void> {
  * Test invalid signature handling
  */
 export async function testInvalidSignature(): Promise<void> {
-  console.log('🧪 Testing invalid signature handling...');
   
   const testPayload = '{"event":"document.created","data":{"documentId":"test"}}';
   const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -309,9 +292,7 @@ export async function testInvalidSignature(): Promise<void> {
   const result = await webhookSecurity.verifyWebhook(mockReq, testPayload);
   
   if (!result.isValid && result.error?.includes('signature')) {
-    console.log('✅ Invalid signature test PASSED - correctly rejected');
   } else {
-    console.log('❌ Invalid signature test FAILED - should have been rejected');
   }
 }
 
@@ -319,7 +300,6 @@ export async function testInvalidSignature(): Promise<void> {
  * Test timestamp expiration handling
  */
 export async function testExpiredTimestamp(): Promise<void> {
-  console.log('🧪 Testing expired timestamp handling...');
   
   const testPayload = '{"event":"document.created","data":{"documentId":"test"}}';
   const expiredTimestamp = (Math.floor(Date.now() / 1000) - 600).toString(); // 10 minutes ago
@@ -343,9 +323,7 @@ export async function testExpiredTimestamp(): Promise<void> {
   const result = await webhookSecurity.verifyWebhook(mockReq, testPayload);
   
   if (!result.isValid && result.error?.includes('timestamp')) {
-    console.log('✅ Expired timestamp test PASSED - correctly rejected');
   } else {
-    console.log('❌ Expired timestamp test FAILED - should have been rejected');
   }
 }
 
@@ -353,18 +331,13 @@ export async function testExpiredTimestamp(): Promise<void> {
  * Run all webhook security tests
  */
 export async function runWebhookTests(): Promise<void> {
-  console.log('🚀 Running webhook security tests...\n');
   
   await testWebhookSecurity();
-  console.log('');
   
   await testInvalidSignature();
-  console.log('');
   
   await testExpiredTimestamp();
-  console.log('');
   
-  console.log('🏁 All webhook security tests completed!');
 }
 
 // =============================================================================
@@ -375,9 +348,7 @@ export async function runWebhookTests(): Promise<void> {
  * Cleanup function for graceful shutdown
  */
 export async function cleanupWebhookSystem(): Promise<void> {
-  console.log('🧹 Cleaning up webhook security system...');
   await cleanup();
-  console.log('✅ Webhook security system cleanup completed');
 }
 
 // =============================================================================
@@ -417,10 +388,8 @@ export function exampleIntegration(): void {
 // =============================================================================
 
 if (require.main === module) {
-  console.log('🔧 Running webhook security demo...\n');
   
   runWebhookTests().then(() => {
-    console.log('\n🎉 Demo completed successfully!');
     cleanupWebhookSystem();
   }).catch((error) => {
     console.error('\n💥 Demo failed:', error);

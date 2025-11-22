@@ -116,7 +116,6 @@ export class FuelSyncService {
 
           // Safety check: prevent infinite loops
           if (!result.totalFetched || result.totalFetched === 0) {
-            console.warn('No transactions fetched, stopping pagination');
             break;
           }
 
@@ -137,7 +136,6 @@ export class FuelSyncService {
       }
 
       if (pageCount >= maxPages && hasMore) {
-        console.warn(`Reached max pages limit (${maxPages}), stopping sync`);
         allErrors.push({
           warning: `Sync stopped at ${maxPages} pages. Manual sync may be needed.`
         });

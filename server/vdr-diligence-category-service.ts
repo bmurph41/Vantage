@@ -26,7 +26,6 @@ export async function ensureDefaultCategories(orgId: string, fallbackUserId?: st
         .limit(1);
 
       if (!firstUser.length) {
-        console.warn(`No users found for org ${orgId}, skipping category seeding for now`);
         return;
       }
       

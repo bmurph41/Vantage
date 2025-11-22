@@ -11,10 +11,8 @@ export function initializeWebSocket(httpServer: Server) {
   });
 
   wss.on("connection", (ws: WebSocket) => {
-    console.log("WebSocket client connected");
     
     ws.on("close", () => {
-      console.log("WebSocket client disconnected");
     });
     
     ws.on("error", (error) => {
@@ -22,12 +20,10 @@ export function initializeWebSocket(httpServer: Server) {
     });
   });
 
-  console.log("WebSocket server initialized");
 }
 
 export function broadcastNewArticle(article: Partial<Article>) {
   if (!wss) {
-    console.warn("WebSocket server not initialized, cannot broadcast");
     return;
   }
   
@@ -54,6 +50,5 @@ export function broadcastNewArticle(article: Partial<Article>) {
   });
 
   if (clientCount > 0) {
-    console.log(`Broadcasted new article to ${clientCount} client(s): ${article.title}`);
   }
 }

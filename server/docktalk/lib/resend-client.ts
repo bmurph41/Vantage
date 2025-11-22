@@ -5,7 +5,6 @@ let connectionSettings: any;
 async function getCredentials() {
   // First try to use direct RESEND_API_KEY environment variable
   if (process.env.RESEND_API_KEY) {
-    console.log('✓ Using RESEND_API_KEY from environment');
     return {
       apiKey: process.env.RESEND_API_KEY,
       fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'

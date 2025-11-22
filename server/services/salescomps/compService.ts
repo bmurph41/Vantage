@@ -51,7 +51,6 @@ export class CompService {
         );
         if (matchingPortfolio) {
           parentPortfolioId = matchingPortfolio.id;
-          console.log(`✨ Auto-assigned comp "${compData.marina}" to portfolio "${matchingPortfolio.marina}" (owner: ${matchingPortfolio.ownerCompanyId})`);
         }
       } catch (error) {
         console.error('Error auto-assigning to portfolio:', error);
@@ -105,12 +104,10 @@ export class CompService {
         });
         
         const compType = compData.isChild ? 'portfolio child comp' : 'individual comp';
-        console.log(`📝 Created pending property for ${compType}: "${compData.marina}" (comp ID: ${comp.id}, pending property ID: ${pendingProperty.id})`);
       } catch (error) {
         console.error('Error creating pending property:', error);
       }
     } else if (isPortfolioParent) {
-      console.log(`⏭️  Skipped pending property for portfolio parent: "${compData.marina}" (comp ID: ${comp.id})`);
     }
     
     // Create pending companies from buyer/seller company data (if not already linked to CRM)
@@ -142,7 +139,6 @@ export class CompService {
           sourceMetadata: { salesCompId: comp.id, role },
           createdBy: userId,
         });
-        console.log(`📝 Created pending company for ${role}: "${name}" (comp ID: ${comp.id})`);
       } catch (error) {
         console.error(`Error creating pending company for ${role}:`, error);
       }
@@ -190,7 +186,6 @@ export class CompService {
           },
           createdBy: userId,
         });
-        console.log(`📝 Created pending contact for broker: "${fullName}" (comp ID: ${comp.id})`);
       } catch (error) {
         console.error('Error creating pending contact for broker:', error);
       }
@@ -294,7 +289,6 @@ export class CompService {
 
     // If both have multiple or neither has any, skip auto-assignment
     if (validBuyerPortfolios.length > 1 || validSellerPortfolios.length > 1) {
-      console.log(`⚠️  Multiple portfolios found for buyer/seller companies - skipping auto-assignment`);
     }
 
     return null;

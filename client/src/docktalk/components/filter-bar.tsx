@@ -187,8 +187,6 @@ export default function FilterBar({
         minRelevance: filters.minRelevance,
         sortBy: filters.sortBy,
       };
-      console.log('[FilterBar] Saving preferences with payload:', payload);
-      console.log('[FilterBar] Current filters object:', filters);
       return await apiRequest('/api/user/filter-preferences', {
         method: 'PUT',
         body: JSON.stringify(payload),

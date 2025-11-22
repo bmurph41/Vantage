@@ -656,7 +656,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       
       const options = BackfillOptionsSchema.parse(req.body);
       
-      console.log(`Starting historical backfill with options:`, options);
       const results = await backfillHistoricalArticles(options);
       
       const totalNew = results.reduce((sum, r) => sum + r.newArticles, 0);
@@ -693,21 +692,16 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       
       const { period } = SummaryOptionsSchema.parse(req.body);
       
-      console.log(`Starting manual summary generation for period: ${period || "both"}`);
       
       let dailySummaries: any[] = [];
       let weeklySummaries: any[] = [];
       
       if (!period || period === "daily") {
-        console.log("Generating daily summaries...");
         dailySummaries = await generateAllCategorySummaries("daily");
-        console.log(`✅ Generated ${dailySummaries.length} daily summaries`);
       }
       
       if (!period || period === "weekly") {
-        console.log("Generating weekly summaries...");
         weeklySummaries = await generateAllCategorySummaries("weekly");
-        console.log(`✅ Generated ${weeklySummaries.length} weekly summaries`);
       }
       
       const total = dailySummaries.length + weeklySummaries.length;
@@ -777,7 +771,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const fromDate = new Date();
       fromDate.setDate(fromDate.getDate() - daysBack);
       
-      console.log(`[Deal Backfill] Starting backfill for articles from the last ${daysBack} days...`);
       
       // Fetch articles from the specified date range
       const articles = await dockTalkStorage.getArticles(null, { 
@@ -786,7 +779,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         fromDate
       });
       
-      console.log(`[Deal Backfill] Found ${articles.length} articles to process`);
       
       let processedCount = 0;
       let dealsFound = 0;
@@ -799,7 +791,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         // Process articles sequentially to avoid rate limits
         for (const article of batch) {
           try {
-            console.log(`[Deal Backfill] Processing article ${article.id}: ${article.title}`);
             
             // Re-enrich the article with AI (sentiment, deals, entities, geography)
             const enrichment = await enrichArticle(
@@ -843,7 +834,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
                   );
                   entitiesFound++;
                 } catch (error) {
-                  console.warn(`Failed to link entity ${entity.name}:`, error);
                 }
               }
             }
@@ -853,7 +843,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
               // Check if deal already exists for this article
               const existingDeals = await dockTalkStorage.getDealsByArticle(article.id);
               if (existingDeals.length > 0) {
-                console.log(`[Deal Backfill] Deal already exists for article ${article.id}, skipping`);
               } else {
                 // Find or create entity IDs for buyer/seller
                 let buyerEntityId: number | undefined;
@@ -893,7 +882,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
                   try {
                     closingDate = new Date(dealInfo.closingDate);
                   } catch (e) {
-                    console.warn("Failed to parse closing date:", dealInfo.closingDate);
                   }
                 }
 
@@ -901,7 +889,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
                   try {
                     announcedDate = new Date(dealInfo.announcedDate);
                   } catch (e) {
-                    console.warn("Failed to parse announced date:", dealInfo.announcedDate);
                   }
                 }
 
@@ -923,7 +910,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
                 });
 
                 dealsFound++;
-                console.log(`[Deal Backfill] ✅ Deal extracted from article ${article.id}: ${article.title}`);
               }
             }
             
@@ -940,7 +926,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         // Send progress update
-        console.log(`[Deal Backfill] Progress: ${processedCount}/${articles.length} articles processed, ${dealsFound} deals found`);
       }
       
       res.json({ 
@@ -968,8 +953,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const id = parseInt(req.params.id);
       
       // Log incoming request for debugging
-      console.log(`[Category Update] Article ${id} - Request body:`, JSON.stringify(req.body));
-      console.log(`[Category Update] Valid categories:`, VALID_CATEGORIES);
       
       const { categories } = CategoryUpdateSchema.parse(req.body);
       
@@ -978,8 +961,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         return res.status(404).json({ error: "Article not found" });
       }
       
-      console.log(`[Category Update] Article ${id} - Current categories:`, article.categories);
-      console.log(`[Category Update] Article ${id} - New categories:`, categories);
       
       await dockTalkStorage.updateArticleCategoryManual(id, categories, article.category || "");
       
@@ -2224,7 +2205,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         `,
       });
 
-      console.log('✅ Daily Digest preview sent successfully:', result);
 
       res.json({ 
         success: true, 
@@ -2298,7 +2278,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         `,
       });
 
-      console.log('✅ Test email sent successfully:', result);
 
       res.json({ 
         success: true, 
@@ -2323,5 +2302,4 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   });
 
   // DockTalk routes registered successfully
-  console.log("✅ DockTalk routes registered");
 }

@@ -75,7 +75,6 @@ export default function Transactions() {
     };
 
     // In a real application, this would generate and download a PDF receipt
-    console.log("Receipt data:", receiptData);
     alert("Receipt generated! Check console for details.");
   };
 

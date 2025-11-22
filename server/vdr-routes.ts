@@ -1381,7 +1381,6 @@ router.post('/projects/:projectId/apply-template', requireAuth, requireVdrAccess
     for (const tf of templateFolders.filter(f => f.parentFolderId)) {
       const parentId = folderMap[tf.parentFolderId!];
       if (!parentId) {
-        console.warn(`Parent folder not found for template folder: ${tf.name}`);
         continue;
       }
 

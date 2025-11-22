@@ -80,7 +80,6 @@ function loadColumnsFromStorage(storageKey: string, defaultColumns: ChartColumn[
     
     return mergedColumns.sort((a, b) => a.order - b.order);
   } catch (error) {
-    console.warn('Failed to load chart columns from storage:', error);
     return defaultColumns;
   }
 }
@@ -89,7 +88,6 @@ function saveColumnsToStorage(storageKey: string, columns: ChartColumn[]): void 
   try {
     localStorage.setItem(storageKey, JSON.stringify(columns));
   } catch (error) {
-    console.warn('Failed to save chart columns to storage:', error);
   }
 }
 

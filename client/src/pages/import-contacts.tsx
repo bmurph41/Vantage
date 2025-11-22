@@ -116,7 +116,6 @@ export default function ImportContacts() {
 
   const uploadMutation = useMutation({
     mutationFn: async (fileContent: string) => {
-      console.log('🚀 Starting CSV upload...', {
         fileName: file?.name,
         entityType,
         contentLength: fileContent.length,
@@ -130,11 +129,9 @@ export default function ImportContacts() {
           entityType,
         }),
       });
-      console.log('✅ Upload response:', response);
       return response;
     },
     onSuccess: (data) => {
-      console.log('✅ Upload succeeded:', data);
       setImportJobId(data.importJob.id);
       setCsvHeaders(data.preview.headers);
       setFieldMappings(data.preview.mappings);
@@ -208,7 +205,6 @@ export default function ImportContacts() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    console.log('📁 File selected:', selectedFile?.name);
     if (selectedFile) {
       if (!selectedFile.name.endsWith('.csv')) {
         toast({
@@ -241,13 +237,11 @@ export default function ImportContacts() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('🎯 File dropped:', e.dataTransfer.files[0]?.name);
 
     const droppedFile = e.dataTransfer.files[0];
     if (droppedFile && droppedFile.name.endsWith('.csv')) {
       setFile(droppedFile);
     } else {
-      console.log('❌ Invalid file dropped:', droppedFile?.name);
       toast({
         title: "Invalid File",
         description: "Please drop a CSV file",

@@ -50,7 +50,6 @@ export async function fetchRssFeeds(): Promise<number> {
     for (const source of sources) {
       try {
         if (source.sourceType === 'web_scrape') {
-          console.log(`Scraping web page: ${source.name}`);
           const articles = await scrapeWebPage(source.url);
           
           for (const article of articles) {
@@ -62,7 +61,6 @@ export async function fetchRssFeeds(): Promise<number> {
           
           await storage.updateRssSourceLastScrapedAt(source.id);
         } else {
-          console.log(`Fetching RSS feed: ${source.name}`);
           const feed = await parser.parseURL(source.url);
           
           for (const item of feed.items || []) {
@@ -98,7 +96,6 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
     let content = article.content || "";
     
     if (!content || content.length < 100) {
-      console.log(`Fetching full article body for: ${article.title}`);
       const fetchedBody = await fetchArticleBody(article.url);
       if (fetchedBody) {
         content = fetchedBody;
@@ -120,7 +117,6 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
     try {
       summary = await summarizeArticle(`${title}\n\n${content}`);
     } catch (error) {
-      console.warn("Failed to generate AI summary:", error);
     }
 
     let sentiment: string | null = null;
@@ -137,7 +133,6 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
       geography = enrichment.geography;
       entities = enrichment.entities || [];
     } catch (error) {
-      console.warn("Failed to enrich article:", error);
     }
 
     const searchText = [
@@ -155,7 +150,6 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
     const { shouldRemove, matchedPattern } = await storage.checkArticleAgainstRemovalPatterns(title, content);
     
     if (shouldRemove) {
-      console.log(`Article matches removal patterns, auto-removing: "${title}"`);
       return 0;
     }
 
@@ -186,7 +180,6 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
           // Normalize entity type to enum values
           const normalizedType = normalizeEntityType(entity.type);
           if (!normalizedType) {
-            console.warn(`Invalid entity type "${entity.type}" for entity ${entity.name}, skipping`);
             continue;
           }
           
@@ -206,7 +199,6 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
             entity.context
           );
         } catch (error) {
-          console.warn(`Failed to link entity ${entity.name}:`, error);
         }
       }
     }
@@ -217,7 +209,6 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
         // Check if deal already exists for this article (deduplication)
         const existingDeals = await storage.getDealsByArticle(newArticle.id);
         if (existingDeals.length > 0) {
-          console.log(`Deal already exists for article ${newArticle.id}, skipping duplicate`);
         } else {
           // Find or create entity IDs for buyer/seller if names are provided
         let buyerEntityId: number | undefined;
@@ -261,7 +252,6 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
           try {
             closingDate = new Date(dealInfo.closingDate);
           } catch (e) {
-            console.warn("Failed to parse closing date:", dealInfo.closingDate);
           }
         }
 
@@ -269,7 +259,6 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
           try {
             announcedDate = new Date(dealInfo.announcedDate);
           } catch (e) {
-            console.warn("Failed to parse announced date:", dealInfo.announcedDate);
           }
         }
 
@@ -290,10 +279,8 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
           confidence: dealInfo.confidence || 80
         });
 
-          console.log(`Deal extracted from article: ${title}`);
         }
       } catch (error) {
-        console.warn(`Failed to save deal for article ${newArticle.id}:`, error);
       }
     }
 
@@ -339,7 +326,6 @@ async function processRssItem(item: FeedItem, sourceName: string): Promise<numbe
     try {
       summary = await summarizeArticle(`${title}\n\n${content}`);
     } catch (error) {
-      console.warn("Failed to generate AI summary:", error);
     }
 
     // Enrich with sentiment analysis and deal extraction
@@ -357,7 +343,6 @@ async function processRssItem(item: FeedItem, sourceName: string): Promise<numbe
       geography = enrichment.geography;
       entities = enrichment.entities || [];
     } catch (error) {
-      console.warn("Failed to enrich article:", error);
     }
 
     // Create search text
@@ -378,7 +363,6 @@ async function processRssItem(item: FeedItem, sourceName: string): Promise<numbe
     const { shouldRemove, matchedPattern } = await storage.checkArticleAgainstRemovalPatterns(title, content);
     
     if (shouldRemove) {
-      console.log(`Article matches removal patterns, auto-removing: "${title}"`);
       return 0;
     }
 
@@ -409,7 +393,6 @@ async function processRssItem(item: FeedItem, sourceName: string): Promise<numbe
           // Normalize entity type to enum values
           const normalizedType = normalizeEntityType(entity.type);
           if (!normalizedType) {
-            console.warn(`Invalid entity type "${entity.type}" for entity ${entity.name}, skipping`);
             continue;
           }
           
@@ -429,7 +412,6 @@ async function processRssItem(item: FeedItem, sourceName: string): Promise<numbe
             entity.context
           );
         } catch (error) {
-          console.warn(`Failed to link entity ${entity.name}:`, error);
         }
       }
     }
@@ -463,10 +445,8 @@ export async function initializeDefaultRssSources(): Promise<void> {
       
       if (!exists) {
         await storage.createRssSource(source);
-        console.log(`Added RSS source: ${source.name}`);
       }
     } catch (error) {
-      console.warn(`Failed to add RSS source ${source.name}:`, error);
     }
   }
 }

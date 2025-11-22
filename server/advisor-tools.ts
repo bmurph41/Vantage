@@ -348,7 +348,6 @@ async function searchDocuments(
         
         // SECURITY: Verify document belongs to this project
         if (!doc || doc.projectId !== projectId) {
-          console.warn(`Skipping chunk from document ${documentId} - does not belong to project ${projectId}`);
           continue; // Skip this result - it doesn't belong to this project
         }
         

@@ -85,10 +85,8 @@ const mockSettings: ProjectSettings = {
 
 // Test function
 export function testCriticalPath() {
-  console.log('🧪 Testing Critical Path Algorithm...');
 
   // Test Case 1: Simple linear dependency chain
-  console.log('\n📋 Test Case 1: Linear Dependencies (A → B → C)');
   const linearTasks = [
     createMockTask('A', 'Task A', [], 3),      // 3 days, no deps
     createMockTask('B', 'Task B', ['A'], 2),   // 2 days, depends on A  
@@ -97,16 +95,11 @@ export function testCriticalPath() {
 
   try {
     const result1 = calculateCriticalPath(linearTasks, mockProject, mockSettings);
-    console.log('✅ Linear Test Results:');
-    console.log(`   Project Duration: ${result1.projectDuration} days (expected: 9)`);
-    console.log(`   Critical Path Length: ${result1.criticalPath.length} tasks (expected: 3)`);
-    console.log(`   Critical Path: ${result1.criticalPath.join(' → ')}`);
     
     // All tasks should be critical in a linear chain
     linearTasks.forEach(task => {
       const node = result1.nodes.get(task.id);
       if (node) {
-        console.log(`   Task ${task.id}: Float = ${node.float}d, Critical = ${node.isCritical}`);
       }
     });
   } catch (error) {
@@ -114,7 +107,6 @@ export function testCriticalPath() {
   }
 
   // Test Case 2: Parallel tasks with different durations
-  console.log('\n📋 Test Case 2: Parallel Tasks (A → B, A → C → D)');
   const parallelTasks = [
     createMockTask('A', 'Task A', [], 2),      // 2 days, no deps
     createMockTask('B', 'Task B', ['A'], 3),   // 3 days, depends on A
@@ -124,14 +116,10 @@ export function testCriticalPath() {
 
   try {
     const result2 = calculateCriticalPath(parallelTasks, mockProject, mockSettings);
-    console.log('✅ Parallel Test Results:');
-    console.log(`   Project Duration: ${result2.projectDuration} days (expected: 8)`);
-    console.log(`   Critical Path: ${result2.criticalPath.join(' → ')} (expected: A → C → D)`);
     
     parallelTasks.forEach(task => {
       const node = result2.nodes.get(task.id);
       if (node) {
-        console.log(`   Task ${task.id}: Float = ${node.float}d, Critical = ${node.isCritical}`);
       }
     });
   } catch (error) {
@@ -139,7 +127,6 @@ export function testCriticalPath() {
   }
 
   // Test Case 3: Complex dependency network
-  console.log('\n📋 Test Case 3: Complex Network');
   const complexTasks = [
     createMockTask('Start', 'Project Start', [], 1),
     createMockTask('Design', 'Design Phase', ['Start'], 5),
@@ -153,22 +140,16 @@ export function testCriticalPath() {
 
   try {
     const result3 = calculateCriticalPath(complexTasks, mockProject, mockSettings);
-    console.log('✅ Complex Test Results:');
-    console.log(`   Project Duration: ${result3.projectDuration} days`);
-    console.log(`   Critical Path: ${result3.criticalPath.join(' → ')}`);
-    console.log(`   Critical Tasks: ${result3.criticalPath.length}/${complexTasks.length}`);
     
     complexTasks.forEach(task => {
       const node = result3.nodes.get(task.id);
       if (node) {
-        console.log(`   ${task.id}: Float = ${node.float}d, Critical = ${node.isCritical ? '🔴' : '🟢'}`);
       }
     });
   } catch (error) {
     console.error('❌ Complex test failed:', error);
   }
 
-  console.log('\n🎯 Critical Path Algorithm Tests Complete!\n');
 }
 
 // Export for use in browser console
