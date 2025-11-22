@@ -8591,6 +8591,25 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.post('/api/sales-comps/:id/duplicate', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+
+      const originalComp = await storage.getCompById(id, orgId);
+      if (!originalComp) {
+        return res.status(404).json({ message: "Comp not found" });
+      }
+
+      const duplicatedComp = await compService.duplicateComp(id, orgId, userId);
+      res.status(201).json(duplicatedComp);
+    } catch (error) {
+      console.error("Error duplicating comp:", error);
+      res.status(500).json({ message: "Failed to duplicate comp" });
+    }
+  });
+
   app.post('/api/sales-comps/bulk-update', async (req: any, res) => {
     try {
       const userId = req.user.id;

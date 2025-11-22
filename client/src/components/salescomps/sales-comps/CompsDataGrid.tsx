@@ -20,7 +20,8 @@ import {
   Plus,
   Minus,
   Check,
-  X
+  X,
+  Copy
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatCurrency, formatPercent, formatNumber } from '@/lib/salescomps/format';
@@ -397,6 +398,33 @@ export default function CompsDataGrid({
       toast({
         title: "Error",
         description: "Failed to remove property from portfolio",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDuplicate = async (comp: SalesComp) => {
+    try {
+      const duplicatedComp = await apiRequest<SalesComp>(
+        'POST',
+        `/api/sales-comps/${comp.id}/duplicate`,
+        {}
+      );
+
+      await queryClient.invalidateQueries({ 
+        queryKey: ['/api/sales-comps'],
+        exact: false
+      });
+      
+      toast({
+        title: "Comp duplicated",
+        description: `"${duplicatedComp.marina}" has been created as a copy`,
+      });
+    } catch (error) {
+      console.error('Error duplicating comp:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate comp",
         variant: "destructive",
       });
     }
@@ -1361,6 +1389,13 @@ export default function CompsDataGrid({
                           >
                             <Edit className="h-4 w-4 mr-2" />
                             Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDuplicate(comp)}
+                            data-testid={`action-duplicate-${comp.id}`}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Duplicate
                           </DropdownMenuItem>
                           {canAddToProject && (
                             <DropdownMenuItem 

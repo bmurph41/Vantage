@@ -248,6 +248,89 @@ export class CompService {
     return success;
   }
 
+  async duplicateComp(id: string, orgId: string, userId: string): Promise<SalesComp> {
+    const original = await this.storage.getComp(id, orgId);
+    if (!original) {
+      throw new Error('Original comp not found');
+    }
+
+    // Create duplicate with modified name
+    const nameSuffix = ' (Copy)';
+    const duplicateData: InsertSalesComp = {
+      orgId: original.orgId,
+      createdBy: userId,
+      marina: original.marina + nameSuffix,
+      salePrice: original.salePrice,
+      isPriceDisclosed: original.isPriceDisclosed,
+      capRate: original.capRate,
+      isCapRateDisclosed: original.isCapRateDisclosed,
+      noi: original.noi,
+      isNoiDisclosed: original.isNoiDisclosed,
+      saleMonth: original.saleMonth,
+      saleYear: original.saleYear,
+      city: original.city,
+      state: original.state,
+      wetSlips: original.wetSlips,
+      dryRacks: original.dryRacks,
+      storageTypes: original.storageTypes,
+      bodyOfWater: original.bodyOfWater,
+      waterBodyName: original.waterBodyName,
+      waterfront: original.waterfront,
+      region: original.region,
+      saleCondition: original.saleCondition,
+      daysOnMarket: original.daysOnMarket,
+      brokerage: original.brokerage,
+      agentFirstName: original.agentFirstName,
+      agentLastName: original.agentLastName,
+      agentContactId: original.agentContactId,
+      address: original.address,
+      zip: original.zip,
+      lat: original.lat,
+      lng: original.lng,
+      seller: original.seller,
+      company: original.company,
+      owner: original.owner,
+      listPrice: original.listPrice,
+      acres: original.acres,
+      occupancy: original.occupancy,
+      yearBuilt: original.yearBuilt,
+      articleUrls: original.articleUrls,
+      notes: original.notes ? original.notes + '\n\n[Duplicated from original comp]' : '[Duplicated from original comp]',
+      hasFuel: original.hasFuel,
+      hasShipStore: original.hasShipStore,
+      hasRestaurant: original.hasRestaurant,
+      hasRepair: original.hasRepair,
+      hasBoatyard: original.hasBoatyard,
+      hasStorage: original.hasStorage,
+      isPortfolio: original.isPortfolio,
+      isChild: original.isChild,
+      parentPortfolioId: original.parentPortfolioId,
+      ownershipRole: original.ownershipRole,
+      ownerCompanyId: original.ownerCompanyId,
+      buyerCompanyId: original.buyerCompanyId,
+      sellerCompanyId: original.sellerCompanyId,
+      propertyId: original.propertyId,
+    };
+
+    // Create the duplicate comp using existing createComp method which handles all the logic
+    const duplicatedComp = await this.createComp(duplicateData, userId);
+
+    // Log audit trail
+    await this.storage.createAuditLog({
+      orgId,
+      userId,
+      entityType: 'sales_comp',
+      entityId: duplicatedComp.id,
+      action: 'create',
+      after: duplicatedComp,
+      metadata: {
+        duplicatedFrom: id,
+      },
+    });
+
+    return duplicatedComp;
+  }
+
   /**
    * Find a matching portfolio for auto-assignment based on buyer/seller company
    * Returns the portfolio if exactly one match is found, null otherwise
