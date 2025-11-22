@@ -4123,6 +4123,29 @@ export const scPortfolioComps = pgTable('sc_portfolio_comps', {
   uniquePortfolioComp: unique('sc_portfolio_comps_unique_idx').on(table.orgId, table.portfolioId, table.salesCompId),
 }));
 
+// Saved analytics filter presets for quick access to frequently used analytics configurations
+export const scAnalyticsFilterPresets = pgTable('sc_analytics_filter_presets', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+
+  // Preset configuration
+  name: text('name').notNull(),
+  description: text('description'),
+  filters: jsonb('filters').$type<Record<string, any>>().default({}),
+  
+  // Quick access
+  isPinned: boolean('is_pinned').default(false),
+  lastUsedAt: timestamp('last_used_at'),
+  useCount: integer('use_count').default(0),
+}, (table) => ({
+  orgIdx: index('sc_analytics_filter_presets_org_idx').on(table.orgId),
+  userIdx: index('sc_analytics_filter_presets_user_idx').on(table.userId),
+  orgUserIdx: index('sc_analytics_filter_presets_org_user_idx').on(table.orgId, table.userId),
+}));
+
 // ============================================================================
 // DOCKTALK M&A SPOTLIGHT
 // ============================================================================
@@ -4666,6 +4689,22 @@ export const insertScDuplicateAuditLogSchema = createInsertSchema(scDuplicateAud
   createdAt: true,
 });
 export type InsertScDuplicateAuditLog = z.infer<typeof insertScDuplicateAuditLogSchema>;
+
+// Analytics Filter Presets
+export type ScAnalyticsFilterPreset = typeof scAnalyticsFilterPresets.$inferSelect;
+export const insertScAnalyticsFilterPresetSchema = createInsertSchema(scAnalyticsFilterPresets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  useCount: true,
+  lastUsedAt: true,
+});
+export type InsertScAnalyticsFilterPreset = z.infer<typeof insertScAnalyticsFilterPresetSchema>;
+export const updateScAnalyticsFilterPresetSchema = insertScAnalyticsFilterPresetSchema.partial().omit({
+  orgId: true,
+  userId: true,
+});
+export type UpdateScAnalyticsFilterPreset = z.infer<typeof updateScAnalyticsFilterPresetSchema>;
 
 // ============================================================================
 // DOCKTALK M&A SPOTLIGHT - Types and Schemas
