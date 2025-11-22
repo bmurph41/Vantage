@@ -34,8 +34,8 @@ export function startDockTalkCronJobs(storage: IStorage): void {
     }
   });
 
-  // Update analytics every 15 minutes
-  cron.schedule("*/15 * * * *", async () => {
+  // Update analytics at :05, :35 past each hour (offset from RSS fetch at :00, :30)
+  cron.schedule("5,35 * * * *", async () => {
     try {
       await updateAnalytics();
     } catch (error) {
@@ -43,8 +43,8 @@ export function startDockTalkCronJobs(storage: IStorage): void {
     }
   });
 
-  // Process daily alerts every 15 minutes (timezone-aware filtering)
-  cron.schedule("*/15 * * * *", async () => {
+  // Process daily alerts at :10, :40 past each hour (offset from analytics)
+  cron.schedule("10,40 * * * *", async () => {
     try {
       await processDailyAlerts();
     } catch (error) {
@@ -52,9 +52,9 @@ export function startDockTalkCronJobs(storage: IStorage): void {
     }
   });
 
-  // Process weekly alerts every 15 minutes all week (timezone-aware filtering checks for Monday)
+  // Process weekly alerts at :15, :45 past each hour (offset from daily alerts)
   // Running all week ensures western timezones (Pacific/Honolulu) Monday evenings are covered
-  cron.schedule("*/15 * * * *", async () => {
+  cron.schedule("15,45 * * * *", async () => {
     try {
       await processWeeklyAlerts();
     } catch (error) {
