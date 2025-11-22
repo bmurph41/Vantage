@@ -825,7 +825,7 @@ function RiskAnalytics({ analytics, risks }: any) {
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>High Risk (Score > 15)</span>
+                  <span>High Risk (Score {'>'} 15)</span>
                   <span className="font-medium">{analytics.risksBySeverity.high}</span>
                 </div>
                 <Progress 
@@ -847,7 +847,7 @@ function RiskAnalytics({ analytics, risks }: any) {
               
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Low Risk (Score < 8)</span>
+                  <span>Low Risk (Score {'<'} 8)</span>
                   <span className="font-medium">{analytics.risksBySeverity.low}</span>
                 </div>
                 <Progress 
