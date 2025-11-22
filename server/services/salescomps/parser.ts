@@ -792,6 +792,15 @@ export class ParserService {
       const dataRows = jsonData.slice(1) as any[][];
       
       dataRows.forEach((row, index) => {
+        // Skip completely empty rows (all cells are null/undefined/empty)
+        const hasAnyData = row.some((cell: any) => 
+          cell !== null && cell !== undefined && String(cell).trim() !== ''
+        );
+        
+        if (!hasAnyData) {
+          return; // Skip this row
+        }
+
         const obj: Record<string, any> = {};
         headers.forEach((header, idx) => {
           const mappedField = mapping[header];
@@ -802,10 +811,8 @@ export class ParserService {
           }
         });
         
-        // Only add non-empty rows
-        if (Object.values(obj).some(val => val !== null && val !== undefined && val !== '')) {
-          results.push(obj);
-        }
+        // Include row even if all mapped fields are empty (as long as the row had some data)
+        results.push(obj);
 
         if (onProgress && index % 100 === 0) {
           onProgress(index, dataRows.length);
@@ -828,6 +835,16 @@ export class ParserService {
       });
 
       parseResult.data.forEach((row: any, index) => {
+        // Skip completely empty rows (all cells are null/undefined/empty)
+        // Papa Parse already skips empty lines, but we double-check for rows with all blank values
+        const hasAnyData = Object.values(row).some((val: any) => 
+          val !== null && val !== undefined && String(val).trim() !== ''
+        );
+        
+        if (!hasAnyData) {
+          return; // Skip this row
+        }
+
         const mappedRow: Record<string, any> = {};
         Object.keys(mapping).forEach(sourceHeader => {
           const targetField = mapping[sourceHeader];
@@ -836,9 +853,8 @@ export class ParserService {
           }
         });
 
-        if (Object.values(mappedRow).some(val => val !== null && val !== undefined && val !== '')) {
-          results.push(mappedRow);
-        }
+        // Include row even if all mapped fields are empty (as long as the row had some data)
+        results.push(mappedRow);
 
         if (onProgress && index % 100 === 0) {
           onProgress(index, parseResult.data.length);
