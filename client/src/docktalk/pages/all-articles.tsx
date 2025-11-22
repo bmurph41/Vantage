@@ -10,14 +10,18 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { connectWebSocket, type WebSocketMessage, type WebSocketController } from "../lib/websocket";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, RefreshCw } from "lucide-react";
+import { Bell, RefreshCw, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function AllArticles() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const wsControllerRef = useRef<WebSocketController | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [newArticlesCount, setNewArticlesCount] = useState(0);
+  const [allArticles, setAllArticles] = useState<any[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreArticles, setHasMoreArticles] = useState(true);
   
   const [filters, setFilters] = useState<ArticleFilters>({
     limit: 50,
@@ -60,7 +64,56 @@ export default function AllArticles() {
   });
 
   // Handle both array and paginated response formats
-  const articles = Array.isArray(articlesData) ? articlesData : (articlesData as any).items || [];
+  const fetchedArticles = Array.isArray(articlesData) ? articlesData : (articlesData as any).items || [];
+
+  // Update accumulated articles when new data arrives
+  useEffect(() => {
+    if (!articlesLoading && fetchedArticles.length > 0) {
+      if (filters.offset === 0) {
+        // Reset - new search or filter change
+        setAllArticles(fetchedArticles);
+        setHasMoreArticles(fetchedArticles.length >= (filters.limit || 50));
+        setIsLoadingMore(false);
+      } else {
+        // Append - loading more articles
+        setAllArticles(prev => {
+          const existingIds = new Set(prev.map(a => a.id));
+          const newArticles = fetchedArticles.filter(a => !existingIds.has(a.id));
+          return [...prev, ...newArticles];
+        });
+        setHasMoreArticles(fetchedArticles.length >= (filters.limit || 50));
+        setIsLoadingMore(false);
+      }
+    } else if (!articlesLoading && fetchedArticles.length === 0 && filters.offset > 0) {
+      // No more articles to load
+      setHasMoreArticles(false);
+      setIsLoadingMore(false);
+    }
+  }, [articlesData, articlesLoading, fetchedArticles.length, filters.offset, filters.limit]);
+
+  const articles = allArticles;
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMoreArticles || isLoadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreArticles && !isLoadingMore && !articlesLoading) {
+          setIsLoadingMore(true);
+          setFilters(prev => ({
+            ...prev,
+            offset: (prev.offset || 0) + (prev.limit || 50)
+          }));
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreArticles, isLoadingMore, articlesLoading]);
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -139,15 +192,11 @@ export default function AllArticles() {
   const featuredArticles = articles.slice(1, 3);
   const regularArticles = articles.slice(3);
 
-  const handleLoadMore = () => {
-    setFilters(prev => ({
-      ...prev,
-      offset: (prev.offset || 0) + (prev.limit || 50)
-    }));
-  };
-
   const handleFilterChange = (newFilters: Partial<ArticleFilters>) => {
     setFilters(prev => ({ ...prev, ...newFilters, offset: 0 }));
+    setAllArticles([]);
+    setHasMoreArticles(true);
+    setIsLoadingMore(false);
   };
 
   const handleClearFilters = () => {
@@ -157,6 +206,9 @@ export default function AllArticles() {
       sortBy: 'newest'
     });
     setSearchQuery("");
+    setAllArticles([]);
+    setHasMoreArticles(true);
+    setIsLoadingMore(false);
   };
 
   if (articlesError) {
@@ -261,18 +313,20 @@ export default function AllArticles() {
                     ))}
                   </div>
 
-                  {/* Load More */}
-                  {articles.length >= (filters.limit || 50) && (
-                    <div className="text-center py-6">
-                      <Button 
-                        onClick={handleLoadMore}
-                        variant="outline"
-                        data-testid="button-load-more"
-                      >
-                        Load More Articles
-                      </Button>
-                    </div>
-                  )}
+                  {/* Infinite Scroll Sentinel & Loading Indicator */}
+                  <div ref={sentinelRef} className="text-center py-6">
+                    {isLoadingMore && (
+                      <div className="flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Loading more articles...</span>
+                      </div>
+                    )}
+                    {!hasMoreArticles && articles.length > 0 && (
+                      <p className="text-gray-500 dark:text-gray-400">
+                        You've reached the end of all articles
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Sidebar */}
