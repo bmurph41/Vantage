@@ -429,13 +429,7 @@ async function processRssItem(item: FeedItem, sourceName: string): Promise<numbe
 export async function initializeDefaultRssSources(): Promise<void> {
   const defaultSources = [
     { name: "Marina Dock Age", url: "https://www.marinadockage.com/feed/" },
-    { name: "Boating Industry", url: "https://boatingindustry.com/feed/" },
-    { name: "Soundings Trade Only", url: "https://www.tradeonlytoday.com/.rss/full/" },
-    { name: "NMMA", url: "https://www.nmma.org/pressroom/news?rss=true" },
-    { name: "Reuters Markets", url: "https://www.reuters.com/markets/us/rss" },
-    { name: "Maritime Reporter", url: "https://www.marinelink.com/rss/news" },
-    { name: "SuperYacht News", url: "https://www.superyachtnews.com/rss" },
-    { name: "Trade Winds", url: "https://www.tradewindsnews.com/rss" }
+    { name: "Boating Industry", url: "https://boatingindustry.com/feed/" }
   ];
 
   for (const source of defaultSources) {
