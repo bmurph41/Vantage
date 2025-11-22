@@ -870,13 +870,22 @@ export class ParserService {
     const percentFields = ['capRate', 'occupancy'];
     const numberFields = ['wetSlips', 'dryRacks', 'saleYear', 'yearBuilt', 'daysOnMarket', 'acres'];
     const monthFields = ['saleMonth'];
+    const textFields = [
+      'marina', 'address', 'city', 'zip', 'notes', 'broker', 'brokerage',
+      'agentFirstName', 'agentLastName', 'bodyOfWater', 'waterBodyName',
+      'waterfront', 'waterType', 'region', 'saleCondition', 'ioBoth',
+      'sellerCompany', 'sellerPrincipal', 'buyerCompany', 'buyerPrincipal',
+      'seller', 'company', 'owner', 'articleUrls', 'parentPortfolioId'
+    ];
 
     if (currencyFields.includes(fieldName)) return 'currency';
     if (percentFields.includes(fieldName)) return 'percent';
     if (numberFields.includes(fieldName)) return 'number';
     if (monthFields.includes(fieldName)) return 'month';
     if (fieldName === 'state') return 'state';
+    if (textFields.includes(fieldName)) return 'text';
     
+    // Default to text for unknown fields (e.g., custom columns)
     return 'text';
   }
 }

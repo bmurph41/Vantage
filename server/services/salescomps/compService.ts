@@ -838,6 +838,10 @@ export class CompService {
         case 'acres':
           value = this.parseFloat(value);
           break;
+        case 'articleUrls':
+          // Convert single URL string into array, or split comma-separated URLs
+          value = this.parseArticleUrls(value);
+          break;
       }
 
       // Handle undisclosed values
@@ -858,8 +862,10 @@ export class CompService {
       }
     }
 
-    // Extract article URLs if present
-    transformed.articleUrls = this.extractArticleUrls(row);
+    // Merge mapped articleUrls with legacy article/article.1 columns
+    const mappedUrls = transformed.articleUrls || [];
+    const legacyUrls = this.extractArticleUrls(row);
+    transformed.articleUrls = [...new Set([...mappedUrls, ...legacyUrls])]; // Deduplicate
 
     return transformed;
   }
@@ -942,10 +948,31 @@ export class CompService {
     return { value, isDisclosed: true };
   }
 
+  private parseArticleUrls(value: any): string[] {
+    if (!value) return [];
+    
+    // If already an array, validate and filter
+    if (Array.isArray(value)) {
+      return value.filter(url => this.isValidUrl(url));
+    }
+    
+    // Convert to string and split on common delimiters
+    const stringValue = String(value).trim();
+    if (!stringValue) return [];
+    
+    // Try splitting by common delimiters (comma, semicolon, pipe, newline)
+    const urls = stringValue
+      .split(/[,;\|\n]+/)
+      .map(url => url.trim())
+      .filter(url => url && this.isValidUrl(url));
+    
+    return urls.length > 0 ? urls : [];
+  }
+
   private extractArticleUrls(row: Record<string, any>): string[] {
     const urls: string[] = [];
     
-    // Check for Article and Article.1 columns
+    // Check for Article and Article.1 columns (legacy support)
     if (row.article && this.isValidUrl(row.article)) {
       urls.push(row.article);
     }

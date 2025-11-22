@@ -18,31 +18,60 @@ interface ColumnMapperSimpleProps {
   onMappingChange: (mapping: Record<string, string>) => void;
 }
 
-// Standard fields that can be mapped to
+// Standard fields that can be mapped to (aligned with Add Sales Comp modal)
 const STANDARD_FIELDS = [
+  // Core Info
   { value: 'marina', label: 'Marina Name', required: true },
+  { value: 'address', label: 'Address' },
+  { value: 'city', label: 'City' },
+  { value: 'state', label: 'State' },
+  { value: 'zip', label: 'ZIP Code' },
+  
+  // Sale Details
   { value: 'salePrice', label: 'Sale Price' },
+  { value: 'listPrice', label: 'List Price' },
   { value: 'capRate', label: 'Cap Rate' },
   { value: 'noi', label: 'NOI' },
   { value: 'saleMonth', label: 'Sale Month' },
   { value: 'saleYear', label: 'Sale Year' },
-  { value: 'city', label: 'City' },
-  { value: 'state', label: 'State' },
+  { value: 'saleCondition', label: 'Sale Condition' },
+  { value: 'daysOnMarket', label: 'Days on Market' },
+  
+  // Physical Details
   { value: 'wetSlips', label: 'Wet Slips' },
   { value: 'dryRacks', label: 'Dry Racks' },
+  { value: 'acres', label: 'Acreage' },
+  { value: 'occupancy', label: 'Occupancy (%)' },
+  { value: 'yearBuilt', label: 'Year Built' },
+  { value: 'ioBoth', label: 'Storage Type' },
+  
+  // Location Details
   { value: 'bodyOfWater', label: 'Body of Water' },
   { value: 'waterBodyName', label: 'Water Body Name' },
   { value: 'waterfront', label: 'Waterfront' },
+  { value: 'waterType', label: 'Water Type' },
   { value: 'region', label: 'Region' },
-  { value: 'saleCondition', label: 'Sale Condition' },
-  { value: 'daysOnMarket', label: 'Days on Market' },
-  { value: 'articleLink', label: 'Article Link' },
-  { value: 'acreage', label: 'Acreage' },
-  { value: 'leasedLand', label: 'Leased Land' },
-  { value: 'buyerName', label: 'Buyer Name' },
-  { value: 'sellerName', label: 'Seller Name' },
-  { value: 'brokerName', label: 'Broker Name' },
-  { value: 'comments', label: 'Comments' },
+  
+  // Transaction Parties
+  { value: 'sellerCompany', label: 'Seller Company' },
+  { value: 'sellerPrincipal', label: 'Seller Principal' },
+  { value: 'buyerCompany', label: 'Buyer Company' },
+  { value: 'buyerPrincipal', label: 'Buyer Principal' },
+  
+  // Broker/Agent Info
+  { value: 'broker', label: 'Broker (full name or text)' },
+  { value: 'brokerage', label: 'Brokerage Company' },
+  { value: 'agentFirstName', label: 'Agent First Name' },
+  { value: 'agentLastName', label: 'Agent Last Name' },
+  
+  // Legacy/Other
+  { value: 'seller', label: 'Seller (legacy)' },
+  { value: 'company', label: 'Company (legacy)' },
+  { value: 'owner', label: 'Owner (legacy)' },
+  
+  // Additional Info
+  { value: 'notes', label: 'Notes/Comments' },
+  { value: 'articleUrls', label: 'Article URL' },
   { value: 'parentPortfolioId', label: 'Portfolio' },
 ];
 
