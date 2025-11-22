@@ -443,6 +443,7 @@ export class DashboardService {
 
   /**
    * Get aggregated dashboard data for all modules
+   * Optimized with parallel queries and SQL aggregations
    */
   async getAggregatedDashboardData(orgId: string): Promise<any> {
     const { deals } = await import('../db');
@@ -450,97 +451,214 @@ export class DashboardService {
     const { vdrProjects, vdrDocuments, vdrDataRequests } = await import('@shared/schema');
     const { salesComps } = await import('@shared/schema');
     const { docktalkArticles, docktalkDeals } = await import('@shared/docktalk-schema');
-    const { fuelSalesTransactions } = await import('@shared/schema');
-    const { eq, and, gte, sql, desc } = await import('drizzle-orm');
+    const { fuelSalesTransactions, shipStoreTransactions, shipStoreProducts, rentRollUnits, modelingProjects } = await import('@shared/schema');
+    const { eq, and, gte, sql, desc, count } = await import('drizzle-orm');
     const { subDays } = await import('date-fns');
 
-    // Fetch CRM data
-    const allDeals = await db.select().from(deals).where(eq(deals.orgId, orgId));
-    const pipelineValue = allDeals.reduce((sum, deal) => sum + (deal.dealValue || 0), 0);
-    const activeDeals = allDeals.filter(d => d.outcome === 'active').length;
-    const wonDeals = allDeals.filter(d => d.outcome === 'won').length;
-    const totalDeals = allDeals.length;
-    const winRate = totalDeals > 0 ? (wonDeals / totalDeals) * 100 : 0;
+    const thirtyDaysAgo = subDays(new Date(), 30);
 
-    // Fetch DD data
-    const allProjects = await db.select().from(projects).where(eq(projects.orgId, orgId));
-    const activeProjects = allProjects.filter(p => p.status === 'active').length;
-    const completedProjects = allProjects.filter(p => p.status === 'completed').length;
+    // Execute all queries in parallel for maximum performance
+    const [
+      crmStats,
+      ddStats,
+      vdrStats,
+      salesCompsData,
+      docktalkData,
+      fuelData,
+      shipStoreData,
+      rentRollData,
+      modelingData,
+    ] = await Promise.all([
+      // CRM aggregated stats
+      db.select({
+        pipelineValue: sql<number>`COALESCE(SUM(CASE WHEN outcome = 'active' THEN deal_value ELSE 0 END), 0)`,
+        activeDeals: sql<number>`COUNT(CASE WHEN outcome = 'active' THEN 1 END)`,
+        wonDeals: sql<number>`COUNT(CASE WHEN outcome = 'won' THEN 1 END)`,
+        totalDeals: count(),
+      })
+      .from(deals)
+      .where(eq(deals.orgId, orgId)),
 
-    // Fetch VDR data
-    const allVdrProjects = await db.select().from(vdrProjects).where(eq(vdrProjects.orgId, orgId));
-    const activeDataRooms = allVdrProjects.filter(p => p.status === 'active').length;
-    const totalDocuments = await db.select({ count: sql<number>`count(*)` })
-      .from(vdrDocuments)
-      .where(eq(vdrDocuments.orgId, orgId));
-    const pendingRequests = await db.select({ count: sql<number>`count(*)` })
-      .from(vdrDataRequests)
+      // Due Diligence aggregated stats
+      db.select({
+        activeProjects: sql<number>`COUNT(CASE WHEN status = 'active' THEN 1 END)`,
+        completedProjects: sql<number>`COUNT(CASE WHEN status = 'completed' THEN 1 END)`,
+        totalProjects: count(),
+      })
+      .from(projects)
+      .where(eq(projects.orgId, orgId)),
+
+      // VDR aggregated stats
+      Promise.all([
+        db.select({
+          activeDataRooms: sql<number>`COUNT(CASE WHEN status = 'active' THEN 1 END)`,
+        })
+        .from(vdrProjects)
+        .where(eq(vdrProjects.orgId, orgId)),
+        db.select({ count: count() })
+        .from(vdrDocuments)
+        .where(eq(vdrDocuments.orgId, orgId)),
+        db.select({ count: count() })
+        .from(vdrDataRequests)
+        .where(and(
+          eq(vdrDataRequests.orgId, orgId),
+          eq(vdrDataRequests.status, 'outstanding')
+        )),
+      ]),
+
+      // Sales Comps data with aggregation
+      Promise.all([
+        db.select().from(salesComps)
+          .where(eq(salesComps.orgId, orgId))
+          .orderBy(desc(salesComps.createdAt))
+          .limit(5),
+        db.select({
+          avgPricePerSlip: sql<number>`AVG(price_per_slip)`,
+          totalComps: count(),
+        })
+        .from(salesComps)
+        .where(eq(salesComps.orgId, orgId)),
+      ]),
+
+      // DockTalk data
+      Promise.all([
+        db.select().from(docktalkArticles)
+          .where(gte(docktalkArticles.publishedAt, thirtyDaysAgo))
+          .orderBy(desc(docktalkArticles.publishedAt))
+          .limit(5),
+        db.select().from(docktalkDeals)
+          .orderBy(desc(docktalkDeals.createdAt))
+          .limit(5),
+      ]),
+
+      // Fuel data (last 30 days)
+      db.select({
+        totalRevenue: sql<number>`COALESCE(SUM(total_amount), 0)`,
+        totalGallons: sql<number>`COALESCE(SUM(quantity), 0)`,
+      })
+      .from(fuelSalesTransactions)
       .where(and(
-        eq(vdrDataRequests.orgId, orgId),
-        eq(vdrDataRequests.status, 'outstanding')
-      ));
+        eq(fuelSalesTransactions.orgId, orgId),
+        gte(fuelSalesTransactions.transactionDate, thirtyDaysAgo)
+      )),
 
-    // Fetch Sales Comps data
-    const recentComps = await db.select().from(salesComps)
-      .where(eq(salesComps.orgId, orgId))
-      .orderBy(desc(salesComps.createdAt))
-      .limit(10);
-    const avgPricePerSlip = recentComps.length > 0
-      ? recentComps.reduce((sum, comp) => sum + (comp.pricePerSlip || 0), 0) / recentComps.length
+      // Ship Store data (last 30 days)
+      Promise.all([
+        db.select({
+          totalRevenue: sql<number>`COALESCE(SUM(total_amount), 0)`,
+          totalTransactions: count(),
+        })
+        .from(shipStoreTransactions)
+        .where(and(
+          eq(shipStoreTransactions.orgId, orgId),
+          gte(shipStoreTransactions.transactionDate, thirtyDaysAgo)
+        ))
+        .then(result => result[0]),
+        db.select({
+          totalValue: sql<number>`COALESCE(SUM(price * quantity), 0)`,
+        })
+        .from(shipStoreProducts)
+        .where(eq(shipStoreProducts.orgId, orgId))
+        .then(result => result[0]),
+      ]),
+
+      // Rent Roll data
+      db.select({
+        totalUnits: count(),
+        occupiedUnits: sql<number>`COUNT(CASE WHEN status = 'occupied' THEN 1 END)`,
+        monthlyIncome: sql<number>`COALESCE(SUM(CASE WHEN status = 'occupied' THEN monthly_rent ELSE 0 END), 0)`,
+      })
+      .from(rentRollUnits)
+      .where(eq(rentRollUnits.orgId, orgId))
+      .then(result => result[0]),
+
+      // Modeling Projects data
+      db.select({
+        activeProjects: sql<number>`COUNT(CASE WHEN status = 'active' THEN 1 END)`,
+        completedProjects: sql<number>`COUNT(CASE WHEN status = 'completed' THEN 1 END)`,
+        totalValuation: sql<number>`COALESCE(SUM(valuation_amount), 0)`,
+      })
+      .from(modelingProjects)
+      .where(eq(modelingProjects.orgId, orgId))
+      .then(result => result[0]),
+    ]);
+
+    // Process results
+    const crmData = crmStats[0];
+    const ddData = ddStats[0];
+    const [vdrProjectsData, vdrDocsData, vdrRequestsData] = vdrStats;
+    const [recentComps, compsAggregates] = salesCompsData;
+    const [recentArticles, recentDeals] = docktalkData;
+    const [shipStoreRevData, shipStoreInvData] = shipStoreData;
+    const rentRollStats = rentRollData;
+    const modelingStats = modelingData;
+
+    const winRate = crmData.totalDeals > 0 
+      ? (Number(crmData.wonDeals) / Number(crmData.totalDeals)) * 100 
       : 0;
 
-    // Fetch DockTalk data
-    const thirtyDaysAgo = subDays(new Date(), 30);
-    const recentArticles = await db.select().from(docktalkArticles)
-      .where(gte(docktalkArticles.publishedAt, thirtyDaysAgo))
-      .orderBy(desc(docktalkArticles.publishedAt))
-      .limit(5);
-    const recentDeals = await db.select().from(docktalkDeals)
-      .orderBy(desc(docktalkDeals.createdAt))
-      .limit(5);
+    const completionRate = ddData.totalProjects > 0 
+      ? (Number(ddData.completedProjects) / Number(ddData.totalProjects)) * 100 
+      : 0;
 
-    // Fetch Fuel data (last 30 days)
-    const fuelRevenue = await db.select({
-      totalRevenue: sql<number>`SUM(total_amount)`,
-      totalGallons: sql<number>`SUM(quantity)`
-    })
-    .from(fuelSalesTransactions)
-    .where(and(
-      eq(fuelSalesTransactions.orgId, orgId),
-      gte(fuelSalesTransactions.transactionDate, thirtyDaysAgo)
-    ));
+    const occupancyRate = rentRollStats?.totalUnits > 0
+      ? (Number(rentRollStats.occupiedUnits) / Number(rentRollStats.totalUnits)) * 100
+      : 0;
+
+    const avgTransaction = shipStoreRevData?.totalTransactions > 0
+      ? Number(shipStoreRevData?.totalRevenue || 0) / Number(shipStoreRevData?.totalTransactions)
+      : 0;
 
     return {
       crm: {
-        pipelineValue,
-        activeDeals,
-        wonDeals,
+        pipelineValue: Number(crmData.pipelineValue || 0),
+        activeDeals: Number(crmData.activeDeals || 0),
+        wonDeals: Number(crmData.wonDeals || 0),
         winRate: Math.round(winRate * 10) / 10,
-        recentDeals: allDeals.slice(0, 5),
       },
       dueDiligence: {
-        activeProjects,
-        completedProjects,
-        totalProjects: allProjects.length,
-        completionRate: allProjects.length > 0 ? Math.round((completedProjects / allProjects.length) * 100) : 0,
+        activeProjects: Number(ddData.activeProjects || 0),
+        completedProjects: Number(ddData.completedProjects || 0),
+        totalProjects: Number(ddData.totalProjects || 0),
+        completionRate: Math.round(completionRate),
       },
       vdr: {
-        activeDataRooms,
-        totalDocuments: totalDocuments[0]?.count || 0,
-        pendingRequests: pendingRequests[0]?.count || 0,
+        activeDataRooms: Number(vdrProjectsData[0]?.activeDataRooms || 0),
+        totalDocuments: Number(vdrDocsData[0]?.count || 0),
+        pendingRequests: Number(vdrRequestsData[0]?.count || 0),
       },
       salesComps: {
-        totalComps: recentComps.length,
-        avgPricePerSlip: Math.round(avgPricePerSlip),
-        recentComps: recentComps.slice(0, 5),
+        totalComps: Number(compsAggregates[0]?.totalComps || 0),
+        avgPricePerSlip: Math.round(Number(compsAggregates[0]?.avgPricePerSlip || 0)),
+        recentComps: recentComps.map(comp => ({
+          propertyName: comp.marina,
+          pricePerSlip: comp.pricePerSlip,
+        })),
       },
       docktalk: {
-        recentArticles,
+        recentArticles: recentArticles.map(a => ({ title: a.title })),
         recentDeals,
       },
       fuel: {
-        monthlyRevenue: Math.round(fuelRevenue[0]?.totalRevenue || 0),
-        monthlyGallons: Math.round(fuelRevenue[0]?.totalGallons || 0),
+        monthlyRevenue: Math.round(Number(fuelData[0]?.totalRevenue || 0)),
+        monthlyGallons: Math.round(Number(fuelData[0]?.totalGallons || 0)),
+      },
+      shipStore: {
+        monthlyRevenue: Math.round(Number(shipStoreRevData?.totalRevenue || 0)),
+        monthlyTransactions: Number(shipStoreRevData?.totalTransactions || 0),
+        avgTransaction: Math.round(avgTransaction),
+        inventoryValue: Math.round(Number(shipStoreInvData?.totalValue || 0)),
+      },
+      rentRoll: {
+        totalUnits: Number(rentRollStats?.totalUnits || 0),
+        occupancyRate: Math.round(occupancyRate),
+        monthlyIncome: Math.round(Number(rentRollStats?.monthlyIncome || 0)),
+        vacantUnits: Number(rentRollStats?.totalUnits || 0) - Number(rentRollStats?.occupiedUnits || 0),
+      },
+      modeling: {
+        activeProjects: Number(modelingStats?.activeProjects || 0),
+        completedProjects: Number(modelingStats?.completedProjects || 0),
+        totalValuation: Math.round(Number(modelingStats?.totalValuation || 0)),
       },
     };
   }

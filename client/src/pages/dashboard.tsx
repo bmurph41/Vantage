@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign } from "lucide-react";
+import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 type DashboardModule = {
   id: string;
@@ -60,6 +61,7 @@ function SortableModule({ module }: { module: DashboardModule }) {
 }
 
 export default function Dashboard() {
+  const { toast } = useToast();
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -68,18 +70,64 @@ export default function Dashboard() {
     })
   );
 
-  const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ['/api/dashboards/data'],
-  });
-
-  const [moduleOrder, setModuleOrder] = useState<string[]>([
+  const DEFAULT_MODULE_ORDER = [
     'crm-pipeline',
     'due-diligence',
     'sales-comps',
     'vdr-activity',
     'docktalk-feed',
     'fuel-operations',
-  ]);
+    'ship-store',
+    'rent-roll',
+    'modeling-projects',
+  ];
+
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ['/api/dashboards/data'],
+  });
+
+  const { data: layoutData } = useQuery({
+    queryKey: ['/api/dashboards/layout'],
+  });
+
+  const [moduleOrder, setModuleOrder] = useState<string[]>(DEFAULT_MODULE_ORDER);
+
+  // Load saved layout on mount
+  useEffect(() => {
+    if (layoutData?.layout) {
+      const savedOrder = layoutData.layout.map((item: any) => item.widgetKey);
+      if (savedOrder.length > 0) {
+        setModuleOrder(savedOrder);
+      }
+    }
+  }, [layoutData]);
+
+  const saveLayoutMutation = useMutation({
+    mutationFn: async (order: string[]) => {
+      const layout = order.map((widgetKey, index) => ({
+        widgetKey,
+        position: { x: index % 3, y: Math.floor(index / 3) },
+        size: { width: 1, height: 1 },
+        config: {},
+      }));
+
+      return apiRequest('PUT', '/api/dashboards/layout', {
+        personaTemplate: 'default',
+        layout,
+        isDefault: false,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboards/layout'] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save dashboard layout",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -92,6 +140,9 @@ export default function Dashboard() {
         const newItems = [...items];
         newItems.splice(oldIndex, 1);
         newItems.splice(newIndex, 0, active.id as string);
+        
+        // Save layout after reordering
+        saveLayoutMutation.mutate(newItems);
         
         return newItems;
       });
@@ -286,6 +337,111 @@ export default function Dashboard() {
               <p className="text-xs text-gray-500">Monthly Gallons</p>
               <p className="text-2xl font-bold" data-testid="fuel-gallons">
                 {data?.monthlyGallons?.toLocaleString() || '0'}
+              </p>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'ship-store',
+      title: 'Ship Store Performance',
+      icon: ShoppingCart,
+      link: '/ship-store',
+      data: dashboardData?.shipStore,
+      renderContent: (data) => (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-500">Monthly Sales</p>
+              <p className="text-2xl font-bold text-green-600" data-testid="ship-store-revenue">
+                ${data?.monthlyRevenue?.toLocaleString() || '0'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Transactions</p>
+              <p className="text-2xl font-bold" data-testid="ship-store-transactions">
+                {data?.monthlyTransactions?.toLocaleString() || '0'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Avg Transaction</p>
+              <p className="text-2xl font-bold" data-testid="ship-store-avg">
+                ${data?.avgTransaction?.toLocaleString() || '0'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Inventory Value</p>
+              <p className="text-2xl font-bold text-blue-600" data-testid="ship-store-inventory">
+                ${data?.inventoryValue?.toLocaleString() || '0'}
+              </p>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'rent-roll',
+      title: 'Rent Roll Overview',
+      icon: Home,
+      link: '/rent-roll',
+      data: dashboardData?.rentRoll,
+      renderContent: (data) => (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-500">Total Units</p>
+              <p className="text-2xl font-bold text-blue-600" data-testid="rent-roll-units">
+                {data?.totalUnits || 0}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Occupancy Rate</p>
+              <p className="text-2xl font-bold text-green-600" data-testid="rent-roll-occupancy">
+                {data?.occupancyRate || 0}%
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Monthly Income</p>
+              <p className="text-2xl font-bold" data-testid="rent-roll-income">
+                ${data?.monthlyIncome?.toLocaleString() || '0'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Vacant Units</p>
+              <p className="text-2xl font-bold text-orange-600" data-testid="rent-roll-vacant">
+                {data?.vacantUnits || 0}
+              </p>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'modeling-projects',
+      title: 'Modeling Projects',
+      icon: BarChart3,
+      link: '/modeling',
+      data: dashboardData?.modeling,
+      renderContent: (data) => (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-500">Active Models</p>
+              <p className="text-2xl font-bold text-blue-600" data-testid="modeling-active">
+                {data?.activeProjects || 0}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Completed</p>
+              <p className="text-2xl font-bold" data-testid="modeling-completed">
+                {data?.completedProjects || 0}
+              </p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs text-gray-500">Total Valuation</p>
+              <p className="text-2xl font-bold text-green-600" data-testid="modeling-valuation">
+                ${data?.totalValuation?.toLocaleString() || '0'}
               </p>
             </div>
           </div>
