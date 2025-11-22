@@ -30,7 +30,8 @@ import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
 import { RecommendationService } from "./services/salescomps/recommendationService";
 import { AICompMatchingService } from "./services/salescomps/aiCompMatchingService";
-import { calculateMetrics, generateInsights, type AnalyticsFilters } from "./services/salescomps/analyticsService";
+import { calculateMetrics, generateInsights, calculateCorrelationData, calculateValuationModels, getMatchedComps, type AnalyticsFilters } from "./services/salescomps/analyticsService";
+import { generateAIInsights } from "./services/salescomps/aiInsightsService";
 import { geocodingService } from "./services/geocodingService";
 import { ParserService as RcParserService } from "./services/ratecomps/parser";
 import { CompService as RcCompService } from "./services/ratecomps/compService";
@@ -8854,12 +8855,70 @@ Current context: Project ${req.params.projectId}`;
       const filters: AnalyticsFilters = req.body;
 
       const metrics = await calculateMetrics(orgId, filters);
-      const insights = await generateInsights(metrics, filters);
+      
+      // Use AI-powered insights with fallback to basic insights
+      let insights;
+      try {
+        insights = await generateAIInsights(metrics, filters);
+      } catch (aiError) {
+        console.error("AI insights failed, using fallback:", aiError);
+        const basicInsights = await generateInsights(metrics, filters);
+        // Convert basic string insights to AIInsight format
+        insights = basicInsights.map(text => ({
+          category: 'trend',
+          title: text.substring(0, 50),
+          description: text,
+          confidence: 'medium',
+          priority: 3,
+        }));
+      }
 
       res.json({ metrics, insights });
     } catch (error) {
       console.error("Error calculating analytics:", error);
       res.status(500).json({ message: "Failed to calculate analytics" });
+    }
+  });
+
+  // Correlation analysis endpoint
+  app.post('/api/sales-comps/analytics/correlation', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: AnalyticsFilters = req.body;
+
+      const correlationData = await calculateCorrelationData(orgId, filters);
+      res.json(correlationData);
+    } catch (error) {
+      console.error("Error calculating correlation data:", error);
+      res.status(500).json({ message: "Failed to calculate correlation data" });
+    }
+  });
+
+  // Valuation models endpoint
+  app.post('/api/sales-comps/analytics/valuation', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: AnalyticsFilters = req.body;
+
+      const valuationModels = await calculateValuationModels(orgId, filters);
+      res.json(valuationModels);
+    } catch (error) {
+      console.error("Error calculating valuation models:", error);
+      res.status(500).json({ message: "Failed to calculate valuation models" });
+    }
+  });
+
+  // Matched comps endpoint
+  app.post('/api/sales-comps/analytics/matched-comps', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { filters, page = 1, pageSize = 50 } = req.body;
+
+      const result = await getMatchedComps(orgId, filters, page, pageSize);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching matched comps:", error);
+      res.status(500).json({ message: "Failed to fetch matched comps" });
     }
   });
 

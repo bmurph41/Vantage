@@ -422,3 +422,370 @@ export async function generateInsights(
 
   return insights;
 }
+
+// Correlation analysis data structures
+export interface ScatterDataPoint {
+  x: number;
+  y: number;
+  name: string;
+  id: string;
+}
+
+export interface CorrelationData {
+  priceVsCapRate: {
+    data: ScatterDataPoint[];
+    correlation: number;
+    sampleSize: number;
+  };
+  priceVsCapacity: {
+    data: ScatterDataPoint[];
+    correlation: number;
+    sampleSize: number;
+  };
+  pricePerSlipVsCapacity: {
+    data: ScatterDataPoint[];
+    correlation: number;
+    sampleSize: number;
+  };
+}
+
+// Calculate Pearson correlation coefficient
+function calculateCorrelation(xValues: number[], yValues: number[]): number {
+  if (xValues.length !== yValues.length || xValues.length === 0) return 0;
+  
+  const n = xValues.length;
+  const sumX = xValues.reduce((a, b) => a + b, 0);
+  const sumY = yValues.reduce((a, b) => a + b, 0);
+  const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0);
+  const sumX2 = xValues.reduce((sum, x) => sum + x * x, 0);
+  const sumY2 = yValues.reduce((sum, y) => sum + y * y, 0);
+  
+  const numerator = n * sumXY - sumX * sumY;
+  const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+  
+  if (denominator === 0) return 0;
+  return numerator / denominator;
+}
+
+export async function calculateCorrelationData(
+  orgId: string,
+  filters: AnalyticsFilters
+): Promise<CorrelationData> {
+  const whereClause = applyFilters(orgId, filters);
+
+  // Fetch raw comp data
+  const comps = await db
+    .select({
+      id: salesComps.id,
+      marina: salesComps.marina,
+      salePrice: salesComps.salePrice,
+      capRate: salesComps.capRate,
+      slipCapacity: salesComps.slipCapacity,
+      pricePerSlip: salesComps.pricePerSlip,
+    })
+    .from(salesComps)
+    .where(whereClause)
+    .limit(500); // Limit for performance
+
+  // Price vs Cap Rate
+  const priceCapRateData = comps
+    .filter(c => c.salePrice && c.capRate && c.capRate > 0)
+    .map(c => ({
+      x: parseFloat(c.salePrice as string),
+      y: parseFloat(c.capRate as string) * 100, // Convert to percentage
+      name: c.marina || 'Unknown Marina',
+      id: c.id,
+    }));
+
+  const priceCapRateCorrelation = calculateCorrelation(
+    priceCapRateData.map(d => d.x),
+    priceCapRateData.map(d => d.y)
+  );
+
+  // Price vs Capacity
+  const priceCapacityData = comps
+    .filter(c => c.salePrice && c.slipCapacity && c.slipCapacity > 0)
+    .map(c => ({
+      x: parseFloat(c.salePrice as string),
+      y: parseInt(c.slipCapacity as string),
+      name: c.marina || 'Unknown Marina',
+      id: c.id,
+    }));
+
+  const priceCapacityCorrelation = calculateCorrelation(
+    priceCapacityData.map(d => d.x),
+    priceCapacityData.map(d => d.y)
+  );
+
+  // Price Per Slip vs Capacity
+  const pricePerSlipCapacityData = comps
+    .filter(c => c.pricePerSlip && c.slipCapacity && c.slipCapacity > 0)
+    .map(c => ({
+      x: parseInt(c.slipCapacity as string),
+      y: parseFloat(c.pricePerSlip as string),
+      name: c.marina || 'Unknown Marina',
+      id: c.id,
+    }));
+
+  const pricePerSlipCapacityCorrelation = calculateCorrelation(
+    pricePerSlipCapacityData.map(d => d.x),
+    pricePerSlipCapacityData.map(d => d.y)
+  );
+
+  return {
+    priceVsCapRate: {
+      data: priceCapRateData,
+      correlation: priceCapRateCorrelation,
+      sampleSize: priceCapRateData.length,
+    },
+    priceVsCapacity: {
+      data: priceCapacityData,
+      correlation: priceCapacityCorrelation,
+      sampleSize: priceCapacityData.length,
+    },
+    pricePerSlipVsCapacity: {
+      data: pricePerSlipCapacityData,
+      correlation: pricePerSlipCapacityCorrelation,
+      sampleSize: pricePerSlipCapacityData.length,
+    },
+  };
+}
+
+// Valuation models data structures
+export interface RegressionModel {
+  data: Array<{ x: number; predicted: number; actual: number; label?: string }>;
+  r2: number;
+  rmse?: number;
+  mae?: number;
+}
+
+export interface ValuationModels {
+  pricePerSlipModel: RegressionModel;
+  capRateModel: RegressionModel;
+}
+
+// Simple linear regression
+function linearRegression(xValues: number[], yValues: number[]): { slope: number; intercept: number; r2: number } {
+  const n = xValues.length;
+  const sumX = xValues.reduce((a, b) => a + b, 0);
+  const sumY = yValues.reduce((a, b) => a + b, 0);
+  const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0);
+  const sumX2 = xValues.reduce((sum, x) => sum + x * x, 0);
+  const sumY2 = yValues.reduce((sum, y) => sum + y * y, 0);
+
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+
+  // Calculate R²
+  const meanY = sumY / n;
+  const ssTotal = yValues.reduce((sum, y) => sum + Math.pow(y - meanY, 2), 0);
+  const ssResidual = yValues.reduce((sum, y, i) => sum + Math.pow(y - (slope * xValues[i] + intercept), 2), 0);
+  const r2 = 1 - (ssResidual / ssTotal);
+
+  return { slope, intercept, r2 };
+}
+
+// Calculate RMSE
+function calculateRMSE(actual: number[], predicted: number[]): number {
+  const n = actual.length;
+  const sumSquaredErrors = actual.reduce((sum, y, i) => sum + Math.pow(y - predicted[i], 2), 0);
+  return Math.sqrt(sumSquaredErrors / n);
+}
+
+// Calculate MAE
+function calculateMAE(actual: number[], predicted: number[]): number {
+  const n = actual.length;
+  const sumAbsErrors = actual.reduce((sum, y, i) => sum + Math.abs(y - predicted[i]), 0);
+  return sumAbsErrors / n;
+}
+
+export async function calculateValuationModels(
+  orgId: string,
+  filters: AnalyticsFilters
+): Promise<ValuationModels> {
+  const whereClause = applyFilters(orgId, filters);
+
+  // Fetch raw comp data
+  const comps = await db
+    .select({
+      id: salesComps.id,
+      marina: salesComps.marina,
+      salePrice: salesComps.salePrice,
+      capRate: salesComps.capRate,
+      slipCapacity: salesComps.slipCapacity,
+      pricePerSlip: salesComps.pricePerSlip,
+      saleDate: salesComps.saleDate,
+    })
+    .from(salesComps)
+    .where(whereClause)
+    .limit(500);
+
+  // Price Per Slip vs Capacity Model
+  const pricePerSlipData = comps
+    .filter(c => c.pricePerSlip && c.slipCapacity && c.slipCapacity > 0)
+    .map(c => ({
+      capacity: parseInt(c.slipCapacity as string),
+      pricePerSlip: parseFloat(c.pricePerSlip as string),
+    }))
+    .sort((a, b) => a.capacity - b.capacity);
+
+  let pricePerSlipModel: RegressionModel;
+  if (pricePerSlipData.length >= 5) {
+    const xValues = pricePerSlipData.map(d => d.capacity);
+    const yValues = pricePerSlipData.map(d => d.pricePerSlip);
+    const { slope, intercept, r2 } = linearRegression(xValues, yValues);
+
+    // Create model data points with capacity ranges
+    const capacityRanges = [50, 100, 200, 400, 600];
+    const modelData = capacityRanges.map(capacity => {
+      const predicted = slope * capacity + intercept;
+      // Find actual average for this range
+      const rangeData = pricePerSlipData.filter(d => 
+        Math.abs(d.capacity - capacity) < 100
+      );
+      const actual = rangeData.length > 0
+        ? rangeData.reduce((sum, d) => sum + d.pricePerSlip, 0) / rangeData.length
+        : predicted;
+
+      return {
+        x: capacity,
+        predicted: Math.max(0, predicted),
+        actual: actual,
+        label: `${capacity} slips`,
+      };
+    });
+
+    const predictedValues = xValues.map(x => slope * x + intercept);
+    const rmse = calculateRMSE(yValues, predictedValues);
+
+    pricePerSlipModel = {
+      data: modelData,
+      r2: Math.max(0, Math.min(1, r2)),
+      rmse: rmse,
+    };
+  } else {
+    // Not enough data
+    pricePerSlipModel = {
+      data: [],
+      r2: 0,
+      rmse: 0,
+    };
+  }
+
+  // Cap Rate Trend Model (by year)
+  const capRateByYear = comps
+    .filter(c => c.capRate && c.saleDate && c.capRate > 0)
+    .map(c => ({
+      year: new Date(c.saleDate as Date).getFullYear(),
+      capRate: parseFloat(c.capRate as string) * 100, // Convert to percentage
+    }));
+
+  // Group by year and calculate averages
+  const yearGroups = capRateByYear.reduce((acc, item) => {
+    if (!acc[item.year]) acc[item.year] = [];
+    acc[item.year].push(item.capRate);
+    return acc;
+  }, {} as Record<number, number[]>);
+
+  const yearlyAvg = Object.entries(yearGroups)
+    .map(([year, rates]) => ({
+      year: parseInt(year),
+      avgCapRate: rates.reduce((a, b) => a + b, 0) / rates.length,
+    }))
+    .sort((a, b) => a.year - b.year);
+
+  let capRateModel: RegressionModel;
+  if (yearlyAvg.length >= 3) {
+    const xValues = yearlyAvg.map(d => d.year);
+    const yValues = yearlyAvg.map(d => d.avgCapRate);
+    const { slope, intercept, r2 } = linearRegression(xValues, yValues);
+
+    const modelData = yearlyAvg.map(d => ({
+      x: d.year,
+      predicted: slope * d.year + intercept,
+      actual: d.avgCapRate,
+    }));
+
+    const predictedValues = xValues.map(x => slope * x + intercept);
+    const mae = calculateMAE(yValues, predictedValues);
+
+    capRateModel = {
+      data: modelData,
+      r2: Math.max(0, Math.min(1, r2)),
+      mae: mae,
+    };
+  } else {
+    capRateModel = {
+      data: [],
+      r2: 0,
+      mae: 0,
+    };
+  }
+
+  return {
+    pricePerSlipModel,
+    capRateModel,
+  };
+}
+
+// Get matched comps with pagination
+export interface MatchedComp {
+  id: string;
+  marina: string | null;
+  state: string | null;
+  city: string | null;
+  saleDate: Date | null;
+  salePrice: string | null;
+  pricePerSlip: string | null;
+  slipCapacity: string | null;
+  capRate: string | null;
+  waterType: string | null;
+  coastalType: string | null;
+  region: string | null;
+  brokerage: string | null;
+}
+
+export async function getMatchedComps(
+  orgId: string,
+  filters: AnalyticsFilters,
+  page: number = 1,
+  pageSize: number = 50
+): Promise<{ comps: MatchedComp[]; total: number }> {
+  const whereClause = applyFilters(orgId, filters);
+
+  // Get total count
+  const countResult = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(salesComps)
+    .where(whereClause);
+
+  const total = countResult[0]?.count || 0;
+
+  // Get paginated data
+  const comps = await db
+    .select({
+      id: salesComps.id,
+      marina: salesComps.marina,
+      state: salesComps.state,
+      city: salesComps.city,
+      saleDate: salesComps.saleDate,
+      salePrice: salesComps.salePrice,
+      pricePerSlip: salesComps.pricePerSlip,
+      slipCapacity: salesComps.slipCapacity,
+      capRate: salesComps.capRate,
+      waterType: salesComps.waterType,
+      coastalType: salesComps.coastalType,
+      region: salesComps.region,
+      brokerage: salesComps.brokerage,
+    })
+    .from(salesComps)
+    .where(whereClause)
+    .orderBy(salesComps.saleDate)
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+
+  return {
+    comps,
+    total,
+  };
+}

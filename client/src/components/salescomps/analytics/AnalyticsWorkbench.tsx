@@ -38,9 +38,17 @@ interface ComparativeAnalysis {
   };
 }
 
+interface AIInsight {
+  category: 'trend' | 'opportunity' | 'risk' | 'anomaly' | 'strategic';
+  title: string;
+  description: string;
+  confidence: 'high' | 'medium' | 'low';
+  priority: number;
+}
+
 interface AnalyticsResponse {
   metrics: ComparativeAnalysis;
-  insights: string[];
+  insights: AIInsight[];
 }
 
 export default function AnalyticsWorkbench() {
@@ -76,6 +84,32 @@ export default function AnalyticsWorkbench() {
       return response;
     },
     enabled: Object.keys(appliedFilters).length > 0 || true,
+  });
+
+  // Fetch correlation data
+  const { data: correlationData, isLoading: isLoadingCorrelation } = useQuery({
+    queryKey: ['analytics-correlation', appliedFilters],
+    queryFn: async () => {
+      const response = await apiRequest('/api/sales-comps/analytics/correlation', {
+        method: 'POST',
+        body: JSON.stringify(appliedFilters),
+      });
+      return response;
+    },
+    enabled: Object.keys(appliedFilters).length > 0,
+  });
+
+  // Fetch valuation models
+  const { data: valuationModels, isLoading: isLoadingValuation } = useQuery({
+    queryKey: ['analytics-valuation', appliedFilters],
+    queryFn: async () => {
+      const response = await apiRequest('/api/sales-comps/analytics/valuation', {
+        method: 'POST',
+        body: JSON.stringify(appliedFilters),
+      });
+      return response;
+    },
+    enabled: Object.keys(appliedFilters).length > 0,
   });
 
   useEffect(() => {
@@ -289,31 +323,17 @@ export default function AnalyticsWorkbench() {
             </TabsContent>
 
             <TabsContent value="correlation" className="mt-2" data-testid="tab-content-correlation">
-              {metrics ? (
-                <CorrelationAnalysisView
-                  data={metrics}
-                  isLoading={isLoading}
-                />
-              ) : (
-                <Card className="p-4 text-center border-dashed">
-                  <ScatterChart className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-                  <p className="text-xs text-muted-foreground">Apply filters to view correlation analysis</p>
-                </Card>
-              )}
+              <CorrelationAnalysisView
+                correlationData={correlationData}
+                isLoading={isLoadingCorrelation}
+              />
             </TabsContent>
 
             <TabsContent value="valuation" className="mt-2" data-testid="tab-content-valuation">
-              {metrics ? (
-                <ValuationModelsView
-                  data={metrics}
-                  isLoading={isLoading}
-                />
-              ) : (
-                <Card className="p-4 text-center border-dashed">
-                  <Calculator className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-                  <p className="text-xs text-muted-foreground">Apply filters to view valuation models</p>
-                </Card>
-              )}
+              <ValuationModelsView
+                valuationModels={valuationModels}
+                isLoading={isLoadingValuation}
+              />
             </TabsContent>
           </Tabs>
         </div>

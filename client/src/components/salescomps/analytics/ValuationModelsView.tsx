@@ -4,13 +4,25 @@ import { Badge } from "@/components/ui/badge";
 import { Calculator, TrendingUp, AlertCircle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
+interface RegressionModel {
+  data: Array<{ x: number; predicted: number; actual: number; label?: string }>;
+  r2: number;
+  rmse?: number;
+  mae?: number;
+}
+
+interface ValuationModels {
+  pricePerSlipModel: RegressionModel;
+  capRateModel: RegressionModel;
+}
+
 interface ValuationModelsViewProps {
-  data: any;
+  valuationModels: ValuationModels | null;
   isLoading?: boolean;
 }
 
-export default function ValuationModelsView({ data, isLoading }: ValuationModelsViewProps) {
-  if (isLoading || !data) {
+export default function ValuationModelsView({ valuationModels, isLoading }: ValuationModelsViewProps) {
+  if (isLoading) {
     return (
       <Card className="p-6 text-center border-dashed">
         <Calculator className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
@@ -19,21 +31,20 @@ export default function ValuationModelsView({ data, isLoading }: ValuationModels
     );
   }
 
-  const pricePerSlipModel = [
-    { capacity: 50, predicted: 18000, actual: 17500, range: "Small" },
-    { capacity: 100, predicted: 16000, actual: 16200, range: "Medium" },
-    { capacity: 200, predicted: 14500, actual: 14800, range: "Large" },
-    { capacity: 400, predicted: 13000, actual: 12900, range: "XL" },
-    { capacity: 600, predicted: 12200, actual: 12000, range: "XXL" },
-  ];
+  if (!valuationModels) {
+    return (
+      <Card className="p-6 text-center border-dashed">
+        <Calculator className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+        <p className="text-sm text-muted-foreground">Apply filters to view valuation models</p>
+      </Card>
+    );
+  }
 
-  const capRateModel = [
-    { year: 2020, predicted: 6.2, actual: 6.1 },
-    { year: 2021, predicted: 6.5, actual: 6.7 },
-    { year: 2022, predicted: 7.0, actual: 7.2 },
-    { year: 2023, predicted: 7.5, actual: 7.4 },
-    { year: 2024, predicted: 7.8, actual: 7.9 },
-  ];
+  const { pricePerSlipModel, capRateModel } = valuationModels;
+
+  // Check if models have sufficient data
+  const hasPricePerSlipData = pricePerSlipModel.data.length >= 3;
+  const hasCapRateData = capRateModel.data.length >= 3;
 
   const valuationBenchmarks = [
     { metric: "Price per Wet Slip", value: "$15,000 - $18,000", note: "National Average" },
@@ -70,29 +81,39 @@ export default function ValuationModelsView({ data, isLoading }: ValuationModels
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={pricePerSlipModel}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="capacity" 
-                  fontSize={11}
-                  tickFormatter={(value) => `${value} slips`}
-                />
-                <YAxis 
-                  fontSize={11}
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                />
-                <Tooltip
-                  formatter={(value: any) => `$${value.toLocaleString()}`}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="predicted" stroke="#3b82f6" name="Predicted" strokeWidth={2} />
-                <Line type="monotone" dataKey="actual" stroke="#10b981" name="Actual" strokeWidth={2} strokeDasharray="5 5" />
-              </LineChart>
-            </ResponsiveContainer>
-            <p className="text-xs text-muted-foreground mt-2">
-              Model R²: 0.87 | RMSE: $1,200
-            </p>
+            {hasPricePerSlipData ? (
+              <>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={pricePerSlipModel.data}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="x" 
+                      fontSize={11}
+                      tickFormatter={(value) => `${value} slips`}
+                    />
+                    <YAxis 
+                      fontSize={11}
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip
+                      formatter={(value: any) => [`$${value.toLocaleString()}`, '']}
+                      labelFormatter={(value) => `${value} slips`}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="predicted" stroke="#3b82f6" name="Predicted" strokeWidth={2} />
+                    <Line type="monotone" dataKey="actual" stroke="#10b981" name="Actual" strokeWidth={2} strokeDasharray="5 5" />
+                  </LineChart>
+                </ResponsiveContainer>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Model R²: {pricePerSlipModel.r2.toFixed(3)}
+                  {pricePerSlipModel.rmse && ` | RMSE: $${pricePerSlipModel.rmse.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                </p>
+              </>
+            ) : (
+              <div className="h-[250px] flex items-center justify-center text-sm text-muted-foreground">
+                Insufficient data for price per slip regression (minimum 5 properties required)
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -105,25 +126,34 @@ export default function ValuationModelsView({ data, isLoading }: ValuationModels
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={capRateModel}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" fontSize={11} />
-                <YAxis 
-                  fontSize={11}
-                  tickFormatter={(value) => `${value}%`}
-                />
-                <Tooltip
-                  formatter={(value: any) => `${value}%`}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="predicted" stroke="#f59e0b" name="Predicted" strokeWidth={2} />
-                <Line type="monotone" dataKey="actual" stroke="#ef4444" name="Actual" strokeWidth={2} strokeDasharray="5 5" />
-              </LineChart>
-            </ResponsiveContainer>
-            <p className="text-xs text-muted-foreground mt-2">
-              Model R²: 0.93 | MAE: 0.15%
-            </p>
+            {hasCapRateData ? (
+              <>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={capRateModel.data}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="x" fontSize={11} />
+                    <YAxis 
+                      fontSize={11}
+                      tickFormatter={(value) => `${value.toFixed(1)}%`}
+                    />
+                    <Tooltip
+                      formatter={(value: any) => [`${value.toFixed(2)}%`, '']}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="predicted" stroke="#f59e0b" name="Predicted" strokeWidth={2} />
+                    <Line type="monotone" dataKey="actual" stroke="#ef4444" name="Actual" strokeWidth={2} strokeDasharray="5 5" />
+                  </LineChart>
+                </ResponsiveContainer>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Model R²: {capRateModel.r2.toFixed(3)}
+                  {capRateModel.mae && ` | MAE: ${capRateModel.mae.toFixed(2)}%`}
+                </p>
+              </>
+            ) : (
+              <div className="h-[250px] flex items-center justify-center text-sm text-muted-foreground">
+                Insufficient data for cap rate regression (minimum 3 years required)
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -142,7 +172,6 @@ export default function ValuationModelsView({ data, isLoading }: ValuationModels
                   <TableHead>Metric</TableHead>
                   <TableHead>Benchmark Range</TableHead>
                   <TableHead>Note</TableHead>
-                  <TableHead className="text-right">Your Portfolio</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -151,27 +180,6 @@ export default function ValuationModelsView({ data, isLoading }: ValuationModels
                     <TableCell className="font-medium">{item.metric}</TableCell>
                     <TableCell>{item.value}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{item.note}</TableCell>
-                    <TableCell className="text-right">
-                      {i === 0 && data?.overall?.avgPricePerSlip ? (
-                        <Badge variant={
-                          data.overall.avgPricePerSlip >= 15000 && data.overall.avgPricePerSlip <= 18000 
-                            ? "default" 
-                            : "secondary"
-                        }>
-                          ${data.overall.avgPricePerSlip.toLocaleString()}
-                        </Badge>
-                      ) : i === 2 && data?.overall?.avgCapRate ? (
-                        <Badge variant={
-                          data.overall.avgCapRate >= 0.065 && data.overall.avgCapRate <= 0.085
-                            ? "default"
-                            : "secondary"
-                        }>
-                          {(data.overall.avgCapRate * 100).toFixed(2)}%
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">—</span>
-                      )}
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
