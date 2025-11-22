@@ -3866,6 +3866,7 @@ export const scPendingPropertyProfiles = pgTable('sc_pending_property_profiles',
   compId: varchar('comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   status: text('status').notNull().default('pending'), // 'pending' | 'completed' | 'skipped'
+  suggestedDuplicates: jsonb('suggested_duplicates').default([]), // Array of potential property IDs
   createdAt: timestamp('created_at').defaultNow(),
   completedAt: timestamp('completed_at'),
 }, (table) => ({

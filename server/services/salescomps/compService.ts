@@ -490,9 +490,6 @@ export class CompService {
         insertedCount: 0,
         updatedCount: 0,
         skippedCount: 0,
-        autoMergedProperties: 0,
-        autoMergedCompanies: 0,
-        autoMergedContacts: 0,
         pendingPropertiesCreated: 0,
         pendingCompaniesCreated: 0,
         pendingContactsCreated: 0,
@@ -599,7 +596,7 @@ export class CompService {
             results.insertedCount++;
             results.successCount++;
 
-            // Smart duplicate detection for property
+            // Create pending property for user confirmation
             if (needsPropertyProfile && createdComp) {
               try {
                 const propertyData = {
@@ -609,143 +606,76 @@ export class CompService {
                   address: transformedData.address,
                 };
                 
+                // Find potential duplicates to suggest to user
                 const propertyDuplicates = await DuplicateDetectionService.findPropertyDuplicates(propertyData, orgId);
+                const suggestedDuplicates = propertyDuplicates.matches.map(m => m.existingEntity.id);
                 
-                if (propertyDuplicates.recommendation === 'auto_merge' && propertyDuplicates.matches.length > 0) {
-                  // Auto-merge: Link to existing property and log audit
-                  const existingProperty = propertyDuplicates.matches[0].existingEntity;
-                  await this.storage.updateComp(createdComp.id, { propertyId: existingProperty.id }, orgId);
-                  
-                  // Log auto-merge decision
-                  await this.storage.createDuplicateAuditLog({
-                    orgId,
-                    entityType: 'property',
-                    action: 'auto_merged',
-                    sourceCompId: createdComp.id,
-                    sourceType: 'csv_import',
-                    newEntityData: propertyData,
-                    existingEntityId: existingProperty.id,
-                    existingEntityData: existingProperty,
-                    matchedBy: propertyDuplicates.matches[0].matchedBy,
-                    confidence: propertyDuplicates.highestConfidence,
-                    performedBy: userId,
-                  });
-                  
-                  results.autoMergedProperties++;
-                } else if (propertyDuplicates.recommendation === 'create_pending') {
-                  // Only create pending for low-confidence matches (<70%)
-                  await this.storage.createPendingPropertyProfile({
-                    compId: createdComp.id,
-                    orgId,
-                    status: 'pending',
-                  });
-                  results.pendingPropertiesCreated++;
-                }
-                // Skip prompt_user and create_new cases (no action needed)
+                // Always create pending property for user review/confirmation
+                await this.storage.createPendingPropertyProfile({
+                  compId: createdComp.id,
+                  orgId,
+                  status: 'pending',
+                  suggestedDuplicates,
+                });
+                results.pendingPropertiesCreated++;
               } catch (error) {
                 console.error('Error processing property duplicate detection:', error);
               }
             }
 
-            // Smart duplicate detection for buyer company
+            // Create pending buyer company for user confirmation
             if (createdComp && transformedData.company && transformedData.company.trim()) {
               try {
                 const companyData = {
                   name: transformedData.company.trim(),
                 };
                 
+                // Find potential duplicates to suggest to user
                 const companyDuplicates = await DuplicateDetectionService.findCompanyDuplicates(companyData, orgId);
+                const suggestedDuplicates = companyDuplicates.matches.map(m => m.existingEntity.id);
                 
-                if (companyDuplicates.recommendation === 'auto_merge' && companyDuplicates.matches.length > 0) {
-                  // Auto-merge: Link comp to existing company
-                  const existingCompany = companyDuplicates.matches[0].existingEntity;
-                  await this.storage.updateComp(createdComp.id, { buyerCompanyId: existingCompany.id }, orgId);
-                  
-                  // Log auto-merge decision
-                  await this.storage.createDuplicateAuditLog({
-                    orgId,
-                    entityType: 'company',
-                    action: 'auto_merged',
-                    sourceCompId: createdComp.id,
-                    sourceType: 'csv_import',
-                    newEntityData: companyData,
-                    existingEntityId: existingCompany.id,
-                    existingEntityData: existingCompany,
-                    matchedBy: companyDuplicates.matches[0].matchedBy,
-                    confidence: companyDuplicates.highestConfidence,
-                    performedBy: userId,
-                  });
-                  
-                  results.autoMergedCompanies = (results.autoMergedCompanies || 0) + 1;
-                } else if (companyDuplicates.recommendation === 'create_pending') {
-                  // Only create pending for low-confidence matches (<70%)
-                  const similarCompanies = await this.storage.findSimilarCompanies(orgId, transformedData.company.trim());
-                  await this.storage.createPendingCompany({
-                    orgId,
-                    name: transformedData.company.trim(),
-                    status: 'pending',
-                    suggestedDuplicates: similarCompanies.map(c => c.id),
-                    sourceMetadata: { salesCompId: createdComp.id, role: 'buyer' },
-                    createdBy: userId,
-                  });
-                  results.pendingCompaniesCreated = (results.pendingCompaniesCreated || 0) + 1;
-                }
-                // Skip prompt_user and create_new cases (no action needed)
+                // Always create pending company for user review/confirmation
+                await this.storage.createPendingCompany({
+                  orgId,
+                  name: transformedData.company.trim(),
+                  status: 'pending',
+                  suggestedDuplicates,
+                  sourceMetadata: { salesCompId: createdComp.id, role: 'buyer' },
+                  createdBy: userId,
+                });
+                results.pendingCompaniesCreated = (results.pendingCompaniesCreated || 0) + 1;
               } catch (error) {
                 console.error('Error processing buyer company duplicate detection:', error);
               }
             }
 
-            // Smart duplicate detection for seller company
+            // Create pending seller company for user confirmation
             if (createdComp && transformedData.seller && transformedData.seller.trim()) {
               try {
                 const companyData = {
                   name: transformedData.seller.trim(),
                 };
                 
+                // Find potential duplicates to suggest to user
                 const companyDuplicates = await DuplicateDetectionService.findCompanyDuplicates(companyData, orgId);
+                const suggestedDuplicates = companyDuplicates.matches.map(m => m.existingEntity.id);
                 
-                if (companyDuplicates.recommendation === 'auto_merge' && companyDuplicates.matches.length > 0) {
-                  // Auto-merge: Link comp to existing company
-                  const existingCompany = companyDuplicates.matches[0].existingEntity;
-                  await this.storage.updateComp(createdComp.id, { sellerCompanyId: existingCompany.id }, orgId);
-                  
-                  // Log auto-merge decision
-                  await this.storage.createDuplicateAuditLog({
-                    orgId,
-                    entityType: 'company',
-                    action: 'auto_merged',
-                    sourceCompId: createdComp.id,
-                    sourceType: 'csv_import',
-                    newEntityData: companyData,
-                    existingEntityId: existingCompany.id,
-                    existingEntityData: existingCompany,
-                    matchedBy: companyDuplicates.matches[0].matchedBy,
-                    confidence: companyDuplicates.highestConfidence,
-                    performedBy: userId,
-                  });
-                  
-                  results.autoMergedCompanies = (results.autoMergedCompanies || 0) + 1;
-                } else if (companyDuplicates.recommendation === 'create_pending') {
-                  // Only create pending for low-confidence matches (<70%)
-                  const similarCompanies = await this.storage.findSimilarCompanies(orgId, transformedData.seller.trim());
-                  await this.storage.createPendingCompany({
-                    orgId,
-                    name: transformedData.seller.trim(),
-                    status: 'pending',
-                    suggestedDuplicates: similarCompanies.map(c => c.id),
-                    sourceMetadata: { salesCompId: createdComp.id, role: 'seller' },
-                    createdBy: userId,
-                  });
-                  results.pendingCompaniesCreated = (results.pendingCompaniesCreated || 0) + 1;
-                }
-                // Skip prompt_user and create_new cases (no action needed)
+                // Always create pending company for user review/confirmation
+                await this.storage.createPendingCompany({
+                  orgId,
+                  name: transformedData.seller.trim(),
+                  status: 'pending',
+                  suggestedDuplicates,
+                  sourceMetadata: { salesCompId: createdComp.id, role: 'seller' },
+                  createdBy: userId,
+                });
+                results.pendingCompaniesCreated = (results.pendingCompaniesCreated || 0) + 1;
               } catch (error) {
                 console.error('Error processing seller company duplicate detection:', error);
               }
             }
 
-            // Smart duplicate detection for broker/agent contact
+            // Create pending broker/agent contact for user confirmation
             // Support both broker string field and agentFirstName/agentLastName structured fields
             if (createdComp) {
               const hasBrokerString = transformedData.broker && transformedData.broker.trim();
@@ -777,53 +707,30 @@ export class CompService {
                     fullName,
                   };
                   
+                  // Find potential duplicates to suggest to user
                   const contactDuplicates = await DuplicateDetectionService.findContactDuplicates(contactData, orgId);
+                  const suggestedDuplicates = contactDuplicates.matches.map(m => m.existingEntity.id);
                   
-                  if (contactDuplicates.recommendation === 'auto_merge' && contactDuplicates.matches.length > 0) {
-                    // Auto-merge: Link comp to existing broker contact
-                    const existingContact = contactDuplicates.matches[0].existingEntity;
-                    await this.storage.updateComp(createdComp.id, { agentContactId: existingContact.id }, orgId);
-                    
-                    // Log auto-merge decision
-                    await this.storage.createDuplicateAuditLog({
-                      orgId,
-                      entityType: 'contact',
-                      action: 'auto_merged',
-                      sourceCompId: createdComp.id,
-                      sourceType: 'csv_import',
-                      newEntityData: contactData,
-                      existingEntityId: existingContact.id,
-                      existingEntityData: existingContact,
-                      matchedBy: contactDuplicates.matches[0].matchedBy,
-                      confidence: contactDuplicates.highestConfidence,
-                      performedBy: userId,
-                    });
-                    
-                    results.autoMergedContacts++;
-                  } else if (contactDuplicates.recommendation === 'create_pending') {
-                    // Only create pending for low-confidence matches (<70%)
-                    const similarContacts = await this.storage.findSimilarContacts(orgId, firstName, lastName);
-                    await this.storage.createPendingContact({
-                      orgId,
-                      sourceType: 'sales_comp',
-                      sourceId: createdComp.id,
-                      fullName,
-                      status: 'pending',
-                      createdBy: userId,
-                      suggestedDuplicates: similarContacts.map(c => c.id),
-                      sourceMetadata: {
-                        compId: createdComp.id,
-                        marina: transformedData.marina,
-                        city: transformedData.city,
-                        state: transformedData.state,
-                        role: 'broker',
-                        agentFirstName: firstName,
-                        agentLastName: lastName,
-                      },
-                    });
-                    results.pendingContactsCreated++;
-                  }
-                  // Skip prompt_user and create_new cases (no action needed)
+                  // Always create pending contact for user review/confirmation
+                  await this.storage.createPendingContact({
+                    orgId,
+                    sourceType: 'sales_comp',
+                    sourceId: createdComp.id,
+                    fullName,
+                    status: 'pending',
+                    createdBy: userId,
+                    suggestedDuplicates,
+                    sourceMetadata: {
+                      compId: createdComp.id,
+                      marina: transformedData.marina,
+                      city: transformedData.city,
+                      state: transformedData.state,
+                      role: 'broker',
+                      agentFirstName: firstName,
+                      agentLastName: lastName,
+                    },
+                  });
+                  results.pendingContactsCreated++;
                 } catch (error) {
                   console.error('Error processing broker/agent contact duplicate detection:', error);
                 }
