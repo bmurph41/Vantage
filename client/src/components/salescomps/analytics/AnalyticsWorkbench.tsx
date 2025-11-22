@@ -15,6 +15,7 @@ import InsightsPanel from "./InsightsPanel";
 import DistributionAnalysisView from "./DistributionAnalysisView";
 import CorrelationAnalysisView from "./CorrelationAnalysisView";
 import ValuationModelsView from "./ValuationModelsView";
+import { SavedFiltersMenu } from "./SavedFiltersMenu";
 
 interface ComparativeAnalysis {
   overall: {
@@ -123,6 +124,11 @@ export default function AnalyticsWorkbench() {
     setAppliedFilters(newFilters);
   };
 
+  const handleLoadFilters = (loadedFilters: AnalyticsFilters) => {
+    setFilters(loadedFilters);
+    setAppliedFilters(loadedFilters);
+  };
+
   const handleExportCSV = () => {
     if (!analyticsData?.metrics) {
       toast({
@@ -191,16 +197,22 @@ export default function AnalyticsWorkbench() {
                 Institutional-grade comparative analysis for marina sales data
               </p>
             </div>
-            <Button
-              onClick={handleExportCSV}
-              variant="outline"
-              size="sm"
-              disabled={!metrics || isLoading}
-              data-testid="button-export-csv"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
+            <div className="flex items-center gap-2">
+              <SavedFiltersMenu
+                currentFilters={filters}
+                onLoadFilters={handleLoadFilters}
+              />
+              <Button
+                onClick={handleExportCSV}
+                variant="outline"
+                size="sm"
+                disabled={!metrics || isLoading}
+                data-testid="button-export-csv"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+            </div>
           </div>
 
           {/* Statistics Overview */}
