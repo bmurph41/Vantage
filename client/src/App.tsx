@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import UnifiedSidebar from "@/components/unified-sidebar";
 import PendingNotificationsBanner from "@/components/pending-notifications-banner";
 import { Loader2 } from "lucide-react";
+import DockTalkRouter from "@/docktalk/DockTalkRouter";
 
 // Loading fallback component
 function PageLoader() {
@@ -91,7 +92,6 @@ const SalesCompsBulkEdit = lazy(() => import("@/pages/analysis/sales-comps/BulkE
 const SalesCompsColumnManager = lazy(() => import("@/pages/analysis/sales-comps/ColumnManager"));
 const ScProjectsIndex = lazy(() => import("@/pages/analysis/projects/Index"));
 const ScProjectsReport = lazy(() => import("@/pages/analysis/projects/Report"));
-const DockTalkRouter = lazy(() => import("@/docktalk/DockTalkRouter"));
 const RateCompsIndex = lazy(() => import("@/pages/analysis/rate-comps/Index"));
 const RateCompsDetail = lazy(() => import("@/pages/analysis/rate-comps/Detail"));
 const RateCompsUpload = lazy(() => import("@/pages/analysis/rate-comps/Upload"));
