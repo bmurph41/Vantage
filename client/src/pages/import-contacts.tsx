@@ -116,11 +116,6 @@ export default function ImportContacts() {
 
   const uploadMutation = useMutation({
     mutationFn: async (fileContent: string) => {
-        fileName: file?.name,
-        entityType,
-        contentLength: fileContent.length,
-        firstChars: fileContent.substring(0, 100)
-      });
       const response = await apiRequest('/api/imports', {
         method: 'POST',
         body: JSON.stringify({
