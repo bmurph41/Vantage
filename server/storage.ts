@@ -336,6 +336,7 @@ export interface IStorage {
   // CRM - Contacts
   getCrmContact(id: string): Promise<CrmContact | undefined>;
   getCrmContactsForOrg(orgId: string): Promise<CrmContact[]>;
+  getCrmContactsForOrgPaginated(orgId: string, options: { page: number; limit: number; search?: string; sortBy?: string; sortOrder?: 'asc' | 'desc' }): Promise<{ data: CrmContact[]; total: number; page: number; limit: number; totalPages: number }>;
   getCrmContactsByCompany(companyId: string): Promise<CrmContact[]>;
   createCrmContact(contact: InsertCrmContact): Promise<CrmContact>;
   updateCrmContact(id: string, updates: Partial<InsertCrmContact>): Promise<CrmContact>;
@@ -2718,6 +2719,59 @@ export class DatabaseStorage implements IStorage {
 
   async getCrmContactsForOrg(orgId: string): Promise<CrmContact[]> {
     return db.select().from(crmContacts).where(eq(crmContacts.ownerId, orgId)).orderBy(desc(crmContacts.createdAt));
+  }
+
+  async getCrmContactsForOrgPaginated(
+    orgId: string,
+    options: { page: number; limit: number; search?: string; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+  ): Promise<{ data: CrmContact[]; total: number; page: number; limit: number; totalPages: number }> {
+    const { page, limit, search, sortBy = 'createdAt', sortOrder = 'desc' } = options;
+    const offset = (page - 1) * limit;
+
+    let whereConditions = eq(crmContacts.ownerId, orgId);
+
+    if (search && search.trim()) {
+      const searchTerm = `%${search.toLowerCase()}%`;
+      whereConditions = and(
+        whereConditions,
+        or(
+          sql`LOWER(${crmContacts.firstName}) LIKE ${searchTerm}`,
+          sql`LOWER(${crmContacts.lastName}) LIKE ${searchTerm}`,
+          sql`LOWER(${crmContacts.email}) LIKE ${searchTerm}`,
+          sql`LOWER(${crmContacts.phone}) LIKE ${searchTerm}`,
+          sql`LOWER(${crmContacts.companyName}) LIKE ${searchTerm}`
+        )
+      );
+    }
+
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(crmContacts)
+      .where(whereConditions);
+    
+    const total = countResult?.count || 0;
+
+    const orderColumn = sortBy === 'firstName' ? crmContacts.firstName :
+                        sortBy === 'lastName' ? crmContacts.lastName :
+                        sortBy === 'email' ? crmContacts.email :
+                        sortBy === 'createdAt' ? crmContacts.createdAt :
+                        crmContacts.createdAt;
+
+    const data = await db
+      .select()
+      .from(crmContacts)
+      .where(whereConditions)
+      .orderBy(sortOrder === 'asc' ? asc(orderColumn) : desc(orderColumn))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
   async getCrmContactsByCompany(companyId: string): Promise<CrmContact[]> {

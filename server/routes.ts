@@ -7039,8 +7039,35 @@ Current context: Project ${req.params.projectId}`;
   // Contacts aliases  
   app.get("/api/contacts", async (req: any, res) => {
     try {
-      const contacts = await storage.getCrmContactsForOrg(req.user.orgId);
-      res.json(contacts);
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+      const search = req.query.search as string | undefined;
+      const sortBy = req.query.sortBy as string | undefined;
+      const sortOrder = (req.query.sortOrder as 'asc' | 'desc') || 'desc';
+
+      if (page !== undefined || limit !== undefined) {
+        const validatedPage = (page && page > 0 && Number.isInteger(page)) ? page : 1;
+        const validatedLimit = (limit && limit > 0 && limit <= 1000 && Number.isInteger(limit)) ? limit : 50;
+
+        if ((page !== undefined && (isNaN(page) || page < 1 || !Number.isInteger(page))) ||
+            (limit !== undefined && (isNaN(limit) || limit < 1 || limit > 1000 || !Number.isInteger(limit)))) {
+          return res.status(400).json({ 
+            error: "Invalid pagination parameters. Page must be a positive integer, limit must be between 1 and 1000." 
+          });
+        }
+
+        const result = await storage.getCrmContactsForOrgPaginated(req.user.orgId, {
+          page: validatedPage,
+          limit: validatedLimit,
+          search,
+          sortBy,
+          sortOrder
+        });
+        res.json(result);
+      } else {
+        const contacts = await storage.getCrmContactsForOrg(req.user.orgId);
+        res.json(contacts);
+      }
     } catch (error) {
       console.error("Failed to get contacts:", error);
       res.status(500).json({ error: "Failed to retrieve contacts" });
