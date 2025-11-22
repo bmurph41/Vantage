@@ -728,64 +728,39 @@ export async function calculateValuationModels(
   };
 }
 
-// Get matched comps with pagination
-export interface MatchedComp {
-  id: string;
-  marina: string | null;
-  state: string | null;
-  city: string | null;
-  saleDate: Date | null;
-  salePrice: string | null;
-  pricePerSlip: string | null;
-  slipCapacity: string | null;
-  capRate: string | null;
-  waterType: string | null;
-  coastalType: string | null;
-  region: string | null;
-  brokerage: string | null;
-}
-
+// Get matched comps
 export async function getMatchedComps(
   orgId: string,
-  filters: AnalyticsFilters,
-  page: number = 1,
-  pageSize: number = 50
-): Promise<{ comps: MatchedComp[]; total: number }> {
+  filters: AnalyticsFilters
+): Promise<any[]> {
   const whereClause = applyFilters(orgId, filters);
 
-  // Get total count
-  const countResult = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(salesComps)
-    .where(whereClause);
-
-  const total = countResult[0]?.count || 0;
-
-  // Get paginated data
   const comps = await db
     .select({
       id: salesComps.id,
-      marina: salesComps.marina,
-      state: salesComps.state,
+      propertyName: salesComps.marina,
+      address: salesComps.address,
       city: salesComps.city,
+      state: salesComps.state,
+      zipCode: salesComps.zipCode,
       saleDate: salesComps.saleDate,
       salePrice: salesComps.salePrice,
+      totalSlips: salesComps.slipCapacity,
       pricePerSlip: salesComps.pricePerSlip,
-      slipCapacity: salesComps.slipCapacity,
-      capRate: salesComps.capRate,
+      storageTypes: salesComps.storageTypes,
+      profitCenters: salesComps.profitCenters,
       waterType: salesComps.waterType,
+      buyerName: salesComps.buyer,
+      sellerName: salesComps.seller,
+      brokerName: salesComps.brokerage,
       coastalType: salesComps.coastalType,
       region: salesComps.region,
-      brokerage: salesComps.brokerage,
+      isPortfolio: salesComps.isPortfolio,
     })
     .from(salesComps)
     .where(whereClause)
-    .orderBy(salesComps.saleDate)
-    .limit(pageSize)
-    .offset((page - 1) * pageSize);
+    .orderBy(desc(salesComps.saleDate))
+    .limit(500);
 
-  return {
-    comps,
-    total,
-  };
+  return comps;
 }

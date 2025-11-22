@@ -16,6 +16,7 @@ import DistributionAnalysisView from "./DistributionAnalysisView";
 import CorrelationAnalysisView from "./CorrelationAnalysisView";
 import ValuationModelsView from "./ValuationModelsView";
 import { SavedFiltersMenu } from "./SavedFiltersMenu";
+import MatchedCompsView from "./MatchedCompsView";
 
 interface ComparativeAnalysis {
   overall: {
@@ -227,10 +228,14 @@ export default function AnalyticsWorkbench() {
 
           {/* Analysis Views */}
           <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 lg:w-auto">
+            <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 lg:w-auto">
               <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden lg:inline">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="matched" className="flex items-center gap-2" data-testid="tab-matched">
+                <Table2 className="h-4 w-4" />
+                <span className="hidden lg:inline">Matched</span>
               </TabsTrigger>
               <TabsTrigger value="trends" className="flex items-center gap-2" data-testid="tab-trends">
                 <TrendingUp className="h-4 w-4" />
@@ -273,6 +278,13 @@ export default function AnalyticsWorkbench() {
                   <p className="text-xs text-muted-foreground">Use the tabs above to view detailed analysis</p>
                 </Card>
               )}
+            </TabsContent>
+
+            <TabsContent value="matched" className="mt-2" data-testid="tab-content-matched">
+              <MatchedCompsView
+                filters={appliedFilters}
+                isLoading={isLoading}
+              />
             </TabsContent>
 
             <TabsContent value="trends" className="mt-2" data-testid="tab-content-trends">

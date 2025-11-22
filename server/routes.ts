@@ -8914,9 +8914,9 @@ Current context: Project ${req.params.projectId}`;
   app.post('/api/sales-comps/analytics/matched-comps', async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { filters, page = 1, pageSize = 50 } = req.body;
+      const filters: AnalyticsFilters = req.body;
 
-      const result = await getMatchedComps(orgId, filters, page, pageSize);
+      const result = await getMatchedComps(orgId, filters);
       res.json(result);
     } catch (error) {
       console.error("Error fetching matched comps:", error);
