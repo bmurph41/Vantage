@@ -440,6 +440,110 @@ export class DashboardService {
       widget: widgetMap.get(layoutWidget.widgetKey) || null
     }));
   }
+
+  /**
+   * Get aggregated dashboard data for all modules
+   */
+  async getAggregatedDashboardData(orgId: string): Promise<any> {
+    const { deals } = await import('../db');
+    const { projects } = await import('@shared/schema');
+    const { vdrProjects, vdrDocuments, vdrDataRequests } = await import('@shared/schema');
+    const { salesComps } = await import('@shared/schema');
+    const { docktalkArticles, docktalkDeals } = await import('@shared/docktalk-schema');
+    const { fuelSalesTransactions } = await import('@shared/schema');
+    const { eq, and, gte, sql, desc } = await import('drizzle-orm');
+    const { subDays } = await import('date-fns');
+
+    // Fetch CRM data
+    const allDeals = await db.select().from(deals).where(eq(deals.orgId, orgId));
+    const pipelineValue = allDeals.reduce((sum, deal) => sum + (deal.dealValue || 0), 0);
+    const activeDeals = allDeals.filter(d => d.outcome === 'active').length;
+    const wonDeals = allDeals.filter(d => d.outcome === 'won').length;
+    const totalDeals = allDeals.length;
+    const winRate = totalDeals > 0 ? (wonDeals / totalDeals) * 100 : 0;
+
+    // Fetch DD data
+    const allProjects = await db.select().from(projects).where(eq(projects.orgId, orgId));
+    const activeProjects = allProjects.filter(p => p.status === 'active').length;
+    const completedProjects = allProjects.filter(p => p.status === 'completed').length;
+
+    // Fetch VDR data
+    const allVdrProjects = await db.select().from(vdrProjects).where(eq(vdrProjects.orgId, orgId));
+    const activeDataRooms = allVdrProjects.filter(p => p.status === 'active').length;
+    const totalDocuments = await db.select({ count: sql<number>`count(*)` })
+      .from(vdrDocuments)
+      .where(eq(vdrDocuments.orgId, orgId));
+    const pendingRequests = await db.select({ count: sql<number>`count(*)` })
+      .from(vdrDataRequests)
+      .where(and(
+        eq(vdrDataRequests.orgId, orgId),
+        eq(vdrDataRequests.status, 'outstanding')
+      ));
+
+    // Fetch Sales Comps data
+    const recentComps = await db.select().from(salesComps)
+      .where(eq(salesComps.orgId, orgId))
+      .orderBy(desc(salesComps.createdAt))
+      .limit(10);
+    const avgPricePerSlip = recentComps.length > 0
+      ? recentComps.reduce((sum, comp) => sum + (comp.pricePerSlip || 0), 0) / recentComps.length
+      : 0;
+
+    // Fetch DockTalk data
+    const thirtyDaysAgo = subDays(new Date(), 30);
+    const recentArticles = await db.select().from(docktalkArticles)
+      .where(gte(docktalkArticles.publishedAt, thirtyDaysAgo))
+      .orderBy(desc(docktalkArticles.publishedAt))
+      .limit(5);
+    const recentDeals = await db.select().from(docktalkDeals)
+      .orderBy(desc(docktalkDeals.createdAt))
+      .limit(5);
+
+    // Fetch Fuel data (last 30 days)
+    const fuelRevenue = await db.select({
+      totalRevenue: sql<number>`SUM(total_amount)`,
+      totalGallons: sql<number>`SUM(quantity)`
+    })
+    .from(fuelSalesTransactions)
+    .where(and(
+      eq(fuelSalesTransactions.orgId, orgId),
+      gte(fuelSalesTransactions.transactionDate, thirtyDaysAgo)
+    ));
+
+    return {
+      crm: {
+        pipelineValue,
+        activeDeals,
+        wonDeals,
+        winRate: Math.round(winRate * 10) / 10,
+        recentDeals: allDeals.slice(0, 5),
+      },
+      dueDiligence: {
+        activeProjects,
+        completedProjects,
+        totalProjects: allProjects.length,
+        completionRate: allProjects.length > 0 ? Math.round((completedProjects / allProjects.length) * 100) : 0,
+      },
+      vdr: {
+        activeDataRooms,
+        totalDocuments: totalDocuments[0]?.count || 0,
+        pendingRequests: pendingRequests[0]?.count || 0,
+      },
+      salesComps: {
+        totalComps: recentComps.length,
+        avgPricePerSlip: Math.round(avgPricePerSlip),
+        recentComps: recentComps.slice(0, 5),
+      },
+      docktalk: {
+        recentArticles,
+        recentDeals,
+      },
+      fuel: {
+        monthlyRevenue: Math.round(fuelRevenue[0]?.totalRevenue || 0),
+        monthlyGallons: Math.round(fuelRevenue[0]?.totalGallons || 0),
+      },
+    };
+  }
 }
 
 export const dashboardService = new DashboardService();

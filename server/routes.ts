@@ -10700,6 +10700,18 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get aggregated dashboard data
+  app.get('/api/dashboards/data', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = await dashboardService.getAggregatedDashboardData(orgId);
+      res.json(data);
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+      res.status(500).json({ error: 'Failed to fetch dashboard data' });
+    }
+  });
+
   // ========================================================================
   // OWNED ASSETS & PORTFOLIO
   // ========================================================================

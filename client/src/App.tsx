@@ -127,15 +127,16 @@ function NotificationSettingsWrapper(props: any) {
 }
 
 function Router() {
+  const [, setLocation] = useLocation();
+
   return (
     <Switch>
-      {/* Due Diligence Tracker Routes with Unified Layout */}
+      {/* Root path redirects to Dashboard */}
       <Route path="/">
-        {() => (
-          <UnifiedLayout>
-            <AllProjectsSummaryPage />
-          </UnifiedLayout>
-        )}
+        {() => {
+          setLocation('/dashboard');
+          return null;
+        }}
       </Route>
       <Route path="/projects">
         {() => (
