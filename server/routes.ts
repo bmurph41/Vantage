@@ -51,6 +51,8 @@ import {
   type InsertCrmFile,
   insertScSavedSearchSchema,
   updateScSavedSearchSchema,
+  insertScAnalyticsFilterPresetSchema,
+  updateScAnalyticsFilterPresetSchema,
   insertScRecommendationFeedbackSchema,
   scProjectProfileSchema,
   scWeightOverridesSchema,
@@ -8919,6 +8921,72 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error fetching matched comps:", error);
       res.status(500).json({ message: "Failed to fetch matched comps" });
+    }
+  });
+
+  // Analytics Filter Presets routes
+  app.get('/api/sales-comps/analytics/filter-presets', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const presets = await storage.getAnalyticsFilterPresets(orgId, userId);
+      res.json(presets);
+    } catch (error) {
+      console.error("Error fetching analytics filter presets:", error);
+      res.status(500).json({ message: "Failed to fetch analytics filter presets" });
+    }
+  });
+
+  app.post('/api/sales-comps/analytics/filter-presets', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const presetData = insertScAnalyticsFilterPresetSchema.parse(req.body);
+      const preset = await storage.createAnalyticsFilterPreset({
+        ...presetData,
+        orgId,
+        userId,
+      });
+
+      res.status(201).json(preset);
+    } catch (error) {
+      console.error("Error creating analytics filter preset:", error);
+      res.status(500).json({ message: "Failed to create analytics filter preset" });
+    }
+  });
+
+  app.patch('/api/sales-comps/analytics/filter-presets/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const presetData = updateScAnalyticsFilterPresetSchema.parse(req.body);
+      const preset = await storage.updateAnalyticsFilterPreset(req.params.id, presetData, orgId, userId);
+
+      if (!preset) return res.status(404).json({ message: "Analytics filter preset not found" });
+
+      res.json(preset);
+    } catch (error) {
+      console.error("Error updating analytics filter preset:", error);
+      res.status(500).json({ message: "Failed to update analytics filter preset" });
+    }
+  });
+
+  app.delete('/api/sales-comps/analytics/filter-presets/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+
+      const success = await storage.deleteAnalyticsFilterPreset(req.params.id, orgId, userId);
+
+      if (!success) return res.status(404).json({ message: "Analytics filter preset not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting analytics filter preset:", error);
+      res.status(500).json({ message: "Failed to delete analytics filter preset" });
     }
   });
 

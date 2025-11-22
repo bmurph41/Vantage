@@ -8,7 +8,7 @@ import {
   crmImportJobs, crmImportedRecords, crmProspectingEntries, crmProspectingUserSettings, crmProspectingGoalTemplates,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
-  salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes, scPortfolios, scPortfolioComps, scPendingPropertyProfiles, scDuplicateAuditLog, scMetricSeries, scMetricPoints, scMetricAlerts,
+  salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scAnalyticsFilterPresets, scCustomStorageTypes, scPortfolios, scPortfolioComps, scPendingPropertyProfiles, scDuplicateAuditLog, scMetricSeries, scMetricPoints, scMetricAlerts,
   rateComps, rateCompColumns, rateCompImports, rcProjects, rcProjectComps, rcAuditLog, rcRecommendationFeedback, rcOrgPreferences, rcSavedSearches, rcCustomStorageTypes, rcPortfolios, rcPortfolioComps, rcPendingPropertyProfiles, rcMetricSeries, rcMetricPoints, rcMetricAlerts,
   fuelIntegrations, fuelImportLogs, debtScenarios, modelingProjects,
   vdrFolders, vdrDocuments, vdrDocumentPermissions, vdrWatermarks, vdrAuditLogs,
@@ -24,7 +24,7 @@ import {
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry, type CrmProspectingUserSettings, type CrmProspectingGoalTemplate,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
-  type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScCustomStorageType, type ScPendingPropertyProfile, type ScDuplicateAuditLog, type ScMetricSeries, type ScMetricPoint, type ScMetricAlert,
+  type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScAnalyticsFilterPreset, type ScCustomStorageType, type ScPendingPropertyProfile, type ScDuplicateAuditLog, type ScMetricSeries, type ScMetricPoint, type ScMetricAlert,
   type RateComp, type RateCompColumn, type RateCompImport, type RcProject, type RcProjectComp, type RcAuditLog, type RcRecommendationFeedback, type RcOrgPreferences, type RcSavedSearch, type RcCustomStorageType, type RcPendingPropertyProfile, type RcMetricSeries, type RcMetricPoint, type RcMetricAlert,
   type FuelIntegration, type FuelImportLog,
   type DebtScenario, type InsertDebtScenario, type UpdateDebtScenario,
@@ -45,7 +45,7 @@ import {
   type InsertSalesComp, type UpdateSalesComp, type InsertCompColumn, type UpdateCompColumn, type InsertCompImport,
   type InsertScProject, type UpdateScProject, type InsertScProjectComp, type UpdateScProjectComp,
   type InsertScRecommendationFeedback, type InsertScOrgPreferences, type UpdateScOrgPreferences,
-  type InsertScSavedSearch, type UpdateScSavedSearch, type InsertScCustomStorageType, type InsertScPendingPropertyProfile, type InsertScDuplicateAuditLog,
+  type InsertScSavedSearch, type UpdateScSavedSearch, type InsertScAnalyticsFilterPreset, type UpdateScAnalyticsFilterPreset, type InsertScCustomStorageType, type InsertScPendingPropertyProfile, type InsertScDuplicateAuditLog,
   type InsertScMetricSeries, type UpdateScMetricSeries, type InsertScMetricPoint, type InsertScMetricAlert, type UpdateScMetricAlert,
   type InsertRateComp, type UpdateRateComp, type InsertRateCompColumn, type UpdateRateCompColumn, type InsertRateCompImport,
   type InsertRcProject, type UpdateRcProject, type InsertRcProjectComp, type UpdateRcProjectComp,
@@ -4149,6 +4149,44 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
+  // Analytics Filter Presets
+  async getScAnalyticsFilterPresets(orgId: string, userId: string): Promise<ScAnalyticsFilterPreset[]> {
+    return await db.select().from(scAnalyticsFilterPresets)
+      .where(and(
+        eq(scAnalyticsFilterPresets.orgId, orgId),
+        eq(scAnalyticsFilterPresets.userId, userId)
+      ))
+      .orderBy(desc(scAnalyticsFilterPresets.isPinned), desc(scAnalyticsFilterPresets.lastUsedAt));
+  }
+
+  async createScAnalyticsFilterPreset(data: InsertScAnalyticsFilterPreset): Promise<ScAnalyticsFilterPreset> {
+    const [newPreset] = await db.insert(scAnalyticsFilterPresets).values(data as any).returning();
+    return newPreset;
+  }
+
+  async updateScAnalyticsFilterPreset(id: string, data: UpdateScAnalyticsFilterPreset, orgId: string, userId: string): Promise<ScAnalyticsFilterPreset | undefined> {
+    const [updatedPreset] = await db.update(scAnalyticsFilterPresets)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(and(
+        eq(scAnalyticsFilterPresets.id, id),
+        eq(scAnalyticsFilterPresets.orgId, orgId),
+        eq(scAnalyticsFilterPresets.userId, userId)
+      ))
+      .returning();
+    return updatedPreset;
+  }
+
+  async deleteScAnalyticsFilterPreset(id: string, orgId: string, userId: string): Promise<boolean> {
+    const result = await db.delete(scAnalyticsFilterPresets)
+      .where(and(
+        eq(scAnalyticsFilterPresets.id, id),
+        eq(scAnalyticsFilterPresets.orgId, orgId),
+        eq(scAnalyticsFilterPresets.userId, userId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
   // Custom Storage Types
   async getScCustomStorageTypes(orgId: string): Promise<ScCustomStorageType[]> {
     return await db.select()
@@ -5391,6 +5429,23 @@ export class DatabaseStorage implements IStorage {
 
   async incrementSavedSearchUsage(id: string, orgId: string): Promise<void> {
     return this.incrementScSavedSearchUsage(id, orgId);
+  }
+
+  // Analytics Filter Presets - Aliases
+  async getAnalyticsFilterPresets(orgId: string, userId: string): Promise<ScAnalyticsFilterPreset[]> {
+    return this.getScAnalyticsFilterPresets(orgId, userId);
+  }
+
+  async createAnalyticsFilterPreset(data: InsertScAnalyticsFilterPreset): Promise<ScAnalyticsFilterPreset> {
+    return this.createScAnalyticsFilterPreset(data);
+  }
+
+  async updateAnalyticsFilterPreset(id: string, data: UpdateScAnalyticsFilterPreset, orgId: string, userId: string): Promise<ScAnalyticsFilterPreset | undefined> {
+    return this.updateScAnalyticsFilterPreset(id, data, orgId, userId);
+  }
+
+  async deleteAnalyticsFilterPreset(id: string, orgId: string, userId: string): Promise<boolean> {
+    return this.deleteScAnalyticsFilterPreset(id, orgId, userId);
   }
 
   // Recommendation System - Aliases
