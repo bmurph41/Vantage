@@ -1,105 +1,110 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import Dashboard from "@/pages/dashboard";
-import ProjectPage from "@/pages/project";
-import NotificationSettingsPage from "@/pages/notification-settings";
-import DDProgressReportPage from "@/pages/dd-progress-report";
-import AllProjectsSummaryPage from "@/pages/all-projects-summary";
-import UserSettingsPage from "@/pages/user-settings";
-import AuditLogsPage from "@/pages/audit-logs";
-import CRMDashboard from "@/pages/crm-dashboard";
 import UnifiedSidebar from "@/components/unified-sidebar";
 import PendingNotificationsBanner from "@/components/pending-notifications-banner";
-import Pipeline from "@/pages/pipeline";
-import Leads from "@/pages/leads";
-import Contacts from "@/pages/contacts";
-import Companies from "@/pages/companies";
-import Deals from "@/pages/deals";
-import DealDetail from "@/pages/deal-detail";
-import Properties from "@/pages/properties";
-import PendingProperties from "@/pages/pending-properties";
-import PendingContacts from "@/pages/pending-contacts";
-import PendingCompanies from "@/pages/pending-companies";
-import Prospecting from "@/pages/prospecting";
-import Analytics from "@/pages/analytics";
-import Forecast from "@/pages/forecast";
-import Forms from "@/pages/forms";
-import Labels from "@/pages/labels";
-import Products from "@/pages/products";
-import Workflows from "@/pages/workflows";
-import Webhooks from "@/pages/webhooks";
-import Dedupe from "@/pages/dedupe";
-import Scoring from "@/pages/scoring";
-import ImportContacts from "@/pages/import-contacts";
-import ImportHistory from "@/pages/import-history";
-import SortableListDemo from "@/pages/demo/SortableListDemo";
-import MilestoneDemo from "@/pages/milestone-demo";
-import NotFound from "@/pages/not-found";
-import CrmTasks from "@/pages/crm-tasks";
-import MarketingAutomation from "@/pages/marketing-automation";
-import CalendarSettings from "@/pages/calendar-settings";
-// Operations pages
-import CustomerAnalytics from "@/pages/operations/CustomerAnalytics";
-import RentRoll from "@/pages/operations/RentRoll";
-import RentRollPortfolio from "@/pages/operations/rent-roll/Portfolio";
-import RentRollProjects from "@/pages/operations/rent-roll/Projects";
-// Operations pages - Fuel Sales
-import FuelSalesDashboard from "@/pages/operations/fuel/Dashboard";
-import FuelSalesTransactions from "@/pages/operations/fuel/Transactions";
-import FuelSalesInventory from "@/pages/operations/fuel/Inventory";
-import FuelSalesAnalytics from "@/pages/operations/fuel/Analytics";
-import FuelSalesReports from "@/pages/operations/fuel/Reports";
-import FuelSalesFinancialModel from "@/pages/operations/fuel/FinancialModel";
-import FuelSalesSettings from "@/pages/operations/fuel/Settings";
-import FuelSalesImportHistory from "@/pages/operations/fuel/ImportHistory";
-import FuelSalesAuditTrail from "@/pages/operations/fuel/AuditTrail";
-// Operations pages - Ship Store
-import ShipStoreDashboard from "@/pages/operations/ship-store/Dashboard";
-import ShipStorePOS from "@/pages/operations/ship-store/POS";
-import ShipStoreInventory from "@/pages/operations/ship-store/Inventory";
-import ShipStoreTransactions from "@/pages/operations/ship-store/Transactions";
-import ShipStoreCheckout from "@/pages/operations/ship-store/Checkout";
-import ShipStoreAnalytics from "@/pages/operations/ship-store/Analytics";
-import ShipStoreReports from "@/pages/operations/ship-store/Reports";
-// Operations pages - Marketing
-import MarketingDashboard from "@/pages/operations/marketing/Dashboard";
-import MarketingCampaigns from "@/pages/operations/marketing/Campaigns";
-import MarketingExpenses from "@/pages/operations/marketing/Expenses";
-import MarketingAttribution from "@/pages/operations/marketing/Attribution";
-import MarketingEmailCampaigns from "@/pages/operations/marketing/EmailCampaigns";
-import MarketingSettings from "@/pages/operations/marketing/Settings";
-// Analysis / Sales Comps pages
-import SalesCompsIndex from "@/pages/analysis/sales-comps/Index";
-import SalesCompsAnalytics from "@/pages/analysis/sales-comps/Analytics";
-import SalesCompsProjects from "@/pages/analysis/sales-comps/Projects";
-import SalesCompsDetail from "@/pages/analysis/sales-comps/Detail";
-import SalesCompsUpload from "@/pages/analysis/sales-comps/Upload";
-import SalesCompsCompare from "@/pages/analysis/sales-comps/Compare";
-import SalesCompsBulkEdit from "@/pages/analysis/sales-comps/BulkEdit";
-import SalesCompsColumnManager from "@/pages/analysis/sales-comps/ColumnManager";
-import ScProjectsIndex from "@/pages/analysis/projects/Index";
-import ScProjectsReport from "@/pages/analysis/projects/Report";
-// Analysis / DockTalk 2.0 Full Application
-import DockTalkRouter from "@/docktalk/DockTalkRouter";
-// Analysis / Rate Comps pages
-import RateCompsIndex from "@/pages/analysis/rate-comps/Index";
-import RateCompsDetail from "@/pages/analysis/rate-comps/Detail";
-import RateCompsUpload from "@/pages/analysis/rate-comps/Upload";
-import RateCompsCompare from "@/pages/analysis/rate-comps/Compare";
-import RateCompsBulkEdit from "@/pages/analysis/rate-comps/BulkEdit";
-import RateCompsColumnManager from "@/pages/analysis/rate-comps/ColumnManager";
-import DemographicsIndex from "@/pages/analysis/demographics/Index";
-import BenchmarksIndex from "@/pages/analysis/benchmarks/Index";
-import DebtScenariosIndex from "@/pages/modeling/debt-scenarios/Index";
-import ModelingProjectsIndex from "@/pages/modeling/projects";
-// VDR pages
-import VDRDashboard from "@/pages/vdr/Dashboard";
-import ProjectVDR from "@/pages/vdr/ProjectVDR";
-import DataRequest from "@/pages/vdr/DataRequest";
+import { Loader2 } from "lucide-react";
+
+// Loading fallback component
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
+
+// Code-split all page imports for optimal bundle size
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const ProjectPage = lazy(() => import("@/pages/project"));
+const NotificationSettingsPage = lazy(() => import("@/pages/notification-settings"));
+const DDProgressReportPage = lazy(() => import("@/pages/dd-progress-report"));
+const AllProjectsSummaryPage = lazy(() => import("@/pages/all-projects-summary"));
+const UserSettingsPage = lazy(() => import("@/pages/user-settings"));
+const AuditLogsPage = lazy(() => import("@/pages/audit-logs"));
+const CRMDashboard = lazy(() => import("@/pages/crm-dashboard"));
+const Pipeline = lazy(() => import("@/pages/pipeline"));
+const Leads = lazy(() => import("@/pages/leads"));
+const Contacts = lazy(() => import("@/pages/contacts"));
+const Companies = lazy(() => import("@/pages/companies"));
+const Deals = lazy(() => import("@/pages/deals"));
+const DealDetail = lazy(() => import("@/pages/deal-detail"));
+const Properties = lazy(() => import("@/pages/properties"));
+const PendingProperties = lazy(() => import("@/pages/pending-properties"));
+const PendingContacts = lazy(() => import("@/pages/pending-contacts"));
+const PendingCompanies = lazy(() => import("@/pages/pending-companies"));
+const Prospecting = lazy(() => import("@/pages/prospecting"));
+const Analytics = lazy(() => import("@/pages/analytics"));
+const Forecast = lazy(() => import("@/pages/forecast"));
+const Forms = lazy(() => import("@/pages/forms"));
+const Labels = lazy(() => import("@/pages/labels"));
+const Products = lazy(() => import("@/pages/products"));
+const Workflows = lazy(() => import("@/pages/workflows"));
+const Webhooks = lazy(() => import("@/pages/webhooks"));
+const Dedupe = lazy(() => import("@/pages/dedupe"));
+const Scoring = lazy(() => import("@/pages/scoring"));
+const ImportContacts = lazy(() => import("@/pages/import-contacts"));
+const ImportHistory = lazy(() => import("@/pages/import-history"));
+const SortableListDemo = lazy(() => import("@/pages/demo/SortableListDemo"));
+const MilestoneDemo = lazy(() => import("@/pages/milestone-demo"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const CrmTasks = lazy(() => import("@/pages/crm-tasks"));
+const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
+const CalendarSettings = lazy(() => import("@/pages/calendar-settings"));
+const CustomerAnalytics = lazy(() => import("@/pages/operations/CustomerAnalytics"));
+const RentRoll = lazy(() => import("@/pages/operations/RentRoll"));
+const RentRollPortfolio = lazy(() => import("@/pages/operations/rent-roll/Portfolio"));
+const RentRollProjects = lazy(() => import("@/pages/operations/rent-roll/Projects"));
+const FuelSalesDashboard = lazy(() => import("@/pages/operations/fuel/Dashboard"));
+const FuelSalesTransactions = lazy(() => import("@/pages/operations/fuel/Transactions"));
+const FuelSalesInventory = lazy(() => import("@/pages/operations/fuel/Inventory"));
+const FuelSalesAnalytics = lazy(() => import("@/pages/operations/fuel/Analytics"));
+const FuelSalesReports = lazy(() => import("@/pages/operations/fuel/Reports"));
+const FuelSalesFinancialModel = lazy(() => import("@/pages/operations/fuel/FinancialModel"));
+const FuelSalesSettings = lazy(() => import("@/pages/operations/fuel/Settings"));
+const FuelSalesImportHistory = lazy(() => import("@/pages/operations/fuel/ImportHistory"));
+const FuelSalesAuditTrail = lazy(() => import("@/pages/operations/fuel/AuditTrail"));
+const ShipStoreDashboard = lazy(() => import("@/pages/operations/ship-store/Dashboard"));
+const ShipStorePOS = lazy(() => import("@/pages/operations/ship-store/POS"));
+const ShipStoreInventory = lazy(() => import("@/pages/operations/ship-store/Inventory"));
+const ShipStoreTransactions = lazy(() => import("@/pages/operations/ship-store/Transactions"));
+const ShipStoreCheckout = lazy(() => import("@/pages/operations/ship-store/Checkout"));
+const ShipStoreAnalytics = lazy(() => import("@/pages/operations/ship-store/Analytics"));
+const ShipStoreReports = lazy(() => import("@/pages/operations/ship-store/Reports"));
+const MarketingDashboard = lazy(() => import("@/pages/operations/marketing/Dashboard"));
+const MarketingCampaigns = lazy(() => import("@/pages/operations/marketing/Campaigns"));
+const MarketingExpenses = lazy(() => import("@/pages/operations/marketing/Expenses"));
+const MarketingAttribution = lazy(() => import("@/pages/operations/marketing/Attribution"));
+const MarketingEmailCampaigns = lazy(() => import("@/pages/operations/marketing/EmailCampaigns"));
+const MarketingSettings = lazy(() => import("@/pages/operations/marketing/Settings"));
+const SalesCompsIndex = lazy(() => import("@/pages/analysis/sales-comps/Index"));
+const SalesCompsAnalytics = lazy(() => import("@/pages/analysis/sales-comps/Analytics"));
+const SalesCompsProjects = lazy(() => import("@/pages/analysis/sales-comps/Projects"));
+const SalesCompsDetail = lazy(() => import("@/pages/analysis/sales-comps/Detail"));
+const SalesCompsUpload = lazy(() => import("@/pages/analysis/sales-comps/Upload"));
+const SalesCompsCompare = lazy(() => import("@/pages/analysis/sales-comps/Compare"));
+const SalesCompsBulkEdit = lazy(() => import("@/pages/analysis/sales-comps/BulkEdit"));
+const SalesCompsColumnManager = lazy(() => import("@/pages/analysis/sales-comps/ColumnManager"));
+const ScProjectsIndex = lazy(() => import("@/pages/analysis/projects/Index"));
+const ScProjectsReport = lazy(() => import("@/pages/analysis/projects/Report"));
+const DockTalkRouter = lazy(() => import("@/docktalk/DockTalkRouter"));
+const RateCompsIndex = lazy(() => import("@/pages/analysis/rate-comps/Index"));
+const RateCompsDetail = lazy(() => import("@/pages/analysis/rate-comps/Detail"));
+const RateCompsUpload = lazy(() => import("@/pages/analysis/rate-comps/Upload"));
+const RateCompsCompare = lazy(() => import("@/pages/analysis/rate-comps/Compare"));
+const RateCompsBulkEdit = lazy(() => import("@/pages/analysis/rate-comps/BulkEdit"));
+const RateCompsColumnManager = lazy(() => import("@/pages/analysis/rate-comps/ColumnManager"));
+const DemographicsIndex = lazy(() => import("@/pages/analysis/demographics/Index"));
+const BenchmarksIndex = lazy(() => import("@/pages/analysis/benchmarks/Index"));
+const DebtScenariosIndex = lazy(() => import("@/pages/modeling/debt-scenarios/Index"));
+const ModelingProjectsIndex = lazy(() => import("@/pages/modeling/projects"));
+const VDRDashboard = lazy(() => import("@/pages/vdr/Dashboard"));
+const ProjectVDR = lazy(() => import("@/pages/vdr/ProjectVDR"));
+const DataRequest = lazy(() => import("@/pages/vdr/DataRequest"));
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
@@ -807,7 +812,9 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <Suspense fallback={<PageLoader />}>
+            <Router />
+          </Suspense>
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>
