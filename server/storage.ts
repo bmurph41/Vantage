@@ -8,7 +8,7 @@ import {
   crmImportJobs, crmImportedRecords, crmProspectingEntries, crmProspectingUserSettings, crmProspectingGoalTemplates,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
-  salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes, scPortfolios, scPortfolioComps, scPendingPropertyProfiles, scMetricSeries, scMetricPoints, scMetricAlerts,
+  salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scCustomStorageTypes, scPortfolios, scPortfolioComps, scPendingPropertyProfiles, scDuplicateAuditLog, scMetricSeries, scMetricPoints, scMetricAlerts,
   rateComps, rateCompColumns, rateCompImports, rcProjects, rcProjectComps, rcAuditLog, rcRecommendationFeedback, rcOrgPreferences, rcSavedSearches, rcCustomStorageTypes, rcPortfolios, rcPortfolioComps, rcPendingPropertyProfiles, rcMetricSeries, rcMetricPoints, rcMetricAlerts,
   fuelIntegrations, fuelImportLogs, debtScenarios, modelingProjects,
   vdrFolders, vdrDocuments, vdrDocumentPermissions, vdrWatermarks, vdrAuditLogs,
@@ -24,7 +24,7 @@ import {
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry, type CrmProspectingUserSettings, type CrmProspectingGoalTemplate,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
-  type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScCustomStorageType, type ScPendingPropertyProfile, type ScMetricSeries, type ScMetricPoint, type ScMetricAlert,
+  type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScCustomStorageType, type ScPendingPropertyProfile, type ScDuplicateAuditLog, type ScMetricSeries, type ScMetricPoint, type ScMetricAlert,
   type RateComp, type RateCompColumn, type RateCompImport, type RcProject, type RcProjectComp, type RcAuditLog, type RcRecommendationFeedback, type RcOrgPreferences, type RcSavedSearch, type RcCustomStorageType, type RcPendingPropertyProfile, type RcMetricSeries, type RcMetricPoint, type RcMetricAlert,
   type FuelIntegration, type FuelImportLog,
   type DebtScenario, type InsertDebtScenario, type UpdateDebtScenario,
@@ -45,7 +45,7 @@ import {
   type InsertSalesComp, type UpdateSalesComp, type InsertCompColumn, type UpdateCompColumn, type InsertCompImport,
   type InsertScProject, type UpdateScProject, type InsertScProjectComp, type UpdateScProjectComp,
   type InsertScRecommendationFeedback, type InsertScOrgPreferences, type UpdateScOrgPreferences,
-  type InsertScSavedSearch, type UpdateScSavedSearch, type InsertScCustomStorageType, type InsertScPendingPropertyProfile,
+  type InsertScSavedSearch, type UpdateScSavedSearch, type InsertScCustomStorageType, type InsertScPendingPropertyProfile, type InsertScDuplicateAuditLog,
   type InsertScMetricSeries, type UpdateScMetricSeries, type InsertScMetricPoint, type InsertScMetricAlert, type UpdateScMetricAlert,
   type InsertRateComp, type UpdateRateComp, type InsertRateCompColumn, type UpdateRateCompColumn, type InsertRateCompImport,
   type InsertRcProject, type UpdateRcProject, type InsertRcProjectComp, type UpdateRcProjectComp,
@@ -562,6 +562,9 @@ export interface IStorage {
   createPendingPropertyProfile(data: InsertScPendingPropertyProfile): Promise<ScPendingPropertyProfile>;
   updatePendingPropertyProfile(id: string, data: Partial<InsertScPendingPropertyProfile>): Promise<ScPendingPropertyProfile>;
   deletePendingPropertyProfile(id: string): Promise<boolean>;
+  
+  // Duplicate Audit Log
+  createDuplicateAuditLog(data: InsertScDuplicateAuditLog): Promise<ScDuplicateAuditLog>;
   
   // CRM Properties - search by name/city/state
   findPropertyByLocation(orgId: string, marina: string, city?: string, state?: string): Promise<Property | undefined>;
@@ -4185,6 +4188,13 @@ export class DatabaseStorage implements IStorage {
 
   async createPendingPropertyProfile(data: InsertScPendingPropertyProfile): Promise<ScPendingPropertyProfile> {
     const [created] = await db.insert(scPendingPropertyProfiles)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+  
+  async createDuplicateAuditLog(data: InsertScDuplicateAuditLog): Promise<ScDuplicateAuditLog> {
+    const [created] = await db.insert(scDuplicateAuditLog)
       .values(data as any)
       .returning();
     return created;

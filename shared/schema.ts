@@ -3874,6 +3874,34 @@ export const scPendingPropertyProfiles = pgTable('sc_pending_property_profiles',
   statusIdx: index('sc_pending_property_profiles_status_idx').on(table.orgId, table.status),
 }));
 
+// Duplicate audit log - tracks auto-merge decisions for compliance and transparency
+export const scDuplicateAuditLog = pgTable('sc_duplicate_audit_log', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  entityType: text('entity_type').notNull(), // 'contact' | 'company' | 'property'
+  action: text('action').notNull(), // 'auto_merged' | 'pending_created' | 'user_merged' | 'user_rejected'
+  
+  sourceCompId: varchar('source_comp_id').references(() => salesComps.id, { onDelete: 'set null' }),
+  sourceType: text('source_type'), // 'csv_import' | 'manual_entry' | 'api'
+  
+  newEntityData: jsonb('new_entity_data').$type<Record<string, any>>(), // The data that was being imported
+  existingEntityId: varchar('existing_entity_id'), // ID of the matched entity (if auto-merged)
+  existingEntityData: jsonb('existing_entity_data').$type<Record<string, any>>(), // Snapshot of existing entity before merge
+  
+  matchedBy: text('matched_by'), // 'email' | 'phone' | 'name' | 'address' | etc.
+  confidence: integer('confidence'), // 0-100 confidence score
+  
+  performedBy: varchar('performed_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('sc_duplicate_audit_log_org_idx').on(table.orgId),
+  orgActionIdx: index('sc_duplicate_audit_log_org_action_idx').on(table.orgId, table.action),
+  orgEntityTypeIdx: index('sc_duplicate_audit_log_org_entity_type_idx').on(table.orgId, table.entityType),
+  orgCreatedIdx: index('sc_duplicate_audit_log_org_created_idx').on(table.orgId, table.createdAt),
+  existingEntityIdx: index('sc_duplicate_audit_log_existing_entity_idx').on(table.existingEntityId),
+}));
+
 // Column definitions for dynamic columns
 export const compColumns = pgTable('comp_columns', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -4630,6 +4658,13 @@ export const insertScPendingPropertyProfileSchema = createInsertSchema(scPending
   createdAt: true,
 });
 export type InsertScPendingPropertyProfile = z.infer<typeof insertScPendingPropertyProfileSchema>;
+
+export type ScDuplicateAuditLog = typeof scDuplicateAuditLog.$inferSelect;
+export const insertScDuplicateAuditLogSchema = createInsertSchema(scDuplicateAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertScDuplicateAuditLog = z.infer<typeof insertScDuplicateAuditLogSchema>;
 
 // ============================================================================
 // DOCKTALK M&A SPOTLIGHT - Types and Schemas

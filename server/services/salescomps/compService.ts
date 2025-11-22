@@ -1,6 +1,7 @@
 import { IStorage } from "../../storage";
 import { ParserService } from "./parser";
 import { ImportAnalysisService } from "./importAnalysisService";
+import { DuplicateDetectionService } from "../../duplicate-detection-service";
 import type { InsertSalesComp, UpdateSalesComp, SalesComp, Project } from "@shared/schema";
 import type { AnalyticsReportData, ProjectReportData } from "../openai";
 
@@ -489,6 +490,10 @@ export class CompService {
         insertedCount: 0,
         updatedCount: 0,
         skippedCount: 0,
+        autoMergedProperties: 0,
+        autoMergedContacts: 0,
+        pendingPropertiesCreated: 0,
+        pendingContactsCreated: 0,
       };
 
       // Process each row according to the plan
@@ -589,20 +594,55 @@ export class CompService {
             results.insertedCount++;
             results.successCount++;
 
-            // Create pending property profile if needed
+            // Smart duplicate detection for property
             if (needsPropertyProfile && createdComp) {
               try {
-                await this.storage.createPendingPropertyProfile({
-                  compId: createdComp.id,
-                  orgId,
-                  status: 'pending',
-                });
+                const propertyData = {
+                  marinaName: transformedData.marina,
+                  city: transformedData.city,
+                  state: transformedData.state,
+                  address: transformedData.address,
+                };
+                
+                const propertyDuplicates = await DuplicateDetectionService.findPropertyDuplicates(propertyData, orgId);
+                
+                if (propertyDuplicates.recommendation === 'auto_merge' && propertyDuplicates.matches.length > 0) {
+                  // Auto-merge: Link to existing property and log audit
+                  const existingProperty = propertyDuplicates.matches[0].existingEntity;
+                  await this.storage.updateComp(createdComp.id, { propertyId: existingProperty.id }, orgId);
+                  
+                  // Log auto-merge decision
+                  await this.storage.createDuplicateAuditLog({
+                    orgId,
+                    entityType: 'property',
+                    action: 'auto_merged',
+                    sourceCompId: createdComp.id,
+                    sourceType: 'csv_import',
+                    newEntityData: propertyData,
+                    existingEntityId: existingProperty.id,
+                    existingEntityData: existingProperty,
+                    matchedBy: propertyDuplicates.matches[0].matchedBy,
+                    confidence: propertyDuplicates.highestConfidence,
+                    performedBy: userId,
+                  });
+                  
+                  results.autoMergedProperties++;
+                  results.warningCount++;
+                } else {
+                  // Create pending property profile for user review
+                  await this.storage.createPendingPropertyProfile({
+                    compId: createdComp.id,
+                    orgId,
+                    status: 'pending',
+                  });
+                  results.pendingPropertiesCreated++;
+                }
               } catch (error) {
-                console.error('Error creating pending property profile:', error);
+                console.error('Error processing property duplicate detection:', error);
               }
             }
 
-            // Create pending contacts for broker and seller if present
+            // Smart duplicate detection for contacts (broker and seller)
             if (createdComp) {
               const contactNames: Array<{ name: string; role: 'broker' | 'seller' }> = [];
               if (transformedData.broker && transformedData.broker.trim()) {
@@ -614,23 +654,59 @@ export class CompService {
 
               for (const { name, role } of contactNames) {
                 try {
-                  await this.storage.createPendingContact({
-                    orgId,
-                    sourceType: 'sales_comp',
-                    sourceId: createdComp.id,
+                  const nameParts = name.split(' ');
+                  const firstName = nameParts[0] || '';
+                  const lastName = nameParts.slice(1).join(' ') || '';
+                  
+                  const contactData = {
+                    firstName,
+                    lastName,
                     fullName: name,
-                    status: 'pending',
-                    createdBy: userId,
-                    sourceMetadata: {
-                      compId: createdComp.id,
-                      marina: transformedData.marina,
-                      city: transformedData.city,
-                      state: transformedData.state,
-                      role: role,
-                    },
-                  });
+                  };
+                  
+                  const contactDuplicates = await DuplicateDetectionService.findContactDuplicates(contactData, orgId);
+                  
+                  if (contactDuplicates.recommendation === 'auto_merge' && contactDuplicates.matches.length > 0) {
+                    // Auto-merge: Log audit (no need to update comp, just document the match)
+                    const existingContact = contactDuplicates.matches[0].existingEntity;
+                    
+                    await this.storage.createDuplicateAuditLog({
+                      orgId,
+                      entityType: 'contact',
+                      action: 'auto_merged',
+                      sourceCompId: createdComp.id,
+                      sourceType: 'csv_import',
+                      newEntityData: contactData,
+                      existingEntityId: existingContact.id,
+                      existingEntityData: existingContact,
+                      matchedBy: contactDuplicates.matches[0].matchedBy,
+                      confidence: contactDuplicates.highestConfidence,
+                      performedBy: userId,
+                    });
+                    
+                    results.autoMergedContacts++;
+                    results.warningCount++;
+                  } else {
+                    // Create pending contact for user review
+                    await this.storage.createPendingContact({
+                      orgId,
+                      sourceType: 'sales_comp',
+                      sourceId: createdComp.id,
+                      fullName: name,
+                      status: 'pending',
+                      createdBy: userId,
+                      sourceMetadata: {
+                        compId: createdComp.id,
+                        marina: transformedData.marina,
+                        city: transformedData.city,
+                        state: transformedData.state,
+                        role: role,
+                      },
+                    });
+                    results.pendingContactsCreated++;
+                  }
                 } catch (error) {
-                  console.error(`Error creating pending contact for ${role}:`, error);
+                  console.error(`Error processing contact duplicate detection for ${role}:`, error);
                 }
               }
             }
