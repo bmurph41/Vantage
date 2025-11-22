@@ -257,6 +257,9 @@ export const rssSources = pgTable("docktalk_rss_sources", {
   customKeywords: text("custom_keywords").array(),
   lastFetched: timestamp("last_fetched"),
   lastScrapedAt: timestamp("last_scraped_at"),
+  consecutiveFailures: integer("consecutive_failures").default(0),
+  lastFailureAt: timestamp("last_failure_at"),
+  lastSuccessAt: timestamp("last_success_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

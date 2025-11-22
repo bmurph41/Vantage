@@ -69,6 +69,8 @@ export interface IStorage {
   deleteRssSource(id: number): Promise<void>;
   updateRssSourceLastFetched(id: number): Promise<void>;
   updateRssSourceLastScrapedAt(id: number): Promise<void>;
+  recordRssSourceSuccess(id: number): Promise<void>;
+  recordRssSourceFailure(id: number): Promise<void>;
   
   // Category correction methods
   updateArticleCategoryManual(id: number, categories: string[], originalCategory: string): Promise<void>;
@@ -482,6 +484,35 @@ export class DatabaseStorage implements IStorage {
 
   async updateRssSourceLastScrapedAt(id: number): Promise<void> {
     await db.update(rssSources).set({ lastScrapedAt: new Date() }).where(eq(rssSources.id, id));
+  }
+
+  async recordRssSourceSuccess(id: number): Promise<void> {
+    await db.update(rssSources).set({ 
+      consecutiveFailures: 0,
+      lastSuccessAt: new Date(),
+      isActive: true
+    }).where(eq(rssSources.id, id));
+  }
+
+  async recordRssSourceFailure(id: number): Promise<void> {
+    const source = await db.query.rssSources.findFirst({
+      where: eq(rssSources.id, id)
+    });
+    
+    if (!source) return;
+    
+    const newFailureCount = (source.consecutiveFailures || 0) + 1;
+    const shouldDisable = newFailureCount >= 3;
+    
+    await db.update(rssSources).set({ 
+      consecutiveFailures: newFailureCount,
+      lastFailureAt: new Date(),
+      isActive: shouldDisable ? false : source.isActive
+    }).where(eq(rssSources.id, id));
+    
+    if (shouldDisable) {
+      console.log(`🚫 RSS source "${source.name}" disabled after ${newFailureCount} consecutive failures`);
+    }
   }
 
   async updateArticleCategoryManual(id: number, categories: string[], originalCategory: string): Promise<void> {

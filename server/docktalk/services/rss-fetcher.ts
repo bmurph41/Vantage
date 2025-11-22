@@ -48,6 +48,11 @@ export async function fetchRssFeeds(): Promise<number> {
     const sources = await storage.getRssSources();
     
     for (const source of sources) {
+      // Skip inactive sources (disabled by circuit breaker)
+      if (!source.isActive) {
+        continue;
+      }
+      
       try {
         if (source.sourceType === 'web_scrape') {
           const articles = await scrapeWebPage(source.url);
@@ -60,6 +65,7 @@ export async function fetchRssFeeds(): Promise<number> {
           }
           
           await storage.updateRssSourceLastScrapedAt(source.id);
+          await storage.recordRssSourceSuccess(source.id);
         } else {
           const feed = await parser.parseURL(source.url);
           
@@ -69,9 +75,11 @@ export async function fetchRssFeeds(): Promise<number> {
           }
           
           await storage.updateRssSourceLastFetched(source.id);
+          await storage.recordRssSourceSuccess(source.id);
         }
       } catch (error) {
         console.error(`Error fetching source ${source.name}:`, error);
+        await storage.recordRssSourceFailure(source.id);
       }
     }
     
