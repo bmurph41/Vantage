@@ -11039,6 +11039,123 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Custom Dashboard Modules CRUD
+  // Get all custom modules for the user
+  app.get('/api/dashboards/custom-modules', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { dashboardCustomModules } = await import('@shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const modules = await db
+        .select()
+        .from(dashboardCustomModules)
+        .where(eq(dashboardCustomModules.userId, userId))
+        .orderBy(desc(dashboardCustomModules.displayOrder));
+
+      res.json(modules);
+    } catch (error) {
+      console.error('Failed to fetch custom modules:', error);
+      res.status(500).json({ error: 'Failed to fetch custom modules' });
+    }
+  });
+
+  // Create a new custom module
+  app.post('/api/dashboards/custom-modules', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { dashboardCustomModules, insertDashboardCustomModuleSchema } = await import('@shared/schema');
+      
+      const validated = insertDashboardCustomModuleSchema.parse({
+        ...req.body,
+        userId,
+        orgId,
+      });
+
+      const [newModule] = await db
+        .insert(dashboardCustomModules)
+        .values(validated)
+        .returning();
+
+      res.json(newModule);
+    } catch (error) {
+      console.error('Failed to create custom module:', error);
+      res.status(500).json({ error: 'Failed to create custom module' });
+    }
+  });
+
+  // Update a custom module
+  app.put('/api/dashboards/custom-modules/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const moduleId = req.params.id;
+      const { dashboardCustomModules } = await import('@shared/schema');
+      const { and } = await import('drizzle-orm');
+      
+      // Verify ownership
+      const existing = await db
+        .select()
+        .from(dashboardCustomModules)
+        .where(and(
+          eq(dashboardCustomModules.id, moduleId),
+          eq(dashboardCustomModules.userId, userId)
+        ))
+        .limit(1);
+
+      if (!existing || existing.length === 0) {
+        return res.status(404).json({ error: 'Custom module not found' });
+      }
+
+      const [updated] = await db
+        .update(dashboardCustomModules)
+        .set({
+          ...req.body,
+          updatedAt: new Date(),
+        })
+        .where(eq(dashboardCustomModules.id, moduleId))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Failed to update custom module:', error);
+      res.status(500).json({ error: 'Failed to update custom module' });
+    }
+  });
+
+  // Delete a custom module
+  app.delete('/api/dashboards/custom-modules/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const moduleId = req.params.id;
+      const { dashboardCustomModules } = await import('@shared/schema');
+      const { and } = await import('drizzle-orm');
+      
+      // Verify ownership
+      const existing = await db
+        .select()
+        .from(dashboardCustomModules)
+        .where(and(
+          eq(dashboardCustomModules.id, moduleId),
+          eq(dashboardCustomModules.userId, userId)
+        ))
+        .limit(1);
+
+      if (!existing || existing.length === 0) {
+        return res.status(404).json({ error: 'Custom module not found' });
+      }
+
+      await db
+        .delete(dashboardCustomModules)
+        .where(eq(dashboardCustomModules.id, moduleId));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete custom module:', error);
+      res.status(500).json({ error: 'Failed to delete custom module' });
+    }
+  });
+
   // Get user dashboard module preferences
   app.get('/api/dashboards/modules', authenticateUser, async (req: any, res) => {
     try {

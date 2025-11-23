@@ -135,6 +135,20 @@ export const calendarSettings = pgTable("calendar_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Dashboard Custom Modules - User-defined filtered dashboard modules
+export const dashboardCustomModules = pgTable("dashboard_custom_modules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  title: text("title").notNull(), // User-defined module name (e.g., "Florida Sales Comps", "Q1 DD Tasks")
+  moduleType: text("module_type").notNull(), // Source: 'crm', 'sales-comps', 'fuel', 'vdr', 'docktalk', 'ship-store', 'dd', 'rent-roll', 'modeling'
+  filters: jsonb("filters").notNull().default(sql`'{}'`), // Filter configuration: { state: 'FL', dateRange: 'Q1', projectId: '123', etc. }
+  displayOrder: integer("display_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Persona Feature Flags - Global registry of persona capabilities
 export const personaFeatureFlags = pgTable("persona_feature_flags", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1197,6 +1211,15 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
 });
+
+export const insertDashboardCustomModuleSchema = createInsertSchema(dashboardCustomModules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDashboardCustomModule = z.infer<typeof insertDashboardCustomModuleSchema>;
+export type DashboardCustomModule = typeof dashboardCustomModules.$inferSelect;
 
 export const insertCalendarSettingsSchema = createInsertSchema(calendarSettings).omit({
   id: true,
