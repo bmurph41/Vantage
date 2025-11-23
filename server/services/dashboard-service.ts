@@ -446,7 +446,7 @@ export class DashboardService {
    * Optimized with parallel queries and SQL aggregations
    */
   async getAggregatedDashboardData(orgId: string): Promise<any> {
-    const { deals } = await import('../db');
+    const { crmDeals } = await import('@shared/schema');
     const { projects } = await import('@shared/schema');
     const { vdrProjects, vdrDocuments, vdrDataRequests } = await import('@shared/schema');
     const { salesComps } = await import('@shared/schema');
@@ -476,8 +476,8 @@ export class DashboardService {
         wonDeals: sql<number>`COUNT(CASE WHEN outcome = 'won' THEN 1 END)`,
         totalDeals: count(),
       })
-      .from(deals)
-      .where(eq(deals.orgId, orgId)),
+      .from(crmDeals)
+      .where(eq(crmDeals.orgId, orgId)),
 
       // Due Diligence aggregated stats
       db.select({
