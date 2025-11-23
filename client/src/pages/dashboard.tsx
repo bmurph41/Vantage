@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3 } from "lucide-react";
+import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,6 +11,9 @@ import { Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TimeRangeSelector, type TimeRange } from "@/components/dashboard/TimeRangeSelector";
+import { ComparisonModule } from "@/components/dashboard/ComparisonModule";
+import { MetricCard } from "@/components/dashboard/MetricCard";
+import { formatCurrency, formatNumber } from "@/lib/formatUtils";
 
 type DashboardModule = {
   id: string;
@@ -21,7 +24,15 @@ type DashboardModule = {
   renderContent: (data: any) => React.ReactNode;
 };
 
-function SortableModule({ module }: { module: DashboardModule }) {
+function SortableModule({ 
+  module, 
+  isCollapsed, 
+  onToggleCollapse 
+}: { 
+  module: DashboardModule;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: module.id,
   });
@@ -43,6 +54,15 @@ function SortableModule({ module }: { module: DashboardModule }) {
             {module.title}
           </CardTitle>
           <div className="flex items-center gap-1">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 w-7 p-0" 
+              onClick={onToggleCollapse}
+              data-testid={`collapse-${module.id}`}
+            >
+              {isCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+            </Button>
             <Link href={module.link}>
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" data-testid={`link-${module.id}`}>
                 <ExternalLink className="h-3.5 w-3.5" />
@@ -53,9 +73,11 @@ function SortableModule({ module }: { module: DashboardModule }) {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {module.renderContent(module.data)}
-        </CardContent>
+        {!isCollapsed && (
+          <CardContent>
+            {module.renderContent(module.data)}
+          </CardContent>
+        )}
       </Card>
     </div>
   );
@@ -64,6 +86,29 @@ function SortableModule({ module }: { module: DashboardModule }) {
 export default function Dashboard() {
   const { toast } = useToast();
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
+  
+  // Collapsed modules state with localStorage persistence
+  const [collapsedModules, setCollapsedModules] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('dashboardCollapsedModules');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
+
+  // Save collapsed state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('dashboardCollapsedModules', JSON.stringify(Array.from(collapsedModules)));
+  }, [collapsedModules]);
+
+  const toggleModuleCollapse = (moduleId: string) => {
+    setCollapsedModules(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(moduleId)) {
+        newSet.delete(moduleId);
+      } else {
+        newSet.add(moduleId);
+      }
+      return newSet;
+    });
+  };
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -183,24 +228,37 @@ export default function Dashboard() {
       renderContent: (data) => (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500">Pipeline Value</p>
-              <p className="text-2xl font-bold text-blue-600" data-testid="crm-pipeline-value">
-                ${data?.pipelineValue?.toLocaleString() || '0'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Active Deals</p>
-              <p className="text-2xl font-bold" data-testid="crm-active-deals">{data?.activeDeals || 0}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Win Rate</p>
-              <p className="text-2xl font-bold text-green-600" data-testid="crm-win-rate">{data?.winRate || 0}%</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Won Deals</p>
-              <p className="text-2xl font-bold" data-testid="crm-won-deals">{data?.wonDeals || 0}</p>
-            </div>
+            <MetricCard
+              label="Pipeline Value"
+              value={data?.pipelineValue || 0}
+              type="currency"
+              compact={true}
+              colorClass="text-blue-600"
+              testId="crm-pipeline-value"
+              tooltip="Total value of all active deals in the pipeline"
+            />
+            <MetricCard
+              label="Active Deals"
+              value={data?.activeDeals || 0}
+              type="number"
+              testId="crm-active-deals"
+              tooltip="Number of deals currently in progress"
+            />
+            <MetricCard
+              label="Win Rate"
+              value={data?.winRate || 0}
+              type="percent"
+              colorClass="text-green-600"
+              testId="crm-win-rate"
+              tooltip="Percentage of deals won vs total closed deals"
+            />
+            <MetricCard
+              label="Won Deals"
+              value={data?.wonDeals || 0}
+              type="number"
+              testId="crm-won-deals"
+              tooltip="Total number of successfully closed deals"
+            />
           </div>
         </div>
       ),
@@ -214,22 +272,36 @@ export default function Dashboard() {
       renderContent: (data) => (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500">Active Projects</p>
-              <p className="text-2xl font-bold text-blue-600" data-testid="dd-active-projects">{data?.activeProjects || 0}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Completed</p>
-              <p className="text-2xl font-bold" data-testid="dd-completed-projects">{data?.completedProjects || 0}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Total Projects</p>
-              <p className="text-2xl font-bold" data-testid="dd-total-projects">{data?.totalProjects || 0}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Completion Rate</p>
-              <p className="text-2xl font-bold text-green-600" data-testid="dd-completion-rate">{data?.completionRate || 0}%</p>
-            </div>
+            <MetricCard
+              label="Active Projects"
+              value={data?.activeProjects || 0}
+              type="number"
+              colorClass="text-blue-600"
+              testId="dd-active-projects"
+              tooltip="Currently active due diligence projects"
+            />
+            <MetricCard
+              label="Completed"
+              value={data?.completedProjects || 0}
+              type="number"
+              testId="dd-completed-projects"
+              tooltip="Successfully completed projects"
+            />
+            <MetricCard
+              label="Total Projects"
+              value={data?.totalProjects || 0}
+              type="number"
+              testId="dd-total-projects"
+              tooltip="Total number of projects tracked"
+            />
+            <MetricCard
+              label="Completion Rate"
+              value={data?.completionRate || 0}
+              type="percent"
+              colorClass="text-green-600"
+              testId="dd-completion-rate"
+              tooltip="Percentage of projects successfully completed"
+            />
           </div>
         </div>
       ),
@@ -243,14 +315,21 @@ export default function Dashboard() {
       renderContent: (data) => (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500">Recent Comps</p>
-              <p className="text-2xl font-bold text-blue-600" data-testid="comps-total">{data?.totalComps || 0}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Avg Price/Slip</p>
-              <p className="text-2xl font-bold" data-testid="comps-avg-price">${data?.avgPricePerSlip?.toLocaleString() || '0'}</p>
-            </div>
+            <MetricCard
+              label="Recent Comps"
+              value={data?.totalComps || 0}
+              type="number"
+              colorClass="text-blue-600"
+              testId="comps-total"
+              tooltip="Number of sales comparables in selected period"
+            />
+            <MetricCard
+              label="Avg Price/Slip"
+              value={data?.avgPricePerSlip || 0}
+              type="currency"
+              testId="comps-avg-price"
+              tooltip="Average price per slip across all comparables"
+            />
           </div>
           {data?.recentComps && data.recentComps.length > 0 && (
             <div className="mt-2">
@@ -259,7 +338,7 @@ export default function Dashboard() {
                 {data.recentComps.slice(0, 3).map((comp: any, idx: number) => (
                   <div key={idx} className="text-xs flex justify-between">
                     <span className="truncate">{comp.propertyName || 'Unnamed'}</span>
-                    <span className="font-semibold">${comp.pricePerSlip?.toLocaleString() || 'N/A'}/slip</span>
+                    <span className="font-semibold">{formatCurrency(comp.pricePerSlip || 0)}/slip</span>
                   </div>
                 ))}
               </div>
@@ -277,17 +356,30 @@ export default function Dashboard() {
       renderContent: (data) => (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500">Active Data Rooms</p>
-              <p className="text-2xl font-bold text-blue-600" data-testid="vdr-active-rooms">{data?.activeDataRooms || 0}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Total Documents</p>
-              <p className="text-2xl font-bold" data-testid="vdr-total-docs">{data?.totalDocuments || 0}</p>
-            </div>
+            <MetricCard
+              label="Active Data Rooms"
+              value={data?.activeDataRooms || 0}
+              type="number"
+              colorClass="text-blue-600"
+              testId="vdr-active-rooms"
+              tooltip="Number of active virtual data rooms"
+            />
+            <MetricCard
+              label="Total Documents"
+              value={data?.totalDocuments || 0}
+              type="number"
+              testId="vdr-total-docs"
+              tooltip="Total documents uploaded across all data rooms"
+            />
             <div className="col-span-2">
-              <p className="text-xs text-gray-500">Pending Requests</p>
-              <p className="text-2xl font-bold text-orange-600" data-testid="vdr-pending-requests">{data?.pendingRequests || 0}</p>
+              <MetricCard
+                label="Pending Requests"
+                value={data?.pendingRequests || 0}
+                type="number"
+                colorClass="text-orange-600"
+                testId="vdr-pending-requests"
+                tooltip="Diligence requests awaiting response"
+              />
             </div>
           </div>
         </div>
@@ -331,18 +423,23 @@ export default function Dashboard() {
       renderContent: (data) => (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500">Monthly Revenue</p>
-              <p className="text-2xl font-bold text-green-600" data-testid="fuel-revenue">
-                ${data?.monthlyRevenue?.toLocaleString() || '0'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Monthly Gallons</p>
-              <p className="text-2xl font-bold" data-testid="fuel-gallons">
-                {data?.monthlyGallons?.toLocaleString() || '0'}
-              </p>
-            </div>
+            <MetricCard
+              label="Monthly Revenue"
+              value={data?.monthlyRevenue || 0}
+              type="currency"
+              compact={true}
+              colorClass="text-green-600"
+              testId="fuel-revenue"
+              tooltip="Total fuel sales revenue for the selected period"
+            />
+            <MetricCard
+              label="Monthly Gallons"
+              value={data?.monthlyGallons || 0}
+              type="number"
+              compact={true}
+              testId="fuel-gallons"
+              tooltip="Total fuel gallons sold in the selected period"
+            />
           </div>
         </div>
       ),
@@ -356,30 +453,39 @@ export default function Dashboard() {
       renderContent: (data) => (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500">Monthly Sales</p>
-              <p className="text-2xl font-bold text-green-600" data-testid="ship-store-revenue">
-                ${data?.monthlyRevenue?.toLocaleString() || '0'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Transactions</p>
-              <p className="text-2xl font-bold" data-testid="ship-store-transactions">
-                {data?.monthlyTransactions?.toLocaleString() || '0'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Avg Transaction</p>
-              <p className="text-2xl font-bold" data-testid="ship-store-avg">
-                ${data?.avgTransaction?.toLocaleString() || '0'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Inventory Value</p>
-              <p className="text-2xl font-bold text-blue-600" data-testid="ship-store-inventory">
-                ${data?.inventoryValue?.toLocaleString() || '0'}
-              </p>
-            </div>
+            <MetricCard
+              label="Monthly Sales"
+              value={data?.monthlyRevenue || 0}
+              type="currency"
+              compact={true}
+              colorClass="text-green-600"
+              testId="ship-store-revenue"
+              tooltip="Total ship store sales revenue"
+            />
+            <MetricCard
+              label="Transactions"
+              value={data?.monthlyTransactions || 0}
+              type="number"
+              compact={true}
+              testId="ship-store-transactions"
+              tooltip="Number of completed transactions"
+            />
+            <MetricCard
+              label="Avg Transaction"
+              value={data?.avgTransaction || 0}
+              type="currency"
+              testId="ship-store-avg"
+              tooltip="Average transaction value"
+            />
+            <MetricCard
+              label="Inventory Value"
+              value={data?.inventoryValue || 0}
+              type="currency"
+              compact={true}
+              colorClass="text-blue-600"
+              testId="ship-store-inventory"
+              tooltip="Current total inventory value"
+            />
           </div>
         </div>
       ),
@@ -393,30 +499,38 @@ export default function Dashboard() {
       renderContent: (data) => (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500">Total Units</p>
-              <p className="text-2xl font-bold text-blue-600" data-testid="rent-roll-units">
-                {data?.totalUnits || 0}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Occupancy Rate</p>
-              <p className="text-2xl font-bold text-green-600" data-testid="rent-roll-occupancy">
-                {data?.occupancyRate || 0}%
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Monthly Income</p>
-              <p className="text-2xl font-bold" data-testid="rent-roll-income">
-                ${data?.monthlyIncome?.toLocaleString() || '0'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Vacant Units</p>
-              <p className="text-2xl font-bold text-orange-600" data-testid="rent-roll-vacant">
-                {data?.vacantUnits || 0}
-              </p>
-            </div>
+            <MetricCard
+              label="Total Units"
+              value={data?.totalUnits || 0}
+              type="number"
+              colorClass="text-blue-600"
+              testId="rent-roll-units"
+              tooltip="Total number of rental units"
+            />
+            <MetricCard
+              label="Occupancy Rate"
+              value={data?.occupancyRate || 0}
+              type="percent"
+              colorClass="text-green-600"
+              testId="rent-roll-occupancy"
+              tooltip="Percentage of units currently occupied"
+            />
+            <MetricCard
+              label="Monthly Income"
+              value={data?.monthlyIncome || 0}
+              type="currency"
+              compact={true}
+              testId="rent-roll-income"
+              tooltip="Total monthly rental income"
+            />
+            <MetricCard
+              label="Vacant Units"
+              value={data?.vacantUnits || 0}
+              type="number"
+              colorClass="text-orange-600"
+              testId="rent-roll-vacant"
+              tooltip="Number of currently vacant units"
+            />
           </div>
         </div>
       ),
@@ -430,23 +544,31 @@ export default function Dashboard() {
       renderContent: (data) => (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-500">Active Models</p>
-              <p className="text-2xl font-bold text-blue-600" data-testid="modeling-active">
-                {data?.activeProjects || 0}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Completed</p>
-              <p className="text-2xl font-bold" data-testid="modeling-completed">
-                {data?.completedProjects || 0}
-              </p>
-            </div>
+            <MetricCard
+              label="Active Models"
+              value={data?.activeProjects || 0}
+              type="number"
+              colorClass="text-blue-600"
+              testId="modeling-active"
+              tooltip="Currently active modeling projects"
+            />
+            <MetricCard
+              label="Completed"
+              value={data?.completedProjects || 0}
+              type="number"
+              testId="modeling-completed"
+              tooltip="Successfully completed modeling projects"
+            />
             <div className="col-span-2">
-              <p className="text-xs text-gray-500">Total Valuation</p>
-              <p className="text-2xl font-bold text-green-600" data-testid="modeling-valuation">
-                ${data?.totalValuation?.toLocaleString() || '0'}
-              </p>
+              <MetricCard
+                label="Total Valuation"
+                value={data?.totalValuation || 0}
+                type="currency"
+                compact={true}
+                colorClass="text-green-600"
+                testId="modeling-valuation"
+                tooltip="Aggregate valuation across all projects"
+              />
             </div>
           </div>
         </div>
@@ -471,6 +593,10 @@ export default function Dashboard() {
           <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
         </div>
 
+        <div className="mb-6">
+          <ComparisonModule />
+        </div>
+
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -482,6 +608,8 @@ export default function Dashboard() {
                 <SortableModule 
                   key={module.id} 
                   module={module} 
+                  isCollapsed={collapsedModules.has(module.id)}
+                  onToggleCollapse={() => toggleModuleCollapse(module.id)}
                 />
               ))}
             </div>
