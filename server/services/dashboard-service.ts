@@ -631,7 +631,7 @@ export class DashboardService {
       db.select({ 
         pending: sql<number>`COUNT(CASE WHEN ${vdrDataRequestItems.status} IN ('outstanding', 'in_progress') THEN 1 END)` 
       }).from(vdrDataRequestItems)
-        .innerJoin(projects, eq(vdrDataRequestItems.vdrProjectId, projects.id))
+        .innerJoin(projects, eq(vdrDataRequestItems.projectId, projects.id))
         .where(eq(projects.orgId, orgId)),
     ]);
 

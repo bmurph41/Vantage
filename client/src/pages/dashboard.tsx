@@ -106,6 +106,12 @@ export default function Dashboard() {
   const [isCRMDetailOpen, setIsCRMDetailOpen] = useState(false);
   const [isSalesCompsDetailOpen, setIsSalesCompsDetailOpen] = useState(false);
   const [isFuelDetailOpen, setIsFuelDetailOpen] = useState(false);
+  const [isDockTalkDetailOpen, setIsDockTalkDetailOpen] = useState(false);
+  const [isVDRDetailOpen, setIsVDRDetailOpen] = useState(false);
+  const [isShipStoreDetailOpen, setIsShipStoreDetailOpen] = useState(false);
+  const [isDDDetailOpen, setIsDDDetailOpen] = useState(false);
+  const [isRentRollDetailOpen, setIsRentRollDetailOpen] = useState(false);
+  const [isModelingDetailOpen, setIsModelingDetailOpen] = useState(false);
   
   // Collapsed modules state with localStorage persistence
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(() => {
@@ -156,6 +162,48 @@ export default function Dashboard() {
     queryKey: ['/api/fuel/transactions/recent', timeRange],
     queryFn: () => fetch('/api/fuel/transactions/recent').then(res => res.json()),
     enabled: isFuelDetailOpen,
+  });
+
+  // Fetch recent DockTalk articles for detail panel
+  const { data: recentArticles, isLoading: articlesLoading } = useQuery({
+    queryKey: ['/api/docktalk/articles/recent', timeRange],
+    queryFn: () => fetch('/api/docktalk/articles/recent').then(res => res.json()),
+    enabled: isDockTalkDetailOpen,
+  });
+
+  // Fetch recent VDR documents for detail panel
+  const { data: recentDocuments, isLoading: documentsLoading } = useQuery({
+    queryKey: ['/api/vdr/documents/recent', timeRange],
+    queryFn: () => fetch('/api/vdr/documents/recent').then(res => res.json()),
+    enabled: isVDRDetailOpen,
+  });
+
+  // Fetch recent ship store transactions for detail panel
+  const { data: recentShipStoreTxns, isLoading: shipStoreLoading } = useQuery({
+    queryKey: ['/api/ship-store/transactions/recent', timeRange],
+    queryFn: () => fetch('/api/ship-store/transactions/recent').then(res => res.json()),
+    enabled: isShipStoreDetailOpen,
+  });
+
+  // Fetch recent DD tasks for detail panel
+  const { data: recentDDTasks, isLoading: ddTasksLoading } = useQuery({
+    queryKey: ['/api/projects/tasks/recent', timeRange],
+    queryFn: () => fetch('/api/projects/tasks/recent').then(res => res.json()),
+    enabled: isDDDetailOpen,
+  });
+
+  // Fetch recent rent roll entries for detail panel
+  const { data: recentRentRoll, isLoading: rentRollLoading } = useQuery({
+    queryKey: ['/api/rent-roll/entries/recent', timeRange],
+    queryFn: () => fetch('/api/rent-roll/entries/recent').then(res => res.json()),
+    enabled: isRentRollDetailOpen,
+  });
+
+  // Fetch recent modeling projects for detail panel
+  const { data: recentModelingProjects, isLoading: modelingLoading } = useQuery({
+    queryKey: ['/api/modeling/projects/recent', timeRange],
+    queryFn: () => fetch('/api/modeling/projects/recent').then(res => res.json()),
+    enabled: isModelingDetailOpen,
   });
 
   // Save module preferences mutation
@@ -371,6 +419,8 @@ export default function Dashboard() {
               colorClass="text-blue-600"
               testId="dd-active-projects"
               tooltip="Currently active due diligence projects"
+              onClick={() => setIsDDDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Completed"
@@ -378,6 +428,8 @@ export default function Dashboard() {
               type="number"
               testId="dd-completed-projects"
               tooltip="Successfully completed projects"
+              onClick={() => setIsDDDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Total Projects"
@@ -385,6 +437,8 @@ export default function Dashboard() {
               type="number"
               testId="dd-total-projects"
               tooltip="Total number of projects tracked"
+              onClick={() => setIsDDDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Completion Rate"
@@ -393,6 +447,8 @@ export default function Dashboard() {
               colorClass="text-green-600"
               testId="dd-completion-rate"
               tooltip="Percentage of projects successfully completed"
+              onClick={() => setIsDDDetailOpen(true)}
+              clickable
             />
           </div>
         </div>
@@ -459,6 +515,8 @@ export default function Dashboard() {
               colorClass="text-blue-600"
               testId="vdr-active-rooms"
               tooltip="Number of active virtual data rooms"
+              onClick={() => setIsVDRDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Total Documents"
@@ -466,6 +524,8 @@ export default function Dashboard() {
               type="number"
               testId="vdr-total-docs"
               tooltip="Total documents uploaded across all data rooms"
+              onClick={() => setIsVDRDetailOpen(true)}
+              clickable
             />
             <div className="col-span-2">
               <MetricCard
@@ -475,6 +535,8 @@ export default function Dashboard() {
                 colorClass="text-orange-600"
                 testId="vdr-pending-requests"
                 tooltip="Diligence requests awaiting response"
+                onClick={() => setIsVDRDetailOpen(true)}
+                clickable
               />
             </div>
           </div>
@@ -489,7 +551,10 @@ export default function Dashboard() {
       data: dashboardData?.docktalk,
       renderContent: (data) => (
         <div className="space-y-3">
-          <div>
+          <div 
+            className="cursor-pointer hover:bg-gray-50 -m-2 p-2 rounded transition-colors"
+            onClick={() => setIsDockTalkDetailOpen(true)}
+          >
             <p className="text-xs text-gray-500 mb-2">Recent M&A Activity</p>
             <p className="text-2xl font-bold text-blue-600" data-testid="docktalk-deals-count">
               {data?.totalDeals || 0} <span className="text-sm text-gray-600">deals tracked</span>
@@ -562,6 +627,8 @@ export default function Dashboard() {
               colorClass="text-green-600"
               testId="ship-store-revenue"
               tooltip="Total ship store sales revenue"
+              onClick={() => setIsShipStoreDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Transactions"
@@ -570,6 +637,8 @@ export default function Dashboard() {
               compact={true}
               testId="ship-store-transactions"
               tooltip="Number of completed transactions"
+              onClick={() => setIsShipStoreDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Avg Transaction"
@@ -577,6 +646,8 @@ export default function Dashboard() {
               type="currency"
               testId="ship-store-avg"
               tooltip="Average transaction value"
+              onClick={() => setIsShipStoreDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Inventory Value"
@@ -586,6 +657,8 @@ export default function Dashboard() {
               colorClass="text-blue-600"
               testId="ship-store-inventory"
               tooltip="Current total inventory value"
+              onClick={() => setIsShipStoreDetailOpen(true)}
+              clickable
             />
           </div>
           <RevenueCharts module="shipStore" timeRange={timeRange} />
@@ -608,6 +681,8 @@ export default function Dashboard() {
               colorClass="text-blue-600"
               testId="rent-roll-units"
               tooltip="Total number of rental units"
+              onClick={() => setIsRentRollDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Occupancy Rate"
@@ -616,6 +691,8 @@ export default function Dashboard() {
               colorClass="text-green-600"
               testId="rent-roll-occupancy"
               tooltip="Percentage of units currently occupied"
+              onClick={() => setIsRentRollDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Monthly Income"
@@ -624,6 +701,8 @@ export default function Dashboard() {
               compact={true}
               testId="rent-roll-income"
               tooltip="Total monthly rental income"
+              onClick={() => setIsRentRollDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Vacant Units"
@@ -632,6 +711,8 @@ export default function Dashboard() {
               colorClass="text-orange-600"
               testId="rent-roll-vacant"
               tooltip="Number of currently vacant units"
+              onClick={() => setIsRentRollDetailOpen(true)}
+              clickable
             />
           </div>
         </div>
@@ -653,6 +734,8 @@ export default function Dashboard() {
               colorClass="text-blue-600"
               testId="modeling-active"
               tooltip="Currently active modeling projects"
+              onClick={() => setIsModelingDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Completed"
@@ -660,6 +743,8 @@ export default function Dashboard() {
               type="number"
               testId="modeling-completed"
               tooltip="Successfully completed modeling projects"
+              onClick={() => setIsModelingDetailOpen(true)}
+              clickable
             />
             <div className="col-span-2">
               <MetricCard
@@ -670,6 +755,8 @@ export default function Dashboard() {
                 colorClass="text-green-600"
                 testId="modeling-valuation"
                 tooltip="Aggregate valuation across all projects"
+                onClick={() => setIsModelingDetailOpen(true)}
+                clickable
               />
             </div>
           </div>
@@ -945,6 +1032,387 @@ export default function Dashboard() {
             onRowClick={(txn: any) => { setIsFuelDetailOpen(false); navigate(`/fuel/transactions/${txn.id}`); }}
             getRowLink={(txn: any) => `/fuel/transactions/${txn.id}`}
             emptyMessage="No recent fuel transactions found"
+          />
+        )}
+      </DetailPanel>
+
+      <DetailPanel
+        open={isDockTalkDetailOpen}
+        onOpenChange={setIsDockTalkDetailOpen}
+        title="DockTalk Articles"
+        description="Recent marina industry news and insights"
+        icon={Radio}
+        sourceLink="/docktalk"
+        sourceLinkText="Go to DockTalk"
+      >
+        {articlesLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <DataTable
+            data={recentArticles || []}
+            columns={[
+              {
+                key: 'publishedDate',
+                header: 'Date',
+                render: (article: any) => (
+                  <div className="font-medium">{new Date(article.publishedDate).toLocaleDateString()}</div>
+                ),
+              },
+              {
+                key: 'title',
+                header: 'Title',
+                render: (article: any) => (
+                  <div className="text-gray-900 font-medium max-w-md truncate">{article.title}</div>
+                ),
+              },
+              {
+                key: 'category',
+                header: 'Category',
+                render: (article: any) => (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    {article.category}
+                  </span>
+                ),
+              },
+            ]}
+            onRowClick={(article: any) => { setIsDockTalkDetailOpen(false); navigate(`/docktalk`); }}
+            getRowLink={() => `/docktalk`}
+            emptyMessage="No recent articles found"
+          />
+        )}
+      </DetailPanel>
+
+      <DetailPanel
+        open={isVDRDetailOpen}
+        onOpenChange={setIsVDRDetailOpen}
+        title="VDR Documents"
+        description="Recently uploaded documents"
+        icon={FileText}
+        sourceLink="/vdr"
+        sourceLinkText="Go to VDR"
+        actions={
+          <Link href="/vdr">
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Upload Document
+            </Button>
+          </Link>
+        }
+      >
+        {documentsLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <DataTable
+            data={recentDocuments || []}
+            columns={[
+              {
+                key: 'createdAt',
+                header: 'Date',
+                render: (doc: any) => (
+                  <div className="font-medium">{new Date(doc.createdAt).toLocaleDateString()}</div>
+                ),
+              },
+              {
+                key: 'fileName',
+                header: 'File Name',
+                render: (doc: any) => (
+                  <div className="text-gray-900 font-medium max-w-md truncate">{doc.fileName}</div>
+                ),
+              },
+              {
+                key: 'projectName',
+                header: 'Project',
+                render: (doc: any) => (
+                  <div className="text-gray-600">{doc.projectName}</div>
+                ),
+              },
+              {
+                key: 'fileSize',
+                header: 'Size',
+                render: (doc: any) => (
+                  <div className="text-gray-600">{(doc.fileSize / 1024 / 1024).toFixed(2)} MB</div>
+                ),
+              },
+            ]}
+            onRowClick={(doc: any) => { setIsVDRDetailOpen(false); navigate(`/vdr`); }}
+            getRowLink={() => `/vdr`}
+            emptyMessage="No recent documents found"
+          />
+        )}
+      </DetailPanel>
+
+      <DetailPanel
+        open={isShipStoreDetailOpen}
+        onOpenChange={setIsShipStoreDetailOpen}
+        title="Ship Store Transactions"
+        description="Recent sales activity"
+        icon={ShoppingCart}
+        sourceLink="/ship-store/transactions"
+        sourceLinkText="Go to Ship Store"
+        actions={
+          <Link href="/ship-store/pos">
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              New Sale
+            </Button>
+          </Link>
+        }
+      >
+        {shipStoreLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <DataTable
+            data={recentShipStoreTxns || []}
+            columns={[
+              {
+                key: 'createdAt',
+                header: 'Date',
+                render: (txn: any) => (
+                  <div className="font-medium">{new Date(txn.createdAt).toLocaleDateString()}</div>
+                ),
+              },
+              {
+                key: 'total',
+                header: 'Total',
+                render: (txn: any) => (
+                  <div className="text-gray-900 font-semibold">
+                    {formatCurrency(Number(txn.total || 0))}
+                  </div>
+                ),
+              },
+              {
+                key: 'paymentMethod',
+                header: 'Payment',
+                render: (txn: any) => (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                    {txn.paymentMethod}
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (txn: any) => (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                    txn.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {txn.status}
+                  </span>
+                ),
+              },
+            ]}
+            onRowClick={(txn: any) => { setIsShipStoreDetailOpen(false); navigate(`/ship-store/transactions/${txn.id}`); }}
+            getRowLink={(txn: any) => `/ship-store/transactions/${txn.id}`}
+            emptyMessage="No recent transactions found"
+          />
+        )}
+      </DetailPanel>
+
+      <DetailPanel
+        open={isDDDetailOpen}
+        onOpenChange={setIsDDDetailOpen}
+        title="Due Diligence Tasks"
+        description="Recently created tasks"
+        icon={Database}
+        sourceLink="/projects"
+        sourceLinkText="Go to Due Diligence"
+        actions={
+          <Link href="/projects">
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Task
+            </Button>
+          </Link>
+        }
+      >
+        {ddTasksLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <DataTable
+            data={recentDDTasks || []}
+            columns={[
+              {
+                key: 'title',
+                header: 'Task',
+                render: (task: any) => (
+                  <div className="text-gray-900 font-medium max-w-md truncate">{task.title}</div>
+                ),
+              },
+              {
+                key: 'projectName',
+                header: 'Project',
+                render: (task: any) => (
+                  <div className="text-gray-600">{task.projectName}</div>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (task: any) => (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                    task.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                    task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : 
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {task.status?.replace('_', ' ')}
+                  </span>
+                ),
+              },
+              {
+                key: 'dueDate',
+                header: 'Due Date',
+                render: (task: any) => (
+                  <div className="text-gray-600">
+                    {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No date'}
+                  </div>
+                ),
+              },
+            ]}
+            onRowClick={(task: any) => { setIsDDDetailOpen(false); navigate(`/projects/${task.projectId}`); }}
+            getRowLink={(task: any) => `/projects/${task.projectId}`}
+            emptyMessage="No recent tasks found"
+          />
+        )}
+      </DetailPanel>
+
+      <DetailPanel
+        open={isRentRollDetailOpen}
+        onOpenChange={setIsRentRollDetailOpen}
+        title="Rent Roll Units"
+        description="Recently added units"
+        icon={Home}
+        sourceLink="/rent-roll"
+        sourceLinkText="Go to Rent Roll"
+        actions={
+          <Link href="/rent-roll">
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Unit
+            </Button>
+          </Link>
+        }
+      >
+        {rentRollLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <DataTable
+            data={recentRentRoll || []}
+            columns={[
+              {
+                key: 'unitNumber',
+                header: 'Unit',
+                render: (entry: any) => (
+                  <div className="font-medium">{entry.unitNumber}</div>
+                ),
+              },
+              {
+                key: 'tenantName',
+                header: 'Tenant',
+                render: (entry: any) => (
+                  <div className="text-gray-900">{entry.tenantName || 'Vacant'}</div>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (entry: any) => (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                    entry.status === 'occupied' ? 'bg-green-100 text-green-800' : 
+                    entry.status === 'vacant' ? 'bg-yellow-100 text-yellow-800' : 
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {entry.status}
+                  </span>
+                ),
+              },
+              {
+                key: 'monthlyRate',
+                header: 'Monthly Rate',
+                render: (entry: any) => (
+                  <div className="text-gray-900 font-semibold">
+                    {formatCurrency(Number(entry.monthlyRate || 0))}
+                  </div>
+                ),
+              },
+            ]}
+            onRowClick={(entry: any) => { setIsRentRollDetailOpen(false); navigate(`/rent-roll`); }}
+            getRowLink={() => `/rent-roll`}
+            emptyMessage="No recent units found"
+          />
+        )}
+      </DetailPanel>
+
+      <DetailPanel
+        open={isModelingDetailOpen}
+        onOpenChange={setIsModelingDetailOpen}
+        title="Modeling Projects"
+        description="Recent valuation projects"
+        icon={BarChart3}
+        sourceLink="/modeling"
+        sourceLinkText="Go to Modeling"
+        actions={
+          <Link href="/modeling/new">
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              New Project
+            </Button>
+          </Link>
+        }
+      >
+        {modelingLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <DataTable
+            data={recentModelingProjects || []}
+            columns={[
+              {
+                key: 'propertyName',
+                header: 'Property',
+                render: (project: any) => (
+                  <div className="text-gray-900 font-medium">{project.propertyName}</div>
+                ),
+              },
+              {
+                key: 'clientName',
+                header: 'Client',
+                render: (project: any) => (
+                  <div className="text-gray-600">{project.clientName}</div>
+                ),
+              },
+              {
+                key: 'projectType',
+                header: 'Type',
+                render: (project: any) => (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    {project.projectType}
+                  </span>
+                ),
+              },
+              {
+                key: 'estimatedValue',
+                header: 'Est. Value',
+                render: (project: any) => (
+                  <div className="text-gray-900 font-semibold">
+                    {project.estimatedValue ? formatCurrency(Number(project.estimatedValue)) : 'TBD'}
+                  </div>
+                ),
+              },
+            ]}
+            onRowClick={(project: any) => { setIsModelingDetailOpen(false); navigate(`/modeling/${project.id}`); }}
+            getRowLink={(project: any) => `/modeling/${project.id}`}
+            emptyMessage="No recent projects found"
           />
         )}
       </DetailPanel>
