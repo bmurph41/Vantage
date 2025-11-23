@@ -10,7 +10,7 @@ interface RevenueChartsProps {
 }
 
 export function RevenueCharts({ module, timeRange }: RevenueChartsProps) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['/api/dashboards/trends/revenue', module, timeRange],
     queryFn: () => fetch(`/api/dashboards/trends/revenue?module=${module}&timeRange=${timeRange}`).then(res => res.json()),
   });
@@ -19,7 +19,7 @@ export function RevenueCharts({ module, timeRange }: RevenueChartsProps) {
     return <Skeleton className="h-40 w-full mt-4" />;
   }
 
-  if (!data || data.length === 0) {
+  if (isError || !data || !Array.isArray(data) || data.length === 0) {
     return null;
   }
 

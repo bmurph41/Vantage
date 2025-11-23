@@ -68,25 +68,16 @@ const allModules: ModuleDefinition[] = [
     category: 'dd',
   },
   {
-    id: 'vdr',
+    id: 'vdr-activity',
     title: 'Virtual Data Room',
     description: 'Manage secure document sharing and data requests',
     icon: FileText,
     category: 'dd',
   },
   
-  // CRM Modules
-  {
-    id: 'marketing',
-    title: 'Marketing Campaigns',
-    description: 'Track campaign performance and lead generation',
-    icon: TrendingUp,
-    category: 'crm',
-  },
-  
   // Intelligence Modules
   {
-    id: 'docktalk',
+    id: 'docktalk-feed',
     title: 'DockTalk Intelligence',
     description: 'Monitor marina industry news and M&A activity',
     icon: Newspaper,

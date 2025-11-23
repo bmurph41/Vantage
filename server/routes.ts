@@ -10804,6 +10804,27 @@ Current context: Project ${req.params.projectId}`;
         return res.status(400).json({ error: 'selectedModules must be an array' });
       }
 
+      // Validate module IDs
+      const validModuleIds = [
+        'crm-pipeline',
+        'modeling-projects',
+        'sales-comps',
+        'rent-roll',
+        'due-diligence',
+        'vdr-activity',
+        'docktalk-feed',
+        'fuel-operations',
+        'ship-store',
+      ];
+
+      const invalidModules = selectedModules.filter(id => !validModuleIds.includes(id));
+      if (invalidModules.length > 0) {
+        return res.status(400).json({ 
+          error: 'Invalid module IDs',
+          invalidModules 
+        });
+      }
+
       await db.update(users)
         .set({ 
           dashboardConfig: sql`jsonb_set(COALESCE(dashboard_config, '{}'::jsonb), '{selectedModules}', ${JSON.stringify(selectedModules)}::jsonb)`
