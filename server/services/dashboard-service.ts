@@ -617,7 +617,7 @@ export class DashboardService {
     const [docsResult, requestsResult] = await Promise.all([
       db.select({ count: count() }).from(vdrDocuments).where(and(...docConditions)),
       db.select({ 
-        pending: sql<number>`COUNT(CASE WHEN ${vdrDataRequestItems.status} IN ('outstanding', 'in_progress') THEN 1 END)` 
+        pending: sql<number>`COUNT(CASE WHEN status IN ('outstanding', 'in_progress') THEN 1 END)` 
       }).from(vdrDataRequestItems)
         .innerJoin(projects, eq(vdrDataRequestItems.vdrProjectId, projects.id))
         .where(eq(projects.orgId, orgId)),

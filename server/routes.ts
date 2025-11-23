@@ -10772,6 +10772,51 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get user dashboard module preferences
+  app.get('/api/dashboards/modules', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { users } = await import('@shared/schema');
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      
+      if (!user || user.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const config = user[0].dashboardConfig as any || {};
+      const selectedModules = config.selectedModules || [];
+      
+      res.json({ selectedModules });
+    } catch (error) {
+      console.error('Failed to fetch dashboard modules:', error);
+      res.status(500).json({ error: 'Failed to fetch dashboard modules' });
+    }
+  });
+
+  // Save user dashboard module preferences
+  app.put('/api/dashboards/modules', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { selectedModules } = req.body;
+      const { users } = await import('@shared/schema');
+
+      if (!Array.isArray(selectedModules)) {
+        return res.status(400).json({ error: 'selectedModules must be an array' });
+      }
+
+      await db.update(users)
+        .set({ 
+          dashboardConfig: sql`jsonb_set(COALESCE(dashboard_config, '{}'::jsonb), '{selectedModules}', ${JSON.stringify(selectedModules)}::jsonb)`
+        })
+        .where(eq(users.id, userId));
+
+      res.json({ success: true, selectedModules });
+    } catch (error) {
+      console.error('Failed to save dashboard modules:', error);
+      res.status(500).json({ error: 'Failed to save dashboard modules' });
+    }
+  });
+
   // ========================================================================
   // OWNED ASSETS & PORTFOLIO
   // ========================================================================

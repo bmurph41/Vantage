@@ -1,4 +1,4 @@
-import { useQuery } from "@tantml:query";
+import { useQuery } from "@tanstack/react-query";
 import { TrendChart } from "./charts/TrendChart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type TimeRange } from "./TimeRangeSelector";

@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, ChevronDown, ChevronUp } from "lucide-react";
+import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +16,7 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { formatCurrency, formatNumber } from "@/lib/formatUtils";
 import { CRMCharts } from "@/components/dashboard/CRMCharts";
 import { RevenueCharts } from "@/components/dashboard/RevenueCharts";
+import { AddModuleModal } from "@/components/dashboard/AddModuleModal";
 
 type DashboardModule = {
   id: string;
@@ -88,6 +89,7 @@ function SortableModule({
 export default function Dashboard() {
   const { toast } = useToast();
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
+  const [isAddModuleModalOpen, setIsAddModuleModalOpen] = useState(false);
   
   // Collapsed modules state with localStorage persistence
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(() => {
@@ -110,6 +112,44 @@ export default function Dashboard() {
       }
       return newSet;
     });
+  };
+
+  // Fetch user module preferences
+  const { data: modulePreferences } = useQuery({
+    queryKey: ['/api/dashboards/modules'],
+  });
+
+  const selectedModules = modulePreferences?.selectedModules || [];
+
+  // Save module preferences mutation
+  const saveModulesMutation = useMutation({
+    mutationFn: async (modules: string[]) => {
+      return await apiRequest('/api/dashboards/modules', {
+        method: 'PUT',
+        body: JSON.stringify({ selectedModules: modules }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboards/modules'] });
+      toast({
+        title: 'Dashboard updated',
+        description: 'Your module preferences have been saved',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to save module preferences',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleToggleModule = (moduleId: string) => {
+    const newSelection = selectedModules.includes(moduleId)
+      ? selectedModules.filter((id: string) => id !== moduleId)
+      : [...selectedModules, moduleId];
+    saveModulesMutation.mutate(newSelection);
   };
   
   const sensors = useSensors(
@@ -581,8 +621,13 @@ export default function Dashboard() {
     },
   ];
 
+  // Filter modules based on user preferences
+  const visibleModules = selectedModules.length > 0 
+    ? modules.filter(m => selectedModules.includes(m.id))
+    : modules;
+
   const orderedModules = moduleOrder
-    .map(id => modules.find(m => m.id === id))
+    .map(id => visibleModules.find(m => m.id === id))
     .filter(Boolean) as DashboardModule[];
 
   return (
@@ -595,7 +640,18 @@ export default function Dashboard() {
               Your comprehensive marina acquisition intelligence platform
             </p>
           </div>
-          <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddModuleModalOpen(true)}
+              data-testid="button-add-module"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Module
+            </Button>
+            <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+          </div>
         </div>
 
         <div className="mb-6">
@@ -627,6 +683,13 @@ export default function Dashboard() {
           </p>
         </div>
       </div>
+
+      <AddModuleModal
+        open={isAddModuleModalOpen}
+        onOpenChange={setIsAddModuleModalOpen}
+        selectedModules={selectedModules}
+        onToggleModule={handleToggleModule}
+      />
     </div>
   );
 }
