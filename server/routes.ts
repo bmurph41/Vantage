@@ -11156,6 +11156,21 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get filtered data for custom module
+  app.post('/api/dashboards/custom-modules/data', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { moduleType, filters, limit } = req.body;
+      const { getFilteredModuleData } = await import('./services/custom-module-service');
+      
+      const data = await getFilteredModuleData({ moduleType, filters, limit }, orgId);
+      res.json(data);
+    } catch (error) {
+      console.error('Failed to fetch custom module data:', error);
+      res.status(500).json({ error: 'Failed to fetch custom module data' });
+    }
+  });
+
   // Get user dashboard module preferences
   app.get('/api/dashboards/modules', authenticateUser, async (req: any, res) => {
     try {

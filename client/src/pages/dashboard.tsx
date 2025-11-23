@@ -98,6 +98,75 @@ function SortableModule({
   );
 }
 
+// Helper function to get module link based on type
+function getModuleLink(moduleType: string): string {
+  const linkMap: Record<string, string> = {
+    crm: '/crm/deals',
+    salesComps: '/analysis/sales-comps/analytics',
+    dueDiligence: '/projects',
+    rentRoll: '/rent-roll',
+    vdr: '/vdr',
+    fuel: '/fuel',
+    shipStore: '/ship-store',
+    modeling: '/modeling',
+    docktalk: '/docktalk',
+  };
+  return linkMap[moduleType] || '/';
+}
+
+// Component to fetch and display custom module data
+function CustomModuleContent({ moduleId, moduleType, filters }: { 
+  moduleId: string; 
+  moduleType: string; 
+  filters: Record<string, any>;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['/api/dashboards/custom-modules/data', moduleId, filters],
+    queryFn: () => 
+      fetch('/api/dashboards/custom-modules/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moduleType, filters, limit: 100 }),
+      }).then(res => res.json()),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        <p className="text-sm">No data matches your filters</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-gray-600">
+        {data.length} record{data.length !== 1 ? 's' : ''} found
+      </p>
+      <div className="space-y-1 max-h-48 overflow-y-auto">
+        {data.slice(0, 10).map((item: any, idx: number) => (
+          <div key={idx} className="text-xs p-2 bg-gray-50 rounded">
+            {item.title || item.propertyName || item.fileName || item.unitNumber || `Record ${idx + 1}`}
+          </div>
+        ))}
+      </div>
+      {data.length > 10 && (
+        <p className="text-xs text-gray-500 text-center">
+          And {data.length - 10} more...
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -204,6 +273,79 @@ export default function Dashboard() {
     queryKey: ['/api/modeling/projects/recent', timeRange],
     queryFn: () => fetch('/api/modeling/projects/recent').then(res => res.json()),
     enabled: isModelingDetailOpen,
+  });
+
+  // Fetch custom modules
+  const { data: customModules = [] } = useQuery({
+    queryKey: ['/api/dashboards/custom-modules'],
+    queryFn: () => fetch('/api/dashboards/custom-modules').then(res => res.json()),
+  });
+
+  // Create custom module mutation
+  const createCustomModuleMutation = useMutation({
+    mutationFn: async (data: { title: string; moduleType: string; filters: Record<string, any> }) => {
+      return await apiRequest('/api/dashboards/custom-modules', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: async (newModule) => {
+      // Automatically add new custom module to selected modules and layout order
+      const customModuleId = `custom-${newModule.id}`;
+      const updatedSelection = [...selectedModules, customModuleId];
+      const updatedOrder = [...moduleOrder, customModuleId];
+      
+      // Update both caches optimistically
+      queryClient.setQueryData(['/api/dashboards/modules'], { selectedModules: updatedSelection });
+      
+      // Update local state immediately for instant rendering
+      setModuleOrder(updatedOrder);
+      
+      // Save both selection and layout order to backend
+      await Promise.all([
+        saveModulesMutation.mutateAsync(updatedSelection),
+        saveLayoutMutation.mutateAsync(updatedOrder),
+      ]);
+      
+      // Only invalidate custom modules query to get the fresh module data
+      // Don't invalidate layout or modules as we just saved them
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboards/custom-modules'] });
+      
+      toast({
+        title: 'Custom module created',
+        description: 'Your custom module has been added to the dashboard',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to create custom module',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Delete custom module mutation
+  const deleteCustomModuleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/dashboards/custom-modules/${id}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboards/custom-modules'] });
+      toast({
+        title: 'Custom module deleted',
+        description: 'The custom module has been removed',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete custom module',
+        variant: 'destructive',
+      });
+    },
   });
 
   // Save module preferences mutation
@@ -765,12 +907,37 @@ export default function Dashboard() {
     },
   ];
 
-  // Filter modules based on user preferences
-  const visibleModules = selectedModules.length > 0 
-    ? modules.filter(m => selectedModules.includes(m.id))
-    : modules;
+  // Add custom modules dynamically - include all active custom modules
+  const customModuleDefinitions: DashboardModule[] = customModules
+    .filter(cm => cm.isActive !== false) // Include all active custom modules
+    .map(cm => ({
+      id: `custom-${cm.id}`,
+      title: cm.title,
+      icon: FileText, // Default icon for custom modules
+      link: getModuleLink(cm.moduleType),
+      data: null, // Will be fetched per module
+      renderContent: () => (
+        <CustomModuleContent 
+          moduleId={cm.id}
+          moduleType={cm.moduleType}
+          filters={cm.filters}
+        />
+      ),
+    }));
 
-  const orderedModules = moduleOrder
+  // Merge predefined and custom modules
+  const allModules = [...modules, ...customModuleDefinitions];
+
+  // Filter modules based on user preferences (custom modules are always visible when active)
+  const customModuleIds = customModuleDefinitions.map(cm => cm.id);
+  const visibleModules = selectedModules.length > 0 
+    ? allModules.filter(m => selectedModules.includes(m.id) || customModuleIds.includes(m.id))
+    : allModules;
+
+  // Ensure custom modules are included in ordering
+  const extendedModuleOrder = [...moduleOrder, ...customModuleIds.filter(id => !moduleOrder.includes(id))];
+
+  const orderedModules = extendedModuleOrder
     .map(id => visibleModules.find(m => m.id === id))
     .filter(Boolean) as DashboardModule[];
 
@@ -808,7 +975,7 @@ export default function Dashboard() {
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
-          <SortableContext items={moduleOrder} strategy={rectSortingStrategy}>
+          <SortableContext items={extendedModuleOrder} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {orderedModules.map((module) => (
                 <SortableModule 
@@ -834,6 +1001,9 @@ export default function Dashboard() {
         onOpenChange={setIsAddModuleModalOpen}
         selectedModules={selectedModules}
         onToggleModule={handleToggleModule}
+        customModules={customModules}
+        onCreateCustomModule={(data) => createCustomModuleMutation.mutate(data)}
+        onDeleteCustomModule={(id) => deleteCustomModuleMutation.mutate(id)}
       />
 
       <DetailPanel
