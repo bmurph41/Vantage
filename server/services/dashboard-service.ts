@@ -891,7 +891,7 @@ export class DashboardService {
         .select({
           date: sql<string>`DATE(${fuelSales.transactionDate})`,
           revenue: sql<number>`SUM(${fuelSales.totalAmount})`,
-          gallons: sql<number>`SUM(${fuelSales.gallons})`,
+          gallons: sql<number>`SUM(${fuelSales.quantityGallons})`,
         })
         .from(fuelSales)
         .where(and(
