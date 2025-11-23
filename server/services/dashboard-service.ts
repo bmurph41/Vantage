@@ -499,18 +499,20 @@ export class DashboardService {
   }
 
   private async getCRMData(orgId: string) {
-    const { deals } = await import('@shared/schema');
+    const { crmDeals, users } = await import('@shared/schema');
     const { sql, count, sum } = await import('drizzle-orm');
     
+    // Join with users to filter by organization
     const result = await db
       .select({
         totalDeals: count(),
-        pipelineValue: sum(deals.value),
-        wonDeals: sql<number>`COUNT(CASE WHEN ${deals.stage} = 'closed_won' THEN 1 END)`,
-        activeDeals: sql<number>`COUNT(CASE WHEN ${deals.stage} NOT IN ('closed_won', 'closed_lost') THEN 1 END)`,
+        pipelineValue: sum(crmDeals.value),
+        wonDeals: sql<number>`COUNT(CASE WHEN ${crmDeals.stage} = 'closed_won' THEN 1 END)`,
+        activeDeals: sql<number>`COUNT(CASE WHEN ${crmDeals.stage} NOT IN ('closed_won', 'closed_lost') THEN 1 END)`,
       })
-      .from(deals)
-      .where(eq(deals.orgId, orgId));
+      .from(crmDeals)
+      .innerJoin(users, eq(crmDeals.ownerId, users.id))
+      .where(eq(users.orgId, orgId));
 
     const data = result[0];
     const wonDeals = Number(data.wonDeals) || 0;
@@ -525,17 +527,17 @@ export class DashboardService {
   }
 
   private async getDDData(orgId: string) {
-    const { dueDiligenceProjects } = await import('@shared/schema');
+    const { projects } = await import('@shared/schema');
     const { sql, count } = await import('drizzle-orm');
     
     const result = await db
       .select({
         totalProjects: count(),
-        completedProjects: sql<number>`COUNT(CASE WHEN ${dueDiligenceProjects.status} = 'completed' THEN 1 END)`,
-        activeProjects: sql<number>`COUNT(CASE WHEN ${dueDiligenceProjects.status} = 'active' THEN 1 END)`,
+        completedProjects: sql<number>`COUNT(CASE WHEN ${projects.status} = 'completed' THEN 1 END)`,
+        activeProjects: sql<number>`COUNT(CASE WHEN ${projects.status} = 'active' THEN 1 END)`,
       })
-      .from(dueDiligenceProjects)
-      .where(eq(dueDiligenceProjects.orgId, orgId));
+      .from(projects)
+      .where(eq(projects.orgId, orgId));
 
     const data = result[0];
     const totalProjects = Number(data.totalProjects) || 0;
@@ -550,18 +552,22 @@ export class DashboardService {
   }
 
   private async getVDRData(orgId: string) {
-    const { vdrProjects, vdrDocuments, vdrDataRequestItems } = await import('@shared/schema');
+    const { vdrDocuments, vdrDataRequestItems, projects } = await import('@shared/schema');
     const { sql, count } = await import('drizzle-orm');
     
-    const [projectsResult, docsResult, requestsResult] = await Promise.all([
-      db.select({ count: count() }).from(vdrProjects).where(eq(vdrProjects.orgId, orgId)),
+    const [docsResult, requestsResult] = await Promise.all([
       db.select({ count: count() }).from(vdrDocuments).where(eq(vdrDocuments.orgId, orgId)),
       db.select({ 
         pending: sql<number>`COUNT(CASE WHEN ${vdrDataRequestItems.status} IN ('outstanding', 'in_progress') THEN 1 END)` 
       }).from(vdrDataRequestItems)
-        .innerJoin(vdrProjects, eq(vdrDataRequestItems.vdrProjectId, vdrProjects.id))
-        .where(eq(vdrProjects.orgId, orgId)),
+        .innerJoin(projects, eq(vdrDataRequestItems.vdrProjectId, projects.id))
+        .where(eq(projects.orgId, orgId)),
     ]);
+
+    // Count active DD projects as active data rooms
+    const projectsResult = await db.select({ count: count() })
+      .from(projects)
+      .where(and(eq(projects.orgId, orgId), eq(projects.status, 'active')));
 
     return {
       activeDataRooms: Number(projectsResult[0]?.count) || 0,
@@ -577,14 +583,14 @@ export class DashboardService {
     const [statsResult, recentResult] = await Promise.all([
       db.select({
         totalComps: count(),
-        avgPricePerSlip: avg(salesComps.pricePerSlip),
+        avgSalePrice: avg(salesComps.salePrice),
       }).from(salesComps).where(eq(salesComps.orgId, orgId)),
-      db.select().from(salesComps).where(eq(salesComps.orgId, orgId)).orderBy(desc(salesComps.saleDate)).limit(5),
+      db.select().from(salesComps).where(eq(salesComps.orgId, orgId)).orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth)).limit(5),
     ]);
 
     return {
       totalComps: Number(statsResult[0]?.totalComps) || 0,
-      avgPricePerSlip: Math.round(Number(statsResult[0]?.avgPricePerSlip) || 0),
+      avgPricePerSlip: Math.round(Number(statsResult[0]?.avgSalePrice) || 0),
       recentComps: recentResult,
     };
   }
@@ -605,7 +611,7 @@ export class DashboardService {
   }
 
   private async getFuelData(orgId: string) {
-    const { fuelTransactions } = await import('@shared/schema');
+    const { fuelSales } = await import('@shared/schema');
     const { sql, sum, gte } = await import('drizzle-orm');
     
     const thirtyDaysAgo = new Date();
@@ -613,14 +619,14 @@ export class DashboardService {
     
     const result = await db
       .select({
-        revenue: sum(fuelTransactions.totalAmount),
-        gallons: sum(fuelTransactions.quantity),
+        revenue: sum(fuelSales.totalAmount),
+        gallons: sum(fuelSales.quantityGallons),
       })
-      .from(fuelTransactions)
+      .from(fuelSales)
       .where(
         and(
-          eq(fuelTransactions.orgId, orgId),
-          gte(fuelTransactions.transactionDate, thirtyDaysAgo)
+          eq(fuelSales.orgId, orgId),
+          gte(fuelSales.transactionDate, thirtyDaysAgo)
         )
       );
 
@@ -637,21 +643,18 @@ export class DashboardService {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
+    // Ship store doesn't have orgId filtering - returns global data
+    // TODO: Add orgId field to ship store tables for multi-tenant support
     const [transResult, inventoryResult] = await Promise.all([
       db.select({
-        revenue: sum(shipStoreTransactions.totalAmount),
+        revenue: sum(shipStoreTransactions.total),
         transactions: count(),
-        avgTransaction: avg(shipStoreTransactions.totalAmount),
+        avgTransaction: avg(shipStoreTransactions.total),
       }).from(shipStoreTransactions)
-        .where(
-          and(
-            eq(shipStoreTransactions.orgId, orgId),
-            gte(shipStoreTransactions.transactionDate, thirtyDaysAgo)
-          )
-        ),
+        .where(gte(shipStoreTransactions.createdAt, thirtyDaysAgo)),
       db.select({
         inventoryValue: sql<number>`SUM(${shipStoreProducts.quantity} * ${shipStoreProducts.price})`,
-      }).from(shipStoreProducts).where(eq(shipStoreProducts.orgId, orgId)),
+      }).from(shipStoreProducts),
     ]);
 
     return {
@@ -663,18 +666,18 @@ export class DashboardService {
   }
 
   private async getRentRollData(orgId: string) {
-    const { rentRollUnits } = await import('@shared/schema');
+    const { rentRollEntries } = await import('@shared/schema');
     const { sql, count, sum } = await import('drizzle-orm');
     
     const result = await db
       .select({
         totalUnits: count(),
-        occupiedUnits: sql<number>`COUNT(CASE WHEN ${rentRollUnits.status} = 'occupied' THEN 1 END)`,
-        vacantUnits: sql<number>`COUNT(CASE WHEN ${rentRollUnits.status} = 'vacant' THEN 1 END)`,
-        monthlyIncome: sum(rentRollUnits.currentRate),
+        occupiedUnits: sql<number>`COUNT(CASE WHEN ${rentRollEntries.status} = 'active' THEN 1 END)`,
+        vacantUnits: sql<number>`COUNT(CASE WHEN ${rentRollEntries.status} = 'vacant' THEN 1 END)`,
+        monthlyIncome: sum(rentRollEntries.monthlyRate),
       })
-      .from(rentRollUnits)
-      .where(eq(rentRollUnits.orgId, orgId));
+      .from(rentRollEntries)
+      .where(eq(rentRollEntries.orgId, orgId));
 
     const data = result[0];
     const totalUnits = Number(data.totalUnits) || 0;
@@ -695,9 +698,9 @@ export class DashboardService {
     const result = await db
       .select({
         totalProjects: count(),
-        completedProjects: sql<number>`COUNT(CASE WHEN ${modelingProjects.status} = 'completed' THEN 1 END)`,
-        activeProjects: sql<number>`COUNT(CASE WHEN ${modelingProjects.status} = 'active' THEN 1 END)`,
-        totalValuation: sum(modelingProjects.estimatedValue),
+        completedProjects: sql<number>`COUNT(CASE WHEN ${modelingProjects.dealOutcome} = 'won' THEN 1 END)`,
+        activeProjects: sql<number>`COUNT(CASE WHEN ${modelingProjects.dealOutcome} = 'active' THEN 1 END)`,
+        totalValuation: sum(modelingProjects.purchasePrice),
       })
       .from(modelingProjects)
       .where(eq(modelingProjects.orgId, orgId));
