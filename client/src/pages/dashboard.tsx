@@ -17,6 +17,7 @@ import { formatCurrency, formatNumber } from "@/lib/formatUtils";
 import { CRMCharts } from "@/components/dashboard/CRMCharts";
 import { RevenueCharts } from "@/components/dashboard/RevenueCharts";
 import { AddModuleModal } from "@/components/dashboard/AddModuleModal";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 type DashboardModule = {
   id: string;
@@ -78,7 +79,16 @@ function SortableModule({
         </CardHeader>
         {!isCollapsed && (
           <CardContent>
-            {module.renderContent(module.data)}
+            <ErrorBoundary
+              fallback={
+                <div className="text-sm text-red-600 p-4">
+                  <p className="font-semibold">Failed to load module data</p>
+                  <p className="text-xs mt-1">Try refreshing the page or contact support if the problem persists.</p>
+                </div>
+              }
+            >
+              {module.renderContent(module.data)}
+            </ErrorBoundary>
           </CardContent>
         )}
       </Card>
