@@ -531,7 +531,7 @@ export class DashboardService {
         dueDiligence: { activeProjects: 0, completedProjects: 0, totalProjects: 0, completionRate: 0 },
         vdr: { activeDataRooms: 0, totalDocuments: 0, pendingRequests: 0 },
         salesComps: { totalComps: 0, avgPricePerSlip: 0, recentComps: [] },
-        docktalk: { recentArticles: [], recentDeals: [] },
+        docktalk: { recentDeals: [], totalDeals: 0 },
         fuel: { monthlyRevenue: 0, monthlyGallons: 0 },
         shipStore: { monthlyRevenue: 0, monthlyTransactions: 0, avgTransaction: 0, inventoryValue: 0 },
         rentRoll: { totalUnits: 0, occupancyRate: 0, monthlyIncome: 0, vacantUnits: 0 },
@@ -660,25 +660,20 @@ export class DashboardService {
   }
 
   private async getDockTalkData(orgId: string, dateFilter: TimeRangeFilter | null) {
-    const { docktalkArticles, docktalkDeals } = await import('@shared/schema');
+    const { docktalkDeals } = await import('@shared/schema');
     const { desc } = await import('drizzle-orm');
     
-    let articleQuery = db.select().from(docktalkArticles);
     let dealQuery = db.select().from(docktalkDeals);
     
     if (dateFilter) {
-      articleQuery = articleQuery.where(gte(docktalkArticles.publishedAt, dateFilter.startDate));
       dealQuery = dealQuery.where(gte(docktalkDeals.announcedDate, dateFilter.startDate));
     }
     
-    const [articles, deals] = await Promise.all([
-      articleQuery.orderBy(desc(docktalkArticles.publishedAt)).limit(5),
-      dealQuery.orderBy(desc(docktalkDeals.announcedDate)).limit(5),
-    ]);
+    const deals = await dealQuery.orderBy(desc(docktalkDeals.announcedDate)).limit(5);
 
     return {
-      recentArticles: articles,
       recentDeals: deals,
+      totalDeals: deals.length,
     };
   }
 

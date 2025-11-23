@@ -304,16 +304,16 @@ export default function Dashboard() {
           <div>
             <p className="text-xs text-gray-500 mb-2">Recent M&A Activity</p>
             <p className="text-2xl font-bold text-blue-600" data-testid="docktalk-deals-count">
-              {data?.recentDeals?.length || 0} <span className="text-sm text-gray-600">recent deals</span>
+              {data?.totalDeals || 0} <span className="text-sm text-gray-600">deals tracked</span>
             </p>
           </div>
-          {data?.recentArticles && data.recentArticles.length > 0 && (
+          {data?.recentDeals && data.recentDeals.length > 0 && (
             <div>
-              <p className="text-xs text-gray-500 mb-2">Latest Articles</p>
+              <p className="text-xs text-gray-500 mb-2">Latest Deals</p>
               <div className="space-y-1">
-                {data.recentArticles.slice(0, 2).map((article: any, idx: number) => (
-                  <div key={idx} className="text-xs truncate" title={article.title}>
-                    • {article.title}
+                {data.recentDeals.slice(0, 2).map((deal: any, idx: number) => (
+                  <div key={idx} className="text-xs truncate" title={deal.marinaName || deal.dealDescription}>
+                    • {deal.marinaName || deal.dealDescription || `Deal ${idx + 1}`}
                   </div>
                 ))}
               </div>
