@@ -13,6 +13,8 @@ export interface MetricCardProps {
   colorClass?: string;
   tooltip?: string;
   testId?: string;
+  onClick?: () => void;
+  clickable?: boolean;
 }
 
 export function MetricCard({
@@ -25,6 +27,8 @@ export function MetricCard({
   colorClass,
   tooltip,
   testId,
+  onClick,
+  clickable = false,
 }: MetricCardProps) {
   const formatValue = () => {
     switch (type) {
@@ -38,9 +42,13 @@ export function MetricCard({
   };
 
   const valueClass = colorClass || 'text-gray-900';
+  const isClickable = clickable || onClick;
 
   return (
-    <div>
+    <div
+      className={isClickable ? 'cursor-pointer hover:bg-gray-50 transition-colors rounded-lg p-2 -m-2' : ''}
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between">
         <p className="text-xs text-gray-500">{label}</p>
         {tooltip && (

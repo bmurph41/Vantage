@@ -7,7 +7,7 @@ import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Data
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TimeRangeSelector, type TimeRange } from "@/components/dashboard/TimeRangeSelector";
@@ -18,6 +18,8 @@ import { CRMCharts } from "@/components/dashboard/CRMCharts";
 import { RevenueCharts } from "@/components/dashboard/RevenueCharts";
 import { AddModuleModal } from "@/components/dashboard/AddModuleModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { DetailPanel } from "@/components/dashboard/DetailPanel";
+import { DataTable, Column } from "@/components/dashboard/DataTable";
 
 type DashboardModule = {
   id: string;
@@ -98,8 +100,10 @@ function SortableModule({
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   const [isAddModuleModalOpen, setIsAddModuleModalOpen] = useState(false);
+  const [isCRMDetailOpen, setIsCRMDetailOpen] = useState(false);
   
   // Collapsed modules state with localStorage persistence
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(() => {
@@ -130,6 +134,13 @@ export default function Dashboard() {
   });
 
   const selectedModules = modulePreferences?.selectedModules || [];
+
+  // Fetch recent deals for detail panel
+  const { data: recentDeals, isLoading: dealsLoading } = useQuery({
+    queryKey: ['/api/crm/deals/recent', timeRange],
+    queryFn: () => fetch('/api/crm/deals/recent').then(res => res.json()),
+    enabled: isCRMDetailOpen,
+  });
 
   // Save module preferences mutation
   const saveModulesMutation = useMutation({
@@ -288,6 +299,8 @@ export default function Dashboard() {
               colorClass="text-blue-600"
               testId="crm-pipeline-value"
               tooltip="Total value of all active deals in the pipeline"
+              onClick={() => setIsCRMDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Active Deals"
@@ -295,6 +308,8 @@ export default function Dashboard() {
               type="number"
               testId="crm-active-deals"
               tooltip="Number of deals currently in progress"
+              onClick={() => setIsCRMDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Win Rate"
@@ -303,6 +318,8 @@ export default function Dashboard() {
               colorClass="text-green-600"
               testId="crm-win-rate"
               tooltip="Percentage of deals won vs total closed deals"
+              onClick={() => setIsCRMDetailOpen(true)}
+              clickable
             />
             <MetricCard
               label="Won Deals"
@@ -310,6 +327,8 @@ export default function Dashboard() {
               type="number"
               testId="crm-won-deals"
               tooltip="Total number of successfully closed deals"
+              onClick={() => setIsCRMDetailOpen(true)}
+              clickable
             />
           </div>
           <CRMCharts timeRange={timeRange} />
@@ -701,6 +720,71 @@ export default function Dashboard() {
         selectedModules={selectedModules}
         onToggleModule={handleToggleModule}
       />
+
+      <DetailPanel
+        open={isCRMDetailOpen}
+        onOpenChange={setIsCRMDetailOpen}
+        title="CRM Pipeline Details"
+        description="Recent deals and pipeline activity"
+        icon={DollarSign}
+        sourceLink="/crm/deals"
+        sourceLinkText="Go to CRM"
+        actions={
+          <Link href="/crm/deals/new">
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Deal
+            </Button>
+          </Link>
+        }
+      >
+        {dealsLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <DataTable
+            data={recentDeals || []}
+            columns={[
+              {
+                key: 'title',
+                header: 'Deal Name',
+                render: (deal: any) => (
+                  <div className="font-medium">{deal.title}</div>
+                ),
+              },
+              {
+                key: 'value',
+                header: 'Value',
+                render: (deal: any) => (
+                  <div className="text-gray-900 font-semibold">
+                    {formatCurrency(Number(deal.value || 0))}
+                  </div>
+                ),
+              },
+              {
+                key: 'stage',
+                header: 'Stage',
+                render: (deal: any) => (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {deal.stage}
+                  </span>
+                ),
+              },
+              {
+                key: 'probability',
+                header: 'Probability',
+                render: (deal: any) => (
+                  <div className="text-gray-600">{deal.probability || 0}%</div>
+                ),
+              },
+            ]}
+            onRowClick={(deal: any) => navigate(`/crm/deals/${deal.id}`)}
+            getRowLink={(deal: any) => `/crm/deals/${deal.id}`}
+            emptyMessage="No recent deals found"
+          />
+        )}
+      </DetailPanel>
     </div>
   );
 }

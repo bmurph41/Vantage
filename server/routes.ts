@@ -10772,6 +10772,37 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get recent deals for detail panel
+  app.get('/api/crm/deals/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { crmDeals, users } = await import('@shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const deals = await db
+        .select({
+          id: crmDeals.id,
+          title: crmDeals.title,
+          value: crmDeals.value,
+          stage: crmDeals.stage,
+          probability: crmDeals.probability,
+          expectedCloseDate: crmDeals.expectedCloseDate,
+          createdAt: crmDeals.createdAt,
+        })
+        .from(crmDeals)
+        .innerJoin(users, eq(crmDeals.ownerId, users.id))
+        .where(eq(users.orgId, orgId))
+        .orderBy(desc(crmDeals.createdAt))
+        .limit(20);
+
+      res.json(deals);
+    } catch (error) {
+      console.error('Failed to fetch recent deals:', error);
+      res.status(500).json({ error: 'Failed to fetch recent deals' });
+    }
+  });
+
   // Get user dashboard module preferences
   app.get('/api/dashboards/modules', authenticateUser, async (req: any, res) => {
     try {
