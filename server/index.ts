@@ -8,6 +8,7 @@ import { registerDockTalkRoutes } from "./docktalk/routes";
 import { startDockTalkCronJobs } from "./docktalk/cron-jobs";
 import { DatabaseStorage as DockTalkStorage } from "./docktalk/storage";
 import { initializeWebSocket } from "./docktalk/websocket";
+import { dashboardWS } from "./websocket";
 
 const app = express();
 app.use(express.json());
@@ -129,6 +130,14 @@ app.use((req, res, next) => {
       log('🚀 DockTalk WebSocket initialized');
     } catch (error) {
       log(`❌ Failed to initialize DockTalk WebSocket: ${error}`);
+    }
+
+    // Initialize Dashboard WebSocket for real-time dashboard updates
+    try {
+      dashboardWS.initialize(server);
+      log('🚀 Dashboard WebSocket initialized');
+    } catch (error) {
+      log(`❌ Failed to initialize Dashboard WebSocket: ${error}`);
     }
     });
   } catch (error) {
