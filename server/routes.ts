@@ -10869,6 +10869,176 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get recent DockTalk articles for detail panel
+  app.get('/api/docktalk/articles/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { docktalkArticles } = await import('@shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const articles = await db
+        .select({
+          id: docktalkArticles.id,
+          title: docktalkArticles.title,
+          publishedDate: docktalkArticles.publishedDate,
+          category: docktalkArticles.category,
+          sourceUrl: docktalkArticles.sourceUrl,
+          createdAt: docktalkArticles.createdAt,
+        })
+        .from(docktalkArticles)
+        .orderBy(desc(docktalkArticles.publishedDate))
+        .limit(20);
+
+      res.json(articles);
+    } catch (error) {
+      console.error('Failed to fetch recent DockTalk articles:', error);
+      res.status(500).json({ error: 'Failed to fetch recent DockTalk articles' });
+    }
+  });
+
+  // Get recent VDR documents for detail panel
+  app.get('/api/vdr/documents/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { vdrDocuments, projects } = await import('@shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const documents = await db
+        .select({
+          id: vdrDocuments.id,
+          fileName: vdrDocuments.fileName,
+          fileSize: vdrDocuments.fileSize,
+          uploadedBy: vdrDocuments.uploadedBy,
+          projectId: vdrDocuments.vdrProjectId,
+          projectName: projects.name,
+          createdAt: vdrDocuments.createdAt,
+        })
+        .from(vdrDocuments)
+        .innerJoin(projects, eq(vdrDocuments.vdrProjectId, projects.id))
+        .where(eq(vdrDocuments.orgId, orgId))
+        .orderBy(desc(vdrDocuments.createdAt))
+        .limit(20);
+
+      res.json(documents);
+    } catch (error) {
+      console.error('Failed to fetch recent VDR documents:', error);
+      res.status(500).json({ error: 'Failed to fetch recent VDR documents' });
+    }
+  });
+
+  // Get recent ship store transactions for detail panel
+  app.get('/api/ship-store/transactions/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const { shipStoreTransactions } = await import('@shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const transactions = await db
+        .select({
+          id: shipStoreTransactions.id,
+          total: shipStoreTransactions.total,
+          paymentMethod: shipStoreTransactions.paymentMethod,
+          status: shipStoreTransactions.status,
+          createdAt: shipStoreTransactions.createdAt,
+        })
+        .from(shipStoreTransactions)
+        .orderBy(desc(shipStoreTransactions.createdAt))
+        .limit(20);
+
+      res.json(transactions);
+    } catch (error) {
+      console.error('Failed to fetch recent ship store transactions:', error);
+      res.status(500).json({ error: 'Failed to fetch recent ship store transactions' });
+    }
+  });
+
+  // Get recent due diligence tasks for detail panel
+  app.get('/api/projects/tasks/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { tasks, projects } = await import('@shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const recentTasks = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          status: tasks.status,
+          dueDate: tasks.dueDate,
+          projectId: tasks.projectId,
+          projectName: projects.name,
+          createdAt: tasks.createdAt,
+        })
+        .from(tasks)
+        .innerJoin(projects, eq(tasks.projectId, projects.id))
+        .where(eq(projects.orgId, orgId))
+        .orderBy(desc(tasks.createdAt))
+        .limit(20);
+
+      res.json(recentTasks);
+    } catch (error) {
+      console.error('Failed to fetch recent DD tasks:', error);
+      res.status(500).json({ error: 'Failed to fetch recent DD tasks' });
+    }
+  });
+
+  // Get recent rent roll entries for detail panel
+  app.get('/api/rent-roll/entries/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { rentRollEntries } = await import('@shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const entries = await db
+        .select({
+          id: rentRollEntries.id,
+          unitNumber: rentRollEntries.unitNumber,
+          tenantName: rentRollEntries.tenantName,
+          monthlyRate: rentRollEntries.monthlyRate,
+          status: rentRollEntries.status,
+          leaseEndDate: rentRollEntries.leaseEndDate,
+          createdAt: rentRollEntries.createdAt,
+        })
+        .from(rentRollEntries)
+        .where(eq(rentRollEntries.orgId, orgId))
+        .orderBy(desc(rentRollEntries.createdAt))
+        .limit(20);
+
+      res.json(entries);
+    } catch (error) {
+      console.error('Failed to fetch recent rent roll entries:', error);
+      res.status(500).json({ error: 'Failed to fetch recent rent roll entries' });
+    }
+  });
+
+  // Get recent modeling projects for detail panel
+  app.get('/api/modeling/projects/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { modelingProjects } = await import('@shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const projects = await db
+        .select({
+          id: modelingProjects.id,
+          propertyName: modelingProjects.propertyName,
+          clientName: modelingProjects.clientName,
+          projectType: modelingProjects.projectType,
+          dealOutcome: modelingProjects.dealOutcome,
+          estimatedValue: modelingProjects.estimatedValue,
+          createdAt: modelingProjects.createdAt,
+        })
+        .from(modelingProjects)
+        .where(eq(modelingProjects.orgId, orgId))
+        .orderBy(desc(modelingProjects.createdAt))
+        .limit(20);
+
+      res.json(projects);
+    } catch (error) {
+      console.error('Failed to fetch recent modeling projects:', error);
+      res.status(500).json({ error: 'Failed to fetch recent modeling projects' });
+    }
+  });
+
   // Get user dashboard module preferences
   app.get('/api/dashboards/modules', authenticateUser, async (req: any, res) => {
     try {
