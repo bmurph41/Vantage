@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { TimeRangeSelector, type TimeRange } from "@/components/dashboard/TimeRangeSelector";
 import { ComparisonModule } from "@/components/dashboard/ComparisonModule";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { EnhancedMetricCard } from "@/components/dashboard/EnhancedMetricCard";
+import { ModuleSection, MetricGrid, DataList, StatBar } from "@/components/dashboard/ModuleSection";
 import { formatCurrency, formatNumber } from "@/lib/formatUtils";
 import { CRMCharts } from "@/components/dashboard/CRMCharts";
 import { RevenueCharts } from "@/components/dashboard/RevenueCharts";
@@ -500,47 +502,63 @@ export default function Dashboard() {
       data: dashboardData?.crm,
       renderContent: (data) => (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <MetricCard
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
               label="Pipeline Value"
               value={data?.pipelineValue || 0}
               type="currency"
+              size="md"
+              variant="primary"
+              icon={DollarSign}
               compact={true}
-              colorClass="text-blue-600"
               testId="crm-pipeline-value"
-              tooltip="Total value of all active deals in the pipeline"
+              tooltip="Total value of all active deals across pipeline stages"
               onClick={() => setIsCRMDetailOpen(true)}
               clickable
+              trend={data?.pipelineValueTrend}
+              trendLabel={timeRange === '7d' ? 'vs last week' : timeRange === '30d' ? 'vs last month' : timeRange === '90d' ? 'vs last quarter' : 'vs last year'}
             />
-            <MetricCard
+            <EnhancedMetricCard
               label="Active Deals"
               value={data?.activeDeals || 0}
               type="number"
+              size="md"
+              icon={Users}
               testId="crm-active-deals"
               tooltip="Number of deals currently in progress"
               onClick={() => setIsCRMDetailOpen(true)}
               clickable
+              badge={data?.newDeals ? `+${data.newDeals} new` : undefined}
             />
-            <MetricCard
+            <EnhancedMetricCard
               label="Win Rate"
               value={data?.winRate || 0}
               type="percent"
-              colorClass="text-green-600"
+              size="md"
+              variant="success"
+              icon={TrendingUp}
               testId="crm-win-rate"
               tooltip="Percentage of deals won vs total closed deals"
               onClick={() => setIsCRMDetailOpen(true)}
               clickable
+              trend={data?.winRateTrend}
             />
-            <MetricCard
-              label="Won Deals"
+            <EnhancedMetricCard
+              label="Won This Period"
               value={data?.wonDeals || 0}
               type="number"
+              size="md"
               testId="crm-won-deals"
-              tooltip="Total number of successfully closed deals"
+              tooltip="Successfully closed deals in selected timeframe"
               onClick={() => setIsCRMDetailOpen(true)}
               clickable
+              comparison={{
+                label: 'Total Value',
+                value: data?.wonValue || 0,
+                type: 'currency'
+              }}
             />
-          </div>
+          </MetricGrid>
           <CRMCharts timeRange={timeRange} />
         </div>
       ),
@@ -553,46 +571,57 @@ export default function Dashboard() {
       data: dashboardData?.dueDiligence,
       renderContent: (data) => (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <MetricCard
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
               label="Active Projects"
               value={data?.activeProjects || 0}
               type="number"
-              colorClass="text-blue-600"
+              size="md"
+              variant="primary"
+              icon={FileText}
               testId="dd-active-projects"
               tooltip="Currently active due diligence projects"
               onClick={() => setIsDDDetailOpen(true)}
               clickable
+              badge={data?.criticalProjects ? `${data.criticalProjects} critical` : undefined}
             />
-            <MetricCard
-              label="Completed"
-              value={data?.completedProjects || 0}
-              type="number"
-              testId="dd-completed-projects"
-              tooltip="Successfully completed projects"
-              onClick={() => setIsDDDetailOpen(true)}
-              clickable
-            />
-            <MetricCard
-              label="Total Projects"
-              value={data?.totalProjects || 0}
-              type="number"
-              testId="dd-total-projects"
-              tooltip="Total number of projects tracked"
-              onClick={() => setIsDDDetailOpen(true)}
-              clickable
-            />
-            <MetricCard
+            <EnhancedMetricCard
               label="Completion Rate"
               value={data?.completionRate || 0}
               type="percent"
-              colorClass="text-green-600"
+              size="md"
+              variant="success"
               testId="dd-completion-rate"
               tooltip="Percentage of projects successfully completed"
               onClick={() => setIsDDDetailOpen(true)}
               clickable
+              trend={data?.completionRateTrend}
             />
-          </div>
+          </MetricGrid>
+          {data?.activeProjects > 0 && (
+            <ModuleSection title="Project Status" description="Active project breakdown">
+              <div className="space-y-3">
+                <StatBar
+                  label="Completed"
+                  value={data?.completedProjects || 0}
+                  total={data?.totalProjects || 1}
+                  color="green"
+                />
+                <StatBar
+                  label="In Progress"
+                  value={data?.activeProjects || 0}
+                  total={data?.totalProjects || 1}
+                  color="blue"
+                />
+                <StatBar
+                  label="On Hold"
+                  value={data?.onHoldProjects || 0}
+                  total={data?.totalProjects || 1}
+                  color="amber"
+                />
+              </div>
+            </ModuleSection>
+          )}
         </div>
       ),
     },
@@ -604,39 +633,48 @@ export default function Dashboard() {
       data: dashboardData?.salesComps,
       renderContent: (data) => (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <MetricCard
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
               label="Recent Comps"
               value={data?.totalComps || 0}
               type="number"
-              colorClass="text-blue-600"
+              size="md"
+              variant="primary"
+              icon={TrendingUp}
               testId="comps-total"
               tooltip="Number of sales comparables in selected period"
               onClick={() => setIsSalesCompsDetailOpen(true)}
               clickable={true}
+              trend={data?.compsTrend}
+              trendLabel={timeRange === '7d' ? 'vs last week' : timeRange === '30d' ? 'vs last month' : timeRange === '90d' ? 'vs last quarter' : 'vs last year'}
             />
-            <MetricCard
+            <EnhancedMetricCard
               label="Avg Price/Slip"
               value={data?.avgPricePerSlip || 0}
               type="currency"
+              size="md"
               testId="comps-avg-price"
               tooltip="Average price per slip across all comparables"
               onClick={() => setIsSalesCompsDetailOpen(true)}
               clickable={true}
+              comparison={{
+                label: 'Median Price',
+                value: data?.medianPricePerSlip || 0,
+                type: 'currency'
+              }}
             />
-          </div>
+          </MetricGrid>
           {data?.recentComps && data.recentComps.length > 0 && (
-            <div className="mt-2">
-              <p className="text-xs text-gray-500 mb-2">Latest Comparables</p>
-              <div className="space-y-1">
-                {data.recentComps.slice(0, 3).map((comp: any, idx: number) => (
-                  <div key={idx} className="text-xs flex justify-between">
-                    <span className="truncate">{comp.propertyName || 'Unnamed'}</span>
-                    <span className="font-semibold">{formatCurrency(comp.pricePerSlip || 0)}/slip</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ModuleSection title="Latest Comparables" description="Most recent marina sales">
+              <DataList
+                items={data.recentComps.slice(0, 3).map((comp: any) => ({
+                  label: comp.propertyName || 'Unnamed Marina',
+                  value: formatCurrency(comp.pricePerSlip || 0) + '/slip',
+                  badge: comp.location ? comp.location.substring(0, 2).toUpperCase() : undefined,
+                }))}
+                maxItems={3}
+              />
+            </ModuleSection>
           )}
         </div>
       ),
@@ -649,39 +687,48 @@ export default function Dashboard() {
       data: dashboardData?.vdr,
       renderContent: (data) => (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <MetricCard
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
               label="Active Data Rooms"
               value={data?.activeDataRooms || 0}
               type="number"
-              colorClass="text-blue-600"
+              size="md"
+              variant="primary"
+              icon={Database}
               testId="vdr-active-rooms"
               tooltip="Number of active virtual data rooms"
               onClick={() => setIsVDRDetailOpen(true)}
               clickable
             />
-            <MetricCard
+            <EnhancedMetricCard
               label="Total Documents"
               value={data?.totalDocuments || 0}
               type="number"
+              size="md"
               testId="vdr-total-docs"
               tooltip="Total documents uploaded across all data rooms"
               onClick={() => setIsVDRDetailOpen(true)}
               clickable
+              badge={data?.recentUploads ? `+${data.recentUploads} today` : undefined}
             />
-            <div className="col-span-2">
-              <MetricCard
-                label="Pending Requests"
-                value={data?.pendingRequests || 0}
-                type="number"
-                colorClass="text-orange-600"
-                testId="vdr-pending-requests"
-                tooltip="Diligence requests awaiting response"
-                onClick={() => setIsVDRDetailOpen(true)}
-                clickable
-              />
-            </div>
-          </div>
+          </MetricGrid>
+          <EnhancedMetricCard
+            label="Pending Requests"
+            value={data?.pendingRequests || 0}
+            type="number"
+            size="md"
+            variant={data?.pendingRequests > 5 ? "warning" : "default"}
+            icon={FileText}
+            testId="vdr-pending-requests"
+            tooltip="Diligence requests awaiting response"
+            onClick={() => setIsVDRDetailOpen(true)}
+            clickable
+            comparison={{
+              label: 'Overdue',
+              value: data?.overdueRequests || 0,
+              type: 'number'
+            }}
+          />
         </div>
       ),
     },
@@ -692,27 +739,32 @@ export default function Dashboard() {
       link: '/docktalk',
       data: dashboardData?.docktalk,
       renderContent: (data) => (
-        <div className="space-y-3">
-          <div 
-            className="cursor-pointer hover:bg-gray-50 -m-2 p-2 rounded transition-colors"
+        <div className="space-y-4">
+          <EnhancedMetricCard
+            label="M&A Deals Tracked"
+            value={data?.totalDeals || 0}
+            type="number"
+            size="md"
+            variant="primary"
+            icon={Radio}
+            testId="docktalk-deals-count"
+            tooltip="Total marina M&A deals tracked in the system"
             onClick={() => setIsDockTalkDetailOpen(true)}
-          >
-            <p className="text-xs text-gray-500 mb-2">Recent M&A Activity</p>
-            <p className="text-2xl font-bold text-blue-600" data-testid="docktalk-deals-count">
-              {data?.totalDeals || 0} <span className="text-sm text-gray-600">deals tracked</span>
-            </p>
-          </div>
+            clickable
+            badge={data?.newDeals ? `+${data.newDeals} new` : undefined}
+            subtitle="deals in database"
+          />
           {data?.recentDeals && data.recentDeals.length > 0 && (
-            <div>
-              <p className="text-xs text-gray-500 mb-2">Latest Deals</p>
-              <div className="space-y-1">
-                {data.recentDeals.slice(0, 2).map((deal: any, idx: number) => (
-                  <div key={idx} className="text-xs truncate" title={deal.marinaName || deal.dealDescription}>
-                    • {deal.marinaName || deal.dealDescription || `Deal ${idx + 1}`}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ModuleSection title="Latest Transactions" description="Most recent M&A activity">
+              <DataList
+                items={data.recentDeals.slice(0, 3).map((deal: any) => ({
+                  label: deal.marinaName || deal.dealDescription || 'Unnamed Deal',
+                  value: deal.dealDate ? new Date(deal.dealDate).toLocaleDateString() : 'Recent',
+                  badge: deal.dealType || 'M&A',
+                }))}
+                maxItems={3}
+              />
+            </ModuleSection>
           )}
         </div>
       ),
@@ -725,29 +777,41 @@ export default function Dashboard() {
       data: dashboardData?.fuel,
       renderContent: (data) => (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <MetricCard
-              label="Monthly Revenue"
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
+              label="Total Revenue"
               value={data?.monthlyRevenue || 0}
               type="currency"
+              size="md"
+              variant="success"
+              icon={DollarSign}
               compact={true}
-              colorClass="text-green-600"
               testId="fuel-revenue"
               tooltip="Total fuel sales revenue for the selected period"
               onClick={() => setIsFuelDetailOpen(true)}
               clickable={true}
+              trend={data?.revenueTrend}
+              trendLabel={timeRange === '7d' ? 'vs last week' : timeRange === '30d' ? 'vs last month' : timeRange === '90d' ? 'vs last quarter' : 'vs last year'}
             />
-            <MetricCard
-              label="Monthly Gallons"
+            <EnhancedMetricCard
+              label="Volume Sold"
               value={data?.monthlyGallons || 0}
               type="number"
+              size="md"
+              icon={Fuel}
               compact={true}
               testId="fuel-gallons"
               tooltip="Total fuel gallons sold in the selected period"
               onClick={() => setIsFuelDetailOpen(true)}
               clickable={true}
+              subtitle="gallons"
+              comparison={{
+                label: 'Avg $/gal',
+                value: data?.avgPricePerGallon || 0,
+                type: 'currency'
+              }}
             />
-          </div>
+          </MetricGrid>
           <RevenueCharts module="fuel" timeRange={timeRange} />
         </div>
       ),
@@ -760,49 +824,64 @@ export default function Dashboard() {
       data: dashboardData?.shipStore,
       renderContent: (data) => (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <MetricCard
-              label="Monthly Sales"
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
+              label="Total Sales"
               value={data?.monthlyRevenue || 0}
               type="currency"
+              size="md"
+              variant="success"
+              icon={DollarSign}
               compact={true}
-              colorClass="text-green-600"
               testId="ship-store-revenue"
-              tooltip="Total ship store sales revenue"
+              tooltip="Total ship store sales revenue for selected period"
               onClick={() => setIsShipStoreDetailOpen(true)}
               clickable
+              trend={data?.revenueTrend}
             />
-            <MetricCard
+            <EnhancedMetricCard
               label="Transactions"
               value={data?.monthlyTransactions || 0}
               type="number"
+              size="md"
+              icon={ShoppingCart}
               compact={true}
               testId="ship-store-transactions"
               tooltip="Number of completed transactions"
               onClick={() => setIsShipStoreDetailOpen(true)}
               clickable
+              comparison={{
+                label: 'Avg Value',
+                value: data?.avgTransaction || 0,
+                type: 'currency'
+              }}
             />
-            <MetricCard
-              label="Avg Transaction"
-              value={data?.avgTransaction || 0}
-              type="currency"
-              testId="ship-store-avg"
-              tooltip="Average transaction value"
-              onClick={() => setIsShipStoreDetailOpen(true)}
-              clickable
-            />
-            <MetricCard
+          </MetricGrid>
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
               label="Inventory Value"
               value={data?.inventoryValue || 0}
               type="currency"
+              size="sm"
+              variant="primary"
               compact={true}
-              colorClass="text-blue-600"
               testId="ship-store-inventory"
-              tooltip="Current total inventory value"
+              tooltip="Current total inventory value at cost"
               onClick={() => setIsShipStoreDetailOpen(true)}
               clickable
             />
-          </div>
+            <EnhancedMetricCard
+              label="Low Stock Items"
+              value={data?.lowStockItems || 0}
+              type="number"
+              size="sm"
+              variant={data?.lowStockItems > 10 ? "warning" : "default"}
+              testId="ship-store-low-stock"
+              tooltip="Products below minimum stock threshold"
+              onClick={() => setIsShipStoreDetailOpen(true)}
+              clickable
+            />
+          </MetricGrid>
           <RevenueCharts module="shipStore" timeRange={timeRange} />
         </div>
       ),
@@ -815,48 +894,63 @@ export default function Dashboard() {
       data: dashboardData?.rentRoll,
       renderContent: (data) => (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <MetricCard
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
               label="Total Units"
               value={data?.totalUnits || 0}
               type="number"
-              colorClass="text-blue-600"
+              size="md"
+              variant="primary"
+              icon={Home}
               testId="rent-roll-units"
-              tooltip="Total number of rental units"
+              tooltip="Total number of rental units in portfolio"
               onClick={() => setIsRentRollDetailOpen(true)}
               clickable
+              comparison={{
+                label: 'Occupied',
+                value: (data?.totalUnits || 0) - (data?.vacantUnits || 0),
+                type: 'number'
+              }}
             />
-            <MetricCard
+            <EnhancedMetricCard
               label="Occupancy Rate"
               value={data?.occupancyRate || 0}
               type="percent"
-              colorClass="text-green-600"
+              size="md"
+              variant="success"
+              icon={TrendingUp}
               testId="rent-roll-occupancy"
               tooltip="Percentage of units currently occupied"
               onClick={() => setIsRentRollDetailOpen(true)}
               clickable
+              trend={data?.occupancyTrend}
             />
-            <MetricCard
+          </MetricGrid>
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
               label="Monthly Income"
               value={data?.monthlyIncome || 0}
               type="currency"
+              size="sm"
               compact={true}
               testId="rent-roll-income"
-              tooltip="Total monthly rental income"
+              tooltip="Total monthly rental income from all units"
               onClick={() => setIsRentRollDetailOpen(true)}
               clickable
             />
-            <MetricCard
+            <EnhancedMetricCard
               label="Vacant Units"
               value={data?.vacantUnits || 0}
               type="number"
-              colorClass="text-orange-600"
+              size="sm"
+              variant={data?.vacantUnits > 5 ? "warning" : "default"}
               testId="rent-roll-vacant"
               tooltip="Number of currently vacant units"
               onClick={() => setIsRentRollDetailOpen(true)}
               clickable
+              badge={data?.vacantUnits > 0 && data?.totalUnits ? `${((data.vacantUnits / data.totalUnits) * 100).toFixed(0)}%` : undefined}
             />
-          </div>
+          </MetricGrid>
         </div>
       ),
     },
@@ -868,40 +962,50 @@ export default function Dashboard() {
       data: dashboardData?.modeling,
       renderContent: (data) => (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <MetricCard
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
               label="Active Models"
               value={data?.activeProjects || 0}
               type="number"
-              colorClass="text-blue-600"
+              size="md"
+              variant="primary"
+              icon={BarChart3}
               testId="modeling-active"
               tooltip="Currently active modeling projects"
               onClick={() => setIsModelingDetailOpen(true)}
               clickable
             />
-            <MetricCard
+            <EnhancedMetricCard
               label="Completed"
               value={data?.completedProjects || 0}
               type="number"
+              size="md"
+              variant="success"
               testId="modeling-completed"
               tooltip="Successfully completed modeling projects"
               onClick={() => setIsModelingDetailOpen(true)}
               clickable
+              trend={data?.completionTrend}
             />
-            <div className="col-span-2">
-              <MetricCard
-                label="Total Valuation"
-                value={data?.totalValuation || 0}
-                type="currency"
-                compact={true}
-                colorClass="text-green-600"
-                testId="modeling-valuation"
-                tooltip="Aggregate valuation across all projects"
-                onClick={() => setIsModelingDetailOpen(true)}
-                clickable
-              />
-            </div>
-          </div>
+          </MetricGrid>
+          <EnhancedMetricCard
+            label="Total Valuation"
+            value={data?.totalValuation || 0}
+            type="currency"
+            size="md"
+            variant="success"
+            icon={DollarSign}
+            compact={true}
+            testId="modeling-valuation"
+            tooltip="Aggregate valuation across all modeling projects"
+            onClick={() => setIsModelingDetailOpen(true)}
+            clickable
+            comparison={{
+              label: 'Avg per Project',
+              value: (data?.totalValuation || 0) / (data?.activeProjects || 1),
+              type: 'currency'
+            }}
+          />
         </div>
       ),
     },
