@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { TimeRangeSelector, type TimeRange } from "@/components/dashboard/TimeRangeSelector";
 
 type DashboardModule = {
   id: string;
@@ -62,6 +63,7 @@ function SortableModule({ module }: { module: DashboardModule }) {
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -84,7 +86,8 @@ export default function Dashboard() {
   ];
 
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ['/api/dashboards/data'],
+    queryKey: ['/api/dashboards/data', timeRange],
+    queryFn: () => fetch(`/api/dashboards/data?timeRange=${timeRange}`).then(res => res.json()),
   });
 
   const { data: layoutData } = useQuery({
@@ -458,11 +461,14 @@ export default function Dashboard() {
   return (
     <div className="flex-1 overflow-auto bg-gray-50" data-testid="page-dashboard">
       <div className="container mx-auto p-6 max-w-7xl">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">MarinaMatch Dashboard</h1>
-          <p className="text-gray-600 mt-1">
-            Your comprehensive marina acquisition intelligence platform
-          </p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">MarinaMatch Dashboard</h1>
+            <p className="text-gray-600 mt-1">
+              Your comprehensive marina acquisition intelligence platform
+            </p>
+          </div>
+          <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
         </div>
 
         <DndContext

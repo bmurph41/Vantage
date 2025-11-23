@@ -3,7 +3,7 @@ import {
   dashboardWidgets,
   userDashboardLayouts,
 } from '@shared/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, gte, sql as drizzleSql } from 'drizzle-orm';
 import type {
   DashboardWidget,
   InsertDashboardWidget,
@@ -13,7 +13,46 @@ import type {
   UpdateUserDashboardLayout,
 } from '@shared/schema';
 
+export type TimeRange = '7d' | '30d' | '90d' | 'ytd' | 'all';
+
+interface TimeRangeFilter {
+  startDate: Date;
+  endDate: Date;
+}
+
 export class DashboardService {
+  // ================================================================================
+  // TIME RANGE HELPERS
+  // ================================================================================
+
+  /**
+   * Calculate date range based on time range filter
+   */
+  private getTimeRangeFilter(timeRange: TimeRange = 'all'): TimeRangeFilter | null {
+    if (timeRange === 'all') return null;
+
+    const endDate = new Date();
+    const startDate = new Date();
+
+    switch (timeRange) {
+      case '7d':
+        startDate.setDate(endDate.getDate() - 7);
+        break;
+      case '30d':
+        startDate.setDate(endDate.getDate() - 30);
+        break;
+      case '90d':
+        startDate.setDate(endDate.getDate() - 90);
+        break;
+      case 'ytd':
+        startDate.setMonth(0, 1); // January 1st
+        startDate.setHours(0, 0, 0, 0);
+        break;
+    }
+
+    return { startDate, endDate };
+  }
+
   // ================================================================================
   // WIDGET REGISTRY
   // ================================================================================
@@ -445,8 +484,10 @@ export class DashboardService {
    * Get aggregated dashboard data for all modules
    * Optimized with parallel queries and SQL aggregations
    */
-  async getAggregatedDashboardData(orgId: string): Promise<any> {
+  async getAggregatedDashboardData(orgId: string, timeRange: TimeRange = 'all'): Promise<any> {
     try {
+      const dateFilter = this.getTimeRangeFilter(timeRange);
+      
       // Execute all queries in parallel for performance
       const [
         crmData,
@@ -459,15 +500,15 @@ export class DashboardService {
         rentRollData,
         modelingData,
       ] = await Promise.all([
-        this.getCRMData(orgId),
-        this.getDDData(orgId),
-        this.getVDRData(orgId),
-        this.getSalesCompsData(orgId),
-        this.getDockTalkData(orgId),
-        this.getFuelData(orgId),
-        this.getShipStoreData(orgId),
-        this.getRentRollData(orgId),
-        this.getModelingData(orgId),
+        this.getCRMData(orgId, dateFilter),
+        this.getDDData(orgId, dateFilter),
+        this.getVDRData(orgId, dateFilter),
+        this.getSalesCompsData(orgId, dateFilter),
+        this.getDockTalkData(orgId, dateFilter),
+        this.getFuelData(orgId, dateFilter),
+        this.getShipStoreData(orgId, dateFilter),
+        this.getRentRollData(orgId, dateFilter),
+        this.getModelingData(orgId, dateFilter),
       ]);
 
       return {
@@ -480,6 +521,7 @@ export class DashboardService {
         shipStore: shipStoreData,
         rentRoll: rentRollData,
         modeling: modelingData,
+        timeRange,
       };
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -494,13 +536,20 @@ export class DashboardService {
         shipStore: { monthlyRevenue: 0, monthlyTransactions: 0, avgTransaction: 0, inventoryValue: 0 },
         rentRoll: { totalUnits: 0, occupancyRate: 0, monthlyIncome: 0, vacantUnits: 0 },
         modeling: { activeProjects: 0, completedProjects: 0, totalValuation: 0 },
+        timeRange,
       };
     }
   }
 
-  private async getCRMData(orgId: string) {
+  private async getCRMData(orgId: string, dateFilter: TimeRangeFilter | null) {
     const { crmDeals, users } = await import('@shared/schema');
     const { sql, count, sum } = await import('drizzle-orm');
+    
+    // Build where conditions
+    const conditions = [eq(users.orgId, orgId)];
+    if (dateFilter) {
+      conditions.push(gte(crmDeals.createdAt, dateFilter.startDate));
+    }
     
     // Join with users to filter by organization
     const result = await db
@@ -512,7 +561,7 @@ export class DashboardService {
       })
       .from(crmDeals)
       .innerJoin(users, eq(crmDeals.ownerId, users.id))
-      .where(eq(users.orgId, orgId));
+      .where(and(...conditions));
 
     const data = result[0];
     const wonDeals = Number(data.wonDeals) || 0;
@@ -526,9 +575,14 @@ export class DashboardService {
     };
   }
 
-  private async getDDData(orgId: string) {
+  private async getDDData(orgId: string, dateFilter: TimeRangeFilter | null) {
     const { projects } = await import('@shared/schema');
     const { sql, count } = await import('drizzle-orm');
+    
+    const conditions = [eq(projects.orgId, orgId)];
+    if (dateFilter) {
+      conditions.push(gte(projects.createdAt, dateFilter.startDate));
+    }
     
     const result = await db
       .select({
@@ -537,7 +591,7 @@ export class DashboardService {
         activeProjects: sql<number>`COUNT(CASE WHEN ${projects.status} = 'active' THEN 1 END)`,
       })
       .from(projects)
-      .where(eq(projects.orgId, orgId));
+      .where(and(...conditions));
 
     const data = result[0];
     const totalProjects = Number(data.totalProjects) || 0;
@@ -551,12 +605,17 @@ export class DashboardService {
     };
   }
 
-  private async getVDRData(orgId: string) {
+  private async getVDRData(orgId: string, dateFilter: TimeRangeFilter | null) {
     const { vdrDocuments, vdrDataRequestItems, projects } = await import('@shared/schema');
     const { sql, count } = await import('drizzle-orm');
     
+    const docConditions = [eq(vdrDocuments.orgId, orgId)];
+    if (dateFilter) {
+      docConditions.push(gte(vdrDocuments.createdAt, dateFilter.startDate));
+    }
+    
     const [docsResult, requestsResult] = await Promise.all([
-      db.select({ count: count() }).from(vdrDocuments).where(eq(vdrDocuments.orgId, orgId)),
+      db.select({ count: count() }).from(vdrDocuments).where(and(...docConditions)),
       db.select({ 
         pending: sql<number>`COUNT(CASE WHEN ${vdrDataRequestItems.status} IN ('outstanding', 'in_progress') THEN 1 END)` 
       }).from(vdrDataRequestItems)
@@ -576,16 +635,21 @@ export class DashboardService {
     };
   }
 
-  private async getSalesCompsData(orgId: string) {
+  private async getSalesCompsData(orgId: string, dateFilter: TimeRangeFilter | null) {
     const { salesComps } = await import('@shared/schema');
     const { sql, count, avg, desc } = await import('drizzle-orm');
+    
+    const conditions = [eq(salesComps.orgId, orgId)];
+    if (dateFilter) {
+      conditions.push(gte(salesComps.createdAt, dateFilter.startDate));
+    }
     
     const [statsResult, recentResult] = await Promise.all([
       db.select({
         totalComps: count(),
         avgSalePrice: avg(salesComps.salePrice),
-      }).from(salesComps).where(eq(salesComps.orgId, orgId)),
-      db.select().from(salesComps).where(eq(salesComps.orgId, orgId)).orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth)).limit(5),
+      }).from(salesComps).where(and(...conditions)),
+      db.select().from(salesComps).where(and(...conditions)).orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth)).limit(5),
     ]);
 
     return {
@@ -595,13 +659,21 @@ export class DashboardService {
     };
   }
 
-  private async getDockTalkData(orgId: string) {
+  private async getDockTalkData(orgId: string, dateFilter: TimeRangeFilter | null) {
     const { docktalkArticles, docktalkDeals } = await import('@shared/schema');
     const { desc } = await import('drizzle-orm');
     
+    let articleQuery = db.select().from(docktalkArticles);
+    let dealQuery = db.select().from(docktalkDeals);
+    
+    if (dateFilter) {
+      articleQuery = articleQuery.where(gte(docktalkArticles.publishedAt, dateFilter.startDate));
+      dealQuery = dealQuery.where(gte(docktalkDeals.announcedDate, dateFilter.startDate));
+    }
+    
     const [articles, deals] = await Promise.all([
-      db.select().from(docktalkArticles).orderBy(desc(docktalkArticles.publishedAt)).limit(5),
-      db.select().from(docktalkDeals).orderBy(desc(docktalkDeals.announcedDate)).limit(5),
+      articleQuery.orderBy(desc(docktalkArticles.publishedAt)).limit(5),
+      dealQuery.orderBy(desc(docktalkDeals.announcedDate)).limit(5),
     ]);
 
     return {
@@ -610,12 +682,15 @@ export class DashboardService {
     };
   }
 
-  private async getFuelData(orgId: string) {
+  private async getFuelData(orgId: string, dateFilter: TimeRangeFilter | null) {
     const { fuelSales } = await import('@shared/schema');
-    const { sql, sum, gte } = await import('drizzle-orm');
+    const { sql, sum } = await import('drizzle-orm');
     
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startDate = dateFilter ? dateFilter.startDate : (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      return d;
+    })();
     
     const result = await db
       .select({
@@ -626,7 +701,7 @@ export class DashboardService {
       .where(
         and(
           eq(fuelSales.orgId, orgId),
-          gte(fuelSales.transactionDate, thirtyDaysAgo)
+          gte(fuelSales.transactionDate, startDate)
         )
       );
 
@@ -636,12 +711,15 @@ export class DashboardService {
     };
   }
 
-  private async getShipStoreData(orgId: string) {
+  private async getShipStoreData(orgId: string, dateFilter: TimeRangeFilter | null) {
     const { shipStoreTransactions, shipStoreProducts } = await import('@shared/schema');
-    const { sql, sum, count, avg, gte } = await import('drizzle-orm');
+    const { sql, sum, count, avg } = await import('drizzle-orm');
     
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startDate = dateFilter ? dateFilter.startDate : (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      return d;
+    })();
     
     // Ship store doesn't have orgId filtering - returns global data
     // TODO: Add orgId field to ship store tables for multi-tenant support
@@ -651,7 +729,7 @@ export class DashboardService {
         transactions: count(),
         avgTransaction: avg(shipStoreTransactions.total),
       }).from(shipStoreTransactions)
-        .where(gte(shipStoreTransactions.createdAt, thirtyDaysAgo)),
+        .where(gte(shipStoreTransactions.createdAt, startDate)),
       db.select({
         inventoryValue: sql<number>`SUM(${shipStoreProducts.quantity} * ${shipStoreProducts.price})`,
       }).from(shipStoreProducts),
@@ -665,9 +743,15 @@ export class DashboardService {
     };
   }
 
-  private async getRentRollData(orgId: string) {
+  private async getRentRollData(orgId: string, dateFilter: TimeRangeFilter | null) {
     const { rentRollEntries } = await import('@shared/schema');
     const { sql, count, sum } = await import('drizzle-orm');
+    
+    // Rent roll is generally current state, but we can filter by creation date for time-based analysis
+    const conditions = [eq(rentRollEntries.orgId, orgId)];
+    if (dateFilter) {
+      conditions.push(gte(rentRollEntries.createdAt, dateFilter.startDate));
+    }
     
     const result = await db
       .select({
@@ -677,7 +761,7 @@ export class DashboardService {
         monthlyIncome: sum(rentRollEntries.monthlyRate),
       })
       .from(rentRollEntries)
-      .where(eq(rentRollEntries.orgId, orgId));
+      .where(and(...conditions));
 
     const data = result[0];
     const totalUnits = Number(data.totalUnits) || 0;
@@ -691,9 +775,14 @@ export class DashboardService {
     };
   }
 
-  private async getModelingData(orgId: string) {
+  private async getModelingData(orgId: string, dateFilter: TimeRangeFilter | null) {
     const { modelingProjects } = await import('@shared/schema');
     const { sql, count, sum } = await import('drizzle-orm');
+    
+    const conditions = [eq(modelingProjects.orgId, orgId)];
+    if (dateFilter) {
+      conditions.push(gte(modelingProjects.createdAt, dateFilter.startDate));
+    }
     
     const result = await db
       .select({
@@ -703,7 +792,7 @@ export class DashboardService {
         totalValuation: sum(modelingProjects.purchasePrice),
       })
       .from(modelingProjects)
-      .where(eq(modelingProjects.orgId, orgId));
+      .where(and(...conditions));
 
     return {
       activeProjects: Number(result[0]?.activeProjects) || 0,
