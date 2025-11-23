@@ -1988,7 +1988,12 @@ export const crmDeals = pgTable("crm_deals", {
   closedAt: timestamp("closed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Performance indexes for dashboard queries
+  ownerCreatedAtIdx: index("crm_deals_owner_created_at").on(table.ownerId, table.createdAt),
+  stageIdx: index("crm_deals_stage").on(table.stage),
+  createdAtIdx: index("crm_deals_created_at").on(table.createdAt),
+}));
 
 // Products table - for revenue tracking
 
@@ -5304,6 +5309,8 @@ export const fuelSales = pgTable('fuel_sales', {
   dateIdx: index('fuel_sales_date_idx').on(table.transactionDate),
   fuelTypeIdx: index('fuel_sales_fuel_type_idx').on(table.fuelType),
   processedByIdx: index('fuel_sales_processed_by_idx').on(table.processedBy),
+  // Composite index for dashboard revenue queries
+  orgDateIdx: index('fuel_sales_org_date_idx').on(table.orgId, table.transactionDate),
 }));
 
 // Fuel Types Configuration - for managing different fuel products
@@ -5776,6 +5783,9 @@ export const modelingProjects = pgTable('modeling_projects', {
   propertyIdx: index('modeling_projects_property_idx').on(table.propertyId),
   stateIdx: index('modeling_projects_state_idx').on(table.state),
   regionIdx: index('modeling_projects_region_idx').on(table.region),
+  // Composite index for dashboard queries
+  orgCreatedAtIdx: index('modeling_projects_org_created_at_idx').on(table.orgId, table.createdAt),
+  orgOutcomeIdx: index('modeling_projects_org_outcome_idx').on(table.orgId, table.dealOutcome),
 }));
 
 // ================================================================================
@@ -6976,7 +6986,10 @@ export const shipStoreTransactions = pgTable("ship_store_transactions", {
     sku: string;
   }>>().notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  // Performance index for dashboard revenue queries
+  createdAtIdx: index('ship_store_transactions_created_at_idx').on(table.createdAt),
+}));
 
 export const insertTransactionSchema = createInsertSchema(shipStoreTransactions).omit({
   id: true,

@@ -71,7 +71,7 @@ function SortableModule({
                 <ExternalLink className="h-3.5 w-3.5" />
               </Button>
             </Link>
-            <div {...listeners} className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
+            <div {...listeners} className="hidden sm:block cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
               <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
           </div>
@@ -632,20 +632,21 @@ export default function Dashboard() {
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50" data-testid="page-dashboard">
-      <div className="container mx-auto p-6 max-w-7xl">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">MarinaMatch Dashboard</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">MarinaMatch Dashboard</h1>
+            <p className="text-sm sm:text-base text-gray-600 mt-1">
               Your comprehensive marina acquisition intelligence platform
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setIsAddModuleModalOpen(true)}
               data-testid="button-add-module"
+              className="w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Module
@@ -678,8 +679,8 @@ export default function Dashboard() {
         </DndContext>
 
         <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>Tip:</strong> Drag and drop modules to rearrange your dashboard. Click the external link icon to navigate to the full page for detailed analysis.
+          <p className="text-xs sm:text-sm text-blue-800">
+            <strong>Tip:</strong> <span className="hidden sm:inline">Drag and drop modules to rearrange your dashboard.</span> Click the external link icon to navigate to the full page for detailed analysis.
           </p>
         </div>
       </div>
