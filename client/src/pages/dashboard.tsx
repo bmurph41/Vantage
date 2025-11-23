@@ -14,6 +14,8 @@ import { TimeRangeSelector, type TimeRange } from "@/components/dashboard/TimeRa
 import { ComparisonModule } from "@/components/dashboard/ComparisonModule";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { formatCurrency, formatNumber } from "@/lib/formatUtils";
+import { CRMCharts } from "@/components/dashboard/CRMCharts";
+import { RevenueCharts } from "@/components/dashboard/RevenueCharts";
 
 type DashboardModule = {
   id: string;
@@ -260,6 +262,7 @@ export default function Dashboard() {
               tooltip="Total number of successfully closed deals"
             />
           </div>
+          <CRMCharts timeRange={timeRange} />
         </div>
       ),
     },
@@ -441,6 +444,7 @@ export default function Dashboard() {
               tooltip="Total fuel gallons sold in the selected period"
             />
           </div>
+          <RevenueCharts module="fuel" timeRange={timeRange} />
         </div>
       ),
     },
@@ -487,6 +491,7 @@ export default function Dashboard() {
               tooltip="Current total inventory value"
             />
           </div>
+          <RevenueCharts module="shipStore" timeRange={timeRange} />
         </div>
       ),
     },

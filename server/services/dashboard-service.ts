@@ -795,6 +795,127 @@ export class DashboardService {
       totalValuation: Number(result[0]?.totalValuation) || 0,
     };
   }
+
+  // ================================================================================
+  // TREND DATA FOR CHARTS
+  // ================================================================================
+
+  /**
+   * Get CRM pipeline trend data (daily aggregates)
+   */
+  async getCRMTrendData(orgId: string, timeRange: TimeRange = '30d') {
+    const { crmDeals, users } = await import('@shared/schema');
+    const { sql } = await import('drizzle-orm');
+    
+    const dateFilter = this.getTimeRangeFilter(timeRange);
+    if (!dateFilter) {
+      return [];
+    }
+
+    const conditions = [eq(users.orgId, orgId), gte(crmDeals.createdAt, dateFilter.startDate)];
+    
+    const result = await db
+      .select({
+        date: sql<string>`DATE(${crmDeals.createdAt})`,
+        pipelineValue: sql<number>`SUM(${crmDeals.value})`,
+        dealCount: sql<number>`COUNT(*)`,
+      })
+      .from(crmDeals)
+      .innerJoin(users, eq(crmDeals.ownerId, users.id))
+      .where(and(...conditions))
+      .groupBy(sql`DATE(${crmDeals.createdAt})`)
+      .orderBy(sql`DATE(${crmDeals.createdAt})`);
+
+    return result.map(row => ({
+      date: row.date,
+      value: Number(row.pipelineValue) || 0,
+      count: Number(row.dealCount) || 0,
+    }));
+  }
+
+  /**
+   * Get deal stage distribution for pie chart
+   */
+  async getCRMStageDistribution(orgId: string, timeRange: TimeRange = '30d') {
+    const { crmDeals, users } = await import('@shared/schema');
+    const { sql } = await import('drizzle-orm');
+    
+    const dateFilter = this.getTimeRangeFilter(timeRange);
+    const conditions = [eq(users.orgId, orgId)];
+    if (dateFilter) {
+      conditions.push(gte(crmDeals.createdAt, dateFilter.startDate));
+    }
+    
+    const result = await db
+      .select({
+        stage: crmDeals.stage,
+        count: sql<number>`COUNT(*)`,
+      })
+      .from(crmDeals)
+      .innerJoin(users, eq(crmDeals.ownerId, users.id))
+      .where(and(...conditions))
+      .groupBy(crmDeals.stage);
+
+    return result.map(row => ({
+      name: row.stage || 'Unknown',
+      value: Number(row.count) || 0,
+    }));
+  }
+
+  /**
+   * Get revenue trend data for financial modules
+   */
+  async getRevenueTrendData(orgId: string, module: 'fuel' | 'shipStore', timeRange: TimeRange = '30d') {
+    const dateFilter = this.getTimeRangeFilter(timeRange);
+    if (!dateFilter) {
+      return [];
+    }
+
+    if (module === 'fuel') {
+      const { fuelSales } = await import('@shared/schema');
+      const { sql } = await import('drizzle-orm');
+      
+      const result = await db
+        .select({
+          date: sql<string>`DATE(${fuelSales.transactionDate})`,
+          revenue: sql<number>`SUM(${fuelSales.totalAmount})`,
+          gallons: sql<number>`SUM(${fuelSales.gallons})`,
+        })
+        .from(fuelSales)
+        .where(and(
+          eq(fuelSales.orgId, orgId),
+          gte(fuelSales.transactionDate, dateFilter.startDate)
+        ))
+        .groupBy(sql`DATE(${fuelSales.transactionDate})`)
+        .orderBy(sql`DATE(${fuelSales.transactionDate})`);
+
+      return result.map(row => ({
+        date: row.date,
+        revenue: Number(row.revenue) || 0,
+        volume: Number(row.gallons) || 0,
+      }));
+    } else {
+      const { shipStoreTransactions } = await import('@shared/schema');
+      const { sql } = await import('drizzle-orm');
+      
+      const result = await db
+        .select({
+          date: sql<string>`DATE(${shipStoreTransactions.createdAt})`,
+          revenue: sql<number>`SUM(${shipStoreTransactions.total})`,
+          transactions: sql<number>`COUNT(*)`,
+        })
+        .from(shipStoreTransactions)
+        .where(gte(shipStoreTransactions.createdAt, dateFilter.startDate))
+        .groupBy(sql`DATE(${shipStoreTransactions.createdAt})`)
+        .orderBy(sql`DATE(${shipStoreTransactions.createdAt})`);
+
+      return result.map(row => ({
+        date: row.date,
+        revenue: Number(row.revenue) || 0,
+        count: Number(row.transactions) || 0,
+      }));
+    }
+  }
 }
 
 export const dashboardService = new DashboardService();

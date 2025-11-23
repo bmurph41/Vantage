@@ -10732,6 +10732,46 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get CRM trend data for charts
+  app.get('/api/dashboards/trends/crm', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const timeRange = (req.query.timeRange as any) || '30d';
+      const data = await dashboardService.getCRMTrendData(orgId, timeRange);
+      res.json(data);
+    } catch (error) {
+      console.error('Failed to fetch CRM trend data:', error);
+      res.status(500).json({ error: 'Failed to fetch CRM trend data' });
+    }
+  });
+
+  // Get CRM stage distribution for pie chart
+  app.get('/api/dashboards/distribution/crm-stages', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const timeRange = (req.query.timeRange as any) || '30d';
+      const data = await dashboardService.getCRMStageDistribution(orgId, timeRange);
+      res.json(data);
+    } catch (error) {
+      console.error('Failed to fetch CRM stage distribution:', error);
+      res.status(500).json({ error: 'Failed to fetch stage distribution' });
+    }
+  });
+
+  // Get revenue trend data for financial modules
+  app.get('/api/dashboards/trends/revenue', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const module = (req.query.module as 'fuel' | 'shipStore') || 'fuel';
+      const timeRange = (req.query.timeRange as any) || '30d';
+      const data = await dashboardService.getRevenueTrendData(orgId, module, timeRange);
+      res.json(data);
+    } catch (error) {
+      console.error('Failed to fetch revenue trend data:', error);
+      res.status(500).json({ error: 'Failed to fetch revenue trend data' });
+    }
+  });
+
   // ========================================================================
   // OWNED ASSETS & PORTFOLIO
   // ========================================================================
