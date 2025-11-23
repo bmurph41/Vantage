@@ -446,56 +446,266 @@ export class DashboardService {
    * Optimized with parallel queries and SQL aggregations
    */
   async getAggregatedDashboardData(orgId: string): Promise<any> {
-    // Temporary: Return mock data to get dashboard loading
-    // TODO: Fix database query issues
+    try {
+      // Execute all queries in parallel for performance
+      const [
+        crmData,
+        ddData,
+        vdrData,
+        compsData,
+        docktalkData,
+        fuelData,
+        shipStoreData,
+        rentRollData,
+        modelingData,
+      ] = await Promise.all([
+        this.getCRMData(orgId),
+        this.getDDData(orgId),
+        this.getVDRData(orgId),
+        this.getSalesCompsData(orgId),
+        this.getDockTalkData(orgId),
+        this.getFuelData(orgId),
+        this.getShipStoreData(orgId),
+        this.getRentRollData(orgId),
+        this.getModelingData(orgId),
+      ]);
+
+      return {
+        crm: crmData,
+        dueDiligence: ddData,
+        vdr: vdrData,
+        salesComps: compsData,
+        docktalk: docktalkData,
+        fuel: fuelData,
+        shipStore: shipStoreData,
+        rentRoll: rentRollData,
+        modeling: modelingData,
+      };
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      // Return empty data on error
+      return {
+        crm: { pipelineValue: 0, activeDeals: 0, wonDeals: 0, winRate: 0 },
+        dueDiligence: { activeProjects: 0, completedProjects: 0, totalProjects: 0, completionRate: 0 },
+        vdr: { activeDataRooms: 0, totalDocuments: 0, pendingRequests: 0 },
+        salesComps: { totalComps: 0, avgPricePerSlip: 0, recentComps: [] },
+        docktalk: { recentArticles: [], recentDeals: [] },
+        fuel: { monthlyRevenue: 0, monthlyGallons: 0 },
+        shipStore: { monthlyRevenue: 0, monthlyTransactions: 0, avgTransaction: 0, inventoryValue: 0 },
+        rentRoll: { totalUnits: 0, occupancyRate: 0, monthlyIncome: 0, vacantUnits: 0 },
+        modeling: { activeProjects: 0, completedProjects: 0, totalValuation: 0 },
+      };
+    }
+  }
+
+  private async getCRMData(orgId: string) {
+    const { deals } = await import('@shared/schema');
+    const { sql, count, sum } = await import('drizzle-orm');
+    
+    const result = await db
+      .select({
+        totalDeals: count(),
+        pipelineValue: sum(deals.value),
+        wonDeals: sql<number>`COUNT(CASE WHEN ${deals.stage} = 'closed_won' THEN 1 END)`,
+        activeDeals: sql<number>`COUNT(CASE WHEN ${deals.stage} NOT IN ('closed_won', 'closed_lost') THEN 1 END)`,
+      })
+      .from(deals)
+      .where(eq(deals.orgId, orgId));
+
+    const data = result[0];
+    const wonDeals = Number(data.wonDeals) || 0;
+    const totalDeals = Number(data.totalDeals) || 0;
+    
     return {
-      crm: {
-        pipelineValue: 0,
-        activeDeals: 0,
-        wonDeals: 0,
-        winRate: 0,
-      },
-      dueDiligence: {
-        activeProjects: 0,
-        completedProjects: 0,
-        totalProjects: 0,
-        completionRate: 0,
-      },
-      vdr: {
-        activeDataRooms: 0,
-        totalDocuments: 0,
-        pendingRequests: 0,
-      },
-      salesComps: {
-        totalComps: 0,
-        avgPricePerSlip: 0,
-        recentComps: [],
-      },
-      docktalk: {
-        recentArticles: [],
-        recentDeals: [],
-      },
-      fuel: {
-        monthlyRevenue: 0,
-        monthlyGallons: 0,
-      },
-      shipStore: {
-        monthlyRevenue: 0,
-        monthlyTransactions: 0,
-        avgTransaction: 0,
-        inventoryValue: 0,
-      },
-      rentRoll: {
-        totalUnits: 0,
-        occupancyRate: 0,
-        monthlyIncome: 0,
-        vacantUnits: 0,
-      },
-      modeling: {
-        activeProjects: 0,
-        completedProjects: 0,
-        totalValuation: 0,
-      },
+      pipelineValue: Number(data.pipelineValue) || 0,
+      activeDeals: Number(data.activeDeals) || 0,
+      wonDeals,
+      winRate: totalDeals > 0 ? Math.round((wonDeals / totalDeals) * 100) : 0,
+    };
+  }
+
+  private async getDDData(orgId: string) {
+    const { dueDiligenceProjects } = await import('@shared/schema');
+    const { sql, count } = await import('drizzle-orm');
+    
+    const result = await db
+      .select({
+        totalProjects: count(),
+        completedProjects: sql<number>`COUNT(CASE WHEN ${dueDiligenceProjects.status} = 'completed' THEN 1 END)`,
+        activeProjects: sql<number>`COUNT(CASE WHEN ${dueDiligenceProjects.status} = 'active' THEN 1 END)`,
+      })
+      .from(dueDiligenceProjects)
+      .where(eq(dueDiligenceProjects.orgId, orgId));
+
+    const data = result[0];
+    const totalProjects = Number(data.totalProjects) || 0;
+    const completedProjects = Number(data.completedProjects) || 0;
+    
+    return {
+      activeProjects: Number(data.activeProjects) || 0,
+      completedProjects,
+      totalProjects,
+      completionRate: totalProjects > 0 ? Math.round((completedProjects / totalProjects) * 100) : 0,
+    };
+  }
+
+  private async getVDRData(orgId: string) {
+    const { vdrProjects, vdrDocuments, vdrDataRequestItems } = await import('@shared/schema');
+    const { sql, count } = await import('drizzle-orm');
+    
+    const [projectsResult, docsResult, requestsResult] = await Promise.all([
+      db.select({ count: count() }).from(vdrProjects).where(eq(vdrProjects.orgId, orgId)),
+      db.select({ count: count() }).from(vdrDocuments).where(eq(vdrDocuments.orgId, orgId)),
+      db.select({ 
+        pending: sql<number>`COUNT(CASE WHEN ${vdrDataRequestItems.status} IN ('outstanding', 'in_progress') THEN 1 END)` 
+      }).from(vdrDataRequestItems)
+        .innerJoin(vdrProjects, eq(vdrDataRequestItems.vdrProjectId, vdrProjects.id))
+        .where(eq(vdrProjects.orgId, orgId)),
+    ]);
+
+    return {
+      activeDataRooms: Number(projectsResult[0]?.count) || 0,
+      totalDocuments: Number(docsResult[0]?.count) || 0,
+      pendingRequests: Number(requestsResult[0]?.pending) || 0,
+    };
+  }
+
+  private async getSalesCompsData(orgId: string) {
+    const { salesComps } = await import('@shared/schema');
+    const { sql, count, avg, desc } = await import('drizzle-orm');
+    
+    const [statsResult, recentResult] = await Promise.all([
+      db.select({
+        totalComps: count(),
+        avgPricePerSlip: avg(salesComps.pricePerSlip),
+      }).from(salesComps).where(eq(salesComps.orgId, orgId)),
+      db.select().from(salesComps).where(eq(salesComps.orgId, orgId)).orderBy(desc(salesComps.saleDate)).limit(5),
+    ]);
+
+    return {
+      totalComps: Number(statsResult[0]?.totalComps) || 0,
+      avgPricePerSlip: Math.round(Number(statsResult[0]?.avgPricePerSlip) || 0),
+      recentComps: recentResult,
+    };
+  }
+
+  private async getDockTalkData(orgId: string) {
+    const { docktalkArticles, docktalkDeals } = await import('@shared/schema');
+    const { desc } = await import('drizzle-orm');
+    
+    const [articles, deals] = await Promise.all([
+      db.select().from(docktalkArticles).orderBy(desc(docktalkArticles.publishedAt)).limit(5),
+      db.select().from(docktalkDeals).orderBy(desc(docktalkDeals.announcedDate)).limit(5),
+    ]);
+
+    return {
+      recentArticles: articles,
+      recentDeals: deals,
+    };
+  }
+
+  private async getFuelData(orgId: string) {
+    const { fuelTransactions } = await import('@shared/schema');
+    const { sql, sum, gte } = await import('drizzle-orm');
+    
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const result = await db
+      .select({
+        revenue: sum(fuelTransactions.totalAmount),
+        gallons: sum(fuelTransactions.quantity),
+      })
+      .from(fuelTransactions)
+      .where(
+        and(
+          eq(fuelTransactions.orgId, orgId),
+          gte(fuelTransactions.transactionDate, thirtyDaysAgo)
+        )
+      );
+
+    return {
+      monthlyRevenue: Number(result[0]?.revenue) || 0,
+      monthlyGallons: Number(result[0]?.gallons) || 0,
+    };
+  }
+
+  private async getShipStoreData(orgId: string) {
+    const { shipStoreTransactions, shipStoreProducts } = await import('@shared/schema');
+    const { sql, sum, count, avg, gte } = await import('drizzle-orm');
+    
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const [transResult, inventoryResult] = await Promise.all([
+      db.select({
+        revenue: sum(shipStoreTransactions.totalAmount),
+        transactions: count(),
+        avgTransaction: avg(shipStoreTransactions.totalAmount),
+      }).from(shipStoreTransactions)
+        .where(
+          and(
+            eq(shipStoreTransactions.orgId, orgId),
+            gte(shipStoreTransactions.transactionDate, thirtyDaysAgo)
+          )
+        ),
+      db.select({
+        inventoryValue: sql<number>`SUM(${shipStoreProducts.quantity} * ${shipStoreProducts.price})`,
+      }).from(shipStoreProducts).where(eq(shipStoreProducts.orgId, orgId)),
+    ]);
+
+    return {
+      monthlyRevenue: Number(transResult[0]?.revenue) || 0,
+      monthlyTransactions: Number(transResult[0]?.transactions) || 0,
+      avgTransaction: Number(transResult[0]?.avgTransaction) || 0,
+      inventoryValue: Number(inventoryResult[0]?.inventoryValue) || 0,
+    };
+  }
+
+  private async getRentRollData(orgId: string) {
+    const { rentRollUnits } = await import('@shared/schema');
+    const { sql, count, sum } = await import('drizzle-orm');
+    
+    const result = await db
+      .select({
+        totalUnits: count(),
+        occupiedUnits: sql<number>`COUNT(CASE WHEN ${rentRollUnits.status} = 'occupied' THEN 1 END)`,
+        vacantUnits: sql<number>`COUNT(CASE WHEN ${rentRollUnits.status} = 'vacant' THEN 1 END)`,
+        monthlyIncome: sum(rentRollUnits.currentRate),
+      })
+      .from(rentRollUnits)
+      .where(eq(rentRollUnits.orgId, orgId));
+
+    const data = result[0];
+    const totalUnits = Number(data.totalUnits) || 0;
+    const occupiedUnits = Number(data.occupiedUnits) || 0;
+    
+    return {
+      totalUnits,
+      occupancyRate: totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0,
+      monthlyIncome: Number(data.monthlyIncome) || 0,
+      vacantUnits: Number(data.vacantUnits) || 0,
+    };
+  }
+
+  private async getModelingData(orgId: string) {
+    const { modelingProjects } = await import('@shared/schema');
+    const { sql, count, sum } = await import('drizzle-orm');
+    
+    const result = await db
+      .select({
+        totalProjects: count(),
+        completedProjects: sql<number>`COUNT(CASE WHEN ${modelingProjects.status} = 'completed' THEN 1 END)`,
+        activeProjects: sql<number>`COUNT(CASE WHEN ${modelingProjects.status} = 'active' THEN 1 END)`,
+        totalValuation: sum(modelingProjects.estimatedValue),
+      })
+      .from(modelingProjects)
+      .where(eq(modelingProjects.orgId, orgId));
+
+    return {
+      activeProjects: Number(result[0]?.activeProjects) || 0,
+      completedProjects: Number(result[0]?.completedProjects) || 0,
+      totalValuation: Number(result[0]?.totalValuation) || 0,
     };
   }
 }
