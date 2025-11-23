@@ -617,7 +617,7 @@ export class DashboardService {
     const [docsResult, requestsResult] = await Promise.all([
       db.select({ count: count() }).from(vdrDocuments).where(and(...docConditions)),
       db.select({ 
-        pending: sql<number>`COUNT(CASE WHEN status IN ('outstanding', 'in_progress') THEN 1 END)` 
+        pending: sql<number>`COUNT(CASE WHEN ${vdrDataRequestItems.status} IN ('outstanding', 'in_progress') THEN 1 END)` 
       }).from(vdrDataRequestItems)
         .innerJoin(projects, eq(vdrDataRequestItems.vdrProjectId, projects.id))
         .where(eq(projects.orgId, orgId)),
@@ -752,7 +752,7 @@ export class DashboardService {
       .select({
         totalUnits: count(),
         occupiedUnits: sql<number>`COUNT(CASE WHEN ${rentRollEntries.status} = 'active' THEN 1 END)`,
-        vacantUnits: sql<number>`COUNT(CASE WHEN ${rentRollEntries.status} = 'vacant' THEN 1 END)`,
+        vacantUnits: sql<number>`COUNT(CASE WHEN ${rentRollEntries.status} IN ('expired', 'terminated') THEN 1 END)`,
         monthlyIncome: sum(rentRollEntries.monthlyRate),
       })
       .from(rentRollEntries)

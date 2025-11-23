@@ -104,6 +104,8 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   const [isAddModuleModalOpen, setIsAddModuleModalOpen] = useState(false);
   const [isCRMDetailOpen, setIsCRMDetailOpen] = useState(false);
+  const [isSalesCompsDetailOpen, setIsSalesCompsDetailOpen] = useState(false);
+  const [isFuelDetailOpen, setIsFuelDetailOpen] = useState(false);
   
   // Collapsed modules state with localStorage persistence
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(() => {
@@ -140,6 +142,20 @@ export default function Dashboard() {
     queryKey: ['/api/crm/deals/recent', timeRange],
     queryFn: () => fetch('/api/crm/deals/recent').then(res => res.json()),
     enabled: isCRMDetailOpen,
+  });
+
+  // Fetch recent sales comps for detail panel
+  const { data: recentComps, isLoading: compsLoading } = useQuery({
+    queryKey: ['/api/analysis/sales-comps/recent', timeRange],
+    queryFn: () => fetch('/api/analysis/sales-comps/recent').then(res => res.json()),
+    enabled: isSalesCompsDetailOpen,
+  });
+
+  // Fetch recent fuel transactions for detail panel
+  const { data: recentFuelTxns, isLoading: fuelLoading } = useQuery({
+    queryKey: ['/api/fuel/transactions/recent', timeRange],
+    queryFn: () => fetch('/api/fuel/transactions/recent').then(res => res.json()),
+    enabled: isFuelDetailOpen,
   });
 
   // Save module preferences mutation
@@ -394,6 +410,8 @@ export default function Dashboard() {
               colorClass="text-blue-600"
               testId="comps-total"
               tooltip="Number of sales comparables in selected period"
+              onClick={() => setIsSalesCompsDetailOpen(true)}
+              clickable={true}
             />
             <MetricCard
               label="Avg Price/Slip"
@@ -401,6 +419,8 @@ export default function Dashboard() {
               type="currency"
               testId="comps-avg-price"
               tooltip="Average price per slip across all comparables"
+              onClick={() => setIsSalesCompsDetailOpen(true)}
+              clickable={true}
             />
           </div>
           {data?.recentComps && data.recentComps.length > 0 && (
@@ -503,6 +523,8 @@ export default function Dashboard() {
               colorClass="text-green-600"
               testId="fuel-revenue"
               tooltip="Total fuel sales revenue for the selected period"
+              onClick={() => setIsFuelDetailOpen(true)}
+              clickable={true}
             />
             <MetricCard
               label="Monthly Gallons"
@@ -511,6 +533,8 @@ export default function Dashboard() {
               compact={true}
               testId="fuel-gallons"
               tooltip="Total fuel gallons sold in the selected period"
+              onClick={() => setIsFuelDetailOpen(true)}
+              clickable={true}
             />
           </div>
           <RevenueCharts module="fuel" timeRange={timeRange} />
@@ -779,9 +803,144 @@ export default function Dashboard() {
                 ),
               },
             ]}
-            onRowClick={(deal: any) => navigate(`/crm/deals/${deal.id}`)}
+            onRowClick={(deal: any) => { setIsCRMDetailOpen(false); navigate(`/crm/deals/${deal.id}`); }}
             getRowLink={(deal: any) => `/crm/deals/${deal.id}`}
             emptyMessage="No recent deals found"
+          />
+        )}
+      </DetailPanel>
+
+      <DetailPanel
+        open={isSalesCompsDetailOpen}
+        onOpenChange={setIsSalesCompsDetailOpen}
+        title="Sales Comps Details"
+        description="Recent marina sales comparables"
+        icon={TrendingUp}
+        sourceLink={`/analysis/sales-comps/analytics?timeRange=${timeRange}`}
+        sourceLinkText="Go to Sales Comps"
+        actions={
+          <Link href="/analysis/sales-comps/new">
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Comp
+            </Button>
+          </Link>
+        }
+      >
+        {compsLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <DataTable
+            data={recentComps || []}
+            columns={[
+              {
+                key: 'propertyName',
+                header: 'Property',
+                render: (comp: any) => (
+                  <div className="font-medium">{comp.propertyName || 'Unnamed'}</div>
+                ),
+              },
+              {
+                key: 'location',
+                header: 'Location',
+                render: (comp: any) => (
+                  <div className="text-gray-600">{comp.city}, {comp.state}</div>
+                ),
+              },
+              {
+                key: 'salePrice',
+                header: 'Sale Price',
+                render: (comp: any) => (
+                  <div className="text-gray-900 font-semibold">
+                    {formatCurrency(Number(comp.salePrice || 0))}
+                  </div>
+                ),
+              },
+              {
+                key: 'pricePerSlip',
+                header: 'Price/Slip',
+                render: (comp: any) => (
+                  <div className="text-gray-600">{formatCurrency(Number(comp.pricePerSlip || 0))}</div>
+                ),
+              },
+            ]}
+            onRowClick={(comp: any) => { setIsSalesCompsDetailOpen(false); navigate(`/analysis/sales-comps/${comp.id}`); }}
+            getRowLink={(comp: any) => `/analysis/sales-comps/${comp.id}`}
+            emptyMessage="No recent sales comps found"
+          />
+        )}
+      </DetailPanel>
+
+      <DetailPanel
+        open={isFuelDetailOpen}
+        onOpenChange={setIsFuelDetailOpen}
+        title="Fuel Transactions"
+        description="Recent fuel sales activity"
+        icon={Fuel}
+        sourceLink={`/fuel/transactions?timeRange=${timeRange}`}
+        sourceLinkText="Go to Fuel"
+        actions={
+          <Link href="/fuel/transactions/new">
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Record Sale
+            </Button>
+          </Link>
+        }
+      >
+        {fuelLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <DataTable
+            data={recentFuelTxns || []}
+            columns={[
+              {
+                key: 'transactionDate',
+                header: 'Date',
+                render: (txn: any) => (
+                  <div className="font-medium">{new Date(txn.transactionDate).toLocaleDateString()}</div>
+                ),
+              },
+              {
+                key: 'customerName',
+                header: 'Customer',
+                render: (txn: any) => (
+                  <div className="text-gray-600">{txn.customerName || 'Walk-in'}</div>
+                ),
+              },
+              {
+                key: 'fuelType',
+                header: 'Fuel Type',
+                render: (txn: any) => (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    {txn.fuelType}
+                  </span>
+                ),
+              },
+              {
+                key: 'gallons',
+                header: 'Gallons',
+                render: (txn: any) => (
+                  <div className="text-gray-600">{formatNumber(Number(txn.gallons || 0))}</div>
+                ),
+              },
+              {
+                key: 'totalAmount',
+                header: 'Total',
+                render: (txn: any) => (
+                  <div className="text-gray-900 font-semibold">
+                    {formatCurrency(Number(txn.totalAmount || 0))}
+                  </div>
+                ),
+              },
+            ]}
+            onRowClick={(txn: any) => { setIsFuelDetailOpen(false); navigate(`/fuel/transactions/${txn.id}`); }}
+            getRowLink={(txn: any) => `/fuel/transactions/${txn.id}`}
+            emptyMessage="No recent fuel transactions found"
           />
         )}
       </DetailPanel>

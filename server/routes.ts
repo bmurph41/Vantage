@@ -10803,6 +10803,69 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get recent sales comps for detail panel
+  app.get('/api/analysis/sales-comps/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { salesComps } = await import('@shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const comps = await db
+        .select({
+          id: salesComps.id,
+          propertyName: salesComps.propertyName,
+          city: salesComps.city,
+          state: salesComps.state,
+          salePrice: salesComps.salePrice,
+          slipCount: salesComps.slipCount,
+          pricePerSlip: salesComps.pricePerSlip,
+          saleYear: salesComps.saleYear,
+          saleMonth: salesComps.saleMonth,
+          createdAt: salesComps.createdAt,
+        })
+        .from(salesComps)
+        .where(eq(salesComps.orgId, orgId))
+        .orderBy(desc(salesComps.createdAt))
+        .limit(20);
+
+      res.json(comps);
+    } catch (error) {
+      console.error('Failed to fetch recent sales comps:', error);
+      res.status(500).json({ error: 'Failed to fetch recent sales comps' });
+    }
+  });
+
+  // Get recent fuel transactions for detail panel
+  app.get('/api/fuel/transactions/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fuelSales } = await import('@shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const transactions = await db
+        .select({
+          id: fuelSales.id,
+          transactionDate: fuelSales.transactionDate,
+          customerName: fuelSales.customerName,
+          fuelType: fuelSales.fuelType,
+          gallons: fuelSales.gallons,
+          pricePerGallon: fuelSales.pricePerGallon,
+          totalAmount: fuelSales.totalAmount,
+          paymentMethod: fuelSales.paymentMethod,
+          createdAt: fuelSales.createdAt,
+        })
+        .from(fuelSales)
+        .where(eq(fuelSales.orgId, orgId))
+        .orderBy(desc(fuelSales.transactionDate))
+        .limit(20);
+
+      res.json(transactions);
+    } catch (error) {
+      console.error('Failed to fetch recent fuel transactions:', error);
+      res.status(500).json({ error: 'Failed to fetch recent fuel transactions' });
+    }
+  });
+
   // Get user dashboard module preferences
   app.get('/api/dashboards/modules', authenticateUser, async (req: any, res) => {
     try {
