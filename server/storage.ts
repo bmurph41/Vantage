@@ -3635,8 +3635,8 @@ export class DatabaseStorage implements IStorage {
         case 'saleYear':
           dbColumn = salesComps.saleYear;
           break;
-        case 'market':
-          dbColumn = salesComps.market;
+        case 'region':
+          dbColumn = salesComps.region;
           break;
         default:
           return [];
@@ -5581,8 +5581,8 @@ export class DatabaseStorage implements IStorage {
         case 'saleYear':
           dbColumn = rateComps.saleYear;
           break;
-        case 'market':
-          dbColumn = rateComps.market;
+        case 'region':
+          dbColumn = rateComps.region;
           break;
         default:
           return [];
