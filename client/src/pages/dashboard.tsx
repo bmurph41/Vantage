@@ -727,7 +727,7 @@ export default function Dashboard() {
         title="CRM Pipeline Details"
         description="Recent deals and pipeline activity"
         icon={DollarSign}
-        sourceLink="/crm/deals"
+        sourceLink={`/crm/deals?timeRange=${timeRange}&status=open`}
         sourceLinkText="Go to CRM"
         actions={
           <Link href="/crm/deals/new">
