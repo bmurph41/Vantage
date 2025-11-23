@@ -726,7 +726,7 @@ export class DashboardService {
       }).from(shipStoreTransactions)
         .where(gte(shipStoreTransactions.createdAt, startDate)),
       db.select({
-        inventoryValue: sql<number>`SUM(${shipStoreProducts.quantity} * ${shipStoreProducts.price})`,
+        inventoryValue: sql<number>`SUM(${shipStoreProducts.stock} * ${shipStoreProducts.price})`,
       }).from(shipStoreProducts),
     ]);
 
