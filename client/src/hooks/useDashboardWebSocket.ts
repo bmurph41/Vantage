@@ -47,7 +47,7 @@ export function useDashboardWebSocket() {
             setLastUpdate(message);
             
             queryClient.invalidateQueries({ 
-              queryKey: ['/api/dashboards/aggregated'] 
+              queryKey: ['/api/dashboards/data'] 
             });
           } else if (message.type === 'pong') {
           }

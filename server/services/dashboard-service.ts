@@ -448,11 +448,12 @@ export class DashboardService {
   async getAggregatedDashboardData(orgId: string): Promise<any> {
     const { crmDeals } = await import('@shared/schema');
     const { projects } = await import('@shared/schema');
-    const { vdrProjects, vdrDocuments, vdrDataRequests } = await import('@shared/schema');
+    const { vdrDocuments } = await import('@shared/schema');
+    const { vdrDataRequests } = await import('@shared/schema');
     const { salesComps } = await import('@shared/schema');
     const { docktalkArticles, docktalkDeals } = await import('@shared/docktalk-schema');
     const { fuelSalesTransactions, shipStoreTransactions, shipStoreProducts, rentRollUnits, modelingProjects } = await import('@shared/schema');
-    const { eq, and, gte, sql, desc, count } = await import('drizzle-orm');
+    const { eq, and, gte, sql, desc, count, isNull } = await import('drizzle-orm');
     const { subDays } = await import('date-fns');
 
     const thirtyDaysAgo = subDays(new Date(), 30);
@@ -491,13 +492,19 @@ export class DashboardService {
       // VDR aggregated stats
       Promise.all([
         db.select({
-          activeDataRooms: sql<number>`COUNT(CASE WHEN status = 'active' THEN 1 END)`,
+          activeProjects: sql<number>`COUNT(DISTINCT project_id)`,
         })
-        .from(vdrProjects)
-        .where(eq(vdrProjects.orgId, orgId)),
+        .from(vdrDocuments)
+        .where(and(
+          eq(vdrDocuments.orgId, orgId),
+          isNull(vdrDocuments.deletedAt)
+        )),
         db.select({ count: count() })
         .from(vdrDocuments)
-        .where(eq(vdrDocuments.orgId, orgId)),
+        .where(and(
+          eq(vdrDocuments.orgId, orgId),
+          isNull(vdrDocuments.deletedAt)
+        )),
         db.select({ count: count() })
         .from(vdrDataRequests)
         .where(and(
