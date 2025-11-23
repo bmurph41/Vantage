@@ -3,15 +3,13 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, Wifi } from "lucide-react";
+import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useDashboardWebSocket } from "@/hooks/useDashboardWebSocket";
-import { Badge } from "@/components/ui/badge";
 
 type DashboardModule = {
   id: string;
@@ -22,7 +20,7 @@ type DashboardModule = {
   renderContent: (data: any) => React.ReactNode;
 };
 
-function SortableModule({ module, isPulsing }: { module: DashboardModule; isPulsing: boolean }) {
+function SortableModule({ module }: { module: DashboardModule }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: module.id,
   });
@@ -37,12 +35,11 @@ function SortableModule({ module, isPulsing }: { module: DashboardModule; isPuls
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-      <Card className={`h-full hover:shadow-lg transition-all ${isPulsing ? 'ring-2 ring-blue-400 shadow-xl animate-pulse' : ''}`}>
+      <Card className="h-full hover:shadow-lg transition-all">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Icon className="h-4 w-4 text-blue-600" />
             {module.title}
-            {isPulsing && <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700 text-xs">Updated</Badge>}
           </CardTitle>
           <div className="flex items-center gap-1">
             <Link href={module.link}>
@@ -65,8 +62,6 @@ function SortableModule({ module, isPulsing }: { module: DashboardModule; isPuls
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { isConnected, lastUpdate } = useDashboardWebSocket();
-  const [pulsingModule, setPulsingModule] = useState<string | null>(null);
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -97,13 +92,6 @@ export default function Dashboard() {
   });
 
   const [moduleOrder, setModuleOrder] = useState<string[]>(DEFAULT_MODULE_ORDER);
-
-  useEffect(() => {
-    if (lastUpdate?.module) {
-      setPulsingModule(lastUpdate.module);
-      setTimeout(() => setPulsingModule(null), 2000);
-    }
-  }, [lastUpdate]);
 
   // Load saved layout on mount
   useEffect(() => {
@@ -470,21 +458,11 @@ export default function Dashboard() {
   return (
     <div className="flex-1 overflow-auto bg-gray-50" data-testid="page-dashboard">
       <div className="container mx-auto p-6 max-w-7xl">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">MarinaMatch Dashboard</h1>
-            <p className="text-gray-600 mt-1">
-              Your comprehensive marina acquisition intelligence platform
-            </p>
-          </div>
-          <Badge 
-            variant={isConnected ? "default" : "secondary"} 
-            className={`flex items-center gap-1.5 ${isConnected ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400'}`}
-            data-testid="ws-status"
-          >
-            <Wifi className="h-3 w-3" />
-            {isConnected ? 'Live' : 'Disconnected'}
-          </Badge>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">MarinaMatch Dashboard</h1>
+          <p className="text-gray-600 mt-1">
+            Your comprehensive marina acquisition intelligence platform
+          </p>
         </div>
 
         <DndContext
@@ -498,7 +476,6 @@ export default function Dashboard() {
                 <SortableModule 
                   key={module.id} 
                   module={module} 
-                  isPulsing={pulsingModule === module.id}
                 />
               ))}
             </div>
