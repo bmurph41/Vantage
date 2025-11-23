@@ -481,48 +481,60 @@ export class DashboardService {
   }
 
   /**
-   * Get aggregated dashboard data for all modules
+   * Get aggregated dashboard data for selected modules only
    * Optimized with parallel queries and SQL aggregations
    */
-  async getAggregatedDashboardData(orgId: string, timeRange: TimeRange = 'all'): Promise<any> {
+  async getAggregatedDashboardData(orgId: string, timeRange: TimeRange = 'all', selectedModules: string[] | null = null): Promise<any> {
     try {
       const dateFilter = this.getTimeRangeFilter(timeRange);
       
-      // Execute all queries in parallel for performance
-      const [
-        crmData,
-        ddData,
-        vdrData,
-        compsData,
-        docktalkData,
-        fuelData,
-        shipStoreData,
-        rentRollData,
-        modelingData,
-      ] = await Promise.all([
-        this.getCRMData(orgId, dateFilter),
-        this.getDDData(orgId, dateFilter),
-        this.getVDRData(orgId, dateFilter),
-        this.getSalesCompsData(orgId, dateFilter),
-        this.getDockTalkData(orgId, dateFilter),
-        this.getFuelData(orgId, dateFilter),
-        this.getShipStoreData(orgId, dateFilter),
-        this.getRentRollData(orgId, dateFilter),
-        this.getModelingData(orgId, dateFilter),
-      ]);
-
-      return {
-        crm: crmData,
-        dueDiligence: ddData,
-        vdr: vdrData,
-        salesComps: compsData,
-        docktalk: docktalkData,
-        fuel: fuelData,
-        shipStore: shipStoreData,
-        rentRoll: rentRollData,
-        modeling: modelingData,
-        timeRange,
+      // Module ID to data fetcher mapping
+      const moduleMap: Record<string, () => Promise<any>> = {
+        'crm-pipeline': () => this.getCRMData(orgId, dateFilter),
+        'due-diligence': () => this.getDDData(orgId, dateFilter),
+        'vdr-activity': () => this.getVDRData(orgId, dateFilter),
+        'sales-comps': () => this.getSalesCompsData(orgId, dateFilter),
+        'docktalk-feed': () => this.getDockTalkData(orgId, dateFilter),
+        'fuel-operations': () => this.getFuelData(orgId, dateFilter),
+        'ship-store': () => this.getShipStoreData(orgId, dateFilter),
+        'rent-roll': () => this.getRentRollData(orgId, dateFilter),
+        'modeling-projects': () => this.getModelingData(orgId, dateFilter),
       };
+      
+      // If no modules specified, fetch all (for backwards compatibility)
+      const modulesToFetch = selectedModules || Object.keys(moduleMap);
+      
+      // Only execute queries for selected modules
+      const dataPromises: Record<string, Promise<any>> = {};
+      modulesToFetch.forEach(moduleId => {
+        if (moduleMap[moduleId]) {
+          dataPromises[moduleId] = moduleMap[moduleId]();
+        }
+      });
+      
+      const results = await Promise.all(Object.values(dataPromises));
+      const moduleKeys = Object.keys(dataPromises);
+      
+      // Map results back to their module IDs
+      const data: Record<string, any> = { timeRange };
+      const moduleKeyMap: Record<string, string> = {
+        'crm-pipeline': 'crm',
+        'due-diligence': 'dueDiligence',
+        'vdr-activity': 'vdr',
+        'sales-comps': 'salesComps',
+        'docktalk-feed': 'docktalk',
+        'fuel-operations': 'fuel',
+        'ship-store': 'shipStore',
+        'rent-roll': 'rentRoll',
+        'modeling-projects': 'modeling',
+      };
+      
+      moduleKeys.forEach((moduleId, index) => {
+        const dataKey = moduleKeyMap[moduleId] || moduleId;
+        data[dataKey] = results[index];
+      });
+
+      return data;
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       // Return empty data on error

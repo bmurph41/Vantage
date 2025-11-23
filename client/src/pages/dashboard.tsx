@@ -210,8 +210,12 @@ export default function Dashboard() {
   ];
 
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ['/api/dashboards/data', timeRange],
-    queryFn: () => fetch(`/api/dashboards/data?timeRange=${timeRange}`).then(res => res.json()),
+    queryKey: ['/api/dashboards/data', timeRange, selectedModules],
+    queryFn: () => {
+      const modules = selectedModules.length > 0 ? selectedModules.join(',') : 'all';
+      return fetch(`/api/dashboards/data?timeRange=${timeRange}&modules=${modules}`).then(res => res.json());
+    },
+    enabled: selectedModules.length > 0 || modulePreferences !== undefined,
   });
 
   const { data: layoutData } = useQuery({

@@ -10724,7 +10724,10 @@ Current context: Project ${req.params.projectId}`;
     try {
       const orgId = req.user.orgId;
       const timeRange = (req.query.timeRange as any) || 'all'; // 7d, 30d, 90d, ytd, all
-      const data = await dashboardService.getAggregatedDashboardData(orgId, timeRange);
+      const modulesParam = req.query.modules as string;
+      const selectedModules = modulesParam && modulesParam !== 'all' ? modulesParam.split(',') : null;
+      
+      const data = await dashboardService.getAggregatedDashboardData(orgId, timeRange, selectedModules);
       res.json(data);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
