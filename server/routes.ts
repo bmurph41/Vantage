@@ -25,6 +25,7 @@ import { personaService } from "./services/persona-service";
 import { dashboardService } from "./services/dashboard-service";
 import { ownedAssetsService } from "./services/owned-assets-service";
 import { debtScenarioService } from "./debt-scenario-service";
+import { calculateAll, type TransactionClosingData } from "./services/transactionClosingEngine";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
@@ -106,7 +107,18 @@ import {
   updateUserDashboardLayoutSchema,
   insertOwnedAssetSchema,
   updateOwnedAssetSchema,
-  insertAssetPerformanceSnapshotSchema
+  insertAssetPerformanceSnapshotSchema,
+  modelingProjects,
+  insertModelingProjectSchema,
+  updateModelingProjectSchema,
+  transactionClosingSummary,
+  closingCostLines,
+  transitionCostLines,
+  nwcLines,
+  insertTransactionClosingSummarySchema,
+  insertClosingCostLineSchema,
+  insertTransitionCostLineSchema,
+  insertNwcLineSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -10248,6 +10260,182 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to fetch modeling analytics:', error);
       res.status(500).json({ error: 'Failed to fetch modeling analytics' });
+    }
+  });
+
+  // ============================================================================
+  // TRANSACTION & CLOSING COSTS
+  // ============================================================================
+
+  // Get transaction closing data for a modeling project
+  app.get('/api/modeling/projects/:projectId/transaction-closing', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      // Verify project exists and belongs to organization
+      const [project] = await db.select().from(modelingProjects)
+        .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)));
+      
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      // Get summary (1:1 relationship)
+      const [summary] = await db.select().from(transactionClosingSummary)
+        .where(eq(transactionClosingSummary.modelingProjectId, projectId));
+      
+      // Get line items
+      const closingLines = await db.select().from(closingCostLines)
+        .where(eq(closingCostLines.modelingProjectId, projectId))
+        .orderBy(asc(closingCostLines.sortOrder));
+      
+      const transitionLines = await db.select().from(transitionCostLines)
+        .where(eq(transitionCostLines.modelingProjectId, projectId))
+        .orderBy(asc(transitionCostLines.sortOrder));
+      
+      const nwcLinesData = await db.select().from(nwcLines)
+        .where(eq(nwcLines.modelingProjectId, projectId))
+        .orderBy(asc(nwcLines.sortOrder));
+      
+      res.json({
+        summary: summary || null,
+        closingCostLines: closingLines,
+        transitionCostLines: transitionLines,
+        nwcLines: nwcLinesData,
+      });
+    } catch (error) {
+      console.error('Failed to fetch transaction closing data:', error);
+      res.status(500).json({ error: 'Failed to fetch transaction closing data' });
+    }
+  });
+
+  // Save transaction closing data for a modeling project
+  app.post('/api/modeling/projects/:projectId/transaction-closing', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      // Verify project exists and belongs to organization
+      const [project] = await db.select().from(modelingProjects)
+        .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)));
+      
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      // Parse and validate request body
+      const { summary, closingCostLines: closingLines, transitionCostLines: transitionLines, nwcLines: nwcLinesData } = req.body;
+      
+      // Run calculations
+      const calculatedSummary = calculateAll({
+        summary: summary || {},
+        closingCostLines: closingLines || [],
+        transitionCostLines: transitionLines || [],
+        nwcLines: nwcLinesData || [],
+      });
+      
+      // Merge user-entered fields with computed fields
+      const summaryToSave = {
+        ...summary, // User-entered fields (purchasePrice, financingFeeRate, etc.)
+        ...calculatedSummary, // Computed fields (override with calculated values)
+      };
+      
+      // Begin transaction - save everything atomically
+      await db.transaction(async (tx) => {
+        // Upsert summary
+        const [existingSummary] = await tx.select().from(transactionClosingSummary)
+          .where(eq(transactionClosingSummary.modelingProjectId, projectId));
+        
+        if (existingSummary) {
+          // Update existing
+          await tx.update(transactionClosingSummary)
+            .set({
+              ...summaryToSave,
+              modelingProjectId: projectId,
+              orgId,
+              updatedAt: new Date(),
+            })
+            .where(eq(transactionClosingSummary.id, existingSummary.id));
+        } else {
+          // Insert new
+          await tx.insert(transactionClosingSummary).values({
+            ...summaryToSave,
+            modelingProjectId: projectId,
+            orgId,
+          });
+        }
+        
+        // Delete existing line items and re-insert (simpler than upsert logic)
+        await tx.delete(closingCostLines).where(eq(closingCostLines.modelingProjectId, projectId));
+        await tx.delete(transitionCostLines).where(eq(transitionCostLines.modelingProjectId, projectId));
+        await tx.delete(nwcLines).where(eq(nwcLines.modelingProjectId, projectId));
+        
+        // Insert closing cost lines
+        if (closingLines && closingLines.length > 0) {
+          await tx.insert(closingCostLines).values(
+            closingLines.map((line: any, index: number) => ({
+              ...line,
+              modelingProjectId: projectId,
+              orgId,
+              sortOrder: line.sortOrder ?? index,
+            }))
+          );
+        }
+        
+        // Insert transition cost lines
+        if (transitionLines && transitionLines.length > 0) {
+          await tx.insert(transitionCostLines).values(
+            transitionLines.map((line: any, index: number) => ({
+              ...line,
+              modelingProjectId: projectId,
+              orgId,
+              sortOrder: line.sortOrder ?? index,
+            }))
+          );
+        }
+        
+        // Insert NWC lines
+        if (nwcLinesData && nwcLinesData.length > 0) {
+          await tx.insert(nwcLines).values(
+            nwcLinesData.map((line: any, index: number) => ({
+              ...line,
+              modelingProjectId: projectId,
+              orgId,
+              sortOrder: line.sortOrder ?? index,
+            }))
+          );
+        }
+      });
+      
+      // Fetch and return saved data
+      const [savedSummary] = await db.select().from(transactionClosingSummary)
+        .where(eq(transactionClosingSummary.modelingProjectId, projectId));
+      
+      const savedClosingLines = await db.select().from(closingCostLines)
+        .where(eq(closingCostLines.modelingProjectId, projectId))
+        .orderBy(asc(closingCostLines.sortOrder));
+      
+      const savedTransitionLines = await db.select().from(transitionCostLines)
+        .where(eq(transitionCostLines.modelingProjectId, projectId))
+        .orderBy(asc(transitionCostLines.sortOrder));
+      
+      const savedNwcLines = await db.select().from(nwcLines)
+        .where(eq(nwcLines.modelingProjectId, projectId))
+        .orderBy(asc(nwcLines.sortOrder));
+      
+      res.json({
+        summary: savedSummary,
+        closingCostLines: savedClosingLines,
+        transitionCostLines: savedTransitionLines,
+        nwcLines: savedNwcLines,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to save transaction closing data:', error);
+      res.status(500).json({ error: 'Failed to save transaction closing data' });
     }
   });
 

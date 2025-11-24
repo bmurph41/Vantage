@@ -102,6 +102,7 @@ const DemographicsIndex = lazy(() => import("@/pages/analysis/demographics/Index
 const BenchmarksIndex = lazy(() => import("@/pages/analysis/benchmarks/Index"));
 const DebtScenariosIndex = lazy(() => import("@/pages/modeling/debt-scenarios/Index"));
 const ModelingProjectsIndex = lazy(() => import("@/pages/modeling/projects"));
+const TransactionClosingPage = lazy(() => import("@/pages/modeling/projects/transaction-closing"));
 const VDRDashboard = lazy(() => import("@/pages/vdr/Dashboard"));
 const ProjectVDR = lazy(() => import("@/pages/vdr/ProjectVDR"));
 const DataRequest = lazy(() => import("@/pages/vdr/DataRequest"));
@@ -786,6 +787,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <ModelingProjectsIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/transaction-closing">
+        {(params) => (
+          <UnifiedLayout>
+            <TransactionClosingPage {...params} />
           </UnifiedLayout>
         )}
       </Route>

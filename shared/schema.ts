@@ -97,6 +97,7 @@ export const personaTypeEnum = pgEnum("persona_type", ["pe_investor", "broker", 
 export const widgetCategoryEnum = pgEnum("widget_category", ["analytics", "pipeline", "operations", "finance", "tasks", "market_intel"]);
 export const assetStatusEnum = pgEnum("asset_status", ["under_management", "optimization", "exit"]);
 export const holdStrategyEnum = pgEnum("hold_strategy", ["core", "value_add", "opportunistic"]);
+export const nwcBucketTypeEnum = pgEnum("nwc_bucket_type", ["current_asset", "current_liability", "nwc_adjustment"]);
 
 // Organizations
 export const organizations = pgTable("organizations", {
@@ -5878,6 +5879,112 @@ export const modelingProjects = pgTable('modeling_projects', {
   orgOutcomeIdx: index('modeling_projects_org_outcome_idx').on(table.orgId, table.dealOutcome),
 }));
 
+// Transaction & Closing Costs - Transaction Closing Summary - Aggregated metrics and computations (1:1 with modeling_projects)
+export const transactionClosingSummary = pgTable('transaction_closing_summary', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }).unique(),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Purchase price (can be pulled from modeling project or manually overridden)
+  purchasePrice: decimal('purchase_price', { precision: 18, scale: 2 }),
+  
+  // Closing costs
+  totalClosingCosts: decimal('total_closing_costs', { precision: 18, scale: 2 }),
+  
+  // Financing fees
+  financingFeeRate: decimal('financing_fee_rate', { precision: 10, scale: 6 }), // e.g., 0.01 = 1%
+  financingBaseAmount: decimal('financing_base_amount', { precision: 18, scale: 2 }), // Base amount for fee calculation
+  financingFees: decimal('financing_fees', { precision: 18, scale: 2 }), // Computed: rate * base
+  
+  // Working capital
+  workingCapitalMonths: integer('working_capital_months'), // Number of months of expenses
+  workingCapitalMonthlyExpenseBase: decimal('working_capital_monthly_expense_base', { precision: 18, scale: 2 }), // Annual opex / 12
+  workingCapitalRequired: decimal('working_capital_required', { precision: 18, scale: 2 }), // months * monthly base
+  
+  // Transition costs
+  transitionCostsTotal: decimal('transition_costs_total', { precision: 18, scale: 2 }),
+  
+  // CapEx (can be pulled from CapEx module or manually entered)
+  capexPhase1: decimal('capex_phase1', { precision: 18, scale: 2 }),
+  capexPhase2: decimal('capex_phase2', { precision: 18, scale: 2 }),
+  capexPhase3: decimal('capex_phase3', { precision: 18, scale: 2 }),
+  
+  // Total investment cost (computed)
+  totalInvestmentCost: decimal('total_investment_cost', { precision: 18, scale: 2 }),
+  
+  // Net working capital outputs
+  currentAssetsTotal: decimal('current_assets_total', { precision: 18, scale: 2 }),
+  currentLiabilitiesTotal: decimal('current_liabilities_total', { precision: 18, scale: 2 }),
+  currentRatio: decimal('current_ratio', { precision: 18, scale: 6 }), // = current_assets / current_liabilities
+  arMinusAp: decimal('ar_minus_ap', { precision: 18, scale: 2 }), // Accounts Receivable - Accounts Payable
+  nwcAdjustmentsTotal: decimal('nwc_adjustments_total', { precision: 18, scale: 2 }),
+  workingCapitalBalance: decimal('working_capital_balance', { precision: 18, scale: 2 }), // (assets - liabilities) + adjustments
+  currentRatioAsOfDate: date('current_ratio_as_of_date'),
+  
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  modelingProjectIdx: index('transaction_closing_summary_modeling_project_idx').on(table.modelingProjectId),
+  orgIdx: index('transaction_closing_summary_org_idx').on(table.orgId),
+}));
+
+// Closing Cost Lines - Detailed line items for closing costs
+export const closingCostLines = pgTable('closing_cost_lines', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  category: text('category').notNull(), // e.g., "Legal Fees", "Broker Fees", "Survey", etc.
+  amount: decimal('amount', { precision: 18, scale: 2 }).notNull().default('0'),
+  notes: text('notes'),
+  isFinancingFee: boolean('is_financing_fee').notNull().default(false), // True if this is the computed financing fee row
+  sortOrder: integer('sort_order').notNull().default(0),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  modelingProjectIdx: index('closing_cost_lines_modeling_project_idx').on(table.modelingProjectId),
+  orgIdx: index('closing_cost_lines_org_idx').on(table.orgId),
+}));
+
+// Transition Cost Lines - Detailed line items for transition costs
+export const transitionCostLines = pgTable('transition_cost_lines', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  category: text('category').notNull(), // e.g., "Office 365", "Software/Migration", "Hardware", etc.
+  amount: decimal('amount', { precision: 18, scale: 2 }).notNull().default('0'),
+  notes: text('notes'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  modelingProjectIdx: index('transition_cost_lines_modeling_project_idx').on(table.modelingProjectId),
+  orgIdx: index('transition_cost_lines_org_idx').on(table.orgId),
+}));
+
+// NWC Lines - Net Working Capital inputs (current assets, liabilities, adjustments)
+export const nwcLines = pgTable('nwc_lines', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  bucketType: nwcBucketTypeEnum('bucket_type').notNull(), // "current_asset", "current_liability", "nwc_adjustment"
+  label: text('label').notNull(), // e.g., "Cash", "Accounts Receivables", "Inventory", etc.
+  amount: decimal('amount', { precision: 18, scale: 2 }).notNull().default('0'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  modelingProjectIdx: index('nwc_lines_modeling_project_idx').on(table.modelingProjectId),
+  orgIdx: index('nwc_lines_org_idx').on(table.orgId),
+  bucketTypeIdx: index('nwc_lines_bucket_type_idx').on(table.bucketType),
+}));
+
 // ================================================================================
 // RBAC & ADVANCED COMPLIANCE SYSTEM
 // ================================================================================
@@ -6714,6 +6821,87 @@ export const updateModelingProjectSchema = insertModelingProjectSchema.partial()
 export type ModelingProject = typeof modelingProjects.$inferSelect;
 export type InsertModelingProject = z.infer<typeof insertModelingProjectSchema>;
 export type UpdateModelingProject = z.infer<typeof updateModelingProjectSchema>;
+
+// Transaction Closing Summary schemas
+export const insertTransactionClosingSummarySchema = createInsertSchema(transactionClosingSummary).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  purchasePrice: z.string().or(z.number()).optional(),
+  totalClosingCosts: z.string().or(z.number()).optional(),
+  financingFeeRate: z.string().or(z.number()).optional(),
+  financingBaseAmount: z.string().or(z.number()).optional(),
+  financingFees: z.string().or(z.number()).optional(),
+  workingCapitalMonthlyExpenseBase: z.string().or(z.number()).optional(),
+  workingCapitalRequired: z.string().or(z.number()).optional(),
+  transitionCostsTotal: z.string().or(z.number()).optional(),
+  capexPhase1: z.string().or(z.number()).optional(),
+  capexPhase2: z.string().or(z.number()).optional(),
+  capexPhase3: z.string().or(z.number()).optional(),
+  totalInvestmentCost: z.string().or(z.number()).optional(),
+  currentAssetsTotal: z.string().or(z.number()).optional(),
+  currentLiabilitiesTotal: z.string().or(z.number()).optional(),
+  currentRatio: z.string().or(z.number()).optional(),
+  arMinusAp: z.string().or(z.number()).optional(),
+  nwcAdjustmentsTotal: z.string().or(z.number()).optional(),
+  workingCapitalBalance: z.string().or(z.number()).optional(),
+});
+
+export const updateTransactionClosingSummarySchema = insertTransactionClosingSummarySchema.partial();
+
+export type TransactionClosingSummary = typeof transactionClosingSummary.$inferSelect;
+export type InsertTransactionClosingSummary = z.infer<typeof insertTransactionClosingSummarySchema>;
+export type UpdateTransactionClosingSummary = z.infer<typeof updateTransactionClosingSummarySchema>;
+
+// Closing Cost Lines schemas
+export const insertClosingCostLineSchema = createInsertSchema(closingCostLines).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.string().or(z.number()).optional(),
+});
+
+export const updateClosingCostLineSchema = insertClosingCostLineSchema.partial();
+
+export type ClosingCostLine = typeof closingCostLines.$inferSelect;
+export type InsertClosingCostLine = z.infer<typeof insertClosingCostLineSchema>;
+export type UpdateClosingCostLine = z.infer<typeof updateClosingCostLineSchema>;
+
+// Transition Cost Lines schemas
+export const insertTransitionCostLineSchema = createInsertSchema(transitionCostLines).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.string().or(z.number()).optional(),
+});
+
+export const updateTransitionCostLineSchema = insertTransitionCostLineSchema.partial();
+
+export type TransitionCostLine = typeof transitionCostLines.$inferSelect;
+export type InsertTransitionCostLine = z.infer<typeof insertTransitionCostLineSchema>;
+export type UpdateTransitionCostLine = z.infer<typeof updateTransitionCostLineSchema>;
+
+// NWC Lines schemas
+export const insertNwcLineSchema = createInsertSchema(nwcLines).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.string().or(z.number()).optional(),
+});
+
+export const updateNwcLineSchema = insertNwcLineSchema.partial();
+
+export type NwcLine = typeof nwcLines.$inferSelect;
+export type InsertNwcLine = z.infer<typeof insertNwcLineSchema>;
+export type UpdateNwcLine = z.infer<typeof updateNwcLineSchema>;
 
 // Persona Feature Flags schemas
 export const insertPersonaFeatureFlagSchema = createInsertSchema(personaFeatureFlags).omit({
