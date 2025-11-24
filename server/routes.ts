@@ -8872,14 +8872,10 @@ Current context: Project ${req.params.projectId}`;
   // Analytics endpoint
   app.post('/api/sales-comps/analytics', async (req: any, res) => {
     try {
-      console.log('🎯 Analytics endpoint hit! Filters:', req.body);
       const orgId = req.user.orgId;
-      console.log('🎯 OrgId:', orgId);
       const filters: AnalyticsFilters = req.body;
 
-      console.log('🎯 Calculating metrics...');
       const metrics = await calculateMetrics(orgId, filters);
-      console.log('🎯 Metrics calculated:', metrics ? 'success' : 'null');
       
       // Use AI-powered insights with fallback to basic insights
       let insights;
@@ -8898,10 +8894,9 @@ Current context: Project ${req.params.projectId}`;
         }));
       }
 
-      console.log('🎯 Sending response:', { hasMetrics: !!metrics, hasInsights: !!insights, insightsCount: insights?.length });
       res.json({ metrics, insights });
     } catch (error) {
-      console.error("❌ Error calculating analytics:", error);
+      console.error("Error calculating analytics:", error);
       res.status(500).json({ message: "Failed to calculate analytics" });
     }
   });
