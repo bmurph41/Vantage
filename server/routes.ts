@@ -10257,8 +10257,8 @@ Current context: Project ${req.params.projectId}`;
         const pipelines = await storage.getCrmPipelinesForOrg(orgId);
         const defaultPipeline = pipelines[0]; // Get first pipeline as default
         
-        let pipelineId: string | null = null;
-        let stageId: string | null = null;
+        let pipelineId: string | undefined;
+        let stageId: string | undefined;
         
         if (defaultPipeline) {
           pipelineId = defaultPipeline.id;
@@ -10270,6 +10270,7 @@ Current context: Project ${req.params.projectId}`;
         }
         
         // Create a corresponding CRM deal for this modeling project
+        // Only include pipelineId/stageId if they exist (omit undefined fields)
         const [deal] = await tx.insert(crmDeals).values({
           title: data.marinaName,
           type: 'marina_acquisition',
@@ -10277,8 +10278,8 @@ Current context: Project ${req.params.projectId}`;
           city: data.city,
           state: data.state,
           stage: 'modeling',
-          pipelineId,
-          stageId,
+          ...(pipelineId && { pipelineId }),
+          ...(stageId && { stageId }),
           ownerId: userId,
         }).returning();
         
