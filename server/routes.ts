@@ -10775,6 +10775,113 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Export dashboard to JSON (PDF MVP)
+  app.post('/api/dashboards/export/pdf', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { timeRange, modules } = req.body;
+      
+      // Security: Fetch dashboard data server-side instead of accepting arbitrary client data
+      const validatedTimeRange = ['7d', '30d', '90d', 'ytd', 'all'].includes(timeRange) ? timeRange : '30d';
+      const validatedModules = Array.isArray(modules) ? modules.filter((m: any) => typeof m === 'string') : null;
+      
+      // Fetch data server-side to prevent payload injection
+      const dashboardData = await dashboardService.getAggregatedDashboardData(orgId, validatedTimeRange, validatedModules);
+      
+      // Create a simple JSON report
+      // For full PDF export, integrate @react-pdf/renderer server-side rendering
+      const report = {
+        title: `Dashboard Report - ${new Date().toLocaleDateString()}`,
+        timeRange: validatedTimeRange,
+        modules: validatedModules || ['all'],
+        data: dashboardData,
+        generatedAt: new Date().toISOString(),
+      };
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="dashboard-report-${new Date().toISOString().split('T')[0]}.json"`);
+      res.json(report);
+    } catch (error) {
+      console.error('Failed to export PDF:', error);
+      res.status(500).json({ error: 'Failed to export dashboard' });
+    }
+  });
+
+  // Export dashboard to Excel
+  app.post('/api/dashboards/export/excel', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { timeRange, modules } = req.body;
+      const XLSX = await import('xlsx');
+      
+      // Security: Validate input and fetch data server-side
+      const validatedTimeRange = ['7d', '30d', '90d', 'ytd', 'all'].includes(timeRange) ? timeRange : '30d';
+      const validatedModules = Array.isArray(modules) ? modules.filter((m: any) => typeof m === 'string') : null;
+      
+      // Fetch data server-side to prevent payload injection
+      const dashboardData = await dashboardService.getAggregatedDashboardData(orgId, validatedTimeRange, validatedModules);
+      
+      // Create workbook with multiple sheets
+      const workbook = XLSX.utils.book_new();
+      
+      // Summary sheet with sanitized data
+      const summaryData = [
+        ['Dashboard Export'],
+        ['Generated:', new Date().toLocaleString()],
+        ['Time Range:', validatedTimeRange],
+        [''],
+        ['Module', 'Key Metrics'],
+      ];
+      
+      // Add CRM data if available
+      if (dashboardData?.crm) {
+        summaryData.push(['CRM Pipeline', '']);
+        summaryData.push(['Pipeline Value', Number(dashboardData.crm.pipelineValue) || 0]);
+        summaryData.push(['Active Deals', Number(dashboardData.crm.activeDeals) || 0]);
+        summaryData.push(['Win Rate', `${Number(dashboardData.crm.winRate) || 0}%`]);
+      }
+      
+      // Add Due Diligence data if available
+      if (dashboardData?.dueDiligence) {
+        summaryData.push(['', '']);
+        summaryData.push(['Due Diligence', '']);
+        summaryData.push(['Active Projects', Number(dashboardData.dueDiligence.activeProjects) || 0]);
+        summaryData.push(['Completed Projects', Number(dashboardData.dueDiligence.completedProjects) || 0]);
+        summaryData.push(['Completion Rate', `${Number(dashboardData.dueDiligence.completionRate) || 0}%`]);
+      }
+      
+      // Add Fuel data if available
+      if (dashboardData?.fuel) {
+        summaryData.push(['', '']);
+        summaryData.push(['Fuel Operations', '']);
+        summaryData.push(['Monthly Revenue', Number(dashboardData.fuel.monthlyRevenue) || 0]);
+        summaryData.push(['Monthly Gallons', Number(dashboardData.fuel.monthlyGallons) || 0]);
+      }
+      
+      // Add Ship Store data if available
+      if (dashboardData?.shipStore) {
+        summaryData.push(['', '']);
+        summaryData.push(['Ship Store', '']);
+        summaryData.push(['Monthly Revenue', Number(dashboardData.shipStore.monthlyRevenue) || 0]);
+        summaryData.push(['Transactions', Number(dashboardData.shipStore.monthlyTransactions) || 0]);
+        summaryData.push(['Avg Transaction', Number(dashboardData.shipStore.avgTransaction) || 0]);
+      }
+      
+      const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+      
+      // Generate Excel file
+      const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="dashboard-report-${new Date().toISOString().split('T')[0]}.xlsx"`);
+      res.send(excelBuffer);
+    } catch (error) {
+      console.error('Failed to export Excel:', error);
+      res.status(500).json({ error: 'Failed to export dashboard' });
+    }
+  });
+
   // Get recent deals for detail panel
   app.get('/api/crm/deals/recent', authenticateUser, async (req: any, res) => {
     try {

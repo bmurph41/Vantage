@@ -22,6 +22,8 @@ import { AddModuleModal } from "@/components/dashboard/AddModuleModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DetailPanel } from "@/components/dashboard/DetailPanel";
 import { DataTable, Column } from "@/components/dashboard/DataTable";
+import { EnhancedDataTable } from "@/components/dashboard/EnhancedDataTable";
+import { ExportMenu } from "@/components/dashboard/ExportMenu";
 
 type DashboardModule = {
   id: string;
@@ -172,7 +174,21 @@ function CustomModuleContent({ moduleId, moduleType, filters }: {
 export default function Dashboard() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [timeRange, setTimeRange] = useState<TimeRange>('30d');
+  // Time range state with localStorage persistence
+  const [timeRange, setTimeRange] = useState<TimeRange>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboardTimeRange');
+      return (saved as TimeRange) || '30d';
+    }
+    return '30d';
+  });
+
+  // Save time range to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboardTimeRange', timeRange);
+    }
+  }, [timeRange]);
   const [isAddModuleModalOpen, setIsAddModuleModalOpen] = useState(false);
   const [isCRMDetailOpen, setIsCRMDetailOpen] = useState(false);
   const [isSalesCompsDetailOpen, setIsSalesCompsDetailOpen] = useState(false);
@@ -186,13 +202,18 @@ export default function Dashboard() {
   
   // Collapsed modules state with localStorage persistence
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(() => {
-    const saved = localStorage.getItem('dashboardCollapsedModules');
-    return saved ? new Set(JSON.parse(saved)) : new Set();
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboardCollapsedModules');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    }
+    return new Set();
   });
 
   // Save collapsed state to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('dashboardCollapsedModules', JSON.stringify(Array.from(collapsedModules)));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboardCollapsedModules', JSON.stringify(Array.from(collapsedModules)));
+    }
   }, [collapsedModules]);
 
   const toggleModuleCollapse = (moduleId: string) => {
@@ -217,63 +238,63 @@ export default function Dashboard() {
   // Fetch recent deals for detail panel
   const { data: recentDeals, isLoading: dealsLoading } = useQuery({
     queryKey: ['/api/crm/deals/recent', timeRange],
-    queryFn: () => fetch('/api/crm/deals/recent').then(res => res.json()),
+    queryFn: () => fetch(`/api/crm/deals/recent?timeRange=${timeRange}`).then(res => res.json()),
     enabled: isCRMDetailOpen,
   });
 
   // Fetch recent sales comps for detail panel
   const { data: recentComps, isLoading: compsLoading } = useQuery({
     queryKey: ['/api/analysis/sales-comps/recent', timeRange],
-    queryFn: () => fetch('/api/analysis/sales-comps/recent').then(res => res.json()),
+    queryFn: () => fetch(`/api/analysis/sales-comps/recent?timeRange=${timeRange}`).then(res => res.json()),
     enabled: isSalesCompsDetailOpen,
   });
 
   // Fetch recent fuel transactions for detail panel
   const { data: recentFuelTxns, isLoading: fuelLoading } = useQuery({
     queryKey: ['/api/fuel/transactions/recent', timeRange],
-    queryFn: () => fetch('/api/fuel/transactions/recent').then(res => res.json()),
+    queryFn: () => fetch(`/api/fuel/transactions/recent?timeRange=${timeRange}`).then(res => res.json()),
     enabled: isFuelDetailOpen,
   });
 
   // Fetch recent DockTalk articles for detail panel
   const { data: recentArticles, isLoading: articlesLoading } = useQuery({
     queryKey: ['/api/docktalk/articles/recent', timeRange],
-    queryFn: () => fetch('/api/docktalk/articles/recent').then(res => res.json()),
+    queryFn: () => fetch(`/api/docktalk/articles/recent?timeRange=${timeRange}`).then(res => res.json()),
     enabled: isDockTalkDetailOpen,
   });
 
   // Fetch recent VDR documents for detail panel
   const { data: recentDocuments, isLoading: documentsLoading } = useQuery({
     queryKey: ['/api/vdr/documents/recent', timeRange],
-    queryFn: () => fetch('/api/vdr/documents/recent').then(res => res.json()),
+    queryFn: () => fetch(`/api/vdr/documents/recent?timeRange=${timeRange}`).then(res => res.json()),
     enabled: isVDRDetailOpen,
   });
 
   // Fetch recent ship store transactions for detail panel
   const { data: recentShipStoreTxns, isLoading: shipStoreLoading } = useQuery({
     queryKey: ['/api/ship-store/transactions/recent', timeRange],
-    queryFn: () => fetch('/api/ship-store/transactions/recent').then(res => res.json()),
+    queryFn: () => fetch(`/api/ship-store/transactions/recent?timeRange=${timeRange}`).then(res => res.json()),
     enabled: isShipStoreDetailOpen,
   });
 
   // Fetch recent DD tasks for detail panel
   const { data: recentDDTasks, isLoading: ddTasksLoading } = useQuery({
     queryKey: ['/api/projects/tasks/recent', timeRange],
-    queryFn: () => fetch('/api/projects/tasks/recent').then(res => res.json()),
+    queryFn: () => fetch(`/api/projects/tasks/recent?timeRange=${timeRange}`).then(res => res.json()),
     enabled: isDDDetailOpen,
   });
 
   // Fetch recent rent roll entries for detail panel
   const { data: recentRentRoll, isLoading: rentRollLoading } = useQuery({
     queryKey: ['/api/rent-roll/entries/recent', timeRange],
-    queryFn: () => fetch('/api/rent-roll/entries/recent').then(res => res.json()),
+    queryFn: () => fetch(`/api/rent-roll/entries/recent?timeRange=${timeRange}`).then(res => res.json()),
     enabled: isRentRollDetailOpen,
   });
 
   // Fetch recent modeling projects for detail panel
   const { data: recentModelingProjects, isLoading: modelingLoading } = useQuery({
     queryKey: ['/api/modeling/projects/recent', timeRange],
-    queryFn: () => fetch('/api/modeling/projects/recent').then(res => res.json()),
+    queryFn: () => fetch(`/api/modeling/projects/recent?timeRange=${timeRange}`).then(res => res.json()),
     enabled: isModelingDetailOpen,
   });
 
@@ -1056,6 +1077,10 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+            <ExportMenu 
+              timeRange={timeRange}
+              selectedModules={selectedModules}
+            />
             <Button
               variant="outline"
               size="sm"
@@ -1114,7 +1139,7 @@ export default function Dashboard() {
         open={isCRMDetailOpen}
         onOpenChange={setIsCRMDetailOpen}
         title="CRM Pipeline Details"
-        description="Recent deals and pipeline activity"
+        description={`${recentDeals?.length || 0} deals found in the selected time period`}
         icon={DollarSign}
         sourceLink={`/crm/deals?timeRange=${timeRange}&status=open`}
         sourceLinkText="Go to CRM"
@@ -1127,52 +1152,96 @@ export default function Dashboard() {
           </Link>
         }
       >
-        {dealsLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-          </div>
-        ) : (
-          <DataTable
-            data={recentDeals || []}
-            columns={[
-              {
-                key: 'title',
-                header: 'Deal Name',
-                render: (deal: any) => (
-                  <div className="font-medium">{deal.title}</div>
-                ),
-              },
-              {
-                key: 'value',
-                header: 'Value',
-                render: (deal: any) => (
-                  <div className="text-gray-900 font-semibold">
-                    {formatCurrency(Number(deal.value || 0))}
-                  </div>
-                ),
-              },
-              {
-                key: 'stage',
-                header: 'Stage',
-                render: (deal: any) => (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {deal.stage}
+        <EnhancedDataTable
+          data={recentDeals || []}
+          columns={[
+            {
+              key: 'title',
+              header: 'Deal Name',
+              sortable: true,
+              render: (deal: any) => (
+                <div className="font-medium text-gray-900">{deal.title}</div>
+              ),
+            },
+            {
+              key: 'value',
+              header: 'Value',
+              sortable: true,
+              render: (deal: any) => (
+                <div className="text-gray-900 font-semibold">
+                  {formatCurrency(Number(deal.value || 0))}
+                </div>
+              ),
+            },
+            {
+              key: 'stage',
+              header: 'Stage',
+              sortable: true,
+              render: (deal: any) => {
+                const stageColors: Record<string, string> = {
+                  lead: 'bg-gray-100 text-gray-800',
+                  qualified: 'bg-blue-100 text-blue-800',
+                  proposal: 'bg-purple-100 text-purple-800',
+                  negotiation: 'bg-yellow-100 text-yellow-800',
+                  closed_won: 'bg-green-100 text-green-800',
+                  closed_lost: 'bg-red-100 text-red-800',
+                };
+                return (
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${stageColors[deal.stage] || 'bg-gray-100 text-gray-800'}`}>
+                    {deal.stage?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                   </span>
-                ),
+                );
               },
-              {
-                key: 'probability',
-                header: 'Probability',
-                render: (deal: any) => (
-                  <div className="text-gray-600">{deal.probability || 0}%</div>
-                ),
-              },
-            ]}
-            onRowClick={(deal: any) => { setIsCRMDetailOpen(false); navigate(`/crm/deals/${deal.id}`); }}
-            getRowLink={(deal: any) => `/crm/deals/${deal.id}`}
-            emptyMessage="No recent deals found"
-          />
-        )}
+            },
+            {
+              key: 'probability',
+              header: 'Probability',
+              sortable: true,
+              render: (deal: any) => (
+                <div className="flex items-center gap-2">
+                  <div className="text-gray-700 font-medium">{deal.probability || 0}%</div>
+                  <div className="flex-1 max-w-[60px] bg-gray-200 rounded-full h-1.5">
+                    <div 
+                      className="bg-blue-600 h-1.5 rounded-full" 
+                      style={{ width: `${deal.probability || 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key: 'createdAt',
+              header: 'Created',
+              sortable: true,
+              render: (deal: any) => (
+                <div className="text-gray-600 text-sm">
+                  {deal.createdAt ? new Date(deal.createdAt).toLocaleDateString() : '-'}
+                </div>
+              ),
+            },
+          ]}
+          onRowClick={(deal: any) => { setIsCRMDetailOpen(false); navigate(`/crm/deals/${deal.id}`); }}
+          getRowLink={(deal: any) => `/crm/deals/${deal.id}`}
+          emptyMessage="No deals found for the selected time period"
+          isLoading={dealsLoading}
+          searchable={true}
+          searchPlaceholder="Search deals..."
+          filters={[
+            {
+              key: 'stage',
+              label: 'Stage',
+              options: [
+                { value: 'lead', label: 'Lead' },
+                { value: 'qualified', label: 'Qualified' },
+                { value: 'proposal', label: 'Proposal' },
+                { value: 'negotiation', label: 'Negotiation' },
+                { value: 'closed_won', label: 'Closed Won' },
+                { value: 'closed_lost', label: 'Closed Lost' },
+              ],
+            },
+          ]}
+          pageSize={25}
+        />
       </DetailPanel>
 
       <DetailPanel

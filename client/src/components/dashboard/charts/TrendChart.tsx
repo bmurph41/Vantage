@@ -63,8 +63,7 @@ export function TrendChart({
         />
         {showLegend && <Legend />}
         {dataKeys.map((item, index) => {
-          const props = {
-            key: item.key,
+          const commonProps = {
             dataKey: item.key,
             stroke: item.color,
             fill: item.color,
@@ -75,7 +74,8 @@ export function TrendChart({
           if (type === 'line') {
             return (
               <Line 
-                {...props}
+                key={item.key}
+                {...commonProps}
                 type="monotone"
                 dot={{ r: 3 }}
                 activeDot={{ r: 5 }}
@@ -84,7 +84,8 @@ export function TrendChart({
           } else if (type === 'area') {
             return (
               <Area 
-                {...props}
+                key={item.key}
+                {...commonProps}
                 type="monotone"
                 fillOpacity={0.6}
               />
@@ -92,7 +93,8 @@ export function TrendChart({
           } else {
             return (
               <Bar 
-                {...props}
+                key={item.key}
+                {...commonProps}
                 radius={[4, 4, 0, 0]}
               />
             );
