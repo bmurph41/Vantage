@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 export type MetricSize = 'sm' | 'md' | 'lg';
 export type MetricType = 'currency' | 'number' | 'percent';
 export type MetricVariant = 'default' | 'primary' | 'success' | 'warning' | 'danger';
+export type PercentFormat = 'integer' | 'decimal'; // 'integer' = 0-100 range, 'decimal' = 0-1 range
 
 export interface EnhancedMetricCardProps {
   label: string;
@@ -29,6 +30,8 @@ export interface EnhancedMetricCardProps {
     value: number;
     type: MetricType;
   };
+  percentFormat?: PercentFormat; // For main value: 'integer' (0-100) or 'decimal' (0-1)
+  trendFormat?: PercentFormat; // For trend: defaults to 'decimal' (0-1) from backend
 }
 
 export function EnhancedMetricCard({
@@ -48,23 +51,30 @@ export function EnhancedMetricCard({
   clickable = false,
   badge,
   comparison,
+  percentFormat, // Optional: explicit format override
+  trendFormat, // Optional: explicit trend format override
 }: EnhancedMetricCardProps) {
-  // Helper to normalize percent values (handles both 0-100 integer and 0-1 decimal ranges)
-  const normalizePercent = (val: number): number => {
-    // Backend provides integers in 0-100 range (e.g., 23 means 23%)
-    // If ever receiving decimals, they're in 0-1 range (e.g., 0.23 means 23%)
-    // Treat as 0-100 integer if: (1) integer AND (2) in reasonable % range
-    // This avoids mishandling edge cases like 1.0 (100% decimal) vs 1 (1% integer)
-    const isReasonablePercentInt = Number.isInteger(val) && Math.abs(val) <= 200;
-    return isReasonablePercentInt ? val / 100 : val;
+  // Helper to normalize percent values with auto-detection or explicit format
+  const normalizePercent = (val: number, explicitFormat?: PercentFormat): number => {
+    // If explicit format provided, use it
+    if (explicitFormat) {
+      return explicitFormat === 'integer' ? val / 100 : val;
+    }
+    
+    // Auto-detect format based on type:
+    // Backend uses Math.round((x) * 100) for all percent metrics, returning integers 0-100
+    // If value is an integer, treat as 0-100 range (e.g., 1 for 1%, 23 for 23%, 100 for 100%)
+    // If value is a decimal, treat as 0-1 range (e.g., 0.01 for 1%, 0.23 for 23%, 1.0 for 100%)
+    // Note: Number.isInteger(1.0) === true in JS, but backend never returns 1.0 (only integer 1)
+    return Number.isInteger(val) ? val / 100 : val;
   };
 
-  const formatValue = (val: number, metricType: MetricType) => {
+  const formatValue = (val: number, metricType: MetricType, format: PercentFormat = percentFormat) => {
     switch (metricType) {
       case 'currency':
         return formatCurrency(val, compact);
       case 'percent':
-        const normalizedVal = normalizePercent(val);
+        const normalizedVal = normalizePercent(val, format);
         return new Intl.NumberFormat('en-US', {
           style: 'percent',
           minimumFractionDigits: 0,
@@ -75,9 +85,9 @@ export function EnhancedMetricCard({
     }
   };
 
-  const formatTrend = (trendVal: number): string => {
-    // Normalize trend percent values the same way
-    const normalized = normalizePercent(trendVal);
+  const formatTrendValue = (trendVal: number): string => {
+    // Trends use explicit trendFormat if provided, otherwise auto-detect
+    const normalized = normalizePercent(trendVal, trendFormat);
     return new Intl.NumberFormat('en-US', {
       style: 'percent',
       minimumFractionDigits: 0,
@@ -204,7 +214,7 @@ export function EnhancedMetricCard({
             getTrendColorClass()
           )}>
             {getTrendIndicator()}
-            <span>{formatTrend(trend)}</span>
+            <span>{formatTrendValue(trend)}</span>
           </div>
         )}
       </div>
