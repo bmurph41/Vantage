@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { AnalyticsFilters } from "./AnalyticsFilters";
 import ComparisonMatrix from "./ComparisonMatrix";
+import { hasValidFilters } from "@/lib/salescomps/filterUtils";
 
 interface SalesComp {
   id: string;
@@ -53,13 +54,15 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
   const { data: matchedComps = [], isLoading } = useQuery<SalesComp[]>({
     queryKey: ["/api/sales-comps/analytics/matched-comps", filters],
     queryFn: async () => {
+      console.log('🔍 Fetching matched comps with filters:', filters);
       const response = await apiRequest("/api/sales-comps/analytics/matched-comps", {
         method: "POST",
         body: JSON.stringify(filters),
       });
+      console.log('✅ Matched comps response:', response?.length, 'properties');
       return response;
     },
-    enabled: Object.keys(filters).length > 0,
+    enabled: hasValidFilters(filters),
   });
 
   const selectedComps = useMemo(() => {
@@ -181,7 +184,7 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
 
   const loading = isLoading || parentLoading;
 
-  if (Object.keys(filters).length === 0) {
+  if (!hasValidFilters(filters)) {
     return (
       <Card className="p-8 text-center border-dashed">
         <Search className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />

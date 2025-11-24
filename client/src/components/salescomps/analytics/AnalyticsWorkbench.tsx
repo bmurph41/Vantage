@@ -17,6 +17,7 @@ import CorrelationAnalysisView from "./CorrelationAnalysisView";
 import ValuationModelsView from "./ValuationModelsView";
 import { SavedFiltersMenu } from "./SavedFiltersMenu";
 import MatchedCompsView from "./MatchedCompsView";
+import { hasValidFilters } from "@/lib/salescomps/filterUtils";
 
 interface ComparativeAnalysis {
   overall: {
@@ -79,39 +80,43 @@ export default function AnalyticsWorkbench() {
   const { data: analyticsData, isLoading, refetch } = useQuery<AnalyticsResponse>({
     queryKey: ['analytics', appliedFilters],
     queryFn: async () => {
+      console.log('🔍 Fetching analytics with filters:', appliedFilters);
       const response = await apiRequest('/api/sales-comps/analytics', {
         method: 'POST',
         body: JSON.stringify(appliedFilters),
       });
+      console.log('✅ Analytics response:', response);
       return response;
     },
-    enabled: Object.keys(appliedFilters).length > 0,
+    enabled: hasValidFilters(appliedFilters),
   });
 
   // Fetch correlation data
   const { data: correlationData, isLoading: isLoadingCorrelation } = useQuery({
     queryKey: ['analytics-correlation', appliedFilters],
     queryFn: async () => {
+      console.log('🔍 Fetching correlation with filters:', appliedFilters);
       const response = await apiRequest('/api/sales-comps/analytics/correlation', {
         method: 'POST',
         body: JSON.stringify(appliedFilters),
       });
       return response;
     },
-    enabled: Object.keys(appliedFilters).length > 0,
+    enabled: hasValidFilters(appliedFilters),
   });
 
   // Fetch valuation models
   const { data: valuationModels, isLoading: isLoadingValuation } = useQuery({
     queryKey: ['analytics-valuation', appliedFilters],
     queryFn: async () => {
+      console.log('🔍 Fetching valuation with filters:', appliedFilters);
       const response = await apiRequest('/api/sales-comps/analytics/valuation', {
         method: 'POST',
         body: JSON.stringify(appliedFilters),
       });
       return response;
     },
-    enabled: Object.keys(appliedFilters).length > 0,
+    enabled: hasValidFilters(appliedFilters),
   });
 
   useEffect(() => {
@@ -121,6 +126,8 @@ export default function AnalyticsWorkbench() {
   }, [filters]);
 
   const handleFiltersChange = (newFilters: AnalyticsFilters) => {
+    console.log('🎯 Filters changed:', newFilters);
+    console.log('🎯 Has valid filters:', hasValidFilters(newFilters));
     setFilters(newFilters);
     setAppliedFilters(newFilters);
   };
