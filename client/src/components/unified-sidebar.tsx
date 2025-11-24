@@ -257,7 +257,9 @@ export default function UnifiedSidebar() {
   };
 
   const NavLink = ({ item }: { item: { name: string; href: string; icon: any; badge?: string; disabled?: boolean } }) => {
-    const isActive = location === item.href;
+    // For Sales Comps, also match sub-routes like analytics and projects
+    const isActive = location === item.href || 
+      (item.href === '/analysis/sales-comps' && location.startsWith('/analysis/sales-comps/'));
     const isDisabled = item.disabled || false;
     
     if (isDisabled) {
