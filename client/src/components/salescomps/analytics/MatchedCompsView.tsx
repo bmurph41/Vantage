@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Table,
@@ -10,10 +10,13 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Search, Table2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Download, Search, Table2, GitCompare, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { AnalyticsFilters } from "./AnalyticsFilters";
+import ComparisonMatrix from "./ComparisonMatrix";
 
 interface SalesComp {
   id: string;
@@ -44,6 +47,8 @@ interface MatchedCompsViewProps {
 
 export default function MatchedCompsView({ filters, isLoading: parentLoading }: MatchedCompsViewProps) {
   const { toast } = useToast();
+  const [selectedCompIds, setSelectedCompIds] = useState<string[]>([]);
+  const [showComparison, setShowComparison] = useState(false);
 
   const { data: matchedComps = [], isLoading } = useQuery<SalesComp[]>({
     queryKey: ["/api/sales-comps/analytics/matched-comps", filters],
@@ -56,6 +61,48 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
     },
     enabled: Object.keys(filters).length > 0,
   });
+
+  const selectedComps = useMemo(() => {
+    return matchedComps.filter(comp => selectedCompIds.includes(comp.id));
+  }, [matchedComps, selectedCompIds]);
+
+  const handleToggleComp = (compId: string) => {
+    setSelectedCompIds(prev => {
+      if (prev.includes(compId)) {
+        return prev.filter(id => id !== compId);
+      } else {
+        if (prev.length >= 6) {
+          toast({
+            title: "Selection limit reached",
+            description: "You can compare up to 6 properties at a time",
+            variant: "destructive",
+          });
+          return prev;
+        }
+        return [...prev, compId];
+      }
+    });
+  };
+
+  const handleRemoveFromComparison = (compId: string) => {
+    setSelectedCompIds(prev => prev.filter(id => id !== compId));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedCompIds([]);
+  };
+
+  const handleShowComparison = () => {
+    if (selectedCompIds.length < 2) {
+      toast({
+        title: "Select more properties",
+        description: "Please select at least 2 properties to compare",
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowComparison(true);
+  };
 
   const handleExportCSV = () => {
     if (matchedComps.length === 0) {
@@ -176,31 +223,102 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
     );
   }
 
-  return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-sm font-semibold">Matched Properties</h3>
-          <p className="text-xs text-muted-foreground">
-            {matchedComps.length} {matchedComps.length === 1 ? 'property' : 'properties'} match your filters
-          </p>
-        </div>
+  // Show comparison matrix if active
+  if (showComparison && selectedComps.length >= 2) {
+    return (
+      <div className="space-y-4">
+        <ComparisonMatrix
+          comps={selectedComps}
+          onRemoveComp={handleRemoveFromComparison}
+          onClose={() => setShowComparison(false)}
+        />
         <Button
-          onClick={handleExportCSV}
           variant="outline"
           size="sm"
-          data-testid="button-export-matched-comps"
+          onClick={() => setShowComparison(false)}
+          className="w-full"
         >
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
+          Back to List View
         </Button>
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Selection Bar */}
+      {selectedCompIds.length > 0 && (
+        <Card className="p-4 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900">
+                {selectedCompIds.length} selected
+              </Badge>
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                {selectedCompIds.length >= 2
+                  ? `Ready to compare ${selectedCompIds.length} properties`
+                  : 'Select at least one more property to compare'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleShowComparison}
+                disabled={selectedCompIds.length < 2}
+                size="sm"
+                variant="default"
+              >
+                <GitCompare className="h-4 w-4 mr-2" />
+                Compare Selected
+              </Button>
+              <Button
+                onClick={handleClearSelection}
+                variant="ghost"
+                size="sm"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold">Matched Properties</h3>
+            <p className="text-xs text-muted-foreground">
+              {matchedComps.length} {matchedComps.length === 1 ? 'property' : 'properties'} match your filters
+            </p>
+          </div>
+          <Button
+            onClick={handleExportCSV}
+            variant="outline"
+            size="sm"
+            data-testid="button-export-matched-comps"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+        </div>
 
       <div className="rounded-md border">
         <div className="max-h-[600px] overflow-auto">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    checked={selectedCompIds.length === matchedComps.length && matchedComps.length > 0}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedCompIds(matchedComps.slice(0, 6).map(c => c.id));
+                      } else {
+                        setSelectedCompIds([]);
+                      }
+                    }}
+                  />
+                </TableHead>
                 <TableHead className="min-w-[200px]">Property</TableHead>
                 <TableHead className="min-w-[120px]">Location</TableHead>
                 <TableHead className="min-w-[100px]">Sale Date</TableHead>
@@ -216,6 +334,12 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
             <TableBody>
               {matchedComps.map((comp) => (
                 <TableRow key={comp.id} data-testid={`row-comp-${comp.id}`}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedCompIds.includes(comp.id)}
+                      onCheckedChange={() => handleToggleComp(comp.id)}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">
                     <div className="flex flex-col">
                       <span className="text-sm">{comp.propertyName || 'Unnamed Property'}</span>
@@ -271,6 +395,7 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
           </Table>
         </div>
       </div>
-    </Card>
+      </Card>
+    </div>
   );
 }
