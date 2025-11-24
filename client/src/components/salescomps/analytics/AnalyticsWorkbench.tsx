@@ -54,10 +54,30 @@ interface AnalyticsResponse {
   insights: AIInsight[];
 }
 
+const STORAGE_KEY = 'salescomps-analytics-filters';
+
 export default function AnalyticsWorkbench() {
   const { toast } = useToast();
-  const [filters, setFilters] = useState<AnalyticsFilters>({});
-  const [appliedFilters, setAppliedFilters] = useState<AnalyticsFilters>({});
+  
+  // Load filters from localStorage on mount
+  const [filters, setFilters] = useState<AnalyticsFilters>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  
+  const [appliedFilters, setAppliedFilters] = useState<AnalyticsFilters>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  
   const [activeView, setActiveView] = useState("overview");
 
   const { data: columnValues } = useQuery({
@@ -109,17 +129,38 @@ export default function AnalyticsWorkbench() {
   useEffect(() => {
     if (Object.keys(filters).length === 0) {
       setAppliedFilters({});
+      localStorage.removeItem(STORAGE_KEY);
     }
   }, [filters]);
 
   const handleFiltersChange = (newFilters: AnalyticsFilters) => {
     setFilters(newFilters);
     setAppliedFilters(newFilters);
+    // Persist filters to localStorage
+    try {
+      if (Object.keys(newFilters).length > 0) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newFilters));
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch (error) {
+      console.error('Failed to save filters to localStorage:', error);
+    }
   };
 
   const handleLoadFilters = (loadedFilters: AnalyticsFilters) => {
     setFilters(loadedFilters);
     setAppliedFilters(loadedFilters);
+    // Persist loaded filters to localStorage
+    try {
+      if (Object.keys(loadedFilters).length > 0) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedFilters));
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch (error) {
+      console.error('Failed to save loaded filters to localStorage:', error);
+    }
   };
 
   const handleExportCSV = () => {
