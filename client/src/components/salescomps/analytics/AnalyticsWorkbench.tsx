@@ -77,19 +77,34 @@ export default function AnalyticsWorkbench() {
     staleTime: 10 * 60 * 1000,
   });
 
-  const { data: analyticsData, isLoading, refetch } = useQuery<AnalyticsResponse>({
+  const { data: analyticsData, isLoading, error, refetch } = useQuery<AnalyticsResponse>({
     queryKey: ['analytics', appliedFilters],
     queryFn: async () => {
       console.log('🚀 Analytics query executing with filters:', appliedFilters);
-      const response = await apiRequest('/api/sales-comps/analytics', {
-        method: 'POST',
-        body: JSON.stringify(appliedFilters),
-      });
-      console.log('✅ Analytics response received');
-      return response;
+      try {
+        const response = await apiRequest('/api/sales-comps/analytics', {
+          method: 'POST',
+          body: JSON.stringify(appliedFilters),
+        });
+        console.log('✅ Analytics response received:', response);
+        console.log('   - Total comps:', response?.totalCount);
+        console.log('   - Avg price:', response?.avgPrice);
+        console.log('   - Data points:', response?.pricePerSlip?.length);
+        return response;
+      } catch (err) {
+        console.error('❌ Analytics query error:', err);
+        throw err;
+      }
     },
     enabled: hasValidFilters(appliedFilters),
   });
+
+  // Log when we have an error
+  useEffect(() => {
+    if (error) {
+      console.error('❌ Analytics query error state:', error);
+    }
+  }, [error]);
 
   // Debug logging for query state
   useEffect(() => {
