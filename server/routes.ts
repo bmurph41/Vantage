@@ -111,6 +111,8 @@ import {
   modelingProjects,
   insertModelingProjectSchema,
   updateModelingProjectSchema,
+  insertModelingRegionSchema,
+  updateModelingRegionSchema,
   transactionClosingSummary,
   closingCostLines,
   transitionCostLines,
@@ -10137,6 +10139,69 @@ Current context: Project ${req.params.projectId}`;
   // MODELING PROJECTS - Valuation & Financial Modeling Tracking
   // ============================================================================
 
+  // Modeling Regions - Organization-specific customizable regions
+  app.get('/api/modeling/regions', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const regions = await storage.getModelingRegions(orgId);
+      res.json(regions);
+    } catch (error) {
+      console.error('Failed to fetch modeling regions:', error);
+      res.status(500).json({ error: 'Failed to fetch modeling regions' });
+    }
+  });
+
+  app.post('/api/modeling/regions', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = insertModelingRegionSchema.parse(req.body);
+      const region = await storage.createModelingRegion({ ...data, orgId });
+      res.status(201).json(region);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create modeling region:', error);
+      res.status(500).json({ error: 'Failed to create modeling region' });
+    }
+  });
+
+  app.patch('/api/modeling/regions/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const data = updateModelingRegionSchema.parse(req.body);
+      const region = await storage.updateModelingRegion(req.params.id, data, orgId);
+      
+      if (!region) {
+        return res.status(404).json({ error: 'Modeling region not found' });
+      }
+      
+      res.json(region);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update modeling region:', error);
+      res.status(500).json({ error: 'Failed to update modeling region' });
+    }
+  });
+
+  app.delete('/api/modeling/regions/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const deleted = await storage.deleteModelingRegion(req.params.id, orgId);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Modeling region not found' });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error('Failed to delete modeling region:', error);
+      res.status(500).json({ error: 'Failed to delete modeling region' });
+    }
+  });
+
   // Get all modeling projects for organization
   app.get('/api/modeling/projects', authenticateUser, async (req: any, res) => {
     try {
@@ -10185,9 +10250,50 @@ Current context: Project ${req.params.projectId}`;
       const userId = req.user.id;
       
       const data = insertModelingProjectSchema.parse(req.body);
-      const project = await storage.createModelingProject({ ...data, orgId, createdBy: userId });
       
-      res.status(201).json(project);
+      // Use database transaction to ensure atomicity
+      const result = await db.transaction(async (tx) => {
+        // Fetch default pipeline and stage for the organization
+        const pipelines = await storage.getCrmPipelinesForOrg(orgId);
+        const defaultPipeline = pipelines[0]; // Get first pipeline as default
+        
+        let pipelineId: string | null = null;
+        let stageId: string | null = null;
+        
+        if (defaultPipeline) {
+          pipelineId = defaultPipeline.id;
+          // Get first stage of the pipeline
+          const stages = await storage.getCrmPipelineStagesForPipeline(pipelineId);
+          if (stages && stages.length > 0) {
+            stageId = stages[0].id;
+          }
+        }
+        
+        // Create a corresponding CRM deal for this modeling project
+        const [deal] = await tx.insert(crmDeals).values({
+          title: data.marinaName,
+          type: 'marina_acquisition',
+          marinaName: data.marinaName,
+          city: data.city,
+          state: data.state,
+          stage: 'modeling',
+          pipelineId,
+          stageId,
+          ownerId: userId,
+        }).returning();
+        
+        // Create the modeling project and link it to the deal
+        const [project] = await tx.insert(modelingProjects).values({ 
+          ...data as any, 
+          orgId, 
+          createdBy: userId,
+          dealId: deal.id 
+        }).returning();
+        
+        return project;
+      });
+      
+      res.status(201).json(result);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });

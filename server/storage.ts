@@ -10,7 +10,7 @@ import {
   calendarSettings,
   salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scAnalyticsFilterPresets, scCustomStorageTypes, scPortfolios, scPortfolioComps, scPendingPropertyProfiles, scDuplicateAuditLog, scMetricSeries, scMetricPoints, scMetricAlerts,
   rateComps, rateCompColumns, rateCompImports, rcProjects, rcProjectComps, rcAuditLog, rcRecommendationFeedback, rcOrgPreferences, rcSavedSearches, rcCustomStorageTypes, rcPortfolios, rcPortfolioComps, rcPendingPropertyProfiles, rcMetricSeries, rcMetricPoints, rcMetricAlerts,
-  fuelIntegrations, fuelImportLogs, debtScenarios, modelingProjects,
+  fuelIntegrations, fuelImportLogs, debtScenarios, modelingRegions, modelingProjects,
   vdrFolders, vdrDocuments, vdrDocumentPermissions, vdrWatermarks, vdrAuditLogs,
   diligenceRequests, requestDocuments, requestComments, requestTemplates,
   externalUsers, externalUserProjectAccess,
@@ -56,6 +56,7 @@ import {
   type InsertVdrFolder, type InsertVdrDocument, type InsertVdrDocumentPermission, type InsertVdrWatermark, type InsertVdrAuditLog,
   type InsertDiligenceRequest, type InsertRequestDocument, type InsertRequestComment, type InsertRequestTemplate,
   type InsertExternalUser, type InsertExternalUserProjectAccess,
+  type ModelingRegion, type InsertModelingRegion, type UpdateModelingRegion,
   type ModelingProject, type InsertModelingProject, type UpdateModelingProject
 } from "@shared/schema";
 import { organizationFeatures, type OrganizationFeature } from "@shared/docktalk-schema";
@@ -753,6 +754,12 @@ export interface IStorage {
   createDebtScenario(data: InsertDebtScenario): Promise<DebtScenario>;
   updateDebtScenario(id: string, updates: UpdateDebtScenario, orgId: string): Promise<DebtScenario | undefined>;
   deleteDebtScenario(id: string, orgId: string): Promise<boolean>;
+
+  // Modeling Regions - Organization-specific customizable regions
+  getModelingRegions(orgId: string): Promise<ModelingRegion[]>;
+  createModelingRegion(data: InsertModelingRegion): Promise<ModelingRegion>;
+  updateModelingRegion(id: string, data: UpdateModelingRegion, orgId: string): Promise<ModelingRegion | undefined>;
+  deleteModelingRegion(id: string, orgId: string): Promise<boolean>;
 
   // Modeling Projects - Valuation & Financial Modeling
   getModelingProjects(orgId: string): Promise<ModelingProject[]>;
@@ -6235,6 +6242,35 @@ export class DatabaseStorage implements IStorage {
         eq(debtScenarios.orgId, orgId)
       ));
     return result.rowCount > 0;
+  }
+
+  // Modeling Regions - Organization-specific customizable regions
+  async getModelingRegions(orgId: string): Promise<ModelingRegion[]> {
+    return await db.select()
+      .from(modelingRegions)
+      .where(eq(modelingRegions.orgId, orgId))
+      .orderBy(asc(modelingRegions.sortOrder), asc(modelingRegions.name));
+  }
+
+  async createModelingRegion(data: InsertModelingRegion): Promise<ModelingRegion> {
+    const [created] = await db.insert(modelingRegions)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateModelingRegion(id: string, data: UpdateModelingRegion, orgId: string): Promise<ModelingRegion | undefined> {
+    const [updated] = await db.update(modelingRegions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(modelingRegions.id, id), eq(modelingRegions.orgId, orgId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteModelingRegion(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(modelingRegions)
+      .where(and(eq(modelingRegions.id, id), eq(modelingRegions.orgId, orgId)));
+    return result.rowCount !== null && result.rowCount > 0;
   }
 
   // Modeling Projects - Valuation & Financial Modeling

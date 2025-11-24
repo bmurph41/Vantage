@@ -38,10 +38,6 @@ const formSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   region: z.string().optional(),
-  purchasePrice: z.number().nullable().optional(),
-  year1CapRate: z.number().nullable().optional(),
-  totalStorageUnits: z.number().nullable().optional(),
-  ebitda: z.number().nullable().optional(),
   dealOutcome: z.enum(['active', 'won', 'lost', 'passed', 'under_review']),
   ddProjectId: z.string().nullable().optional(),
   salesCompId: z.string().nullable().optional(),
@@ -60,10 +56,6 @@ type ModelingProject = {
   city: string | null;
   state: string | null;
   region: string | null;
-  purchasePrice: number | null;
-  year1CapRate: number | null;
-  totalStorageUnits: number | null;
-  ebitda: number | null;
   dealOutcome: string;
   ddProjectId: string | null;
   salesCompId: string | null;
@@ -72,6 +64,13 @@ type ModelingProject = {
   brokerId: string | null;
   companyId: string | null;
   notes: string | null;
+};
+
+type ModelingRegion = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
 };
 
 type Contact = {
@@ -101,6 +100,11 @@ export default function ModelingProjectFormDialog({
     enabled: open,
   });
 
+  const { data: regions = [] } = useQuery<ModelingRegion[]>({
+    queryKey: ['/api/modeling/regions'],
+    enabled: open,
+  });
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -108,10 +112,6 @@ export default function ModelingProjectFormDialog({
       city: '',
       state: '',
       region: '',
-      purchasePrice: null,
-      year1CapRate: null,
-      totalStorageUnits: null,
-      ebitda: null,
       dealOutcome: 'active',
       ddProjectId: null,
       salesCompId: null,
@@ -130,10 +130,6 @@ export default function ModelingProjectFormDialog({
         city: project.city || '',
         state: project.state || '',
         region: project.region || '',
-        purchasePrice: project.purchasePrice,
-        year1CapRate: project.year1CapRate,
-        totalStorageUnits: project.totalStorageUnits,
-        ebitda: project.ebitda,
         dealOutcome: project.dealOutcome as any,
         ddProjectId: project.ddProjectId,
         salesCompId: project.salesCompId,
@@ -149,10 +145,6 @@ export default function ModelingProjectFormDialog({
         city: '',
         state: '',
         region: '',
-        purchasePrice: null,
-        year1CapRate: null,
-        totalStorageUnits: null,
-        ebitda: null,
         dealOutcome: 'active',
         ddProjectId: null,
         salesCompId: null,
@@ -218,7 +210,7 @@ export default function ModelingProjectFormDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? 'Create Modeling Project' : 'Edit Modeling Project'}
+            {mode === 'create' ? 'New Project' : 'Edit Modeling Project'}
           </DialogTitle>
           <DialogDescription>
             {mode === 'create'
@@ -279,98 +271,28 @@ export default function ModelingProjectFormDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Region</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value || ''} placeholder="e.g., Southeast, Northeast" data-testid="input-region" />
-                  </FormControl>
+                  <Select
+                    onValueChange={(value) => field.onChange(value === 'none' ? '' : value)}
+                    value={field.value || 'none'}
+                  >
+                    <FormControl>
+                      <SelectTrigger data-testid="select-region">
+                        <SelectValue placeholder="Select a region" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">No region</SelectItem>
+                      {regions.filter((r) => r.isActive).map((region) => (
+                        <SelectItem key={region.id} value={region.name}>
+                          {region.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="purchasePrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Purchase Price</FormLabel>
-                    <FormControl>
-                      <CurrencyInput
-                        value={field.value || 0}
-                        onChange={field.onChange}
-                        placeholder="$0"
-                        data-testid="input-purchase-price"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="year1CapRate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Year 1 Cap Rate (%)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        {...field}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                        placeholder="0.00"
-                        data-testid="input-cap-rate"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="totalStorageUnits"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Total Storage Units</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
-                        placeholder="0"
-                        data-testid="input-storage-units"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="ebitda"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>EBITDA</FormLabel>
-                    <FormControl>
-                      <CurrencyInput
-                        value={field.value || 0}
-                        onChange={field.onChange}
-                        placeholder="$0"
-                        data-testid="input-ebitda"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
 
             <FormField
               control={form.control}

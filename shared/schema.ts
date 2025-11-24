@@ -5828,6 +5828,21 @@ export const emailCampaigns = pgTable('email_campaigns', {
 // MODELING PROJECTS - Valuation & Financial Modeling
 // ================================================================================
 
+// Modeling Regions - Organization-specific customizable regions for modeling projects
+export const modelingRegions = pgTable('modeling_regions', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  sortOrder: integer('sort_order').default(0),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('modeling_regions_org_idx').on(table.orgId),
+  activeIdx: index('modeling_regions_active_idx').on(table.isActive),
+  sortOrderIdx: index('modeling_regions_sort_order_idx').on(table.sortOrder),
+}));
+
 // Modeling Projects - Track valuation/financial modeling projects
 export const modelingProjects = pgTable('modeling_projects', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -5846,6 +5861,7 @@ export const modelingProjects = pgTable('modeling_projects', {
   brokerCompanyId: varchar('broker_company_id').references(() => crmCompanies.id), // Broker's company
   
   // Linked entities
+  dealId: varchar('deal_id').references(() => crmDeals.id), // Link to CRM deal
   ddProjectId: varchar('dd_project_id').references(() => projects.id), // Link to DD project
   salesCompId: varchar('sales_comp_id').references(() => salesComps.id), // Link to sales comp
   rateCompId: varchar('rate_comp_id').references(() => rateComps.id), // Link to rate comp
@@ -6802,6 +6818,21 @@ export type EmailCampaign = typeof emailCampaigns.$inferSelect;
 export type InsertEmailCampaign = z.infer<typeof insertEmailCampaignSchema>;
 
 // Modeling Projects schemas
+// Modeling Region schemas
+export const insertModelingRegionSchema = createInsertSchema(modelingRegions).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateModelingRegionSchema = insertModelingRegionSchema.partial();
+
+export type ModelingRegion = typeof modelingRegions.$inferSelect;
+export type InsertModelingRegion = z.infer<typeof insertModelingRegionSchema>;
+export type UpdateModelingRegion = z.infer<typeof updateModelingRegionSchema>;
+
+// Modeling Project schemas
 export const insertModelingProjectSchema = createInsertSchema(modelingProjects).omit({
   id: true,
   orgId: true,
