@@ -17,7 +17,7 @@ import CorrelationAnalysisView from "./CorrelationAnalysisView";
 import ValuationModelsView from "./ValuationModelsView";
 import { SavedFiltersMenu } from "./SavedFiltersMenu";
 import MatchedCompsView from "./MatchedCompsView";
-import { hasValidFilters } from "@/lib/salescomps/filterUtils";
+import { hasValidFilters, normalizeFilters } from "@/lib/salescomps/filterUtils";
 
 interface ComparativeAnalysis {
   overall: {
@@ -59,26 +59,29 @@ const STORAGE_KEY = 'salescomps-analytics-filters';
 export default function AnalyticsWorkbench() {
   const { toast } = useToast();
   
-  // Load filters from localStorage on mount
+  // Load filters from localStorage on mount and normalize them
   const [filters, setFilters] = useState<AnalyticsFilters>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : {};
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return normalizeFilters(parsed);
+      }
+      return {};
     } catch {
       return {};
     }
   });
   
-  const [appliedFilters, setAppliedFilters] = useState<AnalyticsFilters>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-  
+  const [appliedFilters, setAppliedFilters] = useState<AnalyticsFilters>({});
   const [activeView, setActiveView] = useState("overview");
+  
+  // Apply normalized filters on mount to trigger analytics queries
+  useEffect(() => {
+    if (hasValidFilters(filters)) {
+      setAppliedFilters(filters);
+    }
+  }, []);
 
   const { data: columnValues } = useQuery({
     queryKey: ['analytics-column-values'],

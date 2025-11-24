@@ -1,6 +1,59 @@
 import type { AnalyticsFilters } from "@/components/salescomps/analytics/AnalyticsFilters";
 
 /**
+ * Normalizes filter values loaded from localStorage
+ * Converts string numbers to actual numbers and ensures proper types
+ */
+export function normalizeFilters(filters: AnalyticsFilters): AnalyticsFilters {
+  if (!filters || typeof filters !== 'object') {
+    return {};
+  }
+
+  const normalized: AnalyticsFilters = {};
+
+  // Copy array filters as-is
+  if (filters.states?.length) normalized.states = filters.states;
+  if (filters.waterTypes?.length) normalized.waterTypes = filters.waterTypes;
+  if (filters.profitCenters?.length) normalized.profitCenters = filters.profitCenters;
+  if (filters.coastalType?.length) normalized.coastalType = filters.coastalType;
+  if (filters.region?.length) normalized.region = filters.region;
+  if (filters.broker?.length) normalized.broker = filters.broker;
+
+  // Convert numeric filters from strings to numbers
+  if (filters.yearSoldMin !== undefined && filters.yearSoldMin !== null) {
+    normalized.yearSoldMin = Number(filters.yearSoldMin);
+  }
+  if (filters.yearSoldMax !== undefined && filters.yearSoldMax !== null) {
+    normalized.yearSoldMax = Number(filters.yearSoldMax);
+  }
+  if (filters.priceMin !== undefined && filters.priceMin !== null) {
+    normalized.priceMin = Number(filters.priceMin);
+  }
+  if (filters.priceMax !== undefined && filters.priceMax !== null) {
+    normalized.priceMax = Number(filters.priceMax);
+  }
+  if (filters.pricePerSlipMin !== undefined && filters.pricePerSlipMin !== null) {
+    normalized.pricePerSlipMin = Number(filters.pricePerSlipMin);
+  }
+  if (filters.pricePerSlipMax !== undefined && filters.pricePerSlipMax !== null) {
+    normalized.pricePerSlipMax = Number(filters.pricePerSlipMax);
+  }
+  if (filters.capacityMin !== undefined && filters.capacityMin !== null) {
+    normalized.capacityMin = Number(filters.capacityMin);
+  }
+  if (filters.capacityMax !== undefined && filters.capacityMax !== null) {
+    normalized.capacityMax = Number(filters.capacityMax);
+  }
+
+  // Copy boolean filter
+  if (filters.isPortfolio !== undefined && filters.isPortfolio !== null) {
+    normalized.isPortfolio = filters.isPortfolio;
+  }
+
+  return normalized;
+}
+
+/**
  * Checks if filters object has any valid, meaningful filter values
  * Returns true only if there's at least one filter with actual data
  */
