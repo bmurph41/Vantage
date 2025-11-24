@@ -72,11 +72,11 @@ function applyFilters(orgId: string, filters: AnalyticsFilters) {
   }
 
   if (filters.yearSoldMin) {
-    conditions.push(sql`EXTRACT(YEAR FROM ${salesComps.saleDate})::integer >= ${filters.yearSoldMin}`);
+    conditions.push(sql`${salesComps.saleYear} >= ${filters.yearSoldMin}`);
   }
 
   if (filters.yearSoldMax) {
-    conditions.push(sql`EXTRACT(YEAR FROM ${salesComps.saleDate})::integer <= ${filters.yearSoldMax}`);
+    conditions.push(sql`${salesComps.saleYear} <= ${filters.yearSoldMax}`);
   }
 
   if (filters.priceMin) {
@@ -200,7 +200,7 @@ export async function calculateMetrics(
   // By Year
   const byYearResults = await db
     .select({
-      year: sql<number>`EXTRACT(YEAR FROM ${salesComps.saleDate})::integer`,
+      year: salesComps.saleYear,
       count: sql<number>`COUNT(*)`,
       avgPrice: sql<number>`AVG(${salesComps.salePrice}::numeric)`,
       avgPricePerSlip: sql<number>`AVG(${salesComps.pricePerSlip}::numeric)`,
@@ -208,8 +208,8 @@ export async function calculateMetrics(
     })
     .from(salesComps)
     .where(whereClause)
-    .groupBy(sql`EXTRACT(YEAR FROM ${salesComps.saleDate})`)
-    .orderBy(sql`EXTRACT(YEAR FROM ${salesComps.saleDate})`);
+    .groupBy(salesComps.saleYear)
+    .orderBy(salesComps.saleYear);
 
   const byYear: Record<string, MetricResult[]> = {};
   const priceOverTime: Array<{ year: number; avgPrice: number; count: number }> = [];
@@ -634,7 +634,8 @@ export async function calculateValuationModels(
       capRate: salesComps.capRate,
       slipCapacity: salesComps.slipCapacity,
       pricePerSlip: salesComps.pricePerSlip,
-      saleDate: salesComps.saleDate,
+      saleYear: salesComps.saleYear,
+      saleMonth: salesComps.saleMonth,
     })
     .from(salesComps)
     .where(whereClause)
@@ -694,9 +695,9 @@ export async function calculateValuationModels(
 
   // Cap Rate Trend Model (by year)
   const capRateByYear = comps
-    .filter(c => c.capRate && c.saleDate && c.capRate > 0)
+    .filter(c => c.capRate && c.saleYear && c.capRate > 0)
     .map(c => ({
-      year: new Date(c.saleDate as Date).getFullYear(),
+      year: c.saleYear as number,
       capRate: parseFloat(c.capRate as string) * 100, // Convert to percentage
     }));
 
@@ -763,7 +764,8 @@ export async function getMatchedComps(
       city: salesComps.city,
       state: salesComps.state,
       zipCode: salesComps.zipCode,
-      saleDate: salesComps.saleDate,
+      saleYear: salesComps.saleYear,
+      saleMonth: salesComps.saleMonth,
       salePrice: salesComps.salePrice,
       totalSlips: salesComps.slipCapacity,
       pricePerSlip: salesComps.pricePerSlip,
@@ -780,7 +782,7 @@ export async function getMatchedComps(
     })
     .from(salesComps)
     .where(whereClause)
-    .orderBy(desc(salesComps.saleDate))
+    .orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth))
     .limit(100);
 
   return comps;
