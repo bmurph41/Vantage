@@ -80,14 +80,25 @@ export default function AnalyticsWorkbench() {
   const { data: analyticsData, isLoading, refetch } = useQuery<AnalyticsResponse>({
     queryKey: ['analytics', appliedFilters],
     queryFn: async () => {
+      console.log('🚀 Analytics query executing with filters:', appliedFilters);
       const response = await apiRequest('/api/sales-comps/analytics', {
         method: 'POST',
         body: JSON.stringify(appliedFilters),
       });
+      console.log('✅ Analytics response received');
       return response;
     },
     enabled: hasValidFilters(appliedFilters),
   });
+
+  // Debug logging for query state
+  useEffect(() => {
+    console.log('🔍 Query state check:');
+    console.log('  - appliedFilters:', appliedFilters);
+    console.log('  - hasValidFilters:', hasValidFilters(appliedFilters));
+    console.log('  - isLoading:', isLoading);
+    console.log('  - has data:', !!analyticsData);
+  }, [appliedFilters, isLoading, analyticsData]);
 
   // Fetch correlation data
   const { data: correlationData, isLoading: isLoadingCorrelation } = useQuery({
@@ -122,6 +133,8 @@ export default function AnalyticsWorkbench() {
   }, [filters]);
 
   const handleFiltersChange = (newFilters: AnalyticsFilters) => {
+    console.log('📥 handleFiltersChange called with:', newFilters);
+    console.log('📥 hasValidFilters result:', hasValidFilters(newFilters));
     setFilters(newFilters);
     setAppliedFilters(newFilters);
   };

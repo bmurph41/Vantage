@@ -49,6 +49,10 @@ export default function AnalyticsFiltersPanel({
   const [displayValues, setDisplayValues] = useState<Record<string, string>>({});
 
   const handleApply = () => {
+    console.log('🔧 Apply clicked - localFilters:', localFilters);
+    console.log('🔧 Filter keys:', Object.keys(localFilters));
+    console.log('🔧 priceMin value:', localFilters.priceMin);
+    console.log('🔧 states value:', localFilters.states);
     onFiltersChange(localFilters);
   };
 
