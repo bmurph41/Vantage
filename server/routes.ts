@@ -11036,8 +11036,9 @@ Current context: Project ${req.params.projectId}`;
   // Get recent ship store transactions for detail panel
   app.get('/api/ship-store/transactions/recent', authenticateUser, async (req: any, res) => {
     try {
+      const orgId = req.user.orgId;
       const { shipStoreTransactions } = await import('@shared/schema');
-      const { desc } = await import('drizzle-orm');
+      const { desc, eq } = await import('drizzle-orm');
       
       const transactions = await db
         .select({
@@ -11048,6 +11049,7 @@ Current context: Project ${req.params.projectId}`;
           createdAt: shipStoreTransactions.createdAt,
         })
         .from(shipStoreTransactions)
+        .where(eq(shipStoreTransactions.orgId, orgId))
         .orderBy(desc(shipStoreTransactions.createdAt))
         .limit(20);
 
