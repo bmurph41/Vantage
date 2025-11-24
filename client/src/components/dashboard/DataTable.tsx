@@ -44,7 +44,10 @@ export function DataTable<T extends { id?: string | number }>({
     );
   }
 
-  if (data.length === 0) {
+  // Ensure data is an array
+  const safeData = Array.isArray(data) ? data : [];
+
+  if (safeData.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
         <p>{emptyMessage}</p>
@@ -71,7 +74,7 @@ export function DataTable<T extends { id?: string | number }>({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((item, index) => {
+          {safeData.map((item, index) => {
             const rowLink = getRowLink?.(item);
             const clickable = onRowClick || rowLink;
 

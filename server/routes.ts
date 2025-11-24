@@ -11063,7 +11063,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const orgId = req.user.orgId;
       const { tasks, projects } = await import('@shared/schema');
-      const { desc } = await import('drizzle-orm');
+      const { desc, eq } = await import('drizzle-orm');
       
       const recentTasks = await db
         .select({
