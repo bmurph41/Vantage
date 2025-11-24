@@ -54,11 +54,8 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
   const { data: matchedComps = [], isLoading } = useQuery<SalesComp[]>({
     queryKey: ["/api/sales-comps/analytics/matched-comps", filters],
     queryFn: async () => {
-      const response = await apiRequest("/api/sales-comps/analytics/matched-comps", {
-        method: "POST",
-        body: JSON.stringify(filters),
-      });
-      return response;
+      const res = await apiRequest("POST", "/api/sales-comps/analytics/matched-comps", filters);
+      return res.json();
     },
     enabled: hasValidFilters(filters),
   });

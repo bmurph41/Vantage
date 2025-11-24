@@ -82,14 +82,11 @@ export default function AnalyticsWorkbench() {
     queryFn: async () => {
       console.log('🚀 Analytics query executing with filters:', appliedFilters);
       try {
-        const response = await apiRequest('/api/sales-comps/analytics', {
-          method: 'POST',
-          body: JSON.stringify(appliedFilters),
-        });
+        const res = await apiRequest('POST', '/api/sales-comps/analytics', appliedFilters);
+        const response = await res.json();
         console.log('✅ Analytics response received:', response);
-        console.log('   - Total comps:', response?.totalCount);
-        console.log('   - Avg price:', response?.avgPrice);
-        console.log('   - Data points:', response?.pricePerSlip?.length);
+        console.log('   - Total comps:', response?.metrics?.totalCount);
+        console.log('   - Avg price:', response?.metrics?.avgPrice);
         return response;
       } catch (err) {
         console.error('❌ Analytics query error:', err);
@@ -119,11 +116,8 @@ export default function AnalyticsWorkbench() {
   const { data: correlationData, isLoading: isLoadingCorrelation } = useQuery({
     queryKey: ['analytics-correlation', appliedFilters],
     queryFn: async () => {
-      const response = await apiRequest('/api/sales-comps/analytics/correlation', {
-        method: 'POST',
-        body: JSON.stringify(appliedFilters),
-      });
-      return response;
+      const res = await apiRequest('POST', '/api/sales-comps/analytics/correlation', appliedFilters);
+      return res.json();
     },
     enabled: hasValidFilters(appliedFilters),
   });
@@ -132,11 +126,8 @@ export default function AnalyticsWorkbench() {
   const { data: valuationModels, isLoading: isLoadingValuation } = useQuery({
     queryKey: ['analytics-valuation', appliedFilters],
     queryFn: async () => {
-      const response = await apiRequest('/api/sales-comps/analytics/valuation', {
-        method: 'POST',
-        body: JSON.stringify(appliedFilters),
-      });
-      return response;
+      const res = await apiRequest('POST', '/api/sales-comps/analytics/valuation', appliedFilters);
+      return res.json();
     },
     enabled: hasValidFilters(appliedFilters),
   });
