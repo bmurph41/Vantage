@@ -1,6 +1,6 @@
 import { db } from '../../db';
 import { salesComps } from '../../../shared/schema';
-import { sql, and, eq, isNull, inArray } from 'drizzle-orm';
+import { sql, and, eq, isNull, inArray, desc } from 'drizzle-orm';
 
 export interface AnalyticsFilters {
   states?: string[];
@@ -80,19 +80,19 @@ function applyFilters(orgId: string, filters: AnalyticsFilters) {
   }
 
   if (filters.priceMin) {
-    conditions.push(sql`${salesComps.salePrice}::numeric >= ${filters.priceMin}`);
+    conditions.push(sql`${salesComps.salePrice} >= ${filters.priceMin}`);
   }
 
   if (filters.priceMax) {
-    conditions.push(sql`${salesComps.salePrice}::numeric <= ${filters.priceMax}`);
+    conditions.push(sql`${salesComps.salePrice} <= ${filters.priceMax}`);
   }
 
   if (filters.pricePerSlipMin) {
-    conditions.push(sql`${salesComps.pricePerSlip}::numeric >= ${filters.pricePerSlipMin}`);
+    conditions.push(sql`CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END >= ${filters.pricePerSlipMin}`);
   }
 
   if (filters.pricePerSlipMax) {
-    conditions.push(sql`${salesComps.pricePerSlip}::numeric <= ${filters.pricePerSlipMax}`);
+    conditions.push(sql`CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END <= ${filters.pricePerSlipMax}`);
   }
 
   if (filters.waterTypes && filters.waterTypes.length > 0) {
@@ -100,11 +100,11 @@ function applyFilters(orgId: string, filters: AnalyticsFilters) {
   }
 
   if (filters.capacityMin) {
-    conditions.push(sql`${salesComps.slipCapacity}::integer >= ${filters.capacityMin}`);
+    conditions.push(sql`(${salesComps.wetSlips} + ${salesComps.dryRacks}) >= ${filters.capacityMin}`);
   }
 
   if (filters.capacityMax) {
-    conditions.push(sql`${salesComps.slipCapacity}::integer <= ${filters.capacityMax}`);
+    conditions.push(sql`(${salesComps.wetSlips} + ${salesComps.dryRacks}) <= ${filters.capacityMax}`);
   }
 
   if (filters.profitCenters && filters.profitCenters.length > 0) {
@@ -143,14 +143,14 @@ export async function calculateMetrics(
   const overallStats = await db
     .select({
       count: sql<number>`COUNT(*)`,
-      avgPrice: sql<number>`AVG(${salesComps.salePrice}::numeric)`,
-      medianPrice: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${salesComps.salePrice}::numeric)`,
-      avgPricePerSlip: sql<number>`AVG(${salesComps.pricePerSlip}::numeric)`,
-      medianPricePerSlip: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${salesComps.pricePerSlip}::numeric)`,
-      avgCapRate: sql<number>`AVG(${salesComps.capRate}::numeric)`,
-      medianCapRate: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${salesComps.capRate}::numeric)`,
-      avgCapacity: sql<number>`AVG(${salesComps.slipCapacity}::numeric)`,
-      totalValue: sql<number>`SUM(${salesComps.salePrice}::numeric)`,
+      avgPrice: sql<number>`AVG(${salesComps.salePrice})`,
+      medianPrice: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${salesComps.salePrice})`,
+      avgPricePerSlip: sql<number>`AVG(CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END)`,
+      medianPricePerSlip: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END)`,
+      avgCapRate: sql<number>`AVG(${salesComps.capRate})`,
+      medianCapRate: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${salesComps.capRate})`,
+      avgCapacity: sql<number>`AVG(${salesComps.wetSlips} + ${salesComps.dryRacks})`,
+      totalValue: sql<number>`SUM(${salesComps.salePrice})`,
     })
     .from(salesComps)
     .where(whereClause);
@@ -172,11 +172,11 @@ export async function calculateMetrics(
     .select({
       state: salesComps.state,
       count: sql<number>`COUNT(*)`,
-      avgPrice: sql<number>`AVG(${salesComps.salePrice}::numeric)`,
-      medianPrice: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${salesComps.salePrice}::numeric)`,
-      avgPricePerSlip: sql<number>`AVG(${salesComps.pricePerSlip}::numeric)`,
-      medianPricePerSlip: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${salesComps.pricePerSlip}::numeric)`,
-      avgCapRate: sql<number>`AVG(${salesComps.capRate}::numeric)`,
+      avgPrice: sql<number>`AVG(${salesComps.salePrice})`,
+      medianPrice: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${salesComps.salePrice})`,
+      avgPricePerSlip: sql<number>`AVG(CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END)`,
+      medianPricePerSlip: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END)`,
+      avgCapRate: sql<number>`AVG(${salesComps.capRate})`,
     })
     .from(salesComps)
     .where(whereClause)
@@ -202,9 +202,9 @@ export async function calculateMetrics(
     .select({
       year: salesComps.saleYear,
       count: sql<number>`COUNT(*)`,
-      avgPrice: sql<number>`AVG(${salesComps.salePrice}::numeric)`,
-      avgPricePerSlip: sql<number>`AVG(${salesComps.pricePerSlip}::numeric)`,
-      avgCapRate: sql<number>`AVG(${salesComps.capRate}::numeric)`,
+      avgPrice: sql<number>`AVG(${salesComps.salePrice})`,
+      avgPricePerSlip: sql<number>`AVG(CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END)`,
+      avgCapRate: sql<number>`AVG(${salesComps.capRate})`,
     })
     .from(salesComps)
     .where(whereClause)
@@ -235,9 +235,9 @@ export async function calculateMetrics(
     .select({
       waterType: salesComps.waterType,
       count: sql<number>`COUNT(*)`,
-      avgPrice: sql<number>`AVG(${salesComps.salePrice}::numeric)`,
-      avgPricePerSlip: sql<number>`AVG(${salesComps.pricePerSlip}::numeric)`,
-      avgCapRate: sql<number>`AVG(${salesComps.capRate}::numeric)`,
+      avgPrice: sql<number>`AVG(${salesComps.salePrice})`,
+      avgPricePerSlip: sql<number>`AVG(CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END)`,
+      avgCapRate: sql<number>`AVG(${salesComps.capRate})`,
     })
     .from(salesComps)
     .where(whereClause)
@@ -261,26 +261,26 @@ export async function calculateMetrics(
     .select({
       priceRange: sql<string>`
         CASE
-          WHEN ${salesComps.salePrice}::numeric < 1000000 THEN 'Under $1M'
-          WHEN ${salesComps.salePrice}::numeric < 5000000 THEN '$1M - $5M'
-          WHEN ${salesComps.salePrice}::numeric < 10000000 THEN '$5M - $10M'
-          WHEN ${salesComps.salePrice}::numeric < 25000000 THEN '$10M - $25M'
+          WHEN ${salesComps.salePrice} < 1000000 THEN 'Under $1M'
+          WHEN ${salesComps.salePrice} < 5000000 THEN '$1M - $5M'
+          WHEN ${salesComps.salePrice} < 10000000 THEN '$5M - $10M'
+          WHEN ${salesComps.salePrice} < 25000000 THEN '$10M - $25M'
           ELSE 'Over $25M'
         END
       `,
       count: sql<number>`COUNT(*)`,
-      avgPrice: sql<number>`AVG(${salesComps.salePrice}::numeric)`,
-      avgPricePerSlip: sql<number>`AVG(${salesComps.pricePerSlip}::numeric)`,
-      avgCapRate: sql<number>`AVG(${salesComps.capRate}::numeric)`,
+      avgPrice: sql<number>`AVG(${salesComps.salePrice})`,
+      avgPricePerSlip: sql<number>`AVG(CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END)`,
+      avgCapRate: sql<number>`AVG(${salesComps.capRate})`,
     })
     .from(salesComps)
     .where(whereClause)
     .groupBy(sql`
       CASE
-        WHEN ${salesComps.salePrice}::numeric < 1000000 THEN 'Under $1M'
-        WHEN ${salesComps.salePrice}::numeric < 5000000 THEN '$1M - $5M'
-        WHEN ${salesComps.salePrice}::numeric < 10000000 THEN '$5M - $10M'
-        WHEN ${salesComps.salePrice}::numeric < 25000000 THEN '$10M - $25M'
+        WHEN ${salesComps.salePrice} < 1000000 THEN 'Under $1M'
+        WHEN ${salesComps.salePrice} < 5000000 THEN '$1M - $5M'
+        WHEN ${salesComps.salePrice} < 10000000 THEN '$5M - $10M'
+        WHEN ${salesComps.salePrice} < 25000000 THEN '$10M - $25M'
         ELSE 'Over $25M'
       END
     `)
@@ -306,14 +306,14 @@ export async function calculateMetrics(
       agentLastName: salesComps.agentLastName,
       broker: salesComps.broker,
       dealCount: sql<number>`COUNT(*)`,
-      totalSales: sql<number>`SUM(${salesComps.salePrice}::numeric)`,
-      avgSalePrice: sql<number>`AVG(${salesComps.salePrice}::numeric)`,
-      avgPricePerSlip: sql<number>`AVG(${salesComps.pricePerSlip}::numeric)`,
+      totalSales: sql<number>`SUM(${salesComps.salePrice})`,
+      avgSalePrice: sql<number>`AVG(${salesComps.salePrice})`,
+      avgPricePerSlip: sql<number>`AVG(CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END)`,
     })
     .from(salesComps)
     .where(whereClause)
     .groupBy(salesComps.brokerage, salesComps.agentFirstName, salesComps.agentLastName, salesComps.broker)
-    .orderBy(sql`SUM(${salesComps.salePrice}::numeric) DESC NULLS LAST`);
+    .orderBy(sql`SUM(${salesComps.salePrice}) DESC NULLS LAST`);
 
   const byAgent: AgentMetrics[] = byAgentResults
     .map((row: any) => {
@@ -500,8 +500,8 @@ export async function calculateCorrelationData(
       marina: salesComps.marina,
       salePrice: salesComps.salePrice,
       capRate: salesComps.capRate,
-      slipCapacity: salesComps.slipCapacity,
-      pricePerSlip: salesComps.pricePerSlip,
+      wetSlips: salesComps.wetSlips,
+      dryRacks: salesComps.dryRacks,
     })
     .from(salesComps)
     .where(whereClause)
@@ -524,10 +524,13 @@ export async function calculateCorrelationData(
 
   // Price vs Capacity
   const priceCapacityData = comps
-    .filter(c => c.salePrice && c.slipCapacity && c.slipCapacity > 0)
+    .filter(c => {
+      const capacity = (c.wetSlips || 0) + (c.dryRacks || 0);
+      return c.salePrice && capacity > 0;
+    })
     .map(c => ({
       x: parseFloat(c.salePrice as string),
-      y: parseInt(c.slipCapacity as string),
+      y: (c.wetSlips || 0) + (c.dryRacks || 0),
       name: c.marina || 'Unknown Marina',
       id: c.id,
     }));
@@ -539,13 +542,20 @@ export async function calculateCorrelationData(
 
   // Price Per Slip vs Capacity
   const pricePerSlipCapacityData = comps
-    .filter(c => c.pricePerSlip && c.slipCapacity && c.slipCapacity > 0)
-    .map(c => ({
-      x: parseInt(c.slipCapacity as string),
-      y: parseFloat(c.pricePerSlip as string),
-      name: c.marina || 'Unknown Marina',
-      id: c.id,
-    }));
+    .filter(c => {
+      const capacity = (c.wetSlips || 0) + (c.dryRacks || 0);
+      return c.salePrice && capacity > 0;
+    })
+    .map(c => {
+      const capacity = (c.wetSlips || 0) + (c.dryRacks || 0);
+      const pricePerSlip = parseFloat(c.salePrice as string) / capacity;
+      return {
+        x: capacity,
+        y: pricePerSlip,
+        name: c.marina || 'Unknown Marina',
+        id: c.id,
+      };
+    });
 
   const pricePerSlipCapacityCorrelation = calculateCorrelation(
     pricePerSlipCapacityData.map(d => d.x),
@@ -632,8 +642,8 @@ export async function calculateValuationModels(
       marina: salesComps.marina,
       salePrice: salesComps.salePrice,
       capRate: salesComps.capRate,
-      slipCapacity: salesComps.slipCapacity,
-      pricePerSlip: salesComps.pricePerSlip,
+      wetSlips: salesComps.wetSlips,
+      dryRacks: salesComps.dryRacks,
       saleYear: salesComps.saleYear,
       saleMonth: salesComps.saleMonth,
     })
@@ -643,11 +653,18 @@ export async function calculateValuationModels(
 
   // Price Per Slip vs Capacity Model
   const pricePerSlipData = comps
-    .filter(c => c.pricePerSlip && c.slipCapacity && c.slipCapacity > 0)
-    .map(c => ({
-      capacity: parseInt(c.slipCapacity as string),
-      pricePerSlip: parseFloat(c.pricePerSlip as string),
-    }))
+    .filter(c => {
+      const capacity = (c.wetSlips || 0) + (c.dryRacks || 0);
+      return c.salePrice && capacity > 0;
+    })
+    .map(c => {
+      const capacity = (c.wetSlips || 0) + (c.dryRacks || 0);
+      const pricePerSlip = parseFloat(c.salePrice as string) / capacity;
+      return {
+        capacity,
+        pricePerSlip,
+      };
+    })
     .sort((a, b) => a.capacity - b.capacity);
 
   let pricePerSlipModel: RegressionModel;
@@ -763,16 +780,16 @@ export async function getMatchedComps(
       address: salesComps.address,
       city: salesComps.city,
       state: salesComps.state,
-      zipCode: salesComps.zipCode,
+      zipCode: salesComps.zip,
       saleYear: salesComps.saleYear,
       saleMonth: salesComps.saleMonth,
       salePrice: salesComps.salePrice,
-      totalSlips: salesComps.slipCapacity,
-      pricePerSlip: salesComps.pricePerSlip,
+      totalSlips: sql<number>`(${salesComps.wetSlips} + ${salesComps.dryRacks})`,
+      pricePerSlip: sql<number>`CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END`,
       storageTypes: salesComps.storageTypes,
       profitCenters: salesComps.profitCenters,
       waterType: salesComps.waterType,
-      buyerName: salesComps.buyer,
+      buyerName: sql<string>`NULL`,
       sellerName: salesComps.seller,
       brokerName: salesComps.brokerage,
       coastalType: salesComps.coastalType,
