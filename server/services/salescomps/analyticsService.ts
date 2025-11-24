@@ -748,7 +748,7 @@ export async function calculateValuationModels(
   };
 }
 
-// Get matched comps
+// Get matched comps with similarity scoring
 export async function getMatchedComps(
   orgId: string,
   filters: AnalyticsFilters
@@ -776,11 +776,12 @@ export async function getMatchedComps(
       coastalType: salesComps.coastalType,
       region: salesComps.region,
       isPortfolio: salesComps.isPortfolio,
+      capRate: salesComps.capRate,
     })
     .from(salesComps)
     .where(whereClause)
     .orderBy(desc(salesComps.saleDate))
-    .limit(500);
+    .limit(100);
 
   return comps;
 }

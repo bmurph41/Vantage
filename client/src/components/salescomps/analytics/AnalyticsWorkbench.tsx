@@ -85,7 +85,7 @@ export default function AnalyticsWorkbench() {
       });
       return response;
     },
-    enabled: Object.keys(appliedFilters).length > 0 || true,
+    enabled: Object.keys(appliedFilters).length > 0,
   });
 
   // Fetch correlation data
