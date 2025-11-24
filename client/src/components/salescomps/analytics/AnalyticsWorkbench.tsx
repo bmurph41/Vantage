@@ -80,37 +80,11 @@ export default function AnalyticsWorkbench() {
   const { data: analyticsData, isLoading, error, refetch } = useQuery<AnalyticsResponse>({
     queryKey: ['analytics', appliedFilters],
     queryFn: async () => {
-      console.log('🚀 Analytics query executing with filters:', appliedFilters);
-      try {
-        const res = await apiRequest('POST', '/api/sales-comps/analytics', appliedFilters);
-        const response = await res.json();
-        console.log('✅ Analytics response received:', response);
-        console.log('   - Total comps:', response?.metrics?.totalCount);
-        console.log('   - Avg price:', response?.metrics?.avgPrice);
-        return response;
-      } catch (err) {
-        console.error('❌ Analytics query error:', err);
-        throw err;
-      }
+      const res = await apiRequest('POST', '/api/sales-comps/analytics', appliedFilters);
+      return res.json();
     },
     enabled: hasValidFilters(appliedFilters),
   });
-
-  // Log when we have an error
-  useEffect(() => {
-    if (error) {
-      console.error('❌ Analytics query error state:', error);
-    }
-  }, [error]);
-
-  // Debug logging for query state
-  useEffect(() => {
-    console.log('🔍 Query state check:');
-    console.log('  - appliedFilters:', appliedFilters);
-    console.log('  - hasValidFilters:', hasValidFilters(appliedFilters));
-    console.log('  - isLoading:', isLoading);
-    console.log('  - has data:', !!analyticsData);
-  }, [appliedFilters, isLoading, analyticsData]);
 
   // Fetch correlation data
   const { data: correlationData, isLoading: isLoadingCorrelation } = useQuery({
@@ -139,8 +113,6 @@ export default function AnalyticsWorkbench() {
   }, [filters]);
 
   const handleFiltersChange = (newFilters: AnalyticsFilters) => {
-    console.log('📥 handleFiltersChange called with:', newFilters);
-    console.log('📥 hasValidFilters result:', hasValidFilters(newFilters));
     setFilters(newFilters);
     setAppliedFilters(newFilters);
   };
