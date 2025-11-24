@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,18 @@ export default function AnalyticsFiltersPanel({
   const [localFilters, setLocalFilters] = useState<AnalyticsFilters>(filters);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [displayValues, setDisplayValues] = useState<Record<string, string>>({});
+
+  // Sync localFilters when filters prop changes (e.g., from localStorage on mount)
+  useEffect(() => {
+    setLocalFilters(filters);
+    // Update display values for currency fields
+    const newDisplayValues: Record<string, string> = {};
+    if (filters.priceMin !== undefined) newDisplayValues.priceMin = formatCurrencyInput(filters.priceMin);
+    if (filters.priceMax !== undefined) newDisplayValues.priceMax = formatCurrencyInput(filters.priceMax);
+    if (filters.pricePerSlipMin !== undefined) newDisplayValues.pricePerSlipMin = formatCurrencyInput(filters.pricePerSlipMin);
+    if (filters.pricePerSlipMax !== undefined) newDisplayValues.pricePerSlipMax = formatCurrencyInput(filters.pricePerSlipMax);
+    setDisplayValues(newDisplayValues);
+  }, [filters]);
 
   const handleApply = () => {
     onFiltersChange(localFilters);
