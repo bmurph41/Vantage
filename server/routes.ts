@@ -11177,7 +11177,11 @@ Current context: Project ${req.params.projectId}`;
       const { dashboardCustomModules, insertDashboardCustomModuleSchema } = await import('@shared/schema');
       
       const validated = insertDashboardCustomModuleSchema.parse({
-        ...req.body,
+        title: req.body.title,
+        moduleType: req.body.moduleType,
+        filters: req.body.filters || {},
+        visualizationType: req.body.visualizationType || 'table',
+        chartConfig: req.body.chartConfig || {},
         userId,
         orgId,
       });
@@ -11277,6 +11281,27 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to fetch custom module data:', error);
       res.status(500).json({ error: 'Failed to fetch custom module data' });
+    }
+  });
+
+  // Generate preview data for custom module
+  app.post('/api/dashboards/custom-modules/preview', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { visualizationType, moduleType, config } = req.body;
+      const { dashboardService } = await import('./services/dashboard-service');
+      
+      const previewData = await dashboardService.generateModulePreview(
+        orgId,
+        visualizationType,
+        moduleType,
+        config
+      );
+      
+      res.json(previewData);
+    } catch (error) {
+      console.error('Failed to generate preview data:', error);
+      res.status(500).json({ error: 'Failed to generate preview data' });
     }
   });
 

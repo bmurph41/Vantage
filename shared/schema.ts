@@ -135,7 +135,7 @@ export const calendarSettings = pgTable("calendar_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Dashboard Custom Modules - User-defined filtered dashboard modules
+// Dashboard Custom Modules - User-defined filtered dashboard modules with visualization configs
 export const dashboardCustomModules = pgTable("dashboard_custom_modules", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
@@ -143,6 +143,8 @@ export const dashboardCustomModules = pgTable("dashboard_custom_modules", {
   title: text("title").notNull(), // User-defined module name (e.g., "Florida Sales Comps", "Q1 DD Tasks")
   moduleType: text("module_type").notNull(), // Source: 'crm', 'sales-comps', 'fuel', 'vdr', 'docktalk', 'ship-store', 'dd', 'rent-roll', 'modeling'
   filters: jsonb("filters").notNull().default(sql`'{}'`), // Filter configuration: { state: 'FL', dateRange: 'Q1', projectId: '123', etc. }
+  visualizationType: text("visualization_type").notNull().default('table'), // 'kpi_card', 'line_chart', 'area_chart', 'bar_chart', 'pie_chart', 'combo_chart', 'stat_grid', 'table', 'goal_tracker', 'comparison_card'
+  chartConfig: jsonb("chart_config").notNull().default(sql`'{}'`), // Visualization config: { xAxis, yAxis, metrics, colors, aggregations, timeframes, etc. }
   displayOrder: integer("display_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1220,6 +1222,71 @@ export const insertDashboardCustomModuleSchema = createInsertSchema(dashboardCus
 
 export type InsertDashboardCustomModule = z.infer<typeof insertDashboardCustomModuleSchema>;
 export type DashboardCustomModule = typeof dashboardCustomModules.$inferSelect;
+
+// Chart Configuration TypeScript Interfaces
+export type VisualizationType = 
+  | 'kpi_card' 
+  | 'line_chart' 
+  | 'area_chart' 
+  | 'bar_chart' 
+  | 'pie_chart' 
+  | 'combo_chart' 
+  | 'stat_grid' 
+  | 'table' 
+  | 'goal_tracker' 
+  | 'comparison_card';
+
+export interface ChartMetric {
+  key: string;
+  label: string;
+  aggregation: 'sum' | 'avg' | 'count' | 'min' | 'max';
+  color?: string;
+  format?: 'currency' | 'number' | 'percent';
+}
+
+export interface ChartAxisConfig {
+  field: string;
+  label: string;
+  type?: 'category' | 'number' | 'date';
+}
+
+export interface TimeframeConfig {
+  type: 'absolute' | 'relative';
+  start?: string; // ISO date or relative like '-30d'
+  end?: string;
+  granularity?: 'day' | 'week' | 'month' | 'quarter' | 'year';
+}
+
+export interface ChartConfig {
+  // Data Selection
+  marinaIds?: string[]; // Specific marinas to include
+  timeframe?: TimeframeConfig;
+  comparisonTimeframe?: TimeframeConfig; // For comparison charts
+  
+  // Axes Configuration (for charts)
+  xAxis?: ChartAxisConfig;
+  yAxis?: ChartAxisConfig;
+  
+  // Metrics Configuration
+  metrics: ChartMetric[];
+  
+  // Visualization Options
+  chartType?: 'line' | 'area' | 'bar'; // For combo charts
+  showGrid?: boolean;
+  showLegend?: boolean;
+  showDataLabels?: boolean;
+  
+  // Colors
+  colorScheme?: string[]; // Hex colors
+  
+  // Goal Tracker Specific
+  goalValue?: number;
+  currentValue?: number;
+  
+  // Stat Grid Specific
+  layout?: 'row' | 'grid';
+  columns?: number;
+}
 
 export const insertCalendarSettingsSchema = createInsertSchema(calendarSettings).omit({
   id: true,

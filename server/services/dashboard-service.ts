@@ -928,6 +928,234 @@ export class DashboardService {
       }));
     }
   }
+
+  /**
+   * Generate preview data for custom module based on configuration
+   */
+  async generateModulePreview(
+    orgId: string,
+    visualizationType: string,
+    moduleType: string,
+    config: any
+  ) {
+    const timeRange = config.timeframe?.start?.replace('-', '') || '30d';
+    const dateFilter = this.getTimeRangeFilter(timeRange as TimeRange);
+
+    switch (moduleType) {
+      case 'crm': {
+        const { deals } = await import('@shared/schema');
+        const { sql } = await import('drizzle-orm');
+
+        if (visualizationType === 'kpi_card') {
+          const [result] = await db
+            .select({ total: sql<number>`SUM(COALESCE(${deals.value}, 0))` })
+            .from(deals)
+            .where(eq(deals.orgId, orgId));
+          
+          return {
+            kpiValue: Number(result?.total) || 0,
+            trend: { value: 12.5, label: 'vs last period' },
+          };
+        }
+
+        if (visualizationType === 'pie_chart') {
+          const statusData = await db
+            .select({
+              name: deals.stage,
+              value: sql<number>`COUNT(*)`,
+            })
+            .from(deals)
+            .where(eq(deals.orgId, orgId))
+            .groupBy(deals.stage);
+
+          return {
+            pieData: statusData.map(row => ({
+              name: row.name || 'Unknown',
+              value: Number(row.value) || 0,
+            })),
+          };
+        }
+
+        if (['line_chart', 'area_chart', 'bar_chart'].includes(visualizationType)) {
+          if (!dateFilter) {
+            return { chartData: [] };
+          }
+
+          const trendData = await db
+            .select({
+              date: sql<string>`DATE(${deals.createdAt})`,
+              value: sql<number>`SUM(COALESCE(${deals.value}, 0))`,
+            })
+            .from(deals)
+            .where(and(
+              eq(deals.orgId, orgId),
+              gte(deals.createdAt, dateFilter.startDate)
+            ))
+            .groupBy(sql`DATE(${deals.createdAt})`)
+            .orderBy(sql`DATE(${deals.createdAt})`);
+
+          return {
+            chartData: trendData.map(row => ({
+              name: row.date,
+              value: Number(row.value) || 0,
+            })),
+          };
+        }
+
+        break;
+      }
+
+      case 'fuel': {
+        const { fuelSales } = await import('@shared/schema');
+        const { sql } = await import('drizzle-orm');
+
+        if (visualizationType === 'kpi_card') {
+          const [result] = await db
+            .select({ total: sql<number>`SUM(${fuelSales.totalAmount})` })
+            .from(fuelSales)
+            .where(eq(fuelSales.orgId, orgId));
+          
+          return {
+            kpiValue: Number(result?.total) || 0,
+          };
+        }
+
+        if (['line_chart', 'area_chart', 'bar_chart', 'combo_chart'].includes(visualizationType)) {
+          if (!dateFilter) {
+            return { chartData: [] };
+          }
+
+          const trendData = await db
+            .select({
+              date: sql<string>`DATE(${fuelSales.transactionDate})`,
+              revenue: sql<number>`SUM(${fuelSales.totalAmount})`,
+              gallons: sql<number>`SUM(${fuelSales.quantityGallons})`,
+            })
+            .from(fuelSales)
+            .where(and(
+              eq(fuelSales.orgId, orgId),
+              gte(fuelSales.transactionDate, dateFilter.startDate)
+            ))
+            .groupBy(sql`DATE(${fuelSales.transactionDate})`)
+            .orderBy(sql`DATE(${fuelSales.transactionDate})`);
+
+          return {
+            chartData: trendData.map(row => ({
+              name: row.date,
+              revenue: Number(row.revenue) || 0,
+              gallons: Number(row.gallons) || 0,
+            })),
+          };
+        }
+
+        break;
+      }
+
+      case 'shipStore': {
+        const { shipStoreTransactions } = await import('@shared/schema');
+        const { sql } = await import('drizzle-orm');
+
+        if (visualizationType === 'kpi_card') {
+          const [result] = await db
+            .select({ total: sql<number>`SUM(${shipStoreTransactions.total})` })
+            .from(shipStoreTransactions)
+            .where(eq(shipStoreTransactions.orgId, orgId));
+          
+          return {
+            kpiValue: Number(result?.total) || 0,
+          };
+        }
+
+        if (visualizationType === 'goal_tracker') {
+          const [result] = await db
+            .select({ total: sql<number>`SUM(${shipStoreTransactions.total})` })
+            .from(shipStoreTransactions)
+            .where(dateFilter ? and(
+              eq(shipStoreTransactions.orgId, orgId),
+              gte(shipStoreTransactions.createdAt, dateFilter.startDate)
+            ) : eq(shipStoreTransactions.orgId, orgId));
+          
+          return {
+            currentValue: Number(result?.total) || 0,
+          };
+        }
+
+        break;
+      }
+
+      case 'dueDiligence': {
+        const { tasks } = await import('@shared/schema');
+        const { sql } = await import('drizzle-orm');
+
+        if (visualizationType === 'stat_grid') {
+          const [total] = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(tasks)
+            .where(eq(tasks.orgId, orgId));
+
+          const [completed] = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(tasks)
+            .where(and(
+              eq(tasks.orgId, orgId),
+              eq(tasks.status, 'completed')
+            ));
+
+          const [inProgress] = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(tasks)
+            .where(and(
+              eq(tasks.orgId, orgId),
+              eq(tasks.status, 'in_progress')
+            ));
+
+          return {
+            stats: [
+              { label: 'Total Tasks', value: Number(total?.count) || 0, format: 'number' },
+              { label: 'Completed', value: Number(completed?.count) || 0, format: 'number' },
+              { label: 'In Progress', value: Number(inProgress?.count) || 0, format: 'number' },
+            ],
+          };
+        }
+
+        break;
+      }
+
+      case 'rentRoll': {
+        const { rentRollEntries } = await import('@shared/schema');
+        const { sql } = await import('drizzle-orm');
+
+        if (visualizationType === 'kpi_card') {
+          const [occupied] = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(rentRollEntries)
+            .where(and(
+              eq(rentRollEntries.orgId, orgId),
+              eq(rentRollEntries.status, 'occupied')
+            ));
+
+          const [total] = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(rentRollEntries)
+            .where(eq(rentRollEntries.orgId, orgId));
+
+          const occupancyRate = total?.count ? ((Number(occupied?.count) || 0) / Number(total.count)) * 100 : 0;
+          
+          return {
+            kpiValue: occupancyRate,
+          };
+        }
+
+        break;
+      }
+    }
+
+    return {
+      chartData: [],
+      kpiValue: 0,
+      message: 'Preview data generation for this combination is not yet available',
+    };
+  }
 }
 
 export const dashboardService = new DashboardService();

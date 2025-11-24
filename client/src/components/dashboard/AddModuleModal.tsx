@@ -12,8 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Check, DollarSign, FileText, Building2, TrendingUp, Home, Fuel, ShoppingCart, Store, Plus, Newspaper, Edit, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CustomModuleBuilder } from "./CustomModuleBuilder";
-import type { DashboardCustomModule } from "@shared/schema";
+import { EnhancedModuleBuilder } from "./EnhancedModuleBuilder";
+import type { DashboardCustomModule, VisualizationType, ChartConfig } from "@shared/schema";
 
 interface ModuleDefinition {
   id: string;
@@ -29,7 +29,13 @@ interface AddModuleModalProps {
   selectedModules: string[];
   onToggleModule: (moduleId: string) => void;
   customModules?: DashboardCustomModule[];
-  onCreateCustomModule?: (data: { title: string; moduleType: string; filters: Record<string, any> }) => void;
+  onCreateCustomModule?: (data: {
+    title: string;
+    moduleType: string;
+    visualizationType: VisualizationType;
+    filters: Record<string, any>;
+    chartConfig: ChartConfig;
+  }) => void;
   onDeleteCustomModule?: (id: string) => void;
 }
 
@@ -134,7 +140,13 @@ export function AddModuleModal({
     return acc;
   }, {} as Record<string, ModuleDefinition[]>);
 
-  const handleCreateModule = (data: { title: string; moduleType: string; filters: Record<string, any> }) => {
+  const handleCreateModule = (data: {
+    title: string;
+    moduleType: string;
+    visualizationType: VisualizationType;
+    filters: Record<string, any>;
+    chartConfig: ChartConfig;
+  }) => {
     onCreateCustomModule?.(data);
     setShowBuilder(false);
   };
@@ -150,8 +162,8 @@ export function AddModuleModal({
         </DialogHeader>
 
         {showBuilder ? (
-          <ScrollArea className="h-[500px]">
-            <CustomModuleBuilder
+          <ScrollArea className="h-[600px]">
+            <EnhancedModuleBuilder
               onSave={handleCreateModule}
               onCancel={() => setShowBuilder(false)}
             />
