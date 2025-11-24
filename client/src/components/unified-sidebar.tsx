@@ -83,7 +83,7 @@ const marketingNav = [
 
 // Due Diligence Navigation
 const ddNav = [
-  { name: "All Projects", href: "/", icon: LayoutDashboard },
+  { name: "All Projects", href: "/projects", icon: LayoutDashboard },
   { name: "Progress Report", href: "/progress-report", icon: ClipboardList },
 ];
 
