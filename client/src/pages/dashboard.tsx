@@ -24,6 +24,13 @@ import { DetailPanel } from "@/components/dashboard/DetailPanel";
 import { DataTable, Column } from "@/components/dashboard/DataTable";
 import { EnhancedDataTable } from "@/components/dashboard/EnhancedDataTable";
 import { ExportMenu } from "@/components/dashboard/ExportMenu";
+import { TrendChart } from "@/components/dashboard/charts/TrendChart";
+import { PieChart } from "@/components/dashboard/charts/PieChart";
+import { ComboChart } from "@/components/dashboard/charts/ComboChart";
+import { KPICard } from "@/components/dashboard/charts/KPICard";
+import { GoalProgressBar } from "@/components/dashboard/charts/GoalProgressBar";
+import { ComparisonCard } from "@/components/dashboard/charts/ComparisonCard";
+import { StatGrid } from "@/components/dashboard/charts/StatGrid";
 
 type DashboardModule = {
   id: string;
@@ -119,12 +126,24 @@ function getModuleLink(moduleType: string): string {
 }
 
 // Component to fetch and display custom module data
-function CustomModuleContent({ moduleId, moduleType, filters }: { 
+function CustomModuleContent({ 
+  moduleId, 
+  moduleType, 
+  visualizationType, 
+  chartConfig, 
+  filters 
+}: { 
   moduleId: string; 
   moduleType: string; 
+  visualizationType?: string;
+  chartConfig?: any;
   filters: Record<string, any>;
 }) {
-  const { data, isLoading } = useQuery({
+  // Legacy modules (no visualization type or chart config) use the old data endpoint
+  const isLegacyModule = !visualizationType && !chartConfig;
+  
+  // Legacy data fetch (original behavior)
+  const { data: legacyData, isLoading: legacyLoading } = useQuery({
     queryKey: ['/api/dashboards/custom-modules/data', moduleId, filters],
     queryFn: () => 
       fetch('/api/dashboards/custom-modules/data', {
@@ -132,7 +151,32 @@ function CustomModuleContent({ moduleId, moduleType, filters }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ moduleType, filters, limit: 100 }),
       }).then(res => res.json()),
+    enabled: isLegacyModule,
   });
+  
+  // New visualization fetch (preview endpoint)
+  const actualVisualizationType = visualizationType || 'table';
+  const { data: previewData, isLoading: previewLoading } = useQuery({
+    queryKey: ['/api/dashboards/custom-modules/preview', moduleId, actualVisualizationType, JSON.stringify(chartConfig), JSON.stringify(filters)],
+    queryFn: async () => {
+      const config = chartConfig ? { ...chartConfig } : {};
+      const response = await apiRequest('/api/dashboards/custom-modules/preview', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          visualizationType: actualVisualizationType, 
+          moduleType, 
+          config,
+          filters,
+        }),
+      });
+      return response;
+    },
+    enabled: !isLegacyModule && !!chartConfig?.metrics?.length,
+  });
+  
+  // Use the appropriate data source
+  const data = isLegacyModule ? legacyData : previewData;
+  const isLoading = isLegacyModule ? legacyLoading : previewLoading;
 
   if (isLoading) {
     return (
@@ -142,33 +186,194 @@ function CustomModuleContent({ moduleId, moduleType, filters }: {
     );
   }
 
-  if (!data || data.length === 0) {
+  // Handle legacy module rendering
+  if (isLegacyModule) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return (
+        <div className="text-center py-8 text-gray-500">
+          <p className="text-sm">No data matches your filters</p>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-gray-600">
+          {data.length} record{data.length !== 1 ? 's' : ''} found
+        </p>
+        <div className="space-y-1 max-h-48 overflow-y-auto">
+          {data.slice(0, 10).map((item: any, idx: number) => (
+            <div key={idx} className="text-xs p-2 bg-gray-50 rounded">
+              {item.title || item.propertyName || item.fileName || item.unitNumber || item.name || `Record ${idx + 1}`}
+            </div>
+          ))}
+        </div>
+        {data.length > 10 && (
+          <p className="text-xs text-gray-500 text-center">
+            And {data.length - 10} more...
+          </p>
+        )}
+      </div>
+    );
+  }
+  
+  // Handle new visualization rendering
+  if (!data) {
     return (
       <div className="text-center py-8 text-gray-500">
-        <p className="text-sm">No data matches your filters</p>
+        <p className="text-sm">No data available</p>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-2">
-      <p className="text-sm text-gray-600">
-        {data.length} record{data.length !== 1 ? 's' : ''} found
-      </p>
-      <div className="space-y-1 max-h-48 overflow-y-auto">
-        {data.slice(0, 10).map((item: any, idx: number) => (
-          <div key={idx} className="text-xs p-2 bg-gray-50 rounded">
-            {item.title || item.propertyName || item.fileName || item.unitNumber || `Record ${idx + 1}`}
+  // Render based on visualization type
+  const formatValue = (value: number) => {
+    const metric = chartConfig?.metrics?.[0];
+    if (!metric) return value.toLocaleString();
+    
+    switch (metric.format) {
+      case 'currency':
+        return `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+      case 'percent':
+        return `${value.toFixed(1)}%`;
+      default:
+        return value.toLocaleString();
+    }
+  };
+
+  switch (actualVisualizationType) {
+    case 'kpi_card':
+      return (
+        <KPICard
+          title={chartConfig?.metrics?.[0]?.label || 'Metric'}
+          value={data.kpiValue || 0}
+          format={chartConfig?.metrics?.[0]?.format}
+          trend={data.trend}
+        />
+      );
+
+    case 'line_chart':
+    case 'area_chart':
+    case 'bar_chart':
+      if (!data.chartData || data.chartData.length === 0) {
+        return <div className="text-center py-8 text-gray-500"><p className="text-sm">No chart data available</p></div>;
+      }
+      return (
+        <TrendChart
+          data={data.chartData}
+          type={visualizationType.replace('_chart', '') as 'line' | 'area' | 'bar'}
+          dataKeys={chartConfig?.metrics?.map(m => ({
+            key: m.key,
+            label: m.label,
+            color: m.color || '#3b82f6',
+          })) || []}
+          showGrid={chartConfig?.showGrid}
+          showLegend={chartConfig?.showLegend}
+          formatValue={formatValue}
+          height={250}
+        />
+      );
+
+    case 'pie_chart':
+      const pieData = data.pieData || data.chartData || [];
+      if (pieData.length === 0) {
+        return <div className="text-center py-8 text-gray-500"><p className="text-sm">No chart data available</p></div>;
+      }
+      return (
+        <PieChart
+          data={pieData}
+          showLegend={chartConfig?.showLegend}
+          showLabels={chartConfig?.showDataLabels}
+          formatValue={formatValue}
+          height={250}
+        />
+      );
+
+    case 'combo_chart':
+      if (!data.chartData || data.chartData.length === 0) {
+        return <div className="text-center py-8 text-gray-500"><p className="text-sm">No chart data available</p></div>;
+      }
+      return (
+        <ComboChart
+          data={data.chartData}
+          series={chartConfig?.metrics?.map(m => ({
+            key: m.key,
+            type: chartConfig?.chartType || 'bar',
+            color: m.color || '#3b82f6',
+            label: m.label,
+          })) || []}
+          showGrid={chartConfig?.showGrid}
+          showLegend={chartConfig?.showLegend}
+          formatValue={formatValue}
+          height={250}
+        />
+      );
+
+    case 'goal_tracker':
+      return (
+        <GoalProgressBar
+          title={chartConfig?.metrics?.[0]?.label || 'Goal'}
+          current={data.currentValue || 0}
+          goal={chartConfig?.goalValue || 100}
+          format={chartConfig?.metrics?.[0]?.format}
+          showPercentage
+        />
+      );
+
+    case 'comparison_card':
+      return (
+        <ComparisonCard
+          title={chartConfig?.metrics?.[0]?.label || 'Comparison'}
+          current={{
+            label: data.currentPeriod?.label || 'Current Period',
+            value: data.currentPeriod?.value || 0,
+          }}
+          previous={{
+            label: data.previousPeriod?.label || 'Previous Period',
+            value: data.previousPeriod?.value || 0,
+          }}
+          format={chartConfig?.metrics?.[0]?.format}
+        />
+      );
+
+    case 'stat_grid':
+      const stats = data.stats || [];
+      if (stats.length === 0) {
+        return <div className="text-center py-8 text-gray-500"><p className="text-sm">No stats available</p></div>;
+      }
+      return (
+        <StatGrid
+          stats={stats}
+          columns={3}
+        />
+      );
+
+    case 'table':
+    default:
+      // Support multiple response formats: tableData, rows, chartData
+      const tableData = data.tableData || data.rows || data.chartData || [];
+      if (!Array.isArray(tableData) || tableData.length === 0) {
+        return <div className="text-center py-8 text-gray-500"><p className="text-sm">No data available</p></div>;
+      }
+      return (
+        <div className="space-y-2">
+          <p className="text-sm text-gray-600">
+            {tableData.length} record{tableData.length !== 1 ? 's' : ''} found
+          </p>
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {tableData.slice(0, 10).map((item: any, idx: number) => (
+              <div key={idx} className="text-xs p-2 bg-gray-50 rounded">
+                {item.title || item.propertyName || item.fileName || item.unitNumber || item.name || `Record ${idx + 1}`}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      {data.length > 10 && (
-        <p className="text-xs text-gray-500 text-center">
-          And {data.length - 10} more...
-        </p>
-      )}
-    </div>
-  );
+          {tableData.length > 10 && (
+            <p className="text-xs text-gray-500 text-center">
+              And {tableData.length - 10} more...
+            </p>
+          )}
+        </div>
+      );
+  }
 }
 
 export default function Dashboard() {
@@ -1045,6 +1250,8 @@ export default function Dashboard() {
         <CustomModuleContent 
           moduleId={cm.id}
           moduleType={cm.moduleType}
+          visualizationType={cm.visualizationType}
+          chartConfig={cm.chartConfig}
           filters={cm.filters}
         />
       ),
