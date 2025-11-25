@@ -111,6 +111,14 @@ export class CommentThreadsService {
       .set({ updatedAt: new Date() })
       .where(eq(modelingCommentThreads.id, input.threadId));
 
+    await this.logAuditEvent(thread.modelingProjectId, orgId, userId, 'comment_added', {
+      threadId: input.threadId,
+      commentId: comment.id,
+      targetType: thread.targetType,
+      targetLabel: thread.targetLabel,
+      hasMentions: input.mentions && input.mentions.length > 0
+    });
+
     return comment.id;
   }
 
@@ -140,6 +148,8 @@ export class CommentThreadsService {
       throw new Error('You can only edit your own comments');
     }
 
+    const previousContent = comment.comment.content;
+
     await db.update(modelingComments)
       .set({
         content: newContent,
@@ -147,6 +157,13 @@ export class CommentThreadsService {
         editedAt: new Date()
       })
       .where(eq(modelingComments.id, commentId));
+
+    await this.logAuditEvent(comment.thread.modelingProjectId, orgId, userId, 'comment_edited', {
+      threadId: comment.thread.id,
+      commentId,
+      previousContentLength: previousContent.length,
+      newContentLength: newContent.length
+    });
   }
 
   async resolveThread(
@@ -187,6 +204,18 @@ export class CommentThreadsService {
     orgId: string,
     userId: string
   ): Promise<void> {
+    const [thread] = await db.select()
+      .from(modelingCommentThreads)
+      .where(and(
+        eq(modelingCommentThreads.id, threadId),
+        eq(modelingCommentThreads.orgId, orgId)
+      ))
+      .limit(1);
+
+    if (!thread) {
+      throw new Error('Thread not found');
+    }
+
     await db.update(modelingCommentThreads)
       .set({
         status: 'open',
@@ -198,6 +227,12 @@ export class CommentThreadsService {
         eq(modelingCommentThreads.id, threadId),
         eq(modelingCommentThreads.orgId, orgId)
       ));
+
+    await this.logAuditEvent(thread.modelingProjectId, orgId, userId, 'comment_thread_reopened', {
+      threadId,
+      targetType: thread.targetType,
+      targetLabel: thread.targetLabel
+    });
   }
 
   async archiveThread(
@@ -205,6 +240,18 @@ export class CommentThreadsService {
     orgId: string,
     userId: string
   ): Promise<void> {
+    const [thread] = await db.select()
+      .from(modelingCommentThreads)
+      .where(and(
+        eq(modelingCommentThreads.id, threadId),
+        eq(modelingCommentThreads.orgId, orgId)
+      ))
+      .limit(1);
+
+    if (!thread) {
+      throw new Error('Thread not found');
+    }
+
     await db.update(modelingCommentThreads)
       .set({
         status: 'archived',
@@ -214,6 +261,12 @@ export class CommentThreadsService {
         eq(modelingCommentThreads.id, threadId),
         eq(modelingCommentThreads.orgId, orgId)
       ));
+
+    await this.logAuditEvent(thread.modelingProjectId, orgId, userId, 'comment_thread_archived', {
+      threadId,
+      targetType: thread.targetType,
+      targetLabel: thread.targetLabel
+    });
   }
 
   async getThread(

@@ -79,11 +79,15 @@ export class DebtSensitivityService {
 
     const [scenario] = await db.select()
       .from(modelingScenarioVersions)
-      .where(eq(modelingScenarioVersions.id, input.scenarioVersionId))
+      .where(and(
+        eq(modelingScenarioVersions.id, input.scenarioVersionId),
+        eq(modelingScenarioVersions.modelingProjectId, projectId),
+        eq(modelingScenarioVersions.orgId, orgId)
+      ))
       .limit(1);
 
     if (!scenario) {
-      throw new Error('Scenario version not found');
+      throw new Error('Scenario version not found or access denied');
     }
 
     const assumptions = typeof scenario.assumptions === 'string' 
@@ -297,10 +301,18 @@ export class DebtSensitivityService {
     
     const [scenario] = await db.select()
       .from(modelingScenarioVersions)
-      .where(eq(modelingScenarioVersions.id, scenarioVersionId))
+      .where(and(
+        eq(modelingScenarioVersions.id, scenarioVersionId),
+        eq(modelingScenarioVersions.modelingProjectId, projectId),
+        eq(modelingScenarioVersions.orgId, orgId)
+      ))
       .limit(1);
 
-    const assumptions = scenario?.assumptions as any || {};
+    if (!scenario) {
+      throw new Error('Scenario version not found or access denied');
+    }
+
+    const assumptions = scenario.assumptions as any || {};
     const noi = assumptions.noi || assumptions.netOperatingIncome || (purchasePrice * 0.065);
 
     const recommendations = lenders.map(lender => {
