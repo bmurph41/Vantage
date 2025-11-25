@@ -93,7 +93,7 @@ export default function MarinaKpiDashboard() {
   };
 
   const formatPercentage = (value: number) => {
-    return `${value.toFixed(1)}%`;
+    return `${value.toFixed(2)}%`;
   };
 
   const getPerformanceColor = (value: number, threshold: number = 80) => {

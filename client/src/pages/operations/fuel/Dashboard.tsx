@@ -227,7 +227,7 @@ export default function Dashboard() {
             value={`$${todaysSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={<DollarSign className="w-6 h-6 text-accent" />}
             change={{
-              value: `${salesChange >= 0 ? '+' : ''}${salesChange.toFixed(1)}%`,
+              value: `${salesChange >= 0 ? '+' : ''}${salesChange.toFixed(2)}%`,
               type: salesChange >= 0 ? "increase" : "decrease",
               label: "vs yesterday"
             }}
@@ -237,7 +237,7 @@ export default function Dashboard() {
             value={todaysGallons.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             icon={<Fuel className="w-6 h-6 text-primary" />}
             change={{
-              value: `${gallonsChange >= 0 ? '+' : ''}${gallonsChange.toFixed(1)}%`,
+              value: `${gallonsChange >= 0 ? '+' : ''}${gallonsChange.toFixed(2)}%`,
               type: gallonsChange >= 0 ? "increase" : "decrease", 
               label: "vs yesterday"
             }}
@@ -247,7 +247,7 @@ export default function Dashboard() {
             value={`$${todaysAvgPrice.toFixed(2)}`}
             icon={<TrendingUp className="w-6 h-6 text-orange-600" />}
             change={{
-              value: `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(1)}%`,
+              value: `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}%`,
               type: priceChange >= 0 ? "increase" : "decrease",
               label: "vs yesterday"
             }}

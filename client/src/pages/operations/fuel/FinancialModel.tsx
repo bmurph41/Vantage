@@ -212,7 +212,7 @@ export default function FinancialModel() {
                 <div>
                   <p className="text-muted-foreground text-sm font-medium">Average Growth Rate</p>
                   <p className="text-2xl font-bold text-foreground" data-testid="avg-growth-rate">
-                    {avgGrowthRate.toFixed(1)}%
+                    {avgGrowthRate.toFixed(2)}%
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
@@ -369,7 +369,7 @@ export default function FinancialModel() {
                       />
                       <p className="text-xs text-muted-foreground mt-1">
                         {calculator.values.profitMargin && parseFloat(calculator.values.profitMargin) > 0 
-                          ? `${parseFloat(calculator.values.profitMargin).toFixed(1)}% margin` 
+                          ? `${parseFloat(calculator.values.profitMargin).toFixed(2)}% margin` 
                           : 'Enter margin or let it calculate'}
                       </p>
                     </div>
@@ -484,10 +484,10 @@ export default function FinancialModel() {
                           ${profit.toLocaleString()}
                         </td>
                         <td className="p-4 text-sm text-foreground" data-testid={`projection-margin-${index}`}>
-                          {margin.toFixed(1)}%
+                          {margin.toFixed(2)}%
                         </td>
                         <td className="p-4 text-sm text-foreground" data-testid={`projection-growth-${index}`}>
-                          {parseFloat(projection.growthRate).toFixed(1)}%
+                          {parseFloat(projection.growthRate).toFixed(2)}%
                         </td>
                         <td className="p-4 text-sm">
                           <Button

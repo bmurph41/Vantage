@@ -262,7 +262,7 @@ export default function PropertyAnalytics({ dateRange }: PropertyAnalyticsProps)
                         <div>
                           <div className="font-medium capitalize">{type.type.replace('_', ' ')}</div>
                           <div className="text-sm text-gray-600">
-                            {type.count} properties • {marketShare.toFixed(1)}% of portfolio
+                            {type.count} properties • {marketShare.toFixed(2)}% of portfolio
                           </div>
                         </div>
                       </div>

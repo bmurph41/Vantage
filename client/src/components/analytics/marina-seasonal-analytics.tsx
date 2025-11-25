@@ -441,7 +441,7 @@ export default function MarinaSeasonalAnalytics() {
                               <div className="text-gray-500">Leads</div>
                             </div>
                             <div>
-                              <div className="font-medium">{(show.conversionRate * 100).toFixed(1)}%</div>
+                              <div className="font-medium">{(show.conversionRate * 100).toFixed(2)}%</div>
                               <div className="text-gray-500">Conv. Rate</div>
                             </div>
                             <div>

@@ -227,7 +227,7 @@ export default function Inventory() {
                     </div>
                     <Progress value={stockPercentage} className="h-2" data-testid={`inventory-progress-${index}`} />
                     <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                      <span>{stockPercentage.toFixed(1)}% Full</span>
+                      <span>{stockPercentage.toFixed(2)}% Full</span>
                       <span>{daysRemaining < 999 ? `${daysRemaining} days remaining` : 'No consumption data'}</span>
                     </div>
                   </div>

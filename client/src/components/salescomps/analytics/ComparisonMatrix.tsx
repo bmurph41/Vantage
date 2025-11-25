@@ -56,8 +56,8 @@ export default function ComparisonMatrix({ comps, onRemoveComp, onClose }: Compa
     
     const diff = ((numPrice - avgPrice) / avgPrice) * 100;
     if (Math.abs(diff) < 5) return { icon: Minus, color: 'text-gray-500', text: 'On par' };
-    if (diff > 0) return { icon: TrendingUp, color: 'text-red-500', text: `+${diff.toFixed(1)}%` };
-    return { icon: TrendingDown, color: 'text-green-500', text: `${diff.toFixed(1)}%` };
+    if (diff > 0) return { icon: TrendingUp, color: 'text-red-500', text: `+${diff.toFixed(2)}%` };
+    return { icon: TrendingDown, color: 'text-green-500', text: `${diff.toFixed(2)}%` };
   };
 
   const getCapacityIndicator = (capacity: number | string | null, avgCapacity: number) => {
@@ -202,7 +202,7 @@ export default function ComparisonMatrix({ comps, onRemoveComp, onClose }: Compa
                   </p>
                   {diff !== null && Math.abs(diff) >= 5 && (
                     <p className={`text-xs mt-1 ${diff > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                      {diff > 0 ? '+' : ''}{diff.toFixed(1)}% vs avg
+                      {diff > 0 ? '+' : ''}{diff.toFixed(2)}% vs avg
                     </p>
                   )}
                 </div>

@@ -395,7 +395,7 @@ export default function AnalyticsOverview({ dateRange }: AnalyticsOverviewProps)
           
           <MetricCard
             title="Conversion Rate"
-            value={`${overview.conversionRate.toFixed(1)}%`}
+            value={`${overview.conversionRate.toFixed(2)}%`}
             subtitle="Lead to customer"
             icon={TrendingUp}
             gradient="from-indigo-500 to-indigo-600"

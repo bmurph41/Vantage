@@ -206,7 +206,7 @@ export default function Analytics() {
                   <TrendingDown className="w-3 h-3 mr-1 text-red-600" />
                 )}
                 <span className={`text-sm font-medium ${revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="kpi-revenue-growth">
-                  {revenueGrowth >= 0 ? '+' : ''}{revenueGrowth.toFixed(1)}%
+                  {revenueGrowth >= 0 ? '+' : ''}{revenueGrowth.toFixed(2)}%
                 </span>
                 <span className="text-muted-foreground text-sm ml-2">vs previous period</span>
               </div>
@@ -233,7 +233,7 @@ export default function Analytics() {
                   <TrendingDown className="w-3 h-3 mr-1 text-red-600" />
                 )}
                 <span className={`text-sm font-medium ${gallonsGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {gallonsGrowth >= 0 ? '+' : ''}{gallonsGrowth.toFixed(1)}%
+                  {gallonsGrowth >= 0 ? '+' : ''}{gallonsGrowth.toFixed(2)}%
                 </span>
                 <span className="text-muted-foreground text-sm ml-2">vs previous period</span>
               </div>
@@ -391,7 +391,7 @@ export default function Analytics() {
                       <td className="p-4 text-sm text-foreground" data-testid={`fuel-count-${index}`}>{item.count}</td>
                       <td className="p-4 text-sm text-foreground" data-testid={`fuel-avg-price-${index}`}>${(item.revenue / item.gallons).toFixed(3)}</td>
                       <td className="p-4 text-sm text-foreground" data-testid={`fuel-percentage-${index}`}>
-                        {((item.revenue / totalRevenue) * 100).toFixed(1)}%
+                        {((item.revenue / totalRevenue) * 100).toFixed(2)}%
                       </td>
                     </tr>
                   ))}

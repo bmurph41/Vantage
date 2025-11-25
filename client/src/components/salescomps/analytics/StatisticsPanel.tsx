@@ -90,7 +90,7 @@ export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelPro
               {priceChange < -0.05 && <TrendingDown className="h-3 w-3 text-red-500" />}
               {Math.abs(priceChange) <= 0.05 && <Minus className="h-3 w-3 text-muted-foreground" />}
               <p className={`text-xs ${priceChange > 0 ? 'text-green-600' : priceChange < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
-                {Math.abs(priceChange * 100).toFixed(1)}% vs median
+                {Math.abs(priceChange * 100).toFixed(2)}% vs median
               </p>
             </div>
           </CardContent>

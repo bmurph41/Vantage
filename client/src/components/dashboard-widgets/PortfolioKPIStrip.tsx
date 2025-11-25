@@ -57,7 +57,7 @@ export default function PortfolioKPIStrip() {
     },
     {
       label: 'Avg Occupancy',
-      value: `${avgOccupancy.toFixed(1)}%`,
+      value: `${avgOccupancy.toFixed(2)}%`,
       icon: TrendingUp,
     },
     {

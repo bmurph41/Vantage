@@ -130,7 +130,7 @@ export function SegmentBreakdown({ data, isLoading, error }: Props) {
                         {segment.segment.charAt(0).toUpperCase() + segment.segment.slice(1)}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {segment.customerCount} customers ({segment.percentage.toFixed(1)}%)
+                        {segment.customerCount} customers ({segment.percentage.toFixed(2)}%)
                       </div>
                     </div>
                   </div>

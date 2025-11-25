@@ -419,7 +419,7 @@ export default function Reports() {
                         <td className="p-4 text-sm">{item.fuelType.name}</td>
                         <td className="p-4 text-sm">{parseFloat(item.currentLevel).toLocaleString()} gal</td>
                         <td className="p-4 text-sm">{parseFloat(item.capacity).toLocaleString()} gal</td>
-                        <td className="p-4 text-sm">{((parseFloat(item.currentLevel) / parseFloat(item.capacity)) * 100).toFixed(1)}%</td>
+                        <td className="p-4 text-sm">{((parseFloat(item.currentLevel) / parseFloat(item.capacity)) * 100).toFixed(2)}%</td>
                         <td className="p-4 text-sm">{parseFloat(item.reorderPoint).toLocaleString()} gal</td>
                       </tr>
                     ))}
