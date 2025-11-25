@@ -1998,6 +1998,99 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // Unified User Preferences endpoint (combines notification and display preferences)
+  app.get("/api/docktalk/user-preferences", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const user = await dockTalkStorage.getUser(req.dockTalkUser!.id);
+      if (!user || !user.orgId) {
+        return res.status(403).json({ error: "User organization not found" });
+      }
+
+      const notificationPrefs = await dockTalkStorage.getUserNotificationPreferences(user.id, user.orgId);
+      const filterPrefs = await dockTalkStorage.getUserFilterPreferences(user.id, user.orgId);
+
+      // Combine preferences into unified format expected by frontend
+      res.json({
+        id: user.id,
+        emailNotifications: notificationPrefs?.enabled ?? false,
+        alertFrequency: notificationPrefs?.frequency ?? 'daily',
+        subscriptionTier: user.subscriptionTier || 'free',
+        categoriesFilter: filterPrefs?.categories || notificationPrefs?.categories || [],
+        createdAt: notificationPrefs?.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: notificationPrefs?.updatedAt?.toISOString() || new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error fetching user preferences:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  const UserPreferencesUpdateSchema = z.object({
+    emailNotifications: z.boolean().optional(),
+    alertFrequency: z.enum(["none", "immediate", "daily", "weekly"]).optional(),
+    categoriesFilter: z.array(z.string()).optional(),
+  });
+
+  app.patch("/api/docktalk/user-preferences", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const user = await dockTalkStorage.getUser(req.dockTalkUser!.id);
+      if (!user || !user.orgId) {
+        return res.status(403).json({ error: "User organization not found" });
+      }
+
+      const data = UserPreferencesUpdateSchema.parse(req.body);
+      
+      // Update notification preferences if relevant fields are provided
+      if (data.emailNotifications !== undefined || data.alertFrequency !== undefined) {
+        const existing = await dockTalkStorage.getUserNotificationPreferences(user.id, user.orgId);
+        
+        if (existing) {
+          await dockTalkStorage.updateUserNotificationPreferences(user.id, user.orgId, {
+            enabled: data.emailNotifications ?? existing.enabled,
+            frequency: data.alertFrequency ?? existing.frequency,
+          });
+        } else {
+          // Create new preferences with user's email
+          await dockTalkStorage.createUserNotificationPreferences({
+            userId: user.id,
+            orgId: user.orgId,
+            emailAddress: user.email || `${user.username}@docktalk.local`,
+            categories: data.categoriesFilter || [],
+            frequency: data.alertFrequency || 'daily',
+            enabled: data.emailNotifications ?? true,
+          });
+        }
+      }
+
+      // Update filter preferences if categories are provided
+      if (data.categoriesFilter !== undefined) {
+        await dockTalkStorage.saveUserFilterPreferences(user.id, user.orgId, {
+          categories: data.categoriesFilter,
+        });
+      }
+
+      // Return updated preferences
+      const notificationPrefs = await dockTalkStorage.getUserNotificationPreferences(user.id, user.orgId);
+      const filterPrefs = await dockTalkStorage.getUserFilterPreferences(user.id, user.orgId);
+
+      res.json({
+        id: user.id,
+        emailNotifications: notificationPrefs?.enabled ?? false,
+        alertFrequency: notificationPrefs?.frequency ?? 'daily',
+        subscriptionTier: user.subscriptionTier || 'free',
+        categoriesFilter: filterPrefs?.categories || notificationPrefs?.categories || [],
+        createdAt: notificationPrefs?.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: notificationPrefs?.updatedAt?.toISOString() || new Date().toISOString(),
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid input data", details: error.errors });
+      }
+      console.error("Error updating user preferences:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/docktalk/notifications", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const notifications = await dockTalkStorage.getNotificationsByUser(req.dockTalkUser!.id, req.dockTalkUser!.orgId, 50);

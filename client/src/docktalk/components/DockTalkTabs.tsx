@@ -16,7 +16,7 @@ interface DockTalkTabsProps {
 export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
   return (
     <Tabs value={activeTab} className="w-full">
-      <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
+      <TabsList className="w-full justify-start border-b border-gray-200 dark:border-gray-800 rounded-none h-auto p-0 bg-white dark:bg-gray-900">
         <Link href="/docktalk">
           <TabsTrigger 
             value="all-articles" 
