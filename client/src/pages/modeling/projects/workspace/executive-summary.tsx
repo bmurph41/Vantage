@@ -199,7 +199,7 @@ export default function WorkspaceExecutiveSummary({ projectId }: WorkspaceExecut
           </Select>
           <Dialog open={showScenarioConfig} onOpenChange={setShowScenarioConfig}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" data-testid="button-configure-scenarios">
                 <Settings className="h-4 w-4 mr-2" />
                 Configure
               </Button>
@@ -257,17 +257,17 @@ export default function WorkspaceExecutiveSummary({ projectId }: WorkspaceExecut
                 ))}
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowScenarioConfig(false)}>
+                <Button variant="outline" onClick={() => setShowScenarioConfig(false)} data-testid="button-cancel-config">
                   Cancel
                 </Button>
-                <Button onClick={() => setShowScenarioConfig(false)}>
+                <Button onClick={() => setShowScenarioConfig(false)} data-testid="button-save-scenarios">
                   <Save className="h-4 w-4 mr-2" />
                   Save Scenarios
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" data-testid="button-export-summary">
             <Download className="h-4 w-4 mr-2" />
             Export PDF
           </Button>

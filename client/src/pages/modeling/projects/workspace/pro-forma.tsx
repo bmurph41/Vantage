@@ -171,7 +171,7 @@ export default function WorkspaceProForma({ projectId }: WorkspaceProFormaProps)
               </SelectContent>
             </Select>
           )}
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" data-testid="button-export-proforma">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -277,6 +277,7 @@ export default function WorkspaceProForma({ projectId }: WorkspaceProFormaProps)
                         key={category}
                         className="bg-muted/50 cursor-pointer hover:bg-muted"
                         onClick={() => toggleCategory(category)}
+                        data-testid={`row-category-${category.toLowerCase()}`}
                       >
                         <TableCell className="font-semibold sticky left-0 bg-muted/50">
                           <div className="flex items-center gap-2">
