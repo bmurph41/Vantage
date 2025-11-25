@@ -11578,6 +11578,92 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ==================== DEBT SENSITIVITY ROUTES ====================
+
+  // Analyze debt sensitivity across lender structures
+  app.post('/api/modeling/projects/:projectId/debt-sensitivity', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { scenarioVersionId, purchasePrice, lenderStructures, rateShifts } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      if (!scenarioVersionId || !purchasePrice) {
+        return res.status(400).json({ error: 'scenarioVersionId and purchasePrice are required' });
+      }
+
+      const { debtSensitivityService } = await import('./services/debt-sensitivity-service');
+      
+      let structures = lenderStructures;
+      if (!structures || structures.length === 0) {
+        structures = await debtSensitivityService.getStandardLenderStructures(purchasePrice);
+      }
+
+      const shifts = rateShifts || [-1.0, -0.5, 0, 0.5, 1.0, 1.5, 2.0];
+
+      const analysis = await debtSensitivityService.analyzeDebtSensitivity(projectId, orgId, userId, {
+        scenarioVersionId,
+        purchasePrice,
+        lenderStructures: structures,
+        rateShifts: shifts
+      });
+
+      res.json(analysis);
+    } catch (error: any) {
+      console.error('Failed to analyze debt sensitivity:', error);
+      res.status(400).json({ error: error.message || 'Failed to analyze debt sensitivity' });
+    }
+  });
+
+  // Get standard lender structures
+  app.get('/api/modeling/debt-sensitivity/lender-templates', authenticateUser, async (req: any, res) => {
+    try {
+      const { purchasePrice } = req.query;
+      const price = parseFloat(purchasePrice as string) || 10000000;
+
+      const { debtSensitivityService } = await import('./services/debt-sensitivity-service');
+      const structures = await debtSensitivityService.getStandardLenderStructures(price);
+
+      res.json(structures);
+    } catch (error) {
+      console.error('Failed to get lender templates:', error);
+      res.status(500).json({ error: 'Failed to get lender templates' });
+    }
+  });
+
+  // Compare multiple lenders and get recommendations
+  app.post('/api/modeling/projects/:projectId/lender-comparison', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { scenarioVersionId, purchasePrice, targetDSCR } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { debtSensitivityService } = await import('./services/debt-sensitivity-service');
+      const comparison = await debtSensitivityService.compareMultipleLenders(
+        projectId,
+        orgId,
+        scenarioVersionId,
+        purchasePrice,
+        targetDSCR || 1.25
+      );
+
+      res.json(comparison);
+    } catch (error: any) {
+      console.error('Failed to compare lenders:', error);
+      res.status(400).json({ error: error.message || 'Failed to compare lenders' });
+    }
+  });
+
   // Get modeling analytics and metrics
   app.get('/api/modeling/analytics', authenticateUser, async (req: any, res) => {
     try {
