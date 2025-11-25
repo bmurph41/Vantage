@@ -9,39 +9,22 @@ import { startDockTalkCronJobs } from "./docktalk/cron-jobs";
 import { DatabaseStorage as DockTalkStorage } from "./docktalk/storage";
 import { initializeWebSocket } from "./docktalk/websocket";
 
+import { configureSecurityMiddleware } from "./middleware/security";
+import { requestIdMiddleware, requestLoggingMiddleware } from "./middleware/logging";
+import { centralizedErrorHandler, notFoundHandler } from "./middleware/error-handler";
+import { tenantContextMiddleware } from "./middleware/tenant-context";
+import { logger } from "./lib/logger";
+
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+app.use(requestIdMiddleware);
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+configureSecurityMiddleware(app);
 
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
+app.use(requestLoggingMiddleware);
 
 (async () => {
   try {
@@ -51,13 +34,7 @@ app.use((req, res, next) => {
     const dockTalkStorage = new DockTalkStorage();
     registerDockTalkRoutes(app, dockTalkStorage);
 
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-
-      res.status(status).json({ message });
-      throw err;
-    });
+    app.use(centralizedErrorHandler);
 
     // importantly only setup vite in development and after
     // setting up all the other routes so the catch-all route

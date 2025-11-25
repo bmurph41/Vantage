@@ -16,6 +16,7 @@ import { FuelSyncService } from "./services/fuel/fuel-sync-service";
 import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/duplicate-finder";
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { AuditService } from "./services/audit-service";
+import { setTenantContext, clearTenantContext } from "./middleware/tenant-context";
 import vdrRouter from "./vdr-routes";
 import shipStoreRouter from "./ship-store-router";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
@@ -203,10 +204,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return event;
   };
   // Middleware for authentication (simplified for demo)
-  const authenticateUser = (req: any, res: any, next: any) => {
-    // In production, this would validate JWT tokens or session
-    req.user = { id: "user-1", orgId: "org-1", role: "owner", email: "demo@marinamatch.com" };
-    next();
+  const authenticateUser = async (req: any, res: any, next: any) => {
+    try {
+      // In production, this would validate JWT tokens or session
+      req.user = { id: "user-1", orgId: "org-1", role: "owner", email: "demo@marinamatch.com" };
+      
+      // Set tenant context for RLS
+      if (req.user?.orgId) {
+        await setTenantContext(req.user.orgId);
+        
+        // Clear tenant context when response finishes
+        res.on('finish', () => {
+          clearTenantContext().catch(err => {
+            console.error('Error clearing tenant context:', err);
+          });
+        });
+      }
+      
+      next();
+    } catch (error) {
+      console.error('Authentication/tenant context error:', error);
+      next(error);
+    }
   };
 
   app.use("/api/dd", authenticateUser);

@@ -267,4 +267,339 @@ export class AuditService {
     const results = await query.orderBy(desc(auditLogs.createdAt));
     return results;
   }
+
+  static async logFileUpload(
+    req: Request,
+    fileId: string,
+    fileName: string,
+    fileSize: number,
+    mimeType: string,
+    destination?: string
+  ): Promise<void> {
+    const context = this.extractContext(req);
+
+    await this.log(context, {
+      eventType: 'create',
+      entityType: 'file_upload',
+      entityId: fileId,
+      action: `File uploaded: ${fileName}`,
+      afterData: {
+        fileName,
+        fileSize,
+        mimeType,
+        destination,
+      },
+      metadata: {
+        fileName,
+        fileSize,
+        mimeType,
+        destination,
+      },
+      severity: 'info',
+      isSuccess: true,
+    });
+  }
+
+  static async logFileDownload(
+    req: Request,
+    fileId: string,
+    fileName: string
+  ): Promise<void> {
+    const context = this.extractContext(req);
+
+    await this.log(context, {
+      eventType: 'view',
+      entityType: 'file_download',
+      entityId: fileId,
+      action: `File downloaded: ${fileName}`,
+      metadata: {
+        fileName,
+      },
+      severity: 'info',
+      isSuccess: true,
+    });
+  }
+
+  static async logFileDelete(
+    req: Request,
+    fileId: string,
+    fileName: string
+  ): Promise<void> {
+    const context = this.extractContext(req);
+
+    await this.log(context, {
+      eventType: 'delete',
+      entityType: 'file',
+      entityId: fileId,
+      action: `File deleted: ${fileName}`,
+      beforeData: { fileName },
+      metadata: {
+        fileName,
+      },
+      severity: 'warning',
+      isSuccess: true,
+    });
+  }
+
+  static async logRoleChange(
+    req: Request,
+    targetUserId: string,
+    targetUserEmail: string,
+    oldRole: string | null,
+    newRole: string,
+    orgId?: string
+  ): Promise<void> {
+    const context = this.extractContext(req);
+
+    await this.log(context, {
+      eventType: 'update',
+      entityType: 'user_role',
+      entityId: targetUserId,
+      action: `Role changed for ${targetUserEmail}: ${oldRole || 'none'} → ${newRole}`,
+      beforeData: { role: oldRole },
+      afterData: { role: newRole },
+      changes: {
+        role: { old: oldRole, new: newRole },
+      },
+      metadata: {
+        targetUserId,
+        targetUserEmail,
+        oldRole,
+        newRole,
+      },
+      severity: 'critical',
+      isSuccess: true,
+    });
+  }
+
+  static async logDealCreate(
+    req: Request,
+    dealId: string,
+    dealName: string,
+    dealData: any
+  ): Promise<void> {
+    const context = this.extractContext(req);
+
+    await this.log(context, {
+      eventType: 'create',
+      entityType: 'deal',
+      entityId: dealId,
+      action: `Deal created: ${dealName}`,
+      afterData: dealData,
+      metadata: {
+        dealName,
+      },
+      severity: 'info',
+      isSuccess: true,
+    });
+  }
+
+  static async logDealUpdate(
+    req: Request,
+    dealId: string,
+    dealName: string,
+    beforeData: any,
+    afterData: any
+  ): Promise<void> {
+    const context = this.extractContext(req);
+    const changes = this.calculateChanges(beforeData, afterData);
+
+    await this.log(context, {
+      eventType: 'update',
+      entityType: 'deal',
+      entityId: dealId,
+      action: `Deal updated: ${dealName}`,
+      beforeData,
+      afterData,
+      changes,
+      metadata: {
+        dealName,
+      },
+      severity: 'info',
+      isSuccess: true,
+    });
+  }
+
+  static async logDealStatusChange(
+    req: Request,
+    dealId: string,
+    dealName: string,
+    oldStatus: string,
+    newStatus: string
+  ): Promise<void> {
+    const context = this.extractContext(req);
+
+    await this.log(context, {
+      eventType: 'update',
+      entityType: 'deal',
+      entityId: dealId,
+      action: `Deal status changed: ${dealName} (${oldStatus} → ${newStatus})`,
+      beforeData: { status: oldStatus },
+      afterData: { status: newStatus },
+      changes: {
+        status: { old: oldStatus, new: newStatus },
+      },
+      metadata: {
+        dealName,
+        oldStatus,
+        newStatus,
+      },
+      severity: newStatus === 'closed_won' || newStatus === 'closed_lost' ? 'critical' : 'info',
+      isSuccess: true,
+    });
+  }
+
+  static async logDealDelete(
+    req: Request,
+    dealId: string,
+    dealName: string
+  ): Promise<void> {
+    const context = this.extractContext(req);
+
+    await this.log(context, {
+      eventType: 'delete',
+      entityType: 'deal',
+      entityId: dealId,
+      action: `Deal deleted: ${dealName}`,
+      beforeData: { dealName },
+      metadata: {
+        dealName,
+      },
+      severity: 'warning',
+      isSuccess: true,
+    });
+  }
+
+  static async logLogin(
+    req: Request,
+    userId: string,
+    email: string,
+    success: boolean,
+    failureReason?: string
+  ): Promise<void> {
+    const context = this.extractContext(req);
+    context.userId = userId;
+
+    await this.log(context, {
+      eventType: 'login',
+      entityType: 'auth',
+      entityId: userId,
+      action: success ? `User logged in: ${email}` : `Login failed: ${email}`,
+      metadata: {
+        email,
+        success,
+        failureReason,
+      },
+      severity: success ? 'info' : 'warning',
+      isSuccess: success,
+      errorMessage: failureReason,
+    });
+  }
+
+  static async logLogout(
+    req: Request
+  ): Promise<void> {
+    const context = this.extractContext(req);
+    const user = (req as any).user;
+
+    await this.log(context, {
+      eventType: 'logout',
+      entityType: 'auth',
+      entityId: user?.id,
+      action: `User logged out: ${user?.email || 'unknown'}`,
+      metadata: {
+        email: user?.email,
+      },
+      severity: 'info',
+      isSuccess: true,
+    });
+  }
+
+  static async logDataExport(
+    req: Request,
+    exportType: string,
+    entityType: string,
+    recordCount: number,
+    format: 'json' | 'csv' | 'xml' | 'pdf' | 'excel'
+  ): Promise<void> {
+    const context = this.extractContext(req);
+
+    await this.log(context, {
+      eventType: 'export',
+      entityType: 'data_export',
+      action: `Exported ${recordCount} ${entityType} records as ${format.toUpperCase()}`,
+      metadata: {
+        exportType,
+        entityType,
+        recordCount,
+        format,
+      },
+      severity: 'info',
+      isSuccess: true,
+    });
+  }
+
+  static async logSecurityEvent(
+    req: Request,
+    eventType: 'permission_denied' | 'rate_limited' | 'invalid_token' | 'suspicious_activity',
+    details: Record<string, any>
+  ): Promise<void> {
+    const context = this.extractContext(req);
+
+    await this.log(context, {
+      eventType: eventType,
+      entityType: 'security',
+      action: `Security event: ${eventType.replace(/_/g, ' ')}`,
+      metadata: details,
+      severity: 'critical',
+      isSuccess: false,
+    });
+  }
+
+  static async logVDRAccess(
+    req: Request,
+    action: 'view' | 'download' | 'upload' | 'delete' | 'share',
+    fileId: string,
+    fileName: string,
+    folderId?: string
+  ): Promise<void> {
+    const context = this.extractContext(req);
+
+    await this.log(context, {
+      eventType: action,
+      entityType: 'vdr_file',
+      entityId: fileId,
+      action: `VDR ${action}: ${fileName}`,
+      metadata: {
+        fileName,
+        folderId,
+        action,
+      },
+      severity: action === 'delete' ? 'warning' : 'info',
+      isSuccess: true,
+    });
+  }
+
+  static async logModelingAction(
+    req: Request,
+    action: 'create' | 'update' | 'delete' | 'approve' | 'reject' | 'lock' | 'export',
+    projectId: string,
+    scenarioType?: string,
+    details?: Record<string, any>
+  ): Promise<void> {
+    const context = this.extractContext(req);
+
+    await this.log(context, {
+      eventType: action,
+      entityType: 'modeling_project',
+      entityId: projectId,
+      action: `Modeling ${action}${scenarioType ? ` (${scenarioType})` : ''}`,
+      metadata: {
+        scenarioType,
+        ...details,
+      },
+      severity: ['approve', 'reject', 'lock', 'delete'].includes(action) ? 'critical' : 'info',
+      isSuccess: true,
+    });
+  }
 }
