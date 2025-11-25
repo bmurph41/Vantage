@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -98,6 +98,15 @@ const modelingNav = [
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
 ];
 
+// Exit Strategy Navigation (sub-menu under Debt Scenarios for quick access)
+const exitStrategyNav = [
+  { name: "Tax Calculator", href: "/modeling/exit/tax", icon: Calculator },
+  { name: "Net Proceeds", href: "/modeling/exit/net-proceeds", icon: DollarSign },
+  { name: "1031 Exchange", href: "/modeling/exit/1031", icon: RefreshCcw },
+  { name: "Sensitivity Analysis", href: "/modeling/exit/sensitivity", icon: TrendingUp },
+  { name: "IRR Calculator", href: "/modeling/exit/irr", icon: Percent },
+];
+
 // DockTalk Navigation - Single Entry Point
 const dockTalkNav = [
   { name: "DockTalk", href: "/docktalk", icon: MessageSquare },
@@ -129,6 +138,7 @@ export default function UnifiedSidebar() {
   const [ddExpanded, setDdExpanded] = useState(false);
   const [vdrExpanded, setVdrExpanded] = useState(false);
   const [modelingExpanded, setModelingExpanded] = useState(false);
+  const [exitStrategyExpanded, setExitStrategyExpanded] = useState(false);
   const [analysisExpanded, setAnalysisExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
@@ -207,6 +217,7 @@ export default function UnifiedSidebar() {
     const isDdPage = location === '/' || location === '/progress-report';
     const isVdrPage = location.startsWith('/vdr');
     const isModelingPage = location.startsWith('/modeling/');
+    const isExitStrategyPage = location.includes('/exit');
     const isAnalysisPage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
     const isDockTalkPage = location.startsWith('/docktalk');
 
@@ -221,6 +232,7 @@ export default function UnifiedSidebar() {
     setDdExpanded(isDdPage);
     setVdrExpanded(isVdrPage);
     setModelingExpanded(isModelingPage);
+    setExitStrategyExpanded(isExitStrategyPage);
     setAnalysisExpanded(isAnalysisPage);
   }, [location]);
 
@@ -576,9 +588,52 @@ export default function UnifiedSidebar() {
               onToggle={() => setModelingExpanded(!modelingExpanded)}
               isActive={location.startsWith('/modeling/')}
             />
-            {modelingExpanded && modelingNav.map((item) => (
-              <NavLink key={item.name} item={item} />
-            ))}
+            {modelingExpanded && (
+              <>
+                {modelingNav.map((item) => (
+                  <NavLink key={item.name} item={item} />
+                ))}
+                
+                {/* Exit Strategy Sub-Section */}
+                <div className="ml-4">
+                  <button
+                    onClick={() => setExitStrategyExpanded(!exitStrategyExpanded)}
+                    className={cn(
+                      "flex items-center w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors",
+                      location.includes('/exit') && "text-blue-600 font-medium"
+                    )}
+                    data-testid="nav-exit-strategy-toggle"
+                  >
+                    <Target className={cn("w-4 h-4 mr-3 flex-shrink-0", location.includes('/exit') && "text-blue-600")} />
+                    <span className="truncate">Exit Strategy</span>
+                    <ChevronRight className={cn(
+                      "ml-auto h-4 w-4 transition-transform",
+                      exitStrategyExpanded && "rotate-90"
+                    )} />
+                  </button>
+                  
+                  {exitStrategyExpanded && (
+                    <div className="ml-4 border-l border-gray-200 pl-2">
+                      {exitStrategyNav.map((item) => (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          onClick={handleNavClick}
+                          className={cn(
+                            "flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors",
+                            location === item.href && "bg-blue-50 text-blue-600 font-medium"
+                          )}
+                          data-testid={`nav-exit-${item.name.toLowerCase().replace(/ /g, '-')}`}
+                        >
+                          <item.icon className={cn("w-3.5 h-3.5 mr-2.5 flex-shrink-0", location === item.href && "text-blue-600")} />
+                          <span className="truncate text-xs">{item.name}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
         
