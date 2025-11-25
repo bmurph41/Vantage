@@ -281,7 +281,7 @@ export default function FormsPage() {
               <BarChart3 className="h-8 w-8 text-cyan-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg. Conversion</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{formStats.avgConversion.toFixed(1)}%</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{formStats.avgConversion.toFixed(2)}%</p>
               </div>
             </div>
           </CardContent>

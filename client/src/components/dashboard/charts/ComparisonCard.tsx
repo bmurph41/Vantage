@@ -29,7 +29,7 @@ export function ComparisonCard({
       case 'currency':
         return `$${val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
       case 'percent':
-        return `${val.toFixed(1)}%`;
+        return `${val.toFixed(2)}%`;
       default:
         return val.toLocaleString();
     }
@@ -86,7 +86,7 @@ export function ComparisonCard({
                     {isPositive ? '+' : ''}{difference > 0 ? formatValue(difference) : formatValue(Math.abs(difference))}
                   </p>
                   <p className="text-xs font-medium">
-                    {isPositive ? '+' : ''}{percentChange.toFixed(1)}%
+                    {isPositive ? '+' : ''}{percentChange.toFixed(2)}%
                   </p>
                 </div>
               </div>

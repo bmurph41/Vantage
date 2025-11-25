@@ -234,7 +234,7 @@ function CustomModuleContent({
       case 'currency':
         return `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
       case 'percent':
-        return `${value.toFixed(1)}%`;
+        return `${value.toFixed(2)}%`;
       default:
         return value.toLocaleString();
     }

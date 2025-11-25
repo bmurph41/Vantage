@@ -134,7 +134,7 @@ export function ComparisonModule() {
                       change.direction === 'down' ? 'text-red-600' : 
                       'text-gray-400'
                     }`}>
-                      {change.percent.toFixed(1)}% {change.direction === 'up' ? 'increase' : change.direction === 'down' ? 'decrease' : 'no change'}
+                      {change.percent.toFixed(2)}% {change.direction === 'up' ? 'increase' : change.direction === 'down' ? 'decrease' : 'no change'}
                     </span>
                   </div>
                 </div>

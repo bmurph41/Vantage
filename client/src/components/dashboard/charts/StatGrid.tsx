@@ -33,7 +33,7 @@ export function StatGrid({
       case 'currency':
         return `$${val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
       case 'percent':
-        return `${val.toFixed(1)}%`;
+        return `${val.toFixed(2)}%`;
       default:
         return val.toLocaleString();
     }
@@ -71,7 +71,7 @@ export function StatGrid({
                         ? 'text-green-600'
                         : 'text-red-600'
                     )}>
-                      {stat.trend.value > 0 ? '+' : ''}{stat.trend.value.toFixed(1)}%
+                      {stat.trend.value > 0 ? '+' : ''}{stat.trend.value.toFixed(2)}%
                     </p>
                   )}
                 </div>

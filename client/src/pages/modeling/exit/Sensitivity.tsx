@@ -274,7 +274,7 @@ export default function ExitSensitivity({ projectId }: SensitivityProps) {
                             className={`border p-2 text-right ${irrColor} ${isBase ? 'bg-blue-100 dark:bg-blue-900 font-bold' : ''}`}
                             data-testid={`cell-irr-${noiPct}-${capRate.toFixed(2)}`}
                           >
-                            {irr.toFixed(1)}%
+                            {irr.toFixed(2)}%
                           </td>
                         );
                       })}
@@ -297,21 +297,21 @@ export default function ExitSensitivity({ projectId }: SensitivityProps) {
               <h4 className="font-medium mb-2">Upside Scenario</h4>
               <p className="text-sm text-muted-foreground mb-1">+15% NOI, -1% Cap Rate</p>
               <p className="text-lg font-bold text-green-600">
-                IRR: {calculateIRR(calculateProfit(calculateExitPrice(baseCase.exitNOI * 1.15, baseCase.exitCapRate - 1))).toFixed(1)}%
+                IRR: {calculateIRR(calculateProfit(calculateExitPrice(baseCase.exitNOI * 1.15, baseCase.exitCapRate - 1))).toFixed(2)}%
               </p>
             </div>
             <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
               <h4 className="font-medium mb-2">Base Case</h4>
               <p className="text-sm text-muted-foreground mb-1">Current assumptions</p>
               <p className="text-lg font-bold text-blue-600">
-                IRR: {baseIRR.toFixed(1)}%
+                IRR: {baseIRR.toFixed(2)}%
               </p>
             </div>
             <div className="p-4 bg-muted rounded-lg">
               <h4 className="font-medium mb-2">Downside Scenario</h4>
               <p className="text-sm text-muted-foreground mb-1">-15% NOI, +1% Cap Rate</p>
               <p className="text-lg font-bold text-red-600">
-                IRR: {calculateIRR(calculateProfit(calculateExitPrice(baseCase.exitNOI * 0.85, baseCase.exitCapRate + 1))).toFixed(1)}%
+                IRR: {calculateIRR(calculateProfit(calculateExitPrice(baseCase.exitNOI * 0.85, baseCase.exitCapRate + 1))).toFixed(2)}%
               </p>
             </div>
           </div>
