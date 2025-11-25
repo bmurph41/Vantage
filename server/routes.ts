@@ -10371,6 +10371,844 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ============================================================================
+  // EXIT STRATEGY SUITE
+  // ============================================================================
+
+  // --- EXIT SCENARIOS ---
+  
+  // Get all exit scenarios for a modeling project
+  app.get('/api/modeling/projects/:projectId/exit/scenarios', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      // Verify project exists and belongs to organization
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      const scenarios = await storage.getExitScenarios(projectId, orgId);
+      res.json(scenarios);
+    } catch (error) {
+      console.error('Failed to fetch exit scenarios:', error);
+      res.status(500).json({ error: 'Failed to fetch exit scenarios' });
+    }
+  });
+
+  // Get single exit scenario
+  app.get('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, scenarioId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      const scenario = await storage.getExitScenario(scenarioId, orgId);
+      if (!scenario || scenario.modelingProjectId !== projectId) {
+        return res.status(404).json({ error: 'Exit scenario not found' });
+      }
+      
+      res.json(scenario);
+    } catch (error) {
+      console.error('Failed to fetch exit scenario:', error);
+      res.status(500).json({ error: 'Failed to fetch exit scenario' });
+    }
+  });
+
+  // Create exit scenario
+  app.post('/api/modeling/projects/:projectId/exit/scenarios', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      const scenario = await storage.createExitScenario({
+        ...req.body,
+        modelingProjectId: projectId,
+        orgId,
+        createdBy: userId
+      });
+      
+      // Log activity
+      await storage.createExitActivity({
+        modelingProjectId: projectId,
+        exitScenarioId: scenario.id,
+        activityType: 'scenario_created',
+        description: `Created exit scenario: ${scenario.name}`,
+        userId,
+        orgId
+      });
+      
+      res.status(201).json(scenario);
+    } catch (error) {
+      console.error('Failed to create exit scenario:', error);
+      res.status(500).json({ error: 'Failed to create exit scenario' });
+    }
+  });
+
+  // Update exit scenario
+  app.patch('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, scenarioId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      const scenario = await storage.updateExitScenario(scenarioId, {
+        ...req.body,
+        updatedBy: userId
+      }, orgId);
+      
+      if (!scenario) {
+        return res.status(404).json({ error: 'Exit scenario not found' });
+      }
+      
+      res.json(scenario);
+    } catch (error) {
+      console.error('Failed to update exit scenario:', error);
+      res.status(500).json({ error: 'Failed to update exit scenario' });
+    }
+  });
+
+  // Delete exit scenario
+  app.delete('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, scenarioId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      const success = await storage.deleteExitScenario(scenarioId, orgId);
+      if (!success) {
+        return res.status(404).json({ error: 'Exit scenario not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete exit scenario:', error);
+      res.status(500).json({ error: 'Failed to delete exit scenario' });
+    }
+  });
+
+  // --- TAX CALCULATIONS ---
+
+  // Get tax calculations for a scenario
+  app.get('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/tax', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, scenarioId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      const taxCalcs = await storage.getExitTaxCalculations(scenarioId, orgId);
+      res.json(taxCalcs);
+    } catch (error) {
+      console.error('Failed to fetch tax calculations:', error);
+      res.status(500).json({ error: 'Failed to fetch tax calculations' });
+    }
+  });
+
+  // Create tax calculation
+  app.post('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/tax', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, scenarioId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      const scenario = await storage.getExitScenario(scenarioId, orgId);
+      if (!scenario) {
+        return res.status(404).json({ error: 'Exit scenario not found' });
+      }
+      
+      const taxCalc = await storage.createExitTaxCalculation({
+        ...req.body,
+        exitScenarioId: scenarioId,
+        orgId
+      });
+      
+      res.status(201).json(taxCalc);
+    } catch (error) {
+      console.error('Failed to create tax calculation:', error);
+      res.status(500).json({ error: 'Failed to create tax calculation' });
+    }
+  });
+
+  // Update tax calculation
+  app.patch('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/tax/:taxId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { taxId } = req.params;
+      
+      const taxCalc = await storage.updateExitTaxCalculation(taxId, req.body, orgId);
+      if (!taxCalc) {
+        return res.status(404).json({ error: 'Tax calculation not found' });
+      }
+      
+      res.json(taxCalc);
+    } catch (error) {
+      console.error('Failed to update tax calculation:', error);
+      res.status(500).json({ error: 'Failed to update tax calculation' });
+    }
+  });
+
+  // Delete tax calculation
+  app.delete('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/tax/:taxId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { taxId } = req.params;
+      
+      const success = await storage.deleteExitTaxCalculation(taxId, orgId);
+      if (!success) {
+        return res.status(404).json({ error: 'Tax calculation not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete tax calculation:', error);
+      res.status(500).json({ error: 'Failed to delete tax calculation' });
+    }
+  });
+
+  // --- SELLER FINANCING ---
+
+  // Get seller financing for a scenario
+  app.get('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/seller-financing', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      
+      const sellerFinancing = await storage.getExitSellerFinancing(scenarioId, orgId);
+      res.json(sellerFinancing);
+    } catch (error) {
+      console.error('Failed to fetch seller financing:', error);
+      res.status(500).json({ error: 'Failed to fetch seller financing' });
+    }
+  });
+
+  // Create seller financing
+  app.post('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/seller-financing', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      
+      const scenario = await storage.getExitScenario(scenarioId, orgId);
+      if (!scenario) {
+        return res.status(404).json({ error: 'Exit scenario not found' });
+      }
+      
+      const sellerFinancing = await storage.createExitSellerFinancing({
+        ...req.body,
+        exitScenarioId: scenarioId,
+        orgId
+      });
+      
+      res.status(201).json(sellerFinancing);
+    } catch (error) {
+      console.error('Failed to create seller financing:', error);
+      res.status(500).json({ error: 'Failed to create seller financing' });
+    }
+  });
+
+  // Update seller financing
+  app.patch('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/seller-financing/:sfId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { sfId } = req.params;
+      
+      const sellerFinancing = await storage.updateExitSellerFinancing(sfId, req.body, orgId);
+      if (!sellerFinancing) {
+        return res.status(404).json({ error: 'Seller financing not found' });
+      }
+      
+      res.json(sellerFinancing);
+    } catch (error) {
+      console.error('Failed to update seller financing:', error);
+      res.status(500).json({ error: 'Failed to update seller financing' });
+    }
+  });
+
+  // Delete seller financing
+  app.delete('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/seller-financing/:sfId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { sfId } = req.params;
+      
+      const success = await storage.deleteExitSellerFinancing(sfId, orgId);
+      if (!success) {
+        return res.status(404).json({ error: 'Seller financing not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete seller financing:', error);
+      res.status(500).json({ error: 'Failed to delete seller financing' });
+    }
+  });
+
+  // --- EARNOUTS ---
+
+  // Get earnouts for a scenario
+  app.get('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/earnouts', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      
+      const earnouts = await storage.getExitEarnouts(scenarioId, orgId);
+      res.json(earnouts);
+    } catch (error) {
+      console.error('Failed to fetch earnouts:', error);
+      res.status(500).json({ error: 'Failed to fetch earnouts' });
+    }
+  });
+
+  // Create earnout
+  app.post('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/earnouts', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      
+      const scenario = await storage.getExitScenario(scenarioId, orgId);
+      if (!scenario) {
+        return res.status(404).json({ error: 'Exit scenario not found' });
+      }
+      
+      const earnout = await storage.createExitEarnout({
+        ...req.body,
+        exitScenarioId: scenarioId,
+        orgId
+      });
+      
+      res.status(201).json(earnout);
+    } catch (error) {
+      console.error('Failed to create earnout:', error);
+      res.status(500).json({ error: 'Failed to create earnout' });
+    }
+  });
+
+  // Update earnout
+  app.patch('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/earnouts/:earnoutId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { earnoutId } = req.params;
+      
+      const earnout = await storage.updateExitEarnout(earnoutId, req.body, orgId);
+      if (!earnout) {
+        return res.status(404).json({ error: 'Earnout not found' });
+      }
+      
+      res.json(earnout);
+    } catch (error) {
+      console.error('Failed to update earnout:', error);
+      res.status(500).json({ error: 'Failed to update earnout' });
+    }
+  });
+
+  // Delete earnout
+  app.delete('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/earnouts/:earnoutId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { earnoutId } = req.params;
+      
+      const success = await storage.deleteExitEarnout(earnoutId, orgId);
+      if (!success) {
+        return res.status(404).json({ error: 'Earnout not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete earnout:', error);
+      res.status(500).json({ error: 'Failed to delete earnout' });
+    }
+  });
+
+  // --- 1031 EXCHANGES ---
+
+  // Get 1031 exchanges for a scenario
+  app.get('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/1031', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      
+      const exchanges = await storage.getExit1031Exchanges(scenarioId, orgId);
+      res.json(exchanges);
+    } catch (error) {
+      console.error('Failed to fetch 1031 exchanges:', error);
+      res.status(500).json({ error: 'Failed to fetch 1031 exchanges' });
+    }
+  });
+
+  // Create 1031 exchange
+  app.post('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/1031', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      
+      const scenario = await storage.getExitScenario(scenarioId, orgId);
+      if (!scenario) {
+        return res.status(404).json({ error: 'Exit scenario not found' });
+      }
+      
+      const exchange = await storage.createExit1031Exchange({
+        ...req.body,
+        exitScenarioId: scenarioId,
+        orgId
+      });
+      
+      res.status(201).json(exchange);
+    } catch (error) {
+      console.error('Failed to create 1031 exchange:', error);
+      res.status(500).json({ error: 'Failed to create 1031 exchange' });
+    }
+  });
+
+  // Update 1031 exchange
+  app.patch('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/1031/:exchangeId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { exchangeId } = req.params;
+      
+      const exchange = await storage.updateExit1031Exchange(exchangeId, req.body, orgId);
+      if (!exchange) {
+        return res.status(404).json({ error: '1031 exchange not found' });
+      }
+      
+      res.json(exchange);
+    } catch (error) {
+      console.error('Failed to update 1031 exchange:', error);
+      res.status(500).json({ error: 'Failed to update 1031 exchange' });
+    }
+  });
+
+  // Delete 1031 exchange
+  app.delete('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/1031/:exchangeId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { exchangeId } = req.params;
+      
+      const success = await storage.deleteExit1031Exchange(exchangeId, orgId);
+      if (!success) {
+        return res.status(404).json({ error: '1031 exchange not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete 1031 exchange:', error);
+      res.status(500).json({ error: 'Failed to delete 1031 exchange' });
+    }
+  });
+
+  // --- DST ANALYSES ---
+
+  // Get DST analyses for a scenario
+  app.get('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/dst', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      
+      const dstAnalyses = await storage.getExitDstAnalyses(scenarioId, orgId);
+      res.json(dstAnalyses);
+    } catch (error) {
+      console.error('Failed to fetch DST analyses:', error);
+      res.status(500).json({ error: 'Failed to fetch DST analyses' });
+    }
+  });
+
+  // Create DST analysis
+  app.post('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/dst', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      
+      const scenario = await storage.getExitScenario(scenarioId, orgId);
+      if (!scenario) {
+        return res.status(404).json({ error: 'Exit scenario not found' });
+      }
+      
+      const dstAnalysis = await storage.createExitDstAnalysis({
+        ...req.body,
+        exitScenarioId: scenarioId,
+        orgId
+      });
+      
+      res.status(201).json(dstAnalysis);
+    } catch (error) {
+      console.error('Failed to create DST analysis:', error);
+      res.status(500).json({ error: 'Failed to create DST analysis' });
+    }
+  });
+
+  // Update DST analysis
+  app.patch('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/dst/:dstId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { dstId } = req.params;
+      
+      const dstAnalysis = await storage.updateExitDstAnalysis(dstId, req.body, orgId);
+      if (!dstAnalysis) {
+        return res.status(404).json({ error: 'DST analysis not found' });
+      }
+      
+      res.json(dstAnalysis);
+    } catch (error) {
+      console.error('Failed to update DST analysis:', error);
+      res.status(500).json({ error: 'Failed to update DST analysis' });
+    }
+  });
+
+  // Delete DST analysis
+  app.delete('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/dst/:dstId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { dstId } = req.params;
+      
+      const success = await storage.deleteExitDstAnalysis(dstId, orgId);
+      if (!success) {
+        return res.status(404).json({ error: 'DST analysis not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete DST analysis:', error);
+      res.status(500).json({ error: 'Failed to delete DST analysis' });
+    }
+  });
+
+  // --- FUNDS ---
+
+  // Get all funds for organization
+  app.get('/api/exit/funds', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const funds = await storage.getExitFunds(orgId);
+      res.json(funds);
+    } catch (error) {
+      console.error('Failed to fetch funds:', error);
+      res.status(500).json({ error: 'Failed to fetch funds' });
+    }
+  });
+
+  // Get single fund
+  app.get('/api/exit/funds/:fundId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      
+      const fund = await storage.getExitFund(fundId, orgId);
+      if (!fund) {
+        return res.status(404).json({ error: 'Fund not found' });
+      }
+      
+      res.json(fund);
+    } catch (error) {
+      console.error('Failed to fetch fund:', error);
+      res.status(500).json({ error: 'Failed to fetch fund' });
+    }
+  });
+
+  // Create fund
+  app.post('/api/exit/funds', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      const fund = await storage.createExitFund({
+        ...req.body,
+        orgId
+      });
+      
+      res.status(201).json(fund);
+    } catch (error) {
+      console.error('Failed to create fund:', error);
+      res.status(500).json({ error: 'Failed to create fund' });
+    }
+  });
+
+  // Update fund
+  app.patch('/api/exit/funds/:fundId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      
+      const fund = await storage.updateExitFund(fundId, req.body, orgId);
+      if (!fund) {
+        return res.status(404).json({ error: 'Fund not found' });
+      }
+      
+      res.json(fund);
+    } catch (error) {
+      console.error('Failed to update fund:', error);
+      res.status(500).json({ error: 'Failed to update fund' });
+    }
+  });
+
+  // Delete fund
+  app.delete('/api/exit/funds/:fundId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      
+      const success = await storage.deleteExitFund(fundId, orgId);
+      if (!success) {
+        return res.status(404).json({ error: 'Fund not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete fund:', error);
+      res.status(500).json({ error: 'Failed to delete fund' });
+    }
+  });
+
+  // --- WATERFALL STRUCTURES ---
+
+  // Get waterfall structures for a scenario
+  app.get('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/waterfall', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      
+      const waterfalls = await storage.getExitWaterfallStructures(scenarioId, orgId);
+      res.json(waterfalls);
+    } catch (error) {
+      console.error('Failed to fetch waterfall structures:', error);
+      res.status(500).json({ error: 'Failed to fetch waterfall structures' });
+    }
+  });
+
+  // Create waterfall structure
+  app.post('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/waterfall', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      
+      const scenario = await storage.getExitScenario(scenarioId, orgId);
+      if (!scenario) {
+        return res.status(404).json({ error: 'Exit scenario not found' });
+      }
+      
+      const waterfall = await storage.createExitWaterfallStructure({
+        ...req.body,
+        exitScenarioId: scenarioId,
+        orgId
+      });
+      
+      res.status(201).json(waterfall);
+    } catch (error) {
+      console.error('Failed to create waterfall structure:', error);
+      res.status(500).json({ error: 'Failed to create waterfall structure' });
+    }
+  });
+
+  // Update waterfall structure
+  app.patch('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/waterfall/:waterfallId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { waterfallId } = req.params;
+      
+      const waterfall = await storage.updateExitWaterfallStructure(waterfallId, req.body, orgId);
+      if (!waterfall) {
+        return res.status(404).json({ error: 'Waterfall structure not found' });
+      }
+      
+      res.json(waterfall);
+    } catch (error) {
+      console.error('Failed to update waterfall structure:', error);
+      res.status(500).json({ error: 'Failed to update waterfall structure' });
+    }
+  });
+
+  // Delete waterfall structure
+  app.delete('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/waterfall/:waterfallId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { waterfallId } = req.params;
+      
+      const success = await storage.deleteExitWaterfallStructure(waterfallId, orgId);
+      if (!success) {
+        return res.status(404).json({ error: 'Waterfall structure not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete waterfall structure:', error);
+      res.status(500).json({ error: 'Failed to delete waterfall structure' });
+    }
+  });
+
+  // --- INVESTORS ---
+
+  // Get investors for a fund
+  app.get('/api/exit/funds/:fundId/investors', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      
+      const fund = await storage.getExitFund(fundId, orgId);
+      if (!fund) {
+        return res.status(404).json({ error: 'Fund not found' });
+      }
+      
+      const investors = await storage.getExitInvestors(fundId, orgId);
+      res.json(investors);
+    } catch (error) {
+      console.error('Failed to fetch investors:', error);
+      res.status(500).json({ error: 'Failed to fetch investors' });
+    }
+  });
+
+  // Create investor
+  app.post('/api/exit/funds/:fundId/investors', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      
+      const fund = await storage.getExitFund(fundId, orgId);
+      if (!fund) {
+        return res.status(404).json({ error: 'Fund not found' });
+      }
+      
+      const investor = await storage.createExitInvestor({
+        ...req.body,
+        fundId,
+        orgId
+      });
+      
+      res.status(201).json(investor);
+    } catch (error) {
+      console.error('Failed to create investor:', error);
+      res.status(500).json({ error: 'Failed to create investor' });
+    }
+  });
+
+  // Update investor
+  app.patch('/api/exit/funds/:fundId/investors/:investorId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { investorId } = req.params;
+      
+      const investor = await storage.updateExitInvestor(investorId, req.body, orgId);
+      if (!investor) {
+        return res.status(404).json({ error: 'Investor not found' });
+      }
+      
+      res.json(investor);
+    } catch (error) {
+      console.error('Failed to update investor:', error);
+      res.status(500).json({ error: 'Failed to update investor' });
+    }
+  });
+
+  // Delete investor
+  app.delete('/api/exit/funds/:fundId/investors/:investorId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { investorId } = req.params;
+      
+      const success = await storage.deleteExitInvestor(investorId, orgId);
+      if (!success) {
+        return res.status(404).json({ error: 'Investor not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete investor:', error);
+      res.status(500).json({ error: 'Failed to delete investor' });
+    }
+  });
+
+  // --- CASH FLOWS ---
+
+  // Get cash flows for a scenario
+  app.get('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/cash-flows', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      
+      const cashFlows = await storage.getExitCashFlows(scenarioId, orgId);
+      res.json(cashFlows);
+    } catch (error) {
+      console.error('Failed to fetch cash flows:', error);
+      res.status(500).json({ error: 'Failed to fetch cash flows' });
+    }
+  });
+
+  // Save cash flows for a scenario (replaces existing)
+  app.post('/api/modeling/projects/:projectId/exit/scenarios/:scenarioId/cash-flows', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      const { cashFlows } = req.body;
+      
+      const scenario = await storage.getExitScenario(scenarioId, orgId);
+      if (!scenario) {
+        return res.status(404).json({ error: 'Exit scenario not found' });
+      }
+      
+      // Delete existing cash flows
+      await storage.deleteExitCashFlows(scenarioId, orgId);
+      
+      // Create new cash flows
+      const createdFlows = [];
+      for (const cf of cashFlows) {
+        const created = await storage.createExitCashFlow({
+          ...cf,
+          exitScenarioId: scenarioId,
+          orgId
+        });
+        createdFlows.push(created);
+      }
+      
+      res.status(201).json(createdFlows);
+    } catch (error) {
+      console.error('Failed to save cash flows:', error);
+      res.status(500).json({ error: 'Failed to save cash flows' });
+    }
+  });
+
+  // --- ACTIVITIES / AUDIT LOG ---
+
+  // Get activities for a scenario or project
+  app.get('/api/modeling/projects/:projectId/exit/activities', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { scenarioId } = req.query;
+      
+      const activities = await storage.getExitActivities(
+        scenarioId as string || null,
+        projectId,
+        orgId
+      );
+      res.json(activities);
+    } catch (error) {
+      console.error('Failed to fetch exit activities:', error);
+      res.status(500).json({ error: 'Failed to fetch exit activities' });
+    }
+  });
+
+  // ============================================================================
   // TRANSACTION & CLOSING COSTS
   // ============================================================================
 
