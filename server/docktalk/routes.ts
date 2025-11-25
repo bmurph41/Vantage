@@ -381,6 +381,11 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   app.get("/api/docktalk/articles/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      
+      if (isNaN(id) || id <= 0) {
+        return res.status(400).json({ error: "Invalid article ID" });
+      }
+      
       const article = await dockTalkStorage.getArticleById(id);
       
       if (!article) {

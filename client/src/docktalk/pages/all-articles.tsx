@@ -174,14 +174,14 @@ export default function AllArticles() {
       refetchArticles();
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/analytics/stats'] });
       toast({
-        title: "Fetch Complete",
+        title: "News Updated",
         description: `Found ${data.newArticles} new article${data.newArticles !== 1 ? 's' : ''}`,
       });
     },
     onError: (error) => {
       toast({
-        title: "Fetch Failed",
-        description: error instanceof Error ? error.message : "Failed to fetch RSS feeds",
+        title: "Update Failed",
+        description: error instanceof Error ? error.message : "Failed to update news feeds",
         variant: "destructive",
       });
     },
@@ -240,7 +240,7 @@ export default function AllArticles() {
                   data-testid="button-fetch-now"
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${manualFetchMutation.isPending ? 'animate-spin' : ''}`} />
-                  {manualFetchMutation.isPending ? 'Fetching...' : 'Fetch Now'}
+                  {manualFetchMutation.isPending ? 'Updating...' : 'Update News'}
                 </Button>
                 
                 {systemStats?.lastUpdate && (

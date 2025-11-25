@@ -180,6 +180,7 @@ export default function ArticleManagementPage() {
   const handleArticlesClick = () => setLocation('/docktalk');
   const handleNotificationClick = () => setLocation('/docktalk/notifications');
   const handleSettingsClick = () => setLocation('/docktalk/sources');
+  const handleArticleManagementClick = () => {}; // Already on this page
 
   const filters: ArticleFilters = {
     search: search || undefined,
@@ -322,6 +323,7 @@ export default function ArticleManagementPage() {
         onArticlesClick={handleArticlesClick}
         onNotificationClick={handleNotificationClick}
         onSettingsClick={handleSettingsClick}
+        onArticleManagementClick={handleArticleManagementClick}
         showArticlesButton={true}
       />
       <div className="flex-1 overflow-auto p-6">
