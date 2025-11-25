@@ -25,6 +25,7 @@ import { personaService } from "./services/persona-service";
 import { dashboardService } from "./services/dashboard-service";
 import { ownedAssetsService } from "./services/owned-assets-service";
 import { debtScenarioService } from "./debt-scenario-service";
+import { docIntelService } from "./services/doc-intel-service";
 import { calculateAll, type TransactionClosingData } from "./services/transactionClosingEngine";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
@@ -10367,6 +10368,415 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to fetch modeling analytics:', error);
       res.status(500).json({ error: 'Failed to fetch modeling analytics' });
+    }
+  });
+
+  // ============================================================================
+  // DOCUMENT INTELLIGENCE - AI-Powered Financial Document Parsing
+  // ============================================================================
+
+  // Configure multer for document uploads
+  const docIntelUpload = multer({
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => {
+        const uploadDir = path.join(process.cwd(), 'server', 'uploads', 'doc-intel');
+        fs.ensureDirSync(uploadDir);
+        cb(null, uploadDir);
+      },
+      filename: (req, file, cb) => {
+        const timestamp = Date.now();
+        const ext = path.extname(file.originalname);
+        cb(null, `${timestamp}-${crypto.randomBytes(8).toString('hex')}${ext}`);
+      }
+    }),
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for financial docs
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+        'application/vnd.ms-excel', // xls
+        'text/csv',
+        'application/pdf'
+      ];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only Excel, CSV, and PDF files are allowed.'));
+      }
+    }
+  });
+
+  // Initialize organization with default categories and patterns
+  app.post('/api/modeling/doc-intel/init', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const result = await docIntelService.initializeOrganization(orgId);
+      res.json(result);
+    } catch (error) {
+      console.error('Failed to initialize document intelligence:', error);
+      res.status(500).json({ error: 'Failed to initialize document intelligence' });
+    }
+  });
+
+  // --- P&L CATEGORIES ---
+  
+  // Get all categories for organization (hierarchical)
+  app.get('/api/modeling/doc-intel/categories', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const hierarchical = req.query.hierarchical === 'true';
+      
+      if (hierarchical) {
+        const categories = await docIntelService.getCategoriesHierarchical(orgId);
+        res.json(categories);
+      } else {
+        const categories = await docIntelService.getCategories(orgId);
+        res.json(categories);
+      }
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+      res.status(500).json({ error: 'Failed to fetch categories' });
+    }
+  });
+
+  // Create category
+  app.post('/api/modeling/doc-intel/categories', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const category = await docIntelService.createCategory(orgId, req.body);
+      res.status(201).json(category);
+    } catch (error) {
+      console.error('Failed to create category:', error);
+      res.status(500).json({ error: 'Failed to create category' });
+    }
+  });
+
+  // Update category
+  app.patch('/api/modeling/doc-intel/categories/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const category = await docIntelService.updateCategory(orgId, req.params.id, req.body);
+      if (!category) {
+        return res.status(404).json({ error: 'Category not found' });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error('Failed to update category:', error);
+      res.status(500).json({ error: 'Failed to update category' });
+    }
+  });
+
+  // Delete category (soft delete)
+  app.delete('/api/modeling/doc-intel/categories/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      await docIntelService.deleteCategory(orgId, req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      res.status(500).json({ error: 'Failed to delete category' });
+    }
+  });
+
+  // --- DOCUMENT UPLOADS ---
+  
+  // Get all uploads for a project
+  app.get('/api/modeling/projects/:projectId/documents', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      const uploads = await docIntelService.getProjectUploads(orgId, projectId);
+      res.json(uploads);
+    } catch (error) {
+      console.error('Failed to fetch document uploads:', error);
+      res.status(500).json({ error: 'Failed to fetch document uploads' });
+    }
+  });
+
+  // Upload new document for processing
+  app.post('/api/modeling/projects/:projectId/documents', authenticateUser, docIntelUpload.single('file'), async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+      
+      const upload = await docIntelService.createUpload(orgId, {
+        modelingProjectId: projectId,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        storagePath: req.file.path,
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+        docType: req.body.docType || null,
+        year: req.body.year ? parseInt(req.body.year) : null,
+        uploadedBy: userId,
+        status: 'uploaded'
+      });
+      
+      res.status(201).json(upload);
+    } catch (error) {
+      console.error('Failed to upload document:', error);
+      res.status(500).json({ error: 'Failed to upload document' });
+    }
+  });
+
+  // Get single upload with stats
+  app.get('/api/modeling/projects/:projectId/documents/:uploadId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, uploadId } = req.params;
+      
+      const upload = await docIntelService.getUpload(orgId, uploadId);
+      if (!upload || upload.modelingProjectId !== projectId) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      
+      const stats = await docIntelService.getUploadStats(orgId, uploadId);
+      res.json({ ...upload, stats });
+    } catch (error) {
+      console.error('Failed to fetch document:', error);
+      res.status(500).json({ error: 'Failed to fetch document' });
+    }
+  });
+
+  // Update upload metadata (doc type, year, wizard step)
+  app.patch('/api/modeling/projects/:projectId/documents/:uploadId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, uploadId } = req.params;
+      
+      const upload = await docIntelService.updateUpload(orgId, uploadId, req.body);
+      if (!upload) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      
+      res.json(upload);
+    } catch (error) {
+      console.error('Failed to update document:', error);
+      res.status(500).json({ error: 'Failed to update document' });
+    }
+  });
+
+  // Delete upload and associated items
+  app.delete('/api/modeling/projects/:projectId/documents/:uploadId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { uploadId } = req.params;
+      
+      await docIntelService.deleteUpload(orgId, uploadId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete document:', error);
+      res.status(500).json({ error: 'Failed to delete document' });
+    }
+  });
+
+  // --- PARSING & EXTRACTION ---
+  
+  // Parse document and extract line items
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/parse', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, uploadId } = req.params;
+      
+      const upload = await docIntelService.getUpload(orgId, uploadId);
+      if (!upload || upload.modelingProjectId !== projectId) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      
+      const items = await docIntelService.parseAndExtract(orgId, uploadId);
+      res.json({ items, count: items.length });
+    } catch (error) {
+      console.error('Failed to parse document:', error);
+      res.status(500).json({ error: 'Failed to parse document' });
+    }
+  });
+
+  // Categorize extracted items using rules
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/categorize', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, uploadId } = req.params;
+      
+      const upload = await docIntelService.getUpload(orgId, uploadId);
+      if (!upload || upload.modelingProjectId !== projectId) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      
+      const items = await docIntelService.categorizeItems(orgId, uploadId);
+      
+      // Update upload to reviewing status
+      await docIntelService.updateUpload(orgId, uploadId, { 
+        status: 'reviewing',
+        reviewStartedAt: new Date(),
+        wizardStep: 2
+      });
+      
+      res.json({ items, count: items.length });
+    } catch (error) {
+      console.error('Failed to categorize items:', error);
+      res.status(500).json({ error: 'Failed to categorize items' });
+    }
+  });
+
+  // --- EXTRACTED ITEMS ---
+  
+  // Get all extracted items for an upload
+  app.get('/api/modeling/projects/:projectId/documents/:uploadId/items', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, uploadId } = req.params;
+      
+      const upload = await docIntelService.getUpload(orgId, uploadId);
+      if (!upload || upload.modelingProjectId !== projectId) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      
+      const withCategories = req.query.withCategories === 'true';
+      const items = withCategories 
+        ? await docIntelService.getExtractedItemsWithCategories(orgId, uploadId)
+        : await docIntelService.getExtractedItems(orgId, uploadId);
+      
+      res.json(items);
+    } catch (error) {
+      console.error('Failed to fetch extracted items:', error);
+      res.status(500).json({ error: 'Failed to fetch extracted items' });
+    }
+  });
+
+  // Confirm an extracted item (assign category)
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/items/:itemId/confirm', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { itemId } = req.params;
+      const { categoryId, amount } = req.body;
+      
+      if (!categoryId) {
+        return res.status(400).json({ error: 'categoryId is required' });
+      }
+      
+      const item = await docIntelService.confirmItem(orgId, itemId, categoryId, userId, amount);
+      res.json(item);
+    } catch (error) {
+      console.error('Failed to confirm item:', error);
+      res.status(500).json({ error: 'Failed to confirm item' });
+    }
+  });
+
+  // Reject an extracted item
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/items/:itemId/reject', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { itemId } = req.params;
+      
+      const item = await docIntelService.rejectItem(orgId, itemId);
+      res.json(item);
+    } catch (error) {
+      console.error('Failed to reject item:', error);
+      res.status(500).json({ error: 'Failed to reject item' });
+    }
+  });
+
+  // Auto-confirm high confidence items
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/items/confirm-high-confidence', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { uploadId } = req.params;
+      const threshold = parseFloat(req.body.threshold) || 0.9;
+      
+      const count = await docIntelService.confirmAllHighConfidence(orgId, uploadId, userId, threshold);
+      res.json({ confirmed: count });
+    } catch (error) {
+      console.error('Failed to auto-confirm items:', error);
+      res.status(500).json({ error: 'Failed to auto-confirm items' });
+    }
+  });
+
+  // --- IMPORT TO P&L ---
+  
+  // Import confirmed items to P&L Lines
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/import', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, uploadId } = req.params;
+      const { fiscalYear } = req.body;
+      
+      const lines = await docIntelService.importConfirmedItems(orgId, uploadId, projectId, userId, fiscalYear);
+      res.json({ imported: lines.length, lines });
+    } catch (error) {
+      console.error('Failed to import items:', error);
+      res.status(500).json({ error: 'Failed to import items' });
+    }
+  });
+
+  // Get P&L Lines for a project
+  app.get('/api/modeling/projects/:projectId/pnl-lines', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      const lines = await docIntelService.getProjectPnlLines(orgId, projectId);
+      res.json(lines);
+    } catch (error) {
+      console.error('Failed to fetch P&L lines:', error);
+      res.status(500).json({ error: 'Failed to fetch P&L lines' });
+    }
+  });
+
+  // --- CATEGORY MAPPINGS & RULES ---
+  
+  // Get category mappings for organization
+  app.get('/api/modeling/doc-intel/mappings', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const projectId = req.query.projectId as string | undefined;
+      
+      const mappings = await docIntelService.getCategoryMappings(orgId, projectId);
+      res.json(mappings);
+    } catch (error) {
+      console.error('Failed to fetch category mappings:', error);
+      res.status(500).json({ error: 'Failed to fetch category mappings' });
+    }
+  });
+
+  // Create learning rule from user feedback
+  app.post('/api/modeling/doc-intel/rules', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { name, keywords, categoryId } = req.body;
+      
+      if (!name || !keywords || !categoryId) {
+        return res.status(400).json({ error: 'name, keywords, and categoryId are required' });
+      }
+      
+      const rule = await docIntelService.createLearningRule(orgId, name, keywords, categoryId, userId);
+      res.status(201).json(rule);
+    } catch (error) {
+      console.error('Failed to create learning rule:', error);
+      res.status(500).json({ error: 'Failed to create learning rule' });
     }
   });
 
