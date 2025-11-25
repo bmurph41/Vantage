@@ -122,6 +122,9 @@ const ExitIRRCalculator = lazy(() => import("@/pages/modeling/exit/IRRCalculator
 const ExitSensitivity = lazy(() => import("@/pages/modeling/exit/Sensitivity"));
 const ExitAIInsights = lazy(() => import("@/pages/modeling/exit/AIInsights"));
 
+// Document Intelligence
+const DocumentIntelligence = lazy(() => import("@/pages/modeling/doc-intel/DocumentIntelligence"));
+
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -809,6 +812,15 @@ function Router() {
         {(params) => (
           <UnifiedLayout>
             <TransactionClosingPage {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      
+      {/* Document Intelligence Route */}
+      <Route path="/modeling/projects/:projectId/doc-intel">
+        {(params) => (
+          <UnifiedLayout>
+            <DocumentIntelligence {...params} />
           </UnifiedLayout>
         )}
       </Route>

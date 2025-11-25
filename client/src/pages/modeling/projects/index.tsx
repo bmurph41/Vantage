@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3 } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import ModelingProjectFormDialog from './form-dialog';
@@ -229,6 +229,15 @@ export default function ModelingProjectsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setLocation(`/modeling/projects/${project.id}/doc-intel`)}
+                              title="Document Intelligence"
+                              data-testid={`button-doc-intel-${project.id}`}
+                            >
+                              <FileSpreadsheet className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
