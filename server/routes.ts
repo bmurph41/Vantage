@@ -10589,6 +10589,132 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ============================================================================
+  // OPERATIONS DATA SYNC - Sync Rent Roll, Fuel Sales, Ship Store to Modeling
+  // ============================================================================
+
+  // Trigger operations data sync for a modeling project
+  app.post('/api/modeling/projects/:projectId/sync-operations', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { dataSources, dateRangeStart, dateRangeEnd, syncType } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      
+      const result = await operationsDataSyncService.syncOperationsData({
+        projectId,
+        orgId,
+        userId,
+        dataSources: dataSources || ['rent_roll', 'fuel_sales', 'ship_store'],
+        dateRangeStart: dateRangeStart ? new Date(dateRangeStart) : undefined,
+        dateRangeEnd: dateRangeEnd ? new Date(dateRangeEnd) : undefined,
+        syncType: syncType || 'manual'
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error('Failed to sync operations data:', error);
+      res.status(500).json({ error: 'Failed to sync operations data' });
+    }
+  });
+
+  // Get actuals data for a modeling project
+  app.get('/api/modeling/projects/:projectId/actuals', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { year } = req.query;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      
+      const actuals = await operationsDataSyncService.getActualsForProject(
+        projectId, 
+        year ? parseInt(year as string) : undefined
+      );
+
+      // Group by category and subcategory for P&L display
+      const grouped = actuals.reduce((acc: any, item) => {
+        const key = `${item.category}-${item.subcategory}`;
+        if (!acc[key]) {
+          acc[key] = {
+            category: item.category,
+            subcategory: item.subcategory,
+            monthlyData: {},
+            annualTotal: 0
+          };
+        }
+        const monthKey = new Date(item.year, item.month - 1).toLocaleString('default', { month: 'short' });
+        const amount = parseFloat(item.amount);
+        acc[key].monthlyData[monthKey] = (acc[key].monthlyData[monthKey] || 0) + amount;
+        acc[key].annualTotal += amount;
+        return acc;
+      }, {});
+
+      res.json({
+        raw: actuals,
+        grouped: Object.values(grouped),
+        year: year ? parseInt(year as string) : null
+      });
+    } catch (error) {
+      console.error('Failed to fetch actuals:', error);
+      res.status(500).json({ error: 'Failed to fetch actuals' });
+    }
+  });
+
+  // Get sync job history for a project
+  app.get('/api/modeling/projects/:projectId/sync-history', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const history = await operationsDataSyncService.getSyncJobHistory(projectId);
+
+      res.json(history);
+    } catch (error) {
+      console.error('Failed to fetch sync history:', error);
+      res.status(500).json({ error: 'Failed to fetch sync history' });
+    }
+  });
+
+  // Get data source summary for a project
+  app.get('/api/modeling/projects/:projectId/data-sources', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const summary = await operationsDataSyncService.getDataSourceSummary(projectId);
+
+      res.json(summary);
+    } catch (error) {
+      console.error('Failed to fetch data sources:', error);
+      res.status(500).json({ error: 'Failed to fetch data sources' });
+    }
+  });
+
   // Get modeling analytics and metrics
   app.get('/api/modeling/analytics', authenticateUser, async (req: any, res) => {
     try {

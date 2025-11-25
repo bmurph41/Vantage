@@ -8624,6 +8624,349 @@ export type InsertPnlLine = z.infer<typeof insertPnlLineSchema>;
 export type UpdatePnlLine = z.infer<typeof updatePnlLineSchema>;
 
 // ============================================================================
+// Operations → Modeling Data Pipeline
+// Canonical actuals schema for aggregating operations data into modeling
+// ============================================================================
+
+// Data source type for tracking where actuals data originated
+export const actualsDataSourceEnum = pgEnum("actuals_data_source", [
+  "rent_roll",      // From Rent Roll module
+  "fuel_sales",     // From Fuel Sales module
+  "ship_store",     // From Ship Store module
+  "quickbooks",     // From QuickBooks Online sync
+  "manual_entry",   // Manually entered by user
+  "csv_import",     // Imported from CSV file
+  "doc_intel"       // Parsed from Document Intelligence
+]);
+
+// Sync status for data pipeline jobs
+export const syncStatusEnum = pgEnum("sync_status", [
+  "pending",
+  "in_progress",
+  "completed",
+  "failed",
+  "partial"
+]);
+
+// Modeling Actuals - Canonical store for historical financial data linked to modeling projects
+export const modelingActuals = pgTable('modeling_actuals', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Period information
+  year: integer('year').notNull(),
+  month: integer('month').notNull(), // 1-12
+  
+  // Category classification (matches P&L structure)
+  category: text('category').notNull(), // 'Revenue', 'COGS', 'Expenses'
+  subcategory: text('subcategory').notNull(), // e.g., 'Wet Slips', 'Fuel Sales', 'Payroll'
+  lineItemDescription: text('line_item_description'),
+  
+  // Amounts
+  amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
+  
+  // Data source tracking for audit
+  dataSource: actualsDataSourceEnum('data_source').notNull(),
+  sourceRecordId: varchar('source_record_id'), // ID from source system
+  sourceRecordType: text('source_record_type'), // e.g., 'rent_roll_entry', 'fuel_sale', 'ship_store_transaction'
+  
+  // Sync metadata
+  syncedAt: timestamp('synced_at').defaultNow().notNull(),
+  syncJobId: varchar('sync_job_id'),
+  
+  // Audit
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('modeling_actuals_org_idx').on(table.orgId),
+  projectIdx: index('modeling_actuals_project_idx').on(table.modelingProjectId),
+  periodIdx: index('modeling_actuals_period_idx').on(table.year, table.month),
+  categoryIdx: index('modeling_actuals_category_idx').on(table.category, table.subcategory),
+  dataSourceIdx: index('modeling_actuals_data_source_idx').on(table.dataSource),
+  uniqueLineItem: unique('modeling_actuals_unique_line').on(
+    table.modelingProjectId, table.year, table.month, table.category, table.subcategory, table.lineItemDescription
+  ),
+}));
+
+// Operations Data Sync Jobs - Track sync operations from Operations modules
+export const operationsDataSyncJobs = pgTable('operations_data_sync_jobs', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Job configuration
+  syncType: text('sync_type').notNull(), // 'full', 'incremental', 'manual'
+  dataSources: text('data_sources').array().notNull(), // ['rent_roll', 'fuel_sales', 'ship_store']
+  dateRangeStart: date('date_range_start'),
+  dateRangeEnd: date('date_range_end'),
+  
+  // Job status
+  status: syncStatusEnum('status').notNull().default('pending'),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  
+  // Results
+  recordsProcessed: integer('records_processed').default(0),
+  recordsImported: integer('records_imported').default(0),
+  recordsSkipped: integer('records_skipped').default(0),
+  recordsFailed: integer('records_failed').default(0),
+  
+  // Error tracking
+  errorLog: jsonb('error_log').default(sql`'[]'`),
+  
+  // Metadata
+  triggeredBy: varchar('triggered_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('ops_sync_jobs_org_idx').on(table.orgId),
+  projectIdx: index('ops_sync_jobs_project_idx').on(table.modelingProjectId),
+  statusIdx: index('ops_sync_jobs_status_idx').on(table.status),
+  dateIdx: index('ops_sync_jobs_date_idx').on(table.createdAt),
+}));
+
+// Operations Data Mappings - Configure how operations data maps to P&L categories
+export const operationsDataMappings = pgTable('operations_data_mappings', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Source configuration
+  dataSource: actualsDataSourceEnum('data_source').notNull(),
+  sourceField: text('source_field').notNull(), // e.g., 'fuel_type', 'slip_type', 'category_id'
+  sourceValue: text('source_value'), // Optional filter value
+  
+  // Target P&L mapping
+  targetCategory: text('target_category').notNull(), // 'Revenue', 'COGS', 'Expenses'
+  targetSubcategory: text('target_subcategory').notNull(), // e.g., 'Fuel Sales', 'Ship Store'
+  targetDescription: text('target_description'), // Optional line item description
+  
+  // Calculation rules
+  amountField: text('amount_field').notNull(), // Which field to use for amount
+  aggregationMethod: text('aggregation_method').notNull().default('sum'), // 'sum', 'count', 'average'
+  
+  // Status
+  isActive: boolean('is_active').notNull().default(true),
+  priority: integer('priority').default(0), // For ordering when multiple mappings match
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('ops_data_mappings_org_idx').on(table.orgId),
+  sourceIdx: index('ops_data_mappings_source_idx').on(table.dataSource, table.sourceField),
+  activeIdx: index('ops_data_mappings_active_idx').on(table.isActive),
+}));
+
+// QuickBooks Integration - OAuth and sync configuration
+export const quickbooksIntegrations = pgTable('quickbooks_integrations', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id).unique(),
+  
+  // OAuth tokens (encrypted at rest)
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  realmId: text('realm_id'), // QuickBooks company ID
+  tokenExpiresAt: timestamp('token_expires_at'),
+  
+  // Connection status
+  isConnected: boolean('is_connected').notNull().default(false),
+  lastSyncAt: timestamp('last_sync_at'),
+  syncFrequency: integer('sync_frequency').default(60), // minutes
+  autoSyncEnabled: boolean('auto_sync_enabled').default(false),
+  
+  // Chart of Accounts mapping
+  chartOfAccountsMapping: jsonb('coa_mapping').default(sql`'{}'`), // Maps QB accounts to P&L categories
+  
+  // Sync configuration
+  syncStartDate: date('sync_start_date'), // How far back to sync
+  excludedAccounts: text('excluded_accounts').array().default(sql`'{}'`), // Account IDs to skip
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('qb_integrations_org_idx').on(table.orgId),
+  connectedIdx: index('qb_integrations_connected_idx').on(table.isConnected),
+}));
+
+// QuickBooks Sync Logs - Track sync operations with QuickBooks
+export const quickbooksSyncLogs = pgTable('quickbooks_sync_logs', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  integrationId: varchar('integration_id').notNull().references(() => quickbooksIntegrations.id, { onDelete: 'cascade' }),
+  modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Sync details
+  syncType: text('sync_type').notNull(), // 'full', 'incremental', 'manual'
+  status: syncStatusEnum('status').notNull().default('pending'),
+  
+  // Period synced
+  periodStart: date('period_start'),
+  periodEnd: date('period_end'),
+  
+  // Results
+  transactionsProcessed: integer('transactions_processed').default(0),
+  transactionsImported: integer('transactions_imported').default(0),
+  transactionsSkipped: integer('transactions_skipped').default(0),
+  transactionsFailed: integer('transactions_failed').default(0),
+  
+  // Error tracking
+  errorLog: jsonb('error_log').default(sql`'[]'`),
+  
+  // Timestamps
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('qb_sync_logs_org_idx').on(table.orgId),
+  integrationIdx: index('qb_sync_logs_integration_idx').on(table.integrationId),
+  projectIdx: index('qb_sync_logs_project_idx').on(table.modelingProjectId),
+  statusIdx: index('qb_sync_logs_status_idx').on(table.status),
+  dateIdx: index('qb_sync_logs_date_idx').on(table.createdAt),
+}));
+
+// Modeling Scenario Versions - Persist scenarios with version history for PE/Family Office compliance
+export const modelingScenarioVersions = pgTable('modeling_scenario_versions', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Scenario identification
+  scenarioType: text('scenario_type').notNull(), // 'base', 'aggressive', 'conservative', 'custom'
+  name: text('name').notNull(),
+  description: text('description'),
+  
+  // Version tracking
+  version: integer('version').notNull().default(1),
+  isCurrentVersion: boolean('is_current_version').notNull().default(true),
+  previousVersionId: varchar('previous_version_id').references((): any => modelingScenarioVersions.id),
+  
+  // Scenario configuration
+  revenueGrowthRate: decimal('revenue_growth_rate', { precision: 5, scale: 2 }),
+  expenseGrowthRate: decimal('expense_growth_rate', { precision: 5, scale: 2 }),
+  exitCapRate: decimal('exit_cap_rate', { precision: 5, scale: 2 }),
+  
+  // Additional assumptions (flexible JSON)
+  assumptions: jsonb('assumptions').default(sql`'{}'`), // Stores all granular assumptions
+  
+  // Approval workflow
+  status: text('status').notNull().default('draft'), // 'draft', 'pending_approval', 'approved', 'rejected'
+  approvedBy: varchar('approved_by').references(() => users.id),
+  approvedAt: timestamp('approved_at'),
+  approvalNotes: text('approval_notes'),
+  
+  // Audit trail
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('scenario_versions_org_idx').on(table.orgId),
+  projectIdx: index('scenario_versions_project_idx').on(table.modelingProjectId),
+  typeIdx: index('scenario_versions_type_idx').on(table.scenarioType),
+  currentIdx: index('scenario_versions_current_idx').on(table.isCurrentVersion),
+  statusIdx: index('scenario_versions_status_idx').on(table.status),
+  uniqueCurrentVersion: unique('scenario_versions_unique_current').on(
+    table.modelingProjectId, table.scenarioType, table.isCurrentVersion
+  ).nullsNotDistinct(),
+}));
+
+// Modeling Audit Log - Comprehensive audit trail for compliance
+export const modelingAuditLog = pgTable('modeling_audit_log', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Event details
+  eventType: text('event_type').notNull(), // 'scenario_created', 'scenario_updated', 'scenario_approved', 'data_synced', 'export_generated', etc.
+  entityType: text('entity_type').notNull(), // 'scenario', 'actuals', 'assumption', 'export'
+  entityId: varchar('entity_id'),
+  
+  // Change tracking
+  previousValue: jsonb('previous_value'),
+  newValue: jsonb('new_value'),
+  changedFields: text('changed_fields').array(),
+  
+  // Context
+  userId: varchar('user_id').notNull().references(() => users.id),
+  userEmail: text('user_email'),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  
+  // Timestamp
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('modeling_audit_org_idx').on(table.orgId),
+  projectIdx: index('modeling_audit_project_idx').on(table.modelingProjectId),
+  eventTypeIdx: index('modeling_audit_event_type_idx').on(table.eventType),
+  entityIdx: index('modeling_audit_entity_idx').on(table.entityType, table.entityId),
+  userIdx: index('modeling_audit_user_idx').on(table.userId),
+  dateIdx: index('modeling_audit_date_idx').on(table.createdAt),
+}));
+
+// Insert schemas for new tables
+export const insertModelingActualsSchema = createInsertSchema(modelingActuals).omit({
+  id: true,
+  syncedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOperationsDataSyncJobSchema = createInsertSchema(operationsDataSyncJobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertOperationsDataMappingSchema = createInsertSchema(operationsDataMappings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQuickbooksIntegrationSchema = createInsertSchema(quickbooksIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQuickbooksSyncLogSchema = createInsertSchema(quickbooksSyncLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertModelingScenarioVersionSchema = createInsertSchema(modelingScenarioVersions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertModelingAuditLogSchema = createInsertSchema(modelingAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Type exports for Operations → Modeling pipeline
+export type ModelingActuals = typeof modelingActuals.$inferSelect;
+export type InsertModelingActuals = z.infer<typeof insertModelingActualsSchema>;
+
+export type OperationsDataSyncJob = typeof operationsDataSyncJobs.$inferSelect;
+export type InsertOperationsDataSyncJob = z.infer<typeof insertOperationsDataSyncJobSchema>;
+
+export type OperationsDataMapping = typeof operationsDataMappings.$inferSelect;
+export type InsertOperationsDataMapping = z.infer<typeof insertOperationsDataMappingSchema>;
+
+export type QuickbooksIntegration = typeof quickbooksIntegrations.$inferSelect;
+export type InsertQuickbooksIntegration = z.infer<typeof insertQuickbooksIntegrationSchema>;
+
+export type QuickbooksSyncLog = typeof quickbooksSyncLogs.$inferSelect;
+export type InsertQuickbooksSyncLog = z.infer<typeof insertQuickbooksSyncLogSchema>;
+
+export type ModelingScenarioVersion = typeof modelingScenarioVersions.$inferSelect;
+export type InsertModelingScenarioVersion = z.infer<typeof insertModelingScenarioVersionSchema>;
+
+export type ModelingAuditLog = typeof modelingAuditLog.$inferSelect;
+export type InsertModelingAuditLog = z.infer<typeof insertModelingAuditLogSchema>;
+
+// ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular
