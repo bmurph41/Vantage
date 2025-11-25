@@ -9256,6 +9256,112 @@ export type ModelingComment = typeof modelingComments.$inferSelect;
 export type InsertModelingComment = z.infer<typeof insertModelingCommentSchema>;
 
 // ============================================================================
+// Demographics & Market Intelligence Schema
+// ============================================================================
+
+// FRED API data cache - stores economic indicators by region
+export const demographicsCache = pgTable('demographics_cache', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Geographic identifiers
+  stateCode: varchar('state_code', { length: 2 }).notNull(),
+  region: varchar('region', { length: 50 }),
+  county: varchar('county', { length: 100 }),
+  
+  // FRED API data series
+  seriesId: varchar('series_id', { length: 50 }).notNull(), // e.g., 'FLFLFN', 'MEHOINUSFLA'
+  seriesName: varchar('series_name', { length: 200 }).notNull(),
+  category: varchar('category', { length: 50 }).notNull(), // 'population', 'income', 'employment', 'housing'
+  
+  // Data values (array of historical data points)
+  dataPoints: jsonb('data_points').notNull().default(sql`'[]'`), // [{date, value}, ...]
+  latestValue: numeric('latest_value'),
+  latestDate: date('latest_date'),
+  
+  // Computed metrics
+  yoyChange: numeric('yoy_change'), // Year-over-year change
+  fiveYearCagr: numeric('five_year_cagr'), // 5-year compound annual growth rate
+  
+  // Cache management
+  fetchedAt: timestamp('fetched_at').notNull().defaultNow(),
+  expiresAt: timestamp('expires_at').notNull(),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('demographics_cache_org_idx').on(table.orgId),
+  stateIdx: index('demographics_cache_state_idx').on(table.stateCode),
+  seriesIdx: index('demographics_cache_series_idx').on(table.seriesId),
+  categoryIdx: index('demographics_cache_category_idx').on(table.category),
+  uniqueEntry: unique('demographics_cache_unique').on(table.orgId, table.stateCode, table.seriesId),
+}));
+
+// Regional market statistics - aggregated from sales comps
+export const regionalMarketStats = pgTable('regional_market_stats', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Geographic identifiers
+  stateCode: varchar('state_code', { length: 2 }).notNull(),
+  region: varchar('region', { length: 50 }),
+  
+  // Marina supply metrics
+  totalMarinas: integer('total_marinas').notNull().default(0),
+  totalWetSlips: integer('total_wet_slips').notNull().default(0),
+  totalDryRacks: integer('total_dry_racks').notNull().default(0),
+  
+  // Transaction metrics
+  transactionCount: integer('transaction_count').notNull().default(0),
+  avgSalePrice: numeric('avg_sale_price'),
+  medianSalePrice: numeric('median_sale_price'),
+  avgPricePerSlip: numeric('avg_price_per_slip'),
+  medianPricePerSlip: numeric('median_price_per_slip'),
+  avgCapRate: numeric('avg_cap_rate'),
+  medianCapRate: numeric('median_cap_rate'),
+  
+  // Time-based trends (last 5 years)
+  priceGrowth1Yr: numeric('price_growth_1yr'),
+  priceGrowth3Yr: numeric('price_growth_3yr'),
+  priceGrowth5Yr: numeric('price_growth_5yr'),
+  
+  // Detailed time series
+  yearlyStats: jsonb('yearly_stats').notNull().default(sql`'[]'`), // [{year, txCount, avgPrice, avgPPS}, ...]
+  
+  // Computation metadata
+  computedAt: timestamp('computed_at').notNull().defaultNow(),
+  dataAsOf: date('data_as_of'), // Latest transaction date included
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('regional_market_stats_org_idx').on(table.orgId),
+  stateIdx: index('regional_market_stats_state_idx').on(table.stateCode),
+  regionIdx: index('regional_market_stats_region_idx').on(table.region),
+  uniqueEntry: unique('regional_market_stats_unique').on(table.orgId, table.stateCode, table.region),
+}));
+
+// Insert schemas for demographics tables
+export const insertDemographicsCacheSchema = createInsertSchema(demographicsCache).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRegionalMarketStatsSchema = createInsertSchema(regionalMarketStats).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Type exports for demographics
+export type DemographicsCache = typeof demographicsCache.$inferSelect;
+export type InsertDemographicsCache = z.infer<typeof insertDemographicsCacheSchema>;
+
+export type RegionalMarketStats = typeof regionalMarketStats.$inferSelect;
+export type InsertRegionalMarketStats = z.infer<typeof insertRegionalMarketStatsSchema>;
+
+// ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular

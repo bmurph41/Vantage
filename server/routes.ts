@@ -14526,6 +14526,83 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ============================================================================
+  // Demographics & Market Intelligence API
+  // ============================================================================
+
+  // Get demographics overview for a specific state
+  app.get('/api/demographics/overview/:stateCode', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { stateCode } = req.params;
+      const { demographicsService } = await import('./services/demographics-service');
+      
+      const overview = await demographicsService.getDemographicsOverview(orgId, stateCode);
+      res.json(overview);
+    } catch (error) {
+      console.error('Failed to fetch demographics overview:', error);
+      res.status(500).json({ error: 'Failed to fetch demographics overview' });
+    }
+  });
+
+  // Get economic indicators for a state
+  app.get('/api/demographics/economic/:stateCode', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { stateCode } = req.params;
+      const { demographicsService } = await import('./services/demographics-service');
+      
+      const indicators = await demographicsService.getEconomicIndicators(orgId, stateCode);
+      res.json(indicators);
+    } catch (error) {
+      console.error('Failed to fetch economic indicators:', error);
+      res.status(500).json({ error: 'Failed to fetch economic indicators' });
+    }
+  });
+
+  // Get regional market statistics for a state
+  app.get('/api/demographics/market/:stateCode', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { stateCode } = req.params;
+      const { demographicsService } = await import('./services/demographics-service');
+      
+      const stats = await demographicsService.getRegionalMarketStats(orgId, stateCode);
+      res.json(stats);
+    } catch (error) {
+      console.error('Failed to fetch market statistics:', error);
+      res.status(500).json({ error: 'Failed to fetch market statistics' });
+    }
+  });
+
+  // Get list of available states with transaction counts
+  app.get('/api/demographics/states', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { demographicsService } = await import('./services/demographics-service');
+      
+      const states = await demographicsService.getAvailableStates(orgId);
+      res.json(states);
+    } catch (error) {
+      console.error('Failed to fetch available states:', error);
+      res.status(500).json({ error: 'Failed to fetch available states' });
+    }
+  });
+
+  // Get national overview
+  app.get('/api/demographics/national', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { demographicsService } = await import('./services/demographics-service');
+      
+      const overview = await demographicsService.getNationalOverview(orgId);
+      res.json(overview);
+    } catch (error) {
+      console.error('Failed to fetch national overview:', error);
+      res.status(500).json({ error: 'Failed to fetch national overview' });
+    }
+  });
+
   // Get recent fuel transactions for detail panel
   app.get('/api/fuel/transactions/recent', authenticateUser, async (req: any, res) => {
     try {
