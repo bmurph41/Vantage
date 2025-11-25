@@ -104,6 +104,11 @@ export class ScenarioVersioningService {
 
     const currentScenario = existing[0];
 
+    // SCENARIO LOCKING: Approved scenarios are immutable - must create new version
+    if (currentScenario.status === 'approved' && !input.createNewVersion) {
+      throw new Error('SCENARIO_LOCKED: Approved scenarios cannot be edited directly. Create a new version to make changes.');
+    }
+
     if (input.createNewVersion) {
       await db.update(modelingScenarioVersions)
         .set({ isCurrentVersion: false })

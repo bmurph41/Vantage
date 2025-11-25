@@ -11013,6 +11013,62 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Generate IC Memo for a project
+  app.get('/api/modeling/projects/:projectId/ic-memo', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const format = (req.query.format as string) || 'json';
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { icMemoService } = await import('./services/ic-memo-service');
+      const memoData = await icMemoService.generateMemoData(projectId, orgId, userId);
+
+      if (format === 'text') {
+        const memoText = icMemoService.formatMemoAsText(memoData);
+        res.setHeader('Content-Type', 'text/plain');
+        res.setHeader('Content-Disposition', `attachment; filename="IC_Memo_${project.marinaName?.replace(/[^a-zA-Z0-9]/g, '_') || 'Project'}_${new Date().toISOString().split('T')[0]}.txt"`);
+        return res.send(memoText);
+      }
+
+      res.json(memoData);
+    } catch (error) {
+      console.error('Failed to generate IC memo:', error);
+      res.status(500).json({ error: 'Failed to generate IC memo' });
+    }
+  });
+
+  // Get audit trail for a project
+  app.get('/api/modeling/projects/:projectId/audit-log', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const entityType = req.query.entityType as string | undefined;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const auditLog = await scenarioVersioningService.getAuditHistory(projectId, { 
+        limit, 
+        entityType 
+      });
+
+      res.json(auditLog);
+    } catch (error) {
+      console.error('Failed to fetch audit log:', error);
+      res.status(500).json({ error: 'Failed to fetch audit log' });
+    }
+  });
+
   // Get modeling analytics and metrics
   app.get('/api/modeling/analytics', authenticateUser, async (req: any, res) => {
     try {

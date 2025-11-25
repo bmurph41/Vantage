@@ -24,7 +24,9 @@ import {
   Clock,
   AlertCircle,
   Calculator,
-  Target
+  Target,
+  GitCompare,
+  History
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
 
@@ -37,6 +39,8 @@ import WorkspaceProForma from './workspace/pro-forma';
 import WorkspaceExecutiveSummary from './workspace/executive-summary';
 import WorkspaceDebtScenarios from './workspace/debt-scenarios';
 import WorkspaceExitStrategy from './workspace/exit-strategy';
+import ScenarioComparison from './workspace/scenario-comparison';
+import AuditTrailViewer from './workspace/audit-trail';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -174,6 +178,14 @@ export default function ProjectWorkspace() {
               <Target className="h-4 w-4" />
               <span className="hidden sm:inline">Exit</span>
             </TabsTrigger>
+            <TabsTrigger value="compare" className="gap-2" data-testid="tab-compare">
+              <GitCompare className="h-4 w-4" />
+              <span className="hidden sm:inline">Compare</span>
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-2" data-testid="tab-audit">
+              <History className="h-4 w-4" />
+              <span className="hidden sm:inline">Audit</span>
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -211,6 +223,14 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="exit" className="space-y-6">
           <WorkspaceExitStrategy projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="compare" className="space-y-6">
+          <ScenarioComparison projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="audit" className="space-y-6">
+          <AuditTrailViewer projectId={projectId!} />
         </TabsContent>
       </Tabs>
     </div>

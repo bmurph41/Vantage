@@ -47,6 +47,7 @@ import {
   FileText,
   BarChart3
 } from 'lucide-react';
+import ICMemoExport from './ic-memo-export';
 
 interface WorkspaceExecutiveSummaryProps {
   projectId: string;
@@ -197,6 +198,7 @@ export default function WorkspaceExecutiveSummary({ projectId }: WorkspaceExecut
               </SelectItem>
             </SelectContent>
           </Select>
+          <ICMemoExport projectId={projectId} />
           <Dialog open={showScenarioConfig} onOpenChange={setShowScenarioConfig}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" data-testid="button-configure-scenarios">
