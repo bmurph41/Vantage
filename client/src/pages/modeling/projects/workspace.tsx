@@ -1,0 +1,196 @@
+import { useState } from 'react';
+import { useParams, useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  ArrowLeft,
+  Home,
+  Settings2,
+  Upload,
+  TrendingUp,
+  FileSpreadsheet,
+  BarChart3,
+  ClipboardList,
+  ChevronRight,
+  Building2,
+  MapPin,
+  Calendar,
+  DollarSign,
+  CheckCircle2,
+  Clock,
+  AlertCircle
+} from 'lucide-react';
+import type { ModelingProject } from '@shared/schema';
+
+import WorkspaceOverview from './workspace/overview';
+import WorkspaceInputs from './workspace/inputs';
+import WorkspaceUploads from './workspace/uploads';
+import WorkspaceAssumptions from './workspace/assumptions';
+import WorkspaceHistoricalPL from './workspace/historical-pl';
+import WorkspaceProForma from './workspace/pro-forma';
+import WorkspaceExecutiveSummary from './workspace/executive-summary';
+
+export default function ProjectWorkspace() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const [, navigate] = useLocation();
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const { data: project, isLoading } = useQuery<ModelingProject>({
+    queryKey: ['/api/modeling/projects', projectId],
+    enabled: !!projectId,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+        </div>
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="p-6">
+        <Card className="p-8 text-center">
+          <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Project Not Found</h2>
+          <p className="text-muted-foreground mb-4">
+            The modeling project you're looking for doesn't exist or you don't have access.
+          </p>
+          <Button onClick={() => navigate('/modeling/projects')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Projects
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  const formatCurrency = (value: number | string | null) => {
+    if (value === null || value === undefined) return '-';
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(numValue);
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/modeling/projects')}
+            data-testid="button-back-to-projects"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div className="h-6 w-px bg-border" />
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3" data-testid="text-project-name">
+              <Building2 className="h-6 w-6 text-muted-foreground" />
+              {project.marinaName}
+            </h1>
+            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+              {(project.city || project.state) && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5" />
+                  {[project.city, project.state].filter(Boolean).join(', ')}
+                </span>
+              )}
+              {project.purchasePrice && (
+                <span className="flex items-center gap-1">
+                  <DollarSign className="h-3.5 w-3.5" />
+                  {formatCurrency(project.purchasePrice)}
+                </span>
+              )}
+              {project.dealOutcome && (
+                <Badge variant="outline" className="capitalize">
+                  {project.dealOutcome.replace('_', ' ')}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid" data-testid="tabs-workspace">
+          <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
+            <Home className="h-4 w-4" />
+            <span className="hidden sm:inline">Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="inputs" className="gap-2" data-testid="tab-inputs">
+            <Settings2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Inputs</span>
+          </TabsTrigger>
+          <TabsTrigger value="uploads" className="gap-2" data-testid="tab-uploads">
+            <Upload className="h-4 w-4" />
+            <span className="hidden sm:inline">Uploads</span>
+          </TabsTrigger>
+          <TabsTrigger value="assumptions" className="gap-2" data-testid="tab-assumptions">
+            <TrendingUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Assumptions</span>
+          </TabsTrigger>
+          <TabsTrigger value="historical" className="gap-2" data-testid="tab-historical">
+            <FileSpreadsheet className="h-4 w-4" />
+            <span className="hidden sm:inline">Historical P&L</span>
+          </TabsTrigger>
+          <TabsTrigger value="proforma" className="gap-2" data-testid="tab-proforma">
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Pro Forma</span>
+          </TabsTrigger>
+          <TabsTrigger value="summary" className="gap-2" data-testid="tab-summary">
+            <ClipboardList className="h-4 w-4" />
+            <span className="hidden sm:inline">Summary</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          <WorkspaceOverview project={project} onTabChange={setActiveTab} />
+        </TabsContent>
+
+        <TabsContent value="inputs" className="space-y-6">
+          <WorkspaceInputs projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="uploads" className="space-y-6">
+          <WorkspaceUploads projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="assumptions" className="space-y-6">
+          <WorkspaceAssumptions projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="historical" className="space-y-6">
+          <WorkspaceHistoricalPL projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="proforma" className="space-y-6">
+          <WorkspaceProForma projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="summary" className="space-y-6">
+          <WorkspaceExecutiveSummary projectId={projectId!} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

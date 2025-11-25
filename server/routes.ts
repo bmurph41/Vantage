@@ -10424,6 +10424,171 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Project Workspace - Configuration
+  app.get('/api/modeling/projects/:projectId/config', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      // Return config from customMetrics or defaults
+      const config = (project.customMetrics as any)?.config || {
+        holdPeriod: 5,
+        startDate: '2026-01-31',
+        seasonMonths: [4, 5, 6, 7, 8, 9, 10],
+        departments: {}
+      };
+      
+      res.json(config);
+    } catch (error) {
+      console.error('Failed to fetch project config:', error);
+      res.status(500).json({ error: 'Failed to fetch project config' });
+    }
+  });
+
+  app.post('/api/modeling/projects/:projectId/config', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const existingMetrics = (project.customMetrics as any) || {};
+      const updatedMetrics = {
+        ...existingMetrics,
+        config: req.body
+      };
+      
+      const updated = await storage.updateModelingProject(
+        projectId,
+        { customMetrics: updatedMetrics, updatedBy: userId },
+        orgId
+      );
+      
+      res.json(req.body);
+    } catch (error) {
+      console.error('Failed to save project config:', error);
+      res.status(500).json({ error: 'Failed to save project config' });
+    }
+  });
+
+  // Project Workspace - Assumptions
+  app.get('/api/modeling/projects/:projectId/assumptions', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const assumptions = (project.customMetrics as any)?.assumptions || null;
+      res.json(assumptions);
+    } catch (error) {
+      console.error('Failed to fetch project assumptions:', error);
+      res.status(500).json({ error: 'Failed to fetch project assumptions' });
+    }
+  });
+
+  app.post('/api/modeling/projects/:projectId/assumptions', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const existingMetrics = (project.customMetrics as any) || {};
+      const updatedMetrics = {
+        ...existingMetrics,
+        assumptions: req.body
+      };
+      
+      const updated = await storage.updateModelingProject(
+        projectId,
+        { customMetrics: updatedMetrics, updatedBy: userId },
+        orgId
+      );
+      
+      res.json(req.body);
+    } catch (error) {
+      console.error('Failed to save project assumptions:', error);
+      res.status(500).json({ error: 'Failed to save project assumptions' });
+    }
+  });
+
+  // Project Workspace - Historical P&L (placeholder returns sample data)
+  app.get('/api/modeling/projects/:projectId/historical-pl/:year', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, year } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      // Return any stored historical data or null for sample data to be used
+      const historicalData = (project.customMetrics as any)?.historicalPL?.[year] || null;
+      res.json(historicalData);
+    } catch (error) {
+      console.error('Failed to fetch historical P&L:', error);
+      res.status(500).json({ error: 'Failed to fetch historical P&L' });
+    }
+  });
+
+  // Project Workspace - Pro Forma (placeholder returns sample data)
+  app.get('/api/modeling/projects/:projectId/pro-forma', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      // Return any stored pro forma data or null for sample data to be used
+      const proFormaData = (project.customMetrics as any)?.proForma || null;
+      res.json(proFormaData);
+    } catch (error) {
+      console.error('Failed to fetch pro forma:', error);
+      res.status(500).json({ error: 'Failed to fetch pro forma' });
+    }
+  });
+
+  // Project Workspace - Executive Summary
+  app.get('/api/modeling/projects/:projectId/executive-summary/:scenario', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, scenario } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      // Return any stored summary data or null for sample data to be used
+      const summaryData = (project.customMetrics as any)?.executiveSummary?.[scenario] || null;
+      res.json(summaryData);
+    } catch (error) {
+      console.error('Failed to fetch executive summary:', error);
+      res.status(500).json({ error: 'Failed to fetch executive summary' });
+    }
+  });
+
   // Get modeling analytics and metrics
   app.get('/api/modeling/analytics', authenticateUser, async (req: any, res) => {
     try {

@@ -126,6 +126,9 @@ const ExitAIInsights = lazy(() => import("@/pages/modeling/exit/AIInsights"));
 // Document Intelligence
 const DocumentIntelligence = lazy(() => import("@/pages/modeling/doc-intel/DocumentIntelligence"));
 
+// Project Workspace
+const ProjectWorkspace = lazy(() => import("@/pages/modeling/projects/workspace"));
+
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -820,6 +823,15 @@ function Router() {
         {(params) => (
           <UnifiedLayout>
             <TransactionClosingPage {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      
+      {/* Project Workspace Route */}
+      <Route path="/modeling/projects/:projectId">
+        {(params) => (
+          <UnifiedLayout>
+            <ProjectWorkspace {...params} />
           </UnifiedLayout>
         )}
       </Route>

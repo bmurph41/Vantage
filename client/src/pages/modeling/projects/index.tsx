@@ -209,7 +209,12 @@ export default function ModelingProjectsPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredProjects.map((project) => (
-                      <TableRow key={project.id} data-testid={`row-project-${project.id}`}>
+                      <TableRow 
+                        key={project.id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setLocation(`/modeling/projects/${project.id}`)}
+                        data-testid={`row-project-${project.id}`}
+                      >
                         <TableCell className="font-medium" data-testid={`text-marina-name-${project.id}`}>
                           {project.marinaName}
                         </TableCell>
@@ -236,7 +241,7 @@ export default function ModelingProjectsPage() {
                             {project.dealOutcome.replace('_', ' ')}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="ghost"
