@@ -8290,6 +8290,334 @@ export type ExitActivity = typeof exitActivities.$inferSelect;
 export type InsertExitActivity = z.infer<typeof insertExitActivitySchema>;
 
 // ============================================================================
+// DOCUMENT INTELLIGENCE - AI-Powered Financial Document Parsing
+// Provides smart import for P&L, Rent Roll, and other financial documents
+// with line item extraction, categorization, and learning from user feedback
+// ============================================================================
+
+// Enums for Document Intelligence
+export const docIntelDocTypeEnum = pgEnum("doc_intel_doc_type", ["pnl", "rent_roll", "balance_sheet", "rate_sheet", "invoice", "other"]);
+export const docIntelItemStatusEnum = pgEnum("doc_intel_item_status", ["pending", "confirmed", "rejected", "needs_review"]);
+export const docIntelProcessingStatusEnum = pgEnum("doc_intel_processing_status", ["uploaded", "processing", "parsed", "reviewing", "completed", "error"]);
+export const pnlCategoryTypeEnum = pgEnum("pnl_category_type", ["revenue", "cogs", "opex", "payroll", "other_expense", "other_income"]);
+
+// P&L Categories - Hierarchical marina-specific categories (org-configurable)
+export const pnlCategories = pgTable('pnl_categories', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Hierarchy
+  parentId: varchar('parent_id'), // Self-referencing for subcategories (null = top-level)
+  categoryType: pnlCategoryTypeEnum('category_type').notNull(), // revenue, cogs, opex, payroll
+  
+  // Display
+  name: text('name').notNull(), // e.g., "Wet Slip Revenue", "Fuel COGS"
+  description: text('description'),
+  sortOrder: integer('sort_order').default(0),
+  
+  // Settings
+  isActive: boolean('is_active').default(true).notNull(),
+  isDefault: boolean('is_default').default(false).notNull(), // System-provided default categories
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('pnl_categories_org_idx').on(table.orgId),
+  parentIdx: index('pnl_categories_parent_idx').on(table.parentId),
+  typeIdx: index('pnl_categories_type_idx').on(table.categoryType),
+  activeIdx: index('pnl_categories_active_idx').on(table.isActive),
+}));
+
+// Document Uploads - Files uploaded for intelligent parsing
+export const docIntelUploads = pgTable('doc_intel_uploads', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // File info
+  filename: text('filename').notNull(),
+  originalName: text('original_name').notNull(),
+  storagePath: text('storage_path').notNull(),
+  mimeType: text('mime_type').notNull(),
+  fileSize: integer('file_size').notNull(),
+  hashSha256: text('hash_sha256'), // For duplicate detection
+  
+  // Classification
+  docType: docIntelDocTypeEnum('doc_type'),
+  year: integer('year'), // Fiscal year of document
+  
+  // Processing status
+  status: docIntelProcessingStatusEnum('status').notNull().default('uploaded'),
+  errorMessage: text('error_message'),
+  
+  // Review progress
+  wizardStep: integer('wizard_step').default(1), // Current step in review wizard (1-5)
+  reviewStartedAt: timestamp('review_started_at'),
+  reviewCompletedAt: timestamp('review_completed_at'),
+  
+  // Metadata
+  uploadedBy: varchar('uploaded_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('doc_intel_uploads_org_idx').on(table.orgId),
+  projectIdx: index('doc_intel_uploads_project_idx').on(table.modelingProjectId),
+  statusIdx: index('doc_intel_uploads_status_idx').on(table.status),
+  docTypeIdx: index('doc_intel_uploads_doc_type_idx').on(table.docType),
+}));
+
+// Extracted Items - Line items parsed from documents
+export const docIntelExtractedItems = pgTable('doc_intel_extracted_items', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  uploadId: varchar('upload_id').notNull().references(() => docIntelUploads.id, { onDelete: 'cascade' }),
+  
+  // Extracted raw data
+  rawText: text('raw_text').notNull(), // Original text from document
+  amount: decimal('amount', { precision: 18, scale: 2 }),
+  extractedDate: text('extracted_date'), // Date string found in document
+  sourcePage: integer('source_page'), // Page/sheet number
+  sourceRow: integer('source_row'), // Row number in spreadsheet
+  
+  // AI suggestions
+  categorySuggested: varchar('category_suggested').references(() => pnlCategories.id),
+  confidenceScore: decimal('confidence_score', { precision: 5, scale: 4 }), // 0.0000 to 1.0000
+  matchedRuleId: varchar('matched_rule_id'), // Which rule triggered this suggestion
+  
+  // User confirmation
+  status: docIntelItemStatusEnum('status').notNull().default('pending'),
+  categoryConfirmed: varchar('category_confirmed').references(() => pnlCategories.id),
+  amountConfirmed: decimal('amount_confirmed', { precision: 18, scale: 2 }),
+  confirmedBy: varchar('confirmed_by').references(() => users.id),
+  confirmedAt: timestamp('confirmed_at'),
+  
+  // Destination mapping
+  targetTable: text('target_table'), // e.g., 'pnl_lines', 'rent_roll_entries'
+  targetRecordId: varchar('target_record_id'), // ID of created record after import
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('doc_intel_items_org_idx').on(table.orgId),
+  uploadIdx: index('doc_intel_items_upload_idx').on(table.uploadId),
+  statusIdx: index('doc_intel_items_status_idx').on(table.status),
+  categoryIdx: index('doc_intel_items_category_idx').on(table.categorySuggested),
+}));
+
+// Category Mappings - Pattern-based rules for auto-categorization
+export const docIntelCategoryMappings = pgTable('doc_intel_category_mappings', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Rule definition
+  name: text('name').notNull(), // e.g., "Dock Revenue Pattern"
+  pattern: text('pattern').notNull(), // Regex pattern to match
+  categoryId: varchar('category_id').notNull().references(() => pnlCategories.id),
+  targetTable: text('target_table').notNull().default('pnl_lines'), // Destination table
+  
+  // Scope
+  projectId: varchar('project_id').references(() => modelingProjects.id), // null = org-wide
+  
+  // Confidence & priority
+  confidenceThreshold: decimal('confidence_threshold', { precision: 5, scale: 4 }).default('0.8'),
+  priority: integer('priority').default(0), // Higher = checked first
+  
+  isActive: boolean('is_active').default(true).notNull(),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('doc_intel_mappings_org_idx').on(table.orgId),
+  categoryIdx: index('doc_intel_mappings_category_idx').on(table.categoryId),
+  projectIdx: index('doc_intel_mappings_project_idx').on(table.projectId),
+  activeIdx: index('doc_intel_mappings_active_idx').on(table.isActive),
+}));
+
+// Learning Rules - Complex rules that improve from user feedback
+export const docIntelLearningRules = pgTable('doc_intel_learning_rules', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Rule definition
+  name: text('name').notNull(),
+  ruleJson: jsonb('rule_json').notNull(), // Complex rule with conditions
+  categoryId: varchar('category_id').notNull().references(() => pnlCategories.id),
+  targetTable: text('target_table').notNull().default('pnl_lines'),
+  
+  // Learning metrics
+  timesApplied: integer('times_applied').default(0),
+  timesConfirmed: integer('times_confirmed').default(0),
+  timesRejected: integer('times_rejected').default(0),
+  confidenceScore: decimal('confidence_score', { precision: 5, scale: 4 }).default('0.5'),
+  
+  // Scope
+  projectId: varchar('project_id').references(() => modelingProjects.id), // null = org-wide
+  
+  isActive: boolean('is_active').default(true).notNull(),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('doc_intel_rules_org_idx').on(table.orgId),
+  categoryIdx: index('doc_intel_rules_category_idx').on(table.categoryId),
+  activeIdx: index('doc_intel_rules_active_idx').on(table.isActive),
+}));
+
+// Training Examples - User confirmations used for learning
+export const docIntelTrainingExamples = pgTable('doc_intel_training_examples', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  extractedItemId: varchar('extracted_item_id').references(() => docIntelExtractedItems.id, { onDelete: 'cascade' }),
+  
+  // Training data
+  textSnippet: text('text_snippet').notNull(), // The text that was categorized
+  labelCategoryId: varchar('label_category_id').notNull().references(() => pnlCategories.id),
+  labelTable: text('label_table').notNull(), // Target table for this type
+  
+  // Context
+  projectId: varchar('project_id').references(() => modelingProjects.id),
+  docType: docIntelDocTypeEnum('doc_type'),
+  
+  // Tracking
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('doc_intel_training_org_idx').on(table.orgId),
+  categoryIdx: index('doc_intel_training_category_idx').on(table.labelCategoryId),
+  projectIdx: index('doc_intel_training_project_idx').on(table.projectId),
+}));
+
+// P&L Lines - Actual P&L data imported from documents
+export const pnlLines = pgTable('pnl_lines', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Category & description
+  categoryId: varchar('category_id').references(() => pnlCategories.id),
+  lineDescription: text('line_description').notNull(),
+  
+  // Financial data
+  amount: decimal('amount', { precision: 18, scale: 2 }).notNull(),
+  fiscalYear: integer('fiscal_year'),
+  fiscalMonth: integer('fiscal_month'), // 1-12, null for annual
+  
+  // Source tracking
+  sourceUploadId: varchar('source_upload_id').references(() => docIntelUploads.id),
+  sourceItemId: varchar('source_item_id').references(() => docIntelExtractedItems.id),
+  isManualEntry: boolean('is_manual_entry').default(false).notNull(),
+  
+  notes: text('notes'),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('pnl_lines_org_idx').on(table.orgId),
+  projectIdx: index('pnl_lines_project_idx').on(table.modelingProjectId),
+  categoryIdx: index('pnl_lines_category_idx').on(table.categoryId),
+  yearIdx: index('pnl_lines_year_idx').on(table.fiscalYear),
+}));
+
+// Insert schemas for Document Intelligence
+export const insertPnlCategorySchema = createInsertSchema(pnlCategories).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updatePnlCategorySchema = insertPnlCategorySchema.partial();
+
+export const insertDocIntelUploadSchema = createInsertSchema(docIntelUploads).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateDocIntelUploadSchema = insertDocIntelUploadSchema.partial();
+
+export const insertDocIntelExtractedItemSchema = createInsertSchema(docIntelExtractedItems).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.string().or(z.number()).optional(),
+  confidenceScore: z.string().or(z.number()).optional(),
+  amountConfirmed: z.string().or(z.number()).optional(),
+});
+
+export const updateDocIntelExtractedItemSchema = insertDocIntelExtractedItemSchema.partial();
+
+export const insertDocIntelCategoryMappingSchema = createInsertSchema(docIntelCategoryMappings).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  confidenceThreshold: z.string().or(z.number()).optional(),
+});
+
+export const updateDocIntelCategoryMappingSchema = insertDocIntelCategoryMappingSchema.partial();
+
+export const insertDocIntelLearningRuleSchema = createInsertSchema(docIntelLearningRules).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  confidenceScore: z.string().or(z.number()).optional(),
+});
+
+export const updateDocIntelLearningRuleSchema = insertDocIntelLearningRuleSchema.partial();
+
+export const insertDocIntelTrainingExampleSchema = createInsertSchema(docIntelTrainingExamples).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+});
+
+export const insertPnlLineSchema = createInsertSchema(pnlLines).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  amount: z.string().or(z.number()),
+});
+
+export const updatePnlLineSchema = insertPnlLineSchema.partial();
+
+// Type exports for Document Intelligence
+export type PnlCategory = typeof pnlCategories.$inferSelect;
+export type InsertPnlCategory = z.infer<typeof insertPnlCategorySchema>;
+export type UpdatePnlCategory = z.infer<typeof updatePnlCategorySchema>;
+
+export type DocIntelUpload = typeof docIntelUploads.$inferSelect;
+export type InsertDocIntelUpload = z.infer<typeof insertDocIntelUploadSchema>;
+export type UpdateDocIntelUpload = z.infer<typeof updateDocIntelUploadSchema>;
+
+export type DocIntelExtractedItem = typeof docIntelExtractedItems.$inferSelect;
+export type InsertDocIntelExtractedItem = z.infer<typeof insertDocIntelExtractedItemSchema>;
+export type UpdateDocIntelExtractedItem = z.infer<typeof updateDocIntelExtractedItemSchema>;
+
+export type DocIntelCategoryMapping = typeof docIntelCategoryMappings.$inferSelect;
+export type InsertDocIntelCategoryMapping = z.infer<typeof insertDocIntelCategoryMappingSchema>;
+export type UpdateDocIntelCategoryMapping = z.infer<typeof updateDocIntelCategoryMappingSchema>;
+
+export type DocIntelLearningRule = typeof docIntelLearningRules.$inferSelect;
+export type InsertDocIntelLearningRule = z.infer<typeof insertDocIntelLearningRuleSchema>;
+export type UpdateDocIntelLearningRule = z.infer<typeof updateDocIntelLearningRuleSchema>;
+
+export type DocIntelTrainingExample = typeof docIntelTrainingExamples.$inferSelect;
+export type InsertDocIntelTrainingExample = z.infer<typeof insertDocIntelTrainingExampleSchema>;
+
+export type PnlLine = typeof pnlLines.$inferSelect;
+export type InsertPnlLine = z.infer<typeof insertPnlLineSchema>;
+export type UpdatePnlLine = z.infer<typeof updatePnlLineSchema>;
+
+// ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular
