@@ -11410,6 +11410,117 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ============================================================================
+  // PORTFOLIO ROLL-UPS - Aggregate Views Across Modeling Projects
+  // ============================================================================
+
+  // Get portfolio summary
+  app.get('/api/portfolio/summary', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const projectIds = req.query.projectIds ? (req.query.projectIds as string).split(',') : undefined;
+      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const summary = await portfolioRollupService.getPortfolioSummary(orgId, projectIds);
+      res.json(summary);
+    } catch (error) {
+      console.error('Failed to get portfolio summary:', error);
+      res.status(500).json({ error: 'Failed to get portfolio summary' });
+    }
+  });
+
+  // Get project rollups with filters
+  app.get('/api/portfolio/projects', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: any = {};
+      if (req.query.region) filters.region = req.query.region as string;
+      if (req.query.state) filters.state = req.query.state as string;
+      if (req.query.status) filters.status = req.query.status as string;
+      if (req.query.minValue) filters.minValue = parseFloat(req.query.minValue as string);
+      if (req.query.maxValue) filters.maxValue = parseFloat(req.query.maxValue as string);
+      
+      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const projects = await portfolioRollupService.getProjectRollups(orgId, filters);
+      res.json(projects);
+    } catch (error) {
+      console.error('Failed to get project rollups:', error);
+      res.status(500).json({ error: 'Failed to get project rollups' });
+    }
+  });
+
+  // Get portfolio breakdown by region, state, status, and year
+  app.get('/api/portfolio/breakdown', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const breakdown = await portfolioRollupService.getPortfolioBreakdown(orgId);
+      res.json(breakdown);
+    } catch (error) {
+      console.error('Failed to get portfolio breakdown:', error);
+      res.status(500).json({ error: 'Failed to get portfolio breakdown' });
+    }
+  });
+
+  // Get portfolio projections for all scenarios
+  app.get('/api/portfolio/projections', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const projectIds = req.query.projectIds ? (req.query.projectIds as string).split(',') : undefined;
+      const yearsToProject = parseInt(req.query.years as string) || 5;
+      
+      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const projections = await portfolioRollupService.getPortfolioProjections(orgId, projectIds, yearsToProject);
+      res.json(projections);
+    } catch (error) {
+      console.error('Failed to get portfolio projections:', error);
+      res.status(500).json({ error: 'Failed to get portfolio projections' });
+    }
+  });
+
+  // Get top performing projects
+  app.get('/api/portfolio/top-performers', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const topPerformers = await portfolioRollupService.getTopPerformingProjects(orgId, limit);
+      res.json(topPerformers);
+    } catch (error) {
+      console.error('Failed to get top performers:', error);
+      res.status(500).json({ error: 'Failed to get top performing projects' });
+    }
+  });
+
+  // Get underperforming projects
+  app.get('/api/portfolio/underperformers', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const occupancyThreshold = parseFloat(req.query.threshold as string) || 70;
+      
+      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const underperformers = await portfolioRollupService.getUnderperformingProjects(orgId, occupancyThreshold);
+      res.json(underperformers);
+    } catch (error) {
+      console.error('Failed to get underperformers:', error);
+      res.status(500).json({ error: 'Failed to get underperforming projects' });
+    }
+  });
+
+  // Export full portfolio report
+  app.get('/api/portfolio/export', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const report = await portfolioRollupService.exportPortfolioReport(orgId);
+      res.json(report);
+    } catch (error) {
+      console.error('Failed to export portfolio report:', error);
+      res.status(500).json({ error: 'Failed to export portfolio report' });
+    }
+  });
+
+  // ============================================================================
   // DOCUMENT INTELLIGENCE - AI-Powered Financial Document Parsing
   // ============================================================================
 

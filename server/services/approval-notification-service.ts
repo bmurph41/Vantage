@@ -8,6 +8,7 @@ import {
 } from '@shared/schema';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import sgMail from '@sendgrid/mail';
+import crypto from 'crypto';
 
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);

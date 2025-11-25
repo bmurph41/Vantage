@@ -55,6 +55,7 @@ export interface ProfitAndLossReport {
 export class QuickBooksService {
   private config: QuickBooksConfig;
   private encryptionKey: string;
+  private isConfigured: boolean = false;
 
   constructor() {
     this.config = {
@@ -63,7 +64,19 @@ export class QuickBooksService {
       redirectUri: process.env.QUICKBOOKS_REDIRECT_URI || 'https://your-app.replit.app/api/quickbooks/callback',
       useSandbox: process.env.NODE_ENV !== 'production'
     };
-    this.encryptionKey = process.env.QB_ENCRYPTION_KEY || 'default-encryption-key-change-me';
+    
+    const envKey = process.env.QB_ENCRYPTION_KEY;
+    if (envKey && envKey.length >= 32) {
+      this.encryptionKey = envKey;
+      this.isConfigured = true;
+    } else {
+      this.encryptionKey = crypto.randomBytes(32).toString('hex');
+      console.warn('QB_ENCRYPTION_KEY not set or too short. QuickBooks integration will not persist tokens across restarts.');
+    }
+  }
+
+  isQuickBooksConfigured(): boolean {
+    return this.isConfigured && !!this.config.clientId && !!this.config.clientSecret;
   }
 
   private encrypt(text: string): string {
