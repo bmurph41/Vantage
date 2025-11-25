@@ -1161,6 +1161,111 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // Global Engagement Tracking (NOT org-scoped - powers cross-organization Trending Now)
+  
+  // Record article view
+  app.post("/api/docktalk/articles/:id/view", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.id, 10);
+      if (isNaN(articleId) || articleId < 1) {
+        return res.status(400).json({ error: "Invalid article ID" });
+      }
+      
+      const userId = req.dockTalkUser?.id;
+      const sessionId = req.body.sessionId || null;
+      const referrer = req.body.referrer || null;
+      
+      await dockTalkStorage.recordArticleView(articleId, userId, sessionId, referrer);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error recording article view:", error);
+      res.status(500).json({ error: "Failed to record view" });
+    }
+  });
+
+  // Toggle article like
+  app.post("/api/docktalk/articles/:id/like", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.id, 10);
+      if (isNaN(articleId) || articleId < 1) {
+        return res.status(400).json({ error: "Invalid article ID" });
+      }
+      
+      const userId = req.dockTalkUser!.id;
+      const isLiked = await dockTalkStorage.getArticleLikeStatus(articleId, userId);
+      
+      if (isLiked) {
+        await dockTalkStorage.removeArticleLike(articleId, userId);
+        res.json({ liked: false });
+      } else {
+        await dockTalkStorage.recordArticleLike(articleId, userId);
+        res.json({ liked: true });
+      }
+    } catch (error) {
+      console.error("Error toggling article like:", error);
+      res.status(500).json({ error: "Failed to toggle like" });
+    }
+  });
+
+  // Get article engagement stats
+  app.get("/api/docktalk/articles/:id/engagement", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.id, 10);
+      if (isNaN(articleId) || articleId < 1) {
+        return res.status(400).json({ error: "Invalid article ID" });
+      }
+      
+      const userId = req.dockTalkUser!.id;
+      const stats = await dockTalkStorage.getArticleEngagementStats(articleId);
+      const isLiked = await dockTalkStorage.getArticleLikeStatus(articleId, userId);
+      
+      res.json({ ...stats, isLiked });
+    } catch (error) {
+      console.error("Error fetching article engagement:", error);
+      res.status(500).json({ error: "Failed to fetch engagement stats" });
+    }
+  });
+
+  // Get trending articles (global across all organizations)
+  app.get("/api/docktalk/articles/trending", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const limitParam = req.query.limit as string | undefined;
+      const hoursBackParam = req.query.hoursBack as string | undefined;
+      
+      const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 10, 50) : 10;
+      const hoursBack = hoursBackParam ? Math.min(parseInt(hoursBackParam, 10) || 48, 168) : 48; // Max 7 days
+      
+      const trendingArticles = await dockTalkStorage.getTrendingArticles({ limit, hoursBack });
+      
+      // Also get the current user's likes for these articles
+      const userId = req.dockTalkUser!.id;
+      const userLikedArticles = await dockTalkStorage.getUserLikedArticles(userId);
+      const likedSet = new Set(userLikedArticles);
+      
+      const articlesWithUserLikes = trendingArticles.map(article => ({
+        ...article,
+        isLiked: likedSet.has(article.id),
+      }));
+      
+      res.json(articlesWithUserLikes);
+    } catch (error) {
+      console.error("Error fetching trending articles:", error);
+      res.status(500).json({ error: "Failed to fetch trending articles" });
+    }
+  });
+
+  // Get user's liked articles
+  app.get("/api/docktalk/user/likes", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const userId = req.dockTalkUser!.id;
+      const likedArticleIds = await dockTalkStorage.getUserLikedArticles(userId);
+      res.json(likedArticleIds);
+    } catch (error) {
+      console.error("Error fetching user likes:", error);
+      res.status(500).json({ error: "Failed to fetch liked articles" });
+    }
+  });
+
   // Entity Extraction & Tracking endpoints (Institutional Intelligence - Protected)
   app.get("/api/docktalk/entities", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {

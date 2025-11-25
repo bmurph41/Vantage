@@ -1,4 +1,4 @@
-import { users, articles, rssSources, systemStats, savedFilters, savedSearches, userArticleAnnotations, portfolioCompanies, notifications, articleFingerprints, articleDuplicates, userNotificationPreferences, articleRemovalPatterns, userFilterPreferences, entities, articleEntities, watchlists, watchlistEntities, organizationFeatures, userTagLibrary, articleTagAssignments, articleFeedback, type User, type InsertUser, type Article, type InsertArticle, type RssSource, type InsertRssSource, type SystemStats, type SavedFilter, type InsertSavedFilter, type SavedSearch, type InsertSavedSearch, type UserArticleAnnotation, type InsertUserArticleAnnotation, type PortfolioCompany, type InsertPortfolioCompany, type Notification, type InsertNotification, type UserNotificationPreferences, type InsertUserNotificationPreferences, type ArticleRemovalPattern, type InsertArticleRemovalPattern, type UserFilterPreferences, type InsertUserFilterPreferences, type Entity, type InsertEntity, type ArticleEntity, type InsertArticleEntity, type Watchlist, type InsertWatchlist, type WatchlistEntity, type InsertWatchlistEntity, type UserTag, type InsertUserTag, type ArticleTagAssignment, type InsertArticleTagAssignment, type ArticleFeedback, type InsertArticleFeedback } from "@shared/docktalk-schema";
+import { users, articles, rssSources, systemStats, savedFilters, savedSearches, userArticleAnnotations, portfolioCompanies, notifications, articleFingerprints, articleDuplicates, userNotificationPreferences, articleRemovalPatterns, userFilterPreferences, entities, articleEntities, watchlists, watchlistEntities, organizationFeatures, userTagLibrary, articleTagAssignments, articleFeedback, articleViews, articleLikes, type User, type InsertUser, type Article, type InsertArticle, type RssSource, type InsertRssSource, type SystemStats, type SavedFilter, type InsertSavedFilter, type SavedSearch, type InsertSavedSearch, type UserArticleAnnotation, type InsertUserArticleAnnotation, type PortfolioCompany, type InsertPortfolioCompany, type Notification, type InsertNotification, type UserNotificationPreferences, type InsertUserNotificationPreferences, type ArticleRemovalPattern, type InsertArticleRemovalPattern, type UserFilterPreferences, type InsertUserFilterPreferences, type Entity, type InsertEntity, type ArticleEntity, type InsertArticleEntity, type Watchlist, type InsertWatchlist, type WatchlistEntity, type InsertWatchlistEntity, type UserTag, type InsertUserTag, type ArticleTagAssignment, type InsertArticleTagAssignment, type ArticleFeedback, type InsertArticleFeedback, type ArticleView, type InsertArticleView, type ArticleLike, type InsertArticleLike } from "@shared/docktalk-schema";
 import { docktalkDeals, type DocktalkDeal, type InsertDocktalkDeal } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, gte, lte, sql, count, inArray } from "drizzle-orm";
@@ -80,6 +80,15 @@ export interface IStorage {
   removeArticle(id: number, reason: string, userId: string): Promise<void>;
   getRemovalPatterns(): Promise<any[]>;
   checkArticleAgainstRemovalPatterns(title: string, content: string): Promise<{ shouldRemove: boolean; matchedPattern?: any }>;
+  
+  // Global engagement methods (NOT org-scoped - for cross-organization trending)
+  recordArticleView(articleId: number, userId?: string, sessionId?: string, referrer?: string): Promise<void>;
+  recordArticleLike(articleId: number, userId: string): Promise<boolean>;
+  removeArticleLike(articleId: number, userId: string): Promise<boolean>;
+  getArticleLikeStatus(articleId: number, userId: string): Promise<boolean>;
+  getArticleEngagementStats(articleId: number): Promise<{ viewCount: number; likeCount: number }>;
+  getTrendingArticles(options: { limit?: number; hoursBack?: number }): Promise<Array<Article & { viewCount: number; likeCount: number; engagementScore: number }>>;
+  getUserLikedArticles(userId: string): Promise<number[]>;
   
   // Analytics methods
   getSystemStats(): Promise<SystemStats | undefined>;
@@ -1051,6 +1060,145 @@ export class DatabaseStorage implements IStorage {
     }
 
     return { shouldRemove: false };
+  }
+
+  // Global engagement methods (NOT org-scoped - for cross-organization trending)
+  async recordArticleView(articleId: number, userId?: string, sessionId?: string, referrer?: string): Promise<void> {
+    await db.insert(articleViews).values({
+      articleId,
+      userId: userId || null,
+      sessionId: sessionId || null,
+      referrer: referrer || null,
+    });
+  }
+
+  async recordArticleLike(articleId: number, userId: string): Promise<boolean> {
+    try {
+      await db.insert(articleLikes).values({
+        articleId,
+        userId,
+      });
+      return true;
+    } catch (error: any) {
+      // If unique constraint violation, like already exists
+      if (error.code === '23505') {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  async removeArticleLike(articleId: number, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(articleLikes)
+      .where(and(eq(articleLikes.articleId, articleId), eq(articleLikes.userId, userId)));
+    return (result as any).rowCount > 0;
+  }
+
+  async getArticleLikeStatus(articleId: number, userId: string): Promise<boolean> {
+    const [like] = await db
+      .select()
+      .from(articleLikes)
+      .where(and(eq(articleLikes.articleId, articleId), eq(articleLikes.userId, userId)));
+    return !!like;
+  }
+
+  async getArticleEngagementStats(articleId: number): Promise<{ viewCount: number; likeCount: number }> {
+    const [viewResult] = await db
+      .select({ count: count() })
+      .from(articleViews)
+      .where(eq(articleViews.articleId, articleId));
+    
+    const [likeResult] = await db
+      .select({ count: count() })
+      .from(articleLikes)
+      .where(eq(articleLikes.articleId, articleId));
+    
+    return {
+      viewCount: viewResult?.count || 0,
+      likeCount: likeResult?.count || 0,
+    };
+  }
+
+  async getTrendingArticles(options: { limit?: number; hoursBack?: number }): Promise<Array<Article & { viewCount: number; likeCount: number; engagementScore: number }>> {
+    const { limit = 10, hoursBack = 48 } = options;
+    const cutoffDate = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+    
+    // Get articles with engagement data from the last N hours
+    // Engagement score = (views * 1) + (likes * 5) - weighted to favor likes
+    const result = await db.execute(sql`
+      WITH engagement_stats AS (
+        SELECT 
+          a.id,
+          COALESCE(v.view_count, 0) AS view_count,
+          COALESCE(l.like_count, 0) AS like_count,
+          (COALESCE(v.view_count, 0) * 1 + COALESCE(l.like_count, 0) * 5) AS engagement_score
+        FROM docktalk_articles a
+        LEFT JOIN (
+          SELECT article_id, COUNT(*) AS view_count
+          FROM docktalk_article_views
+          WHERE viewed_at >= ${cutoffDate}
+          GROUP BY article_id
+        ) v ON a.id = v.article_id
+        LEFT JOIN (
+          SELECT article_id, COUNT(*) AS like_count
+          FROM docktalk_article_likes
+          WHERE liked_at >= ${cutoffDate}
+          GROUP BY article_id
+        ) l ON a.id = l.article_id
+        WHERE a.is_removed = false OR a.is_removed IS NULL
+      )
+      SELECT 
+        a.*,
+        e.view_count,
+        e.like_count,
+        e.engagement_score
+      FROM docktalk_articles a
+      JOIN engagement_stats e ON a.id = e.id
+      WHERE e.engagement_score > 0
+      ORDER BY e.engagement_score DESC, a.published_at DESC
+      LIMIT ${limit}
+    `);
+    
+    return (result.rows as any[]).map(row => ({
+      id: row.id,
+      title: row.title,
+      url: row.url,
+      source: row.source,
+      publishedAt: row.published_at,
+      category: row.category,
+      categories: row.categories,
+      tags: row.tags,
+      summary: row.summary,
+      content: row.content,
+      imageUrl: row.image_url,
+      relevanceScore: row.relevance_score,
+      sentiment: row.sentiment,
+      dealMetadata: row.deal_metadata,
+      geography: row.geography,
+      region: row.region,
+      searchText: row.search_text,
+      isBookmarked: row.is_bookmarked,
+      manuallyReviewed: row.manually_reviewed,
+      originalCategory: row.original_category,
+      isRemoved: row.is_removed,
+      removalReason: row.removal_reason,
+      removedAt: row.removed_at,
+      removedBy: row.removed_by,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      viewCount: parseInt(row.view_count) || 0,
+      likeCount: parseInt(row.like_count) || 0,
+      engagementScore: parseInt(row.engagement_score) || 0,
+    }));
+  }
+
+  async getUserLikedArticles(userId: string): Promise<number[]> {
+    const likes = await db
+      .select({ articleId: articleLikes.articleId })
+      .from(articleLikes)
+      .where(eq(articleLikes.userId, userId));
+    return likes.map(l => l.articleId);
   }
 
   async getUserFilterPreferences(userId: string, orgId: string): Promise<UserFilterPreferences | undefined> {
