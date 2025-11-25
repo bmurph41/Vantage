@@ -50,6 +50,10 @@ Preferred communication style: Simple, everyday language.
     - **Operations Data Sync**: Institutional-grade pipeline for operational data (Rent Roll, Fuel Sales, Ship Store) to modeling projects.
     - **Exit Strategy Suite**: Integrated tools for exit analysis (Tax Calculator, Net Proceeds, 1031 Exchange, DST Analysis, Seller Financing, Earnout Modeling, Waterfall Analysis, IRR, Sensitivity Analysis, AI Insights).
     - **Document Intelligence**: AI-powered document parsing for P&L and Rent Roll with QuickBooks-style review workflow, hierarchical categorization, and confidence scoring.
+    - **Scenario Versioning**: Version history for Base/Aggressive/Conservative scenarios with audit trail, approval workflows (draft → pending → approved/rejected), and version comparison.
+    - **QuickBooks Integration**: OAuth2 connection flow for QuickBooks Online, P&L sync to modeling actuals with automatic category mapping, encrypted token storage.
+    - **Approval Notifications**: In-app notification system for scenario approval requests with SendGrid email integration, multi-approver support, and approval statistics.
+    - **Portfolio Roll-ups**: Aggregate views across multiple modeling projects with portfolio summary (value, NOI, cap rates, IRR), breakdown by region/state/status/year, multi-year projections, and performance analysis.
 - **Marketing Module**: Tracks campaigns, expenses, lead attribution, and integrates with email platforms.
 - **Fuel Sales Module**: Manages fuel operations, transactions, inventory, and analytics, with portfolio management.
 - **Ship Store Module**: POS/inventory system with product catalog, transactions, analytics, and customer tracking, with portfolio management.
