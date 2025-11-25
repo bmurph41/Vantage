@@ -101,6 +101,7 @@ const RateCompsColumnManager = lazy(() => import("@/pages/analysis/rate-comps/Co
 const DemographicsIndex = lazy(() => import("@/pages/analysis/demographics/Index"));
 const BenchmarksIndex = lazy(() => import("@/pages/analysis/benchmarks/Index"));
 const DebtScenariosIndex = lazy(() => import("@/pages/modeling/debt-scenarios/Index"));
+const ExitStrategiesIndex = lazy(() => import("@/pages/modeling/exit-strategies"));
 const ModelingProjectsIndex = lazy(() => import("@/pages/modeling/projects"));
 const ModelingSettings = lazy(() => import("@/pages/modeling/settings"));
 const TransactionClosingPage = lazy(() => import("@/pages/modeling/projects/transaction-closing"));
@@ -942,6 +943,14 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <DebtScenariosIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      
+      <Route path="/modeling/exit-strategies">
+        {() => (
+          <UnifiedLayout>
+            <ExitStrategiesIndex />
           </UnifiedLayout>
         )}
       </Route>
