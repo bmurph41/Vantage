@@ -15,6 +15,8 @@ import {
   diligenceRequests, requestDocuments, requestComments, requestTemplates,
   externalUsers, externalUserProjectAccess,
   docktalkDeals,
+  exitScenarios, exitTaxCalculations, exitSellerFinancing, exitEarnouts, exit1031Exchanges,
+  exitDstAnalyses, exitFunds, exitWaterfallStructures, exitInvestors, exitCashFlows, exitActivities,
   type Organization, type User, type Project, type ProjectSettings, 
   type DDTask, type ProjectTemplate, type AuditLog,
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type ProjectPendingContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
@@ -57,7 +59,18 @@ import {
   type InsertDiligenceRequest, type InsertRequestDocument, type InsertRequestComment, type InsertRequestTemplate,
   type InsertExternalUser, type InsertExternalUserProjectAccess,
   type ModelingRegion, type InsertModelingRegion, type UpdateModelingRegion,
-  type ModelingProject, type InsertModelingProject, type UpdateModelingProject
+  type ModelingProject, type InsertModelingProject, type UpdateModelingProject,
+  type ExitScenario, type InsertExitScenario, type UpdateExitScenario,
+  type ExitTaxCalculation, type InsertExitTaxCalculation, type UpdateExitTaxCalculation,
+  type ExitSellerFinancing, type InsertExitSellerFinancing, type UpdateExitSellerFinancing,
+  type ExitEarnout, type InsertExitEarnout, type UpdateExitEarnout,
+  type Exit1031Exchange, type InsertExit1031Exchange, type UpdateExit1031Exchange,
+  type ExitDstAnalysis, type InsertExitDstAnalysis, type UpdateExitDstAnalysis,
+  type ExitFund, type InsertExitFund, type UpdateExitFund,
+  type ExitWaterfallStructure, type InsertExitWaterfallStructure, type UpdateExitWaterfallStructure,
+  type ExitInvestor, type InsertExitInvestor, type UpdateExitInvestor,
+  type ExitCashFlow, type InsertExitCashFlow,
+  type ExitActivity, type InsertExitActivity
 } from "@shared/schema";
 import { organizationFeatures, type OrganizationFeature } from "@shared/docktalk-schema";
 import { db } from "./db";
@@ -791,6 +804,78 @@ export interface IStorage {
     dealsByBroker: Array<{ brokerId: string; brokerName: string; count: number; totalValue: number }>;
     dealsByRegion: Array<{ region: string; count: number; totalValue: number }>;
   }>;
+
+  // Exit Strategy Suite - Exit Scenarios
+  getExitScenarios(modelingProjectId: string, orgId: string): Promise<ExitScenario[]>;
+  getExitScenario(id: string, orgId: string): Promise<ExitScenario | undefined>;
+  createExitScenario(data: InsertExitScenario & { orgId: string; createdBy?: string }): Promise<ExitScenario>;
+  updateExitScenario(id: string, data: UpdateExitScenario & { updatedBy?: string }, orgId: string): Promise<ExitScenario | undefined>;
+  deleteExitScenario(id: string, orgId: string): Promise<boolean>;
+
+  // Exit Strategy Suite - Tax Calculations
+  getExitTaxCalculations(exitScenarioId: string, orgId: string): Promise<ExitTaxCalculation[]>;
+  getExitTaxCalculation(id: string, orgId: string): Promise<ExitTaxCalculation | undefined>;
+  createExitTaxCalculation(data: InsertExitTaxCalculation & { orgId: string }): Promise<ExitTaxCalculation>;
+  updateExitTaxCalculation(id: string, data: UpdateExitTaxCalculation, orgId: string): Promise<ExitTaxCalculation | undefined>;
+  deleteExitTaxCalculation(id: string, orgId: string): Promise<boolean>;
+
+  // Exit Strategy Suite - Seller Financing
+  getExitSellerFinancing(exitScenarioId: string, orgId: string): Promise<ExitSellerFinancing[]>;
+  getExitSellerFinancingById(id: string, orgId: string): Promise<ExitSellerFinancing | undefined>;
+  createExitSellerFinancing(data: InsertExitSellerFinancing & { orgId: string }): Promise<ExitSellerFinancing>;
+  updateExitSellerFinancing(id: string, data: UpdateExitSellerFinancing, orgId: string): Promise<ExitSellerFinancing | undefined>;
+  deleteExitSellerFinancing(id: string, orgId: string): Promise<boolean>;
+
+  // Exit Strategy Suite - Earnouts
+  getExitEarnouts(exitScenarioId: string, orgId: string): Promise<ExitEarnout[]>;
+  getExitEarnout(id: string, orgId: string): Promise<ExitEarnout | undefined>;
+  createExitEarnout(data: InsertExitEarnout & { orgId: string }): Promise<ExitEarnout>;
+  updateExitEarnout(id: string, data: UpdateExitEarnout, orgId: string): Promise<ExitEarnout | undefined>;
+  deleteExitEarnout(id: string, orgId: string): Promise<boolean>;
+
+  // Exit Strategy Suite - 1031 Exchanges
+  getExit1031Exchanges(exitScenarioId: string, orgId: string): Promise<Exit1031Exchange[]>;
+  getExit1031Exchange(id: string, orgId: string): Promise<Exit1031Exchange | undefined>;
+  createExit1031Exchange(data: InsertExit1031Exchange & { orgId: string }): Promise<Exit1031Exchange>;
+  updateExit1031Exchange(id: string, data: UpdateExit1031Exchange, orgId: string): Promise<Exit1031Exchange | undefined>;
+  deleteExit1031Exchange(id: string, orgId: string): Promise<boolean>;
+
+  // Exit Strategy Suite - DST Analyses
+  getExitDstAnalyses(exitScenarioId: string, orgId: string): Promise<ExitDstAnalysis[]>;
+  getExitDstAnalysis(id: string, orgId: string): Promise<ExitDstAnalysis | undefined>;
+  createExitDstAnalysis(data: InsertExitDstAnalysis & { orgId: string }): Promise<ExitDstAnalysis>;
+  updateExitDstAnalysis(id: string, data: UpdateExitDstAnalysis, orgId: string): Promise<ExitDstAnalysis | undefined>;
+  deleteExitDstAnalysis(id: string, orgId: string): Promise<boolean>;
+
+  // Exit Strategy Suite - Funds
+  getExitFunds(orgId: string): Promise<ExitFund[]>;
+  getExitFund(id: string, orgId: string): Promise<ExitFund | undefined>;
+  createExitFund(data: InsertExitFund & { orgId: string }): Promise<ExitFund>;
+  updateExitFund(id: string, data: UpdateExitFund, orgId: string): Promise<ExitFund | undefined>;
+  deleteExitFund(id: string, orgId: string): Promise<boolean>;
+
+  // Exit Strategy Suite - Waterfall Structures
+  getExitWaterfallStructures(exitScenarioId: string, orgId: string): Promise<ExitWaterfallStructure[]>;
+  getExitWaterfallStructure(id: string, orgId: string): Promise<ExitWaterfallStructure | undefined>;
+  createExitWaterfallStructure(data: InsertExitWaterfallStructure & { orgId: string }): Promise<ExitWaterfallStructure>;
+  updateExitWaterfallStructure(id: string, data: UpdateExitWaterfallStructure, orgId: string): Promise<ExitWaterfallStructure | undefined>;
+  deleteExitWaterfallStructure(id: string, orgId: string): Promise<boolean>;
+
+  // Exit Strategy Suite - Investors
+  getExitInvestors(fundId: string, orgId: string): Promise<ExitInvestor[]>;
+  getExitInvestor(id: string, orgId: string): Promise<ExitInvestor | undefined>;
+  createExitInvestor(data: InsertExitInvestor & { orgId: string }): Promise<ExitInvestor>;
+  updateExitInvestor(id: string, data: UpdateExitInvestor, orgId: string): Promise<ExitInvestor | undefined>;
+  deleteExitInvestor(id: string, orgId: string): Promise<boolean>;
+
+  // Exit Strategy Suite - Cash Flows
+  getExitCashFlows(exitScenarioId: string, orgId: string): Promise<ExitCashFlow[]>;
+  createExitCashFlow(data: InsertExitCashFlow & { orgId: string }): Promise<ExitCashFlow>;
+  deleteExitCashFlows(exitScenarioId: string, orgId: string): Promise<boolean>;
+
+  // Exit Strategy Suite - Activities
+  getExitActivities(exitScenarioId: string | null, modelingProjectId: string | null, orgId: string): Promise<ExitActivity[]>;
+  createExitActivity(data: InsertExitActivity & { orgId: string }): Promise<ExitActivity>;
 
   // Virtual Data Room - Composed VDR storage access
   vdr: import("./vdr-storage").IVdrStorage;
@@ -6597,6 +6682,509 @@ export class DatabaseStorage implements IStorage {
       capRateDistribution,
       priceDistribution
     };
+  }
+
+  // ============================================================================
+  // EXIT STRATEGY SUITE - Implementation Methods
+  // ============================================================================
+
+  // Exit Scenarios
+  async getExitScenarios(modelingProjectId: string, orgId: string): Promise<ExitScenario[]> {
+    return await db.select()
+      .from(exitScenarios)
+      .where(and(
+        eq(exitScenarios.modelingProjectId, modelingProjectId),
+        eq(exitScenarios.orgId, orgId)
+      ))
+      .orderBy(desc(exitScenarios.createdAt));
+  }
+
+  async getExitScenario(id: string, orgId: string): Promise<ExitScenario | undefined> {
+    const [scenario] = await db.select()
+      .from(exitScenarios)
+      .where(and(
+        eq(exitScenarios.id, id),
+        eq(exitScenarios.orgId, orgId)
+      ));
+    return scenario || undefined;
+  }
+
+  async createExitScenario(data: InsertExitScenario & { orgId: string; createdBy?: string }): Promise<ExitScenario> {
+    const [created] = await db.insert(exitScenarios)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateExitScenario(id: string, data: UpdateExitScenario & { updatedBy?: string }, orgId: string): Promise<ExitScenario | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(exitScenarios)
+      .set(updateData as any)
+      .where(and(
+        eq(exitScenarios.id, id),
+        eq(exitScenarios.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteExitScenario(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(exitScenarios)
+      .where(and(
+        eq(exitScenarios.id, id),
+        eq(exitScenarios.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Tax Calculations
+  async getExitTaxCalculations(exitScenarioId: string, orgId: string): Promise<ExitTaxCalculation[]> {
+    return await db.select()
+      .from(exitTaxCalculations)
+      .where(and(
+        eq(exitTaxCalculations.exitScenarioId, exitScenarioId),
+        eq(exitTaxCalculations.orgId, orgId)
+      ))
+      .orderBy(desc(exitTaxCalculations.createdAt));
+  }
+
+  async getExitTaxCalculation(id: string, orgId: string): Promise<ExitTaxCalculation | undefined> {
+    const [calc] = await db.select()
+      .from(exitTaxCalculations)
+      .where(and(
+        eq(exitTaxCalculations.id, id),
+        eq(exitTaxCalculations.orgId, orgId)
+      ));
+    return calc || undefined;
+  }
+
+  async createExitTaxCalculation(data: InsertExitTaxCalculation & { orgId: string }): Promise<ExitTaxCalculation> {
+    const [created] = await db.insert(exitTaxCalculations)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateExitTaxCalculation(id: string, data: UpdateExitTaxCalculation, orgId: string): Promise<ExitTaxCalculation | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(exitTaxCalculations)
+      .set(updateData as any)
+      .where(and(
+        eq(exitTaxCalculations.id, id),
+        eq(exitTaxCalculations.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteExitTaxCalculation(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(exitTaxCalculations)
+      .where(and(
+        eq(exitTaxCalculations.id, id),
+        eq(exitTaxCalculations.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Seller Financing
+  async getExitSellerFinancing(exitScenarioId: string, orgId: string): Promise<ExitSellerFinancing[]> {
+    return await db.select()
+      .from(exitSellerFinancing)
+      .where(and(
+        eq(exitSellerFinancing.exitScenarioId, exitScenarioId),
+        eq(exitSellerFinancing.orgId, orgId)
+      ))
+      .orderBy(desc(exitSellerFinancing.createdAt));
+  }
+
+  async getExitSellerFinancingById(id: string, orgId: string): Promise<ExitSellerFinancing | undefined> {
+    const [sf] = await db.select()
+      .from(exitSellerFinancing)
+      .where(and(
+        eq(exitSellerFinancing.id, id),
+        eq(exitSellerFinancing.orgId, orgId)
+      ));
+    return sf || undefined;
+  }
+
+  async createExitSellerFinancing(data: InsertExitSellerFinancing & { orgId: string }): Promise<ExitSellerFinancing> {
+    const [created] = await db.insert(exitSellerFinancing)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateExitSellerFinancing(id: string, data: UpdateExitSellerFinancing, orgId: string): Promise<ExitSellerFinancing | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(exitSellerFinancing)
+      .set(updateData as any)
+      .where(and(
+        eq(exitSellerFinancing.id, id),
+        eq(exitSellerFinancing.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteExitSellerFinancing(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(exitSellerFinancing)
+      .where(and(
+        eq(exitSellerFinancing.id, id),
+        eq(exitSellerFinancing.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Earnouts
+  async getExitEarnouts(exitScenarioId: string, orgId: string): Promise<ExitEarnout[]> {
+    return await db.select()
+      .from(exitEarnouts)
+      .where(and(
+        eq(exitEarnouts.exitScenarioId, exitScenarioId),
+        eq(exitEarnouts.orgId, orgId)
+      ))
+      .orderBy(asc(exitEarnouts.sortOrder));
+  }
+
+  async getExitEarnout(id: string, orgId: string): Promise<ExitEarnout | undefined> {
+    const [earnout] = await db.select()
+      .from(exitEarnouts)
+      .where(and(
+        eq(exitEarnouts.id, id),
+        eq(exitEarnouts.orgId, orgId)
+      ));
+    return earnout || undefined;
+  }
+
+  async createExitEarnout(data: InsertExitEarnout & { orgId: string }): Promise<ExitEarnout> {
+    const [created] = await db.insert(exitEarnouts)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateExitEarnout(id: string, data: UpdateExitEarnout, orgId: string): Promise<ExitEarnout | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(exitEarnouts)
+      .set(updateData as any)
+      .where(and(
+        eq(exitEarnouts.id, id),
+        eq(exitEarnouts.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteExitEarnout(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(exitEarnouts)
+      .where(and(
+        eq(exitEarnouts.id, id),
+        eq(exitEarnouts.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // 1031 Exchanges
+  async getExit1031Exchanges(exitScenarioId: string, orgId: string): Promise<Exit1031Exchange[]> {
+    return await db.select()
+      .from(exit1031Exchanges)
+      .where(and(
+        eq(exit1031Exchanges.exitScenarioId, exitScenarioId),
+        eq(exit1031Exchanges.orgId, orgId)
+      ))
+      .orderBy(desc(exit1031Exchanges.createdAt));
+  }
+
+  async getExit1031Exchange(id: string, orgId: string): Promise<Exit1031Exchange | undefined> {
+    const [exchange] = await db.select()
+      .from(exit1031Exchanges)
+      .where(and(
+        eq(exit1031Exchanges.id, id),
+        eq(exit1031Exchanges.orgId, orgId)
+      ));
+    return exchange || undefined;
+  }
+
+  async createExit1031Exchange(data: InsertExit1031Exchange & { orgId: string }): Promise<Exit1031Exchange> {
+    const [created] = await db.insert(exit1031Exchanges)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateExit1031Exchange(id: string, data: UpdateExit1031Exchange, orgId: string): Promise<Exit1031Exchange | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(exit1031Exchanges)
+      .set(updateData as any)
+      .where(and(
+        eq(exit1031Exchanges.id, id),
+        eq(exit1031Exchanges.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteExit1031Exchange(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(exit1031Exchanges)
+      .where(and(
+        eq(exit1031Exchanges.id, id),
+        eq(exit1031Exchanges.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // DST Analyses
+  async getExitDstAnalyses(exitScenarioId: string, orgId: string): Promise<ExitDstAnalysis[]> {
+    return await db.select()
+      .from(exitDstAnalyses)
+      .where(and(
+        eq(exitDstAnalyses.exitScenarioId, exitScenarioId),
+        eq(exitDstAnalyses.orgId, orgId)
+      ))
+      .orderBy(asc(exitDstAnalyses.sortOrder));
+  }
+
+  async getExitDstAnalysis(id: string, orgId: string): Promise<ExitDstAnalysis | undefined> {
+    const [dst] = await db.select()
+      .from(exitDstAnalyses)
+      .where(and(
+        eq(exitDstAnalyses.id, id),
+        eq(exitDstAnalyses.orgId, orgId)
+      ));
+    return dst || undefined;
+  }
+
+  async createExitDstAnalysis(data: InsertExitDstAnalysis & { orgId: string }): Promise<ExitDstAnalysis> {
+    const [created] = await db.insert(exitDstAnalyses)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateExitDstAnalysis(id: string, data: UpdateExitDstAnalysis, orgId: string): Promise<ExitDstAnalysis | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(exitDstAnalyses)
+      .set(updateData as any)
+      .where(and(
+        eq(exitDstAnalyses.id, id),
+        eq(exitDstAnalyses.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteExitDstAnalysis(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(exitDstAnalyses)
+      .where(and(
+        eq(exitDstAnalyses.id, id),
+        eq(exitDstAnalyses.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Funds
+  async getExitFunds(orgId: string): Promise<ExitFund[]> {
+    return await db.select()
+      .from(exitFunds)
+      .where(eq(exitFunds.orgId, orgId))
+      .orderBy(desc(exitFunds.vintage));
+  }
+
+  async getExitFund(id: string, orgId: string): Promise<ExitFund | undefined> {
+    const [fund] = await db.select()
+      .from(exitFunds)
+      .where(and(
+        eq(exitFunds.id, id),
+        eq(exitFunds.orgId, orgId)
+      ));
+    return fund || undefined;
+  }
+
+  async createExitFund(data: InsertExitFund & { orgId: string }): Promise<ExitFund> {
+    const [created] = await db.insert(exitFunds)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateExitFund(id: string, data: UpdateExitFund, orgId: string): Promise<ExitFund | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(exitFunds)
+      .set(updateData as any)
+      .where(and(
+        eq(exitFunds.id, id),
+        eq(exitFunds.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteExitFund(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(exitFunds)
+      .where(and(
+        eq(exitFunds.id, id),
+        eq(exitFunds.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Waterfall Structures
+  async getExitWaterfallStructures(exitScenarioId: string, orgId: string): Promise<ExitWaterfallStructure[]> {
+    return await db.select()
+      .from(exitWaterfallStructures)
+      .where(and(
+        eq(exitWaterfallStructures.exitScenarioId, exitScenarioId),
+        eq(exitWaterfallStructures.orgId, orgId)
+      ))
+      .orderBy(desc(exitWaterfallStructures.createdAt));
+  }
+
+  async getExitWaterfallStructure(id: string, orgId: string): Promise<ExitWaterfallStructure | undefined> {
+    const [waterfall] = await db.select()
+      .from(exitWaterfallStructures)
+      .where(and(
+        eq(exitWaterfallStructures.id, id),
+        eq(exitWaterfallStructures.orgId, orgId)
+      ));
+    return waterfall || undefined;
+  }
+
+  async createExitWaterfallStructure(data: InsertExitWaterfallStructure & { orgId: string }): Promise<ExitWaterfallStructure> {
+    const [created] = await db.insert(exitWaterfallStructures)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateExitWaterfallStructure(id: string, data: UpdateExitWaterfallStructure, orgId: string): Promise<ExitWaterfallStructure | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(exitWaterfallStructures)
+      .set(updateData as any)
+      .where(and(
+        eq(exitWaterfallStructures.id, id),
+        eq(exitWaterfallStructures.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteExitWaterfallStructure(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(exitWaterfallStructures)
+      .where(and(
+        eq(exitWaterfallStructures.id, id),
+        eq(exitWaterfallStructures.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Investors
+  async getExitInvestors(fundId: string, orgId: string): Promise<ExitInvestor[]> {
+    return await db.select()
+      .from(exitInvestors)
+      .where(and(
+        eq(exitInvestors.fundId, fundId),
+        eq(exitInvestors.orgId, orgId)
+      ))
+      .orderBy(asc(exitInvestors.name));
+  }
+
+  async getExitInvestor(id: string, orgId: string): Promise<ExitInvestor | undefined> {
+    const [investor] = await db.select()
+      .from(exitInvestors)
+      .where(and(
+        eq(exitInvestors.id, id),
+        eq(exitInvestors.orgId, orgId)
+      ));
+    return investor || undefined;
+  }
+
+  async createExitInvestor(data: InsertExitInvestor & { orgId: string }): Promise<ExitInvestor> {
+    const [created] = await db.insert(exitInvestors)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateExitInvestor(id: string, data: UpdateExitInvestor, orgId: string): Promise<ExitInvestor | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(exitInvestors)
+      .set(updateData as any)
+      .where(and(
+        eq(exitInvestors.id, id),
+        eq(exitInvestors.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteExitInvestor(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(exitInvestors)
+      .where(and(
+        eq(exitInvestors.id, id),
+        eq(exitInvestors.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Cash Flows
+  async getExitCashFlows(exitScenarioId: string, orgId: string): Promise<ExitCashFlow[]> {
+    return await db.select()
+      .from(exitCashFlows)
+      .where(and(
+        eq(exitCashFlows.exitScenarioId, exitScenarioId),
+        eq(exitCashFlows.orgId, orgId)
+      ))
+      .orderBy(asc(exitCashFlows.period));
+  }
+
+  async createExitCashFlow(data: InsertExitCashFlow & { orgId: string }): Promise<ExitCashFlow> {
+    const [created] = await db.insert(exitCashFlows)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async deleteExitCashFlows(exitScenarioId: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(exitCashFlows)
+      .where(and(
+        eq(exitCashFlows.exitScenarioId, exitScenarioId),
+        eq(exitCashFlows.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Activities
+  async getExitActivities(exitScenarioId: string | null, modelingProjectId: string | null, orgId: string): Promise<ExitActivity[]> {
+    const conditions = [eq(exitActivities.orgId, orgId)];
+    
+    if (exitScenarioId) {
+      conditions.push(eq(exitActivities.exitScenarioId, exitScenarioId));
+    }
+    if (modelingProjectId) {
+      conditions.push(eq(exitActivities.modelingProjectId, modelingProjectId));
+    }
+    
+    return await db.select()
+      .from(exitActivities)
+      .where(and(...conditions))
+      .orderBy(desc(exitActivities.createdAt));
+  }
+
+  async createExitActivity(data: InsertExitActivity & { orgId: string }): Promise<ExitActivity> {
+    const [created] = await db.insert(exitActivities)
+      .values(data as any)
+      .returning();
+    return created;
   }
 }
 
