@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart } from 'lucide-react';
 import { Link } from 'wouter';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
@@ -147,6 +147,12 @@ export default function ModelingProjectsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/modeling/portfolio">
+            <Button variant="outline" data-testid="button-portfolio">
+              <PieChart className="h-4 w-4 mr-2" />
+              Portfolio
+            </Button>
+          </Link>
           <Link href="/modeling/settings">
             <Button variant="outline" data-testid="button-settings">
               <Settings className="h-4 w-4 mr-2" />
