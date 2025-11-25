@@ -79,14 +79,14 @@ export default function AnalyticsPanel({ systemStats, statsLoading }: AnalyticsP
       queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
       queryClient.invalidateQueries({ queryKey: ['/api/analytics'] });
       toast({
-        title: "Fetch completed",
+        title: "Update completed",
         description: data.message,
       });
     },
     onError: (error) => {
       toast({
-        title: "Fetch failed",
-        description: error instanceof Error ? error.message : "Failed to fetch articles",
+        title: "Update failed",
+        description: error instanceof Error ? error.message : "Failed to update articles",
         variant: "destructive",
       });
     },
@@ -261,7 +261,7 @@ export default function AnalyticsPanel({ systemStats, statsLoading }: AnalyticsP
             data-testid="button-force-update"
           >
             <i className="fas fa-sync-alt mr-2"></i>
-            {manualFetchMutation.isPending ? "Updating..." : "Force Update Now"}
+            {manualFetchMutation.isPending ? "Updating..." : "Update Now"}
           </Button>
           <Button 
             variant="outline"

@@ -590,7 +590,7 @@ export class DatabaseStorage implements IStorage {
         count: sql<number>`count(*)`
       })
       .from(articles)
-      .where(gte(articles.createdAt, sql`NOW() - INTERVAL '30 days'`))
+      .where(gte(articles.createdAt, sql`NOW() - INTERVAL '90 days'`))
       .groupBy(category)
       .orderBy(sql`count(*) desc`);
     
@@ -604,7 +604,7 @@ export class DatabaseStorage implements IStorage {
         count: sql<number>`count(*)`
       })
       .from(articles)
-      .where(gte(articles.createdAt, sql`NOW() - INTERVAL '30 days'`))
+      .where(gte(articles.createdAt, sql`NOW() - INTERVAL '90 days'`))
       .groupBy(articles.source)
       .orderBy(sql`count(*) desc`);
 

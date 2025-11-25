@@ -17,8 +17,8 @@ export function startDockTalkCronJobs(storage: IStorage): void {
     initializeDefaultRssSources().catch(console.error);
   });
   
-  // Schedule RSS fetching every 30 minutes (reduced from 5 to prevent server overload)
-  const cronSchedule = process.env.CRON_SCHEDULE || "*/30 * * * *";
+  // Schedule RSS fetching every 15 minutes for real-time updates
+  const cronSchedule = process.env.CRON_SCHEDULE || "*/15 * * * *";
   
   cron.schedule(cronSchedule, async () => {
     try {
