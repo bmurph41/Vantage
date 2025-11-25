@@ -39,6 +39,7 @@ export async function updateBookmarkStatus(id: number, isBookmarked: boolean): P
     headers: {
       "Content-Type": "application/json",
     },
+    credentials: "include",
     body: JSON.stringify({ isBookmarked }),
   });
   
@@ -156,6 +157,7 @@ export async function createRssSource(data: {
     headers: {
       "Content-Type": "application/json",
     },
+    credentials: "include",
     body: JSON.stringify(data),
   });
   
@@ -179,6 +181,7 @@ export async function updateRssSource(id: number, data: {
     headers: {
       "Content-Type": "application/json",
     },
+    credentials: "include",
     body: JSON.stringify(data),
   });
   
@@ -192,6 +195,7 @@ export async function updateRssSource(id: number, data: {
 export async function deleteRssSource(id: number): Promise<void> {
   const response = await fetch(`${API_BASE}/rss-sources/${id}`, {
     method: "DELETE",
+    credentials: "include",
   });
   
   if (!response.ok) {
@@ -205,6 +209,7 @@ export async function previewRssSource(url: string, sourceType: "rss" | "web_scr
     headers: {
       "Content-Type": "application/json",
     },
+    credentials: "include",
     body: JSON.stringify({ url, sourceType }),
   });
   
@@ -221,6 +226,7 @@ export async function updateArticleCategory(id: number, categories: string[]): P
     headers: {
       "Content-Type": "application/json",
     },
+    credentials: "include",
     body: JSON.stringify({ categories }),
   });
   
@@ -238,6 +244,7 @@ export async function updateArticleRegion(id: number, region: string | null): Pr
     headers: {
       "Content-Type": "application/json",
     },
+    credentials: "include",
     body: JSON.stringify({ region }),
   });
   
