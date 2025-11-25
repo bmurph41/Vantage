@@ -11158,6 +11158,175 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ==================== BENCHMARK COMPARISON ROUTES ====================
+
+  // Compare project metrics against sales comps benchmarks
+  app.get('/api/modeling/projects/:projectId/benchmarks', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { region, state, yearStart, yearEnd, priceMin, priceMax } = req.query;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { benchmarkComparisonService } = await import('./services/benchmark-comparison-service');
+      const benchmarks = await benchmarkComparisonService.compareToBenchmarks(projectId, orgId, {
+        region: region as string,
+        state: state as string,
+        yearRange: yearStart && yearEnd ? { 
+          start: parseInt(yearStart as string), 
+          end: parseInt(yearEnd as string) 
+        } : undefined,
+        priceRange: priceMin && priceMax ? { 
+          min: parseFloat(priceMin as string), 
+          max: parseFloat(priceMax as string) 
+        } : undefined
+      });
+
+      res.json(benchmarks);
+    } catch (error) {
+      console.error('Failed to get benchmark comparison:', error);
+      res.status(500).json({ error: 'Failed to get benchmark comparison' });
+    }
+  });
+
+  // Get portfolio risk metrics
+  app.get('/api/modeling/portfolio/risk-metrics', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      const { benchmarkComparisonService } = await import('./services/benchmark-comparison-service');
+      const riskMetrics = await benchmarkComparisonService.getPortfolioRiskMetrics(orgId);
+
+      res.json(riskMetrics);
+    } catch (error) {
+      console.error('Failed to get portfolio risk metrics:', error);
+      res.status(500).json({ error: 'Failed to get portfolio risk metrics' });
+    }
+  });
+
+  // ==================== MULTI-APPROVER WORKFLOW ROUTES ====================
+
+  // Create approval request for a scenario
+  app.post('/api/modeling/projects/:projectId/approval-requests', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { scenarioVersionId, title, description, requiredApprovers, quorumCount, deadline } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { multiApproverService } = await import('./services/multi-approver-service');
+      const requestId = await multiApproverService.createApprovalRequest(projectId, orgId, userId, {
+        scenarioVersionId,
+        title,
+        description,
+        requiredApprovers,
+        quorumCount: quorumCount || 1,
+        deadline: deadline ? new Date(deadline) : undefined
+      });
+
+      res.json({ id: requestId, message: 'Approval request created successfully' });
+    } catch (error) {
+      console.error('Failed to create approval request:', error);
+      res.status(500).json({ error: 'Failed to create approval request' });
+    }
+  });
+
+  // Get approval requests for a project
+  app.get('/api/modeling/projects/:projectId/approval-requests', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { multiApproverService } = await import('./services/multi-approver-service');
+      const requests = await multiApproverService.getProjectApprovalRequests(projectId, orgId);
+
+      res.json(requests);
+    } catch (error) {
+      console.error('Failed to get approval requests:', error);
+      res.status(500).json({ error: 'Failed to get approval requests' });
+    }
+  });
+
+  // Get pending approvals for current user
+  app.get('/api/modeling/pending-approvals', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      
+      const { multiApproverService } = await import('./services/multi-approver-service');
+      const pendingApprovals = await multiApproverService.getPendingApprovalsForUser(userId, orgId);
+
+      res.json(pendingApprovals);
+    } catch (error) {
+      console.error('Failed to get pending approvals:', error);
+      res.status(500).json({ error: 'Failed to get pending approvals' });
+    }
+  });
+
+  // Submit approval decision
+  app.post('/api/modeling/approval-requests/:requestId/decide', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { requestId } = req.params;
+      const { decision, comments } = req.body;
+      
+      if (!['approved', 'rejected'].includes(decision)) {
+        return res.status(400).json({ error: 'Decision must be "approved" or "rejected"' });
+      }
+
+      const { multiApproverService } = await import('./services/multi-approver-service');
+      const result = await multiApproverService.submitDecision(orgId, userId, {
+        approvalRequestId: requestId,
+        decision,
+        comments
+      });
+
+      res.json({ 
+        message: `Decision submitted: ${decision}`,
+        requestStatus: result.requestStatus,
+        isComplete: result.isComplete
+      });
+    } catch (error: any) {
+      console.error('Failed to submit decision:', error);
+      res.status(400).json({ error: error.message || 'Failed to submit decision' });
+    }
+  });
+
+  // Get single approval request details
+  app.get('/api/modeling/approval-requests/:requestId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { requestId } = req.params;
+      
+      const { multiApproverService } = await import('./services/multi-approver-service');
+      const request = await multiApproverService.getApprovalRequest(requestId, orgId);
+
+      if (!request) {
+        return res.status(404).json({ error: 'Approval request not found' });
+      }
+
+      res.json(request);
+    } catch (error) {
+      console.error('Failed to get approval request:', error);
+      res.status(500).json({ error: 'Failed to get approval request' });
+    }
+  });
+
   // Get modeling analytics and metrics
   app.get('/api/modeling/analytics', authenticateUser, async (req: any, res) => {
     try {

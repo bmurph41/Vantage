@@ -8903,6 +8903,57 @@ export const modelingAuditLog = pgTable('modeling_audit_log', {
   dateIdx: index('modeling_audit_date_idx').on(table.createdAt),
 }));
 
+// Modeling Multi-Approver Workflow - IC committee approvals with quorum requirements
+export const modelingApprovalRequests = pgTable('modeling_approval_requests', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  scenarioVersionId: varchar('scenario_version_id').notNull().references(() => modelingScenarioVersions.id),
+  
+  // Request details
+  title: text('title').notNull(),
+  description: text('description'),
+  requestedBy: varchar('requested_by').notNull().references(() => users.id),
+  requestedAt: timestamp('requested_at').defaultNow().notNull(),
+  
+  // Workflow configuration
+  requiredApprovers: jsonb('required_approvers').notNull(), // Array of user IDs required to approve
+  quorumCount: integer('quorum_count').notNull().default(1), // Minimum approvals needed
+  deadline: timestamp('deadline'),
+  
+  // Status tracking
+  status: text('status').notNull().default('pending'), // 'pending', 'approved', 'rejected', 'expired'
+  completedAt: timestamp('completed_at'),
+  
+  // Audit
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('approval_req_org_idx').on(table.orgId),
+  projectIdx: index('approval_req_project_idx').on(table.modelingProjectId),
+  scenarioIdx: index('approval_req_scenario_idx').on(table.scenarioVersionId),
+  statusIdx: index('approval_req_status_idx').on(table.status),
+}));
+
+// Individual approver decisions
+export const modelingApproverDecisions = pgTable('modeling_approver_decisions', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  approvalRequestId: varchar('approval_request_id').notNull().references(() => modelingApprovalRequests.id, { onDelete: 'cascade' }),
+  approverId: varchar('approver_id').notNull().references(() => users.id),
+  
+  // Decision
+  decision: text('decision').notNull(), // 'approved', 'rejected', 'pending'
+  comments: text('comments'),
+  decidedAt: timestamp('decided_at'),
+  
+  // Audit
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  requestIdx: index('approver_decision_request_idx').on(table.approvalRequestId),
+  approverIdx: index('approver_decision_approver_idx').on(table.approverId),
+  uniqueApproverRequest: unique('unique_approver_request').on(table.approvalRequestId, table.approverId),
+}));
+
 // Modeling Sensitivity Matrix - Store sensitivity analysis results with scenario versioning
 export const modelingSensitivityMatrices = pgTable('modeling_sensitivity_matrices', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -8991,6 +9042,18 @@ export const insertModelingSensitivityMatrixSchema = createInsertSchema(modeling
   updatedAt: true,
 });
 
+export const insertModelingApprovalRequestSchema = createInsertSchema(modelingApprovalRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  requestedAt: true,
+});
+
+export const insertModelingApproverDecisionSchema = createInsertSchema(modelingApproverDecisions).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Type exports for Operations → Modeling pipeline
 export type ModelingActuals = typeof modelingActuals.$inferSelect;
 export type InsertModelingActuals = z.infer<typeof insertModelingActualsSchema>;
@@ -9015,6 +9078,12 @@ export type InsertModelingAuditLog = z.infer<typeof insertModelingAuditLogSchema
 
 export type ModelingSensitivityMatrix = typeof modelingSensitivityMatrices.$inferSelect;
 export type InsertModelingSensitivityMatrix = z.infer<typeof insertModelingSensitivityMatrixSchema>;
+
+export type ModelingApprovalRequest = typeof modelingApprovalRequests.$inferSelect;
+export type InsertModelingApprovalRequest = z.infer<typeof insertModelingApprovalRequestSchema>;
+
+export type ModelingApproverDecision = typeof modelingApproverDecisions.$inferSelect;
+export type InsertModelingApproverDecision = z.infer<typeof insertModelingApproverDecisionSchema>;
 
 // ============================================================================
 // DockTalk 2.0 Schema Integration
