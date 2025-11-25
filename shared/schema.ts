@@ -1812,6 +1812,90 @@ export const pendingCompanies = pgTable("pending_companies", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Property Ownership History - Tracks all ownership changes/sales for properties
+export const propertyOwnershipHistory = pgTable("property_ownership_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  
+  // Core relationships
+  propertyId: varchar("property_id").notNull().references(() => crmProperties.id, { onDelete: 'cascade' }),
+  salesCompId: varchar("sales_comp_id").references(() => salesComps.id, { onDelete: 'set null' }),
+  
+  // Transaction details
+  transactionDate: date("transaction_date"),
+  salePrice: integer("sale_price"),
+  pricePerSlip: integer("price_per_slip"),
+  capRate: decimal("cap_rate", { precision: 5, scale: 2 }),
+  
+  // Buyer information
+  buyerCompanyId: varchar("buyer_company_id").references(() => crmCompanies.id, { onDelete: 'set null' }),
+  buyerContactId: varchar("buyer_contact_id").references(() => crmContacts.id, { onDelete: 'set null' }),
+  buyerName: text("buyer_name"), // Free-form for when not linked to CRM
+  
+  // Seller information
+  sellerCompanyId: varchar("seller_company_id").references(() => crmCompanies.id, { onDelete: 'set null' }),
+  sellerContactId: varchar("seller_contact_id").references(() => crmContacts.id, { onDelete: 'set null' }),
+  sellerName: text("seller_name"), // Free-form for when not linked to CRM
+  
+  // Transaction type and source
+  transactionType: text("transaction_type").default('sale'), // 'sale', 'acquisition', 'merger', 'foreclosure', 'transfer'
+  source: text("source").default('sales_comp'), // 'sales_comp', 'manual', 'import', 'public_records'
+  
+  // Additional metadata
+  notes: text("notes"),
+  metadata: jsonb("metadata").default({}), // Additional transaction details
+  
+  // Audit fields
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgPropertyIdx: index("ownership_history_org_property_idx").on(table.orgId, table.propertyId),
+  propertyDateIdx: index("ownership_history_property_date_idx").on(table.propertyId, table.transactionDate),
+  orgBuyerIdx: index("ownership_history_org_buyer_idx").on(table.orgId, table.buyerCompanyId),
+  orgSellerIdx: index("ownership_history_org_seller_idx").on(table.orgId, table.sellerCompanyId),
+  salesCompIdx: index("ownership_history_sales_comp_idx").on(table.salesCompId),
+}));
+
+// CRM Match Results - Stores fuzzy match results for pending items
+export const crmMatchResults = pgTable("crm_match_results", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  
+  // Source reference (which pending item this match belongs to)
+  pendingType: text("pending_type").notNull(), // 'property', 'contact', 'company'
+  pendingId: varchar("pending_id").notNull(), // ID in the respective pending table
+  
+  // Match target
+  matchEntityType: text("match_entity_type").notNull(), // 'property', 'contact', 'company'
+  matchEntityId: varchar("match_entity_id").notNull(), // ID in the CRM table
+  
+  // Match quality
+  confidenceScore: integer("confidence_score").notNull(), // 0-100
+  confidenceLevel: text("confidence_level").notNull(), // 'high', 'medium', 'low'
+  matchedFields: jsonb("matched_fields").default([]), // Array of field names that matched
+  fieldScores: jsonb("field_scores").default({}), // { fieldName: score } for each compared field
+  
+  // Match explanation
+  matchReason: text("match_reason"), // Human-readable explanation
+  
+  // DockTalk flags
+  isInPortfolio: boolean("is_in_portfolio").default(false), // Company is in DockTalk Portfolio
+  isOnWatchlist: boolean("is_on_watchlist").default(false), // Company is on DockTalk Watchlist
+  
+  // Action taken
+  resolution: text("resolution"), // 'accepted', 'rejected', 'merged', null if pending
+  resolvedBy: varchar("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgPendingIdx: index("crm_match_org_pending_idx").on(table.orgId, table.pendingType, table.pendingId),
+  pendingIdIdx: index("crm_match_pending_id_idx").on(table.pendingId),
+  matchEntityIdx: index("crm_match_entity_idx").on(table.matchEntityType, table.matchEntityId),
+  confidenceIdx: index("crm_match_confidence_idx").on(table.orgId, table.confidenceLevel),
+}));
+
 // Leads table (separate from contacts for better lead management)
 
 export const crmLeads = pgTable("crm_leads", {
@@ -3692,6 +3776,24 @@ export const insertPendingCompanySchema = createInsertSchema(pendingCompanies).o
 });
 export type InsertPendingCompany = z.infer<typeof insertPendingCompanySchema>;
 export type PendingCompany = typeof pendingCompanies.$inferSelect;
+
+// Property Ownership History schema
+export const insertPropertyOwnershipHistorySchema = createInsertSchema(propertyOwnershipHistory).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPropertyOwnershipHistory = z.infer<typeof insertPropertyOwnershipHistorySchema>;
+export type PropertyOwnershipHistory = typeof propertyOwnershipHistory.$inferSelect;
+
+// CRM Match Results schema
+export const insertCrmMatchResultSchema = createInsertSchema(crmMatchResults).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+});
+export type InsertCrmMatchResult = z.infer<typeof insertCrmMatchResultSchema>;
+export type CrmMatchResult = typeof crmMatchResults.$inferSelect;
 
 // CRM File schema
 export const insertCrmFileSchema = createInsertSchema(crmFiles).omit({
