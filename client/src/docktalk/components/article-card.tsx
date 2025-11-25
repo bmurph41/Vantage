@@ -1,12 +1,13 @@
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { updateBookmarkStatus } from "../lib/api";
+import { updateBookmarkStatus, toggleArticleLike, recordArticleView } from "../lib/api";
 import { Article } from "../types/article";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Bookmark, Share2, ExternalLink, TrendingUp, TrendingDown, Minus, DollarSign, MapPin, Globe } from "lucide-react";
+import { Bookmark, Share2, ExternalLink, TrendingUp, TrendingDown, Minus, DollarSign, MapPin, Globe, Heart } from "lucide-react";
 
 interface ArticleCardProps {
   article: Article;
@@ -29,13 +30,40 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string
   "Legal": { bg: "bg-pink-50 dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400", border: "border-l-pink-500" }
 };
 
+interface ExtendedArticle extends Article {
+  isLiked?: boolean;
+  likeCount?: number;
+  viewCount?: number;
+}
+
 export default function ArticleCard({ article, featured = false }: ArticleCardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const extArticle = article as ExtendedArticle;
+  const [isLiked, setIsLiked] = useState(extArticle.isLiked || false);
 
   // Get primary category for border color (first category or fall back to legacy category)
   const primaryCategory = (article.categories && article.categories[0]) || article.category || "General";
   const primaryCategoryStyle = CATEGORY_COLORS[primaryCategory] || CATEGORY_COLORS["General"];
+
+  const likeMutation = useMutation({
+    mutationFn: () => toggleArticleLike(article.id),
+    onMutate: async () => {
+      setIsLiked(!isLiked);
+    },
+    onSuccess: (data) => {
+      setIsLiked(data.liked);
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles/trending'] });
+    },
+    onError: () => {
+      setIsLiked(extArticle.isLiked || false);
+      toast({
+        title: "Error",
+        description: "Failed to update like status",
+        variant: "destructive",
+      });
+    },
+  });
 
   const bookmarkMutation = useMutation({
     mutationFn: ({ id, isBookmarked }: { id: number; isBookmarked: boolean }) =>
@@ -82,7 +110,14 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
     }
   };
 
+  const handleLike = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    likeMutation.mutate();
+  };
+
   const handleClick = () => {
+    // Record the view (fire and forget - don't block the click)
+    recordArticleView(article.id).catch(() => {});
     window.open(article.url, '_blank', 'noopener,noreferrer');
   };
 
@@ -281,6 +316,20 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLike}
+              disabled={likeMutation.isPending}
+              className={cn(
+                "h-8 w-8",
+                isLiked && "text-red-500 hover:text-red-600"
+              )}
+              data-testid={`button-like-${article.id}`}
+            >
+              <Heart className={cn("h-4 w-4", isLiked && "fill-current")} />
+            </Button>
+
             <Button
               variant="ghost"
               size="icon"

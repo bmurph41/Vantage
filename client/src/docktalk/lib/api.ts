@@ -339,3 +339,89 @@ export async function deleteArticle(id: number): Promise<void> {
     throw new Error(`Failed to delete article: ${errorMessage}`);
   }
 }
+
+// Global Engagement API (cross-organization trending)
+export interface TrendingArticle extends Article {
+  viewCount: number;
+  likeCount: number;
+  engagementScore: number;
+  isLiked: boolean;
+}
+
+export interface EngagementStats {
+  viewCount: number;
+  likeCount: number;
+  isLiked: boolean;
+}
+
+export async function recordArticleView(articleId: number, sessionId?: string, referrer?: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/articles/${articleId}/view`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ sessionId, referrer }),
+  });
+  
+  if (!response.ok) {
+    console.error("Failed to record article view");
+  }
+}
+
+export async function toggleArticleLike(articleId: number): Promise<{ liked: boolean }> {
+  const response = await fetch(`${API_BASE}/articles/${articleId}/like`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to toggle article like");
+  }
+  
+  return response.json();
+}
+
+export async function fetchArticleEngagement(articleId: number): Promise<EngagementStats> {
+  const response = await fetch(`${API_BASE}/articles/${articleId}/engagement`, {
+    credentials: "include",
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to fetch article engagement");
+  }
+  
+  return response.json();
+}
+
+export async function fetchTrendingArticles(limit: number = 10, hoursBack: number = 48): Promise<TrendingArticle[]> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    hoursBack: hoursBack.toString(),
+  });
+  
+  const response = await fetch(`${API_BASE}/articles/trending?${params}`, {
+    credentials: "include",
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to fetch trending articles");
+  }
+  
+  return response.json();
+}
+
+export async function fetchUserLikedArticles(): Promise<number[]> {
+  const response = await fetch(`${API_BASE}/user/likes`, {
+    credentials: "include",
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to fetch user likes");
+  }
+  
+  return response.json();
+}
