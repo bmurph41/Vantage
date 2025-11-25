@@ -50,10 +50,19 @@ Preferred communication style: Simple, everyday language.
     - **Operations Data Sync**: Institutional-grade pipeline for operational data (Rent Roll, Fuel Sales, Ship Store) to modeling projects.
     - **Exit Strategy Suite**: Integrated tools for exit analysis (Tax Calculator, Net Proceeds, 1031 Exchange, DST Analysis, Seller Financing, Earnout Modeling, Waterfall Analysis, IRR, Sensitivity Analysis, AI Insights).
     - **Document Intelligence**: AI-powered document parsing for P&L and Rent Roll with QuickBooks-style review workflow, hierarchical categorization, and confidence scoring.
-    - **Scenario Versioning**: Version history for Base/Aggressive/Conservative scenarios with audit trail, approval workflows (draft → pending → approved/rejected), and version comparison.
+    - **Scenario Versioning**: Version history for Base/Aggressive/Conservative scenarios with audit trail, approval workflows (draft → pending → approved/rejected), and version comparison. Scenario locking prevents edits to approved scenarios.
     - **QuickBooks Integration**: OAuth2 connection flow for QuickBooks Online, P&L sync to modeling actuals with automatic category mapping, encrypted token storage.
     - **Approval Notifications**: In-app notification system for scenario approval requests with SendGrid email integration, multi-approver support, and approval statistics.
     - **Portfolio Roll-ups**: Aggregate views across multiple modeling projects with portfolio summary (value, NOI, cap rates, IRR), breakdown by region/state/status/year, multi-year projections, and performance analysis.
+    - **Pro Forma Engine**: Real-time projections calculated from modeling actuals and scenario assumptions with historical P&L data binding.
+    - **Sensitivity Matrix Storage**: Persisted sensitivity analysis results with scenario versioning for cap rate and growth rate scenarios.
+    - **Benchmark Comparison**: Compares project metrics against sales comps database with portfolio risk metrics (concentration, vintage, geographic exposure).
+    - **Multi-Approver Workflows**: IC committee support with quorum requirements and parallel sign-offs for institutional approval processes.
+    - **Comment Threads**: Inline scenario discussions for IC feedback with mentions, resolution tracking, and full audit trail.
+    - **VDR Integration**: Auto-populates Virtual Data Room with modeling outputs (IC memos, pro formas, scenario comparisons) for deal closing.
+    - **Debt Sensitivity Analysis**: Interest rate scenarios across lender structures (bank, credit union, CMBS, bridge, SBA) with DSCR calculations.
+    - **Waterfall Customization**: Configurable LP/GP splits, hurdle rates, catch-up provisions with European/American waterfall support and IRR calculations.
+    - **External API**: Export-ready data feeds (JSON, CSV, XML) for downstream reporting systems with webhook payload generation.
 - **Marketing Module**: Tracks campaigns, expenses, lead attribution, and integrates with email platforms.
 - **Fuel Sales Module**: Manages fuel operations, transactions, inventory, and analytics, with portfolio management.
 - **Ship Store Module**: POS/inventory system with product catalog, transactions, analytics, and customer tracking, with portfolio management.
