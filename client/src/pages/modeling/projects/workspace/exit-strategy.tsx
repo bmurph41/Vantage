@@ -1,16 +1,20 @@
+import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Calculator, 
   TrendingUp, 
   Building2, 
   FileSpreadsheet,
-  ArrowRight,
-  Plus,
   DollarSign,
   Percent,
   BarChart3,
@@ -19,7 +23,8 @@ import {
   Landmark,
   HandCoins,
   Award,
-  ExternalLink
+  Link2,
+  Info
 } from "lucide-react";
 import type { ModelingProject, ExitScenario } from "@shared/schema";
 
@@ -27,94 +32,273 @@ interface WorkspaceExitStrategyProps {
   projectId: string;
 }
 
+type ScenarioType = 'base' | 'aggressive' | 'conservative';
+
+type ScenarioConfig = {
+  name: string;
+  description: string;
+  revenueGrowth: number;
+  expenseGrowth: number;
+  exitCapRate: number;
+};
+
+const defaultScenarios: Record<ScenarioType, ScenarioConfig> = {
+  base: {
+    name: 'Base Case',
+    description: 'Manual assumptions as entered',
+    revenueGrowth: 3,
+    expenseGrowth: 2,
+    exitCapRate: 7.5,
+  },
+  aggressive: {
+    name: 'Aggressive',
+    description: 'Higher growth, lower expenses, cap rate compression',
+    revenueGrowth: 5,
+    expenseGrowth: 1.5,
+    exitCapRate: 7.0,
+  },
+  conservative: {
+    name: 'Conservative',
+    description: 'Lower growth, higher expenses, cap rate expansion',
+    revenueGrowth: 2,
+    expenseGrowth: 3,
+    exitCapRate: 8.0,
+  },
+};
+
+const formatCurrency = (value: number | string): string => {
+  const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+  if (isNaN(num)) return '$0';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(num);
+};
+
+const parseCurrency = (value: string): string => {
+  const num = value.replace(/[^0-9.-]/g, '');
+  return num || '0';
+};
+
+const formatPercent = (value: number | string): string => {
+  const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+  if (isNaN(num)) return '0.00%';
+  return `${num.toFixed(2)}%`;
+};
+
+const parsePercent = (value: string): string => {
+  const num = value.replace(/[^0-9.-]/g, '');
+  return num || '0';
+};
+
+interface CurrencyInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  linked?: boolean;
+  onUnlink?: () => void;
+  "data-testid"?: string;
+  disabled?: boolean;
+}
+
+function CurrencyInput({ value, onChange, linked, onUnlink, "data-testid": testId, disabled }: CurrencyInputProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [displayValue, setDisplayValue] = useState(formatCurrency(value));
+
+  useEffect(() => {
+    if (!isFocused) {
+      setDisplayValue(formatCurrency(value));
+    }
+  }, [value, isFocused]);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setDisplayValue(value);
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const parsed = parseCurrency(displayValue);
+    onChange(parsed);
+    setDisplayValue(formatCurrency(parsed));
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isFocused) {
+      setDisplayValue(e.target.value);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <Input
+        type={isFocused ? "number" : "text"}
+        value={isFocused ? displayValue : formatCurrency(value)}
+        onChange={handleChange}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        data-testid={testId}
+        disabled={disabled}
+        className={linked ? "pr-10 border-blue-300 bg-blue-50/50" : ""}
+      />
+      {linked && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button 
+                onClick={onUnlink}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-blue-100 rounded"
+                type="button"
+              >
+                <Link2 className="h-4 w-4 text-blue-500" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Linked to project data. Click to unlink and edit manually.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+  );
+}
+
+interface PercentInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  "data-testid"?: string;
+}
+
+function PercentInput({ value, onChange, "data-testid": testId }: PercentInputProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [displayValue, setDisplayValue] = useState(formatPercent(value));
+
+  useEffect(() => {
+    if (!isFocused) {
+      setDisplayValue(formatPercent(value));
+    }
+  }, [value, isFocused]);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setDisplayValue(value);
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const parsed = parsePercent(displayValue);
+    onChange(parsed);
+    setDisplayValue(formatPercent(parsed));
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isFocused) {
+      setDisplayValue(e.target.value);
+    }
+  };
+
+  return (
+    <Input
+      type={isFocused ? "number" : "text"}
+      value={isFocused ? displayValue : formatPercent(value)}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      step="0.01"
+      data-testid={testId}
+    />
+  );
+}
+
 const exitTools = [
   { 
     id: "tax", 
     name: "Tax Calculator", 
+    shortName: "Tax",
     description: "Capital gains & depreciation recapture analysis", 
     icon: Calculator,
-    path: "/tax",
     color: "text-red-500",
     bgColor: "bg-red-50"
   },
   { 
     id: "net-proceeds", 
     name: "Net Proceeds", 
+    shortName: "Proceeds",
     description: "Cash-on-cash analysis at exit", 
     icon: DollarSign,
-    path: "/net-proceeds",
     color: "text-green-500",
     bgColor: "bg-green-50"
   },
   { 
     id: "1031", 
     name: "1031 Exchange", 
+    shortName: "1031",
     description: "Like-kind exchange planning", 
     icon: RefreshCcw,
-    path: "/1031",
     color: "text-blue-500",
     bgColor: "bg-blue-50"
   },
   { 
     id: "dst", 
     name: "DST Analysis", 
+    shortName: "DST",
     description: "Delaware Statutory Trust modeling", 
     icon: Landmark,
-    path: "/dst",
     color: "text-purple-500",
     bgColor: "bg-purple-50"
   },
   { 
     id: "seller-financing", 
     name: "Seller Financing", 
+    shortName: "Seller Fin.",
     description: "Installment sale modeling", 
     icon: HandCoins,
-    path: "/seller-financing",
     color: "text-amber-500",
     bgColor: "bg-amber-50"
   },
   { 
     id: "earnout", 
-    name: "Earnout Modeling", 
+    name: "Earnout", 
+    shortName: "Earnout",
     description: "Contingent payment structures", 
     icon: Award,
-    path: "/earnout",
     color: "text-indigo-500",
     bgColor: "bg-indigo-50"
   },
   { 
     id: "waterfall", 
-    name: "Waterfall Analysis", 
+    name: "Waterfall", 
+    shortName: "Waterfall",
     description: "Fund distribution modeling", 
     icon: BarChart3,
-    path: "/waterfall",
     color: "text-cyan-500",
     bgColor: "bg-cyan-50"
   },
   { 
     id: "irr", 
     name: "IRR Calculator", 
+    shortName: "IRR",
     description: "Multi-period return analysis", 
     icon: Percent,
-    path: "/irr",
     color: "text-emerald-500",
     bgColor: "bg-emerald-50"
   },
   { 
     id: "sensitivity", 
-    name: "Sensitivity Analysis", 
+    name: "Sensitivity", 
+    shortName: "Sensitivity",
     description: "What-if scenario explorer", 
     icon: TrendingUp,
-    path: "/sensitivity",
     color: "text-orange-500",
     bgColor: "bg-orange-50"
   },
   { 
     id: "ai-insights", 
     name: "AI Insights", 
+    shortName: "AI",
     description: "AI-powered exit recommendations", 
     icon: Brain,
-    path: "/ai-insights",
     color: "text-pink-500",
     bgColor: "bg-pink-50"
   },
@@ -122,17 +306,32 @@ const exitTools = [
 
 export default function WorkspaceExitStrategy({ projectId }: WorkspaceExitStrategyProps) {
   const [, navigate] = useLocation();
+  const [activeTab, setActiveTab] = useState("tax");
+  const [activeScenario, setActiveScenario] = useState<ScenarioType>('base');
+  const [scenarios, setScenarios] = useState(defaultScenarios);
   
   const { data: project, isLoading: projectLoading } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
   });
 
-  const { data: scenarios = [], isLoading: scenariosLoading } = useQuery<ExitScenario[]>({
-    queryKey: ['/api/modeling/projects', projectId, 'exit', 'scenarios'],
-    enabled: !!projectId,
+  const { data: config } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 
-  const basePath = `/modeling/projects/${projectId}/exit`;
+  const { data: proForma } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId, 'pro-forma'],
+  });
+
+  const holdPeriod = config?.holdPeriod || 5;
+  const purchasePrice = Number(project?.purchasePrice) || 0;
+  
+  const currentScenario = scenarios[activeScenario];
+  const exitCapRate = currentScenario.exitCapRate;
+  
+  const year1NOI = proForma?.year1NOI || (Number(project?.ebitda) || 680000);
+  const netGrowthRate = (currentScenario.revenueGrowth - currentScenario.expenseGrowth) / 100;
+  const exitNOI = year1NOI * Math.pow(1 + netGrowthRate, holdPeriod);
+  const calculatedSalePrice = exitNOI / (exitCapRate / 100);
 
   if (projectLoading) {
     return (
@@ -150,34 +349,75 @@ export default function WorkspaceExitStrategy({ projectId }: WorkspaceExitStrate
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-xl font-semibold" data-testid="exit-strategy-title">Exit Strategy Suite</h2>
           <p className="text-sm text-muted-foreground">
-            Institutional-grade exit analysis tools for {project?.marinaName}
+            Institutional-grade exit analysis for {project?.marinaName}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(basePath)}
-            data-testid="button-full-exit-suite"
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            Full Suite View
-          </Button>
-          <Button 
-            onClick={() => navigate(`${basePath}/scenarios`)}
-            data-testid="button-manage-exit-scenarios"
-          >
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Manage Scenarios
-          </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium">Scenario:</Label>
+            <Select value={activeScenario} onValueChange={(v: ScenarioType) => setActiveScenario(v)}>
+              <SelectTrigger className="w-44" data-testid="select-exit-scenario">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="base">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-blue-500" />
+                    Base Case
+                  </div>
+                </SelectItem>
+                <SelectItem value="aggressive">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-green-500" />
+                    Aggressive
+                  </div>
+                </SelectItem>
+                <SelectItem value="conservative">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-amber-500" />
+                    Conservative
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <Card className="bg-blue-50/50 border-blue-200">
+        <CardContent className="py-4">
+          <div className="flex items-start gap-3">
+            <Link2 className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-blue-800 font-medium">Project-Linked Mode</p>
+              <p className="text-sm text-blue-700">
+                Sale price is calculated from your {currentScenario.name} scenario: Exit NOI ({formatCurrency(exitNOI)}) ÷ Exit Cap Rate ({exitCapRate}%). 
+                Values update when you change scenarios. Click the link icon on any field to manually override.
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-blue-700">Net Growth:</span>
+                <Badge variant="outline" className="bg-white">{(currentScenario.revenueGrowth - currentScenario.expenseGrowth).toFixed(1)}%/yr</Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-blue-700">Exit NOI:</span>
+                <Badge variant="outline" className="bg-white font-mono">{formatCurrency(exitNOI)}</Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-blue-700">Sale Price:</span>
+                <Badge variant="outline" className="bg-white font-mono">{formatCurrency(calculatedSalePrice)}</Badge>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2">
@@ -185,41 +425,9 @@ export default function WorkspaceExitStrategy({ projectId }: WorkspaceExitStrate
                 <Building2 className="h-4 w-4 text-blue-500" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Property Value</p>
-                <p className="text-lg font-bold" data-testid="text-exit-property-value">
-                  ${(Number(project?.purchasePrice) || 0).toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-green-50 rounded-lg">
-                <FileSpreadsheet className="h-4 w-4 text-green-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Exit Scenarios</p>
-                <p className="text-lg font-bold" data-testid="text-exit-scenario-count">
-                  {scenarios.length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-purple-50 rounded-lg">
-                <Percent className="h-4 w-4 text-purple-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Cap Rate</p>
-                <p className="text-lg font-bold" data-testid="text-exit-cap-rate">
-                  {project?.year1CapRate ? `${project.year1CapRate}%` : 'N/A'}
+                <p className="text-xs text-muted-foreground">Purchase Price</p>
+                <p className="text-lg font-bold" data-testid="text-exit-purchase-price">
+                  {formatCurrency(purchasePrice)}
                 </p>
               </div>
             </div>
@@ -233,9 +441,57 @@ export default function WorkspaceExitStrategy({ projectId }: WorkspaceExitStrate
                 <TrendingUp className="h-4 w-4 text-amber-500" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">EBITDA</p>
-                <p className="text-lg font-bold" data-testid="text-exit-ebitda">
-                  ${(Number(project?.ebitda) || 0).toLocaleString()}
+                <p className="text-xs text-muted-foreground">Exit NOI (Yr {holdPeriod})</p>
+                <p className="text-lg font-bold" data-testid="text-exit-noi">
+                  {formatCurrency(exitNOI)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-purple-50 rounded-lg">
+                <Percent className="h-4 w-4 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Exit Cap Rate</p>
+                <p className="text-lg font-bold" data-testid="text-exit-cap-rate">
+                  {exitCapRate}%
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-green-50 rounded-lg">
+                <DollarSign className="h-4 w-4 text-green-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Sale Price ({currentScenario.name})</p>
+                <p className="text-lg font-bold text-green-600" data-testid="text-exit-sale-price">
+                  {formatCurrency(calculatedSalePrice)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-cyan-50 rounded-lg">
+                <FileSpreadsheet className="h-4 w-4 text-cyan-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Hold Period</p>
+                <p className="text-lg font-bold" data-testid="text-exit-hold-period">
+                  {holdPeriod} years
                 </p>
               </div>
             </div>
@@ -243,148 +499,1221 @@ export default function WorkspaceExitStrategy({ projectId }: WorkspaceExitStrate
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Exit Analysis Tools</CardTitle>
-              <CardDescription>
-                Professional-grade tools for comprehensive exit planning
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {exitTools.map((tool) => (
-                  <button
-                    key={tool.id}
-                    onClick={() => navigate(`${basePath}${tool.path}`)}
-                    className="flex items-start gap-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors text-left group"
-                    data-testid={`button-exit-tool-${tool.id}`}
-                  >
-                    <div className={`p-2 rounded-lg ${tool.bgColor}`}>
-                      <tool.icon className={`h-4 w-4 ${tool.color}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm group-hover:text-primary transition-colors">
-                        {tool.name}
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {tool.description}
-                      </p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors mt-1" />
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
+          {exitTools.map((tool) => (
+            <TabsTrigger 
+              key={tool.id} 
+              value={tool.id}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              data-testid={`tab-exit-${tool.id}`}
+            >
+              <tool.icon className={`h-3.5 w-3.5 ${activeTab === tool.id ? tool.color : ''}`} />
+              <span className="hidden sm:inline">{tool.shortName}</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base">Recent Scenarios</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => navigate(`${basePath}/scenarios`)}
-                data-testid="button-view-all-scenarios"
-              >
-                View All
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {scenariosLoading ? (
-                <div className="space-y-3">
-                  {[...Array(3)].map((_, i) => (
-                    <Skeleton key={i} className="h-14" />
-                  ))}
-                </div>
-              ) : scenarios.length === 0 ? (
-                <div className="text-center py-6">
-                  <FileSpreadsheet className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-                  <p className="text-sm text-muted-foreground mb-4">
-                    No exit scenarios yet
-                  </p>
-                  <Button 
-                    size="sm"
-                    onClick={() => navigate(`${basePath}/scenarios`)}
-                    data-testid="button-create-exit-scenario"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Scenario
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {scenarios.slice(0, 4).map((scenario) => (
-                    <button
-                      key={scenario.id}
-                      onClick={() => navigate(`${basePath}/scenarios/${scenario.id}`)}
-                      className="w-full flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors text-left"
-                      data-testid={`button-exit-scenario-${scenario.id}`}
-                    >
-                      <div>
-                        <p className="font-medium text-sm">{scenario.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Exit Year: {scenario.exitYear || 'TBD'}
-                        </p>
-                      </div>
-                      <Badge variant={scenario.status === 'active' ? 'default' : 'secondary'} className="text-xs">
-                        {scenario.status}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="tax" className="mt-6">
+          <TaxCalculatorPanel 
+            salePrice={calculatedSalePrice.toString()}
+            costBasis={purchasePrice.toString()}
+            holdPeriod={holdPeriod.toString()}
+          />
+        </TabsContent>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button 
-                variant="outline" 
-                className="w-full justify-start text-sm"
-                onClick={() => navigate(`${basePath}/scenarios`)}
-                data-testid="button-quick-new-scenario"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                New Exit Scenario
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start text-sm"
-                onClick={() => navigate(`${basePath}/ai-insights`)}
-                data-testid="button-quick-ai-analysis"
-              >
-                <Brain className="h-4 w-4 mr-2" />
-                Run AI Analysis
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start text-sm"
-                onClick={() => navigate(`${basePath}/sensitivity`)}
-                data-testid="button-quick-sensitivity"
-              >
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Sensitivity Analysis
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start text-sm"
-                onClick={() => navigate(`${basePath}/irr`)}
-                data-testid="button-quick-irr"
-              >
-                <Percent className="h-4 w-4 mr-2" />
-                IRR Calculator
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        <TabsContent value="net-proceeds" className="mt-6">
+          <NetProceedsPanel salePrice={calculatedSalePrice.toString()} />
+        </TabsContent>
+
+        <TabsContent value="1031" className="mt-6">
+          <Exchange1031Panel salePrice={calculatedSalePrice.toString()} />
+        </TabsContent>
+
+        <TabsContent value="dst" className="mt-6">
+          <DSTAnalysisPanel 
+            salePrice={calculatedSalePrice.toString()} 
+            holdPeriod={holdPeriod.toString()} 
+          />
+        </TabsContent>
+
+        <TabsContent value="seller-financing" className="mt-6">
+          <SellerFinancingPanel salePrice={calculatedSalePrice.toString()} />
+        </TabsContent>
+
+        <TabsContent value="earnout" className="mt-6">
+          <EarnoutPanel salePrice={calculatedSalePrice.toString()} />
+        </TabsContent>
+
+        <TabsContent value="waterfall" className="mt-6">
+          <WaterfallPanel salePrice={calculatedSalePrice.toString()} />
+        </TabsContent>
+
+        <TabsContent value="irr" className="mt-6">
+          <IRRCalculatorPanel 
+            initialInvestment={purchasePrice.toString()}
+            exitValue={calculatedSalePrice.toString()}
+            holdPeriod={holdPeriod}
+          />
+        </TabsContent>
+
+        <TabsContent value="sensitivity" className="mt-6">
+          <SensitivityPanel 
+            baseNOI={exitNOI.toString()} 
+            baseCapRate={exitCapRate.toString()} 
+          />
+        </TabsContent>
+
+        <TabsContent value="ai-insights" className="mt-6">
+          <AIInsightsPanel 
+            projectId={projectId}
+            salePrice={calculatedSalePrice}
+            purchasePrice={purchasePrice}
+            holdPeriod={holdPeriod}
+            scenario={currentScenario.name}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+}
+
+interface TaxCalculatorPanelProps {
+  salePrice: string;
+  costBasis: string;
+  holdPeriod: string;
+}
+
+function TaxCalculatorPanel({ salePrice: initialSalePrice, costBasis: initialCostBasis, holdPeriod: initialHoldPeriod }: TaxCalculatorPanelProps) {
+  const [salePriceLinked, setSalePriceLinked] = useState(true);
+  const [costBasisLinked, setCostBasisLinked] = useState(true);
+  const [holdPeriodLinked, setHoldPeriodLinked] = useState(true);
+  
+  const [salePrice, setSalePrice] = useState<string>(initialSalePrice);
+  const [costBasis, setCostBasis] = useState<string>(initialCostBasis);
+  const [holdingPeriod, setHoldingPeriod] = useState<string>(initialHoldPeriod);
+  const [depreciationRecapture, setDepreciationRecapture] = useState<string>("500000");
+  const [taxRate, setTaxRate] = useState<string>("20");
+  const [stateRate, setStateRate] = useState<string>("5");
+
+  useEffect(() => {
+    if (salePriceLinked) setSalePrice(initialSalePrice);
+  }, [initialSalePrice, salePriceLinked]);
+
+  useEffect(() => {
+    if (costBasisLinked) setCostBasis(initialCostBasis);
+  }, [initialCostBasis, costBasisLinked]);
+
+  useEffect(() => {
+    if (holdPeriodLinked) setHoldingPeriod(initialHoldPeriod);
+  }, [initialHoldPeriod, holdPeriodLinked]);
+
+  const calculateTax = () => {
+    const sale = parseFloat(salePrice) || 0;
+    const basis = parseFloat(costBasis) || 0;
+    const depreciation = parseFloat(depreciationRecapture) || 0;
+    const fedRate = parseFloat(taxRate) / 100 || 0.20;
+    const stRate = parseFloat(stateRate) / 100 || 0.05;
+    
+    const capitalGain = sale - basis;
+    const federalTax = capitalGain * fedRate;
+    const stateTax = capitalGain * stRate;
+    const depTax = depreciation * 0.25;
+    const niit = capitalGain > 250000 ? capitalGain * 0.038 : 0;
+    const totalTax = federalTax + stateTax + depTax + niit;
+    const netProceeds = sale - totalTax;
+    
+    return { capitalGain, federalTax, stateTax, depTax, niit, totalTax, netProceeds };
+  };
+
+  const results = calculateTax();
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calculator className="h-5 w-5 text-red-500" />
+            Tax Calculator
+          </CardTitle>
+          <CardDescription>
+            Calculate capital gains, depreciation recapture, and state taxes
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="flex items-center gap-1">
+                Sale Price
+                {salePriceLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <CurrencyInput 
+                value={salePrice} 
+                onChange={(v) => { setSalePrice(v); setSalePriceLinked(false); }}
+                linked={salePriceLinked}
+                onUnlink={() => setSalePriceLinked(false)}
+                data-testid="input-sale-price"
+              />
+            </div>
+            <div>
+              <Label className="flex items-center gap-1">
+                Cost Basis
+                {costBasisLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <CurrencyInput 
+                value={costBasis} 
+                onChange={(v) => { setCostBasis(v); setCostBasisLinked(false); }}
+                linked={costBasisLinked}
+                onUnlink={() => setCostBasisLinked(false)}
+                data-testid="input-cost-basis"
+              />
+            </div>
+            <div>
+              <Label>Depreciation Recapture</Label>
+              <CurrencyInput 
+                value={depreciationRecapture} 
+                onChange={setDepreciationRecapture}
+                data-testid="input-depreciation"
+              />
+            </div>
+            <div>
+              <Label className="flex items-center gap-1">
+                Holding Period (Years)
+                {holdPeriodLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <div className="relative">
+                <Input 
+                  type="number" 
+                  value={holdingPeriod} 
+                  onChange={(e) => { setHoldingPeriod(e.target.value); setHoldPeriodLinked(false); }}
+                  data-testid="input-holding-period"
+                  className={holdPeriodLinked ? "pr-10 border-blue-300 bg-blue-50/50" : ""}
+                />
+                {holdPeriodLinked && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button 
+                          onClick={() => setHoldPeriodLinked(false)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-blue-100 rounded"
+                          type="button"
+                        >
+                          <Link2 className="h-4 w-4 text-blue-500" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Linked to project data. Click to unlink and edit manually.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+            </div>
+            <div>
+              <Label>Federal Cap Gains Rate</Label>
+              <PercentInput 
+                value={taxRate} 
+                onChange={setTaxRate}
+                data-testid="input-fed-rate"
+              />
+            </div>
+            <div>
+              <Label>State Tax Rate</Label>
+              <PercentInput 
+                value={stateRate} 
+                onChange={setStateRate}
+                data-testid="input-state-rate"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tax Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Capital Gain</span>
+              <span className="font-semibold" data-testid="text-capital-gain">{formatCurrency(results.capitalGain)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Federal Tax</span>
+              <span className="text-red-600" data-testid="text-federal-tax">-{formatCurrency(results.federalTax)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">State Tax</span>
+              <span className="text-red-600" data-testid="text-state-tax">-{formatCurrency(results.stateTax)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Depreciation Recapture (25%)</span>
+              <span className="text-red-600" data-testid="text-dep-recapture">-{formatCurrency(results.depTax)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">NIIT (3.8%)</span>
+              <span className="text-red-600" data-testid="text-niit">-{formatCurrency(results.niit)}</span>
+            </div>
+            <div className="flex justify-between py-3 bg-muted/50 rounded-lg px-3">
+              <span className="font-semibold">Total Tax Liability</span>
+              <span className="font-bold text-red-600" data-testid="text-total-tax">{formatCurrency(results.totalTax)}</span>
+            </div>
+            <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
+              <span className="font-semibold">Net Proceeds After Tax</span>
+              <span className="font-bold text-green-600" data-testid="text-net-proceeds">{formatCurrency(results.netProceeds)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface NetProceedsPanelProps {
+  salePrice: string;
+}
+
+function NetProceedsPanel({ salePrice: initialSalePrice }: NetProceedsPanelProps) {
+  const [salePriceLinked, setSalePriceLinked] = useState(true);
+  const [salePrice, setSalePrice] = useState<string>(initialSalePrice);
+  const [loanBalance, setLoanBalance] = useState<string>("2500000");
+  const [closingCosts, setClosingCosts] = useState<string>("150000");
+  const [brokerFee, setBrokerFee] = useState<string>("5");
+  const [taxes, setTaxes] = useState<string>("300000");
+
+  useEffect(() => {
+    if (salePriceLinked) setSalePrice(initialSalePrice);
+  }, [initialSalePrice, salePriceLinked]);
+
+  const calculate = () => {
+    const sale = parseFloat(salePrice) || 0;
+    const loan = parseFloat(loanBalance) || 0;
+    const closing = parseFloat(closingCosts) || 0;
+    const brokerPct = parseFloat(brokerFee) / 100 || 0;
+    const tax = parseFloat(taxes) || 0;
+    
+    const brokerCost = sale * brokerPct;
+    const totalDeductions = loan + closing + brokerCost + tax;
+    const netProceeds = sale - totalDeductions;
+    
+    return { brokerCost, totalDeductions, netProceeds };
+  };
+
+  const results = calculate();
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-green-500" />
+            Net Proceeds Calculator
+          </CardTitle>
+          <CardDescription>
+            Calculate cash proceeds after all deductions
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="flex items-center gap-1">
+                Sale Price
+                {salePriceLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <CurrencyInput 
+                value={salePrice} 
+                onChange={(v) => { setSalePrice(v); setSalePriceLinked(false); }}
+                linked={salePriceLinked}
+                onUnlink={() => setSalePriceLinked(false)}
+              />
+            </div>
+            <div>
+              <Label>Loan Balance</Label>
+              <CurrencyInput value={loanBalance} onChange={setLoanBalance} />
+            </div>
+            <div>
+              <Label>Closing Costs</Label>
+              <CurrencyInput value={closingCosts} onChange={setClosingCosts} />
+            </div>
+            <div>
+              <Label>Broker Fee</Label>
+              <PercentInput value={brokerFee} onChange={setBrokerFee} />
+            </div>
+            <div className="col-span-2">
+              <Label>Estimated Taxes</Label>
+              <CurrencyInput value={taxes} onChange={setTaxes} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Proceeds Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Gross Sale Price</span>
+              <span className="font-semibold">{formatCurrency(salePrice)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Loan Payoff</span>
+              <span className="text-red-600">-{formatCurrency(loanBalance)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Broker Commission</span>
+              <span className="text-red-600">-{formatCurrency(results.brokerCost)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Closing Costs</span>
+              <span className="text-red-600">-{formatCurrency(closingCosts)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Taxes</span>
+              <span className="text-red-600">-{formatCurrency(taxes)}</span>
+            </div>
+            <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
+              <span className="font-semibold">Net Cash Proceeds</span>
+              <span className="font-bold text-green-600">{formatCurrency(results.netProceeds)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface Exchange1031PanelProps {
+  salePrice: string;
+}
+
+function Exchange1031Panel({ salePrice: initialSalePrice }: Exchange1031PanelProps) {
+  const [salePriceLinked, setSalePriceLinked] = useState(true);
+  const [relinquishedValue, setRelinquishedValue] = useState<string>(initialSalePrice);
+  const [replacementValue, setReplacementValue] = useState<string>((parseFloat(initialSalePrice) * 1.2).toString());
+  const [bootReceived, setBootReceived] = useState<string>("0");
+  const [identificationDays] = useState<string>("45");
+  const [closingDays] = useState<string>("180");
+
+  useEffect(() => {
+    if (salePriceLinked) {
+      setRelinquishedValue(initialSalePrice);
+      setReplacementValue((parseFloat(initialSalePrice) * 1.2).toString());
+    }
+  }, [initialSalePrice, salePriceLinked]);
+
+  const deferredGain = Math.min(parseFloat(relinquishedValue) || 0, parseFloat(replacementValue) || 0);
+  const taxableGain = parseFloat(bootReceived) || 0;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCcw className="h-5 w-5 text-blue-500" />
+            1031 Exchange Planner
+          </CardTitle>
+          <CardDescription>
+            Plan your like-kind exchange and track deadlines
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="flex items-center gap-1">
+                Relinquished Property Value
+                {salePriceLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <CurrencyInput 
+                value={relinquishedValue} 
+                onChange={(v) => { setRelinquishedValue(v); setSalePriceLinked(false); }}
+                linked={salePriceLinked}
+                onUnlink={() => setSalePriceLinked(false)}
+              />
+            </div>
+            <div>
+              <Label>Replacement Property Value</Label>
+              <CurrencyInput value={replacementValue} onChange={setReplacementValue} />
+            </div>
+            <div>
+              <Label>Boot Received</Label>
+              <CurrencyInput value={bootReceived} onChange={setBootReceived} />
+            </div>
+            <div>
+              <Label>Identification Period</Label>
+              <Input type="text" value={`${identificationDays} days`} disabled />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Exchange Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Deferred Gain</span>
+              <span className="font-semibold text-green-600">{formatCurrency(deferredGain)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Taxable Boot</span>
+              <span className="text-red-600">{formatCurrency(taxableGain)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">ID Deadline</span>
+              <span>{identificationDays} days</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Closing Deadline</span>
+              <span>{closingDays} days</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface DSTAnalysisPanelProps {
+  salePrice: string;
+  holdPeriod: string;
+}
+
+function DSTAnalysisPanel({ salePrice: initialSalePrice, holdPeriod: initialHoldPeriod }: DSTAnalysisPanelProps) {
+  const [investmentLinked, setInvestmentLinked] = useState(true);
+  const [holdPeriodLinked, setHoldPeriodLinked] = useState(true);
+  
+  const [investmentAmount, setInvestmentAmount] = useState<string>(initialSalePrice);
+  const [distributionRate, setDistributionRate] = useState<string>("5.5");
+  const [holdPeriod, setHoldPeriod] = useState<string>(initialHoldPeriod);
+
+  useEffect(() => {
+    if (investmentLinked) setInvestmentAmount(initialSalePrice);
+  }, [initialSalePrice, investmentLinked]);
+
+  useEffect(() => {
+    if (holdPeriodLinked) setHoldPeriod(initialHoldPeriod);
+  }, [initialHoldPeriod, holdPeriodLinked]);
+
+  const annualDistribution = (parseFloat(investmentAmount) || 0) * (parseFloat(distributionRate) / 100 || 0);
+  const totalDistributions = annualDistribution * (parseFloat(holdPeriod) || 0);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Landmark className="h-5 w-5 text-purple-500" />
+            DST Analysis
+          </CardTitle>
+          <CardDescription>
+            Delaware Statutory Trust investment modeling
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="flex items-center gap-1">
+                Investment Amount
+                {investmentLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <CurrencyInput 
+                value={investmentAmount} 
+                onChange={(v) => { setInvestmentAmount(v); setInvestmentLinked(false); }}
+                linked={investmentLinked}
+                onUnlink={() => setInvestmentLinked(false)}
+              />
+            </div>
+            <div>
+              <Label>Distribution Rate</Label>
+              <PercentInput value={distributionRate} onChange={setDistributionRate} />
+            </div>
+            <div>
+              <Label className="flex items-center gap-1">
+                Hold Period (Years)
+                {holdPeriodLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <div className="relative">
+                <Input 
+                  type="number" 
+                  value={holdPeriod} 
+                  onChange={(e) => { setHoldPeriod(e.target.value); setHoldPeriodLinked(false); }}
+                  className={holdPeriodLinked ? "pr-10 border-blue-300 bg-blue-50/50" : ""}
+                />
+                {holdPeriodLinked && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button 
+                          onClick={() => setHoldPeriodLinked(false)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-blue-100 rounded"
+                          type="button"
+                        >
+                          <Link2 className="h-4 w-4 text-blue-500" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Linked to project data. Click to unlink.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>DST Returns</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Annual Distribution</span>
+              <span className="font-semibold text-green-600">{formatCurrency(annualDistribution)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Total Distributions</span>
+              <span className="font-semibold">{formatCurrency(totalDistributions)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface SellerFinancingPanelProps {
+  salePrice: string;
+}
+
+function SellerFinancingPanel({ salePrice: initialSalePrice }: SellerFinancingPanelProps) {
+  const [salePriceLinked, setSalePriceLinked] = useState(true);
+  const [salePrice, setSalePrice] = useState<string>(initialSalePrice);
+  const [downPayment, setDownPayment] = useState<string>((parseFloat(initialSalePrice) * 0.2).toString());
+  const [interestRate, setInterestRate] = useState<string>("6");
+  const [term, setTerm] = useState<string>("10");
+
+  useEffect(() => {
+    if (salePriceLinked) {
+      setSalePrice(initialSalePrice);
+      setDownPayment((parseFloat(initialSalePrice) * 0.2).toString());
+    }
+  }, [initialSalePrice, salePriceLinked]);
+
+  const loanAmount = (parseFloat(salePrice) || 0) - (parseFloat(downPayment) || 0);
+  const monthlyRate = (parseFloat(interestRate) / 100 || 0) / 12;
+  const months = (parseFloat(term) || 0) * 12;
+  const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1) || 0;
+  const totalInterest = (monthlyPayment * months) - loanAmount;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HandCoins className="h-5 w-5 text-amber-500" />
+            Seller Financing
+          </CardTitle>
+          <CardDescription>
+            Installment sale with amortization
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="flex items-center gap-1">
+                Sale Price
+                {salePriceLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <CurrencyInput 
+                value={salePrice} 
+                onChange={(v) => { setSalePrice(v); setSalePriceLinked(false); }}
+                linked={salePriceLinked}
+                onUnlink={() => setSalePriceLinked(false)}
+              />
+            </div>
+            <div>
+              <Label>Down Payment</Label>
+              <CurrencyInput value={downPayment} onChange={setDownPayment} />
+            </div>
+            <div>
+              <Label>Interest Rate</Label>
+              <PercentInput value={interestRate} onChange={setInterestRate} />
+            </div>
+            <div>
+              <Label>Term (Years)</Label>
+              <Input type="number" value={term} onChange={(e) => setTerm(e.target.value)} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Financing Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Loan Amount</span>
+              <span className="font-semibold">{formatCurrency(loanAmount)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Monthly Payment</span>
+              <span className="font-semibold text-green-600">{formatCurrency(monthlyPayment)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Total Interest</span>
+              <span>{formatCurrency(totalInterest)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface EarnoutPanelProps {
+  salePrice: string;
+}
+
+function EarnoutPanel({ salePrice: initialSalePrice }: EarnoutPanelProps) {
+  const [basePriceLinked, setBasePriceLinked] = useState(true);
+  const [basePrice, setBasePrice] = useState<string>((parseFloat(initialSalePrice) * 0.8).toString());
+  const [earnoutMax, setEarnoutMax] = useState<string>((parseFloat(initialSalePrice) * 0.2).toString());
+  const [probability, setProbability] = useState<string>("60");
+
+  useEffect(() => {
+    if (basePriceLinked) {
+      setBasePrice((parseFloat(initialSalePrice) * 0.8).toString());
+      setEarnoutMax((parseFloat(initialSalePrice) * 0.2).toString());
+    }
+  }, [initialSalePrice, basePriceLinked]);
+
+  const expectedEarnout = (parseFloat(earnoutMax) || 0) * (parseFloat(probability) / 100 || 0);
+  const totalExpected = (parseFloat(basePrice) || 0) + expectedEarnout;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Award className="h-5 w-5 text-indigo-500" />
+            Earnout Modeling
+          </CardTitle>
+          <CardDescription>
+            Contingent payment structures
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="flex items-center gap-1">
+                Base Price
+                {basePriceLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <CurrencyInput 
+                value={basePrice} 
+                onChange={(v) => { setBasePrice(v); setBasePriceLinked(false); }}
+                linked={basePriceLinked}
+                onUnlink={() => setBasePriceLinked(false)}
+              />
+            </div>
+            <div>
+              <Label>Maximum Earnout</Label>
+              <CurrencyInput value={earnoutMax} onChange={setEarnoutMax} />
+            </div>
+            <div>
+              <Label>Achievement Probability</Label>
+              <PercentInput value={probability} onChange={setProbability} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Earnout Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Expected Earnout</span>
+              <span className="font-semibold text-green-600">{formatCurrency(expectedEarnout)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Total Expected Value</span>
+              <span className="font-semibold">{formatCurrency(totalExpected)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface WaterfallPanelProps {
+  salePrice: string;
+}
+
+function WaterfallPanel({ salePrice: initialSalePrice }: WaterfallPanelProps) {
+  const [distributionLinked, setDistributionLinked] = useState(true);
+  const [totalDistribution, setTotalDistribution] = useState<string>(initialSalePrice);
+  const [lpCapital, setLpCapital] = useState<string>((parseFloat(initialSalePrice) * 0.8).toString());
+  const [preferredReturn, setPreferredReturn] = useState<string>("8");
+  const [carriedInterest, setCarriedInterest] = useState<string>("20");
+
+  useEffect(() => {
+    if (distributionLinked) {
+      setTotalDistribution(initialSalePrice);
+      setLpCapital((parseFloat(initialSalePrice) * 0.8).toString());
+    }
+  }, [initialSalePrice, distributionLinked]);
+
+  const prefAmount = (parseFloat(lpCapital) || 0) * (parseFloat(preferredReturn) / 100 || 0);
+  const remaining = (parseFloat(totalDistribution) || 0) - prefAmount - (parseFloat(lpCapital) || 0);
+  const gpCarry = remaining > 0 ? remaining * (parseFloat(carriedInterest) / 100 || 0) : 0;
+  const lpShare = remaining - gpCarry;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-cyan-500" />
+            Waterfall Analysis
+          </CardTitle>
+          <CardDescription>
+            Fund distribution modeling
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="flex items-center gap-1">
+                Total Distribution
+                {distributionLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <CurrencyInput 
+                value={totalDistribution} 
+                onChange={(v) => { setTotalDistribution(v); setDistributionLinked(false); }}
+                linked={distributionLinked}
+                onUnlink={() => setDistributionLinked(false)}
+              />
+            </div>
+            <div>
+              <Label>LP Capital</Label>
+              <CurrencyInput value={lpCapital} onChange={setLpCapital} />
+            </div>
+            <div>
+              <Label>Preferred Return</Label>
+              <PercentInput value={preferredReturn} onChange={setPreferredReturn} />
+            </div>
+            <div>
+              <Label>Carried Interest</Label>
+              <PercentInput value={carriedInterest} onChange={setCarriedInterest} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Distribution Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">LP Preferred Return</span>
+              <span className="font-semibold">{formatCurrency(prefAmount)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">LP Capital Return</span>
+              <span className="font-semibold">{formatCurrency(lpCapital)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">GP Carried Interest</span>
+              <span className="font-semibold">{formatCurrency(gpCarry)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">LP Profit Share</span>
+              <span className="font-semibold text-green-600">{formatCurrency(lpShare)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface IRRCalculatorPanelProps {
+  initialInvestment: string;
+  exitValue: string;
+  holdPeriod: number;
+}
+
+function IRRCalculatorPanel({ initialInvestment: initialInvest, exitValue: initialExitValue, holdPeriod: initialHoldPeriod }: IRRCalculatorPanelProps) {
+  const [investmentLinked, setInvestmentLinked] = useState(true);
+  const [exitLinked, setExitLinked] = useState(true);
+  
+  const [initialInvestment, setInitialInvestment] = useState<string>(initialInvest);
+  const [exitValue, setExitValue] = useState<string>(initialExitValue);
+  const [year1, setYear1] = useState<string>("100000");
+  const [year2, setYear2] = useState<string>("150000");
+  const [year3, setYear3] = useState<string>("200000");
+
+  useEffect(() => {
+    if (investmentLinked) setInitialInvestment(initialInvest);
+  }, [initialInvest, investmentLinked]);
+
+  useEffect(() => {
+    if (exitLinked) setExitValue(initialExitValue);
+  }, [initialExitValue, exitLinked]);
+
+  const annualCashFlows = [
+    parseFloat(year1) || 0,
+    parseFloat(year2) || 0,
+    parseFloat(year3) || 0,
+  ];
+  
+  const cashFlows = [
+    -(parseFloat(initialInvestment) || 0),
+    ...annualCashFlows.slice(0, initialHoldPeriod - 1),
+    (annualCashFlows[Math.min(initialHoldPeriod - 1, 2)] || 0) + (parseFloat(exitValue) || 0)
+  ];
+
+  const calculateIRR = (flows: number[]) => {
+    if (flows.length < 2) return "0.00";
+    let rate = 0.1;
+    for (let i = 0; i < 100; i++) {
+      let npv = 0;
+      let npvDerivative = 0;
+      for (let t = 0; t < flows.length; t++) {
+        npv += flows[t] / Math.pow(1 + rate, t);
+        npvDerivative -= t * flows[t] / Math.pow(1 + rate, t + 1);
+      }
+      if (Math.abs(npv) < 0.01) break;
+      if (npvDerivative !== 0) {
+        rate = rate - npv / npvDerivative;
+      }
+    }
+    return (rate * 100).toFixed(2);
+  };
+
+  const irr = calculateIRR(cashFlows);
+  const totalCashFlow = cashFlows.reduce((a, b) => a + b, 0);
+  const multiple = (totalCashFlow + (parseFloat(initialInvestment) || 0)) / (parseFloat(initialInvestment) || 1);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Percent className="h-5 w-5 text-emerald-500" />
+            IRR Calculator
+          </CardTitle>
+          <CardDescription>
+            Multi-period return analysis ({initialHoldPeriod}-year hold)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="flex items-center gap-1">
+                Initial Investment
+                {investmentLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <CurrencyInput 
+                value={initialInvestment} 
+                onChange={(v) => { setInitialInvestment(v); setInvestmentLinked(false); }}
+                linked={investmentLinked}
+                onUnlink={() => setInvestmentLinked(false)}
+              />
+            </div>
+            <div>
+              <Label className="flex items-center gap-1">
+                Exit Value
+                {exitLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <CurrencyInput 
+                value={exitValue} 
+                onChange={(v) => { setExitValue(v); setExitLinked(false); }}
+                linked={exitLinked}
+                onUnlink={() => setExitLinked(false)}
+              />
+            </div>
+            <div>
+              <Label>Year 1 Cash Flow</Label>
+              <CurrencyInput value={year1} onChange={setYear1} />
+            </div>
+            <div>
+              <Label>Year 2 Cash Flow</Label>
+              <CurrencyInput value={year2} onChange={setYear2} />
+            </div>
+            <div className="col-span-2">
+              <Label>Year 3 Cash Flow</Label>
+              <CurrencyInput value={year3} onChange={setYear3} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Returns Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex justify-between py-3 bg-emerald-50 rounded-lg px-3">
+              <span className="font-semibold">IRR</span>
+              <span className="font-bold text-emerald-600">{irr}%</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Equity Multiple</span>
+              <span className="font-semibold">{multiple.toFixed(2)}x</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Total Profit</span>
+              <span className="font-semibold text-green-600">{formatCurrency(totalCashFlow)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface SensitivityPanelProps {
+  baseNOI: string;
+  baseCapRate: string;
+}
+
+function SensitivityPanel({ baseNOI: initialNOI, baseCapRate: initialCapRate }: SensitivityPanelProps) {
+  const [noiLinked, setNoiLinked] = useState(true);
+  const [capRateLinked, setCapRateLinked] = useState(true);
+  
+  const [baseNOI, setBaseNOI] = useState<string>(initialNOI);
+  const [baseCapRate, setBaseCapRate] = useState<string>(initialCapRate);
+
+  useEffect(() => {
+    if (noiLinked) setBaseNOI(initialNOI);
+  }, [initialNOI, noiLinked]);
+
+  useEffect(() => {
+    if (capRateLinked) setBaseCapRate(initialCapRate);
+  }, [initialCapRate, capRateLinked]);
+
+  const capRates = [5, 5.5, 6, 6.5, 7, 7.5, 8];
+  const noiChanges = [-10, -5, 0, 5, 10];
+
+  const calculateValue = (noi: number, capRate: number) => {
+    return noi / (capRate / 100);
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-orange-500" />
+            Sensitivity Analysis
+          </CardTitle>
+          <CardDescription>
+            NOI & Cap Rate sensitivity matrix
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 max-w-md">
+            <div>
+              <Label className="flex items-center gap-1">
+                Base NOI
+                {noiLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <CurrencyInput 
+                value={baseNOI} 
+                onChange={(v) => { setBaseNOI(v); setNoiLinked(false); }}
+                linked={noiLinked}
+                onUnlink={() => setNoiLinked(false)}
+              />
+            </div>
+            <div>
+              <Label className="flex items-center gap-1">
+                Base Cap Rate
+                {capRateLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+              </Label>
+              <div className="relative">
+                <PercentInput 
+                  value={baseCapRate} 
+                  onChange={(v) => { setBaseCapRate(v); setCapRateLinked(false); }}
+                />
+                {capRateLinked && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button 
+                          onClick={() => setCapRateLinked(false)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-blue-100 rounded z-10"
+                          type="button"
+                        >
+                          <Link2 className="h-4 w-4 text-blue-500" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Linked to project data. Click to unlink.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Value Sensitivity Matrix</CardTitle>
+          <CardDescription>Property value at different NOI and Cap Rate combinations</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-left">NOI / Cap Rate</th>
+                  {capRates.map(cr => (
+                    <th key={cr} className="p-2 text-center">{formatPercent(cr)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {noiChanges.map(change => {
+                  const noi = (parseFloat(baseNOI) || 0) * (1 + change / 100);
+                  return (
+                    <tr key={change} className="border-b">
+                      <td className="p-2 font-medium">
+                        {formatCurrency(noi)} ({change >= 0 ? '+' : ''}{change}%)
+                      </td>
+                      {capRates.map(cr => {
+                        const value = calculateValue(noi, cr);
+                        const isBase = change === 0 && Math.abs(cr - parseFloat(baseCapRate)) < 0.1;
+                        return (
+                          <td 
+                            key={cr} 
+                            className={`p-2 text-center ${isBase ? 'bg-blue-100 font-bold' : ''}`}
+                          >
+                            ${(value / 1000000).toFixed(2)}M
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface AIInsightsPanelProps {
+  projectId: string;
+  salePrice: number;
+  purchasePrice: number;
+  holdPeriod: number;
+  scenario: string;
+}
+
+function AIInsightsPanel({ projectId, salePrice, purchasePrice, holdPeriod, scenario }: AIInsightsPanelProps) {
+  const appreciation = ((salePrice - purchasePrice) / purchasePrice * 100).toFixed(1);
+  const annualReturn = (Math.pow(salePrice / purchasePrice, 1 / holdPeriod) - 1) * 100;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Brain className="h-5 w-5 text-pink-500" />
+          AI Insights
+        </CardTitle>
+        <CardDescription>
+          AI-powered exit recommendations based on {scenario} scenario
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">Total Appreciation</p>
+            <p className="text-2xl font-bold text-green-600">{appreciation}%</p>
+          </div>
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">Annualized Return</p>
+            <p className="text-2xl font-bold text-blue-600">{annualReturn.toFixed(1)}%</p>
+          </div>
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">Hold Period</p>
+            <p className="text-2xl font-bold">{holdPeriod} years</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="p-4 border rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-green-50 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-green-500" />
+              </div>
+              <div>
+                <h4 className="font-medium">Exit Timing Recommendation</h4>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Based on your {holdPeriod}-year hold period and {scenario} assumptions, 
+                  the projected exit value of {formatCurrency(salePrice)} represents solid returns. 
+                  Consider market conditions and interest rate environment when finalizing exit timing.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 border rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-50 rounded-lg">
+                <RefreshCcw className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <h4 className="font-medium">Tax Strategy Consideration</h4>
+                <p className="text-sm text-muted-foreground mt-1">
+                  With {formatCurrency(salePrice - purchasePrice)} in potential gains, 
+                  consider a 1031 exchange to defer capital gains taxes. This could preserve 
+                  more capital for your next investment.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 border rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-purple-50 rounded-lg">
+                <BarChart3 className="h-5 w-5 text-purple-500" />
+              </div>
+              <div>
+                <h4 className="font-medium">Value Enhancement Opportunity</h4>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Review the Sensitivity Analysis tab to understand how NOI improvements 
+                  could impact exit value. Small operational improvements can significantly 
+                  increase sale price at your target cap rate.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
