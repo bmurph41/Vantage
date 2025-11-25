@@ -17,11 +17,28 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import {
   Save,
@@ -34,15 +51,49 @@ import {
   Warehouse,
   Ship,
   Fuel,
-  ShoppingCart
+  ShoppingCart,
+  GitBranch,
+  History,
+  CheckCircle,
+  Clock,
+  XCircle,
+  ChevronDown,
+  RotateCcw,
+  Send,
+  ThumbsUp,
+  ThumbsDown,
+  Plus
 } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface WorkspaceAssumptionsProps {
   projectId: string;
 }
 
+type ScenarioType = 'base' | 'aggressive' | 'conservative' | 'custom';
+type ScenarioStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected';
+
+interface Scenario {
+  id: string;
+  scenarioType: ScenarioType;
+  name: string;
+  description?: string;
+  version: number;
+  isCurrentVersion: boolean;
+  revenueGrowthRate?: string;
+  expenseGrowthRate?: string;
+  exitCapRate?: string;
+  assumptions: any;
+  status: ScenarioStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  approvalNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 type GrowthRates = Record<string, number>;
-type OccupancyData = Record<string, Record<string, number>>; // departmentId -> year -> rate
+type OccupancyData = Record<string, Record<string, number>>;
 type MarginData = Record<string, { historical: number; projected: number }>;
 
 const revenueCategories = [
@@ -76,17 +127,60 @@ const storageOptions = [
   { id: 'mooring_balls', name: 'Mooring Balls', totalUnits: 25 },
 ];
 
+const scenarioTypeConfig: Record<ScenarioType, { label: string; color: string; icon: any }> = {
+  base: { label: 'Base Case', color: 'bg-blue-500', icon: TrendingUp },
+  aggressive: { label: 'Aggressive', color: 'bg-green-500', icon: TrendingUp },
+  conservative: { label: 'Conservative', color: 'bg-orange-500', icon: TrendingUp },
+  custom: { label: 'Custom', color: 'bg-purple-500', icon: GitBranch },
+};
+
+const statusConfig: Record<ScenarioStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: any }> = {
+  draft: { label: 'Draft', variant: 'secondary', icon: Clock },
+  pending_approval: { label: 'Pending Approval', variant: 'outline', icon: Clock },
+  approved: { label: 'Approved', variant: 'default', icon: CheckCircle },
+  rejected: { label: 'Rejected', variant: 'destructive', icon: XCircle },
+};
+
 export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptionsProps) {
   const { toast } = useToast();
+  const [activeScenarioType, setActiveScenarioType] = useState<ScenarioType>('base');
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [hasChanges, setHasChanges] = useState(false);
 
-  const { data: assumptions, isLoading } = useQuery<any>({
-    queryKey: ['/api/modeling/projects', projectId, 'assumptions'],
+  const { data: scenarios = [], isLoading: scenariosLoading, refetch: refetchScenarios } = useQuery<Scenario[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'scenarios'],
+  });
+
+  const { data: versionHistory = [] } = useQuery<Scenario[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'scenarios', activeScenarioType, 'history'],
+    enabled: showHistoryDialog,
   });
 
   const { data: config } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 
+  const initScenariosMutation = useMutation({
+    mutationFn: () => apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios/init`),
+    onSuccess: () => {
+      refetchScenarios();
+      toast({ title: 'Initialized', description: 'Default scenarios have been created.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to initialize scenarios.', variant: 'destructive' });
+    },
+  });
+
+  useEffect(() => {
+    if (!scenariosLoading && scenarios.length === 0) {
+      initScenariosMutation.mutate();
+    }
+  }, [scenarios, scenariosLoading]);
+
+  const activeScenario = scenarios.find(s => s.scenarioType === activeScenarioType && s.isCurrentVersion);
   const holdPeriod = config?.holdPeriod || 5;
   const years = Array.from({ length: holdPeriod }, (_, i) => 2026 + i);
 
@@ -96,65 +190,152 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
   const [margins, setMargins] = useState<MarginData>({});
 
   useEffect(() => {
-    if (assumptions) {
-      setGrowthRates(assumptions.growthRates || {});
-      setExpenseGrowth(assumptions.expenseGrowth || {});
-      setOccupancy(assumptions.occupancy || {});
-      setMargins(assumptions.margins || {});
+    if (activeScenario?.assumptions) {
+      const assumptions = activeScenario.assumptions;
+      setGrowthRates(assumptions.growthRates || getDefaultGrowthRates(activeScenarioType));
+      setExpenseGrowth(assumptions.expenseGrowth || getDefaultExpenseGrowth(activeScenarioType));
+      setOccupancy(assumptions.occupancy || getDefaultOccupancy(years));
+      setMargins(assumptions.margins || getDefaultMargins());
+      setHasChanges(false);
     } else {
-      const defaultGrowth: GrowthRates = {};
-      revenueCategories.forEach(cat => { defaultGrowth[cat.id] = 3; });
-      setGrowthRates(defaultGrowth);
-
-      const defaultExpenseGrowth: GrowthRates = {};
-      expenseCategories.forEach(cat => { defaultExpenseGrowth[cat.id] = 2; });
-      setExpenseGrowth(defaultExpenseGrowth);
-
-      const defaultOccupancy: OccupancyData = {};
-      storageOptions.forEach(opt => {
-        defaultOccupancy[opt.id] = {};
-        years.forEach(year => {
-          defaultOccupancy[opt.id][year] = 85;
-        });
-      });
-      setOccupancy(defaultOccupancy);
-
-      const defaultMargins: MarginData = {
-        fuel: { historical: 15, projected: 18 },
-        ship_store: { historical: 35, projected: 38 },
-      };
-      setMargins(defaultMargins);
+      setGrowthRates(getDefaultGrowthRates(activeScenarioType));
+      setExpenseGrowth(getDefaultExpenseGrowth(activeScenarioType));
+      setOccupancy(getDefaultOccupancy(years));
+      setMargins(getDefaultMargins());
+      setHasChanges(false);
     }
-  }, [assumptions, holdPeriod]);
+  }, [activeScenario, activeScenarioType, holdPeriod]);
+
+  function getDefaultGrowthRates(scenarioType: ScenarioType): GrowthRates {
+    const baseRates: Record<ScenarioType, number> = {
+      base: 3,
+      aggressive: 5,
+      conservative: 1.5,
+      custom: 3,
+    };
+    const rate = baseRates[scenarioType];
+    const defaultGrowth: GrowthRates = {};
+    revenueCategories.forEach(cat => { defaultGrowth[cat.id] = rate; });
+    return defaultGrowth;
+  }
+
+  function getDefaultExpenseGrowth(scenarioType: ScenarioType): GrowthRates {
+    const baseRates: Record<ScenarioType, number> = {
+      base: 2.5,
+      aggressive: 2,
+      conservative: 3,
+      custom: 2.5,
+    };
+    const rate = baseRates[scenarioType];
+    const defaultExpenseGrowth: GrowthRates = {};
+    expenseCategories.forEach(cat => { defaultExpenseGrowth[cat.id] = rate; });
+    return defaultExpenseGrowth;
+  }
+
+  function getDefaultOccupancy(years: number[]): OccupancyData {
+    const defaultOccupancy: OccupancyData = {};
+    storageOptions.forEach(opt => {
+      defaultOccupancy[opt.id] = {};
+      years.forEach(year => {
+        defaultOccupancy[opt.id][year] = 85;
+      });
+    });
+    return defaultOccupancy;
+  }
+
+  function getDefaultMargins(): MarginData {
+    return {
+      fuel: { historical: 15, projected: 18 },
+      ship_store: { historical: 35, projected: 38 },
+    };
+  }
 
   const saveMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', `/api/modeling/projects/${projectId}/assumptions`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'assumptions'] });
-      toast({ title: 'Saved', description: 'Assumptions have been saved.' });
+    mutationFn: ({ createNewVersion }: { createNewVersion: boolean }) => {
+      if (!activeScenario) {
+        return apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios`, {
+          scenarioType: activeScenarioType,
+          name: scenarioTypeConfig[activeScenarioType].label,
+          revenueGrowthRate: Object.values(growthRates).reduce((a, b) => a + b, 0) / Object.values(growthRates).length,
+          expenseGrowthRate: Object.values(expenseGrowth).reduce((a, b) => a + b, 0) / Object.values(expenseGrowth).length,
+          assumptions: { growthRates, expenseGrowth, occupancy, margins },
+        });
+      }
+      return apiRequest('PATCH', `/api/modeling/projects/${projectId}/scenarios/${activeScenario.id}`, {
+        assumptions: { growthRates, expenseGrowth, occupancy, margins },
+        createNewVersion,
+      });
+    },
+    onSuccess: (_, { createNewVersion }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
+      setHasChanges(false);
+      toast({ 
+        title: createNewVersion ? 'New Version Created' : 'Saved', 
+        description: createNewVersion 
+          ? `Version ${(activeScenario?.version || 0) + 1} has been created.`
+          : 'Assumptions have been saved.' 
+      });
     },
     onError: () => {
       toast({ title: 'Error', description: 'Failed to save assumptions.', variant: 'destructive' });
     },
   });
 
-  const handleSave = () => {
-    saveMutation.mutate({
-      growthRates,
-      expenseGrowth,
-      occupancy,
-      margins,
-    });
+  const submitMutation = useMutation({
+    mutationFn: () => apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios/${activeScenario?.id}/submit`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
+      toast({ title: 'Submitted', description: 'Scenario submitted for approval.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to submit scenario.', variant: 'destructive' });
+    },
+  });
+
+  const approvalMutation = useMutation({
+    mutationFn: ({ action, notes }: { action: 'approve' | 'reject'; notes?: string }) =>
+      apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios/${activeScenario?.id}/${action}`, { notes }),
+    onSuccess: (_, { action }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
+      setShowApprovalDialog(false);
+      setApprovalNotes('');
+      toast({ 
+        title: action === 'approve' ? 'Approved' : 'Rejected', 
+        description: `Scenario has been ${action}d.` 
+      });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to process approval.', variant: 'destructive' });
+    },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (versionId: string) => 
+      apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios/${versionId}/restore`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
+      setShowHistoryDialog(false);
+      toast({ title: 'Restored', description: 'Previous version has been restored.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to restore version.', variant: 'destructive' });
+    },
+  });
+
+  const handleSave = (createNewVersion = false) => {
+    saveMutation.mutate({ createNewVersion });
   };
 
   const updateGrowthRate = (categoryId: string, value: string) => {
     const numValue = parseFloat(value) || 0;
     setGrowthRates(prev => ({ ...prev, [categoryId]: numValue }));
+    setHasChanges(true);
   };
 
   const updateExpenseGrowth = (categoryId: string, value: string) => {
     const numValue = parseFloat(value) || 0;
     setExpenseGrowth(prev => ({ ...prev, [categoryId]: numValue }));
+    setHasChanges(true);
   };
 
   const updateOccupancy = (storageId: string, year: number, value: string) => {
@@ -166,6 +347,7 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
         [year]: Math.min(100, Math.max(0, numValue)),
       },
     }));
+    setHasChanges(true);
   };
 
   const updateMargin = (categoryId: string, field: 'historical' | 'projected', value: string) => {
@@ -177,26 +359,140 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
         [field]: Math.min(100, Math.max(0, numValue)),
       },
     }));
+    setHasChanges(true);
   };
+
+  const StatusIcon = activeScenario ? statusConfig[activeScenario.status as ScenarioStatus]?.icon : Clock;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-xl font-semibold">Assumptions</h2>
           <p className="text-sm text-muted-foreground">
-            Configure growth rates, occupancy projections, and COGS margins
+            Configure growth rates, occupancy projections, and COGS margins by scenario
           </p>
         </div>
-        <Button 
-          onClick={handleSave} 
-          disabled={saveMutation.isPending}
-          data-testid="button-save-assumptions"
-        >
-          <Save className="h-4 w-4 mr-2" />
-          {saveMutation.isPending ? 'Saving...' : 'Save Assumptions'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {activeScenario && (
+            <>
+              <Badge 
+                variant={statusConfig[activeScenario.status as ScenarioStatus]?.variant || 'secondary'}
+                className="flex items-center gap-1"
+              >
+                <StatusIcon className="h-3 w-3" />
+                {statusConfig[activeScenario.status as ScenarioStatus]?.label || activeScenario.status}
+              </Badge>
+              <Badge variant="outline" className="flex items-center gap-1">
+                <GitBranch className="h-3 w-3" />
+                v{activeScenario.version}
+              </Badge>
+            </>
+          )}
+        </div>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <Tabs value={activeScenarioType} onValueChange={(v) => setActiveScenarioType(v as ScenarioType)}>
+                <TabsList>
+                  {(['base', 'aggressive', 'conservative'] as ScenarioType[]).map(type => {
+                    const config = scenarioTypeConfig[type];
+                    const scenario = scenarios.find(s => s.scenarioType === type && s.isCurrentVersion);
+                    return (
+                      <TabsTrigger 
+                        key={type} 
+                        value={type}
+                        className="flex items-center gap-2"
+                        data-testid={`tab-scenario-${type}`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${config.color}`} />
+                        {config.label}
+                        {scenario && (
+                          <span className="text-xs text-muted-foreground">(v{scenario.version})</span>
+                        )}
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHistoryDialog(true)}
+                data-testid="button-version-history"
+              >
+                <History className="h-4 w-4 mr-2" />
+                History
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    disabled={saveMutation.isPending || !hasChanges}
+                    data-testid="button-save-dropdown"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Save
+                    <ChevronDown className="h-4 w-4 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleSave(false)} data-testid="button-save-current">
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSave(true)} data-testid="button-save-new-version">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Save as New Version
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => submitMutation.mutate()}
+                    disabled={activeScenario?.status !== 'draft'}
+                    data-testid="button-submit-approval"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Submit for Approval
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {activeScenario?.status === 'pending_approval' && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" data-testid="button-review-dropdown">
+                      Review
+                      <ChevronDown className="h-4 w-4 ml-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem 
+                      onClick={() => { setApprovalAction('approve'); setShowApprovalDialog(true); }}
+                      data-testid="button-approve"
+                    >
+                      <ThumbsUp className="h-4 w-4 mr-2 text-green-500" />
+                      Approve
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => { setApprovalAction('reject'); setShowApprovalDialog(true); }}
+                      data-testid="button-reject"
+                    >
+                      <ThumbsDown className="h-4 w-4 mr-2 text-red-500" />
+                      Reject
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
 
       <Tabs defaultValue="growth" className="space-y-4">
         <TabsList>
@@ -345,7 +641,7 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
               <CardTitle>COGS Margins</CardTitle>
               <CardDescription>
                 Set gross profit margins for departments with cost of goods sold. 
-                COGS is calculated as (1 - Margin%) × Revenue.
+                COGS is calculated as (1 - Margin%) x Revenue.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -411,7 +707,7 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                       <div className="flex items-center gap-2 p-2 rounded bg-muted/50">
                         <AlertCircle className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm text-muted-foreground">
-                          COGS = Revenue × (1 - {margin.projected || 0}%) = Revenue × {((100 - (margin.projected || 0)) / 100).toFixed(2)}
+                          COGS = Revenue x (1 - {margin.projected || 0}%) = Revenue x {((100 - (margin.projected || 0)) / 100).toFixed(2)}
                         </span>
                       </div>
                     </div>
@@ -422,6 +718,116 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Version History - {scenarioTypeConfig[activeScenarioType]?.label}
+            </DialogTitle>
+            <DialogDescription>
+              View and restore previous versions of this scenario.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[400px]">
+            <div className="space-y-2">
+              {versionHistory.map((version) => (
+                <div 
+                  key={version.id} 
+                  className={`p-4 rounded-lg border ${version.isCurrentVersion ? 'border-primary bg-primary/5' : ''}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Badge variant={version.isCurrentVersion ? 'default' : 'outline'}>
+                        v{version.version}
+                      </Badge>
+                      <div>
+                        <p className="font-medium">{version.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(version.createdAt), 'MMM d, yyyy h:mm a')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant={statusConfig[version.status as ScenarioStatus]?.variant || 'secondary'}
+                        className="text-xs"
+                      >
+                        {statusConfig[version.status as ScenarioStatus]?.label || version.status}
+                      </Badge>
+                      {!version.isCurrentVersion && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => restoreMutation.mutate(version.id)}
+                          disabled={restoreMutation.isPending}
+                          data-testid={`button-restore-${version.id}`}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Restore
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {version.description && (
+                    <p className="text-sm text-muted-foreground mt-2">{version.description}</p>
+                  )}
+                </div>
+              ))}
+              {versionHistory.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No version history available
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {approvalAction === 'approve' ? (
+                <><ThumbsUp className="h-5 w-5 text-green-500" /> Approve Scenario</>
+              ) : (
+                <><ThumbsDown className="h-5 w-5 text-red-500" /> Reject Scenario</>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {approvalAction === 'approve' 
+                ? 'Approving this scenario will mark it as ready for use in reporting and analysis.'
+                : 'Rejecting this scenario will require revision before it can be approved.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="approval-notes">Notes (optional)</Label>
+              <Input
+                id="approval-notes"
+                placeholder="Add any comments..."
+                value={approvalNotes}
+                onChange={(e) => setApprovalNotes(e.target.value)}
+                data-testid="input-approval-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowApprovalDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant={approvalAction === 'approve' ? 'default' : 'destructive'}
+              onClick={() => approvalMutation.mutate({ action: approvalAction, notes: approvalNotes })}
+              disabled={approvalMutation.isPending}
+              data-testid={`button-confirm-${approvalAction}`}
+            >
+              {approvalMutation.isPending ? 'Processing...' : approvalAction === 'approve' ? 'Approve' : 'Reject'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
