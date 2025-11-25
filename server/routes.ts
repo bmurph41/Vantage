@@ -11664,6 +11664,225 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ==================== WATERFALL CUSTOMIZATION ROUTES ====================
+
+  // Calculate waterfall distribution
+  app.post('/api/modeling/projects/:projectId/waterfall', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const input = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      if (!input.scenarioVersionId || !input.totalInvestment) {
+        return res.status(400).json({ error: 'scenarioVersionId and totalInvestment are required' });
+      }
+
+      const { waterfallService } = await import('./services/waterfall-service');
+      const result = await waterfallService.calculateWaterfall(projectId, orgId, userId, input);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to calculate waterfall:', error);
+      res.status(400).json({ error: error.message || 'Failed to calculate waterfall' });
+    }
+  });
+
+  // Get standard waterfall configurations
+  app.get('/api/modeling/waterfall/templates', authenticateUser, async (req: any, res) => {
+    try {
+      const { waterfallService } = await import('./services/waterfall-service');
+      const configs = await waterfallService.getStandardWaterfallConfigs();
+
+      res.json(configs);
+    } catch (error) {
+      console.error('Failed to get waterfall templates:', error);
+      res.status(500).json({ error: 'Failed to get waterfall templates' });
+    }
+  });
+
+  // Compare multiple waterfall structures
+  app.post('/api/modeling/projects/:projectId/waterfall/compare', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { baseInput, configs } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { waterfallService } = await import('./services/waterfall-service');
+      const comparison = await waterfallService.compareWaterfallStructures(
+        projectId,
+        orgId,
+        baseInput,
+        configs
+      );
+
+      res.json(comparison);
+    } catch (error: any) {
+      console.error('Failed to compare waterfall structures:', error);
+      res.status(400).json({ error: error.message || 'Failed to compare waterfall structures' });
+    }
+  });
+
+  // ==================== EXTERNAL API ROUTES ====================
+
+  // Export single project data
+  app.get('/api/modeling/export/project/:projectId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { format } = req.query;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { externalAPIService } = await import('./services/external-api-service');
+      const exportData = await externalAPIService.exportProject(
+        projectId, 
+        orgId, 
+        userId, 
+        (format as 'json' | 'csv' | 'xml') || 'json'
+      );
+
+      if (format === 'csv') {
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="project_${projectId}.csv"`);
+        res.send(exportData);
+      } else if (format === 'xml') {
+        res.setHeader('Content-Type', 'application/xml');
+        res.setHeader('Content-Disposition', `attachment; filename="project_${projectId}.xml"`);
+        res.send(exportData);
+      } else {
+        res.json(exportData);
+      }
+    } catch (error: any) {
+      console.error('Failed to export project:', error);
+      res.status(400).json({ error: error.message || 'Failed to export project' });
+    }
+  });
+
+  // Export portfolio data
+  app.get('/api/modeling/export/portfolio', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { status, region, outcome, minValue, maxValue } = req.query;
+
+      const { externalAPIService } = await import('./services/external-api-service');
+      const exportData = await externalAPIService.exportPortfolio(orgId, userId, {
+        status: status as string,
+        region: region as string,
+        outcome: outcome as string,
+        minValue: minValue ? parseFloat(minValue as string) : undefined,
+        maxValue: maxValue ? parseFloat(maxValue as string) : undefined
+      });
+
+      res.json(exportData);
+    } catch (error: any) {
+      console.error('Failed to export portfolio:', error);
+      res.status(400).json({ error: error.message || 'Failed to export portfolio' });
+    }
+  });
+
+  // Get webhook payload preview
+  app.get('/api/modeling/webhook/preview/:projectId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { eventType } = req.query;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { externalAPIService } = await import('./services/external-api-service');
+      const payload = await externalAPIService.getWebhookPayload(
+        projectId,
+        orgId,
+        (eventType as 'scenario_approved' | 'project_updated' | 'analysis_completed') || 'project_updated'
+      );
+
+      res.json(payload);
+    } catch (error: any) {
+      console.error('Failed to get webhook payload:', error);
+      res.status(400).json({ error: error.message || 'Failed to get webhook payload' });
+    }
+  });
+
+  // Generate API documentation
+  app.get('/api/modeling/api-docs', authenticateUser, async (req: any, res) => {
+    try {
+      const docs = {
+        version: '1.0.0',
+        endpoints: [
+          {
+            method: 'GET',
+            path: '/api/modeling/export/project/:projectId',
+            description: 'Export project data in JSON, CSV, or XML format',
+            params: { format: 'json | csv | xml' }
+          },
+          {
+            method: 'GET',
+            path: '/api/modeling/export/portfolio',
+            description: 'Export portfolio data with optional filters',
+            params: { status: 'string', region: 'string', outcome: 'string', minValue: 'number', maxValue: 'number' }
+          },
+          {
+            method: 'GET',
+            path: '/api/modeling/webhook/preview/:projectId',
+            description: 'Preview webhook payload for integration testing',
+            params: { eventType: 'scenario_approved | project_updated | analysis_completed' }
+          },
+          {
+            method: 'POST',
+            path: '/api/modeling/projects/:projectId/pro-forma',
+            description: 'Generate pro forma projections from actuals'
+          },
+          {
+            method: 'POST',
+            path: '/api/modeling/projects/:projectId/sensitivity-matrix',
+            description: 'Generate sensitivity analysis matrix'
+          },
+          {
+            method: 'GET',
+            path: '/api/modeling/projects/:projectId/benchmarks',
+            description: 'Compare project metrics against sales comps'
+          },
+          {
+            method: 'POST',
+            path: '/api/modeling/projects/:projectId/debt-sensitivity',
+            description: 'Analyze debt sensitivity across lender structures'
+          },
+          {
+            method: 'POST',
+            path: '/api/modeling/projects/:projectId/waterfall',
+            description: 'Calculate LP/GP waterfall distributions'
+          }
+        ],
+        authentication: 'Bearer token or session cookie required',
+        rateLimit: '100 requests per minute'
+      };
+
+      res.json(docs);
+    } catch (error) {
+      console.error('Failed to get API docs:', error);
+      res.status(500).json({ error: 'Failed to get API docs' });
+    }
+  });
+
   // Get modeling analytics and metrics
   app.get('/api/modeling/analytics', authenticateUser, async (req: any, res) => {
     try {
