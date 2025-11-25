@@ -10529,7 +10529,7 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Project Workspace - Historical P&L (placeholder returns sample data)
+  // Project Workspace - Historical P&L with data binding
   app.get('/api/modeling/projects/:projectId/historical-pl/:year', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -10540,8 +10540,12 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      // Return any stored historical data or null for sample data to be used
-      const historicalData = (project.customMetrics as any)?.historicalPL?.[year] || null;
+      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+      const historicalData = await proFormaEngineService.getHistoricalPL(
+        projectId, 
+        orgId, 
+        year ? parseInt(year) : undefined
+      );
       res.json(historicalData);
     } catch (error) {
       console.error('Failed to fetch historical P&L:', error);
@@ -10549,19 +10553,20 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Project Workspace - Pro Forma (placeholder returns sample data)
+  // Project Workspace - Pro Forma with real-time calculations
   app.get('/api/modeling/projects/:projectId/pro-forma', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { projectId } = req.params;
+      const scenarioType = (req.query.scenario as string) || 'base';
       
       const project = await storage.getModelingProject(projectId, orgId);
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      // Return any stored pro forma data or null for sample data to be used
-      const proFormaData = (project.customMetrics as any)?.proForma || null;
+      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+      const proFormaData = await proFormaEngineService.generateProForma(projectId, orgId, scenarioType);
       res.json(proFormaData);
     } catch (error) {
       console.error('Failed to fetch pro forma:', error);
@@ -10569,7 +10574,7 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Project Workspace - Executive Summary
+  // Project Workspace - Executive Summary with real-time calculations
   app.get('/api/modeling/projects/:projectId/executive-summary/:scenario', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -10580,8 +10585,41 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      // Return any stored summary data or null for sample data to be used
-      const summaryData = (project.customMetrics as any)?.executiveSummary?.[scenario] || null;
+      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+      const proForma = await proFormaEngineService.generateProForma(projectId, orgId, scenario);
+      
+      const summaryData = {
+        scenario,
+        projectName: project.marinaName || project.name,
+        purchasePrice: proForma.metrics.purchasePrice,
+        totalUnits: project.totalUnits,
+        acreage: project.acreage,
+        metrics: {
+          goingInCapRate: proForma.metrics.goingInCapRate,
+          exitCapRate: proForma.metrics.exitCapRate,
+          irr: proForma.metrics.irr,
+          equityMultiple: proForma.metrics.equityMultiple,
+          totalReturn: proForma.metrics.totalReturn
+        },
+        yearOne: {
+          revenue: proForma.revenue.totals[0],
+          expenses: proForma.expenses.totals[0],
+          noi: proForma.noi[0]
+        },
+        exitYear: {
+          revenue: proForma.revenue.totals[proForma.revenue.totals.length - 1],
+          expenses: proForma.expenses.totals[proForma.expenses.totals.length - 1],
+          noi: proForma.noi[proForma.noi.length - 1],
+          exitValue: proForma.metrics.exitValue
+        },
+        growthRates: {
+          revenue: proForma.metrics.revenueGrowthRate,
+          expenses: proForma.metrics.expenseGrowthRate
+        },
+        projectionYears: proForma.years,
+        noiByyear: proForma.noi
+      };
+      
       res.json(summaryData);
     } catch (error) {
       console.error('Failed to fetch executive summary:', error);
@@ -11066,6 +11104,57 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to fetch audit log:', error);
       res.status(500).json({ error: 'Failed to fetch audit log' });
+    }
+  });
+
+  // ==================== SENSITIVITY MATRIX ROUTES ====================
+  
+  // Generate sensitivity matrix for a project
+  app.post('/api/modeling/projects/:projectId/sensitivity-matrix', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { scenarioType = 'base', config, save, name, description } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { sensitivityMatrixService } = await import('./services/sensitivity-matrix-service');
+      const result = await sensitivityMatrixService.generateMatrix(projectId, orgId, scenarioType, config);
+
+      if (save) {
+        const userId = req.user.id;
+        const savedId = await sensitivityMatrixService.saveMatrix(projectId, orgId, userId, result, name, description);
+        result.id = savedId;
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error('Failed to generate sensitivity matrix:', error);
+      res.status(500).json({ error: 'Failed to generate sensitivity matrix' });
+    }
+  });
+
+  // Get saved sensitivity matrices for a project
+  app.get('/api/modeling/projects/:projectId/sensitivity-matrices', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { sensitivityMatrixService } = await import('./services/sensitivity-matrix-service');
+      const matrices = await sensitivityMatrixService.getMatrices(projectId, orgId);
+
+      res.json(matrices);
+    } catch (error) {
+      console.error('Failed to fetch sensitivity matrices:', error);
+      res.status(500).json({ error: 'Failed to fetch sensitivity matrices' });
     }
   });
 

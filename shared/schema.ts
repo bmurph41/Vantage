@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index, customType, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index, customType, decimal, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -8903,6 +8903,47 @@ export const modelingAuditLog = pgTable('modeling_audit_log', {
   dateIdx: index('modeling_audit_date_idx').on(table.createdAt),
 }));
 
+// Modeling Sensitivity Matrix - Store sensitivity analysis results with scenario versioning
+export const modelingSensitivityMatrices = pgTable('modeling_sensitivity_matrices', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  scenarioVersionId: varchar('scenario_version_id').references(() => modelingScenarioVersions.id),
+  
+  // Analysis configuration
+  analysisType: text('analysis_type').notNull(), // 'exit_cap_vs_growth', 'revenue_vs_expenses', 'irr_sensitivity', 'custom'
+  name: text('name'),
+  description: text('description'),
+  
+  // Variable configuration
+  xAxisVariable: text('x_axis_variable').notNull(), // 'exit_cap_rate', 'revenue_growth', etc.
+  xAxisMin: numeric('x_axis_min'),
+  xAxisMax: numeric('x_axis_max'),
+  xAxisStep: numeric('x_axis_step'),
+  
+  yAxisVariable: text('y_axis_variable').notNull(),
+  yAxisMin: numeric('y_axis_min'),
+  yAxisMax: numeric('y_axis_max'),
+  yAxisStep: numeric('y_axis_step'),
+  
+  // Target metric being analyzed
+  targetMetric: text('target_metric').notNull(), // 'irr', 'equity_multiple', 'noi', 'exit_value'
+  
+  // Computed matrix data
+  matrixData: jsonb('matrix_data').notNull(), // 2D array of computed values
+  baselineValue: numeric('baseline_value'),
+  
+  // Metadata
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('sensitivity_org_idx').on(table.orgId),
+  projectIdx: index('sensitivity_project_idx').on(table.modelingProjectId),
+  scenarioIdx: index('sensitivity_scenario_idx').on(table.scenarioVersionId),
+  typeIdx: index('sensitivity_type_idx').on(table.analysisType),
+}));
+
 // Insert schemas for new tables
 export const insertModelingActualsSchema = createInsertSchema(modelingActuals).omit({
   id: true,
@@ -8944,6 +8985,12 @@ export const insertModelingAuditLogSchema = createInsertSchema(modelingAuditLog)
   createdAt: true,
 });
 
+export const insertModelingSensitivityMatrixSchema = createInsertSchema(modelingSensitivityMatrices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Type exports for Operations → Modeling pipeline
 export type ModelingActuals = typeof modelingActuals.$inferSelect;
 export type InsertModelingActuals = z.infer<typeof insertModelingActualsSchema>;
@@ -8965,6 +9012,9 @@ export type InsertModelingScenarioVersion = z.infer<typeof insertModelingScenari
 
 export type ModelingAuditLog = typeof modelingAuditLog.$inferSelect;
 export type InsertModelingAuditLog = z.infer<typeof insertModelingAuditLogSchema>;
+
+export type ModelingSensitivityMatrix = typeof modelingSensitivityMatrices.$inferSelect;
+export type InsertModelingSensitivityMatrix = z.infer<typeof insertModelingSensitivityMatrixSchema>;
 
 // ============================================================================
 // DockTalk 2.0 Schema Integration
