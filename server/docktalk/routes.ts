@@ -1017,6 +1017,62 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // Full article update (edit title, summary, etc.)
+  app.patch("/api/docktalk/articles/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const ArticleUpdateSchema = z.object({
+        title: z.string().min(1).optional(),
+        summary: z.string().optional(),
+        categories: z.array(z.enum(VALID_CATEGORIES)).optional(),
+        region: z.enum(["US/Domestic", "International"]).nullable().optional(),
+        tags: z.array(z.string()).optional(),
+      });
+
+      const id = parseInt(req.params.id);
+      const updates = ArticleUpdateSchema.parse(req.body);
+      
+      const article = await dockTalkStorage.getArticleById(id);
+      if (!article) {
+        return res.status(404).json({ error: "Article not found" });
+      }
+      
+      // If categories are being updated, mark as manually reviewed for AI training
+      const updateData: any = { ...updates };
+      if (updates.categories) {
+        updateData.category = updates.categories[0] || null;
+        updateData.manuallyReviewed = true;
+        updateData.originalCategory = article.category || article.categories?.[0] || "";
+      }
+      
+      const updated = await dockTalkStorage.updateArticle(id, updateData);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid article data", details: error.errors });
+      }
+      console.error("Error updating article:", error);
+      res.status(500).json({ error: "Failed to update article" });
+    }
+  });
+
+  // Delete article permanently
+  app.delete("/api/docktalk/articles/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      const article = await dockTalkStorage.getArticleById(id);
+      if (!article) {
+        return res.status(404).json({ error: "Article not found" });
+      }
+      
+      await dockTalkStorage.deleteArticle(id);
+      res.json({ success: true, message: "Article deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting article:", error);
+      res.status(500).json({ error: "Failed to delete article" });
+    }
+  });
+
   // Auto-recategorize using updated AI logic
   app.post("/api/docktalk/articles/:id/recategorize", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
