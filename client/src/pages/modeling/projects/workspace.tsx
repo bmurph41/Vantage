@@ -22,7 +22,9 @@ import {
   DollarSign,
   CheckCircle2,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Calculator,
+  Target
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
 
@@ -33,6 +35,8 @@ import WorkspaceAssumptions from './workspace/assumptions';
 import WorkspaceHistoricalPL from './workspace/historical-pl';
 import WorkspaceProForma from './workspace/pro-forma';
 import WorkspaceExecutiveSummary from './workspace/executive-summary';
+import WorkspaceDebtScenarios from './workspace/debt-scenarios';
+import WorkspaceExitStrategy from './workspace/exit-strategy';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -132,36 +136,46 @@ export default function ProjectWorkspace() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid" data-testid="tabs-workspace">
-          <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
-            <Home className="h-4 w-4" />
-            <span className="hidden sm:inline">Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="inputs" className="gap-2" data-testid="tab-inputs">
-            <Settings2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Inputs</span>
-          </TabsTrigger>
-          <TabsTrigger value="uploads" className="gap-2" data-testid="tab-uploads">
-            <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">Uploads</span>
-          </TabsTrigger>
-          <TabsTrigger value="assumptions" className="gap-2" data-testid="tab-assumptions">
-            <TrendingUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Assumptions</span>
-          </TabsTrigger>
-          <TabsTrigger value="historical" className="gap-2" data-testid="tab-historical">
-            <FileSpreadsheet className="h-4 w-4" />
-            <span className="hidden sm:inline">Historical P&L</span>
-          </TabsTrigger>
-          <TabsTrigger value="proforma" className="gap-2" data-testid="tab-proforma">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Pro Forma</span>
-          </TabsTrigger>
-          <TabsTrigger value="summary" className="gap-2" data-testid="tab-summary">
-            <ClipboardList className="h-4 w-4" />
-            <span className="hidden sm:inline">Summary</span>
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="inline-flex min-w-full lg:min-w-0" data-testid="tabs-workspace">
+            <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
+              <Home className="h-4 w-4" />
+              <span className="hidden sm:inline">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="inputs" className="gap-2" data-testid="tab-inputs">
+              <Settings2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Inputs</span>
+            </TabsTrigger>
+            <TabsTrigger value="uploads" className="gap-2" data-testid="tab-uploads">
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">Uploads</span>
+            </TabsTrigger>
+            <TabsTrigger value="assumptions" className="gap-2" data-testid="tab-assumptions">
+              <TrendingUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Assumptions</span>
+            </TabsTrigger>
+            <TabsTrigger value="historical" className="gap-2" data-testid="tab-historical">
+              <FileSpreadsheet className="h-4 w-4" />
+              <span className="hidden sm:inline">Historical</span>
+            </TabsTrigger>
+            <TabsTrigger value="proforma" className="gap-2" data-testid="tab-proforma">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Pro Forma</span>
+            </TabsTrigger>
+            <TabsTrigger value="summary" className="gap-2" data-testid="tab-summary">
+              <ClipboardList className="h-4 w-4" />
+              <span className="hidden sm:inline">Summary</span>
+            </TabsTrigger>
+            <TabsTrigger value="debt" className="gap-2" data-testid="tab-debt">
+              <Calculator className="h-4 w-4" />
+              <span className="hidden sm:inline">Debt</span>
+            </TabsTrigger>
+            <TabsTrigger value="exit" className="gap-2" data-testid="tab-exit">
+              <Target className="h-4 w-4" />
+              <span className="hidden sm:inline">Exit</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="space-y-6">
           <WorkspaceOverview project={project} onTabChange={setActiveTab} />
@@ -189,6 +203,14 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="summary" className="space-y-6">
           <WorkspaceExecutiveSummary projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="debt" className="space-y-6">
+          <WorkspaceDebtScenarios projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="exit" className="space-y-6">
+          <WorkspaceExitStrategy projectId={projectId!} />
         </TabsContent>
       </Tabs>
     </div>
