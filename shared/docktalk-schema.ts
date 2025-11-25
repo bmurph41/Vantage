@@ -604,6 +604,41 @@ export const articleFeedback = pgTable("docktalk_article_feedback", {
   uniqueFeedback: uniqueIndex("idx_docktalk_feedback_unique").on(table.articleId, table.userId, table.feedbackType),
 }));
 
+// Global Article Engagement Tables - NOT org-scoped for cross-organization trending
+export const articleViews = pgTable("docktalk_article_views", {
+  id: serial("id").primaryKey(),
+  articleId: integer("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
+  userId: varchar("user_id"), // Optional - can track anonymous views too
+  viewedAt: timestamp("viewed_at").notNull().defaultNow(),
+  sessionId: varchar("session_id"), // For grouping page views in a session
+  referrer: text("referrer"), // Where they came from
+}, (table) => ({
+  byArticle: index("idx_docktalk_views_article").on(table.articleId),
+  byUser: index("idx_docktalk_views_user").on(table.userId),
+  byDate: index("idx_docktalk_views_date").on(table.viewedAt),
+}));
+
+export const articleLikes = pgTable("docktalk_article_likes", {
+  id: serial("id").primaryKey(),
+  articleId: integer("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull(), // Must be logged in to like
+  likedAt: timestamp("liked_at").notNull().defaultNow(),
+}, (table) => ({
+  byArticle: index("idx_docktalk_likes_article").on(table.articleId),
+  byUser: index("idx_docktalk_likes_user").on(table.userId),
+  uniqueLike: uniqueIndex("idx_docktalk_likes_unique").on(table.articleId, table.userId),
+}));
+
+export const insertArticleViewSchema = createInsertSchema(articleViews).omit({
+  id: true,
+  viewedAt: true,
+});
+
+export const insertArticleLikeSchema = createInsertSchema(articleLikes).omit({
+  id: true,
+  likedAt: true,
+});
+
 export const insertUserTagLibrarySchema = createInsertSchema(userTagLibrary).omit({
   id: true,
   createdAt: true,
@@ -670,3 +705,7 @@ export type ArticleTagAssignment = typeof articleTagAssignments.$inferSelect;
 export type InsertArticleTagAssignment = z.infer<typeof insertArticleTagAssignmentSchema>;
 export type ArticleFeedback = typeof articleFeedback.$inferSelect;
 export type InsertArticleFeedback = z.infer<typeof insertArticleFeedbackSchema>;
+export type ArticleView = typeof articleViews.$inferSelect;
+export type InsertArticleView = z.infer<typeof insertArticleViewSchema>;
+export type ArticleLike = typeof articleLikes.$inferSelect;
+export type InsertArticleLike = z.infer<typeof insertArticleLikeSchema>;
