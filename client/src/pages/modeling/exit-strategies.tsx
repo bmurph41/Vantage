@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Calculator, 
   TrendingUp, 
@@ -20,6 +19,114 @@ import {
   Target,
   Info
 } from "lucide-react";
+
+const formatCurrency = (value: number | string): string => {
+  const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+  if (isNaN(num)) return '$0';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(num);
+};
+
+const parseCurrency = (value: string): string => {
+  const num = value.replace(/[^0-9.-]/g, '');
+  return num || '0';
+};
+
+const formatPercent = (value: number | string): string => {
+  const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+  if (isNaN(num)) return '0.00%';
+  return `${num.toFixed(2)}%`;
+};
+
+const parsePercent = (value: string): string => {
+  const num = value.replace(/[^0-9.-]/g, '');
+  return num || '0';
+};
+
+interface CurrencyInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  "data-testid"?: string;
+}
+
+function CurrencyInput({ value, onChange, "data-testid": testId }: CurrencyInputProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [displayValue, setDisplayValue] = useState(formatCurrency(value));
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setDisplayValue(value);
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const parsed = parseCurrency(displayValue);
+    onChange(parsed);
+    setDisplayValue(formatCurrency(parsed));
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isFocused) {
+      setDisplayValue(e.target.value);
+    }
+  };
+
+  return (
+    <Input
+      type={isFocused ? "number" : "text"}
+      value={isFocused ? displayValue : formatCurrency(value)}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      data-testid={testId}
+    />
+  );
+}
+
+interface PercentInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  "data-testid"?: string;
+}
+
+function PercentInput({ value, onChange, "data-testid": testId }: PercentInputProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [displayValue, setDisplayValue] = useState(formatPercent(value));
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setDisplayValue(value);
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const parsed = parsePercent(displayValue);
+    onChange(parsed);
+    setDisplayValue(formatPercent(parsed));
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isFocused) {
+      setDisplayValue(e.target.value);
+    }
+  };
+
+  return (
+    <Input
+      type={isFocused ? "number" : "text"}
+      value={isFocused ? displayValue : formatPercent(value)}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      step="0.01"
+      data-testid={testId}
+    />
+  );
+}
 
 const exitTools = [
   { 
@@ -258,29 +365,26 @@ function TaxCalculatorPanel() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Sale Price ($)</Label>
-              <Input 
-                type="number" 
+              <Label>Sale Price</Label>
+              <CurrencyInput 
                 value={salePrice} 
-                onChange={(e) => setSalePrice(e.target.value)}
+                onChange={setSalePrice}
                 data-testid="input-sale-price"
               />
             </div>
             <div>
-              <Label>Cost Basis ($)</Label>
-              <Input 
-                type="number" 
+              <Label>Cost Basis</Label>
+              <CurrencyInput 
                 value={costBasis} 
-                onChange={(e) => setCostBasis(e.target.value)}
+                onChange={setCostBasis}
                 data-testid="input-cost-basis"
               />
             </div>
             <div>
-              <Label>Depreciation Recapture ($)</Label>
-              <Input 
-                type="number" 
+              <Label>Depreciation Recapture</Label>
+              <CurrencyInput 
                 value={depreciationRecapture} 
-                onChange={(e) => setDepreciationRecapture(e.target.value)}
+                onChange={setDepreciationRecapture}
                 data-testid="input-depreciation"
               />
             </div>
@@ -294,20 +398,18 @@ function TaxCalculatorPanel() {
               />
             </div>
             <div>
-              <Label>Federal Cap Gains Rate (%)</Label>
-              <Input 
-                type="number" 
+              <Label>Federal Cap Gains Rate</Label>
+              <PercentInput 
                 value={taxRate} 
-                onChange={(e) => setTaxRate(e.target.value)}
+                onChange={setTaxRate}
                 data-testid="input-fed-rate"
               />
             </div>
             <div>
-              <Label>State Tax Rate (%)</Label>
-              <Input 
-                type="number" 
+              <Label>State Tax Rate</Label>
+              <PercentInput 
                 value={stateRate} 
-                onChange={(e) => setStateRate(e.target.value)}
+                onChange={setStateRate}
                 data-testid="input-state-rate"
               />
             </div>
@@ -323,31 +425,31 @@ function TaxCalculatorPanel() {
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Capital Gain</span>
-              <span className="font-semibold" data-testid="text-capital-gain">${results.capitalGain.toLocaleString()}</span>
+              <span className="font-semibold" data-testid="text-capital-gain">{formatCurrency(results.capitalGain)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Federal Tax</span>
-              <span className="text-red-600" data-testid="text-federal-tax">-${results.federalTax.toLocaleString()}</span>
+              <span className="text-red-600" data-testid="text-federal-tax">-{formatCurrency(results.federalTax)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">State Tax</span>
-              <span className="text-red-600" data-testid="text-state-tax">-${results.stateTax.toLocaleString()}</span>
+              <span className="text-red-600" data-testid="text-state-tax">-{formatCurrency(results.stateTax)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Depreciation Recapture (25%)</span>
-              <span className="text-red-600" data-testid="text-dep-recapture">-${results.depTax.toLocaleString()}</span>
+              <span className="text-red-600" data-testid="text-dep-recapture">-{formatCurrency(results.depTax)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">NIIT (3.8%)</span>
-              <span className="text-red-600" data-testid="text-niit">-${results.niit.toLocaleString()}</span>
+              <span className="text-red-600" data-testid="text-niit">-{formatCurrency(results.niit)}</span>
             </div>
             <div className="flex justify-between py-3 bg-muted/50 rounded-lg px-3">
               <span className="font-semibold">Total Tax Liability</span>
-              <span className="font-bold text-red-600" data-testid="text-total-tax">${results.totalTax.toLocaleString()}</span>
+              <span className="font-bold text-red-600" data-testid="text-total-tax">{formatCurrency(results.totalTax)}</span>
             </div>
             <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
               <span className="font-semibold">Net Proceeds After Tax</span>
-              <span className="font-bold text-green-600" data-testid="text-net-proceeds">${results.netProceeds.toLocaleString()}</span>
+              <span className="font-bold text-green-600" data-testid="text-net-proceeds">{formatCurrency(results.netProceeds)}</span>
             </div>
           </div>
         </CardContent>
@@ -394,24 +496,24 @@ function NetProceedsPanel() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Sale Price ($)</Label>
-              <Input type="number" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
+              <Label>Sale Price</Label>
+              <CurrencyInput value={salePrice} onChange={setSalePrice} />
             </div>
             <div>
-              <Label>Loan Balance ($)</Label>
-              <Input type="number" value={loanBalance} onChange={(e) => setLoanBalance(e.target.value)} />
+              <Label>Loan Balance</Label>
+              <CurrencyInput value={loanBalance} onChange={setLoanBalance} />
             </div>
             <div>
-              <Label>Closing Costs ($)</Label>
-              <Input type="number" value={closingCosts} onChange={(e) => setClosingCosts(e.target.value)} />
+              <Label>Closing Costs</Label>
+              <CurrencyInput value={closingCosts} onChange={setClosingCosts} />
             </div>
             <div>
-              <Label>Broker Fee (%)</Label>
-              <Input type="number" value={brokerFee} onChange={(e) => setBrokerFee(e.target.value)} />
+              <Label>Broker Fee</Label>
+              <PercentInput value={brokerFee} onChange={setBrokerFee} />
             </div>
             <div className="col-span-2">
-              <Label>Estimated Taxes ($)</Label>
-              <Input type="number" value={taxes} onChange={(e) => setTaxes(e.target.value)} />
+              <Label>Estimated Taxes</Label>
+              <CurrencyInput value={taxes} onChange={setTaxes} />
             </div>
           </div>
         </CardContent>
@@ -425,27 +527,27 @@ function NetProceedsPanel() {
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Gross Sale Price</span>
-              <span className="font-semibold">${parseFloat(salePrice).toLocaleString()}</span>
+              <span className="font-semibold">{formatCurrency(salePrice)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Loan Payoff</span>
-              <span className="text-red-600">-${parseFloat(loanBalance).toLocaleString()}</span>
+              <span className="text-red-600">-{formatCurrency(loanBalance)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Broker Commission</span>
-              <span className="text-red-600">-${results.brokerCost.toLocaleString()}</span>
+              <span className="text-red-600">-{formatCurrency(results.brokerCost)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Closing Costs</span>
-              <span className="text-red-600">-${parseFloat(closingCosts).toLocaleString()}</span>
+              <span className="text-red-600">-{formatCurrency(closingCosts)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Taxes</span>
-              <span className="text-red-600">-${parseFloat(taxes).toLocaleString()}</span>
+              <span className="text-red-600">-{formatCurrency(taxes)}</span>
             </div>
             <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
               <span className="font-semibold">Net Cash Proceeds</span>
-              <span className="font-bold text-green-600">${results.netProceeds.toLocaleString()}</span>
+              <span className="font-bold text-green-600">{formatCurrency(results.netProceeds)}</span>
             </div>
           </div>
         </CardContent>
@@ -479,16 +581,16 @@ function Exchange1031Panel() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Relinquished Property Value ($)</Label>
-              <Input type="number" value={relinquishedValue} onChange={(e) => setRelinquishedValue(e.target.value)} />
+              <Label>Relinquished Property Value</Label>
+              <CurrencyInput value={relinquishedValue} onChange={setRelinquishedValue} />
             </div>
             <div>
-              <Label>Replacement Property Value ($)</Label>
-              <Input type="number" value={replacementValue} onChange={(e) => setReplacementValue(e.target.value)} />
+              <Label>Replacement Property Value</Label>
+              <CurrencyInput value={replacementValue} onChange={setReplacementValue} />
             </div>
             <div>
-              <Label>Boot Received ($)</Label>
-              <Input type="number" value={bootReceived} onChange={(e) => setBootReceived(e.target.value)} />
+              <Label>Boot Received</Label>
+              <CurrencyInput value={bootReceived} onChange={setBootReceived} />
             </div>
             <div>
               <Label>Identification Period (Days)</Label>
@@ -506,11 +608,11 @@ function Exchange1031Panel() {
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Deferred Gain</span>
-              <span className="font-semibold text-green-600">${deferredGain.toLocaleString()}</span>
+              <span className="font-semibold text-green-600">{formatCurrency(deferredGain)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Taxable Boot</span>
-              <span className="text-red-600">${taxableGain.toLocaleString()}</span>
+              <span className="text-red-600">{formatCurrency(taxableGain)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">ID Deadline</span>
@@ -550,12 +652,12 @@ function DSTAnalysisPanel() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Investment Amount ($)</Label>
-              <Input type="number" value={investmentAmount} onChange={(e) => setInvestmentAmount(e.target.value)} />
+              <Label>Investment Amount</Label>
+              <CurrencyInput value={investmentAmount} onChange={setInvestmentAmount} />
             </div>
             <div>
-              <Label>Distribution Rate (%)</Label>
-              <Input type="number" value={distributionRate} onChange={(e) => setDistributionRate(e.target.value)} />
+              <Label>Distribution Rate</Label>
+              <PercentInput value={distributionRate} onChange={setDistributionRate} />
             </div>
             <div>
               <Label>Hold Period (Years)</Label>
@@ -573,11 +675,11 @@ function DSTAnalysisPanel() {
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Annual Distribution</span>
-              <span className="font-semibold text-green-600">${annualDistribution.toLocaleString()}</span>
+              <span className="font-semibold text-green-600">{formatCurrency(annualDistribution)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Total Distributions</span>
-              <span className="font-semibold">${totalDistributions.toLocaleString()}</span>
+              <span className="font-semibold">{formatCurrency(totalDistributions)}</span>
             </div>
           </div>
         </CardContent>
@@ -613,16 +715,16 @@ function SellerFinancingPanel() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Sale Price ($)</Label>
-              <Input type="number" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
+              <Label>Sale Price</Label>
+              <CurrencyInput value={salePrice} onChange={setSalePrice} />
             </div>
             <div>
-              <Label>Down Payment ($)</Label>
-              <Input type="number" value={downPayment} onChange={(e) => setDownPayment(e.target.value)} />
+              <Label>Down Payment</Label>
+              <CurrencyInput value={downPayment} onChange={setDownPayment} />
             </div>
             <div>
-              <Label>Interest Rate (%)</Label>
-              <Input type="number" value={interestRate} onChange={(e) => setInterestRate(e.target.value)} />
+              <Label>Interest Rate</Label>
+              <PercentInput value={interestRate} onChange={setInterestRate} />
             </div>
             <div>
               <Label>Term (Years)</Label>
@@ -640,15 +742,15 @@ function SellerFinancingPanel() {
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Loan Amount</span>
-              <span className="font-semibold">${loanAmount.toLocaleString()}</span>
+              <span className="font-semibold">{formatCurrency(loanAmount)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Monthly Payment</span>
-              <span className="font-semibold text-green-600">${monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+              <span className="font-semibold text-green-600">{formatCurrency(monthlyPayment)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Total Interest</span>
-              <span>${totalInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+              <span>{formatCurrency(totalInterest)}</span>
             </div>
           </div>
         </CardContent>
@@ -680,16 +782,16 @@ function EarnoutPanel() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Base Price ($)</Label>
-              <Input type="number" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} />
+              <Label>Base Price</Label>
+              <CurrencyInput value={basePrice} onChange={setBasePrice} />
             </div>
             <div>
-              <Label>Maximum Earnout ($)</Label>
-              <Input type="number" value={earnoutMax} onChange={(e) => setEarnoutMax(e.target.value)} />
+              <Label>Maximum Earnout</Label>
+              <CurrencyInput value={earnoutMax} onChange={setEarnoutMax} />
             </div>
             <div>
-              <Label>Achievement Probability (%)</Label>
-              <Input type="number" value={probability} onChange={(e) => setProbability(e.target.value)} />
+              <Label>Achievement Probability</Label>
+              <PercentInput value={probability} onChange={setProbability} />
             </div>
           </div>
         </CardContent>
@@ -703,11 +805,11 @@ function EarnoutPanel() {
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Expected Earnout</span>
-              <span className="font-semibold text-green-600">${expectedEarnout.toLocaleString()}</span>
+              <span className="font-semibold text-green-600">{formatCurrency(expectedEarnout)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Total Expected Value</span>
-              <span className="font-semibold">${totalExpected.toLocaleString()}</span>
+              <span className="font-semibold">{formatCurrency(totalExpected)}</span>
             </div>
           </div>
         </CardContent>
@@ -742,20 +844,20 @@ function WaterfallPanel() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Total Distribution ($)</Label>
-              <Input type="number" value={totalDistribution} onChange={(e) => setTotalDistribution(e.target.value)} />
+              <Label>Total Distribution</Label>
+              <CurrencyInput value={totalDistribution} onChange={setTotalDistribution} />
             </div>
             <div>
-              <Label>LP Capital ($)</Label>
-              <Input type="number" value={lpCapital} onChange={(e) => setLpCapital(e.target.value)} />
+              <Label>LP Capital</Label>
+              <CurrencyInput value={lpCapital} onChange={setLpCapital} />
             </div>
             <div>
-              <Label>Preferred Return (%)</Label>
-              <Input type="number" value={preferredReturn} onChange={(e) => setPreferredReturn(e.target.value)} />
+              <Label>Preferred Return</Label>
+              <PercentInput value={preferredReturn} onChange={setPreferredReturn} />
             </div>
             <div>
-              <Label>Carried Interest (%)</Label>
-              <Input type="number" value={carriedInterest} onChange={(e) => setCarriedInterest(e.target.value)} />
+              <Label>Carried Interest</Label>
+              <PercentInput value={carriedInterest} onChange={setCarriedInterest} />
             </div>
           </div>
         </CardContent>
@@ -769,19 +871,19 @@ function WaterfallPanel() {
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">LP Preferred Return</span>
-              <span className="font-semibold">${prefAmount.toLocaleString()}</span>
+              <span className="font-semibold">{formatCurrency(prefAmount)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">LP Capital Return</span>
-              <span className="font-semibold">${parseFloat(lpCapital).toLocaleString()}</span>
+              <span className="font-semibold">{formatCurrency(lpCapital)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">GP Carried Interest</span>
-              <span className="font-semibold">${gpCarry.toLocaleString()}</span>
+              <span className="font-semibold">{formatCurrency(gpCarry)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">LP Profit Share</span>
-              <span className="font-semibold text-green-600">${lpShare.toLocaleString()}</span>
+              <span className="font-semibold text-green-600">{formatCurrency(lpShare)}</span>
             </div>
           </div>
         </CardContent>
@@ -838,24 +940,24 @@ function IRRCalculatorPanel() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Initial Investment ($)</Label>
-              <Input type="number" value={initialInvestment} onChange={(e) => setInitialInvestment(e.target.value)} />
+              <Label>Initial Investment</Label>
+              <CurrencyInput value={initialInvestment} onChange={setInitialInvestment} />
             </div>
             <div>
-              <Label>Year 1 Cash Flow ($)</Label>
-              <Input type="number" value={year1} onChange={(e) => setYear1(e.target.value)} />
+              <Label>Year 1 Cash Flow</Label>
+              <CurrencyInput value={year1} onChange={setYear1} />
             </div>
             <div>
-              <Label>Year 2 Cash Flow ($)</Label>
-              <Input type="number" value={year2} onChange={(e) => setYear2(e.target.value)} />
+              <Label>Year 2 Cash Flow</Label>
+              <CurrencyInput value={year2} onChange={setYear2} />
             </div>
             <div>
-              <Label>Year 3 Cash Flow ($)</Label>
-              <Input type="number" value={year3} onChange={(e) => setYear3(e.target.value)} />
+              <Label>Year 3 Cash Flow</Label>
+              <CurrencyInput value={year3} onChange={setYear3} />
             </div>
             <div className="col-span-2">
-              <Label>Exit Value ($)</Label>
-              <Input type="number" value={exitValue} onChange={(e) => setExitValue(e.target.value)} />
+              <Label>Exit Value</Label>
+              <CurrencyInput value={exitValue} onChange={setExitValue} />
             </div>
           </div>
         </CardContent>
@@ -877,7 +979,7 @@ function IRRCalculatorPanel() {
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Total Profit</span>
-              <span className="font-semibold text-green-600">${totalCashFlow.toLocaleString()}</span>
+              <span className="font-semibold text-green-600">{formatCurrency(totalCashFlow)}</span>
             </div>
           </div>
         </CardContent>
@@ -912,12 +1014,12 @@ function SensitivityPanel() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4 max-w-md">
             <div>
-              <Label>Base NOI ($)</Label>
-              <Input type="number" value={baseNOI} onChange={(e) => setBaseNOI(e.target.value)} />
+              <Label>Base NOI</Label>
+              <CurrencyInput value={baseNOI} onChange={setBaseNOI} />
             </div>
             <div>
-              <Label>Base Cap Rate (%)</Label>
-              <Input type="number" value={baseCapRate} onChange={(e) => setBaseCapRate(e.target.value)} />
+              <Label>Base Cap Rate</Label>
+              <PercentInput value={baseCapRate} onChange={setBaseCapRate} />
             </div>
           </div>
         </CardContent>
@@ -935,7 +1037,7 @@ function SensitivityPanel() {
                 <tr className="border-b">
                   <th className="p-2 text-left">NOI / Cap Rate</th>
                   {capRates.map(cr => (
-                    <th key={cr} className="p-2 text-center">{cr}%</th>
+                    <th key={cr} className="p-2 text-center">{formatPercent(cr)}</th>
                   ))}
                 </tr>
               </thead>
@@ -945,7 +1047,7 @@ function SensitivityPanel() {
                   return (
                     <tr key={change} className="border-b">
                       <td className="p-2 font-medium">
-                        ${noi.toLocaleString()} ({change >= 0 ? '+' : ''}{change}%)
+                        {formatCurrency(noi)} ({change >= 0 ? '+' : ''}{change}%)
                       </td>
                       {capRates.map(cr => {
                         const value = calculateValue(noi, cr);
