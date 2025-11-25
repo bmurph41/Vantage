@@ -11040,6 +11040,189 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ============================================================================
+  // QUICKBOOKS INTEGRATION - OAuth2 Connection and P&L Sync
+  // ============================================================================
+
+  // Get QuickBooks connection status
+  app.get('/api/quickbooks/status', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { quickBooksService } = await import('./services/quickbooks-service');
+      const status = await quickBooksService.getConnectionStatus(orgId);
+      res.json(status);
+    } catch (error) {
+      console.error('Failed to get QuickBooks status:', error);
+      res.status(500).json({ error: 'Failed to get connection status' });
+    }
+  });
+
+  // Get QuickBooks authorization URL
+  app.get('/api/quickbooks/auth-url', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { quickBooksService } = await import('./services/quickbooks-service');
+      const authUrl = quickBooksService.getAuthorizationUrl(orgId);
+      res.json({ authUrl });
+    } catch (error) {
+      console.error('Failed to generate auth URL:', error);
+      res.status(500).json({ error: 'Failed to generate authorization URL' });
+    }
+  });
+
+  // QuickBooks OAuth callback
+  app.get('/api/quickbooks/callback', async (req, res) => {
+    try {
+      const { code, realmId, state, error: oauthError } = req.query;
+      
+      if (oauthError) {
+        console.error('QuickBooks OAuth error:', oauthError);
+        return res.redirect('/settings/integrations?qb_error=authorization_denied');
+      }
+
+      if (!code || !realmId || !state) {
+        return res.redirect('/settings/integrations?qb_error=missing_params');
+      }
+
+      const { quickBooksService } = await import('./services/quickbooks-service');
+      await quickBooksService.handleCallback(
+        code as string,
+        realmId as string,
+        state as string
+      );
+
+      res.redirect('/settings/integrations?qb_connected=true');
+    } catch (error) {
+      console.error('Failed to handle QuickBooks callback:', error);
+      res.redirect('/settings/integrations?qb_error=connection_failed');
+    }
+  });
+
+  // Disconnect QuickBooks
+  app.post('/api/quickbooks/disconnect', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { quickBooksService } = await import('./services/quickbooks-service');
+      await quickBooksService.disconnect(orgId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to disconnect QuickBooks:', error);
+      res.status(500).json({ error: 'Failed to disconnect' });
+    }
+  });
+
+  // Get QuickBooks company info
+  app.get('/api/quickbooks/company', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { quickBooksService } = await import('./services/quickbooks-service');
+      const companyInfo = await quickBooksService.getCompanyInfo(orgId);
+      res.json(companyInfo);
+    } catch (error) {
+      console.error('Failed to get company info:', error);
+      res.status(500).json({ error: 'Failed to get company information' });
+    }
+  });
+
+  // Get QuickBooks chart of accounts
+  app.get('/api/quickbooks/accounts', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { quickBooksService } = await import('./services/quickbooks-service');
+      const accounts = await quickBooksService.getChartOfAccounts(orgId);
+      res.json(accounts);
+    } catch (error) {
+      console.error('Failed to get chart of accounts:', error);
+      res.status(500).json({ error: 'Failed to get chart of accounts' });
+    }
+  });
+
+  // Get QuickBooks P&L report
+  app.get('/api/quickbooks/profit-and-loss', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'Start date and end date are required' });
+      }
+
+      const { quickBooksService } = await import('./services/quickbooks-service');
+      const report = await quickBooksService.getProfitAndLoss(
+        orgId,
+        startDate as string,
+        endDate as string
+      );
+      res.json(report);
+    } catch (error) {
+      console.error('Failed to get P&L report:', error);
+      res.status(500).json({ error: 'Failed to get Profit & Loss report' });
+    }
+  });
+
+  // Sync QuickBooks P&L to modeling actuals
+  app.post('/api/quickbooks/sync/:projectId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { startDate, endDate } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'Start date and end date are required' });
+      }
+
+      const { quickBooksService } = await import('./services/quickbooks-service');
+      const result = await quickBooksService.syncProfitAndLossToActuals(
+        orgId,
+        projectId,
+        startDate,
+        endDate
+      );
+      res.json(result);
+    } catch (error) {
+      console.error('Failed to sync QuickBooks data:', error);
+      res.status(500).json({ error: 'Failed to sync QuickBooks data' });
+    }
+  });
+
+  // Get QuickBooks sync history
+  app.get('/api/quickbooks/sync-history', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const { quickBooksService } = await import('./services/quickbooks-service');
+      const history = await quickBooksService.getSyncHistory(orgId, limit);
+      res.json(history);
+    } catch (error) {
+      console.error('Failed to get sync history:', error);
+      res.status(500).json({ error: 'Failed to get sync history' });
+    }
+  });
+
+  // Update account mapping
+  app.post('/api/quickbooks/account-mapping', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { mapping } = req.body;
+      
+      if (!mapping) {
+        return res.status(400).json({ error: 'Mapping data is required' });
+      }
+
+      const { quickBooksService } = await import('./services/quickbooks-service');
+      await quickBooksService.updateAccountMapping(orgId, mapping);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to update account mapping:', error);
+      res.status(500).json({ error: 'Failed to update account mapping' });
+    }
+  });
+
+  // ============================================================================
   // DOCUMENT INTELLIGENCE - AI-Powered Financial Document Parsing
   // ============================================================================
 
