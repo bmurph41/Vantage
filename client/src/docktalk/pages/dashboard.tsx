@@ -43,6 +43,10 @@ export default function Dashboard() {
     setLocation('/docktalk/sources');
   };
 
+  const handleArticleManagementClick = () => {
+    setLocation('/docktalk/article-management');
+  };
+
   // Check if we're on a settings/notification page (show Articles button)
   const isSettingsPage = location === "/docktalk/notifications" || location === "/docktalk/sources";
 
@@ -55,6 +59,7 @@ export default function Dashboard() {
           onArticlesClick={handleArticlesClick}
           onNotificationClick={handleNotificationClick}
           onSettingsClick={handleSettingsClick}
+          onArticleManagementClick={handleArticleManagementClick}
           showArticlesButton={true}
         />
         <div className="flex-1 overflow-auto p-6">
@@ -73,6 +78,7 @@ export default function Dashboard() {
           onArticlesClick={handleArticlesClick}
           onNotificationClick={handleNotificationClick}
           onSettingsClick={handleSettingsClick}
+          onArticleManagementClick={handleArticleManagementClick}
           showArticlesButton={true}
         />
         <div className="flex-1 overflow-auto p-6">
@@ -90,6 +96,7 @@ export default function Dashboard() {
         onArticlesClick={handleArticlesClick}
         onNotificationClick={handleNotificationClick}
         onSettingsClick={handleSettingsClick}
+        onArticleManagementClick={handleArticleManagementClick}
         showArticlesButton={false}
       />
 

@@ -1,0 +1,602 @@
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "../lib/queryClient";
+import { fetchArticles, updateArticleCategory, removeArticle, fetchSystemStats } from "../lib/api";
+import { Article, ArticleFilters } from "../types/article";
+import DockTalkHeader from "../components/DockTalkHeader";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  Brain, 
+  Trash2, 
+  Edit, 
+  Search, 
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Filter,
+  CheckCircle2,
+  XCircle,
+  RefreshCw
+} from "lucide-react";
+import { formatDistanceToNow, format } from "date-fns";
+import { cn } from "@/lib/utils";
+
+const AVAILABLE_CATEGORIES = [
+  "Macro",
+  "Development", 
+  "Operations",
+  "Regulatory",
+  "Environmental",
+  "Technology",
+  "General",
+  "Boat Sales",
+  "Industry Trends",
+  "Marina Sale",
+  "Education",
+  "Insurance",
+  "Legal"
+];
+
+const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
+  "Macro": { bg: "bg-blue-100", text: "text-blue-700" },
+  "Development": { bg: "bg-purple-100", text: "text-purple-700" },
+  "Operations": { bg: "bg-orange-100", text: "text-orange-700" },
+  "Regulatory": { bg: "bg-red-100", text: "text-red-700" },
+  "Environmental": { bg: "bg-green-100", text: "text-green-700" },
+  "Technology": { bg: "bg-indigo-100", text: "text-indigo-700" },
+  "General": { bg: "bg-gray-100", text: "text-gray-700" },
+  "Boat Sales": { bg: "bg-cyan-100", text: "text-cyan-700" },
+  "Industry Trends": { bg: "bg-amber-100", text: "text-amber-700" },
+  "Marina Sale": { bg: "bg-rose-100", text: "text-rose-700" },
+  "Education": { bg: "bg-emerald-100", text: "text-emerald-700" },
+  "Insurance": { bg: "bg-yellow-100", text: "text-yellow-700" },
+  "Legal": { bg: "bg-pink-100", text: "text-pink-700" }
+};
+
+const PAGE_SIZE = 25;
+
+export default function ArticleManagementPage() {
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [page, setPage] = useState(0);
+  const [selectedArticles, setSelectedArticles] = useState<number[]>([]);
+  
+  const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+  const [editCategories, setEditCategories] = useState<string[]>([]);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  
+  const [removeArticleId, setRemoveArticleId] = useState<number | null>(null);
+  const [removeReason, setRemoveReason] = useState("");
+
+  const { data: systemStats } = useQuery({
+    queryKey: ['/api/docktalk/analytics/stats'],
+    queryFn: fetchSystemStats,
+    refetchInterval: 60 * 1000,
+  });
+
+  const handleArticlesClick = () => setLocation('/docktalk');
+  const handleNotificationClick = () => setLocation('/docktalk/notifications');
+  const handleSettingsClick = () => setLocation('/docktalk/sources');
+
+  const filters: ArticleFilters = {
+    search: search || undefined,
+    categories: categoryFilter.length > 0 ? categoryFilter : undefined,
+    source: sourceFilter || undefined,
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
+    sortBy: 'newest'
+  };
+
+  const { data: articles = [], isLoading, refetch } = useQuery<Article[]>({
+    queryKey: ['/api/docktalk/articles', filters],
+    queryFn: () => fetchArticles(filters),
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: ({ id, categories }: { id: number; categories: string[] }) =>
+      updateArticleCategory(id, categories),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles'] });
+      setIsEditDialogOpen(false);
+      setEditingArticle(null);
+      toast({
+        title: "Categories Updated",
+        description: "Article categories have been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update categories",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeArticleMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      removeArticle(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles'] });
+      setRemoveArticleId(null);
+      setRemoveReason("");
+      toast({
+        title: "Article Removed",
+        description: "Article has been removed from the feed. This helps train the AI.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to remove article",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditCategories = (article: Article) => {
+    setEditingArticle(article);
+    setEditCategories(article.categories || []);
+    setIsEditDialogOpen(true);
+  };
+
+  const toggleCategory = (category: string) => {
+    setEditCategories(prev => 
+      prev.includes(category) 
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    );
+  };
+
+  const handleSaveCategories = () => {
+    if (editingArticle) {
+      updateCategoryMutation.mutate({ 
+        id: editingArticle.id, 
+        categories: editCategories 
+      });
+    }
+  };
+
+  const handleRemoveArticle = () => {
+    if (removeArticleId && removeReason.trim()) {
+      removeArticleMutation.mutate({ 
+        id: removeArticleId, 
+        reason: removeReason 
+      });
+    }
+  };
+
+  const toggleSelectArticle = (id: number) => {
+    setSelectedArticles(prev =>
+      prev.includes(id)
+        ? prev.filter(a => a !== id)
+        : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedArticles.length === articles.length) {
+      setSelectedArticles([]);
+    } else {
+      setSelectedArticles(articles.map(a => a.id));
+    }
+  };
+
+  const uniqueSources = [...new Set(articles.map(a => a.source))].filter(Boolean);
+
+  return (
+    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
+      <DockTalkHeader
+        newArticlesCount={systemStats?.newArticlesToday || 0}
+        onArticlesClick={handleArticlesClick}
+        onNotificationClick={handleNotificationClick}
+        onSettingsClick={handleSettingsClick}
+        showArticlesButton={true}
+      />
+      <div className="flex-1 overflow-auto p-6">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+                <Brain className="h-8 w-8 text-purple-500" />
+                Article Management
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Review, categorize, and remove articles to train the AI
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+
+          <Card>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search articles by title or content..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(0);
+                }}
+                className="pl-10"
+                data-testid="input-search"
+              />
+            </div>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full md:w-auto">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Categories ({categoryFilter.length || "All"})
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56">
+                <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {AVAILABLE_CATEGORIES.map((cat) => (
+                  <DropdownMenuCheckboxItem
+                    key={cat}
+                    checked={categoryFilter.includes(cat)}
+                    onCheckedChange={(checked) => {
+                      setCategoryFilter(prev =>
+                        checked 
+                          ? [...prev, cat]
+                          : prev.filter(c => c !== cat)
+                      );
+                      setPage(0);
+                    }}
+                  >
+                    {cat}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                {categoryFilter.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                      checked={false}
+                      onCheckedChange={() => setCategoryFilter([])}
+                    >
+                      Clear All
+                    </DropdownMenuCheckboxItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Select value={sourceFilter} onValueChange={(v) => { setSourceFilter(v === "all" ? "" : v); setPage(0); }}>
+              <SelectTrigger className="w-full md:w-[180px]" data-testid="select-source">
+                <SelectValue placeholder="All Sources" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sources</SelectItem>
+                {uniqueSources.map((source) => (
+                  <SelectItem key={source} value={source}>{source}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : articles.length > 0 ? (
+            <>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={selectedArticles.length === articles.length && articles.length > 0}
+                          onCheckedChange={toggleSelectAll}
+                          data-testid="checkbox-select-all"
+                        />
+                      </TableHead>
+                      <TableHead className="min-w-[300px]">Article</TableHead>
+                      <TableHead>Categories</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Published</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {articles.map((article) => (
+                      <TableRow key={article.id} data-testid={`article-row-${article.id}`}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedArticles.includes(article.id)}
+                            onCheckedChange={() => toggleSelectArticle(article.id)}
+                            data-testid={`checkbox-article-${article.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-md">
+                            <a 
+                              href={article.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium hover:underline flex items-center gap-1 line-clamp-2"
+                            >
+                              {article.title}
+                              <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-50" />
+                            </a>
+                            {article.summary && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                                {article.summary}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {article.categories && article.categories.length > 0 ? (
+                              article.categories.map((cat) => {
+                                const style = CATEGORY_COLORS[cat] || CATEGORY_COLORS["General"];
+                                return (
+                                  <Badge 
+                                    key={cat} 
+                                    className={cn("text-xs", style.bg, style.text)}
+                                    variant="secondary"
+                                  >
+                                    {cat}
+                                  </Badge>
+                                );
+                              })
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Uncategorized</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{article.source}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">
+                            {article.publishedAt 
+                              ? formatDistanceToNow(new Date(article.publishedAt), { addSuffix: true })
+                              : "Unknown"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {article.manuallyReviewed ? (
+                            <Badge variant="outline" className="text-green-600 border-green-300">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Reviewed
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-gray-500">
+                              AI Assigned
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditCategories(article)}
+                              data-testid={`button-edit-${article.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setRemoveArticleId(article.id)}
+                              className="text-destructive hover:text-destructive"
+                              data-testid={`button-remove-${article.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-muted-foreground">
+                  Showing {page * PAGE_SIZE + 1} - {page * PAGE_SIZE + articles.length} articles
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                    data-testid="button-prev-page"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={articles.length < PAGE_SIZE}
+                    data-testid="button-next-page"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h3 className="font-medium mb-1">No Articles Found</h3>
+              <p className="text-sm text-muted-foreground">
+                {search || categoryFilter.length > 0 || sourceFilter
+                  ? "Try adjusting your filters"
+                  : "Articles will appear here once RSS feeds are fetched"}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Categories</DialogTitle>
+            <DialogDescription>
+              {editingArticle && (
+                <span className="line-clamp-2">{editingArticle.title}</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <p className="text-sm font-medium mb-3">Select Categories:</p>
+            <div className="flex flex-wrap gap-2">
+              {AVAILABLE_CATEGORIES.map((cat) => {
+                const isSelected = editCategories.includes(cat);
+                const style = CATEGORY_COLORS[cat] || CATEGORY_COLORS["General"];
+                return (
+                  <Badge
+                    key={cat}
+                    variant={isSelected ? "default" : "outline"}
+                    className={cn(
+                      "cursor-pointer transition-all",
+                      isSelected ? cn(style.bg, style.text) : "hover:bg-muted"
+                    )}
+                    onClick={() => toggleCategory(cat)}
+                    data-testid={`category-toggle-${cat.toLowerCase().replace(/ /g, '-')}`}
+                  >
+                    {isSelected && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                    {cat}
+                  </Badge>
+                );
+              })}
+            </div>
+            
+            {editingArticle?.originalCategory && editingArticle.originalCategory !== (editingArticle.categories?.[0] || '') && (
+              <div className="mt-4 p-3 rounded-lg bg-muted/50">
+                <p className="text-xs text-muted-foreground">
+                  <strong>Original AI Category:</strong> {editingArticle.originalCategory}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveCategories}
+              disabled={updateCategoryMutation.isPending || editCategories.length === 0}
+              data-testid="button-save-categories"
+            >
+              {updateCategoryMutation.isPending ? "Saving..." : "Save Categories"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!removeArticleId} onOpenChange={() => setRemoveArticleId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Article</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the article from the feed and help train the AI to avoid similar content. 
+              Please provide a reason for removal.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Why should this article be removed? (e.g., not relevant, duplicate, spam, low quality)"
+            value={removeReason}
+            onChange={(e) => setRemoveReason(e.target.value)}
+            className="min-h-[80px]"
+            data-testid="input-remove-reason"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setRemoveReason("")}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveArticle}
+              disabled={!removeReason.trim() || removeArticleMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-remove"
+            >
+              {removeArticleMutation.isPending ? "Removing..." : "Remove Article"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+        </div>
+      </div>
+    </div>
+  );
+}

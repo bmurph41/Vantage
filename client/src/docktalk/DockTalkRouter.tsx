@@ -2,6 +2,7 @@ import { Switch, Route } from "wouter";
 import Dashboard from "./pages/dashboard";
 import EntityProfile from "./pages/entity-profile";
 import Admin from "./pages/admin";
+import ArticleManagement from "./pages/article-management";
 import NotFound from "./pages/not-found";
 
 export default function DockTalkRouter() {
@@ -16,6 +17,7 @@ export default function DockTalkRouter() {
       <Route path="/docktalk/watchlists" component={Dashboard} />
       <Route path="/docktalk/notifications" component={Dashboard} />
       <Route path="/docktalk/sources" component={Dashboard} />
+      <Route path="/docktalk/article-management" component={ArticleManagement} />
       <Route path="/docktalk/admin" component={Admin} />
       <Route path="/docktalk/entities/:id" component={EntityProfile} />
       <Route component={NotFound} />

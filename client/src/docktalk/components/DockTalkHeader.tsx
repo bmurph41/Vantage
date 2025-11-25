@@ -1,4 +1,4 @@
-import { Bell, Settings, Newspaper } from "lucide-react";
+import { Bell, Settings, Newspaper, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,6 +9,7 @@ interface DockTalkHeaderProps {
   onArticlesClick: () => void;
   onNotificationClick: () => void;
   onSettingsClick: () => void;
+  onArticleManagementClick?: () => void;
   notificationContent?: React.ReactNode;
   showArticlesButton?: boolean;
 }
@@ -18,6 +19,7 @@ export default function DockTalkHeader({
   onArticlesClick,
   onNotificationClick, 
   onSettingsClick,
+  onArticleManagementClick,
   notificationContent,
   showArticlesButton = false
 }: DockTalkHeaderProps) {
@@ -100,6 +102,25 @@ export default function DockTalkHeader({
               <p>Email Notifications</p>
             </TooltipContent>
           </Tooltip>
+
+          {/* AI Training - Article Management */}
+          {onArticleManagementClick && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onArticleManagementClick}
+                  data-testid="button-article-management"
+                >
+                  <Brain className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>AI Training</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {/* Settings Wheel - Sources Management */}
           <Tooltip>
