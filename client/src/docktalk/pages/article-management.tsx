@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "../lib/queryClient";
-import { fetchArticles, updateArticleCategory, removeArticle, fetchSystemStats } from "../lib/api";
-import { Article, ArticleFilters } from "../types/article";
+import { fetchArticles, updateArticleCategory, removeArticle, fetchSystemStats, fetchCategoryDistribution, fetchSourceDistribution, fetchAllCategories } from "../lib/api";
+import { Article, ArticleFilters, CategoryDistribution, SourceDistribution } from "../types/article";
 import DockTalkHeader from "../components/DockTalkHeader";
 import {
   Card,
@@ -77,8 +77,9 @@ import {
 import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-const AVAILABLE_CATEGORIES = [
+const FALLBACK_CATEGORIES = [
   "Macro",
+  "M&A",
   "Development", 
   "Operations",
   "Regulatory",
@@ -86,27 +87,40 @@ const AVAILABLE_CATEGORIES = [
   "Technology",
   "General",
   "Boat Sales",
+  "Boat Show",
+  "Manufacturing",
   "Industry Trends",
   "Marina Sale",
   "Education",
   "Insurance",
-  "Legal"
+  "Legal",
+  "People Moves",
+  "Company Earnings",
+  "Awards",
+  "Business Planning"
 ];
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
   "Macro": { bg: "bg-blue-100", text: "text-blue-700" },
+  "M&A": { bg: "bg-orange-100", text: "text-orange-700" },
   "Development": { bg: "bg-purple-100", text: "text-purple-700" },
-  "Operations": { bg: "bg-orange-100", text: "text-orange-700" },
+  "Operations": { bg: "bg-slate-100", text: "text-slate-700" },
   "Regulatory": { bg: "bg-red-100", text: "text-red-700" },
   "Environmental": { bg: "bg-green-100", text: "text-green-700" },
   "Technology": { bg: "bg-indigo-100", text: "text-indigo-700" },
   "General": { bg: "bg-gray-100", text: "text-gray-700" },
   "Boat Sales": { bg: "bg-cyan-100", text: "text-cyan-700" },
+  "Boat Show": { bg: "bg-pink-100", text: "text-pink-700" },
+  "Manufacturing": { bg: "bg-stone-100", text: "text-stone-700" },
   "Industry Trends": { bg: "bg-amber-100", text: "text-amber-700" },
   "Marina Sale": { bg: "bg-rose-100", text: "text-rose-700" },
   "Education": { bg: "bg-emerald-100", text: "text-emerald-700" },
   "Insurance": { bg: "bg-yellow-100", text: "text-yellow-700" },
-  "Legal": { bg: "bg-pink-100", text: "text-pink-700" }
+  "Legal": { bg: "bg-fuchsia-100", text: "text-fuchsia-700" },
+  "People Moves": { bg: "bg-teal-100", text: "text-teal-700" },
+  "Company Earnings": { bg: "bg-lime-100", text: "text-lime-700" },
+  "Awards": { bg: "bg-amber-100", text: "text-amber-700" },
+  "Business Planning": { bg: "bg-violet-100", text: "text-violet-700" }
 };
 
 const PAGE_SIZE = 25;
@@ -132,6 +146,35 @@ export default function ArticleManagementPage() {
     queryFn: fetchSystemStats,
     refetchInterval: 60 * 1000,
   });
+
+  // Fetch categories from backend
+  const { data: categoryDistribution = [] } = useQuery<CategoryDistribution[]>({
+    queryKey: ['/api/docktalk/analytics/categories'],
+    queryFn: fetchCategoryDistribution,
+  });
+
+  // Fetch sources from backend
+  const { data: sourceDistribution = [] } = useQuery<SourceDistribution[]>({
+    queryKey: ['/api/docktalk/analytics/sources'],
+    queryFn: fetchSourceDistribution,
+  });
+
+  // Fetch ALL valid categories for editing (not just ones with articles)
+  const { data: allCategories = FALLBACK_CATEGORIES } = useQuery<string[]>({
+    queryKey: ['/api/docktalk/categories/all'],
+    queryFn: fetchAllCategories,
+  });
+
+  // Get available categories from backend for filtering (only categories with articles)
+  const filterCategories = categoryDistribution.length > 0 
+    ? categoryDistribution.map(c => c.category).sort()
+    : FALLBACK_CATEGORIES;
+
+  // Use all categories for editing dialog
+  const availableCategories = allCategories.length > 0 ? allCategories : FALLBACK_CATEGORIES;
+
+  // Get available sources from backend
+  const availableSources = sourceDistribution.map(s => s.source).filter(Boolean).sort();
 
   const handleArticlesClick = () => setLocation('/docktalk');
   const handleNotificationClick = () => setLocation('/docktalk/notifications');
@@ -241,7 +284,10 @@ export default function ArticleManagementPage() {
     }
   };
 
-  const uniqueSources = [...new Set(articles.map(a => a.source))].filter(Boolean);
+  // Use backend sources, or fallback to unique sources from current articles
+  const displaySources = availableSources.length > 0 
+    ? availableSources 
+    : [...new Set(articles.map(a => a.source))].filter(Boolean);
 
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
@@ -297,7 +343,7 @@ export default function ArticleManagementPage() {
               <DropdownMenuContent className="w-56">
                 <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {AVAILABLE_CATEGORIES.map((cat) => (
+                {filterCategories.map((cat) => (
                   <DropdownMenuCheckboxItem
                     key={cat}
                     checked={categoryFilter.includes(cat)}
@@ -333,7 +379,7 @@ export default function ArticleManagementPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Sources</SelectItem>
-                {uniqueSources.map((source) => (
+                {displaySources.map((source) => (
                   <SelectItem key={source} value={source}>{source}</SelectItem>
                 ))}
               </SelectContent>
@@ -521,7 +567,7 @@ export default function ArticleManagementPage() {
           <div className="py-4">
             <p className="text-sm font-medium mb-3">Select Categories:</p>
             <div className="flex flex-wrap gap-2">
-              {AVAILABLE_CATEGORIES.map((cat) => {
+              {availableCategories.map((cat) => {
                 const isSelected = editCategories.includes(cat);
                 const style = CATEGORY_COLORS[cat] || CATEGORY_COLORS["General"];
                 return (

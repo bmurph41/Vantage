@@ -56,7 +56,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const [location] = useLocation();
   const { data: categories = [] } = useQuery({
-    queryKey: ['/api/analytics/categories'],
+    queryKey: ['/api/docktalk/analytics/categories'],
     queryFn: fetchCategoryDistribution,
     refetchInterval: 5 * 60 * 1000,
   });

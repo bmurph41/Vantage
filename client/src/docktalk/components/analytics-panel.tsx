@@ -62,13 +62,13 @@ export default function AnalyticsPanel({ systemStats, statsLoading }: AnalyticsP
   const queryClient = useQueryClient();
 
   const { data: trendingTopics = [], isLoading: trendingLoading } = useQuery({
-    queryKey: ['/api/analytics/trending'],
+    queryKey: ['/api/docktalk/analytics/trending'],
     queryFn: fetchTrendingTopics,
     refetchInterval: 5 * 60 * 1000,
   });
 
   const { data: sourceDistribution = [], isLoading: sourcesLoading } = useQuery({
-    queryKey: ['/api/analytics/sources'],
+    queryKey: ['/api/docktalk/analytics/sources'],
     queryFn: fetchSourceDistribution,
     refetchInterval: 5 * 60 * 1000,
   });

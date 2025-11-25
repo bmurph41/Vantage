@@ -159,14 +159,14 @@ export default function FilterBar({
 }: FilterBarProps) {
   const { toast } = useToast();
   
-  // Fetch available categories
+  // Fetch available categories from backend
   const { data: categoryDistribution = [] } = useQuery<CategoryDistribution[]>({
-    queryKey: ['/api/analytics/categories'],
+    queryKey: ['/api/docktalk/analytics/categories'],
   });
 
-  // Fetch available sources
+  // Fetch available sources from backend (active RSS sources)
   const { data: sourceDistribution = [] } = useQuery<SourceDistribution[]>({
-    queryKey: ['/api/analytics/sources'],
+    queryKey: ['/api/docktalk/analytics/sources'],
   });
 
   // Check auth status

@@ -463,6 +463,16 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // Returns all valid categories (for category editing UI)
+  app.get("/api/docktalk/categories/all", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      res.json(VALID_CATEGORIES);
+    } catch (error) {
+      console.error("Error fetching all categories:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/docktalk/analytics/sources", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       // Get sources from actual articles (dynamically updates as articles are added)

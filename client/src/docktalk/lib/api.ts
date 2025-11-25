@@ -67,7 +67,9 @@ export async function fetchTrendingTopics(): Promise<TrendingTopic[]> {
 }
 
 export async function fetchCategoryDistribution(): Promise<CategoryDistribution[]> {
-  const response = await fetch(`${API_BASE}/analytics/categories`);
+  const response = await fetch(`${API_BASE}/analytics/categories`, {
+    credentials: "include"
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch category distribution: ${response.statusText}`);
   }
@@ -75,8 +77,21 @@ export async function fetchCategoryDistribution(): Promise<CategoryDistribution[
   return response.json();
 }
 
+export async function fetchAllCategories(): Promise<string[]> {
+  const response = await fetch(`${API_BASE}/categories/all`, {
+    credentials: "include"
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch all categories: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
 export async function fetchSourceDistribution(): Promise<SourceDistribution[]> {
-  const response = await fetch(`${API_BASE}/analytics/sources`);
+  const response = await fetch(`${API_BASE}/analytics/sources`, {
+    credentials: "include"
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch source distribution: ${response.statusText}`);
   }
