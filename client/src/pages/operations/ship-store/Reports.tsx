@@ -311,7 +311,7 @@ export default function ShipStoreReports() {
   };
 
   const formatPercent = (value: number) => {
-    return `${value.toFixed(1)}%`;
+    return `${value.toFixed(2)}%`;
   };
 
   return (

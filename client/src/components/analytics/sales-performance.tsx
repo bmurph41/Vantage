@@ -127,7 +127,7 @@ export default function SalesPerformance({ dateRange }: SalesPerformanceProps) {
   };
 
   const formatPercent = (value: number) => {
-    return `${value.toFixed(1)}%`;
+    return `${value.toFixed(2)}%`;
   };
 
   const getPerformanceTier = (agent: SalesAgent) => {

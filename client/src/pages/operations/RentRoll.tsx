@@ -69,7 +69,7 @@ export default function RentRollPage() {
   };
 
   const formatPercent = (value: number) => {
-    return `${(value * 100).toFixed(1)}%`;
+    return `${(value * 100).toFixed(2)}%`;
   };
 
   return (

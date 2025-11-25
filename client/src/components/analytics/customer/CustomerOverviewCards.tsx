@@ -50,7 +50,7 @@ export function CustomerOverviewCards({ data, isLoading, error }: Props) {
   };
 
   const formatPercent = (value: number) => {
-    return `${value.toFixed(1)}%`;
+    return `${value.toFixed(2)}%`;
   };
 
   return (

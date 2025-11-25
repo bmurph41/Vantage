@@ -81,7 +81,7 @@ export default function WorkspaceProForma({ projectId }: WorkspaceProFormaProps)
   };
 
   const formatPercent = (value: number) => {
-    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+    return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
   };
 
   const isSeasonalMonth = (monthIndex: number) => seasonMonths.includes(monthIndex + 1);
