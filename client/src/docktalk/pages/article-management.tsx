@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "../lib/queryClient";
-import { fetchArticles, updateArticleCategory, removeArticle, fetchSystemStats, fetchCategoryDistribution, fetchSourceDistribution, fetchAllCategories } from "../lib/api";
+import { fetchArticles, updateArticleCategory, removeArticle, deleteArticle, fetchSystemStats, fetchCategoryDistribution, fetchSourceDistribution, fetchAllCategories } from "../lib/api";
 import { Article, ArticleFilters, CategoryDistribution, SourceDistribution } from "../types/article";
 import DockTalkHeader from "../components/DockTalkHeader";
 import {
@@ -140,6 +140,7 @@ export default function ArticleManagementPage() {
   
   const [removeArticleId, setRemoveArticleId] = useState<number | null>(null);
   const [removeReason, setRemoveReason] = useState("");
+  const [deleteArticleId, setDeleteArticleId] = useState<number | null>(null);
 
   const { data: systemStats } = useQuery({
     queryKey: ['/api/docktalk/analytics/stats'],
@@ -236,6 +237,25 @@ export default function ArticleManagementPage() {
     },
   });
 
+  const deleteArticleMutation = useMutation({
+    mutationFn: (id: number) => deleteArticle(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles'] });
+      setDeleteArticleId(null);
+      toast({
+        title: "Article Deleted",
+        description: "Article has been permanently deleted.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete article",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEditCategories = (article: Article) => {
     setEditingArticle(article);
     setEditCategories(article.categories || []);
@@ -265,6 +285,12 @@ export default function ArticleManagementPage() {
         id: removeArticleId, 
         reason: removeReason 
       });
+    }
+  };
+
+  const handleDeleteArticle = () => {
+    if (deleteArticleId) {
+      deleteArticleMutation.mutate(deleteArticleId);
     }
   };
 
@@ -494,15 +520,42 @@ export default function ArticleManagementPage() {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setRemoveArticleId(article.id)}
-                              className="text-destructive hover:text-destructive"
-                              data-testid={`button-remove-${article.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  data-testid={`button-article-actions-${article.id}`}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full justify-start text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                  onClick={() => setRemoveArticleId(article.id)}
+                                  data-testid={`button-remove-${article.id}`}
+                                >
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Remove (trains AI)
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full justify-start text-destructive hover:text-destructive hover:bg-red-50"
+                                  onClick={() => setDeleteArticleId(article.id)}
+                                  data-testid={`button-delete-${article.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete permanently
+                                </Button>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -637,6 +690,28 @@ export default function ArticleManagementPage() {
               data-testid="button-confirm-remove"
             >
               {removeArticleMutation.isPending ? "Removing..." : "Remove Article"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteArticleId} onOpenChange={() => setDeleteArticleId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Article Permanently</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the article from the database. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteArticle}
+              disabled={deleteArticleMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteArticleMutation.isPending ? "Deleting..." : "Delete Permanently"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

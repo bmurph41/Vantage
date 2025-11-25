@@ -299,3 +299,43 @@ export async function removeArticle(id: number, reason: string): Promise<void> {
     throw new Error(`Failed to remove article: ${errorMessage}`);
   }
 }
+
+export interface ArticleUpdate {
+  title?: string;
+  summary?: string;
+  categories?: string[];
+  region?: "US/Domestic" | "International" | null;
+  tags?: string[];
+}
+
+export async function updateArticle(id: number, updates: ArticleUpdate): Promise<Article> {
+  const response = await fetch(`${API_BASE}/articles/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updates),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    const errorMessage = errorData.error || response.statusText;
+    throw new Error(`Failed to update article: ${errorMessage}`);
+  }
+  
+  return response.json();
+}
+
+export async function deleteArticle(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/articles/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    const errorMessage = errorData.error || response.statusText;
+    throw new Error(`Failed to delete article: ${errorMessage}`);
+  }
+}
