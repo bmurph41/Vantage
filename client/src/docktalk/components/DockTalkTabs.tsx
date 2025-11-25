@@ -89,31 +89,31 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
         </Link>
       </TabsList>
 
-      <TabsContent value="all-articles" className="mt-0">
+      <TabsContent value="all-articles" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
         <AllArticlesPage />
       </TabsContent>
 
-      <TabsContent value="market-intelligence" className="mt-0">
+      <TabsContent value="market-intelligence" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
         <MarketIntelligencePage />
       </TabsContent>
 
-      <TabsContent value="m&a-spotlight" className="mt-0">
+      <TabsContent value="m&a-spotlight" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
         <DealsPage />
       </TabsContent>
 
-      <TabsContent value="saved" className="mt-0">
+      <TabsContent value="saved" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
         <SavedArticlesPage />
       </TabsContent>
 
-      <TabsContent value="portfolio" className="mt-0">
+      <TabsContent value="portfolio" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
         <PortfolioCompaniesPage />
       </TabsContent>
 
-      <TabsContent value="saved-searches" className="mt-0">
+      <TabsContent value="saved-searches" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
         <SavedSearchesPage />
       </TabsContent>
 
-      <TabsContent value="watchlists" className="mt-0">
+      <TabsContent value="watchlists" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
         <WatchlistsPage />
       </TabsContent>
     </Tabs>

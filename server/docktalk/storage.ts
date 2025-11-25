@@ -1602,6 +1602,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Get all deals with article region using LEFT JOIN
+    // Cast region to text to avoid enum validation issues with COALESCE
     let query = db
       .select({
         id: docktalkDeals.id,
@@ -1609,7 +1610,7 @@ export class DatabaseStorage implements IStorage {
         dealStatus: docktalkDeals.dealStatus,
         announcedDate: docktalkDeals.announcedDate,
         articleId: docktalkDeals.articleId,
-        region: sql<string>`COALESCE(${articles.region}, 'Unknown')`.as('region'),
+        region: sql<string>`COALESCE(${articles.region}::text, 'Unknown')`.as('region'),
       })
       .from(docktalkDeals)
       .leftJoin(articles, eq(docktalkDeals.articleId, articles.id));
