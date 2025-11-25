@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { useLocation } from 'wouter';
 import {
   Dialog,
   DialogContent,
@@ -93,6 +94,7 @@ export default function ModelingProjectFormDialog({
   project,
 }: ModelingProjectFormDialogProps) {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [brokerSearch, setBrokerSearch] = useState('');
 
   const { data: contacts = [] } = useQuery<Contact[]>({
@@ -158,11 +160,18 @@ export default function ModelingProjectFormDialog({
   }, [open, project, mode, form]);
 
   const createMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest('POST', '/api/modeling/projects', data),
-    onSuccess: () => {
+    mutationFn: async (data: FormData) => {
+      const response = await apiRequest('POST', '/api/modeling/projects', data);
+      return response.json() as Promise<{ id: string }>;
+    },
+    onSuccess: (createdProject) => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
-      toast({ title: 'Success', description: 'Modeling project created successfully' });
+      toast({ 
+        title: 'Project Created', 
+        description: 'Now upload your P&L and Rent Roll documents' 
+      });
       onOpenChange(false);
+      setLocation(`/modeling/projects/${createdProject.id}/doc-intel`);
     },
     onError: () => {
       toast({
