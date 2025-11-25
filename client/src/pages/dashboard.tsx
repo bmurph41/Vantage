@@ -504,10 +504,13 @@ export default function Dashboard() {
   });
 
   // Fetch custom modules
-  const { data: customModules = [] } = useQuery({
+  const { data: customModulesData } = useQuery({
     queryKey: ['/api/dashboards/custom-modules'],
     queryFn: () => fetch('/api/dashboards/custom-modules').then(res => res.json()),
   });
+  
+  // Ensure customModules is always an array (API may return error object)
+  const customModules = Array.isArray(customModulesData) ? customModulesData : [];
 
   // Create custom module mutation
   const createCustomModuleMutation = useMutation({
