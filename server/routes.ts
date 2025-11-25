@@ -10715,6 +10715,304 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ============================================================================
+  // SCENARIO VERSIONING - Institutional-grade scenario management with history
+  // ============================================================================
+
+  // Get all current scenarios for a project
+  app.get('/api/modeling/projects/:projectId/scenarios', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const scenarios = await scenarioVersioningService.getCurrentScenarios(projectId);
+
+      res.json(scenarios);
+    } catch (error) {
+      console.error('Failed to fetch scenarios:', error);
+      res.status(500).json({ error: 'Failed to fetch scenarios' });
+    }
+  });
+
+  // Initialize default scenarios for a project
+  app.post('/api/modeling/projects/:projectId/scenarios/init', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const scenarios = await scenarioVersioningService.initializeDefaultScenarios(projectId, orgId, userId);
+
+      res.json(scenarios);
+    } catch (error) {
+      console.error('Failed to initialize scenarios:', error);
+      res.status(500).json({ error: 'Failed to initialize scenarios' });
+    }
+  });
+
+  // Create a new scenario
+  app.post('/api/modeling/projects/:projectId/scenarios', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { scenarioType, name, description, revenueGrowthRate, expenseGrowthRate, exitCapRate, assumptions } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const scenario = await scenarioVersioningService.createScenario({
+        orgId,
+        projectId,
+        userId,
+        scenarioType,
+        name,
+        description,
+        revenueGrowthRate,
+        expenseGrowthRate,
+        exitCapRate,
+        assumptions
+      });
+
+      res.json(scenario);
+    } catch (error) {
+      console.error('Failed to create scenario:', error);
+      res.status(500).json({ error: 'Failed to create scenario' });
+    }
+  });
+
+  // Get a specific scenario by ID
+  app.get('/api/modeling/projects/:projectId/scenarios/:scenarioId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, scenarioId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const scenario = await scenarioVersioningService.getScenarioById(scenarioId);
+
+      if (!scenario) {
+        return res.status(404).json({ error: 'Scenario not found' });
+      }
+
+      res.json(scenario);
+    } catch (error) {
+      console.error('Failed to fetch scenario:', error);
+      res.status(500).json({ error: 'Failed to fetch scenario' });
+    }
+  });
+
+  // Update a scenario (optionally create new version)
+  app.patch('/api/modeling/projects/:projectId/scenarios/:scenarioId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, scenarioId } = req.params;
+      const { name, description, revenueGrowthRate, expenseGrowthRate, exitCapRate, assumptions, createNewVersion } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const scenario = await scenarioVersioningService.updateScenario({
+        scenarioId,
+        userId,
+        name,
+        description,
+        revenueGrowthRate,
+        expenseGrowthRate,
+        exitCapRate,
+        assumptions,
+        createNewVersion
+      });
+
+      res.json(scenario);
+    } catch (error) {
+      console.error('Failed to update scenario:', error);
+      res.status(500).json({ error: 'Failed to update scenario' });
+    }
+  });
+
+  // Get version history for a scenario type
+  app.get('/api/modeling/projects/:projectId/scenarios/:scenarioType/history', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, scenarioType } = req.params;
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const history = await scenarioVersioningService.getScenarioVersionHistory(projectId, scenarioType as any, limit);
+
+      res.json(history);
+    } catch (error) {
+      console.error('Failed to fetch scenario history:', error);
+      res.status(500).json({ error: 'Failed to fetch scenario history' });
+    }
+  });
+
+  // Restore a previous scenario version
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/restore', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, scenarioId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const restored = await scenarioVersioningService.restoreVersion(scenarioId, userId);
+
+      res.json(restored);
+    } catch (error) {
+      console.error('Failed to restore scenario:', error);
+      res.status(500).json({ error: 'Failed to restore scenario' });
+    }
+  });
+
+  // Submit scenario for approval
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/submit', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, scenarioId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const scenario = await scenarioVersioningService.submitForApproval(scenarioId, userId);
+
+      res.json(scenario);
+    } catch (error) {
+      console.error('Failed to submit scenario:', error);
+      res.status(500).json({ error: 'Failed to submit scenario' });
+    }
+  });
+
+  // Approve a scenario
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/approve', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, scenarioId } = req.params;
+      const { notes } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const scenario = await scenarioVersioningService.approveScenario(scenarioId, userId, notes);
+
+      res.json(scenario);
+    } catch (error) {
+      console.error('Failed to approve scenario:', error);
+      res.status(500).json({ error: 'Failed to approve scenario' });
+    }
+  });
+
+  // Reject a scenario
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/reject', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, scenarioId } = req.params;
+      const { notes } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const scenario = await scenarioVersioningService.rejectScenario(scenarioId, userId, notes);
+
+      res.json(scenario);
+    } catch (error) {
+      console.error('Failed to reject scenario:', error);
+      res.status(500).json({ error: 'Failed to reject scenario' });
+    }
+  });
+
+  // Get audit history for a project
+  app.get('/api/modeling/projects/:projectId/audit', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { limit, entityType } = req.query;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const history = await scenarioVersioningService.getAuditHistory(projectId, {
+        limit: limit ? parseInt(limit as string) : undefined,
+        entityType: entityType as string
+      });
+
+      res.json(history);
+    } catch (error) {
+      console.error('Failed to fetch audit history:', error);
+      res.status(500).json({ error: 'Failed to fetch audit history' });
+    }
+  });
+
+  // Compare multiple scenarios
+  app.post('/api/modeling/projects/:projectId/scenarios/compare', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { scenarioIds } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const comparison = await scenarioVersioningService.compareScenarios(projectId, scenarioIds);
+
+      res.json(comparison);
+    } catch (error) {
+      console.error('Failed to compare scenarios:', error);
+      res.status(500).json({ error: 'Failed to compare scenarios' });
+    }
+  });
+
   // Get modeling analytics and metrics
   app.get('/api/modeling/analytics', authenticateUser, async (req: any, res) => {
     try {
