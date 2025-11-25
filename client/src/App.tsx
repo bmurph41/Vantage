@@ -107,6 +107,21 @@ const VDRDashboard = lazy(() => import("@/pages/vdr/Dashboard"));
 const ProjectVDR = lazy(() => import("@/pages/vdr/ProjectVDR"));
 const DataRequest = lazy(() => import("@/pages/vdr/DataRequest"));
 
+// Exit Strategy Suite pages
+const ExitStrategyDashboard = lazy(() => import("@/pages/modeling/exit/Dashboard"));
+const ExitScenarios = lazy(() => import("@/pages/modeling/exit/Scenarios"));
+const ExitScenarioDetail = lazy(() => import("@/pages/modeling/exit/ScenarioDetail"));
+const ExitTaxCalculator = lazy(() => import("@/pages/modeling/exit/TaxCalculator"));
+const ExitNetProceeds = lazy(() => import("@/pages/modeling/exit/NetProceeds"));
+const Exit1031Exchange = lazy(() => import("@/pages/modeling/exit/Exchange1031"));
+const ExitDSTAnalysis = lazy(() => import("@/pages/modeling/exit/DSTAnalysis"));
+const ExitSellerFinancing = lazy(() => import("@/pages/modeling/exit/SellerFinancing"));
+const ExitEarnout = lazy(() => import("@/pages/modeling/exit/Earnout"));
+const ExitWaterfall = lazy(() => import("@/pages/modeling/exit/Waterfall"));
+const ExitIRRCalculator = lazy(() => import("@/pages/modeling/exit/IRRCalculator"));
+const ExitSensitivity = lazy(() => import("@/pages/modeling/exit/Sensitivity"));
+const ExitAIInsights = lazy(() => import("@/pages/modeling/exit/AIInsights"));
+
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -797,6 +812,100 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
+      
+      {/* Exit Strategy Suite Routes */}
+      <Route path="/modeling/projects/:projectId/exit">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitStrategyDashboard {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/scenarios">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitScenarios {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/scenarios/:scenarioId">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitScenarioDetail {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/tax">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitTaxCalculator {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/net-proceeds">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitNetProceeds {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/1031">
+        {(params) => (
+          <UnifiedLayout>
+            <Exit1031Exchange {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/dst">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitDSTAnalysis {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/seller-financing">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitSellerFinancing {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/earnout">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitEarnout {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/waterfall">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitWaterfall {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/irr">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitIRRCalculator {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/sensitivity">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitSensitivity {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/ai-insights">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitAIInsights {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      
       <Route path="/modeling/debt-scenarios">
         {() => (
           <UnifiedLayout>
