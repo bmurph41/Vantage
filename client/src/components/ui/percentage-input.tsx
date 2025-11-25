@@ -13,9 +13,9 @@ const PercentageInput = forwardRef<HTMLInputElement, PercentageInputProps>(
     const [displayValue, setDisplayValue] = useState<string>('');
     const [isFocused, setIsFocused] = useState(false);
 
-    // Format number as percentage (00.0%)
+    // Format number as percentage (0.00%)
     const formatPercentage = (val: number): string => {
-      return val.toFixed(1);
+      return val.toFixed(2);
     };
 
     // Parse formatted string to number
@@ -77,7 +77,7 @@ const PercentageInput = forwardRef<HTMLInputElement, PercentageInputProps>(
           onFocus={handleFocus}
           onBlur={handleBlur}
           className={cn("pr-7", className)}
-          placeholder="0.0"
+          placeholder="0.00"
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 pointer-events-none">
           %

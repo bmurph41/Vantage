@@ -23,7 +23,7 @@ export function formatNumber(value: number, compact: boolean = false): string {
   return new Intl.NumberFormat('en-US').format(value);
 }
 
-export function formatPercent(value: number, decimals: number = 0): string {
+export function formatPercent(value: number, decimals: number = 2): string {
   return `${value.toFixed(decimals)}%`;
 }
 
