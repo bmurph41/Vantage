@@ -11327,6 +11327,202 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ==================== COMMENT THREADS ROUTES ====================
+
+  // Create a comment thread
+  app.post('/api/modeling/projects/:projectId/threads', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { scenarioVersionId, targetType, targetId, targetLabel, initialComment } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      if (!targetType || !initialComment) {
+        return res.status(400).json({ error: 'targetType and initialComment are required' });
+      }
+
+      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const threadId = await commentThreadsService.createThread(projectId, orgId, userId, {
+        scenarioVersionId,
+        targetType,
+        targetId,
+        targetLabel,
+        initialComment
+      });
+
+      res.json({ id: threadId, message: 'Thread created successfully' });
+    } catch (error) {
+      console.error('Failed to create comment thread:', error);
+      res.status(500).json({ error: 'Failed to create comment thread' });
+    }
+  });
+
+  // Get all threads for a project
+  app.get('/api/modeling/projects/:projectId/threads', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { scenarioVersionId, status, targetType } = req.query;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const threads = await commentThreadsService.getProjectThreads(projectId, orgId, {
+        scenarioVersionId: scenarioVersionId as string,
+        status: status as 'open' | 'resolved' | 'archived',
+        targetType: targetType as string
+      });
+
+      res.json(threads);
+    } catch (error) {
+      console.error('Failed to get comment threads:', error);
+      res.status(500).json({ error: 'Failed to get comment threads' });
+    }
+  });
+
+  // Get unresolved thread count for a project
+  app.get('/api/modeling/projects/:projectId/threads/unresolved-count', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const count = await commentThreadsService.getUnresolvedCount(projectId, orgId);
+
+      res.json(count);
+    } catch (error) {
+      console.error('Failed to get unresolved count:', error);
+      res.status(500).json({ error: 'Failed to get unresolved count' });
+    }
+  });
+
+  // Get single thread with comments
+  app.get('/api/modeling/threads/:threadId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { threadId } = req.params;
+      
+      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const thread = await commentThreadsService.getThread(threadId, orgId);
+
+      if (!thread) {
+        return res.status(404).json({ error: 'Thread not found' });
+      }
+
+      res.json(thread);
+    } catch (error) {
+      console.error('Failed to get thread:', error);
+      res.status(500).json({ error: 'Failed to get thread' });
+    }
+  });
+
+  // Add comment to thread
+  app.post('/api/modeling/threads/:threadId/comments', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { threadId } = req.params;
+      const { content, mentions } = req.body;
+      
+      if (!content) {
+        return res.status(400).json({ error: 'Comment content is required' });
+      }
+
+      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const commentId = await commentThreadsService.addComment(orgId, userId, {
+        threadId,
+        content,
+        mentions
+      });
+
+      res.json({ id: commentId, message: 'Comment added successfully' });
+    } catch (error: any) {
+      console.error('Failed to add comment:', error);
+      res.status(400).json({ error: error.message || 'Failed to add comment' });
+    }
+  });
+
+  // Edit comment
+  app.patch('/api/modeling/comments/:commentId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { commentId } = req.params;
+      const { content } = req.body;
+      
+      if (!content) {
+        return res.status(400).json({ error: 'Comment content is required' });
+      }
+
+      const { commentThreadsService } = await import('./services/comment-threads-service');
+      await commentThreadsService.editComment(commentId, orgId, userId, content);
+
+      res.json({ message: 'Comment updated successfully' });
+    } catch (error: any) {
+      console.error('Failed to edit comment:', error);
+      res.status(400).json({ error: error.message || 'Failed to edit comment' });
+    }
+  });
+
+  // Resolve thread
+  app.post('/api/modeling/threads/:threadId/resolve', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { threadId } = req.params;
+      
+      const { commentThreadsService } = await import('./services/comment-threads-service');
+      await commentThreadsService.resolveThread(threadId, orgId, userId);
+
+      res.json({ message: 'Thread resolved successfully' });
+    } catch (error: any) {
+      console.error('Failed to resolve thread:', error);
+      res.status(400).json({ error: error.message || 'Failed to resolve thread' });
+    }
+  });
+
+  // Reopen thread
+  app.post('/api/modeling/threads/:threadId/reopen', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { threadId } = req.params;
+      
+      const { commentThreadsService } = await import('./services/comment-threads-service');
+      await commentThreadsService.reopenThread(threadId, orgId, userId);
+
+      res.json({ message: 'Thread reopened successfully' });
+    } catch (error: any) {
+      console.error('Failed to reopen thread:', error);
+      res.status(400).json({ error: error.message || 'Failed to reopen thread' });
+    }
+  });
+
+  // Archive thread
+  app.post('/api/modeling/threads/:threadId/archive', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { threadId } = req.params;
+      
+      const { commentThreadsService } = await import('./services/comment-threads-service');
+      await commentThreadsService.archiveThread(threadId, orgId, userId);
+
+      res.json({ message: 'Thread archived successfully' });
+    } catch (error: any) {
+      console.error('Failed to archive thread:', error);
+      res.status(400).json({ error: error.message || 'Failed to archive thread' });
+    }
+  });
+
   // Get modeling analytics and metrics
   app.get('/api/modeling/analytics', authenticateUser, async (req: any, res) => {
     try {

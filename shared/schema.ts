@@ -8954,6 +8954,57 @@ export const modelingApproverDecisions = pgTable('modeling_approver_decisions', 
   uniqueApproverRequest: unique('unique_approver_request').on(table.approvalRequestId, table.approverId),
 }));
 
+// Modeling Comment Threads - IC feedback and collaboration on scenarios
+export const modelingCommentThreads = pgTable('modeling_comment_threads', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  scenarioVersionId: varchar('scenario_version_id').references(() => modelingScenarioVersions.id),
+  
+  // Thread context
+  targetType: text('target_type').notNull(), // 'scenario', 'metric', 'assumption', 'line_item'
+  targetId: text('target_id'), // ID of the specific element being discussed
+  targetLabel: text('target_label'), // Human-readable label (e.g., "Revenue Growth Rate")
+  
+  // Thread status
+  status: text('status').notNull().default('open'), // 'open', 'resolved', 'archived'
+  resolvedBy: varchar('resolved_by').references(() => users.id),
+  resolvedAt: timestamp('resolved_at'),
+  
+  // Metadata
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('comment_thread_org_idx').on(table.orgId),
+  projectIdx: index('comment_thread_project_idx').on(table.modelingProjectId),
+  scenarioIdx: index('comment_thread_scenario_idx').on(table.scenarioVersionId),
+  statusIdx: index('comment_thread_status_idx').on(table.status),
+}));
+
+// Individual comments within threads
+export const modelingComments = pgTable('modeling_comments', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  threadId: varchar('thread_id').notNull().references(() => modelingCommentThreads.id, { onDelete: 'cascade' }),
+  
+  // Comment content
+  content: text('content').notNull(),
+  
+  // Mentions and reactions
+  mentions: jsonb('mentions'), // Array of user IDs mentioned
+  
+  // Edit tracking
+  isEdited: boolean('is_edited').default(false),
+  editedAt: timestamp('edited_at'),
+  
+  // Metadata
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  threadIdx: index('comment_thread_id_idx').on(table.threadId),
+  createdByIdx: index('comment_created_by_idx').on(table.createdBy),
+}));
+
 // Modeling Sensitivity Matrix - Store sensitivity analysis results with scenario versioning
 export const modelingSensitivityMatrices = pgTable('modeling_sensitivity_matrices', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -9054,6 +9105,17 @@ export const insertModelingApproverDecisionSchema = createInsertSchema(modelingA
   createdAt: true,
 });
 
+export const insertModelingCommentThreadSchema = createInsertSchema(modelingCommentThreads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertModelingCommentSchema = createInsertSchema(modelingComments).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Type exports for Operations → Modeling pipeline
 export type ModelingActuals = typeof modelingActuals.$inferSelect;
 export type InsertModelingActuals = z.infer<typeof insertModelingActualsSchema>;
@@ -9084,6 +9146,12 @@ export type InsertModelingApprovalRequest = z.infer<typeof insertModelingApprova
 
 export type ModelingApproverDecision = typeof modelingApproverDecisions.$inferSelect;
 export type InsertModelingApproverDecision = z.infer<typeof insertModelingApproverDecisionSchema>;
+
+export type ModelingCommentThread = typeof modelingCommentThreads.$inferSelect;
+export type InsertModelingCommentThread = z.infer<typeof insertModelingCommentThreadSchema>;
+
+export type ModelingComment = typeof modelingComments.$inferSelect;
+export type InsertModelingComment = z.infer<typeof insertModelingCommentSchema>;
 
 // ============================================================================
 // DockTalk 2.0 Schema Integration
