@@ -13,6 +13,7 @@ import {
   type RssSource,
   type PreviewArticle,
 } from "../lib/api";
+import { AITraining } from "../components/AITraining";
 import {
   Card,
   CardContent,
@@ -629,6 +630,8 @@ export default function SourcesPage() {
           </Card>
         )}
       </div>
+
+      <AITraining />
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
