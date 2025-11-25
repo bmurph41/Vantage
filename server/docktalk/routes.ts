@@ -2394,5 +2394,251 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // ============ USER TAG LIBRARY API ============
+  
+  // Get user's tag library
+  app.get("/api/docktalk/tags", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const tags = await dockTalkStorage.getUserTags(req.dockTalkUser!.id, req.dockTalkUser!.orgId);
+      res.json(tags);
+    } catch (error) {
+      console.error("Error fetching user tags:", error);
+      res.status(500).json({ error: "Failed to fetch tags" });
+    }
+  });
+
+  // Create a new tag
+  app.post("/api/docktalk/tags", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const TagSchema = z.object({
+        name: z.string().min(1, "Name is required").max(50, "Name too long"),
+        description: z.string().optional(),
+        color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid color format").optional(),
+      });
+
+      const validated = TagSchema.parse(req.body);
+      
+      const tag = await dockTalkStorage.createUserTag({
+        ...validated,
+        userId: req.dockTalkUser!.id,
+        orgId: req.dockTalkUser!.orgId,
+      });
+      res.status(201).json(tag);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      if (error instanceof Error && (error.message.includes("duplicate") || error.message.includes("unique"))) {
+        return res.status(409).json({ error: "A tag with this name already exists" });
+      }
+      console.error("Error creating tag:", error);
+      res.status(500).json({ error: "Failed to create tag" });
+    }
+  });
+
+  // Update a tag
+  app.patch("/api/docktalk/tags/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid tag ID" });
+      }
+
+      const TagUpdateSchema = z.object({
+        name: z.string().min(1).max(50).optional(),
+        description: z.string().optional(),
+        color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+      });
+
+      const validated = TagUpdateSchema.parse(req.body);
+      
+      const tag = await dockTalkStorage.updateUserTag(id, req.dockTalkUser!.id, req.dockTalkUser!.orgId, validated);
+      if (!tag) {
+        return res.status(404).json({ error: "Tag not found" });
+      }
+      res.json(tag);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error updating tag:", error);
+      res.status(500).json({ error: "Failed to update tag" });
+    }
+  });
+
+  // Delete a tag
+  app.delete("/api/docktalk/tags/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid tag ID" });
+      }
+
+      const deleted = await dockTalkStorage.deleteUserTag(id, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Tag not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting tag:", error);
+      res.status(500).json({ error: "Failed to delete tag" });
+    }
+  });
+
+  // ============ ARTICLE TAG ASSIGNMENTS API ============
+
+  // Get tags assigned to an article
+  app.get("/api/docktalk/articles/:articleId/tags", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      if (isNaN(articleId)) {
+        return res.status(400).json({ error: "Invalid article ID" });
+      }
+
+      const assignments = await dockTalkStorage.getArticleTagAssignments(articleId, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching article tags:", error);
+      res.status(500).json({ error: "Failed to fetch article tags" });
+    }
+  });
+
+  // Assign a tag to an article
+  app.post("/api/docktalk/articles/:articleId/tags", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      if (isNaN(articleId)) {
+        return res.status(400).json({ error: "Invalid article ID" });
+      }
+
+      const AssignmentSchema = z.object({
+        tagId: z.number().int().positive(),
+        confidence: z.number().int().min(0).max(100).optional(),
+      });
+
+      const validated = AssignmentSchema.parse(req.body);
+      
+      const assignment = await dockTalkStorage.assignTagToArticle({
+        articleId,
+        tagId: validated.tagId,
+        userId: req.dockTalkUser!.id,
+        orgId: req.dockTalkUser!.orgId,
+        confidence: validated.confidence,
+      });
+      res.status(201).json(assignment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      if (error instanceof Error && (error.message.includes("duplicate") || error.message.includes("unique"))) {
+        return res.status(409).json({ error: "This tag is already assigned to this article" });
+      }
+      console.error("Error assigning tag:", error);
+      res.status(500).json({ error: "Failed to assign tag" });
+    }
+  });
+
+  // Remove a tag from an article
+  app.delete("/api/docktalk/articles/:articleId/tags/:tagId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      const tagId = parseInt(req.params.tagId);
+      if (isNaN(articleId) || isNaN(tagId)) {
+        return res.status(400).json({ error: "Invalid article or tag ID" });
+      }
+
+      const removed = await dockTalkStorage.removeTagFromArticle(articleId, tagId, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
+      if (!removed) {
+        return res.status(404).json({ error: "Tag assignment not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing tag:", error);
+      res.status(500).json({ error: "Failed to remove tag" });
+    }
+  });
+
+  // Get articles with a specific tag
+  app.get("/api/docktalk/tags/:tagId/articles", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const tagId = parseInt(req.params.tagId);
+      if (isNaN(tagId)) {
+        return res.status(400).json({ error: "Invalid tag ID" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const articles = await dockTalkStorage.getTaggedArticles(tagId, req.dockTalkUser!.id, req.dockTalkUser!.orgId, limit);
+      res.json(articles);
+    } catch (error) {
+      console.error("Error fetching tagged articles:", error);
+      res.status(500).json({ error: "Failed to fetch tagged articles" });
+    }
+  });
+
+  // ============ ARTICLE FEEDBACK API ============
+
+  // Get feedback for an article
+  app.get("/api/docktalk/articles/:articleId/feedback", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      if (isNaN(articleId)) {
+        return res.status(400).json({ error: "Invalid article ID" });
+      }
+
+      const feedback = await dockTalkStorage.getArticleFeedback(articleId, req.dockTalkUser!.id, req.dockTalkUser!.orgId);
+      res.json(feedback);
+    } catch (error) {
+      console.error("Error fetching article feedback:", error);
+      res.status(500).json({ error: "Failed to fetch feedback" });
+    }
+  });
+
+  // Submit feedback for an article (irrelevant, duplicate, etc.)
+  app.post("/api/docktalk/articles/:articleId/feedback", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      if (isNaN(articleId)) {
+        return res.status(400).json({ error: "Invalid article ID" });
+      }
+
+      const FeedbackSchema = z.object({
+        feedbackType: z.enum(["irrelevant", "duplicate", "low_quality", "wrong_category", "spam", "helpful"]),
+        reason: z.string().optional(),
+        suggestedCategory: z.string().optional(),
+        duplicateOfArticleId: z.number().int().positive().optional(),
+      });
+
+      const validated = FeedbackSchema.parse(req.body);
+      
+      const feedback = await dockTalkStorage.createArticleFeedback({
+        articleId,
+        userId: req.dockTalkUser!.id,
+        orgId: req.dockTalkUser!.orgId,
+        ...validated,
+      });
+      res.status(201).json(feedback);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      if (error instanceof Error && (error.message.includes("duplicate") || error.message.includes("unique"))) {
+        return res.status(409).json({ error: "You have already submitted this type of feedback for this article" });
+      }
+      console.error("Error submitting feedback:", error);
+      res.status(500).json({ error: "Failed to submit feedback" });
+    }
+  });
+
+  // Get feedback statistics
+  app.get("/api/docktalk/feedback/stats", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const stats = await dockTalkStorage.getFeedbackStats(req.dockTalkUser!.id, req.dockTalkUser!.orgId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching feedback stats:", error);
+      res.status(500).json({ error: "Failed to fetch feedback stats" });
+    }
+  });
+
   // DockTalk routes registered successfully
 }

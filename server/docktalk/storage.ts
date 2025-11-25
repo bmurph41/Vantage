@@ -1,4 +1,4 @@
-import { users, articles, rssSources, systemStats, savedFilters, savedSearches, userArticleAnnotations, portfolioCompanies, notifications, articleFingerprints, articleDuplicates, userNotificationPreferences, articleRemovalPatterns, userFilterPreferences, entities, articleEntities, watchlists, watchlistEntities, organizationFeatures, type User, type InsertUser, type Article, type InsertArticle, type RssSource, type InsertRssSource, type SystemStats, type SavedFilter, type InsertSavedFilter, type SavedSearch, type InsertSavedSearch, type UserArticleAnnotation, type InsertUserArticleAnnotation, type PortfolioCompany, type InsertPortfolioCompany, type Notification, type InsertNotification, type UserNotificationPreferences, type InsertUserNotificationPreferences, type ArticleRemovalPattern, type InsertArticleRemovalPattern, type UserFilterPreferences, type InsertUserFilterPreferences, type Entity, type InsertEntity, type ArticleEntity, type InsertArticleEntity, type Watchlist, type InsertWatchlist, type WatchlistEntity, type InsertWatchlistEntity } from "@shared/docktalk-schema";
+import { users, articles, rssSources, systemStats, savedFilters, savedSearches, userArticleAnnotations, portfolioCompanies, notifications, articleFingerprints, articleDuplicates, userNotificationPreferences, articleRemovalPatterns, userFilterPreferences, entities, articleEntities, watchlists, watchlistEntities, organizationFeatures, userTagLibrary, articleTagAssignments, articleFeedback, type User, type InsertUser, type Article, type InsertArticle, type RssSource, type InsertRssSource, type SystemStats, type SavedFilter, type InsertSavedFilter, type SavedSearch, type InsertSavedSearch, type UserArticleAnnotation, type InsertUserArticleAnnotation, type PortfolioCompany, type InsertPortfolioCompany, type Notification, type InsertNotification, type UserNotificationPreferences, type InsertUserNotificationPreferences, type ArticleRemovalPattern, type InsertArticleRemovalPattern, type UserFilterPreferences, type InsertUserFilterPreferences, type Entity, type InsertEntity, type ArticleEntity, type InsertArticleEntity, type Watchlist, type InsertWatchlist, type WatchlistEntity, type InsertWatchlistEntity, type UserTag, type InsertUserTag, type ArticleTagAssignment, type InsertArticleTagAssignment, type ArticleFeedback, type InsertArticleFeedback } from "@shared/docktalk-schema";
 import { docktalkDeals, type DocktalkDeal, type InsertDocktalkDeal } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, gte, lte, sql, count, inArray } from "drizzle-orm";
@@ -204,6 +204,25 @@ export interface IStorage {
     monthlyDeals: Array<{ month: string; count: number }>;
     recentDealsCount: number;
   }>;
+
+  // User Tag Library methods
+  getUserTags(userId: string, orgId: string): Promise<UserTag[]>;
+  createUserTag(tag: InsertUserTag): Promise<UserTag>;
+  updateUserTag(id: number, userId: string, orgId: string, updates: Partial<InsertUserTag>): Promise<UserTag | undefined>;
+  deleteUserTag(id: number, userId: string, orgId: string): Promise<boolean>;
+  
+  // Article Tag Assignment methods
+  getArticleTagAssignments(articleId: number, userId: string, orgId: string): Promise<ArticleTagAssignment[]>;
+  assignTagToArticle(assignment: InsertArticleTagAssignment): Promise<ArticleTagAssignment>;
+  removeTagFromArticle(articleId: number, tagId: number, userId: string, orgId: string): Promise<boolean>;
+  getTaggedArticles(tagId: number, userId: string, orgId: string, limit?: number): Promise<Article[]>;
+  
+  // Article Feedback methods
+  getArticleFeedback(articleId: number, userId: string, orgId: string): Promise<ArticleFeedback[]>;
+  createArticleFeedback(feedback: InsertArticleFeedback): Promise<ArticleFeedback>;
+  getUnprocessedFeedback(limit?: number): Promise<ArticleFeedback[]>;
+  markFeedbackProcessed(id: number): Promise<void>;
+  getFeedbackStats(userId: string, orgId: string): Promise<{ total: number; byType: Array<{ type: string; count: number }> }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1761,6 +1780,200 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return user;
+  }
+
+  // User Tag Library methods
+  async getUserTags(userId: string, orgId: string): Promise<UserTag[]> {
+    return await db
+      .select()
+      .from(userTagLibrary)
+      .where(and(
+        eq(userTagLibrary.userId, userId),
+        eq(userTagLibrary.orgId, orgId),
+        eq(userTagLibrary.isActive, true)
+      ))
+      .orderBy(desc(userTagLibrary.usageCount));
+  }
+
+  async createUserTag(tag: InsertUserTag): Promise<UserTag> {
+    const [created] = await db
+      .insert(userTagLibrary)
+      .values(tag)
+      .returning();
+    return created;
+  }
+
+  async updateUserTag(id: number, userId: string, orgId: string, updates: Partial<InsertUserTag>): Promise<UserTag | undefined> {
+    const [updated] = await db
+      .update(userTagLibrary)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(
+        eq(userTagLibrary.id, id),
+        eq(userTagLibrary.userId, userId),
+        eq(userTagLibrary.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteUserTag(id: number, userId: string, orgId: string): Promise<boolean> {
+    const result = await db
+      .update(userTagLibrary)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(
+        eq(userTagLibrary.id, id),
+        eq(userTagLibrary.userId, userId),
+        eq(userTagLibrary.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Article Tag Assignment methods
+  async getArticleTagAssignments(articleId: number, userId: string, orgId: string): Promise<ArticleTagAssignment[]> {
+    return await db
+      .select()
+      .from(articleTagAssignments)
+      .where(and(
+        eq(articleTagAssignments.articleId, articleId),
+        eq(articleTagAssignments.userId, userId),
+        eq(articleTagAssignments.orgId, orgId)
+      ));
+  }
+
+  async assignTagToArticle(assignment: InsertArticleTagAssignment): Promise<ArticleTagAssignment> {
+    const [created] = await db
+      .insert(articleTagAssignments)
+      .values(assignment)
+      .returning();
+    
+    // Increment usage count for the tag
+    await db
+      .update(userTagLibrary)
+      .set({ 
+        usageCount: sql`${userTagLibrary.usageCount} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(userTagLibrary.id, assignment.tagId));
+    
+    return created;
+  }
+
+  async removeTagFromArticle(articleId: number, tagId: number, userId: string, orgId: string): Promise<boolean> {
+    const result = await db
+      .delete(articleTagAssignments)
+      .where(and(
+        eq(articleTagAssignments.articleId, articleId),
+        eq(articleTagAssignments.tagId, tagId),
+        eq(articleTagAssignments.userId, userId),
+        eq(articleTagAssignments.orgId, orgId)
+      ))
+      .returning();
+    
+    if (result.length > 0) {
+      // Decrement usage count for the tag
+      await db
+        .update(userTagLibrary)
+        .set({ 
+          usageCount: sql`GREATEST(${userTagLibrary.usageCount} - 1, 0)`,
+          updatedAt: new Date()
+        })
+        .where(eq(userTagLibrary.id, tagId));
+    }
+    
+    return result.length > 0;
+  }
+
+  async getTaggedArticles(tagId: number, userId: string, orgId: string, limit = 50): Promise<Article[]> {
+    const assignments = await db
+      .select({ articleId: articleTagAssignments.articleId })
+      .from(articleTagAssignments)
+      .where(and(
+        eq(articleTagAssignments.tagId, tagId),
+        eq(articleTagAssignments.userId, userId),
+        eq(articleTagAssignments.orgId, orgId)
+      ))
+      .limit(limit);
+    
+    if (assignments.length === 0) return [];
+    
+    const articleIds = assignments.map(a => a.articleId);
+    return await db
+      .select()
+      .from(articles)
+      .where(inArray(articles.id, articleIds))
+      .orderBy(desc(articles.publishedAt));
+  }
+
+  // Article Feedback methods
+  async getArticleFeedback(articleId: number, userId: string, orgId: string): Promise<ArticleFeedback[]> {
+    return await db
+      .select()
+      .from(articleFeedback)
+      .where(and(
+        eq(articleFeedback.articleId, articleId),
+        eq(articleFeedback.userId, userId),
+        eq(articleFeedback.orgId, orgId)
+      ))
+      .orderBy(desc(articleFeedback.createdAt));
+  }
+
+  async createArticleFeedback(feedback: InsertArticleFeedback): Promise<ArticleFeedback> {
+    const [created] = await db
+      .insert(articleFeedback)
+      .values(feedback)
+      .returning();
+    
+    // If feedback is "irrelevant" or "duplicate", mark the article as removed
+    if (feedback.feedbackType === 'irrelevant' || feedback.feedbackType === 'duplicate' || feedback.feedbackType === 'spam') {
+      await db
+        .update(articles)
+        .set({ 
+          isRemoved: true,
+          removalReason: feedback.feedbackType,
+          removedAt: new Date(),
+          removedBy: feedback.userId
+        })
+        .where(eq(articles.id, feedback.articleId));
+    }
+    
+    return created;
+  }
+
+  async getUnprocessedFeedback(limit = 100): Promise<ArticleFeedback[]> {
+    return await db
+      .select()
+      .from(articleFeedback)
+      .where(eq(articleFeedback.processedByAi, false))
+      .orderBy(articleFeedback.createdAt)
+      .limit(limit);
+  }
+
+  async markFeedbackProcessed(id: number): Promise<void> {
+    await db
+      .update(articleFeedback)
+      .set({ processedByAi: true, processedAt: new Date() })
+      .where(eq(articleFeedback.id, id));
+  }
+
+  async getFeedbackStats(userId: string, orgId: string): Promise<{ total: number; byType: Array<{ type: string; count: number }> }> {
+    const allFeedback = await db
+      .select()
+      .from(articleFeedback)
+      .where(and(
+        eq(articleFeedback.userId, userId),
+        eq(articleFeedback.orgId, orgId)
+      ));
+    
+    const byType: Record<string, number> = {};
+    allFeedback.forEach(f => {
+      byType[f.feedbackType] = (byType[f.feedbackType] || 0) + 1;
+    });
+    
+    return {
+      total: allFeedback.length,
+      byType: Object.entries(byType).map(([type, count]) => ({ type, count }))
+    };
   }
 }
 

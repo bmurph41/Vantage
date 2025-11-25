@@ -546,6 +546,83 @@ export const insertSummaryEditSchema = createInsertSchema(summaryEdits).omit({
   createdAt: true,
 });
 
+// User Tag Library - custom tags for AI training
+export const userTagLibrary = pgTable("docktalk_user_tag_library", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color").default("#6366f1"), // Tailwind indigo-500
+  isActive: boolean("is_active").default(true),
+  usageCount: integer("usage_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  byUser: index("idx_docktalk_tag_library_user").on(table.userId),
+  byOrg: index("idx_docktalk_tag_library_org").on(table.orgId),
+  uniqueUserTag: uniqueIndex("idx_docktalk_tag_library_unique").on(table.userId, table.name),
+}));
+
+// Article Tag Assignments - links articles to user tags for AI training
+export const articleTagAssignments = pgTable("docktalk_article_tag_assignments", {
+  id: serial("id").primaryKey(),
+  articleId: integer("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
+  tagId: integer("tag_id").notNull().references(() => userTagLibrary.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  confidence: integer("confidence").default(100), // User confidence in tag assignment
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  byArticle: index("idx_docktalk_tag_assignments_article").on(table.articleId),
+  byTag: index("idx_docktalk_tag_assignments_tag").on(table.tagId),
+  byUser: index("idx_docktalk_tag_assignments_user").on(table.userId),
+  byOrg: index("idx_docktalk_tag_assignments_org").on(table.orgId),
+  uniqueAssignment: uniqueIndex("idx_docktalk_tag_assignments_unique").on(table.articleId, table.tagId, table.userId),
+}));
+
+// Article Feedback - user feedback for AI training (irrelevant, duplicate, etc.)
+export const articleFeedbackTypeEnum = pgEnum("docktalk_article_feedback_type", ["irrelevant", "duplicate", "low_quality", "wrong_category", "spam", "helpful"]);
+
+export const articleFeedback = pgTable("docktalk_article_feedback", {
+  id: serial("id").primaryKey(),
+  articleId: integer("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  feedbackType: articleFeedbackTypeEnum("feedback_type").notNull(),
+  reason: text("reason"),
+  suggestedCategory: text("suggested_category"),
+  duplicateOfArticleId: integer("duplicate_of_article_id").references(() => articles.id),
+  processedByAi: boolean("processed_by_ai").default(false),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  byArticle: index("idx_docktalk_feedback_article").on(table.articleId),
+  byUser: index("idx_docktalk_feedback_user").on(table.userId),
+  byOrg: index("idx_docktalk_feedback_org").on(table.orgId),
+  byType: index("idx_docktalk_feedback_type").on(table.feedbackType),
+  uniqueFeedback: uniqueIndex("idx_docktalk_feedback_unique").on(table.articleId, table.userId, table.feedbackType),
+}));
+
+export const insertUserTagLibrarySchema = createInsertSchema(userTagLibrary).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  usageCount: true,
+});
+
+export const insertArticleTagAssignmentSchema = createInsertSchema(articleTagAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertArticleFeedbackSchema = createInsertSchema(articleFeedback).omit({
+  id: true,
+  createdAt: true,
+  processedByAi: true,
+  processedAt: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type UserNotificationPreferences = typeof userNotificationPreferences.$inferSelect;
@@ -587,3 +664,9 @@ export type CategorySummary = typeof categorySummaries.$inferSelect;
 export type InsertCategorySummary = z.infer<typeof insertCategorySummarySchema>;
 export type SummaryEdit = typeof summaryEdits.$inferSelect;
 export type InsertSummaryEdit = z.infer<typeof insertSummaryEditSchema>;
+export type UserTag = typeof userTagLibrary.$inferSelect;
+export type InsertUserTag = z.infer<typeof insertUserTagLibrarySchema>;
+export type ArticleTagAssignment = typeof articleTagAssignments.$inferSelect;
+export type InsertArticleTagAssignment = z.infer<typeof insertArticleTagAssignmentSchema>;
+export type ArticleFeedback = typeof articleFeedback.$inferSelect;
+export type InsertArticleFeedback = z.infer<typeof insertArticleFeedbackSchema>;

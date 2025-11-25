@@ -147,9 +147,11 @@ async function sendNotification(notification: AlertNotification, search: SavedSe
     return;
   }
 
-  // Get notification preferences to check if email is configured
+  // Get notification preferences to check if email is configured and enabled
+  // Note: getUserNotificationPreferences may require orgId, but for alerts we check globally
   const preferences = await storage.getUserNotificationPreferences(notification.userId);
-  const shouldSendEmail = preferences?.emailAddress && preferences.frequency !== 'none';
+  // Check that emails are enabled AND email address is configured
+  const shouldSendEmail = preferences?.enabled !== false && preferences?.emailAddress;
 
   let deliveryMethod: "console" | "email" = "console";
   let deliveryStatus: "sent" | "failed" = "sent";
