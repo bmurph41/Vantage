@@ -5,7 +5,8 @@ import DockTalkTabs from "../components/DockTalkTabs";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSystemStats } from "../lib/api";
 import { useAuth } from "@/hooks/useAuth";
-import PreferencesPage from "./preferences";
+import NotificationsPage from "./notifications";
+import SourcesPage from "./sources";
 
 export default function Dashboard() {
   const [newArticlesCount, setNewArticlesCount] = useState(0);
@@ -20,7 +21,6 @@ export default function Dashboard() {
     if (location === "/docktalk/portfolio") return "portfolio";
     if (location === "/docktalk/saved-searches") return "saved-searches";
     if (location === "/docktalk/watchlists") return "watchlists";
-    if (location === "/docktalk/preferences") return "preferences";
     return "all-articles"; // default
   };
 
@@ -31,25 +31,52 @@ export default function Dashboard() {
     refetchInterval: 60 * 1000,
   });
 
+  const handleArticlesClick = () => {
+    setLocation('/docktalk');
+  };
+
   const handleNotificationClick = () => {
-    // Notification functionality - can be expanded later
+    setLocation('/docktalk/notifications');
   };
 
   const handleSettingsClick = () => {
-    setLocation('/docktalk/preferences');
+    setLocation('/docktalk/sources');
   };
 
-  // Show preferences page if on /docktalk/preferences route
-  if (location === "/docktalk/preferences") {
+  // Check if we're on a settings/notification page (show Articles button)
+  const isSettingsPage = location === "/docktalk/notifications" || location === "/docktalk/sources";
+
+  // Show notifications page for email setup
+  if (location === "/docktalk/notifications") {
     return (
       <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
         <DockTalkHeader
           newArticlesCount={systemStats?.newArticlesToday || 0}
+          onArticlesClick={handleArticlesClick}
           onNotificationClick={handleNotificationClick}
           onSettingsClick={handleSettingsClick}
+          showArticlesButton={true}
         />
         <div className="flex-1 overflow-auto p-6">
-          <PreferencesPage />
+          <NotificationsPage />
+        </div>
+      </div>
+    );
+  }
+
+  // Show sources page for RSS/URL management
+  if (location === "/docktalk/sources") {
+    return (
+      <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
+        <DockTalkHeader
+          newArticlesCount={systemStats?.newArticlesToday || 0}
+          onArticlesClick={handleArticlesClick}
+          onNotificationClick={handleNotificationClick}
+          onSettingsClick={handleSettingsClick}
+          showArticlesButton={true}
+        />
+        <div className="flex-1 overflow-auto p-6">
+          <SourcesPage />
         </div>
       </div>
     );
@@ -60,8 +87,10 @@ export default function Dashboard() {
       {/* Header with notification bell and settings */}
       <DockTalkHeader
         newArticlesCount={systemStats?.newArticlesToday || 0}
+        onArticlesClick={handleArticlesClick}
         onNotificationClick={handleNotificationClick}
         onSettingsClick={handleSettingsClick}
+        showArticlesButton={false}
       />
 
       {/* Tabbed Navigation */}
