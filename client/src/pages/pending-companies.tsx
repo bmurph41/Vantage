@@ -28,7 +28,8 @@ export default function PendingCompanies() {
 
   const { data: pendingCompanies = [], isLoading } = useQuery<PendingCompany[]>({
     queryKey: ['/api/crm/pending-companies'],
-    refetchInterval: 30000,
+    staleTime: 60 * 1000, // Consider data fresh for 1 minute
+    refetchInterval: 2 * 60 * 1000, // Refresh every 2 minutes
   });
 
   const { mutate: fetchDuplicate, isPending: isFetchingDuplicate } = useMutation({

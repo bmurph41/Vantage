@@ -175,20 +175,26 @@ export default function UnifiedSidebar() {
     return personas.some(p => sectionAccess[section]?.includes(p));
   };
 
-  // Fetch pending items counts
+  // Fetch pending items counts - shared cache with notification banner
   const { data: pendingProperties = [] } = useQuery<PendingItem[]>({
     queryKey: ['/api/crm/pending-properties'],
-    refetchInterval: 60000, // Refresh every minute
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
+    refetchOnWindowFocus: false,
   });
 
   const { data: pendingContacts = [] } = useQuery<PendingItem[]>({
     queryKey: ['/api/crm/pending-contacts'],
-    refetchInterval: 60000, // Refresh every minute
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: pendingCompanies = [] } = useQuery<PendingItem[]>({
     queryKey: ['/api/crm/pending-companies'],
-    refetchInterval: 60000, // Refresh every minute
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const pendingPropertiesCount = pendingProperties.filter(p => p.status === 'pending').length;

@@ -21,25 +21,33 @@ type PendingPropertyProfile = {
 export default function PendingNotificationsBanner() {
   const [dismissedNotifications, setDismissedNotifications] = useState<Set<string>>(new Set());
 
-  // Fetch all pending items
+  // Fetch all pending items - use longer stale time to reduce unnecessary refetches
   const { data: pendingProperties = [] } = useQuery<PendingItem[]>({
     queryKey: ['/api/crm/pending-properties'],
-    refetchInterval: 30000, // Refresh every 30 seconds for real-time updates
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes instead of 30 seconds
+    refetchOnWindowFocus: false,
   });
 
   const { data: pendingContacts = [] } = useQuery<PendingItem[]>({
     queryKey: ['/api/crm/pending-contacts'],
-    refetchInterval: 30000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: pendingCompanies = [] } = useQuery<PendingItem[]>({
     queryKey: ['/api/crm/pending-companies'],
-    refetchInterval: 30000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: pendingProfiles = [] } = useQuery<PendingPropertyProfile[]>({
     queryKey: ['/api/sales-comps/pending-property-profiles'],
-    refetchInterval: 30000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Calculate counts
