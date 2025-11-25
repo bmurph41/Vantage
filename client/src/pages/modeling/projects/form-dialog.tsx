@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -27,24 +27,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MapPin, Check, ChevronsUpDown, User, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { CurrencyInput } from '@/components/ui/currency-input';
+import { cn } from '@/lib/utils';
+import { normalizeState } from '@shared/utils/state-normalization';
 
 const formSchema = z.object({
   marinaName: z.string().min(1, 'Marina name is required'),
+  address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
+  zipCode: z.string().optional(),
   region: z.string().optional(),
   dealOutcome: z.enum(['active', 'won', 'lost', 'passed', 'under_review']),
+  dealSource: z.enum(['direct_to_seller', 'broker', 'owned_marina']).nullable().optional(),
   ddProjectId: z.string().nullable().optional(),
   salesCompId: z.string().nullable().optional(),
   rateCompId: z.string().nullable().optional(),
   propertyId: z.string().nullable().optional(),
   brokerId: z.string().nullable().optional(),
+  brokerCompanyId: z.string().nullable().optional(),
   companyId: z.string().nullable().optional(),
   notes: z.string().optional(),
 });
@@ -54,15 +73,19 @@ type FormData = z.infer<typeof formSchema>;
 type ModelingProject = {
   id: string;
   marinaName: string;
+  address: string | null;
   city: string | null;
   state: string | null;
+  zipCode: string | null;
   region: string | null;
   dealOutcome: string;
+  dealSource: string | null;
   ddProjectId: string | null;
   salesCompId: string | null;
   rateCompId: string | null;
   propertyId: string | null;
   brokerId: string | null;
+  brokerCompanyId: string | null;
   companyId: string | null;
   notes: string | null;
 };
@@ -74,10 +97,27 @@ type ModelingRegion = {
   isActive: boolean;
 };
 
-type Contact = {
+type BrokerContact = {
   id: string;
   firstName: string;
   lastName: string;
+  email: string | null;
+  phone: string | null;
+  title: string | null;
+  companyId: string | null;
+  companyName: string | null;
+};
+
+type BrokerCompany = {
+  id: string;
+  name: string;
+  domain: string | null;
+  phone: string | null;
+};
+
+type BrokerSearchResult = {
+  contacts: BrokerContact[];
+  companies: BrokerCompany[];
 };
 
 interface ModelingProjectFormDialogProps {
@@ -96,68 +136,218 @@ export default function ModelingProjectFormDialog({
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [brokerSearch, setBrokerSearch] = useState('');
-
-  const { data: contacts = [] } = useQuery<Contact[]>({
-    queryKey: ['/api/crm/contacts'],
-    enabled: open,
-  });
+  const [brokerPopoverOpen, setBrokerPopoverOpen] = useState(false);
+  const [selectedBrokerDisplay, setSelectedBrokerDisplay] = useState('');
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
+  const [apiReady, setApiReady] = useState(false);
+  const addressInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   const { data: regions = [] } = useQuery<ModelingRegion[]>({
     queryKey: ['/api/modeling/regions'],
     enabled: open,
   });
 
+  const { data: brokerResults, isLoading: isSearchingBrokers } = useQuery<BrokerSearchResult>({
+    queryKey: ['/api/modeling/broker-search', brokerSearch],
+    queryFn: async () => {
+      if (!brokerSearch || brokerSearch.length < 2) {
+        return { contacts: [], companies: [] };
+      }
+      const response = await fetch(`/api/modeling/broker-search?q=${encodeURIComponent(brokerSearch)}`);
+      return response.json();
+    },
+    enabled: open && brokerSearch.length >= 2,
+  });
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       marinaName: '',
+      address: '',
       city: '',
       state: '',
+      zipCode: '',
       region: '',
       dealOutcome: 'active',
+      dealSource: null,
       ddProjectId: null,
       salesCompId: null,
       rateCompId: null,
       propertyId: null,
       brokerId: null,
+      brokerCompanyId: null,
       companyId: null,
       notes: '',
     },
   });
 
+  const dealSource = form.watch('dealSource');
+
+  useEffect(() => {
+    const loadGoogleMaps = async () => {
+      if (typeof google !== 'undefined' && google.maps) {
+        setApiReady(true);
+        return;
+      }
+
+      setIsLoadingAddress(true);
+      try {
+        let apiKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY;
+        
+        if (!apiKey) {
+          try {
+            const response = await fetch('/api/config/google-maps-key');
+            const data = await response.json();
+            apiKey = data.apiKey;
+          } catch (err) {
+            console.warn('Could not fetch Google Maps API key');
+          }
+        }
+        
+        if (!apiKey) {
+          setIsLoadingAddress(false);
+          return;
+        }
+
+        const { Loader } = await import('@googlemaps/js-api-loader');
+        const loader = new Loader({
+          apiKey,
+          version: 'weekly',
+          libraries: ['places'],
+        });
+
+        await loader.load();
+        setApiReady(true);
+      } catch (error) {
+        console.error('Failed to load Google Maps API:', error);
+      } finally {
+        setIsLoadingAddress(false);
+      }
+    };
+
+    if (open) {
+      loadGoogleMaps();
+    }
+  }, [open]);
+
+  const handlePlaceChanged = useCallback(() => {
+    const place = autocompleteRef.current?.getPlace();
+    
+    if (!place || !place.address_components) {
+      return;
+    }
+
+    let streetNumber = '';
+    let route = '';
+    let city = '';
+    let state = '';
+    let zipCode = '';
+
+    place.address_components?.forEach((component) => {
+      const types = component.types;
+      
+      if (types.includes('street_number')) {
+        streetNumber = component.long_name;
+      }
+      if (types.includes('route')) {
+        route = component.long_name;
+      }
+      if (types.includes('locality')) {
+        city = component.long_name;
+      }
+      if (types.includes('administrative_area_level_1')) {
+        state = component.short_name;
+      }
+      if (types.includes('postal_code')) {
+        zipCode = component.long_name;
+      }
+    });
+
+    const streetAddress = streetNumber ? `${streetNumber} ${route}` : route;
+    
+    form.setValue('address', streetAddress);
+    form.setValue('city', city);
+    form.setValue('state', state);
+    form.setValue('zipCode', zipCode);
+  }, [form]);
+
+  useEffect(() => {
+    if (!apiReady || !addressInputRef.current || !open) {
+      return;
+    }
+
+    try {
+      autocompleteRef.current = new google.maps.places.Autocomplete(addressInputRef.current, {
+        types: ['address'],
+        componentRestrictions: { country: 'us' },
+        fields: ['address_components', 'formatted_address', 'geometry'],
+      });
+
+      autocompleteRef.current.addListener('place_changed', handlePlaceChanged);
+    } catch (error) {
+      console.error('Failed to initialize autocomplete:', error);
+    }
+
+    return () => {
+      if (autocompleteRef.current) {
+        google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+    };
+  }, [apiReady, open, handlePlaceChanged]);
+
   useEffect(() => {
     if (open && project && mode === 'edit') {
       form.reset({
         marinaName: project.marinaName,
+        address: project.address || '',
         city: project.city || '',
         state: project.state || '',
+        zipCode: project.zipCode || '',
         region: project.region || '',
         dealOutcome: project.dealOutcome as any,
+        dealSource: project.dealSource as any || null,
         ddProjectId: project.ddProjectId,
         salesCompId: project.salesCompId,
         rateCompId: project.rateCompId,
         propertyId: project.propertyId,
         brokerId: project.brokerId,
+        brokerCompanyId: project.brokerCompanyId,
         companyId: project.companyId,
         notes: project.notes || '',
       });
     } else if (open && mode === 'create') {
       form.reset({
         marinaName: '',
+        address: '',
         city: '',
         state: '',
+        zipCode: '',
         region: '',
         dealOutcome: 'active',
+        dealSource: null,
         ddProjectId: null,
         salesCompId: null,
         rateCompId: null,
         propertyId: null,
         brokerId: null,
+        brokerCompanyId: null,
         companyId: null,
         notes: '',
       });
+      setSelectedBrokerDisplay('');
+      setBrokerSearch('');
     }
   }, [open, project, mode, form]);
+
+  useEffect(() => {
+    if (dealSource !== 'broker') {
+      form.setValue('brokerId', null);
+      form.setValue('brokerCompanyId', null);
+      setSelectedBrokerDisplay('');
+      setBrokerSearch('');
+    }
+  }, [dealSource, form]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -199,7 +389,19 @@ export default function ModelingProjectFormDialog({
     },
   });
 
+  const handleStateBlur = () => {
+    const currentState = form.getValues('state');
+    if (currentState) {
+      const normalized = normalizeState(currentState);
+      form.setValue('state', normalized);
+    }
+  };
+
   const onSubmit = (data: FormData) => {
+    if (data.state) {
+      data.state = normalizeState(data.state);
+    }
+    
     if (mode === 'create') {
       createMutation.mutate(data);
     } else {
@@ -207,12 +409,27 @@ export default function ModelingProjectFormDialog({
     }
   };
 
+  const handleSelectBroker = (contact: BrokerContact) => {
+    form.setValue('brokerId', contact.id);
+    form.setValue('brokerCompanyId', contact.companyId);
+    setSelectedBrokerDisplay(`${contact.firstName} ${contact.lastName}${contact.companyName ? ` (${contact.companyName})` : ''}`);
+    setBrokerPopoverOpen(false);
+    setBrokerSearch('');
+  };
+
+  const handleSelectCompany = (company: BrokerCompany) => {
+    form.setValue('brokerCompanyId', company.id);
+    form.setValue('brokerId', null);
+    setSelectedBrokerDisplay(company.name);
+    setBrokerPopoverOpen(false);
+    setBrokerSearch('');
+  };
+
   const isPending = createMutation.isPending || updateMutation.isPending;
 
-  const filteredContacts = contacts.filter(
-    (contact) =>
-      `${contact.firstName} ${contact.lastName}`.toLowerCase().includes(brokerSearch.toLowerCase())
-  );
+  const sortedRegions = [...regions]
+    .filter(r => r.isActive)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -244,7 +461,43 @@ export default function ModelingProjectFormDialog({
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                        {isLoadingAddress ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <MapPin className="w-4 h-4" />
+                        )}
+                      </div>
+                      <Input
+                        ref={addressInputRef}
+                        {...field}
+                        value={field.value || ''}
+                        placeholder="Start typing an address..."
+                        className="pl-10"
+                        data-testid="input-address"
+                        autoComplete="off"
+                      />
+                    </div>
+                  </FormControl>
+                  {!apiReady && !isLoadingAddress && (
+                    <p className="text-xs text-muted-foreground">
+                      Address autocomplete unavailable. Enter address manually.
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="city"
@@ -266,7 +519,31 @@ export default function ModelingProjectFormDialog({
                   <FormItem>
                     <FormLabel>State</FormLabel>
                     <FormControl>
-                      <Input {...field} value={field.value || ''} placeholder="State" data-testid="input-state" />
+                      <Input 
+                        {...field} 
+                        value={field.value || ''} 
+                        placeholder="FL" 
+                        data-testid="input-state"
+                        onBlur={(e) => {
+                          field.onBlur();
+                          handleStateBlur();
+                        }}
+                        maxLength={20}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="zipCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Zip Code</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ''} placeholder="12345" data-testid="input-zipcode" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -291,7 +568,7 @@ export default function ModelingProjectFormDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="none">No region</SelectItem>
-                      {regions.filter((r) => r.isActive).map((region) => (
+                      {sortedRegions.map((region) => (
                         <SelectItem key={region.id} value={region.name}>
                           {region.name}
                         </SelectItem>
@@ -305,22 +582,24 @@ export default function ModelingProjectFormDialog({
 
             <FormField
               control={form.control}
-              name="dealOutcome"
+              name="dealSource"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Deal Outcome</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <FormLabel>Deal Source</FormLabel>
+                  <Select 
+                    onValueChange={(value) => field.onChange(value === 'none' ? null : value)} 
+                    value={field.value || 'none'}
+                  >
                     <FormControl>
-                      <SelectTrigger data-testid="select-outcome">
-                        <SelectValue placeholder="Select outcome" />
+                      <SelectTrigger data-testid="select-deal-source">
+                        <SelectValue placeholder="Select deal source" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="won">Won</SelectItem>
-                      <SelectItem value="lost">Lost</SelectItem>
-                      <SelectItem value="passed">Passed</SelectItem>
-                      <SelectItem value="under_review">Under Review</SelectItem>
+                      <SelectItem value="none">No source selected</SelectItem>
+                      <SelectItem value="direct_to_seller">Direct to Seller</SelectItem>
+                      <SelectItem value="broker">Broker</SelectItem>
+                      <SelectItem value="owned_marina">Owned Marina</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -328,37 +607,126 @@ export default function ModelingProjectFormDialog({
               )}
             />
 
+            {dealSource === 'broker' && (
+              <FormField
+                control={form.control}
+                name="brokerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Broker</FormLabel>
+                    <Popover open={brokerPopoverOpen} onOpenChange={setBrokerPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between",
+                              !selectedBrokerDisplay && "text-muted-foreground"
+                            )}
+                            data-testid="button-select-broker"
+                          >
+                            {selectedBrokerDisplay || "Search for a broker..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0" align="start">
+                        <Command shouldFilter={false}>
+                          <CommandInput 
+                            placeholder="Search brokers by name or company..."
+                            value={brokerSearch}
+                            onValueChange={setBrokerSearch}
+                            data-testid="input-broker-search"
+                          />
+                          <CommandList>
+                            {brokerSearch.length < 2 ? (
+                              <CommandEmpty>Type at least 2 characters to search...</CommandEmpty>
+                            ) : isSearchingBrokers ? (
+                              <div className="flex items-center justify-center py-6">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              </div>
+                            ) : (
+                              <>
+                                {brokerResults?.contacts && brokerResults.contacts.length > 0 && (
+                                  <CommandGroup heading="Contacts">
+                                    {brokerResults.contacts.map((contact) => (
+                                      <CommandItem
+                                        key={contact.id}
+                                        value={contact.id}
+                                        onSelect={() => handleSelectBroker(contact)}
+                                        data-testid={`broker-contact-${contact.id}`}
+                                      >
+                                        <User className="mr-2 h-4 w-4" />
+                                        <div className="flex flex-col">
+                                          <span>{contact.firstName} {contact.lastName}</span>
+                                          {contact.companyName && (
+                                            <span className="text-xs text-muted-foreground">{contact.companyName}</span>
+                                          )}
+                                        </div>
+                                        {field.value === contact.id && (
+                                          <Check className="ml-auto h-4 w-4" />
+                                        )}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                )}
+                                {brokerResults?.contacts && brokerResults.contacts.length > 0 && 
+                                 brokerResults?.companies && brokerResults.companies.length > 0 && (
+                                  <CommandSeparator />
+                                )}
+                                {brokerResults?.companies && brokerResults.companies.length > 0 && (
+                                  <CommandGroup heading="Companies">
+                                    {brokerResults.companies.map((company) => (
+                                      <CommandItem
+                                        key={company.id}
+                                        value={company.id}
+                                        onSelect={() => handleSelectCompany(company)}
+                                        data-testid={`broker-company-${company.id}`}
+                                      >
+                                        <Building2 className="mr-2 h-4 w-4" />
+                                        <span>{company.name}</span>
+                                        {form.getValues('brokerCompanyId') === company.id && !form.getValues('brokerId') && (
+                                          <Check className="ml-auto h-4 w-4" />
+                                        )}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                )}
+                                {(!brokerResults?.contacts || brokerResults.contacts.length === 0) && 
+                                 (!brokerResults?.companies || brokerResults.companies.length === 0) && (
+                                  <CommandEmpty>No brokers found</CommandEmpty>
+                                )}
+                              </>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <FormField
               control={form.control}
-              name="brokerId"
+              name="dealOutcome"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Broker (Contact)</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(value === 'none' ? null : value)}
-                    value={field.value || 'none'}
-                  >
+                  <FormLabel>Deal Status</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger data-testid="select-broker">
-                        <SelectValue placeholder="Select a broker" />
+                      <SelectTrigger data-testid="select-outcome">
+                        <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <div className="p-2">
-                        <Input
-                          placeholder="Search contacts..."
-                          value={brokerSearch}
-                          onChange={(e) => setBrokerSearch(e.target.value)}
-                          className="mb-2"
-                          data-testid="input-broker-search"
-                        />
-                      </div>
-                      <SelectItem value="none">No broker</SelectItem>
-                      {filteredContacts.map((contact) => (
-                        <SelectItem key={contact.id} value={contact.id}>
-                          {contact.firstName} {contact.lastName}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="under_review">Under Review</SelectItem>
+                      <SelectItem value="won">Won</SelectItem>
+                      <SelectItem value="lost">Lost</SelectItem>
+                      <SelectItem value="passed">Passed</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -377,7 +745,7 @@ export default function ModelingProjectFormDialog({
                       {...field}
                       value={field.value || ''}
                       placeholder="Additional notes or comments..."
-                      rows={4}
+                      rows={3}
                       data-testid="textarea-notes"
                     />
                   </FormControl>

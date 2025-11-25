@@ -13,7 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings } from 'lucide-react';
+import { Link } from 'wouter';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import ModelingProjectFormDialog from './form-dialog';
@@ -145,10 +146,18 @@ export default function ModelingProjectsPage() {
             Track valuation and financial modeling projects
           </p>
         </div>
-        <Button onClick={handleCreate} data-testid="button-create-project">
-          <Plus className="h-4 w-4 mr-2" />
-          New Project
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href="/modeling/settings">
+            <Button variant="outline" data-testid="button-settings">
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+          </Link>
+          <Button onClick={handleCreate} data-testid="button-create-project">
+            <Plus className="h-4 w-4 mr-2" />
+            New Project
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="projects" className="space-y-6">

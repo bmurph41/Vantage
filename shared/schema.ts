@@ -79,6 +79,7 @@ export const leadStatusEnum = pgEnum("lead_status", ["none", "new", "contacted",
 export const contactTagEnum = pgEnum("contact_tag", ["lead", "seller", "competitor", "broker", "vendor", "insurance", "lender", "attorney", "other"]);
 export const phoneTypeEnum = pgEnum("phone_type", ["office", "mobile", "home"]);
 export const dealOutcomeEnum = pgEnum("deal_outcome", ["won", "lost", "passed", "under_review", "active"]);
+export const dealSourceEnum = pgEnum("deal_source", ["direct_to_seller", "broker", "owned_marina"]);
 
 // VDR & Request Management enums
 export const vdrPermissionLevelEnum = pgEnum("vdr_permission_level", ["no_access", "view_only", "view_download", "view_download_print", "full_access"]);
@@ -5869,9 +5870,14 @@ export const modelingProjects = pgTable('modeling_projects', {
   companyId: varchar('company_id').references(() => crmCompanies.id), // Property owner/seller company
   
   // Geographic/regional data
+  address: text('address'), // Street address
   city: text('city'),
-  state: text('state'),
+  state: text('state'), // Two-letter state abbreviation
+  zipCode: text('zip_code'),
   region: text('region'), // e.g., "Southeast", "Great Lakes", etc.
+  
+  // Deal source - how the deal originated
+  dealSource: dealSourceEnum('deal_source'),
   
   // Custom metrics - extensible field for user-defined metrics
   customMetrics: jsonb('custom_metrics').default(sql`'{}'`), // Flexible structure for additional fields

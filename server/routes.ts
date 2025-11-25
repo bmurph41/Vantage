@@ -10203,6 +10203,85 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Search brokers - searches CRM contacts and companies together
+  app.get('/api/modeling/broker-search', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const query = (req.query.q || req.query.query || '').trim();
+      
+      if (!query || query.length < 2) {
+        return res.json({ contacts: [], companies: [] });
+      }
+      
+      const searchTerm = `%${query.toLowerCase()}%`;
+      
+      // Search contacts (brokers)
+      const contacts = await db
+        .select({
+          id: crmContacts.id,
+          firstName: crmContacts.firstName,
+          lastName: crmContacts.lastName,
+          email: crmContacts.email,
+          phone: crmContacts.phone,
+          title: crmContacts.title,
+          companyId: crmContacts.companyId,
+        })
+        .from(crmContacts)
+        .where(
+          and(
+            eq(crmContacts.orgId, orgId),
+            or(
+              sql`LOWER(${crmContacts.firstName}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmContacts.lastName}) LIKE ${searchTerm}`,
+              sql`LOWER(CONCAT(${crmContacts.firstName}, ' ', ${crmContacts.lastName})) LIKE ${searchTerm}`,
+              sql`LOWER(${crmContacts.email}) LIKE ${searchTerm}`
+            )
+          )
+        )
+        .limit(10);
+      
+      // Search companies (broker companies)
+      const companies = await db
+        .select({
+          id: crmCompanies.id,
+          name: crmCompanies.name,
+          domain: crmCompanies.domain,
+          phone: crmCompanies.phone,
+        })
+        .from(crmCompanies)
+        .where(
+          and(
+            eq(crmCompanies.orgId, orgId),
+            sql`LOWER(${crmCompanies.name}) LIKE ${searchTerm}`
+          )
+        )
+        .limit(10);
+      
+      // Get company names for contacts
+      const contactsWithCompany = await Promise.all(
+        contacts.map(async (contact) => {
+          if (contact.companyId) {
+            const company = await db
+              .select({ name: crmCompanies.name })
+              .from(crmCompanies)
+              .where(eq(crmCompanies.id, contact.companyId))
+              .limit(1);
+            return {
+              ...contact,
+              companyName: company[0]?.name || null,
+            };
+          }
+          return { ...contact, companyName: null };
+        })
+      );
+      
+      res.json({ contacts: contactsWithCompany, companies });
+    } catch (error) {
+      console.error('Failed to search brokers:', error);
+      res.status(500).json({ error: 'Failed to search brokers' });
+    }
+  });
+
   // Get all modeling projects for organization
   app.get('/api/modeling/projects', authenticateUser, async (req: any, res) => {
     try {
