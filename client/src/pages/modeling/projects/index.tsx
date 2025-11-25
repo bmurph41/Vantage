@@ -13,7 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, Pencil, Trash2, TrendingUp } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3 } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import ModelingProjectFormDialog from './form-dialog';
 import ModelingAnalytics from './analytics';
@@ -45,6 +46,7 @@ type ModelingProject = {
 
 export default function ModelingProjectsPage() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProject, setSelectedProject] = useState<ModelingProject | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -227,6 +229,15 @@ export default function ModelingProjectsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setLocation(`/modeling/projects/${project.id}/exit`)}
+                              title="Exit Strategy Suite"
+                              data-testid={`button-exit-strategy-${project.id}`}
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
