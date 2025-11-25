@@ -11040,6 +11040,193 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ============================================================================
+  // APPROVAL NOTIFICATIONS - Email and In-App Notifications for Scenario Approvals
+  // ============================================================================
+
+  // Get pending approvals for the organization
+  app.get('/api/approvals/pending', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const pendingApprovals = await approvalNotificationService.getPendingApprovals(orgId);
+      res.json(pendingApprovals);
+    } catch (error) {
+      console.error('Failed to get pending approvals:', error);
+      res.status(500).json({ error: 'Failed to get pending approvals' });
+    }
+  });
+
+  // Get approval statistics
+  app.get('/api/approvals/stats', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const stats = await approvalNotificationService.getApprovalStats(orgId);
+      res.json(stats);
+    } catch (error) {
+      console.error('Failed to get approval stats:', error);
+      res.status(500).json({ error: 'Failed to get approval statistics' });
+    }
+  });
+
+  // Get available approvers for the organization
+  app.get('/api/approvals/approvers', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const approvers = await approvalNotificationService.getOrgApprovers(orgId);
+      res.json(approvers);
+    } catch (error) {
+      console.error('Failed to get approvers:', error);
+      res.status(500).json({ error: 'Failed to get approvers' });
+    }
+  });
+
+  // Get user notifications
+  app.get('/api/notifications', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const unreadOnly = req.query.unreadOnly === 'true';
+      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const notifications = await approvalNotificationService.getUserNotifications(orgId, userId, unreadOnly);
+      res.json(notifications);
+    } catch (error) {
+      console.error('Failed to get notifications:', error);
+      res.status(500).json({ error: 'Failed to get notifications' });
+    }
+  });
+
+  // Get unread notification count
+  app.get('/api/notifications/unread-count', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const count = await approvalNotificationService.getUnreadCount(orgId, userId);
+      res.json({ count });
+    } catch (error) {
+      console.error('Failed to get unread count:', error);
+      res.status(500).json({ error: 'Failed to get unread count' });
+    }
+  });
+
+  // Mark notification as read
+  app.post('/api/notifications/:notificationId/read', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { notificationId } = req.params;
+      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      await approvalNotificationService.markNotificationRead(notificationId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+      res.status(500).json({ error: 'Failed to mark notification as read' });
+    }
+  });
+
+  // Mark all notifications as read
+  app.post('/api/notifications/mark-all-read', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      await approvalNotificationService.markAllNotificationsRead(orgId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+      res.status(500).json({ error: 'Failed to mark all notifications as read' });
+    }
+  });
+
+  // Submit scenario for approval with specific approvers
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/submit-for-approval', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, scenarioId } = req.params;
+      const { approverIds } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      
+      const updated = await scenarioVersioningService.submitForApproval(scenarioId, userId);
+
+      if (approverIds && approverIds.length > 0) {
+        await approvalNotificationService.notifyApprovalRequested(scenarioId, userId, approverIds);
+      } else {
+        const orgApprovers = await approvalNotificationService.getOrgApprovers(orgId);
+        const approverUserIds = orgApprovers.map(a => a.id).filter(id => id !== userId);
+        if (approverUserIds.length > 0) {
+          await approvalNotificationService.notifyApprovalRequested(scenarioId, userId, approverUserIds);
+        }
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Failed to submit for approval:', error);
+      res.status(500).json({ error: 'Failed to submit for approval' });
+    }
+  });
+
+  // Approve scenario with notifications
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/approve-with-notification', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, scenarioId } = req.params;
+      const { notes } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      
+      const updated = await scenarioVersioningService.approveScenario(scenarioId, userId, notes);
+      await approvalNotificationService.notifyApprovalDecision(scenarioId, 'approved', userId, notes);
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Failed to approve scenario:', error);
+      res.status(500).json({ error: 'Failed to approve scenario' });
+    }
+  });
+
+  // Reject scenario with notifications
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/reject-with-notification', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, scenarioId } = req.params;
+      const { notes } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      
+      const updated = await scenarioVersioningService.rejectScenario(scenarioId, userId, notes);
+      await approvalNotificationService.notifyApprovalDecision(scenarioId, 'rejected', userId, notes);
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Failed to reject scenario:', error);
+      res.status(500).json({ error: 'Failed to reject scenario' });
+    }
+  });
+
+  // ============================================================================
   // QUICKBOOKS INTEGRATION - OAuth2 Connection and P&L Sync
   // ============================================================================
 
