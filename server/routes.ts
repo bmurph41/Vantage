@@ -11523,6 +11523,61 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ==================== VDR INTEGRATION ROUTES ====================
+
+  // Export modeling outputs to VDR
+  app.post('/api/modeling/projects/:projectId/export-to-vdr', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { includeICMemo, includeProForma, includeScenarioComparison, includeSensitivityAnalysis, scenarioVersionIds } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { vdrModelingIntegrationService } = await import('./services/vdr-modeling-integration-service');
+      const result = await vdrModelingIntegrationService.exportToVDR(projectId, orgId, userId, {
+        includeICMemo,
+        includeProForma,
+        includeScenarioComparison,
+        includeSensitivityAnalysis,
+        scenarioVersionIds
+      });
+
+      res.json({
+        message: `Successfully exported ${result.documents.length} documents to VDR`,
+        ...result
+      });
+    } catch (error: any) {
+      console.error('Failed to export to VDR:', error);
+      res.status(400).json({ error: error.message || 'Failed to export to VDR' });
+    }
+  });
+
+  // Get VDR export history for a project
+  app.get('/api/modeling/projects/:projectId/vdr-exports', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { vdrModelingIntegrationService } = await import('./services/vdr-modeling-integration-service');
+      const history = await vdrModelingIntegrationService.getVDRExportHistory(projectId, orgId);
+
+      res.json(history);
+    } catch (error) {
+      console.error('Failed to get VDR export history:', error);
+      res.status(500).json({ error: 'Failed to get VDR export history' });
+    }
+  });
+
   // Get modeling analytics and metrics
   app.get('/api/modeling/analytics', authenticateUser, async (req: any, res) => {
     try {
