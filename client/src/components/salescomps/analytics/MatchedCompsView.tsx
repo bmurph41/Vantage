@@ -26,8 +26,11 @@ interface SalesComp {
   city: string | null;
   state: string | null;
   zipCode: string | null;
-  saleDate: string | null;
+  saleYear: number | null;
+  saleMonth: number | null;
   salePrice: number | null;
+  wetSlips: number | null;
+  dryRacks: number | null;
   totalSlips: number | null;
   pricePerSlip: number | null;
   storageTypes: string[] | null;
@@ -36,9 +39,21 @@ interface SalesComp {
   buyerName: string | null;
   sellerName: string | null;
   brokerName: string | null;
+  agentName: string | null;
   coastalType: string | null;
   region: string | null;
   isPortfolio: boolean;
+  capRate: number | null;
+  noi: number | null;
+  listPrice: number | null;
+  acres: number | null;
+  occupancy: number | null;
+  yearBuilt: number | null;
+  daysOnMarket: number | null;
+  saleCondition: string | null;
+  bodyOfWater: string | null;
+  waterBodyName: string | null;
+  company: string | null;
 }
 
 interface MatchedCompsViewProps {
@@ -114,41 +129,75 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
 
     const headers = [
       'Property Name',
+      'Address',
       'City',
       'State',
+      'Zip Code',
       'Sale Date',
       'Sale Price',
+      'Cap Rate',
+      'NOI',
+      'Wet Slips',
+      'Dry Racks',
       'Total Slips',
       'Price Per Slip',
       'Water Type',
+      'Coastal Type',
+      'Region',
+      'Body of Water',
       'Storage Types',
       'Profit Centers',
       'Buyer',
       'Seller',
       'Broker',
-      'Coastal Type',
-      'Region',
+      'Agent',
+      'Days on Market',
+      'List Price',
+      'Acres',
+      'Year Built',
+      'Occupancy',
       'Portfolio',
     ];
 
-    const rows = matchedComps.map((comp) => [
-      comp.propertyName || '',
-      comp.city || '',
-      comp.state || '',
-      comp.saleDate || '',
-      comp.salePrice ? `$${comp.salePrice.toLocaleString()}` : '',
-      comp.totalSlips || '',
-      comp.pricePerSlip ? `$${comp.pricePerSlip.toLocaleString()}` : '',
-      comp.waterType || '',
-      comp.storageTypes?.join('; ') || '',
-      comp.profitCenters?.join('; ') || '',
-      comp.buyerName || '',
-      comp.sellerName || '',
-      comp.brokerName || '',
-      comp.coastalType || '',
-      comp.region || '',
-      comp.isPortfolio ? 'Yes' : 'No',
-    ]);
+    const rows = matchedComps.map((comp) => {
+      const saleDate = comp.saleYear 
+        ? (comp.saleMonth ? `${comp.saleMonth}/${comp.saleYear}` : `${comp.saleYear}`)
+        : '';
+      const capRate = comp.capRate 
+        ? `${(Number(comp.capRate) > 1 ? Number(comp.capRate) : Number(comp.capRate) * 100).toFixed(2)}%`
+        : '';
+      return [
+        comp.propertyName || '',
+        comp.address || '',
+        comp.city || '',
+        comp.state || '',
+        comp.zipCode || '',
+        saleDate,
+        comp.salePrice ? `$${Number(comp.salePrice).toLocaleString()}` : '',
+        capRate,
+        comp.noi ? `$${Number(comp.noi).toLocaleString()}` : '',
+        comp.wetSlips ?? '',
+        comp.dryRacks ?? '',
+        comp.totalSlips ?? '',
+        comp.pricePerSlip ? `$${Math.round(Number(comp.pricePerSlip)).toLocaleString()}` : '',
+        comp.waterType || '',
+        comp.coastalType || '',
+        comp.region || '',
+        comp.waterBodyName || comp.bodyOfWater || '',
+        comp.storageTypes?.join('; ') || '',
+        comp.profitCenters?.join('; ') || '',
+        comp.buyerName || comp.company || '',
+        comp.sellerName || '',
+        comp.brokerName || '',
+        comp.agentName || '',
+        comp.daysOnMarket ?? '',
+        comp.listPrice ? `$${Number(comp.listPrice).toLocaleString()}` : '',
+        comp.acres ?? '',
+        comp.yearBuilt ?? '',
+        comp.occupancy ? `${comp.occupancy}%` : '',
+        comp.isPortfolio ? 'Yes' : 'No',
+      ];
+    });
 
     const csvContent = [
       headers.join(','),
@@ -317,78 +366,116 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
                     }}
                   />
                 </TableHead>
-                <TableHead className="min-w-[200px]">Property</TableHead>
-                <TableHead className="min-w-[120px]">Location</TableHead>
-                <TableHead className="min-w-[100px]">Sale Date</TableHead>
-                <TableHead className="text-right min-w-[120px]">Sale Price</TableHead>
-                <TableHead className="text-right min-w-[80px]">Slips</TableHead>
-                <TableHead className="text-right min-w-[120px]">Price/Slip</TableHead>
+                <TableHead className="min-w-[180px]">Property</TableHead>
+                <TableHead className="min-w-[140px]">Location</TableHead>
+                <TableHead className="min-w-[90px]">Sale Date</TableHead>
+                <TableHead className="text-right min-w-[100px]">Sale Price</TableHead>
+                <TableHead className="text-right min-w-[90px]">Cap Rate</TableHead>
+                <TableHead className="text-right min-w-[80px]">Wet</TableHead>
+                <TableHead className="text-right min-w-[80px]">Dry</TableHead>
+                <TableHead className="text-right min-w-[100px]">$/Slip</TableHead>
                 <TableHead className="min-w-[100px]">Water Type</TableHead>
-                <TableHead className="min-w-[150px]">Storage</TableHead>
-                <TableHead className="min-w-[150px]">Profit Centers</TableHead>
-                <TableHead className="min-w-[150px]">Broker</TableHead>
+                <TableHead className="min-w-[100px]">Region</TableHead>
+                <TableHead className="min-w-[120px]">Buyer</TableHead>
+                <TableHead className="min-w-[120px]">Seller</TableHead>
+                <TableHead className="min-w-[130px]">Broker</TableHead>
+                <TableHead className="min-w-[120px]">Profit Centers</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {matchedComps.map((comp) => (
-                <TableRow key={comp.id} data-testid={`row-comp-${comp.id}`}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedCompIds.includes(comp.id)}
-                      onCheckedChange={() => handleToggleComp(comp.id)}
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col">
-                      <span className="text-sm">{comp.propertyName || 'Unnamed Property'}</span>
-                      {comp.isPortfolio && (
-                        <span className="text-xs text-muted-foreground bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-1.5 py-0.5 rounded w-fit mt-1">
-                          Portfolio
+              {matchedComps.map((comp) => {
+                const saleDate = comp.saleYear 
+                  ? (comp.saleMonth ? `${comp.saleMonth}/${comp.saleYear}` : `${comp.saleYear}`)
+                  : '-';
+                const capRateDisplay = comp.capRate 
+                  ? `${(Number(comp.capRate) > 1 ? Number(comp.capRate) : Number(comp.capRate) * 100).toFixed(2)}%`
+                  : '-';
+                return (
+                  <TableRow key={comp.id} data-testid={`row-comp-${comp.id}`}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedCompIds.includes(comp.id)}
+                        onCheckedChange={() => handleToggleComp(comp.id)}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <span className="text-sm truncate max-w-[160px]" title={comp.propertyName || 'Unnamed Property'}>
+                          {comp.propertyName || 'Unnamed Property'}
                         </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      {comp.city && comp.state ? `${comp.city}, ${comp.state}` : comp.city || comp.state || '-'}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      {comp.saleDate ? new Date(comp.saleDate).toLocaleDateString() : '-'}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="text-sm font-medium">
-                      {comp.salePrice ? `$${comp.salePrice.toLocaleString()}` : '-'}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="text-sm">{comp.totalSlips || '-'}</div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="text-sm font-medium">
-                      {comp.pricePerSlip ? `$${comp.pricePerSlip.toLocaleString()}` : '-'}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">{comp.waterType || '-'}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-xs">
-                      {comp.storageTypes?.join(', ') || '-'}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-xs">
-                      {comp.profitCenters?.join(', ') || '-'}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">{comp.brokerName || '-'}</div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        {comp.isPortfolio && (
+                          <Badge variant="secondary" className="text-[10px] px-1 py-0 w-fit mt-0.5">
+                            Portfolio
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div>{comp.city && comp.state ? `${comp.city}, ${comp.state}` : comp.city || comp.state || '-'}</div>
+                        {comp.zipCode && <div className="text-xs text-muted-foreground">{comp.zipCode}</div>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{saleDate}</div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="text-sm font-medium">
+                        {comp.salePrice ? `$${Number(comp.salePrice).toLocaleString()}` : '-'}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="text-sm">{capRateDisplay}</div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="text-sm">{comp.wetSlips ?? '-'}</div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="text-sm">{comp.dryRacks ?? '-'}</div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="text-sm font-medium">
+                        {comp.pricePerSlip ? `$${Math.round(Number(comp.pricePerSlip)).toLocaleString()}` : '-'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{comp.waterType || comp.coastalType || '-'}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm truncate max-w-[90px]" title={comp.region || '-'}>
+                        {comp.region || '-'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm truncate max-w-[110px]" title={comp.buyerName || comp.company || '-'}>
+                        {comp.buyerName || comp.company || '-'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm truncate max-w-[110px]" title={comp.sellerName || '-'}>
+                        {comp.sellerName || '-'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div className="truncate max-w-[120px]" title={comp.brokerName || '-'}>
+                          {comp.brokerName || '-'}
+                        </div>
+                        {comp.agentName && comp.agentName.trim() && (
+                          <div className="text-xs text-muted-foreground truncate max-w-[120px]" title={comp.agentName}>
+                            {comp.agentName}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-xs truncate max-w-[110px]" title={comp.profitCenters?.join(', ') || '-'}>
+                        {comp.profitCenters?.join(', ') || '-'}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

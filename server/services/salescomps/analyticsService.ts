@@ -784,23 +784,38 @@ export async function getMatchedComps(
       saleYear: salesComps.saleYear,
       saleMonth: salesComps.saleMonth,
       salePrice: salesComps.salePrice,
-      totalSlips: sql<number>`(${salesComps.wetSlips} + ${salesComps.dryRacks})`,
-      pricePerSlip: sql<number>`CASE WHEN (${salesComps.wetSlips} + ${salesComps.dryRacks}) > 0 THEN ${salesComps.salePrice} / (${salesComps.wetSlips} + ${salesComps.dryRacks}) ELSE NULL END`,
+      wetSlips: salesComps.wetSlips,
+      dryRacks: salesComps.dryRacks,
+      totalSlips: sql<number>`COALESCE(${salesComps.wetSlips}, 0) + COALESCE(${salesComps.dryRacks}, 0)`,
+      pricePerSlip: sql<number>`CASE WHEN (COALESCE(${salesComps.wetSlips}, 0) + COALESCE(${salesComps.dryRacks}, 0)) > 0 THEN ${salesComps.salePrice}::numeric / (COALESCE(${salesComps.wetSlips}, 0) + COALESCE(${salesComps.dryRacks}, 0)) ELSE NULL END`,
       storageTypes: salesComps.storageTypes,
       profitCenters: salesComps.profitCenters,
       waterType: salesComps.waterType,
-      buyerName: sql<string>`NULL`,
+      buyerName: salesComps.owner,
       sellerName: salesComps.seller,
       brokerName: salesComps.brokerage,
+      agentName: sql<string>`CONCAT_WS(' ', ${salesComps.agentFirstName}, ${salesComps.agentLastName})`,
       coastalType: salesComps.coastalType,
       region: salesComps.region,
       isPortfolio: salesComps.isPortfolio,
       capRate: salesComps.capRate,
+      noi: salesComps.noi,
+      listPrice: salesComps.listPrice,
+      acres: salesComps.acres,
+      occupancy: salesComps.occupancy,
+      yearBuilt: salesComps.yearBuilt,
+      daysOnMarket: salesComps.daysOnMarket,
+      saleCondition: salesComps.saleCondition,
+      bodyOfWater: salesComps.bodyOfWater,
+      waterBodyName: salesComps.waterBodyName,
+      company: salesComps.company,
+      lat: salesComps.lat,
+      lng: salesComps.lng,
     })
     .from(salesComps)
     .where(whereClause)
     .orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth))
-    .limit(100);
+    .limit(500);
 
   return comps;
 }
