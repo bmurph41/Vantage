@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, BarChart3, TrendingUp, Layers, Lightbulb, MapPin, PieChart, ScatterChart, Calculator, Table2, FileSpreadsheet } from "lucide-react";
+import { Download, TrendingUp, Layers, Lightbulb, MapPin, PieChart, ScatterChart, Calculator, Table2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import AnalyticsFiltersPanel, { type AnalyticsFilters } from "./AnalyticsFilters";
@@ -75,7 +75,7 @@ export default function AnalyticsWorkbench() {
   });
   
   const [appliedFilters, setAppliedFilters] = useState<AnalyticsFilters>({});
-  const [activeView, setActiveView] = useState("overview");
+  const [activeView, setActiveView] = useState("matched");
   
   // Apply normalized filters on mount to trigger analytics queries
   useEffect(() => {
@@ -265,11 +265,7 @@ export default function AnalyticsWorkbench() {
 
           {/* Analysis Views */}
           <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 lg:w-auto">
-              <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden lg:inline">Overview</span>
-              </TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 lg:w-auto">
               <TabsTrigger value="matched" className="flex items-center gap-2" data-testid="tab-matched">
                 <Table2 className="h-4 w-4" />
                 <span className="hidden lg:inline">Matched</span>
@@ -299,23 +295,6 @@ export default function AnalyticsWorkbench() {
                 <span className="hidden lg:inline">Valuation</span>
               </TabsTrigger>
             </TabsList>
-
-            <TabsContent value="overview" className="space-y-2 mt-2" data-testid="tab-content-overview">
-              {!metrics ? (
-                <Card className="p-4 text-center border-dashed">
-                  <Lightbulb className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-                  <h3 className="text-sm font-semibold mb-1">Start Your Analysis</h3>
-                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                    Apply filters on the left to generate comprehensive market analytics and insights
-                  </p>
-                </Card>
-              ) : (
-                <Card className="p-4 text-center border-dashed">
-                  <BarChart3 className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-                  <p className="text-xs text-muted-foreground">Use the tabs above to view detailed analysis</p>
-                </Card>
-              )}
-            </TabsContent>
 
             <TabsContent value="matched" className="mt-2" data-testid="tab-content-matched">
               <MatchedCompsView
