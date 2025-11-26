@@ -9453,6 +9453,45 @@ export const insertLocationDemographicsCacheSchema = createInsertSchema(location
 export type LocationDemographicsCache = typeof locationDemographicsCache.$inferSelect;
 export type InsertLocationDemographicsCache = z.infer<typeof insertLocationDemographicsCacheSchema>;
 
+// Demographic Project Locations - stores location configurations per modeling project
+export const demographicProjectLocations = pgTable('demographic_project_locations', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Location data
+  address: text('address').notNull(),
+  latitude: real('latitude').notNull(),
+  longitude: real('longitude').notNull(),
+  label: varchar('label', { length: 100 }),
+  
+  // Trade area configuration
+  analysisMode: varchar('analysis_mode', { length: 20 }).notNull().default('distance'), // 'distance' | 'drivetime'
+  distanceRings: jsonb('distance_rings').notNull().default(sql`'[1]'::jsonb`), // Array of miles: [1, 3, 5, 10]
+  driveTimes: jsonb('drive_times').notNull().default(sql`'[]'::jsonb`), // Array of minutes: [5, 10, 15, 20]
+  
+  // Display order
+  sortOrder: integer('sort_order').default(0),
+  
+  // Metadata
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('demo_proj_loc_org_idx').on(table.orgId),
+  projectIdx: index('demo_proj_loc_project_idx').on(table.modelingProjectId),
+  uniqueLocation: unique('demo_proj_loc_unique').on(table.modelingProjectId, table.latitude, table.longitude),
+}));
+
+export const insertDemographicProjectLocationSchema = createInsertSchema(demographicProjectLocations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DemographicProjectLocation = typeof demographicProjectLocations.$inferSelect;
+export type InsertDemographicProjectLocation = z.infer<typeof insertDemographicProjectLocationSchema>;
+
 // ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
