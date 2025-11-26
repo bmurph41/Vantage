@@ -625,6 +625,7 @@ function LocationAnalysisSection() {
   
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [comparisonTradeAreas, setComparisonTradeAreas] = useState<Record<number, string>>({});
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
@@ -862,7 +863,75 @@ function LocationAnalysisSection() {
     setSelectedLocations([]);
     setLocationData(new Map());
     setHasUnsavedChanges(false);
+    setComparisonTradeAreas({});
   };
+  
+  useEffect(() => {
+    if (selectedLocations.length === 0) {
+      setComparisonTradeAreas({});
+      return;
+    }
+    
+    setComparisonTradeAreas(prevState => {
+      const newState: Record<number, string> = {};
+      let hasChanged = false;
+      
+      selectedLocations.forEach((loc, idx) => {
+        const locKey = `${loc.latitude},${loc.longitude}`;
+        const areaMap = locationData.get(locKey);
+        
+        if (!areaMap) {
+          if (prevState[idx] !== undefined) {
+            hasChanged = true;
+          }
+          return;
+        }
+        
+        const loadedAreas = Array.from(areaMap.entries())
+          .filter(([, ta]) => ta.demographics !== null && !ta.isLoading);
+        
+        if (loadedAreas.length === 0) {
+          if (prevState[idx] !== undefined) {
+            hasChanged = true;
+          }
+          return;
+        }
+        
+        const sortedLoaded = loadedAreas.sort(([keyA], [keyB]) => {
+          const partsA = keyA.split('-');
+          const partsB = keyB.split('-');
+          const valA = partsA.length > 1 ? parseFloat(partsA[1]) : 0;
+          const valB = partsB.length > 1 ? parseFloat(partsB[1]) : 0;
+          return (isNaN(valA) ? 0 : valA) - (isNaN(valB) ? 0 : valB);
+        });
+        
+        const currentSelection = prevState[idx];
+        const currentSelectionValid = currentSelection && 
+          loadedAreas.some(([key]) => key === currentSelection);
+        
+        if (currentSelectionValid) {
+          newState[idx] = currentSelection;
+        } else {
+          const firstKey = sortedLoaded[0][0];
+          newState[idx] = firstKey;
+          if (currentSelection !== firstKey) {
+            hasChanged = true;
+          }
+        }
+      });
+      
+      Object.keys(prevState).forEach(key => {
+        const numKey = parseInt(key);
+        if (numKey >= selectedLocations.length) {
+          hasChanged = true;
+        }
+      });
+      
+      return hasChanged || Object.keys(newState).length !== Object.keys(prevState).length 
+        ? newState 
+        : prevState;
+    });
+  }, [selectedLocations, locationData]);
 
   const toggleDefaultDistanceRing = (miles: number) => {
     setDefaultDistanceRings(prev => {
@@ -1385,27 +1454,88 @@ function LocationAnalysisSection() {
               )}
               
               {loadedAreas.length > 0 && (
-                <div className="space-y-6">
-                  {loadedAreas.map((tradeArea, taIdx) => (
-                    <div key={taIdx} className="space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b">
-                        {tradeArea.type === 'distance' ? (
-                          <CircleDot className="h-4 w-4 text-primary" />
-                        ) : (
-                          <Clock className="h-4 w-4 text-blue-500" />
-                        )}
-                        <span className="font-medium text-sm">{tradeArea.label}</span>
-                        <Badge variant="outline" className="text-xs ml-auto">
-                          {tradeArea.radiusMiles} mile radius
-                        </Badge>
-                      </div>
+                <Tabs defaultValue={loadedAreas[0]?.label || ''} className="w-full">
+                  <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
+                    {(() => {
+                      const isDistance = loc.config.analysisMode === 'distance';
+                      const sortedRings = isDistance
+                        ? [...loc.config.distanceRings].sort((a, b) => a - b)
+                        : [...loc.config.driveTimes].sort((a, b) => a - b);
                       
-                      {tradeArea.demographics && (
-                        <TradeAreaDemographicsDisplay data={tradeArea.demographics} />
-                      )}
-                    </div>
-                  ))}
-                </div>
+                      return loadedAreas.map((tradeArea, taIdx) => {
+                        const ringValue = isDistance
+                          ? parseFloat(tradeArea.label.replace(' Mile Radius', ''))
+                          : parseFloat(tradeArea.label.replace(' Min Drive', ''));
+                        const colorIdx = sortedRings.indexOf(ringValue);
+                        const ringColor = RING_COLORS[colorIdx >= 0 ? colorIdx : 0];
+                        
+                        return (
+                          <TabsTrigger
+                            key={tradeArea.label}
+                            value={tradeArea.label}
+                            className="flex items-center gap-2 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-1.5"
+                            data-testid={`tab-trade-area-${taIdx}`}
+                          >
+                            <div 
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-white/50"
+                              style={{ backgroundColor: ringColor.stroke }}
+                            />
+                            {tradeArea.type === 'distance' ? (
+                              <CircleDot className="h-3 w-3" />
+                            ) : (
+                              <Clock className="h-3 w-3" />
+                            )}
+                            <span>{tradeArea.label}</span>
+                          </TabsTrigger>
+                        );
+                      });
+                    })()}
+                  </TabsList>
+                  
+                  {loadedAreas.map((tradeArea, taIdx) => {
+                    const isDistance = loc.config.analysisMode === 'distance';
+                    const sortedRings = isDistance
+                      ? [...loc.config.distanceRings].sort((a, b) => a - b)
+                      : [...loc.config.driveTimes].sort((a, b) => a - b);
+                    const ringValue = isDistance
+                      ? parseFloat(tradeArea.label.replace(' Mile Radius', ''))
+                      : parseFloat(tradeArea.label.replace(' Min Drive', ''));
+                    const colorIdx = sortedRings.indexOf(ringValue);
+                    const ringColor = RING_COLORS[colorIdx >= 0 ? colorIdx : 0];
+                    
+                    return (
+                      <TabsContent 
+                        key={tradeArea.label} 
+                        value={tradeArea.label}
+                        className="mt-4"
+                      >
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full border border-white shadow-sm"
+                                style={{ backgroundColor: ringColor.stroke }}
+                              />
+                              <span className="font-medium text-sm">{tradeArea.label}</span>
+                              <Badge variant="outline" className="text-xs">
+                                ~{tradeArea.radiusMiles.toFixed(1)} mile radius
+                              </Badge>
+                            </div>
+                            {tradeArea.demographics && (
+                              <Badge className="text-xs" style={{ backgroundColor: ringColor.stroke }}>
+                                Pop: {formatNumber(tradeArea.demographics.totalPopulation)}
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          {tradeArea.demographics && (
+                            <TradeAreaDemographicsDisplay data={tradeArea.demographics} />
+                          )}
+                        </div>
+                      </TabsContent>
+                    );
+                  })}
+                </Tabs>
               )}
             </CardContent>
           </Card>
@@ -1419,19 +1549,79 @@ function LocationAnalysisSection() {
               <BarChart3 className="h-5 w-5 text-primary" />
               Comparison Summary
             </CardTitle>
-            <CardDescription>Key metrics comparison across selected locations (first trade area of each)</CardDescription>
+            <CardDescription>Compare demographics across locations - select which trade area to compare for each</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-2 px-3 font-medium">Metric</th>
-                    {selectedLocations.map((loc, idx) => (
-                      <th key={idx} className="text-right py-2 px-3 font-medium max-w-32 truncate">
-                        {loc.label || `Loc ${idx + 1}`}
-                      </th>
-                    ))}
+                    <th className="text-left py-2 px-3 font-medium w-36">Metric</th>
+                    {selectedLocations.map((loc, idx) => {
+                      const locKey = `${loc.latitude},${loc.longitude}`;
+                      const areaMap = locationData.get(locKey);
+                      const tradeAreasList = areaMap ? Array.from(areaMap.entries()).filter(([, ta]) => ta.demographics) : [];
+                      const isDistance = loc.config.analysisMode === 'distance';
+                      const sortedRings = isDistance
+                        ? [...loc.config.distanceRings].sort((a, b) => a - b)
+                        : [...loc.config.driveTimes].sort((a, b) => a - b);
+                      
+                      const sortedTradeAreas = [...tradeAreasList].sort(([keyA], [keyB]) => {
+                        const partsA = keyA.split('-');
+                        const partsB = keyB.split('-');
+                        const valA = partsA.length > 1 ? parseFloat(partsA[1]) : 0;
+                        const valB = partsB.length > 1 ? parseFloat(partsB[1]) : 0;
+                        return (isNaN(valA) ? 0 : valA) - (isNaN(valB) ? 0 : valB);
+                      });
+                      
+                      const defaultKey = sortedTradeAreas[0]?.[0] || '';
+                      const selectedKey = (comparisonTradeAreas[idx] && sortedTradeAreas.some(([k]) => k === comparisonTradeAreas[idx])) 
+                        ? comparisonTradeAreas[idx] 
+                        : defaultKey;
+                      
+                      return (
+                        <th key={idx} className="py-2 px-2 font-medium min-w-44">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs text-muted-foreground truncate max-w-40">
+                              {loc.label || loc.address.split(',')[0]}
+                            </span>
+                            {sortedTradeAreas.length > 0 && (
+                              <Select
+                                value={selectedKey}
+                                onValueChange={(value) => {
+                                  setComparisonTradeAreas(prev => ({ ...prev, [idx]: value }));
+                                }}
+                              >
+                                <SelectTrigger className="h-7 text-xs" data-testid={`select-compare-area-${idx}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {sortedTradeAreas.map(([key, ta]) => {
+                                    const keyParts = key.split('-');
+                                    const parsedRingValue = keyParts.length > 1 ? parseFloat(keyParts[1]) : NaN;
+                                    const ringValue = isNaN(parsedRingValue) ? (sortedRings[0] || 0) : parsedRingValue;
+                                    const colorIdx = sortedRings.indexOf(ringValue);
+                                    const ringColor = RING_COLORS[colorIdx >= 0 ? colorIdx : 0];
+                                    
+                                    return (
+                                      <SelectItem key={key} value={key}>
+                                        <div className="flex items-center gap-2">
+                                          <div 
+                                            className="w-2 h-2 rounded-full"
+                                            style={{ backgroundColor: ringColor.stroke }}
+                                          />
+                                          <span>{ta.label}</span>
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -1448,14 +1638,44 @@ function LocationAnalysisSection() {
                       {selectedLocations.map((loc, lIdx) => {
                         const locKey = `${loc.latitude},${loc.longitude}`;
                         const areaMap = locationData.get(locKey);
-                        const firstKey = loc.config.analysisMode === 'distance'
-                          ? `distance-${loc.config.distanceRings[0]}`
-                          : `drivetime-${loc.config.driveTimes[0]}`;
-                        const tradeArea = areaMap?.get(firstKey);
+                        const isDistance = loc.config.analysisMode === 'distance';
+                        const sortedRings = isDistance
+                          ? [...loc.config.distanceRings].sort((a, b) => a - b)
+                          : [...loc.config.driveTimes].sort((a, b) => a - b);
+                        
+                        const tradeAreasList = areaMap ? Array.from(areaMap.entries()).filter(([, ta]) => ta.demographics) : [];
+                        const sortedTradeAreas = [...tradeAreasList].sort(([keyA], [keyB]) => {
+                          const partsA = keyA.split('-');
+                          const partsB = keyB.split('-');
+                          const valA = partsA.length > 1 ? parseFloat(partsA[1]) : 0;
+                          const valB = partsB.length > 1 ? parseFloat(partsB[1]) : 0;
+                          return (isNaN(valA) ? 0 : valA) - (isNaN(valB) ? 0 : valB);
+                        });
+                        
+                        const defaultKey = sortedTradeAreas[0]?.[0] || '';
+                        const selectedKey = (comparisonTradeAreas[lIdx] && sortedTradeAreas.some(([k]) => k === comparisonTradeAreas[lIdx]))
+                          ? comparisonTradeAreas[lIdx]
+                          : defaultKey;
+                        const tradeArea = selectedKey && areaMap ? areaMap.get(selectedKey) : null;
                         const value = tradeArea?.demographics?.[metric.key as keyof DemographicSummary];
+                        
+                        const keyParts = selectedKey ? selectedKey.split('-') : [];
+                        const parsedRingValue = keyParts.length > 1 ? parseFloat(keyParts[1]) : NaN;
+                        const ringValue = isNaN(parsedRingValue) ? (sortedRings[0] || 0) : parsedRingValue;
+                        const colorIdx = sortedRings.indexOf(ringValue);
+                        const ringColor = RING_COLORS[colorIdx >= 0 ? colorIdx : 0];
+                        
                         return (
                           <td key={lIdx} className="text-right py-2 px-3">
-                            {metric.format(value as number)}
+                            <div className="flex items-center justify-end gap-2">
+                              {mIdx === 0 && (
+                                <div 
+                                  className="w-2 h-2 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: ringColor.stroke }}
+                                />
+                              )}
+                              <span>{metric.format(value as number)}</span>
+                            </div>
                           </td>
                         );
                       })}
