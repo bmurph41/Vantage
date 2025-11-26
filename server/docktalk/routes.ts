@@ -14,6 +14,7 @@ import {
   editSummary
 } from "./services/category-summary-service";
 import { getUncachableResendClient } from "./lib/resend-client";
+import { findMatchingCrmCompanies, searchCrmCompanies } from "./company-matcher";
 
 const VALID_CATEGORIES = [
   'Macro',
@@ -1907,6 +1908,146 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       res.json(articles);
     } catch (error) {
       console.error("Error fetching portfolio company articles:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // CRM Company Integration - Match Suggestions
+  app.post("/api/docktalk/portfolio-companies/match-suggestions", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const { companyName, domain } = req.body;
+      if (!companyName) {
+        return res.status(400).json({ error: "Company name is required" });
+      }
+
+      const matches = await findMatchingCrmCompanies(companyName, req.dockTalkUser!.orgId, domain);
+      res.json(matches);
+    } catch (error) {
+      console.error("Error finding CRM company matches:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // CRM Company Integration - Search CRM Companies
+  app.get("/api/docktalk/crm-companies/search", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || query.length < 2) {
+        return res.json([]);
+      }
+
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const companies = await searchCrmCompanies(query, req.dockTalkUser!.orgId, limit);
+      res.json(companies);
+    } catch (error) {
+      console.error("Error searching CRM companies:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // CRM Company Integration - Link Portfolio Company to CRM Company
+  app.post("/api/docktalk/portfolio-companies/:id/link-crm", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const { crmCompanyId } = req.body;
+      if (!crmCompanyId) {
+        return res.status(400).json({ error: "CRM company ID is required" });
+      }
+
+      const company = await dockTalkStorage.linkPortfolioCompanyToCrm(
+        req.params.id,
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId,
+        crmCompanyId
+      );
+
+      if (!company) {
+        return res.status(404).json({ error: "Portfolio company not found" });
+      }
+
+      res.json(company);
+    } catch (error) {
+      console.error("Error linking portfolio company to CRM:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // CRM Company Integration - Unlink Portfolio Company from CRM Company
+  app.delete("/api/docktalk/portfolio-companies/:id/unlink-crm", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const company = await dockTalkStorage.unlinkPortfolioCompanyFromCrm(
+        req.params.id,
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId
+      );
+
+      if (!company) {
+        return res.status(404).json({ error: "Portfolio company not found" });
+      }
+
+      res.json(company);
+    } catch (error) {
+      console.error("Error unlinking portfolio company from CRM:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // CRM Company Integration - Create CRM Company from Portfolio Company
+  const CreateCrmCompanySchema = z.object({
+    name: z.string().min(1),
+    domain: z.string().optional(),
+    industry: z.string().optional(),
+    website: z.string().optional(),
+    address: z.string().optional(),
+    phone: z.string().optional(),
+    description: z.string().optional(),
+  });
+
+  app.post("/api/docktalk/portfolio-companies/:id/create-crm", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const data = CreateCrmCompanySchema.parse(req.body);
+      
+      const result = await dockTalkStorage.createCrmCompanyFromPortfolio(
+        req.params.id,
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId,
+        data
+      );
+
+      if (!result) {
+        return res.status(404).json({ error: "Portfolio company not found" });
+      }
+
+      res.status(201).json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid input data", details: error.errors });
+      }
+      console.error("Error creating CRM company from portfolio:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get CRM Company linked to Portfolio Company
+  app.get("/api/docktalk/portfolio-companies/:id/crm-company", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const company = await dockTalkStorage.getPortfolioCompanyById(
+        req.params.id,
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId
+      );
+
+      if (!company) {
+        return res.status(404).json({ error: "Portfolio company not found" });
+      }
+
+      if (!company.crmCompanyId) {
+        return res.json({ linked: false, crmCompany: null });
+      }
+
+      const crmCompany = await dockTalkStorage.getLinkedCrmCompany(company.crmCompanyId);
+      res.json({ linked: true, crmCompany });
+    } catch (error) {
+      console.error("Error fetching linked CRM company:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

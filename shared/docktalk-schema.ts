@@ -330,12 +330,15 @@ export const portfolioCompanies = pgTable("docktalk_portfolio_companies", {
   region: text("region"),
   notes: text("notes"),
   isActive: boolean("is_active").default(true),
+  crmCompanyId: varchar("crm_company_id"), // Links to CRM companies.id (not enforced by FK to avoid circular dependency)
+  crmLinkStatus: text("crm_link_status").default("unlinked"), // unlinked, linked, pending_review
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   byUser: index("idx_docktalk_portfolio_user").on(table.userId),
   byCompany: index("idx_docktalk_portfolio_company").on(table.companyName),
   byOrg: index("idx_docktalk_portfolio_org").on(table.orgId),
+  byCrmCompany: index("idx_docktalk_portfolio_crm_company").on(table.crmCompanyId),
 }));
 
 export const notificationSourceEnum = pgEnum("docktalk_notification_source", ["saved_search", "category_alert"]);

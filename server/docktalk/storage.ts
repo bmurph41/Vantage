@@ -1,5 +1,5 @@
 import { users, articles, rssSources, systemStats, savedFilters, savedSearches, userArticleAnnotations, portfolioCompanies, notifications, articleFingerprints, articleDuplicates, userNotificationPreferences, articleRemovalPatterns, userFilterPreferences, entities, articleEntities, watchlists, watchlistEntities, organizationFeatures, userTagLibrary, articleTagAssignments, articleFeedback, articleViews, articleLikes, type User, type InsertUser, type Article, type InsertArticle, type RssSource, type InsertRssSource, type SystemStats, type SavedFilter, type InsertSavedFilter, type SavedSearch, type InsertSavedSearch, type UserArticleAnnotation, type InsertUserArticleAnnotation, type PortfolioCompany, type InsertPortfolioCompany, type Notification, type InsertNotification, type UserNotificationPreferences, type InsertUserNotificationPreferences, type ArticleRemovalPattern, type InsertArticleRemovalPattern, type UserFilterPreferences, type InsertUserFilterPreferences, type Entity, type InsertEntity, type ArticleEntity, type InsertArticleEntity, type Watchlist, type InsertWatchlist, type WatchlistEntity, type InsertWatchlistEntity, type UserTag, type InsertUserTag, type ArticleTagAssignment, type InsertArticleTagAssignment, type ArticleFeedback, type InsertArticleFeedback, type ArticleView, type InsertArticleView, type ArticleLike, type InsertArticleLike } from "@shared/docktalk-schema";
-import { docktalkDeals, type DocktalkDeal, type InsertDocktalkDeal } from "@shared/schema";
+import { docktalkDeals, crmCompanies, type DocktalkDeal, type InsertDocktalkDeal, type CrmCompany } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, gte, lte, sql, count, inArray } from "drizzle-orm";
 
@@ -111,6 +111,12 @@ export interface IStorage {
   updatePortfolioCompany(id: string, userId: string, orgId: string, company: Partial<InsertPortfolioCompany>): Promise<PortfolioCompany | null>;
   deletePortfolioCompany(id: string, userId: string, orgId: string): Promise<boolean>;
   getArticlesForPortfolioCompany(companyId: string, userId: string, orgId: string, limit?: number): Promise<Article[]>;
+  
+  // Portfolio-CRM Integration methods
+  linkPortfolioCompanyToCrm(portfolioId: string, userId: string, orgId: string, crmCompanyId: string): Promise<PortfolioCompany | null>;
+  unlinkPortfolioCompanyFromCrm(portfolioId: string, userId: string, orgId: string): Promise<PortfolioCompany | null>;
+  createCrmCompanyFromPortfolio(portfolioId: string, userId: string, orgId: string, crmData: { name: string; domain?: string; industry?: string; website?: string; address?: string; phone?: string; description?: string }): Promise<{ portfolioCompany: PortfolioCompany; crmCompany: any } | null>;
+  getLinkedCrmCompany(crmCompanyId: string): Promise<any | null>;
   
   // Saved Searches methods
   getSavedSearches(userId: string, orgId: string): Promise<SavedSearch[]>;
@@ -723,6 +729,85 @@ export class DatabaseStorage implements IStorage {
       .where(sql`(${sql.join(conditions, sql` OR `)})`)
       .orderBy(desc(articles.publishedAt))
       .limit(limit);
+  }
+
+  async linkPortfolioCompanyToCrm(portfolioId: string, userId: string, orgId: string, crmCompanyId: string): Promise<PortfolioCompany | null> {
+    const company = await this.getPortfolioCompanyById(portfolioId, userId, orgId);
+    if (!company) return null;
+
+    const [updated] = await db
+      .update(portfolioCompanies)
+      .set({ 
+        crmCompanyId, 
+        crmLinkStatus: "linked",
+        updatedAt: new Date() 
+      })
+      .where(and(eq(portfolioCompanies.id, portfolioId), eq(portfolioCompanies.orgId, orgId)))
+      .returning();
+
+    return updated || null;
+  }
+
+  async unlinkPortfolioCompanyFromCrm(portfolioId: string, userId: string, orgId: string): Promise<PortfolioCompany | null> {
+    const company = await this.getPortfolioCompanyById(portfolioId, userId, orgId);
+    if (!company) return null;
+
+    const [updated] = await db
+      .update(portfolioCompanies)
+      .set({ 
+        crmCompanyId: null, 
+        crmLinkStatus: "unlinked",
+        updatedAt: new Date() 
+      })
+      .where(and(eq(portfolioCompanies.id, portfolioId), eq(portfolioCompanies.orgId, orgId)))
+      .returning();
+
+    return updated || null;
+  }
+
+  async createCrmCompanyFromPortfolio(
+    portfolioId: string, 
+    userId: string, 
+    orgId: string, 
+    crmData: { name: string; domain?: string; industry?: string; website?: string; address?: string; phone?: string; description?: string }
+  ): Promise<{ portfolioCompany: PortfolioCompany; crmCompany: CrmCompany } | null> {
+    const portfolioCompany = await this.getPortfolioCompanyById(portfolioId, userId, orgId);
+    if (!portfolioCompany) return null;
+
+    const [newCrmCompany] = await db
+      .insert(crmCompanies)
+      .values({
+        name: crmData.name,
+        domain: crmData.domain || null,
+        industry: crmData.industry || null,
+        website: crmData.website || null,
+        address: crmData.address || null,
+        phone: crmData.phone || null,
+        description: crmData.description || null,
+        ownerId: orgId,
+      })
+      .returning();
+
+    const [updatedPortfolio] = await db
+      .update(portfolioCompanies)
+      .set({ 
+        crmCompanyId: newCrmCompany.id, 
+        crmLinkStatus: "linked",
+        updatedAt: new Date() 
+      })
+      .where(and(eq(portfolioCompanies.id, portfolioId), eq(portfolioCompanies.orgId, orgId)))
+      .returning();
+
+    return { portfolioCompany: updatedPortfolio, crmCompany: newCrmCompany };
+  }
+
+  async getLinkedCrmCompany(crmCompanyId: string): Promise<CrmCompany | null> {
+    const [company] = await db
+      .select()
+      .from(crmCompanies)
+      .where(eq(crmCompanies.id, crmCompanyId));
+
+    return company || null;
   }
 
   async getSavedSearches(userId: string, orgId: string): Promise<SavedSearch[]> {
