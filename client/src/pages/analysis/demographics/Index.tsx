@@ -881,9 +881,9 @@ function LocationAnalysisSection() {
                 </SelectTrigger>
                 <SelectContent>
                   {projectsLoading ? (
-                    <SelectItem value="" disabled>Loading projects...</SelectItem>
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading projects...</div>
                   ) : projects.length === 0 ? (
-                    <SelectItem value="" disabled>No projects found</SelectItem>
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">No projects found</div>
                   ) : (
                     projects.map(project => (
                       <SelectItem key={project.id} value={project.id}>
