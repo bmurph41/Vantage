@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLoadScript, Autocomplete } from "@react-google-maps/api";
 import { apiRequest } from "@/lib/queryClient";
 import { 
@@ -23,7 +25,10 @@ import {
   X,
   Plus,
   Target,
-  Activity
+  Activity,
+  Clock,
+  Car,
+  Ruler
 } from "lucide-react";
 
 interface DemographicSummary {
@@ -316,6 +321,109 @@ function LocationDemographicsCard({ data, onRemove, label }: {
   );
 }
 
+function TradeAreaDemographicsDisplay({ data }: { data: DemographicSummary }) {
+  const keyStats = [
+    { label: "Population", value: formatNumber(data.totalPopulation), icon: Users, color: "text-blue-600" },
+    { label: "Median Age", value: data.medianAge ? `${data.medianAge.toFixed(1)} yrs` : "N/A", icon: Users, color: "text-indigo-600" },
+    { label: "Median Income", value: formatCurrency(data.medianHouseholdIncome), icon: DollarSign, color: "text-green-600" },
+    { label: "Per Capita Income", value: formatCurrency(data.perCapitaIncome), icon: DollarSign, color: "text-emerald-600" },
+    { label: "Home Value", value: formatCurrency(data.medianHomeValue), icon: Home, color: "text-purple-600" },
+    { label: "Household Size", value: data.householdSize?.toFixed(1) || "N/A", icon: Home, color: "text-orange-600" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        {keyStats.map((stat, idx) => (
+          <div key={idx} className="p-2 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-1 mb-1">
+              <stat.icon className={`h-3 w-3 ${stat.color}`} />
+              <span className="text-xs text-muted-foreground">{stat.label}</span>
+            </div>
+            <div className="text-sm font-semibold">{stat.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {data.educationLevels && Object.keys(data.educationLevels).length > 0 && (
+          <div>
+            <h5 className="text-xs font-medium mb-2 flex items-center gap-1">
+              <GraduationCap className="h-3 w-3" />
+              Education
+            </h5>
+            <div className="space-y-1">
+              {Object.entries(data.educationLevels)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 4)
+                .map(([level, value]) => {
+                  const total = Object.values(data.educationLevels!).reduce((a, b) => a + b, 0);
+                  const pct = total > 0 ? (value / total) * 100 : 0;
+                  return (
+                    <div key={level} className="flex items-center gap-2 text-xs">
+                      <span className="w-28 truncate text-muted-foreground">{formatLabel(level)}</span>
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="w-12 text-right text-muted-foreground">{formatPercent(pct)}</span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {data.incomeDistribution && Object.keys(data.incomeDistribution).length > 0 && (
+          <div>
+            <h5 className="text-xs font-medium mb-2 flex items-center gap-1">
+              <DollarSign className="h-3 w-3" />
+              Income Distribution
+            </h5>
+            <div className="space-y-1">
+              {Object.entries(data.incomeDistribution)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 4)
+                .map(([range, value]) => {
+                  const total = Object.values(data.incomeDistribution!).reduce((a, b) => a + b, 0);
+                  const pct = total > 0 ? (value / total) * 100 : 0;
+                  return (
+                    <div key={range} className="flex items-center gap-2 text-xs">
+                      <span className="w-24 truncate text-muted-foreground">{formatLabel(range)}</span>
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-green-500 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="w-12 text-right text-muted-foreground">{formatPercent(pct)}</span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {data.raceEthnicity && Object.keys(data.raceEthnicity).length > 0 && (
+        <div>
+          <h5 className="text-xs font-medium mb-2 flex items-center gap-1">
+            <PieChart className="h-3 w-3" />
+            Race & Ethnicity
+          </h5>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-xs">
+            {Object.entries(data.raceEthnicity)
+              .sort(([,a], [,b]) => b - a)
+              .slice(0, 6)
+              .map(([group, value]) => (
+                <div key={group} className="flex items-center justify-between">
+                  <span className="text-muted-foreground truncate">{formatLabel(group)}</span>
+                  <span className="font-medium">{formatPercent(value)}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const libraries: ("places")[] = ["places"];
 
 function AddressSearchInput({ 
@@ -425,31 +533,121 @@ function AddressSearchInput({
   );
 }
 
+interface TradeAreaData {
+  radiusMiles: number;
+  label: string;
+  type: 'distance' | 'drivetime';
+  demographics: DemographicSummary | null;
+  isLoading: boolean;
+}
+
+const DISTANCE_RINGS = [
+  { value: 1, label: "1 Mile" },
+  { value: 3, label: "3 Miles" },
+  { value: 5, label: "5 Miles" },
+  { value: 10, label: "10 Miles" },
+];
+
+const DRIVE_TIMES = [
+  { value: 5, label: "5 Min", estimatedMiles: 2.5 },
+  { value: 10, label: "10 Min", estimatedMiles: 5 },
+  { value: 15, label: "15 Min", estimatedMiles: 8 },
+  { value: 20, label: "20 Min", estimatedMiles: 12 },
+];
+
 function LocationAnalysisSection() {
   const [selectedLocations, setSelectedLocations] = useState<SelectedLocation[]>([]);
-  const [locationData, setLocationData] = useState<Map<string, LocationDemographicsResponse>>(new Map());
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeRadius, setActiveRadius] = useState<number | null>(null);
+  const [locationData, setLocationData] = useState<Map<string, Map<string, TradeAreaData>>>(new Map());
+  const [selectedDistanceRings, setSelectedDistanceRings] = useState<number[]>([1]);
+  const [selectedDriveTimes, setSelectedDriveTimes] = useState<number[]>([]);
+  const [analysisMode, setAnalysisMode] = useState<'distance' | 'drivetime'>('distance');
 
   const fetchDemographicsMutation = useMutation({
-    mutationFn: async (location: SelectedLocation) => {
+    mutationFn: async ({ location, radiusMiles, tradeAreaKey }: { 
+      location: SelectedLocation; 
+      radiusMiles: number;
+      tradeAreaKey: string;
+    }) => {
       const response = await apiRequest('POST', '/api/demographics/location', {
         latitude: location.latitude,
         longitude: location.longitude,
         address: location.address,
-        radiusMiles: activeRadius
+        radiusMiles: radiusMiles
       });
       const data = await response.json() as LocationDemographicsResponse;
-      return { location, data };
+      return { location, data, tradeAreaKey };
     },
-    onSuccess: ({ location, data }) => {
-      const key = `${location.latitude},${location.longitude}`;
-      setLocationData(prev => new Map(prev).set(key, data));
+    onSuccess: ({ location, data, tradeAreaKey }) => {
+      const locationKey = `${location.latitude},${location.longitude}`;
+      setLocationData(prev => {
+        const next = new Map(prev);
+        const locationMap = next.get(locationKey) || new Map();
+        const existingData = locationMap.get(tradeAreaKey);
+        if (existingData) {
+          locationMap.set(tradeAreaKey, {
+            ...existingData,
+            demographics: data.demographics,
+            isLoading: false
+          });
+        }
+        next.set(locationKey, locationMap);
+        return next;
+      });
     }
   });
 
+  const fetchAllTradeAreas = useCallback((location: SelectedLocation) => {
+    const locationKey = `${location.latitude},${location.longitude}`;
+    const tradeAreas = new Map<string, TradeAreaData>();
+    
+    if (analysisMode === 'distance') {
+      selectedDistanceRings.forEach(miles => {
+        const key = `distance-${miles}`;
+        tradeAreas.set(key, {
+          radiusMiles: miles,
+          label: `${miles} Mile Radius`,
+          type: 'distance',
+          demographics: null,
+          isLoading: true
+        });
+        fetchDemographicsMutation.mutate({ 
+          location, 
+          radiusMiles: miles, 
+          tradeAreaKey: key 
+        });
+      });
+    } else {
+      selectedDriveTimes.forEach(minutes => {
+        const driveTime = DRIVE_TIMES.find(d => d.value === minutes);
+        if (driveTime) {
+          const key = `drivetime-${minutes}`;
+          tradeAreas.set(key, {
+            radiusMiles: driveTime.estimatedMiles,
+            label: `${minutes} Min Drive`,
+            type: 'drivetime',
+            demographics: null,
+            isLoading: true
+          });
+          fetchDemographicsMutation.mutate({ 
+            location, 
+            radiusMiles: driveTime.estimatedMiles, 
+            tradeAreaKey: key 
+          });
+        }
+      });
+    }
+    
+    setLocationData(prev => new Map(prev).set(locationKey, tradeAreas));
+  }, [analysisMode, selectedDistanceRings, selectedDriveTimes, fetchDemographicsMutation]);
+
   const handleAddLocation = useCallback((location: SelectedLocation) => {
     if (selectedLocations.length >= 5) return;
+    
+    const hasSelection = analysisMode === 'distance' 
+      ? selectedDistanceRings.length > 0 
+      : selectedDriveTimes.length > 0;
+    
+    if (!hasSelection) return;
     
     const exists = selectedLocations.some(
       l => l.latitude === location.latitude && l.longitude === location.longitude
@@ -458,8 +656,8 @@ function LocationAnalysisSection() {
     
     const newLocation = { ...location, label: `Location ${selectedLocations.length + 1}` };
     setSelectedLocations(prev => [...prev, newLocation]);
-    fetchDemographicsMutation.mutate(newLocation);
-  }, [selectedLocations, fetchDemographicsMutation]);
+    fetchAllTradeAreas(newLocation);
+  }, [selectedLocations, analysisMode, selectedDistanceRings, selectedDriveTimes, fetchAllTradeAreas]);
 
   const handleRemoveLocation = useCallback((index: number) => {
     const location = selectedLocations[index];
@@ -472,12 +670,31 @@ function LocationAnalysisSection() {
     });
   }, [selectedLocations]);
 
-  const radiusOptions = [
-    { value: null, label: "Point Location" },
-    { value: 1, label: "1 Mile Radius" },
-    { value: 3, label: "3 Mile Radius" },
-    { value: 5, label: "5 Mile Radius" },
-  ];
+  const toggleDistanceRing = (miles: number) => {
+    setSelectedDistanceRings(prev => {
+      if (prev.includes(miles)) {
+        return prev.filter(m => m !== miles);
+      }
+      return [...prev, miles].sort((a, b) => a - b);
+    });
+  };
+
+  const toggleDriveTime = (minutes: number) => {
+    setSelectedDriveTimes(prev => {
+      if (prev.includes(minutes)) {
+        return prev.filter(m => m !== minutes);
+      }
+      if (prev.length >= 3) return prev;
+      return [...prev, minutes].sort((a, b) => a - b);
+    });
+  };
+
+  const getLocationTradeAreas = (location: SelectedLocation): TradeAreaData[] => {
+    const key = `${location.latitude},${location.longitude}`;
+    const areaMap = locationData.get(key);
+    if (!areaMap) return [];
+    return Array.from(areaMap.values());
+  };
 
   return (
     <div className="space-y-6">
@@ -488,39 +705,93 @@ function LocationAnalysisSection() {
             <CardTitle>Location-Based Demographics</CardTitle>
           </div>
           <CardDescription>
-            Search for any U.S. address to analyze Census demographics. Add up to 5 locations to compare.
+            Search for any U.S. address to analyze Census demographics with distance rings or drive times.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <Label className="text-sm mb-2 block">Search Address</Label>
-              <AddressSearchInput 
-                onSelect={handleAddLocation}
-                placeholder="Enter a property address..."
-              />
-            </div>
-            <div className="w-full md:w-48">
-              <Label className="text-sm mb-2 block">Trade Area</Label>
-              <Select 
-                value={activeRadius?.toString() || "null"} 
-                onValueChange={(v) => setActiveRadius(v === "null" ? null : parseInt(v))}
-              >
-                <SelectTrigger data-testid="select-radius-trigger">
-                  <SelectValue placeholder="Select radius" />
-                </SelectTrigger>
-                <SelectContent>
-                  {radiusOptions.map(opt => (
-                    <SelectItem key={opt.label} value={opt.value?.toString() || "null"}>
-                      <div className="flex items-center gap-2">
-                        <CircleDot className="h-3 w-3" />
-                        {opt.label}
-                      </div>
-                    </SelectItem>
+          <Tabs value={analysisMode} onValueChange={(v) => setAnalysisMode(v as 'distance' | 'drivetime')}>
+            <TabsList className="grid w-full grid-cols-2 max-w-md">
+              <TabsTrigger value="distance" className="flex items-center gap-2" data-testid="tab-distance">
+                <Ruler className="h-4 w-4" />
+                Distance Rings
+              </TabsTrigger>
+              <TabsTrigger value="drivetime" className="flex items-center gap-2" data-testid="tab-drivetime">
+                <Car className="h-4 w-4" />
+                Drive Time
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="distance" className="mt-4">
+              <div className="space-y-3">
+                <Label className="text-sm">Select Distance Rings</Label>
+                <div className="flex flex-wrap gap-3">
+                  {DISTANCE_RINGS.map(ring => (
+                    <div key={ring.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`ring-${ring.value}`}
+                        checked={selectedDistanceRings.includes(ring.value)}
+                        onCheckedChange={() => toggleDistanceRing(ring.value)}
+                        data-testid={`checkbox-distance-${ring.value}`}
+                      />
+                      <label
+                        htmlFor={`ring-${ring.value}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-1"
+                      >
+                        <CircleDot className="h-3 w-3 text-primary" />
+                        {ring.label}
+                      </label>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
+                </div>
+                {selectedDistanceRings.length === 0 && (
+                  <p className="text-xs text-amber-600">Select at least one distance ring</p>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="drivetime" className="mt-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Select Drive Times (up to 3)</Label>
+                  <span className="text-xs text-muted-foreground">{selectedDriveTimes.length}/3 selected</span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {DRIVE_TIMES.map(time => (
+                    <div key={time.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`time-${time.value}`}
+                        checked={selectedDriveTimes.includes(time.value)}
+                        onCheckedChange={() => toggleDriveTime(time.value)}
+                        disabled={!selectedDriveTimes.includes(time.value) && selectedDriveTimes.length >= 3}
+                        data-testid={`checkbox-drivetime-${time.value}`}
+                      />
+                      <label
+                        htmlFor={`time-${time.value}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-1"
+                      >
+                        <Clock className="h-3 w-3 text-blue-500" />
+                        {time.label}
+                        <span className="text-xs text-muted-foreground">(~{time.estimatedMiles} mi)</span>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {selectedDriveTimes.length === 0 && (
+                  <p className="text-xs text-amber-600">Select at least one drive time</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Drive times are estimated based on typical suburban driving conditions (~30 mph average).
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="pt-4 border-t">
+            <Label className="text-sm mb-2 block">Search Address</Label>
+            <AddressSearchInput 
+              onSelect={handleAddLocation}
+              placeholder="Enter a property address..."
+            />
           </div>
 
           {selectedLocations.length > 0 && (
@@ -574,90 +845,141 @@ function LocationAnalysisSection() {
         </Card>
       )}
 
-      {selectedLocations.length > 0 && (
-        <div className={`grid gap-4 ${
-          selectedLocations.length === 1 ? 'grid-cols-1' :
-          selectedLocations.length === 2 ? 'grid-cols-1 md:grid-cols-2' :
-          'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-        }`}>
-          {selectedLocations.map((loc, idx) => {
-            const key = `${loc.latitude},${loc.longitude}`;
-            const data = locationData.get(key);
-            
-            if (!data) {
-              return (
-                <Card key={idx}>
-                  <CardContent className="py-12 text-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-                    <span className="text-sm text-muted-foreground">Loading...</span>
-                  </CardContent>
-                </Card>
-              );
-            }
-            
-            return (
-              <LocationDemographicsCard
-                key={idx}
-                data={data.demographics}
-                label={loc.address}
-                onRemove={() => handleRemoveLocation(idx)}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {selectedLocations.length >= 2 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Comparison Summary
-            </CardTitle>
-            <CardDescription>Key metrics comparison across selected locations</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-3 font-medium">Metric</th>
-                    {selectedLocations.map((loc, idx) => (
-                      <th key={idx} className="text-right py-2 px-3 font-medium max-w-32 truncate">
-                        {loc.label || `Loc ${idx + 1}`}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { label: "Population", key: "totalPopulation", format: formatNumber },
-                    { label: "Median Age", key: "medianAge", format: (v: number) => v ? `${v.toFixed(1)} yrs` : "N/A" },
-                    { label: "Median Income", key: "medianHouseholdIncome", format: formatCurrency },
-                    { label: "Per Capita Income", key: "perCapitaIncome", format: formatCurrency },
-                    { label: "Median Home Value", key: "medianHomeValue", format: formatCurrency },
-                    { label: "Household Size", key: "householdSize", format: (v: number) => v ? v.toFixed(1) : "N/A" },
-                  ].map((metric, mIdx) => (
-                    <tr key={mIdx} className="border-b border-muted hover:bg-muted/30">
-                      <td className="py-2 px-3 font-medium">{metric.label}</td>
-                      {selectedLocations.map((loc, lIdx) => {
-                        const key = `${loc.latitude},${loc.longitude}`;
-                        const data = locationData.get(key);
-                        const value = data?.demographics[metric.key as keyof DemographicSummary];
-                        return (
-                          <td key={lIdx} className="text-right py-2 px-3">
-                            {metric.format(value as number)}
-                          </td>
-                        );
-                      })}
-                    </tr>
+      {selectedLocations.length > 0 && selectedLocations.map((loc, locIdx) => {
+        const tradeAreas = getLocationTradeAreas(loc);
+        const hasLoading = tradeAreas.some(ta => ta.isLoading);
+        const loadedAreas = tradeAreas.filter(ta => ta.demographics);
+        
+        return (
+          <Card key={locIdx} className="overflow-hidden">
+            <CardHeader className="bg-muted/30">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-base">{loc.address}</CardTitle>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={() => handleRemoveLocation(locIdx)}
+                  data-testid={`button-remove-card-${locIdx}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <CardDescription className="flex items-center gap-2 flex-wrap">
+                {tradeAreas.map((ta, taIdx) => (
+                  <Badge 
+                    key={taIdx} 
+                    variant={ta.isLoading ? "outline" : "secondary"}
+                    className="text-xs"
+                  >
+                    {ta.type === 'distance' ? (
+                      <CircleDot className="h-3 w-3 mr-1" />
+                    ) : (
+                      <Clock className="h-3 w-3 mr-1" />
+                    )}
+                    {ta.label}
+                    {ta.isLoading && <span className="ml-1 animate-pulse">...</span>}
+                  </Badge>
+                ))}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {hasLoading && loadedAreas.length === 0 && (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  <span className="ml-2 text-sm text-muted-foreground">Loading demographics...</span>
+                </div>
+              )}
+              
+              {loadedAreas.length > 0 && (
+                <div className="space-y-6">
+                  {loadedAreas.map((tradeArea, taIdx) => (
+                    <div key={taIdx} className="space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b">
+                        {tradeArea.type === 'distance' ? (
+                          <CircleDot className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Clock className="h-4 w-4 text-blue-500" />
+                        )}
+                        <span className="font-medium text-sm">{tradeArea.label}</span>
+                        <Badge variant="outline" className="text-xs ml-auto">
+                          {tradeArea.radiusMiles} mile radius
+                        </Badge>
+                      </div>
+                      
+                      {tradeArea.demographics && (
+                        <TradeAreaDemographicsDisplay data={tradeArea.demographics} />
+                      )}
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      {selectedLocations.length >= 2 && (() => {
+        const firstTradeAreaKey = analysisMode === 'distance' 
+          ? `distance-${selectedDistanceRings[0]}` 
+          : `drivetime-${selectedDriveTimes[0]}`;
+        
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                Comparison Summary
+              </CardTitle>
+              <CardDescription>Key metrics comparison across selected locations (first trade area)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-3 font-medium">Metric</th>
+                      {selectedLocations.map((loc, idx) => (
+                        <th key={idx} className="text-right py-2 px-3 font-medium max-w-32 truncate">
+                          {loc.label || `Loc ${idx + 1}`}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { label: "Population", key: "totalPopulation", format: formatNumber },
+                      { label: "Median Age", key: "medianAge", format: (v: number) => v ? `${v.toFixed(1)} yrs` : "N/A" },
+                      { label: "Median Income", key: "medianHouseholdIncome", format: formatCurrency },
+                      { label: "Per Capita Income", key: "perCapitaIncome", format: formatCurrency },
+                      { label: "Median Home Value", key: "medianHomeValue", format: formatCurrency },
+                      { label: "Household Size", key: "householdSize", format: (v: number) => v ? v.toFixed(1) : "N/A" },
+                    ].map((metric, mIdx) => (
+                      <tr key={mIdx} className="border-b border-muted hover:bg-muted/30">
+                        <td className="py-2 px-3 font-medium">{metric.label}</td>
+                        {selectedLocations.map((loc, lIdx) => {
+                          const locKey = `${loc.latitude},${loc.longitude}`;
+                          const areaMap = locationData.get(locKey);
+                          const tradeArea = areaMap?.get(firstTradeAreaKey);
+                          const value = tradeArea?.demographics?.[metric.key as keyof DemographicSummary];
+                          return (
+                            <td key={lIdx} className="text-right py-2 px-3">
+                              {metric.format(value as number)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }
