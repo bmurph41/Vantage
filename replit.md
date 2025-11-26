@@ -71,7 +71,9 @@ Preferred communication style: Simple, everyday language.
 - **Market Demographics Module**: Regional market analysis with state-level FRED economic indicators (population, income, employment, housing) and location-based Census demographics. Features include:
     - **State Analysis**: FRED API integration for state-level economic data with YoY trends and 5-year CAGR.
     - **Location Analysis**: Census Bureau API integration for granular demographics at any U.S. address (tract/county/state level).
-    - **Trade Area Analysis**: Configurable 1/3/5 mile radius demographic analysis.
+    - **Trade Area Analysis**: Configurable distance rings (1/3/5/10 miles) or drive times (5/10/15/20 minutes) with per-location customization.
+    - **Per-Location Configuration**: Each location can have its own trade area settings (distance rings vs drive times) editable via settings popover.
+    - **Project Persistence**: Location configurations are saved per modeling project with project selector and save/load functionality.
     - **Multi-Location Comparison**: Side-by-side comparison of up to 5 locations with population, income, education, and housing metrics.
     - **Property Demographics**: Direct integration with CRM properties for automatic demographic lookups.
     - **Caching Layer**: Automatic caching of FRED and Census API responses to minimize external calls.
