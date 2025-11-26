@@ -428,10 +428,10 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
                       <div className="text-sm">{capRateDisplay}</div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="text-sm">{comp.wetSlips ?? '-'}</div>
+                      <div className="text-sm">{comp.wetSlips != null ? Number(comp.wetSlips).toLocaleString() : '-'}</div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="text-sm">{comp.dryRacks ?? '-'}</div>
+                      <div className="text-sm">{comp.dryRacks != null ? Number(comp.dryRacks).toLocaleString() : '-'}</div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="text-sm font-medium">
