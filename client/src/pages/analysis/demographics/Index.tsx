@@ -21,7 +21,9 @@ import {
   CircleDot,
   Globe,
   X,
-  Plus
+  Plus,
+  Target,
+  Activity
 } from "lucide-react";
 
 interface DemographicSummary {
