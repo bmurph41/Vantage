@@ -1,6 +1,6 @@
 import { db } from '../../db';
 import { salesComps } from '../../../shared/schema';
-import { sql, and, eq, isNull, inArray, desc } from 'drizzle-orm';
+import { sql, and, eq, isNull, inArray, desc, or } from 'drizzle-orm';
 
 export interface AnalyticsFilters {
   states?: string[];
@@ -827,6 +827,13 @@ export async function getMatchedComps(
 export interface TrendsFilters {
   yearMin?: number;
   yearMax?: number;
+  regions?: string[];
+  states?: string[];
+  wetSlipsMin?: number;
+  wetSlipsMax?: number;
+  dryRacksMin?: number;
+  dryRacksMax?: number;
+  profitCenters?: string[];
 }
 
 export interface YearlyTrendData {
@@ -908,6 +915,74 @@ function applyTrendsFilters(orgId: string, filters: TrendsFilters) {
 
   if (filters.yearMax) {
     conditions.push(sql`${salesComps.saleYear} <= ${filters.yearMax}`);
+  }
+
+  // Location filters - use inArray for robust parameter handling
+  if (filters.regions && filters.regions.length > 0) {
+    conditions.push(inArray(salesComps.region, filters.regions));
+  }
+
+  if (filters.states && filters.states.length > 0) {
+    conditions.push(inArray(salesComps.state, filters.states));
+  }
+
+  // Capacity filters - check for undefined to allow zero values
+  if (filters.wetSlipsMin !== undefined) {
+    conditions.push(sql`COALESCE(${salesComps.wetSlips}, 0) >= ${filters.wetSlipsMin}`);
+  }
+
+  if (filters.wetSlipsMax !== undefined) {
+    conditions.push(sql`COALESCE(${salesComps.wetSlips}, 0) <= ${filters.wetSlipsMax}`);
+  }
+
+  if (filters.dryRacksMin !== undefined) {
+    conditions.push(sql`COALESCE(${salesComps.dryRacks}, 0) >= ${filters.dryRacksMin}`);
+  }
+
+  if (filters.dryRacksMax !== undefined) {
+    conditions.push(sql`COALESCE(${salesComps.dryRacks}, 0) <= ${filters.dryRacksMax}`);
+  }
+
+  // Profit center filters - match any of the selected profit centers
+  if (filters.profitCenters && filters.profitCenters.length > 0) {
+    const profitCenterConditions: any[] = [];
+    for (const pc of filters.profitCenters) {
+      switch (pc) {
+        case 'storage':
+          profitCenterConditions.push(eq(salesComps.profitCenterStorage, true));
+          break;
+        case 'events':
+          profitCenterConditions.push(eq(salesComps.profitCenterEvents, true));
+          break;
+        case 'service':
+          profitCenterConditions.push(eq(salesComps.profitCenterService, true));
+          break;
+        case 'third_party_leases':
+          profitCenterConditions.push(eq(salesComps.profitCenterThirdPartyLeases, true));
+          break;
+        case 'boat_rentals':
+          profitCenterConditions.push(eq(salesComps.profitCenterBoatRentals, true));
+          break;
+        case 'boat_brokerage':
+          profitCenterConditions.push(eq(salesComps.profitCenterBoatBrokerage, true));
+          break;
+        case 'rv_park':
+          profitCenterConditions.push(eq(salesComps.profitCenterRvPark, true));
+          break;
+        case 'fuel':
+          profitCenterConditions.push(eq(salesComps.profitCenterFuel, true));
+          break;
+        case 'ship_store':
+          profitCenterConditions.push(eq(salesComps.profitCenterShipStore, true));
+          break;
+        case 'parts':
+          profitCenterConditions.push(eq(salesComps.profitCenterParts, true));
+          break;
+      }
+    }
+    if (profitCenterConditions.length > 0) {
+      conditions.push(or(...profitCenterConditions));
+    }
   }
 
   return and(...conditions);

@@ -1,10 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiRequest } from "@/lib/queryClient";
@@ -14,8 +13,9 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, DollarSign, BarChart3, Building2,
-  RefreshCw, Calendar, Repeat, Users, Lightbulb, ChevronRight
+  RefreshCw, Repeat, Users, Lightbulb, ChevronRight
 } from "lucide-react";
+import TrendsFiltersPanel, { type TrendsFilters } from "./TrendsFiltersPanel";
 
 interface YearlyTrendData {
   year: number;
@@ -84,16 +84,6 @@ interface MarketTrendsData {
   insights: string[];
 }
 
-const TIME_PERIOD_OPTIONS = [
-  { value: "all", label: "All Time" },
-  { value: "last10", label: "Last 10 Years" },
-  { value: "last5", label: "Last 5 Years" },
-  { value: "last3", label: "Last 3 Years" },
-  { value: "2020-present", label: "2020 - Present" },
-  { value: "2015-2020", label: "2015 - 2020" },
-  { value: "2010-2015", label: "2010 - 2015" },
-];
-
 const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
 function formatCurrency(value: number | null | undefined): string {
@@ -111,21 +101,8 @@ function formatPercent(value: number | null | undefined): string {
 }
 
 export default function TrendsView() {
-  const [timePeriod, setTimePeriod] = useState("all");
+  const [filters, setFilters] = useState<TrendsFilters>({});
   const [activeTab, setActiveTab] = useState("overview");
-
-  const filters = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    switch (timePeriod) {
-      case "last10": return { yearMin: currentYear - 10 };
-      case "last5": return { yearMin: currentYear - 5 };
-      case "last3": return { yearMin: currentYear - 3 };
-      case "2020-present": return { yearMin: 2020 };
-      case "2015-2020": return { yearMin: 2015, yearMax: 2020 };
-      case "2010-2015": return { yearMin: 2010, yearMax: 2015 };
-      default: return {};
-    }
-  }, [timePeriod]);
 
   const { data: trendsData, isLoading, refetch, isFetching } = useQuery<MarketTrendsData>({
     queryKey: ["/api/sales-comps/analytics/trends", filters],
@@ -164,42 +141,50 @@ export default function TrendsView() {
 
   const { summary, yearlyTrends, quarterlyTrends, regionalBreakdown, repeatSales, topBrokers, insights } = trendsData;
 
+  const activeFilterCount = [
+    filters.yearMin || filters.yearMax ? 1 : 0,
+    filters.regions?.length || 0,
+    filters.states?.length || 0,
+    filters.wetSlipsMin || filters.wetSlipsMax ? 1 : 0,
+    filters.dryRacksMin || filters.dryRacksMax ? 1 : 0,
+    filters.profitCenters?.length || 0,
+  ].reduce((a, b) => a + b, 0);
+
   return (
     <div className="space-y-6">
-      {/* Header with Time Period Selector */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-primary" />
             Market Trends
+            {activeFilterCount > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} applied
+              </Badge>
+            )}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             Historical analysis of marina sales activity and pricing
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Select value={timePeriod} onValueChange={setTimePeriod}>
-            <SelectTrigger className="w-[180px]" data-testid="select-time-period">
-              <Calendar className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Time Period" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIME_PERIOD_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={() => refetch()} 
-            disabled={isFetching}
-            data-testid="button-refresh-trends"
-          >
-            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          </Button>
-        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => refetch()} 
+          disabled={isFetching}
+          data-testid="button-refresh-trends"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
+
+      {/* Filters Panel */}
+      <TrendsFiltersPanel 
+        filters={filters} 
+        onFiltersChange={setFilters} 
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
