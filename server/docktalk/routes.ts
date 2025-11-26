@@ -1806,10 +1806,21 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   // Portfolio Companies Management
   const PortfolioCompanySchema = z.object({
     companyName: z.string().min(1),
-    aliases: z.array(z.string()).optional(),
-    sector: z.string().optional(),
-    region: z.string().optional(),
-    notes: z.string().optional(),
+    aliases: z.array(z.string()).optional().nullable(),
+    sector: z.string().optional().nullable(),
+    region: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+    companyType: z.enum(["marina_operator", "marina_owner", "boat_dealer", "marine_services", "yacht_club", "boatyard", "marine_retail", "marine_finance", "other"]).optional().nullable(),
+    relationshipStage: z.enum(["tracking", "interested", "in_pipeline", "portfolio_holding", "exited"]).optional().nullable(),
+    geographyFocus: z.array(z.string()).optional().nullable(),
+    website: z.string().optional().nullable(),
+    parentCompany: z.string().optional().nullable(),
+    watchKeywords: z.array(z.string()).optional().nullable(),
+    excludedTerms: z.array(z.string()).optional().nullable(),
+    alertFrequency: z.enum(["none", "immediate", "daily", "weekly"]).optional().nullable(),
+    alertChannels: z.array(z.string()).optional().nullable(),
+    alertSensitivity: z.enum(["all_mentions", "headlines_only", "high_relevance"]).optional().nullable(),
+    isActive: z.boolean().optional(),
   });
 
   const PortfolioCompanyUpdateSchema = PortfolioCompanySchema.partial();
