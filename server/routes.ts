@@ -40,7 +40,14 @@ import { ParserService as RcParserService } from "./services/ratecomps/parser";
 import { CompService as RcCompService } from "./services/ratecomps/compService";
 import { FilterBuilder as RcFilterBuilder } from "./services/ratecomps/filterBuilder";
 import { RecommendationService as RcRecommendationService } from "./services/ratecomps/recommendationService";
-import { calculateMetrics as rcCalculateMetrics, generateInsights as rcGenerateInsights, type AnalyticsFilters as RcAnalyticsFilters } from "./services/ratecomps/analyticsService";
+import { 
+  calculateMetrics as rcCalculateMetrics, 
+  generateInsights as rcGenerateInsights, 
+  calculateRateTierMetrics,
+  generateRateTierInsights,
+  type AnalyticsFilters as RcAnalyticsFilters,
+  type RateTierAnalyticsFilters
+} from "./services/ratecomps/analyticsService";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertDDTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
@@ -16934,6 +16941,204 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Rate Tiers routes (flexible pricing tiers)
+  app.get('/api/rate-comps/:rateCompId/tiers', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { rateCompId } = req.params;
+
+      const tiers = await storage.getRateTiersByRateComp(rateCompId, orgId);
+      res.json(tiers);
+    } catch (error) {
+      console.error("Error fetching rate tiers:", error);
+      res.status(500).json({ message: "Failed to fetch rate tiers" });
+    }
+  });
+
+  app.get('/api/rate-tiers', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { storageType, isCurrentRate, loaMin, loaMax } = req.query;
+
+      const filters: any = {};
+      if (storageType) filters.storageType = storageType;
+      if (isCurrentRate !== undefined) filters.isCurrentRate = isCurrentRate === 'true';
+      if (loaMin || loaMax) {
+        filters.loaRange = {};
+        if (loaMin) filters.loaRange.min = parseFloat(loaMin);
+        if (loaMax) filters.loaRange.max = parseFloat(loaMax);
+      }
+
+      const tiers = await storage.getRateTiersByOrg(orgId, Object.keys(filters).length > 0 ? filters : undefined);
+      res.json(tiers);
+    } catch (error) {
+      console.error("Error fetching rate tiers:", error);
+      res.status(500).json({ message: "Failed to fetch rate tiers" });
+    }
+  });
+
+  app.get('/api/rate-tiers/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const tier = await storage.getRateTier(req.params.id, orgId);
+      if (!tier) return res.status(404).json({ message: "Rate tier not found" });
+      res.json(tier);
+    } catch (error) {
+      console.error("Error fetching rate tier:", error);
+      res.status(500).json({ message: "Failed to fetch rate tier" });
+    }
+  });
+
+  app.post('/api/rate-comps/:rateCompId/tiers', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { rateCompId } = req.params;
+
+      const comp = await storage.getRateComp(rateCompId, orgId);
+      if (!comp) return res.status(404).json({ message: "Rate comp not found" });
+
+      const tierData = req.body;
+      const tier = await storage.createRateTier({
+        ...tierData,
+        rateCompId,
+        orgId,
+        createdBy: userId,
+      });
+
+      await storage.createRcAuditLog({
+        orgId,
+        userId,
+        entity: 'rate_tier',
+        entityId: tier.id,
+        action: 'create',
+        after: tier,
+      });
+
+      res.status(201).json(tier);
+    } catch (error) {
+      console.error("Error creating rate tier:", error);
+      res.status(500).json({ message: "Failed to create rate tier" });
+    }
+  });
+
+  app.post('/api/rate-comps/:rateCompId/tiers/bulk', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { rateCompId } = req.params;
+
+      const comp = await storage.getRateComp(rateCompId, orgId);
+      if (!comp) return res.status(404).json({ message: "Rate comp not found" });
+
+      const tiersData = req.body.tiers;
+      if (!Array.isArray(tiersData) || tiersData.length === 0) {
+        return res.status(400).json({ message: "Invalid or empty tiers array" });
+      }
+
+      const tiersToCreate = tiersData.map(tier => ({
+        ...tier,
+        rateCompId,
+        orgId,
+        createdBy: userId,
+      }));
+
+      const createdTiers = await storage.bulkCreateRateTiers(tiersToCreate);
+
+      await storage.createRcAuditLog({
+        orgId,
+        userId,
+        entity: 'rate_tier',
+        entityId: rateCompId,
+        action: 'bulk_create',
+        after: { count: createdTiers.length },
+      });
+
+      res.status(201).json(createdTiers);
+    } catch (error) {
+      console.error("Error bulk creating rate tiers:", error);
+      res.status(500).json({ message: "Failed to create rate tiers" });
+    }
+  });
+
+  app.patch('/api/rate-tiers/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const tier = await storage.getRateTier(req.params.id, orgId);
+      if (!tier) return res.status(404).json({ message: "Rate tier not found" });
+
+      const updates = { ...req.body, updatedBy: userId };
+      const updatedTier = await storage.updateRateTier(req.params.id, updates, orgId);
+
+      await storage.createRcAuditLog({
+        orgId,
+        userId,
+        entity: 'rate_tier',
+        entityId: req.params.id,
+        action: 'update',
+        before: tier,
+        after: updatedTier,
+      });
+
+      res.json(updatedTier);
+    } catch (error) {
+      console.error("Error updating rate tier:", error);
+      res.status(500).json({ message: "Failed to update rate tier" });
+    }
+  });
+
+  app.delete('/api/rate-tiers/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const tier = await storage.getRateTier(req.params.id, orgId);
+      if (!tier) return res.status(404).json({ message: "Rate tier not found" });
+
+      await storage.deleteRateTier(req.params.id, orgId);
+
+      await storage.createRcAuditLog({
+        orgId,
+        userId,
+        entity: 'rate_tier',
+        entityId: req.params.id,
+        action: 'delete',
+        before: tier,
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting rate tier:", error);
+      res.status(500).json({ message: "Failed to delete rate tier" });
+    }
+  });
+
+  app.get('/api/rate-comps/:id/with-tiers', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const compWithTiers = await storage.getRateCompWithTiers(req.params.id, orgId);
+      if (!compWithTiers) return res.status(404).json({ message: "Rate comp not found" });
+      res.json(compWithTiers);
+    } catch (error) {
+      console.error("Error fetching rate comp with tiers:", error);
+      res.status(500).json({ message: "Failed to fetch rate comp with tiers" });
+    }
+  });
+
+  app.post('/api/rate-comps/with-tiers', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters = req.body.filters || {};
+      const compsWithTiers = await storage.getRateCompsWithTiers(orgId, filters);
+      res.json(compsWithTiers);
+    } catch (error) {
+      console.error("Error fetching rate comps with tiers:", error);
+      res.status(500).json({ message: "Failed to fetch rate comps with tiers" });
+    }
+  });
+
   // Analytics endpoint
   app.post('/api/rate-comps/analytics', async (req: any, res) => {
     try {
@@ -17125,6 +17330,92 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error generating insights:", error);
       res.status(500).json({ message: "Failed to generate insights" });
+    }
+  });
+
+  // Rate Tier Analytics endpoints
+  app.post('/api/rate-tiers/analytics', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: RateTierAnalyticsFilters = req.body.filters || {};
+
+      const analysis = await calculateRateTierMetrics(orgId, filters);
+      const insights = await generateRateTierInsights(analysis, filters);
+
+      res.json({
+        analysis,
+        insights,
+      });
+    } catch (error) {
+      console.error("Error calculating rate tier analytics:", error);
+      res.status(500).json({ message: "Failed to calculate rate tier analytics" });
+    }
+  });
+
+  app.post('/api/rate-tiers/analytics/normalized-rates', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: RateTierAnalyticsFilters = req.body.filters || {};
+
+      const analysis = await calculateRateTierMetrics(orgId, filters);
+
+      res.json({
+        overall: analysis.overall,
+        byStorageType: analysis.byStorageType,
+        byState: analysis.byState,
+        bySize: analysis.bySize,
+        tiers: analysis.tiers,
+      });
+    } catch (error) {
+      console.error("Error getting normalized rates:", error);
+      res.status(500).json({ message: "Failed to get normalized rates" });
+    }
+  });
+
+  app.post('/api/rate-tiers/analytics/compare', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { targetLoa, targetStorageType, filters } = req.body;
+
+      const analysis = await calculateRateTierMetrics(orgId, filters || {});
+      
+      // Find matching tiers for comparison
+      let matchingTiers = analysis.tiers;
+      
+      if (targetStorageType) {
+        matchingTiers = matchingTiers.filter(t => t.storageType === targetStorageType);
+      }
+      
+      if (targetLoa) {
+        matchingTiers = matchingTiers.filter(t => {
+          if (t.exactLoa) return t.exactLoa === targetLoa;
+          const min = t.sizeMin || 0;
+          const max = t.sizeMax || Infinity;
+          return targetLoa >= min && targetLoa <= max;
+        });
+      }
+
+      // Calculate comparison stats
+      const rates = matchingTiers.map(t => t.normalizedRate);
+      const count = rates.length;
+      
+      const comparison = {
+        matchingTierCount: count,
+        avgNormalizedRate: count > 0 ? rates.reduce((a, b) => a + b, 0) / count : 0,
+        minNormalizedRate: count > 0 ? Math.min(...rates) : 0,
+        maxNormalizedRate: count > 0 ? Math.max(...rates) : 0,
+        tiers: matchingTiers.slice(0, 20), // Return top 20 matching tiers
+        percentiles: count > 3 ? {
+          p25: rates.sort((a, b) => a - b)[Math.floor(count * 0.25)] || 0,
+          p50: rates.sort((a, b) => a - b)[Math.floor(count * 0.5)] || 0,
+          p75: rates.sort((a, b) => a - b)[Math.floor(count * 0.75)] || 0,
+        } : null,
+      };
+
+      res.json(comparison);
+    } catch (error) {
+      console.error("Error comparing rates:", error);
+      res.status(500).json({ message: "Failed to compare rates" });
     }
   });
 

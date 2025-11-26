@@ -1,6 +1,7 @@
 import { db } from '../../db';
-import { rateComps } from '../../../shared/schema';
-import { sql, and, eq, isNull, inArray } from 'drizzle-orm';
+import { rateComps, rateTiers } from '../../../shared/schema';
+import { sql, and, eq, isNull, inArray, asc, desc } from 'drizzle-orm';
+import { normalizeRate, formatRateDisplay, formatNormalizedRate, STORAGE_TYPE_LABELS } from '../../../shared/ratecomps-utils';
 
 export interface AnalyticsFilters {
   states?: string[];
@@ -365,4 +366,368 @@ export async function generateInsights(
   }
 
   return insights;
+}
+
+// Rate Tier Analytics Interfaces and Functions
+export interface RateTierAnalyticsFilters {
+  states?: string[];
+  storageTypes?: string[];
+  electricRequired?: boolean;
+  protectionLevels?: string[];
+  seasonalRate?: boolean;
+  sizeMin?: number;
+  sizeMax?: number;
+}
+
+export interface NormalizedRateTier {
+  id: string;
+  rateCompId: string;
+  marinaName: string;
+  state: string;
+  city: string;
+  storageType: string;
+  loaMin: number | null;
+  loaMax: number | null;
+  sizeBasis: string | null;
+  amountCents: number;
+  rateUnit: string;
+  ratePeriod: string;
+  electricIncluded: boolean;
+  electricAdditionalCents: number | null;
+  protectionLevel: string | null;
+  seasonality: string | null;
+  seasonStartMonth: number | null;
+  seasonEndMonth: number | null;
+  tierLabel: string | null;
+  normalizedRate: number;
+  normalizedRateDisplay: string;
+}
+
+export interface RateTierAnalysis {
+  overall: {
+    count: number;
+    avgNormalizedRate: number;
+    medianNormalizedRate: number;
+    minNormalizedRate: number;
+    maxNormalizedRate: number;
+    stdDevNormalizedRate: number;
+  };
+  byStorageType?: Record<string, {
+    count: number;
+    avgNormalizedRate: number;
+    medianNormalizedRate: number;
+    minNormalizedRate: number;
+    maxNormalizedRate: number;
+  }>;
+  byState?: Record<string, {
+    count: number;
+    avgNormalizedRate: number;
+    medianNormalizedRate: number;
+    minNormalizedRate: number;
+    maxNormalizedRate: number;
+  }>;
+  bySize?: {
+    small: { count: number; avgRate: number }; // < 25ft
+    medium: { count: number; avgRate: number }; // 25-40ft
+    large: { count: number; avgRate: number }; // 40-60ft
+    mega: { count: number; avgRate: number }; // > 60ft
+  };
+  topRates: NormalizedRateTier[];
+  bottomRates: NormalizedRateTier[];
+  tiers: NormalizedRateTier[];
+}
+
+export async function calculateRateTierMetrics(
+  orgId: string,
+  filters: RateTierAnalyticsFilters = {}
+): Promise<RateTierAnalysis> {
+  // Get all rate tiers with their parent rate comp info
+  const allTiers = await db
+    .select({
+      tier: rateTiers,
+      comp: {
+        id: rateComps.id,
+        marina: rateComps.marina,
+        state: rateComps.state,
+        city: rateComps.city,
+        orgId: rateComps.orgId,
+        deletedAt: rateComps.deletedAt,
+      }
+    })
+    .from(rateTiers)
+    .innerJoin(rateComps, eq(rateTiers.rateCompId, rateComps.id))
+    .where(and(
+      eq(rateComps.orgId, orgId),
+      isNull(rateComps.deletedAt)
+    ));
+
+  // Apply filters and calculate normalized rates
+  let processedTiers: NormalizedRateTier[] = allTiers
+    .map(({ tier, comp }) => {
+      // Call normalizeRate with the proper tier object structure
+      const normResult = normalizeRate({
+        amountCents: tier.amountCents,
+        rateUnit: tier.rateUnit,
+        ratePeriod: tier.ratePeriod,
+        loaMin: tier.loaMin,
+        loaMax: tier.loaMax,
+        seasonality: tier.seasonality,
+        seasonStartMonth: tier.seasonStartMonth,
+        seasonEndMonth: tier.seasonEndMonth,
+      });
+
+      return {
+        id: tier.id,
+        rateCompId: tier.rateCompId,
+        marinaName: comp.marina || 'Unknown Marina',
+        state: comp.state || '',
+        city: comp.city || '',
+        storageType: tier.storageType,
+        loaMin: tier.loaMin,
+        loaMax: tier.loaMax,
+        sizeBasis: tier.sizeBasis,
+        amountCents: tier.amountCents,
+        rateUnit: tier.rateUnit,
+        ratePeriod: tier.ratePeriod,
+        electricIncluded: tier.electricIncluded || false,
+        electricAdditionalCents: tier.electricAdditionalCents,
+        protectionLevel: tier.protectionLevel,
+        seasonality: tier.seasonality,
+        seasonStartMonth: tier.seasonStartMonth,
+        seasonEndMonth: tier.seasonEndMonth,
+        tierLabel: tier.tierLabel,
+        normalizedRate: normResult.normalizedValue,
+        normalizedRateDisplay: formatNormalizedRate(normResult.normalizedValue),
+      };
+    })
+    .filter(tier => tier.normalizedRate > 0); // Filter out invalid rates
+
+  // Apply filters
+  if (filters.states && filters.states.length > 0) {
+    processedTiers = processedTiers.filter(t => filters.states!.includes(t.state));
+  }
+  if (filters.storageTypes && filters.storageTypes.length > 0) {
+    processedTiers = processedTiers.filter(t => filters.storageTypes!.includes(t.storageType));
+  }
+  if (filters.electricRequired !== undefined) {
+    // Filter by whether electric is included (equivalent to "electric required but provided")
+    processedTiers = processedTiers.filter(t => t.electricIncluded === filters.electricRequired);
+  }
+  if (filters.protectionLevels && filters.protectionLevels.length > 0) {
+    processedTiers = processedTiers.filter(t => t.protectionLevel && filters.protectionLevels!.includes(t.protectionLevel));
+  }
+  if (filters.seasonalRate !== undefined) {
+    // Filter by seasonality type
+    processedTiers = processedTiers.filter(t => (t.seasonality === 'seasonal') === filters.seasonalRate);
+  }
+  if (filters.sizeMin !== undefined) {
+    processedTiers = processedTiers.filter(t => {
+      const size = t.loaMin || 0;
+      return size >= filters.sizeMin!;
+    });
+  }
+  if (filters.sizeMax !== undefined) {
+    processedTiers = processedTiers.filter(t => {
+      const size = t.loaMax || Infinity;
+      return size <= filters.sizeMax!;
+    });
+  }
+
+  // Sort by normalized rate for consistent ordering
+  processedTiers.sort((a, b) => a.normalizedRate - b.normalizedRate);
+
+  // Calculate overall statistics
+  const rates = processedTiers.map(t => t.normalizedRate);
+  const count = rates.length;
+
+  const overall = {
+    count,
+    avgNormalizedRate: count > 0 ? rates.reduce((a, b) => a + b, 0) / count : 0,
+    medianNormalizedRate: count > 0 ? calculateMedian(rates) : 0,
+    minNormalizedRate: count > 0 ? Math.min(...rates) : 0,
+    maxNormalizedRate: count > 0 ? Math.max(...rates) : 0,
+    stdDevNormalizedRate: count > 0 ? calculateStdDev(rates) : 0,
+  };
+
+  // Group by storage type
+  const byStorageType: Record<string, { count: number; avgNormalizedRate: number; medianNormalizedRate: number; minNormalizedRate: number; maxNormalizedRate: number }> = {};
+  const storageTypeGroups = groupBy(processedTiers, t => t.storageType);
+  for (const [type, tiers] of Object.entries(storageTypeGroups)) {
+    const typeRates = tiers.map(t => t.normalizedRate);
+    byStorageType[type] = {
+      count: typeRates.length,
+      avgNormalizedRate: typeRates.reduce((a, b) => a + b, 0) / typeRates.length,
+      medianNormalizedRate: calculateMedian(typeRates),
+      minNormalizedRate: Math.min(...typeRates),
+      maxNormalizedRate: Math.max(...typeRates),
+    };
+  }
+
+  // Group by state
+  const byState: Record<string, { count: number; avgNormalizedRate: number; medianNormalizedRate: number; minNormalizedRate: number; maxNormalizedRate: number }> = {};
+  const stateGroups = groupBy(processedTiers, t => t.state);
+  for (const [state, tiers] of Object.entries(stateGroups)) {
+    if (!state) continue;
+    const stateRates = tiers.map(t => t.normalizedRate);
+    byState[state] = {
+      count: stateRates.length,
+      avgNormalizedRate: stateRates.reduce((a, b) => a + b, 0) / stateRates.length,
+      medianNormalizedRate: calculateMedian(stateRates),
+      minNormalizedRate: Math.min(...stateRates),
+      maxNormalizedRate: Math.max(...stateRates),
+    };
+  }
+
+  // Group by size
+  const bySize = {
+    small: { count: 0, avgRate: 0 },
+    medium: { count: 0, avgRate: 0 },
+    large: { count: 0, avgRate: 0 },
+    mega: { count: 0, avgRate: 0 },
+  };
+
+  const sizeGroups: Record<string, number[]> = { small: [], medium: [], large: [], mega: [] };
+  for (const tier of processedTiers) {
+    // Calculate average size using loaMin and loaMax
+    const avgSize = tier.loaMin && tier.loaMax 
+      ? (tier.loaMin + tier.loaMax) / 2 
+      : tier.loaMin || tier.loaMax || 30;
+    
+    if (avgSize < 25) {
+      sizeGroups.small.push(tier.normalizedRate);
+    } else if (avgSize < 40) {
+      sizeGroups.medium.push(tier.normalizedRate);
+    } else if (avgSize < 60) {
+      sizeGroups.large.push(tier.normalizedRate);
+    } else {
+      sizeGroups.mega.push(tier.normalizedRate);
+    }
+  }
+
+  for (const [size, rates] of Object.entries(sizeGroups)) {
+    (bySize as any)[size] = {
+      count: rates.length,
+      avgRate: rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : 0,
+    };
+  }
+
+  // Get top and bottom rates
+  const sortedByRate = [...processedTiers].sort((a, b) => b.normalizedRate - a.normalizedRate);
+  const topRates = sortedByRate.slice(0, 10);
+  const bottomRates = sortedByRate.slice(-10).reverse();
+
+  return {
+    overall,
+    byStorageType,
+    byState,
+    bySize,
+    topRates,
+    bottomRates,
+    tiers: processedTiers,
+  };
+}
+
+export async function generateRateTierInsights(
+  analysis: RateTierAnalysis,
+  filters: RateTierAnalyticsFilters = {}
+): Promise<string[]> {
+  const insights: string[] = [];
+
+  // Overall insights
+  if (analysis.overall.count > 0) {
+    insights.push(`Analyzed ${analysis.overall.count} rate tiers across marinas.`);
+    insights.push(
+      `Average normalized rate: ${formatNormalizedRate(analysis.overall.avgNormalizedRate)} (median: ${formatNormalizedRate(analysis.overall.medianNormalizedRate)})`
+    );
+    insights.push(
+      `Rate range: ${formatNormalizedRate(analysis.overall.minNormalizedRate)} to ${formatNormalizedRate(analysis.overall.maxNormalizedRate)}`
+    );
+  }
+
+  // Storage type insights
+  if (analysis.byStorageType && Object.keys(analysis.byStorageType).length > 1) {
+    const storageData = Object.entries(analysis.byStorageType)
+      .filter(([_, data]) => data.count >= 2)
+      .sort((a, b) => b[1].avgNormalizedRate - a[1].avgNormalizedRate);
+
+    if (storageData.length > 0) {
+      const [highestType, highestData] = storageData[0];
+      const [lowestType, lowestData] = storageData[storageData.length - 1];
+      
+      const highestLabel = STORAGE_TYPE_LABELS[highestType as keyof typeof STORAGE_TYPE_LABELS] || highestType;
+      const lowestLabel = STORAGE_TYPE_LABELS[lowestType as keyof typeof STORAGE_TYPE_LABELS] || lowestType;
+      
+      insights.push(
+        `${highestLabel} commands the highest rates at ${formatNormalizedRate(highestData.avgNormalizedRate)} avg`
+      );
+      if (highestType !== lowestType) {
+        insights.push(
+          `${lowestLabel} has the lowest rates at ${formatNormalizedRate(lowestData.avgNormalizedRate)} avg`
+        );
+      }
+    }
+  }
+
+  // State insights
+  if (analysis.byState && Object.keys(analysis.byState).length > 1) {
+    const stateData = Object.entries(analysis.byState)
+      .filter(([_, data]) => data.count >= 2)
+      .sort((a, b) => b[1].avgNormalizedRate - a[1].avgNormalizedRate);
+
+    if (stateData.length > 0) {
+      const [highestState, highestData] = stateData[0];
+      insights.push(
+        `${highestState} has the highest average rates at ${formatNormalizedRate(highestData.avgNormalizedRate)}`
+      );
+    }
+  }
+
+  // Size insights
+  if (analysis.bySize) {
+    const sizesWithData = Object.entries(analysis.bySize)
+      .filter(([_, data]) => data.count > 0)
+      .sort((a, b) => b[1].avgRate - a[1].avgRate);
+
+    if (sizesWithData.length > 0) {
+      const sizeLabels: Record<string, string> = {
+        small: 'Small boats (<25ft)',
+        medium: 'Medium boats (25-40ft)',
+        large: 'Large boats (40-60ft)',
+        mega: 'Mega yachts (>60ft)',
+      };
+
+      const [highestSize, highestData] = sizesWithData[0];
+      insights.push(
+        `${sizeLabels[highestSize]} have the highest average rates at ${formatNormalizedRate(highestData.avgRate)}`
+      );
+    }
+  }
+
+  return insights;
+}
+
+// Utility functions
+function calculateMedian(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 
+    ? sorted[mid] 
+    : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function calculateStdDev(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+  const squareDiffs = arr.map(value => Math.pow(value - avg, 2));
+  return Math.sqrt(squareDiffs.reduce((a, b) => a + b, 0) / arr.length);
+}
+
+function groupBy<T>(arr: T[], keyFn: (item: T) => string): Record<string, T[]> {
+  return arr.reduce((acc, item) => {
+    const key = keyFn(item);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
 }

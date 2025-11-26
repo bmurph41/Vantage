@@ -748,6 +748,17 @@ export interface IStorage {
   updateRcPendingPropertyProfile(id: string, data: Partial<InsertRcPendingPropertyProfile>): Promise<RcPendingPropertyProfile>;
   deleteRcPendingPropertyProfile(id: string): Promise<boolean>;
 
+  // RateComps - Rate Tiers (flexible pricing tiers)
+  getRateTiersByRateComp(rateCompId: string, orgId: string): Promise<RateTier[]>;
+  getRateTiersByOrg(orgId: string, filters?: { storageType?: string; isCurrentRate?: boolean; loaRange?: { min?: number; max?: number } }): Promise<RateTier[]>;
+  getRateTier(id: string, orgId: string): Promise<RateTier | undefined>;
+  createRateTier(tier: InsertRateTier): Promise<RateTier>;
+  updateRateTier(id: string, updates: UpdateRateTier, orgId: string): Promise<RateTier | undefined>;
+  deleteRateTier(id: string, orgId: string): Promise<boolean>;
+  bulkCreateRateTiers(tiers: InsertRateTier[]): Promise<RateTier[]>;
+  getRateCompWithTiers(rateCompId: string, orgId: string): Promise<RateCompWithTiers | undefined>;
+  getRateCompsWithTiers(orgId: string, filters?: Record<string, any>): Promise<RateCompWithTiers[]>;
+
   // Fuel Integrations
   getFuelIntegration(orgId: string): Promise<FuelIntegration | undefined>;
   getFuelIntegrationById(id: string): Promise<FuelIntegration | undefined>;
@@ -6206,6 +6217,108 @@ export class DatabaseStorage implements IStorage {
       .where(eq(rcPendingPropertyProfiles.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  // RateComps - Rate Tiers (flexible pricing tiers)
+  async getRateTiersByRateComp(rateCompId: string, orgId: string): Promise<RateTier[]> {
+    return await db.select()
+      .from(rateTiers)
+      .where(and(
+        eq(rateTiers.rateCompId, rateCompId),
+        eq(rateTiers.orgId, orgId)
+      ))
+      .orderBy(asc(rateTiers.loaMin), asc(rateTiers.beamMin));
+  }
+
+  async getRateTiersByOrg(orgId: string, filters?: { storageType?: string; isCurrentRate?: boolean; loaRange?: { min?: number; max?: number } }): Promise<RateTier[]> {
+    const conditions = [eq(rateTiers.orgId, orgId)];
+    
+    if (filters?.storageType) {
+      conditions.push(eq(rateTiers.storageType, filters.storageType));
+    }
+    if (filters?.isCurrentRate !== undefined) {
+      conditions.push(eq(rateTiers.isCurrentRate, filters.isCurrentRate));
+    }
+    if (filters?.loaRange?.min !== undefined) {
+      conditions.push(sql`${rateTiers.loaMax} >= ${filters.loaRange.min}`);
+    }
+    if (filters?.loaRange?.max !== undefined) {
+      conditions.push(sql`${rateTiers.loaMin} <= ${filters.loaRange.max}`);
+    }
+
+    return await db.select()
+      .from(rateTiers)
+      .where(and(...conditions))
+      .orderBy(asc(rateTiers.loaMin), asc(rateTiers.createdAt));
+  }
+
+  async getRateTier(id: string, orgId: string): Promise<RateTier | undefined> {
+    const [tier] = await db.select()
+      .from(rateTiers)
+      .where(and(eq(rateTiers.id, id), eq(rateTiers.orgId, orgId)));
+    return tier || undefined;
+  }
+
+  async createRateTier(tier: InsertRateTier): Promise<RateTier> {
+    const [created] = await db.insert(rateTiers).values(tier).returning();
+    return created;
+  }
+
+  async updateRateTier(id: string, updates: UpdateRateTier, orgId: string): Promise<RateTier | undefined> {
+    const [updated] = await db.update(rateTiers)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(rateTiers.id, id), eq(rateTiers.orgId, orgId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteRateTier(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(rateTiers)
+      .where(and(eq(rateTiers.id, id), eq(rateTiers.orgId, orgId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async bulkCreateRateTiers(tiers: InsertRateTier[]): Promise<RateTier[]> {
+    if (tiers.length === 0) return [];
+    return await db.insert(rateTiers).values(tiers).returning();
+  }
+
+  async getRateCompWithTiers(rateCompId: string, orgId: string): Promise<RateCompWithTiers | undefined> {
+    const [comp] = await db.select()
+      .from(rateComps)
+      .where(and(eq(rateComps.id, rateCompId), eq(rateComps.orgId, orgId), isNull(rateComps.deletedAt)));
+    
+    if (!comp) return undefined;
+    
+    const tiers = await this.getRateTiersByRateComp(rateCompId, orgId);
+    return { ...comp, tiers };
+  }
+
+  async getRateCompsWithTiers(orgId: string, filters?: Record<string, any>): Promise<RateCompWithTiers[]> {
+    const { comps } = await this.getRateComps({ orgId, filters, pageSize: 1000 });
+    
+    if (comps.length === 0) return [];
+
+    const compIds = comps.map(c => c.id);
+    const allTiers = await db.select()
+      .from(rateTiers)
+      .where(and(
+        inArray(rateTiers.rateCompId, compIds),
+        eq(rateTiers.orgId, orgId)
+      ));
+
+    const tiersByCompId = new Map<string, RateTier[]>();
+    for (const tier of allTiers) {
+      const existing = tiersByCompId.get(tier.rateCompId) || [];
+      existing.push(tier);
+      tiersByCompId.set(tier.rateCompId, existing);
+    }
+
+    return comps.map(comp => ({
+      ...comp,
+      tiers: tiersByCompId.get(comp.id) || []
+    }));
   }
 
   async getFuelIntegration(orgId: string): Promise<FuelIntegration | undefined> {

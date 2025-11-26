@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Save, Plus, Trash2 } from "lucide-react";
+import { X, Save, Plus, Trash2, DollarSign } from "lucide-react";
 import { rateCompsApi } from '@/lib/ratecomps/api';
 import { queryKeys } from '@/lib/ratecomps/queryKeys';
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,7 @@ import type { RateComp, InsertRateComp, UpdateRateComp } from "@shared/schema";
 import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES, US_REGIONS } from "@shared/salescomps-constants";
 import { AddressInput } from "@/components/address-input";
 import { useCustomStorageTypes, useCreateCustomStorageType } from "@/hooks/ratecomps/useCustomStorageTypes";
+import RateTiersEditor from "./RateTiersEditor";
 
 const compFormSchema = z.object({
   marina: z.string().min(1, "Marina name is required"),
@@ -116,6 +117,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   const [showNewPortfolioDialog, setShowNewPortfolioDialog] = useState(false);
   const [newPortfolioName, setNewPortfolioName] = useState("");
   const [linkToPortfolio, setLinkToPortfolio] = useState(!!(comp?.parentPortfolioId));
+  const [showRateTiersDialog, setShowRateTiersDialog] = useState(false);
   
   // Portfolio mode state
   const [portfolioTabs, setPortfolioTabs] = useState<Array<{id: string, marinaName: string}>>([
@@ -1632,7 +1634,19 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
         {/* Footer */}
         <div className="px-6 py-4 border-t border-border">
           <div className="flex items-center justify-between">
-            <div></div>
+            <div>
+              {isEdit && comp && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowRateTiersDialog(true)}
+                  data-testid="button-manage-rate-tiers"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Manage Rate Tiers
+                </Button>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -1700,6 +1714,26 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rate Tiers Dialog */}
+      {isEdit && comp && (
+        <Dialog open={showRateTiersDialog} onOpenChange={setShowRateTiersDialog}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>Rate Tiers - {comp.marina}</DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[70vh] overflow-auto py-4">
+              <RateTiersEditor
+                rateCompId={comp.id}
+                marinaName={comp.marina}
+                onTiersUpdated={() => {
+                  queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
+                }}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
