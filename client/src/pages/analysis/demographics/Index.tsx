@@ -398,16 +398,14 @@ function LocationAnalysisSection() {
 
   const fetchDemographicsMutation = useMutation({
     mutationFn: async (location: SelectedLocation) => {
-      const response = await apiRequest<LocationDemographicsResponse>('/api/demographics/location', {
-        method: 'POST',
-        body: JSON.stringify({
-          latitude: location.latitude,
-          longitude: location.longitude,
-          address: location.address,
-          radiusMiles: activeRadius
-        })
+      const response = await apiRequest('POST', '/api/demographics/location', {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: location.address,
+        radiusMiles: activeRadius
       });
-      return { location, data: response };
+      const data = await response.json() as LocationDemographicsResponse;
+      return { location, data };
     },
     onSuccess: ({ location, data }) => {
       const key = `${location.latitude},${location.longitude}`;
