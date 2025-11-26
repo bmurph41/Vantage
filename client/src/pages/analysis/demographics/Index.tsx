@@ -660,7 +660,7 @@ function LocationAnalysisSection() {
   });
 
   const locationsLoadedRef = useRef<string | null>(null);
-  const pendingFetchesRef = useRef<SelectedLocation[]>([]);
+  const [pendingFetches, setPendingFetches] = useState<SelectedLocation[]>([]);
   
   useEffect(() => {
     if (!selectedProjectId) {
@@ -693,25 +693,15 @@ function LocationAnalysisSection() {
       setSelectedLocations(loadedLocations);
       setLocationData(new Map());
       setHasUnsavedChanges(false);
-      pendingFetchesRef.current = loadedLocations;
+      setPendingFetches(loadedLocations);
     } else {
       setSelectedLocations([]);
       setLocationData(new Map());
       setHasUnsavedChanges(false);
-      pendingFetchesRef.current = [];
+      setPendingFetches([]);
     }
   }, [savedLocations, selectedProjectId]);
   
-  useEffect(() => {
-    if (pendingFetchesRef.current.length > 0) {
-      const locationsToFetch = pendingFetchesRef.current;
-      pendingFetchesRef.current = [];
-      locationsToFetch.forEach(loc => {
-        setTimeout(() => fetchAllTradeAreas(loc), 100);
-      });
-    }
-  });
-
   const fetchDemographicsMutation = useMutation({
     mutationFn: async ({ location, radiusMiles, tradeAreaKey }: { 
       location: SelectedLocation; 
@@ -790,6 +780,16 @@ function LocationAnalysisSection() {
     
     setLocationData(prev => new Map(prev).set(locationKey, tradeAreas));
   }, [fetchDemographicsMutation]);
+
+  useEffect(() => {
+    if (pendingFetches.length > 0) {
+      const locationsToFetch = [...pendingFetches];
+      setPendingFetches([]);
+      locationsToFetch.forEach(loc => {
+        fetchAllTradeAreas(loc);
+      });
+    }
+  }, [pendingFetches, fetchAllTradeAreas]);
 
   const handleAddLocation = useCallback((baseLocation: Omit<SelectedLocation, 'config' | 'label'>) => {
     if (selectedLocations.length >= 5) return;
