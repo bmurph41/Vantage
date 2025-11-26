@@ -75,11 +75,16 @@ app.use(requestLoggingMiddleware);
         log(`Failed to start DockTalk background jobs: ${error}`);
       }
 
-      try {
-        initializeWebSocket(server);
-        log('DockTalk WebSocket initialized');
-      } catch (error) {
-        log(`Failed to initialize DockTalk WebSocket: ${error}`);
+      // Skip DockTalk WebSocket in development to avoid conflict with Vite HMR WebSocket
+      if (process.env.NODE_ENV !== 'development') {
+        try {
+          initializeWebSocket(server);
+          log('DockTalk WebSocket initialized');
+        } catch (error) {
+          log(`Failed to initialize DockTalk WebSocket: ${error}`);
+        }
+      } else {
+        log('DockTalk WebSocket disabled in development mode (use production for real-time updates)');
       }
 
       // Async services - run in background without awaiting
