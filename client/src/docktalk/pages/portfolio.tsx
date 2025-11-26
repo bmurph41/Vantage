@@ -16,30 +16,88 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Building2, Plus, Trash2, FileText, Bell, BellOff, ChevronDown, ChevronRight,
-  Link2, Unlink, Search, CheckCircle2, AlertCircle, ExternalLink, Loader2
+  Link2, Unlink, Search, CheckCircle2, AlertCircle, Loader2, Pencil, Settings2,
+  Globe, MapPin, Tag
 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
+
+const COMPANY_TYPES = [
+  { value: "marina_operator", label: "Marina Operator" },
+  { value: "marina_owner", label: "Marina Owner" },
+  { value: "boat_dealer", label: "Boat Dealer" },
+  { value: "marine_services", label: "Marine Services" },
+  { value: "yacht_club", label: "Yacht Club" },
+  { value: "boatyard", label: "Boatyard" },
+  { value: "marine_retail", label: "Marine Retail" },
+  { value: "marine_finance", label: "Marine Finance" },
+  { value: "other", label: "Other" },
+];
+
+const RELATIONSHIP_STAGES = [
+  { value: "tracking", label: "Tracking" },
+  { value: "interested", label: "Interested" },
+  { value: "in_pipeline", label: "In Pipeline" },
+  { value: "portfolio_holding", label: "Portfolio Holding" },
+  { value: "exited", label: "Exited" },
+];
+
+const GEOGRAPHY_REGIONS = [
+  "Northeast", "Southeast", "Gulf Coast", "Great Lakes", "Pacific Northwest",
+  "California", "Florida", "Texas", "Mid-Atlantic", "New England"
+];
+
+const ALERT_FREQUENCIES = [
+  { value: "none", label: "None" },
+  { value: "immediate", label: "Immediate" },
+  { value: "daily", label: "Daily Digest" },
+  { value: "weekly", label: "Weekly Summary" },
+];
+
+const ALERT_SENSITIVITIES = [
+  { value: "all_mentions", label: "All Mentions" },
+  { value: "headlines_only", label: "Headlines Only" },
+  { value: "high_relevance", label: "High Relevance" },
+];
 
 interface PortfolioCompany {
   id: string;
   companyName: string;
-  aliases: string[];
+  aliases: string[] | null;
   sector: string | null;
   region: string | null;
   notes: string | null;
   isActive: boolean;
   crmCompanyId: string | null;
   crmLinkStatus: string | null;
+  companyType: string | null;
+  relationshipStage: string | null;
+  geographyFocus: string[] | null;
+  website: string | null;
+  parentCompany: string | null;
+  watchKeywords: string[] | null;
+  excludedTerms: string[] | null;
+  alertFrequency: string | null;
+  alertChannels: string[] | null;
+  alertSensitivity: string | null;
+  lastAlertSent: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,14 +126,30 @@ interface Article {
   categories: string[];
 }
 
+const getStageColor = (stage: string | null) => {
+  switch (stage) {
+    case "tracking": return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+    case "interested": return "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
+    case "in_pipeline": return "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300";
+    case "portfolio_holding": return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+    case "exited": return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+    default: return "bg-slate-100 text-slate-700";
+  }
+};
+
+const getTypeLabel = (type: string | null) => {
+  const found = COMPANY_TYPES.find(t => t.value === type);
+  return found?.label || type || "";
+};
+
+const getStageLabel = (stage: string | null) => {
+  const found = RELATIONSHIP_STAGES.find(s => s.value === stage);
+  return found?.label || stage || "";
+};
+
 export default function PortfolioCompaniesPage() {
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [companyName, setCompanyName] = useState("");
-  const [aliases, setAliases] = useState("");
-  const [sector, setSector] = useState("");
-  const [region, setRegion] = useState("");
-  const [notes, setNotes] = useState("");
   const [expandedCompany, setExpandedCompany] = useState<string | null>(null);
   
   const [showMatchDialog, setShowMatchDialog] = useState(false);
@@ -86,6 +160,33 @@ export default function PortfolioCompaniesPage() {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkingCompanyId, setLinkingCompanyId] = useState<string | null>(null);
   const [crmSearchQuery, setCrmSearchQuery] = useState("");
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<PortfolioCompany | null>(null);
+
+  const [alertDialogOpen, setAlertDialogOpen] = useState(false);
+  const [alertCompany, setAlertCompany] = useState<PortfolioCompany | null>(null);
+
+  const [formData, setFormData] = useState({
+    companyName: "",
+    aliases: "",
+    sector: "",
+    region: "",
+    notes: "",
+    companyType: "",
+    relationshipStage: "tracking",
+    geographyFocus: [] as string[],
+    website: "",
+    parentCompany: "",
+    watchKeywords: "",
+    excludedTerms: "",
+  });
+
+  const [alertFormData, setAlertFormData] = useState({
+    alertFrequency: "daily",
+    alertChannels: ["in_app"] as string[],
+    alertSensitivity: "all_mentions",
+  });
 
   const { data: companies = [], isLoading } = useQuery<PortfolioCompany[]>({
     queryKey: ['/api/docktalk/portfolio-companies'],
@@ -118,13 +219,7 @@ export default function PortfolioCompaniesPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: {
-      companyName: string;
-      aliases?: string[];
-      sector?: string;
-      region?: string;
-      notes?: string;
-    }) => {
+    mutationFn: async (data: any) => {
       const response = await fetch('/api/docktalk/portfolio-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -241,7 +336,7 @@ export default function PortfolioCompaniesPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<PortfolioCompany> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
       const response = await fetch(`/api/docktalk/portfolio-companies/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -253,9 +348,13 @@ export default function PortfolioCompaniesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/portfolio-companies'] });
+      setEditDialogOpen(false);
+      setEditingCompany(null);
+      setAlertDialogOpen(false);
+      setAlertCompany(null);
       toast({
-        title: "Settings Updated",
-        description: "Portfolio company alert settings have been updated.",
+        title: "Company Updated",
+        description: "Portfolio company has been updated.",
       });
     },
     onError: () => {
@@ -292,17 +391,116 @@ export default function PortfolioCompaniesPage() {
   });
 
   const resetForm = () => {
-    setCompanyName("");
-    setAliases("");
-    setSector("");
-    setRegion("");
-    setNotes("");
+    setFormData({
+      companyName: "",
+      aliases: "",
+      sector: "",
+      region: "",
+      notes: "",
+      companyType: "",
+      relationshipStage: "tracking",
+      geographyFocus: [],
+      website: "",
+      parentCompany: "",
+      watchKeywords: "",
+      excludedTerms: "",
+    });
     setPendingCompanyData(null);
     setMatchResults(null);
   };
 
+  const openEditDialog = (company: PortfolioCompany) => {
+    setEditingCompany(company);
+    setFormData({
+      companyName: company.companyName,
+      aliases: (company.aliases || []).join(", "),
+      sector: company.sector || "",
+      region: company.region || "",
+      notes: company.notes || "",
+      companyType: company.companyType || "",
+      relationshipStage: company.relationshipStage || "tracking",
+      geographyFocus: company.geographyFocus || [],
+      website: company.website || "",
+      parentCompany: company.parentCompany || "",
+      watchKeywords: (company.watchKeywords || []).join(", "),
+      excludedTerms: (company.excludedTerms || []).join(", "),
+    });
+    setEditDialogOpen(true);
+  };
+
+  const openAlertDialog = (company: PortfolioCompany) => {
+    setAlertCompany(company);
+    setAlertFormData({
+      alertFrequency: company.alertFrequency || "daily",
+      alertChannels: company.alertChannels || ["in_app"],
+      alertSensitivity: company.alertSensitivity || "all_mentions",
+    });
+    setAlertDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingCompany) return;
+
+    const aliasesArray = formData.aliases.split(',').map(a => a.trim()).filter(Boolean);
+    const watchKeywordsArray = formData.watchKeywords.split(',').map(k => k.trim()).filter(Boolean);
+    const excludedTermsArray = formData.excludedTerms.split(',').map(t => t.trim()).filter(Boolean);
+
+    updateMutation.mutate({
+      id: editingCompany.id,
+      data: {
+        companyName: formData.companyName.trim(),
+        aliases: aliasesArray.length > 0 ? aliasesArray : null,
+        sector: formData.sector.trim() || null,
+        region: formData.region.trim() || null,
+        notes: formData.notes.trim() || null,
+        companyType: formData.companyType || null,
+        relationshipStage: formData.relationshipStage || null,
+        geographyFocus: formData.geographyFocus.length > 0 ? formData.geographyFocus : null,
+        website: formData.website.trim() || null,
+        parentCompany: formData.parentCompany.trim() || null,
+        watchKeywords: watchKeywordsArray.length > 0 ? watchKeywordsArray : null,
+        excludedTerms: excludedTermsArray.length > 0 ? excludedTermsArray : null,
+      },
+    });
+  };
+
+  const handleSaveAlertSettings = () => {
+    if (!alertCompany) return;
+
+    updateMutation.mutate({
+      id: alertCompany.id,
+      data: {
+        isActive: alertFormData.alertFrequency !== "none",
+        alertFrequency: alertFormData.alertFrequency,
+        alertChannels: alertFormData.alertChannels,
+        alertSensitivity: alertFormData.alertSensitivity,
+      },
+    });
+  };
+
+  const prepareCompanyData = () => {
+    const aliasesArray = formData.aliases.split(',').map(a => a.trim()).filter(Boolean);
+    const watchKeywordsArray = formData.watchKeywords.split(',').map(k => k.trim()).filter(Boolean);
+    const excludedTermsArray = formData.excludedTerms.split(',').map(t => t.trim()).filter(Boolean);
+
+    return {
+      companyName: formData.companyName.trim(),
+      aliases: aliasesArray.length > 0 ? aliasesArray : undefined,
+      sector: formData.sector.trim() || undefined,
+      region: formData.region.trim() || undefined,
+      notes: formData.notes.trim() || undefined,
+      companyType: formData.companyType || undefined,
+      relationshipStage: formData.relationshipStage || undefined,
+      geographyFocus: formData.geographyFocus.length > 0 ? formData.geographyFocus : undefined,
+      website: formData.website.trim() || undefined,
+      parentCompany: formData.parentCompany.trim() || undefined,
+      watchKeywords: watchKeywordsArray.length > 0 ? watchKeywordsArray : undefined,
+      excludedTerms: excludedTermsArray.length > 0 ? excludedTermsArray : undefined,
+    };
+  };
+
   const checkForMatches = async () => {
-    if (!companyName.trim()) {
+    if (!formData.companyName.trim()) {
       toast({
         title: "Validation Error",
         description: "Company name is required",
@@ -317,22 +515,14 @@ export default function PortfolioCompaniesPage() {
       const response = await fetch('/api/docktalk/portfolio-companies/match-suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyName: companyName.trim() }),
+        body: JSON.stringify({ companyName: formData.companyName.trim() }),
         credentials: 'include',
       });
       
       if (!response.ok) throw new Error('Failed to check for matches');
       
       const matches: MatchResult = await response.json();
-      
-      const aliasesArray = aliases.split(',').map(a => a.trim()).filter(Boolean);
-      const companyData = {
-        companyName: companyName.trim(),
-        aliases: aliasesArray.length > 0 ? aliasesArray : undefined,
-        sector: sector.trim() || undefined,
-        region: region.trim() || undefined,
-        notes: notes.trim() || undefined,
-      };
+      const companyData = prepareCompanyData();
       
       setPendingCompanyData(companyData);
       
@@ -395,6 +585,24 @@ export default function PortfolioCompaniesPage() {
     }
   };
 
+  const toggleGeography = (region: string) => {
+    setFormData(prev => ({
+      ...prev,
+      geographyFocus: prev.geographyFocus.includes(region)
+        ? prev.geographyFocus.filter(r => r !== region)
+        : [...prev.geographyFocus, region]
+    }));
+  };
+
+  const toggleAlertChannel = (channel: string) => {
+    setAlertFormData(prev => ({
+      ...prev,
+      alertChannels: prev.alertChannels.includes(channel)
+        ? prev.alertChannels.filter(c => c !== channel)
+        : [...prev.alertChannels, channel]
+    }));
+  };
+
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
       <div className="flex items-center justify-between mb-8">
@@ -415,7 +623,7 @@ export default function PortfolioCompaniesPage() {
               Add Company
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[525px]">
+          <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add Portfolio Company</DialogTitle>
               <DialogDescription>
@@ -423,74 +631,198 @@ export default function PortfolioCompaniesPage() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="companyName">
-                    Company Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="companyName"
-                    data-testid="input-company-name"
-                    placeholder="e.g., Safe Harbor Marinas"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    required
-                  />
-                </div>
+              <Tabs defaultValue="basic" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                  <TabsTrigger value="classification">Classification</TabsTrigger>
+                  <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+                </TabsList>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="aliases">
-                    Aliases (comma-separated)
-                  </Label>
-                  <Input
-                    id="aliases"
-                    data-testid="input-aliases"
-                    placeholder="e.g., Safe Harbor, SHM"
-                    value={aliases}
-                    onChange={(e) => setAliases(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Add alternative names or abbreviations to improve article matching
-                  </p>
-                </div>
+                <TabsContent value="basic" className="space-y-4 pt-4">
+                  <div className="grid gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="companyName">
+                        Company Name <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="companyName"
+                        data-testid="input-company-name"
+                        placeholder="e.g., Safe Harbor Marinas"
+                        value={formData.companyName}
+                        onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                        required
+                      />
+                    </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="sector">Sector</Label>
-                    <Input
-                      id="sector"
-                      data-testid="input-sector"
-                      placeholder="e.g., Marina Operations"
-                      value={sector}
-                      onChange={(e) => setSector(e.target.value)}
-                    />
+                    <div className="grid gap-2">
+                      <Label htmlFor="aliases">Aliases (comma-separated)</Label>
+                      <Input
+                        id="aliases"
+                        data-testid="input-aliases"
+                        placeholder="e.g., Safe Harbor, SHM"
+                        value={formData.aliases}
+                        onChange={(e) => setFormData(prev => ({ ...prev, aliases: e.target.value }))}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Add alternative names or abbreviations to improve article matching
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="website">Website</Label>
+                        <Input
+                          id="website"
+                          data-testid="input-website"
+                          placeholder="e.g., safeharbor.com"
+                          value={formData.website}
+                          onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="parentCompany">Parent Company</Label>
+                        <Input
+                          id="parentCompany"
+                          data-testid="input-parent-company"
+                          placeholder="e.g., Sun Communities"
+                          value={formData.parentCompany}
+                          onChange={(e) => setFormData(prev => ({ ...prev, parentCompany: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="notes">Notes</Label>
+                      <Textarea
+                        id="notes"
+                        data-testid="input-notes"
+                        placeholder="Internal notes about this portfolio company..."
+                        value={formData.notes}
+                        onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                        rows={3}
+                      />
+                    </div>
                   </div>
+                </TabsContent>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="region">Region</Label>
-                    <Input
-                      id="region"
-                      data-testid="input-region"
-                      placeholder="e.g., US Southeast"
-                      value={region}
-                      onChange={(e) => setRegion(e.target.value)}
-                    />
+                <TabsContent value="classification" className="space-y-4 pt-4">
+                  <div className="grid gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label>Company Type</Label>
+                        <Select 
+                          value={formData.companyType} 
+                          onValueChange={(v) => setFormData(prev => ({ ...prev, companyType: v }))}
+                        >
+                          <SelectTrigger data-testid="select-company-type">
+                            <SelectValue placeholder="Select type..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COMPANY_TYPES.map(type => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Relationship Stage</Label>
+                        <Select 
+                          value={formData.relationshipStage} 
+                          onValueChange={(v) => setFormData(prev => ({ ...prev, relationshipStage: v }))}
+                        >
+                          <SelectTrigger data-testid="select-relationship-stage">
+                            <SelectValue placeholder="Select stage..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {RELATIONSHIP_STAGES.map(stage => (
+                              <SelectItem key={stage.value} value={stage.value}>
+                                {stage.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Geography Focus</Label>
+                      <div className="flex flex-wrap gap-2 p-3 border rounded-md">
+                        {GEOGRAPHY_REGIONS.map(region => (
+                          <div key={region} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`geo-${region}`}
+                              checked={formData.geographyFocus.includes(region)}
+                              onCheckedChange={() => toggleGeography(region)}
+                            />
+                            <Label htmlFor={`geo-${region}`} className="text-sm cursor-pointer">
+                              {region}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="sector">Sector (legacy)</Label>
+                        <Input
+                          id="sector"
+                          data-testid="input-sector"
+                          placeholder="e.g., Marina Operations"
+                          value={formData.sector}
+                          onChange={(e) => setFormData(prev => ({ ...prev, sector: e.target.value }))}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="region">Region (legacy)</Label>
+                        <Input
+                          id="region"
+                          data-testid="input-region"
+                          placeholder="e.g., US Southeast"
+                          value={formData.region}
+                          onChange={(e) => setFormData(prev => ({ ...prev, region: e.target.value }))}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </TabsContent>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    data-testid="input-notes"
-                    placeholder="Internal notes about this portfolio company..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
+                <TabsContent value="monitoring" className="space-y-4 pt-4">
+                  <div className="grid gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="watchKeywords">Watch Keywords (comma-separated)</Label>
+                      <Input
+                        id="watchKeywords"
+                        data-testid="input-watch-keywords"
+                        placeholder="e.g., acquisition, expansion, partnership"
+                        value={formData.watchKeywords}
+                        onChange={(e) => setFormData(prev => ({ ...prev, watchKeywords: e.target.value }))}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Additional keywords to match in articles beyond the company name
+                      </p>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="excludedTerms">Excluded Terms (comma-separated)</Label>
+                      <Input
+                        id="excludedTerms"
+                        data-testid="input-excluded-terms"
+                        placeholder="e.g., restaurant, hotel"
+                        value={formData.excludedTerms}
+                        onChange={(e) => setFormData(prev => ({ ...prev, excludedTerms: e.target.value }))}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Terms to filter out from article matching to reduce noise
+                      </p>
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
+
+              <DialogFooter className="mt-6">
                 <Button
                   type="button"
                   variant="outline"
@@ -686,6 +1018,274 @@ export default function PortfolioCompaniesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Company Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => {
+        setEditDialogOpen(open);
+        if (!open) {
+          setEditingCompany(null);
+          resetForm();
+        }
+      }}>
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Company</DialogTitle>
+            <DialogDescription>
+              Update the details and classification for {editingCompany?.companyName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="classification">Classification</TabsTrigger>
+              <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="basic" className="space-y-4 pt-4">
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-companyName">Company Name</Label>
+                  <Input
+                    id="edit-companyName"
+                    value={formData.companyName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-aliases">Aliases (comma-separated)</Label>
+                  <Input
+                    id="edit-aliases"
+                    value={formData.aliases}
+                    onChange={(e) => setFormData(prev => ({ ...prev, aliases: e.target.value }))}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-website">Website</Label>
+                    <Input
+                      id="edit-website"
+                      value={formData.website}
+                      onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-parentCompany">Parent Company</Label>
+                    <Input
+                      id="edit-parentCompany"
+                      value={formData.parentCompany}
+                      onChange={(e) => setFormData(prev => ({ ...prev, parentCompany: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-notes">Notes</Label>
+                  <Textarea
+                    id="edit-notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="classification" className="space-y-4 pt-4">
+              <div className="grid gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Company Type</Label>
+                    <Select 
+                      value={formData.companyType} 
+                      onValueChange={(v) => setFormData(prev => ({ ...prev, companyType: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COMPANY_TYPES.map(type => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Relationship Stage</Label>
+                    <Select 
+                      value={formData.relationshipStage} 
+                      onValueChange={(v) => setFormData(prev => ({ ...prev, relationshipStage: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select stage..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {RELATIONSHIP_STAGES.map(stage => (
+                          <SelectItem key={stage.value} value={stage.value}>
+                            {stage.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Geography Focus</Label>
+                  <div className="flex flex-wrap gap-2 p-3 border rounded-md">
+                    {GEOGRAPHY_REGIONS.map(region => (
+                      <div key={region} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`edit-geo-${region}`}
+                          checked={formData.geographyFocus.includes(region)}
+                          onCheckedChange={() => toggleGeography(region)}
+                        />
+                        <Label htmlFor={`edit-geo-${region}`} className="text-sm cursor-pointer">
+                          {region}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="monitoring" className="space-y-4 pt-4">
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-watchKeywords">Watch Keywords (comma-separated)</Label>
+                  <Input
+                    id="edit-watchKeywords"
+                    value={formData.watchKeywords}
+                    onChange={(e) => setFormData(prev => ({ ...prev, watchKeywords: e.target.value }))}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-excludedTerms">Excluded Terms (comma-separated)</Label>
+                  <Input
+                    id="edit-excludedTerms"
+                    value={formData.excludedTerms}
+                    onChange={(e) => setFormData(prev => ({ ...prev, excludedTerms: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alert Configuration Dialog */}
+      <Dialog open={alertDialogOpen} onOpenChange={(open) => {
+        setAlertDialogOpen(open);
+        if (!open) setAlertCompany(null);
+      }}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5" />
+              Alert Settings
+            </DialogTitle>
+            <DialogDescription>
+              Configure how you receive alerts for {alertCompany?.companyName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label>Alert Frequency</Label>
+              <Select 
+                value={alertFormData.alertFrequency} 
+                onValueChange={(v) => setAlertFormData(prev => ({ ...prev, alertFrequency: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ALERT_FREQUENCIES.map(freq => (
+                    <SelectItem key={freq.value} value={freq.value}>
+                      {freq.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                How often you want to receive notifications about this company
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notification Channels</Label>
+              <div className="flex flex-col gap-3 p-3 border rounded-md">
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id="channel-in_app"
+                    checked={alertFormData.alertChannels.includes("in_app")}
+                    onCheckedChange={() => toggleAlertChannel("in_app")}
+                  />
+                  <Label htmlFor="channel-in_app" className="cursor-pointer">
+                    In-App Notifications
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id="channel-email"
+                    checked={alertFormData.alertChannels.includes("email")}
+                    onCheckedChange={() => toggleAlertChannel("email")}
+                  />
+                  <Label htmlFor="channel-email" className="cursor-pointer">
+                    Email Notifications
+                  </Label>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Alert Sensitivity</Label>
+              <Select 
+                value={alertFormData.alertSensitivity} 
+                onValueChange={(v) => setAlertFormData(prev => ({ ...prev, alertSensitivity: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ALERT_SENSITIVITIES.map(sens => (
+                    <SelectItem key={sens.value} value={sens.value}>
+                      {sens.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                All mentions includes any article text, headlines only catches major news
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAlertDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveAlertSettings} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Saving..." : "Save Settings"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
@@ -699,9 +1299,9 @@ export default function PortfolioCompaniesPage() {
               <Building2 className="h-16 w-16 text-muted-foreground/50" />
             </div>
             <CardTitle className="text-2xl">No Portfolio Companies Yet</CardTitle>
-            <CardDescription className="text-base mt-2">
+            <p className="text-muted-foreground text-base mt-2">
               Start tracking marina companies in your investment portfolio to receive automated alerts when they appear in industry news.
-            </CardDescription>
+            </p>
             <div className="mt-6">
               <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-first-company">
                 <Plus className="h-4 w-4 mr-2" />
@@ -717,73 +1317,88 @@ export default function PortfolioCompaniesPage() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <CardTitle className="text-xl flex items-center gap-2">
+                    <CardTitle className="text-xl flex items-center gap-2 flex-wrap">
                       <Building2 className="h-5 w-5 text-primary" />
                       {company.companyName}
                       {company.crmCompanyId && (
-                        <Badge variant="secondary" className="text-xs ml-2" data-testid={`badge-crm-linked-${company.id}`}>
+                        <Badge variant="secondary" className="text-xs" data-testid={`badge-crm-linked-${company.id}`}>
                           <Link2 className="h-3 w-3 mr-1" />
                           CRM Linked
                         </Badge>
                       )}
-                    </CardTitle>
-                    <div className="flex items-center gap-4 mt-2">
-                      {company.sector && (
-                        <Badge variant="secondary" data-testid={`badge-sector-${company.id}`}>
-                          {company.sector}
+                      {company.relationshipStage && (
+                        <Badge className={`text-xs ${getStageColor(company.relationshipStage)}`}>
+                          {getStageLabel(company.relationshipStage)}
                         </Badge>
                       )}
-                      {company.region && (
-                        <Badge variant="outline" data-testid={`badge-region-${company.id}`}>
-                          {company.region}
+                    </CardTitle>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {company.companyType && (
+                        <Badge variant="outline" className="text-xs">
+                          <Tag className="h-3 w-3 mr-1" />
+                          {getTypeLabel(company.companyType)}
+                        </Badge>
+                      )}
+                      {company.geographyFocus && company.geographyFocus.length > 0 && (
+                        <Badge variant="outline" className="text-xs">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {company.geographyFocus.slice(0, 2).join(", ")}
+                          {company.geographyFocus.length > 2 && ` +${company.geographyFocus.length - 2}`}
+                        </Badge>
+                      )}
+                      {company.website && (
+                        <Badge variant="outline" className="text-xs">
+                          <Globe className="h-3 w-3 mr-1" />
+                          {company.website}
                         </Badge>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEditDialog(company)}
+                      data-testid={`button-edit-${company.id}`}
+                    >
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openAlertDialog(company)}
+                      data-testid={`button-alert-settings-${company.id}`}
+                    >
+                      {company.isActive ? (
+                        <Bell className="h-4 w-4 text-primary" />
+                      ) : (
+                        <BellOff className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
                     {company.crmCompanyId ? (
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => unlinkMutation.mutate(company.id)}
                         disabled={unlinkMutation.isPending}
                         data-testid={`button-unlink-${company.id}`}
                       >
-                        <Unlink className="h-4 w-4 mr-1" />
-                        Unlink
+                        <Unlink className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     ) : (
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => {
                           setLinkingCompanyId(company.id);
                           setLinkDialogOpen(true);
                         }}
                         data-testid={`button-link-${company.id}`}
                       >
-                        <Link2 className="h-4 w-4 mr-1" />
-                        Link to CRM
+                        <Link2 className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     )}
-                    <div className="flex items-center gap-2" data-testid={`alert-toggle-${company.id}`}>
-                      <Label htmlFor={`alert-${company.id}`} className="text-sm cursor-pointer">
-                        {company.isActive ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
-                      </Label>
-                      <Switch
-                        id={`alert-${company.id}`}
-                        checked={company.isActive}
-                        onCheckedChange={(checked) => {
-                          updateMutation.mutate({
-                            id: company.id,
-                            data: { isActive: checked },
-                          });
-                        }}
-                        disabled={updateMutation.isPending}
-                        data-testid={`switch-alert-${company.id}`}
-                      />
-                    </div>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -811,12 +1426,48 @@ export default function PortfolioCompaniesPage() {
                   </div>
                 )}
 
+                {company.parentCompany && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Parent Company:</p>
+                    <p className="text-sm text-foreground">{company.parentCompany}</p>
+                  </div>
+                )}
+
                 {company.notes && (
                   <div>
                     <p className="text-sm font-medium text-muted-foreground mb-1">Notes:</p>
                     <p className="text-sm text-foreground" data-testid={`text-notes-${company.id}`}>
                       {company.notes}
                     </p>
+                  </div>
+                )}
+
+                {(company.watchKeywords?.length || company.excludedTerms?.length) && (
+                  <div className="flex gap-4">
+                    {company.watchKeywords && company.watchKeywords.length > 0 && (
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Watch Keywords:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {company.watchKeywords.map((kw, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              {kw}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {company.excludedTerms && company.excludedTerms.length > 0 && (
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Excluded Terms:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {company.excludedTerms.map((term, idx) => (
+                            <Badge key={idx} variant="outline" className="text-xs text-muted-foreground">
+                              -{term}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -886,8 +1537,8 @@ export default function PortfolioCompaniesPage() {
             <div>
               <h3 className="font-semibold text-sm">Alert Notifications</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                You'll receive alerts when any of your tracked companies are mentioned in DockTalk articles. 
-                Configure your notification preferences in Settings to control alert frequency and delivery method.
+                Click the bell icon on any company to configure alert frequency, channels, and sensitivity. 
+                You'll receive notifications when tracked companies appear in DockTalk articles.
               </p>
             </div>
           </div>
