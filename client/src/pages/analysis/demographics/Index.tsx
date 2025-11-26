@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader } from "@googlemaps/js-api-loader";
+import { useLoadScript, Autocomplete } from "@react-google-maps/api";
 import { apiRequest } from "@/lib/queryClient";
 import { 
   Users, 
@@ -362,6 +362,8 @@ function LocationDemographicsCard({ data, onRemove, label }: {
   );
 }
 
+const libraries: ("places")[] = ["places"];
+
 function AddressSearchInput({ 
   onSelect, 
   placeholder = "Enter an address...",
@@ -371,62 +373,100 @@ function AddressSearchInput({
   placeholder?: string;
   className?: string;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [inputValue, setInputValue] = useState("");
   
-  useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (!apiKey || !inputRef.current) return;
-    
-    const loader = new Loader({
-      apiKey,
-      version: "weekly",
-      libraries: ["places"]
-    });
-    
-    loader.load().then(() => {
-      if (!inputRef.current) return;
-      
-      autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
-        types: ["address"],
-        componentRestrictions: { country: "us" },
-        fields: ["formatted_address", "geometry", "name"]
-      });
-      
-      autocompleteRef.current.addListener("place_changed", () => {
-        const place = autocompleteRef.current?.getPlace();
-        if (place?.geometry?.location) {
-          onSelect({
-            address: place.formatted_address || place.name || "",
-            latitude: place.geometry.location.lat(),
-            longitude: place.geometry.location.lng()
-          });
-          setInputValue(place.formatted_address || place.name || "");
-        }
-      });
-    }).catch(console.error);
-    
-    return () => {
-      if (autocompleteRef.current) {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: apiKey || "",
+    libraries,
+  });
+
+  const onLoad = useCallback((autocomplete: google.maps.places.Autocomplete) => {
+    autocompleteRef.current = autocomplete;
+  }, []);
+
+  const onPlaceChanged = useCallback(() => {
+    if (autocompleteRef.current) {
+      const place = autocompleteRef.current.getPlace();
+      if (place?.geometry?.location) {
+        onSelect({
+          address: place.formatted_address || place.name || "",
+          latitude: place.geometry.location.lat(),
+          longitude: place.geometry.location.lng()
+        });
+        setInputValue(place.formatted_address || place.name || "");
       }
-    };
+    }
   }, [onSelect]);
+
+  if (!apiKey) {
+    return (
+      <div className={`relative ${className}`}>
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Google Maps API key required..."
+          disabled
+          className="pl-9"
+          data-testid="input-address-search"
+        />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className={`relative ${className}`}>
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Error loading Google Maps..."
+          disabled
+          className="pl-9"
+          data-testid="input-address-search"
+        />
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className={`relative ${className}`}>
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-pulse" />
+        <Input
+          type="text"
+          placeholder="Loading..."
+          disabled
+          className="pl-9"
+          data-testid="input-address-search"
+        />
+      </div>
+    );
+  }
   
   return (
     <div className={`relative ${className}`}>
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-      <Input
-        ref={inputRef}
-        type="text"
-        placeholder={placeholder}
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        className="pl-9"
-        data-testid="input-address-search"
-      />
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+      <Autocomplete
+        onLoad={onLoad}
+        onPlaceChanged={onPlaceChanged}
+        options={{
+          types: ["address"],
+          componentRestrictions: { country: "us" },
+          fields: ["formatted_address", "geometry", "name"]
+        }}
+      >
+        <Input
+          type="text"
+          placeholder={placeholder}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          className="pl-9"
+          data-testid="input-address-search"
+        />
+      </Autocomplete>
     </div>
   );
 }
