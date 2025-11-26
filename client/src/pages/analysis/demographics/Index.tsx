@@ -83,11 +83,48 @@ const formatPercent = (value: number | null | undefined): string => {
   return `${value.toFixed(2)}%`;
 };
 
-const TrendIndicator = ({ value }: { value: number | null }) => {
-  if (value === null) return <Minus className="h-4 w-4 text-muted-foreground" />;
-  if (value > 0) return <ArrowUpRight className="h-4 w-4 text-green-600" />;
-  if (value < 0) return <ArrowDownRight className="h-4 w-4 text-red-600" />;
-  return <Minus className="h-4 w-4 text-muted-foreground" />;
+const formatLabel = (key: string): string => {
+  const labelMap: Record<string, string> = {
+    lessThanHighSchool: "Less Than High School",
+    highSchool: "High School",
+    someCollege: "Some College",
+    bachelors: "Bachelor's Degree",
+    graduate: "Graduate Degree",
+    under25k: "Under $25K",
+    "25kto50k": "$25K - $50K",
+    "50kto75k": "$50K - $75K",
+    "75kto100k": "$75K - $100K",
+    "100kto150k": "$100K - $150K",
+    over150k: "Over $150K",
+    white: "White",
+    black: "Black",
+    asian: "Asian",
+    hispanic: "Hispanic",
+    americanIndian: "American Indian",
+    pacificIslander: "Pacific Islander",
+    twoOrMore: "Two or More Races",
+    otherRace: "Other Race",
+    agriculture: "Agriculture",
+    construction: "Construction",
+    manufacturing: "Manufacturing",
+    wholesale: "Wholesale",
+    retail: "Retail",
+    transportation: "Transportation",
+    information: "Information",
+    finance: "Finance",
+    professional: "Professional",
+    education: "Education & Healthcare",
+    arts: "Arts & Entertainment",
+    otherServices: "Other Services",
+    publicAdmin: "Public Administration",
+  };
+  
+  if (labelMap[key]) return labelMap[key];
+  
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, str => str.toUpperCase())
+    .trim();
 };
 
 const getCategoryIcon = (category: string) => {
@@ -204,20 +241,20 @@ function LocationDemographicsCard({ data, onRemove, label }: {
             <div className="space-y-2">
               {Object.entries(data.educationLevels)
                 .sort(([,a], [,b]) => b - a)
-                .slice(0, 4)
+                .slice(0, 5)
                 .map(([level, value]) => {
                   const total = Object.values(data.educationLevels!).reduce((a, b) => a + b, 0);
                   const pct = total > 0 ? (value / total) * 100 : 0;
                   return (
                     <div key={level} className="flex items-center gap-2 text-xs">
-                      <span className="w-32 truncate text-muted-foreground">{level}</span>
+                      <span className="w-40 truncate text-muted-foreground">{formatLabel(level)}</span>
                       <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-primary rounded-full" 
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <span className="w-12 text-right">{formatPercent(pct)}</span>
+                      <span className="w-14 text-right">{formatPercent(pct)}</span>
                     </div>
                   );
                 })}
@@ -234,20 +271,20 @@ function LocationDemographicsCard({ data, onRemove, label }: {
             <div className="space-y-2">
               {Object.entries(data.incomeDistribution)
                 .sort(([,a], [,b]) => b - a)
-                .slice(0, 5)
+                .slice(0, 6)
                 .map(([range, value]) => {
                   const total = Object.values(data.incomeDistribution!).reduce((a, b) => a + b, 0);
                   const pct = total > 0 ? (value / total) * 100 : 0;
                   return (
                     <div key={range} className="flex items-center gap-2 text-xs">
-                      <span className="w-28 truncate text-muted-foreground">{range}</span>
+                      <span className="w-28 truncate text-muted-foreground">{formatLabel(range)}</span>
                       <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-green-500 rounded-full" 
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <span className="w-12 text-right">{formatPercent(pct)}</span>
+                      <span className="w-14 text-right">{formatPercent(pct)}</span>
                     </div>
                   );
                 })}
@@ -265,16 +302,12 @@ function LocationDemographicsCard({ data, onRemove, label }: {
               {Object.entries(data.raceEthnicity)
                 .sort(([,a], [,b]) => b - a)
                 .slice(0, 6)
-                .map(([group, value]) => {
-                  const total = data.totalPopulation || 1;
-                  const pct = (value / total) * 100;
-                  return (
-                    <div key={group} className="flex items-center justify-between">
-                      <span className="text-muted-foreground truncate">{group}</span>
-                      <span className="font-medium">{formatPercent(pct)}</span>
-                    </div>
-                  );
-                })}
+                .map(([group, value]) => (
+                  <div key={group} className="flex items-center justify-between">
+                    <span className="text-muted-foreground truncate">{formatLabel(group)}</span>
+                    <span className="font-medium">{formatPercent(value)}</span>
+                  </div>
+                ))}
             </div>
           </div>
         )}
