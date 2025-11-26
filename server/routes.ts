@@ -33,7 +33,7 @@ import { CompService } from "./services/salescomps/compService";
 import { FilterBuilder } from "./services/salescomps/filterBuilder";
 import { RecommendationService } from "./services/salescomps/recommendationService";
 import { AICompMatchingService } from "./services/salescomps/aiCompMatchingService";
-import { calculateMetrics, generateInsights, calculateCorrelationData, calculateValuationModels, getMatchedComps, type AnalyticsFilters } from "./services/salescomps/analyticsService";
+import { calculateMetrics, generateInsights, calculateCorrelationData, calculateValuationModels, getMatchedComps, getMarketTrends, generateTrendsInsights, type AnalyticsFilters, type TrendsFilters } from "./services/salescomps/analyticsService";
 import { generateAIInsights } from "./services/salescomps/aiInsightsService";
 import { geocodingService } from "./services/geocodingService";
 import { ParserService as RcParserService } from "./services/ratecomps/parser";
@@ -9005,6 +9005,25 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error fetching matched comps:", error);
       res.status(500).json({ message: "Failed to fetch matched comps" });
+    }
+  });
+
+  // Market Trends endpoint
+  app.post('/api/sales-comps/analytics/trends', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters: TrendsFilters = req.body || {};
+
+      const trendsData = await getMarketTrends(orgId, filters);
+      const insights = await generateTrendsInsights(trendsData);
+
+      res.json({
+        ...trendsData,
+        insights,
+      });
+    } catch (error) {
+      console.error("Error fetching market trends:", error);
+      res.status(500).json({ message: "Failed to fetch market trends" });
     }
   });
 

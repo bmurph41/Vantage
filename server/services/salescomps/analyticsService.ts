@@ -819,3 +819,395 @@ export async function getMatchedComps(
 
   return comps;
 }
+
+// ==========================================
+// MARKET TRENDS ANALYSIS
+// ==========================================
+
+export interface TrendsFilters {
+  yearMin?: number;
+  yearMax?: number;
+}
+
+export interface YearlyTrendData {
+  year: number;
+  transactionCount: number;
+  totalVolume: number;
+  avgPrice: number;
+  medianPrice: number;
+  avgPricePerSlip: number;
+  medianPricePerSlip: number;
+  avgCapRate: number;
+  avgCapacity: number;
+}
+
+export interface QuarterlyTrendData {
+  year: number;
+  quarter: number;
+  label: string;
+  transactionCount: number;
+  totalVolume: number;
+  avgPrice: number;
+  avgPricePerSlip: number;
+}
+
+export interface RegionalTrendData {
+  region: string;
+  transactionCount: number;
+  totalVolume: number;
+  avgPrice: number;
+  marketShare: number;
+}
+
+export interface RepeatSale {
+  propertyName: string;
+  city: string | null;
+  state: string | null;
+  sales: Array<{
+    saleYear: number;
+    saleMonth: number | null;
+    salePrice: number;
+    pricePerSlip: number | null;
+  }>;
+  priceAppreciation: number;
+  annualizedReturn: number;
+  holdingPeriodYears: number;
+}
+
+export interface MarketTrendsData {
+  summary: {
+    totalTransactions: number;
+    totalVolume: number;
+    earliestYear: number;
+    latestYear: number;
+    avgAnnualGrowth: number;
+    volumeCAGR: number;
+  };
+  yearlyTrends: YearlyTrendData[];
+  quarterlyTrends: QuarterlyTrendData[];
+  regionalBreakdown: RegionalTrendData[];
+  repeatSales: RepeatSale[];
+  topBrokers: Array<{
+    name: string;
+    dealCount: number;
+    totalVolume: number;
+    marketShare: number;
+  }>;
+}
+
+function applyTrendsFilters(orgId: string, filters: TrendsFilters) {
+  const conditions: any[] = [
+    eq(salesComps.orgId, orgId),
+    isNull(salesComps.deletedAt),
+    sql`${salesComps.saleYear} IS NOT NULL`
+  ];
+
+  if (filters.yearMin) {
+    conditions.push(sql`${salesComps.saleYear} >= ${filters.yearMin}`);
+  }
+
+  if (filters.yearMax) {
+    conditions.push(sql`${salesComps.saleYear} <= ${filters.yearMax}`);
+  }
+
+  return and(...conditions);
+}
+
+export async function getMarketTrends(
+  orgId: string,
+  filters: TrendsFilters = {}
+): Promise<MarketTrendsData> {
+  const whereClause = applyTrendsFilters(orgId, filters);
+
+  // Get yearly trends
+  const yearlyResults = await db
+    .select({
+      year: salesComps.saleYear,
+      transactionCount: sql<number>`COUNT(*)`,
+      totalVolume: sql<number>`SUM(COALESCE(${salesComps.salePrice}, 0))`,
+      avgPrice: sql<number>`AVG(${salesComps.salePrice})`,
+      medianPrice: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${salesComps.salePrice})`,
+      avgPricePerSlip: sql<number>`AVG(CASE WHEN (COALESCE(${salesComps.wetSlips}, 0) + COALESCE(${salesComps.dryRacks}, 0)) > 0 THEN ${salesComps.salePrice}::numeric / (COALESCE(${salesComps.wetSlips}, 0) + COALESCE(${salesComps.dryRacks}, 0)) ELSE NULL END)`,
+      medianPricePerSlip: sql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY CASE WHEN (COALESCE(${salesComps.wetSlips}, 0) + COALESCE(${salesComps.dryRacks}, 0)) > 0 THEN ${salesComps.salePrice}::numeric / (COALESCE(${salesComps.wetSlips}, 0) + COALESCE(${salesComps.dryRacks}, 0)) ELSE NULL END)`,
+      avgCapRate: sql<number>`AVG(${salesComps.capRate})`,
+      avgCapacity: sql<number>`AVG(COALESCE(${salesComps.wetSlips}, 0) + COALESCE(${salesComps.dryRacks}, 0))`,
+    })
+    .from(salesComps)
+    .where(whereClause)
+    .groupBy(salesComps.saleYear)
+    .orderBy(salesComps.saleYear);
+
+  const yearlyTrends: YearlyTrendData[] = yearlyResults
+    .filter((r: any) => r.year)
+    .map((r: any) => ({
+      year: r.year,
+      transactionCount: Number(r.transactionCount) || 0,
+      totalVolume: Number(r.totalVolume) || 0,
+      avgPrice: Number(r.avgPrice) || 0,
+      medianPrice: Number(r.medianPrice) || 0,
+      avgPricePerSlip: Number(r.avgPricePerSlip) || 0,
+      medianPricePerSlip: Number(r.medianPricePerSlip) || 0,
+      avgCapRate: Number(r.avgCapRate) || 0,
+      avgCapacity: Number(r.avgCapacity) || 0,
+    }));
+
+  // Get quarterly trends for more granular view
+  const quarterlyResults = await db
+    .select({
+      year: salesComps.saleYear,
+      quarter: sql<number>`CEIL(COALESCE(${salesComps.saleMonth}, 1)::numeric / 3)`,
+      transactionCount: sql<number>`COUNT(*)`,
+      totalVolume: sql<number>`SUM(COALESCE(${salesComps.salePrice}, 0))`,
+      avgPrice: sql<number>`AVG(${salesComps.salePrice})`,
+      avgPricePerSlip: sql<number>`AVG(CASE WHEN (COALESCE(${salesComps.wetSlips}, 0) + COALESCE(${salesComps.dryRacks}, 0)) > 0 THEN ${salesComps.salePrice}::numeric / (COALESCE(${salesComps.wetSlips}, 0) + COALESCE(${salesComps.dryRacks}, 0)) ELSE NULL END)`,
+    })
+    .from(salesComps)
+    .where(whereClause)
+    .groupBy(salesComps.saleYear, sql`CEIL(COALESCE(${salesComps.saleMonth}, 1)::numeric / 3)`)
+    .orderBy(salesComps.saleYear, sql`CEIL(COALESCE(${salesComps.saleMonth}, 1)::numeric / 3)`);
+
+  const quarterlyTrends: QuarterlyTrendData[] = quarterlyResults
+    .filter((r: any) => r.year)
+    .map((r: any) => ({
+      year: r.year,
+      quarter: Number(r.quarter) || 1,
+      label: `Q${r.quarter || 1} ${r.year}`,
+      transactionCount: Number(r.transactionCount) || 0,
+      totalVolume: Number(r.totalVolume) || 0,
+      avgPrice: Number(r.avgPrice) || 0,
+      avgPricePerSlip: Number(r.avgPricePerSlip) || 0,
+    }));
+
+  // Get regional breakdown
+  const totalVolumeResult = await db
+    .select({
+      total: sql<number>`SUM(COALESCE(${salesComps.salePrice}, 0))`,
+    })
+    .from(salesComps)
+    .where(whereClause);
+
+  const totalMarketVolume = Number(totalVolumeResult[0]?.total) || 1;
+
+  const regionalResults = await db
+    .select({
+      region: salesComps.region,
+      transactionCount: sql<number>`COUNT(*)`,
+      totalVolume: sql<number>`SUM(COALESCE(${salesComps.salePrice}, 0))`,
+      avgPrice: sql<number>`AVG(${salesComps.salePrice})`,
+    })
+    .from(salesComps)
+    .where(whereClause)
+    .groupBy(salesComps.region)
+    .orderBy(sql`SUM(COALESCE(${salesComps.salePrice}, 0)) DESC`);
+
+  const regionalBreakdown: RegionalTrendData[] = regionalResults
+    .filter((r: any) => r.region)
+    .map((r: any) => ({
+      region: r.region || 'Unknown',
+      transactionCount: Number(r.transactionCount) || 0,
+      totalVolume: Number(r.totalVolume) || 0,
+      avgPrice: Number(r.avgPrice) || 0,
+      marketShare: (Number(r.totalVolume) / totalMarketVolume) * 100,
+    }));
+
+  // Get repeat sales (properties sold multiple times)
+  const repeatSalesQuery = await db
+    .select({
+      marina: salesComps.marina,
+      city: salesComps.city,
+      state: salesComps.state,
+      saleYear: salesComps.saleYear,
+      saleMonth: salesComps.saleMonth,
+      salePrice: salesComps.salePrice,
+      wetSlips: salesComps.wetSlips,
+      dryRacks: salesComps.dryRacks,
+    })
+    .from(salesComps)
+    .where(whereClause)
+    .orderBy(salesComps.marina, salesComps.saleYear, salesComps.saleMonth);
+
+  // Group by property name to find repeat sales
+  const propertySales = new Map<string, any[]>();
+  for (const sale of repeatSalesQuery) {
+    if (!sale.marina) continue;
+    const key = `${sale.marina.toLowerCase().trim()}-${sale.city?.toLowerCase() || ''}-${sale.state?.toLowerCase() || ''}`;
+    if (!propertySales.has(key)) {
+      propertySales.set(key, []);
+    }
+    propertySales.get(key)!.push(sale);
+  }
+
+  const repeatSales: RepeatSale[] = [];
+  for (const [_, sales] of propertySales) {
+    if (sales.length < 2) continue;
+
+    // Sort by year/month
+    sales.sort((a, b) => {
+      if (a.saleYear !== b.saleYear) return a.saleYear - b.saleYear;
+      return (a.saleMonth || 1) - (b.saleMonth || 1);
+    });
+
+    const firstSale = sales[0];
+    const lastSale = sales[sales.length - 1];
+    const firstPrice = Number(firstSale.salePrice) || 0;
+    const lastPrice = Number(lastSale.salePrice) || 0;
+
+    if (firstPrice <= 0 || lastPrice <= 0) continue;
+
+    const holdingPeriodYears = (lastSale.saleYear - firstSale.saleYear) || 1;
+    const priceAppreciation = ((lastPrice - firstPrice) / firstPrice) * 100;
+    const annualizedReturn = holdingPeriodYears > 0 
+      ? (Math.pow(lastPrice / firstPrice, 1 / holdingPeriodYears) - 1) * 100 
+      : 0;
+
+    repeatSales.push({
+      propertyName: firstSale.marina,
+      city: firstSale.city,
+      state: firstSale.state,
+      sales: sales.map(s => ({
+        saleYear: s.saleYear,
+        saleMonth: s.saleMonth,
+        salePrice: Number(s.salePrice) || 0,
+        pricePerSlip: (Number(s.wetSlips) + Number(s.dryRacks)) > 0 
+          ? Number(s.salePrice) / (Number(s.wetSlips) + Number(s.dryRacks))
+          : null,
+      })),
+      priceAppreciation,
+      annualizedReturn,
+      holdingPeriodYears,
+    });
+  }
+
+  // Sort repeat sales by appreciation
+  repeatSales.sort((a, b) => b.priceAppreciation - a.priceAppreciation);
+
+  // Get top brokers
+  const brokerResults = await db
+    .select({
+      brokerage: salesComps.brokerage,
+      dealCount: sql<number>`COUNT(*)`,
+      totalVolume: sql<number>`SUM(COALESCE(${salesComps.salePrice}, 0))`,
+    })
+    .from(salesComps)
+    .where(whereClause)
+    .groupBy(salesComps.brokerage)
+    .orderBy(sql`SUM(COALESCE(${salesComps.salePrice}, 0)) DESC`)
+    .limit(10);
+
+  const topBrokers = brokerResults
+    .filter((r: any) => r.brokerage)
+    .map((r: any) => ({
+      name: r.brokerage || 'Unknown',
+      dealCount: Number(r.dealCount) || 0,
+      totalVolume: Number(r.totalVolume) || 0,
+      marketShare: (Number(r.totalVolume) / totalMarketVolume) * 100,
+    }));
+
+  // Calculate summary statistics
+  const totalTransactions = yearlyTrends.reduce((sum, y) => sum + y.transactionCount, 0);
+  const totalVolume = yearlyTrends.reduce((sum, y) => sum + y.totalVolume, 0);
+  const earliestYear = yearlyTrends.length > 0 ? yearlyTrends[0].year : new Date().getFullYear();
+  const latestYear = yearlyTrends.length > 0 ? yearlyTrends[yearlyTrends.length - 1].year : new Date().getFullYear();
+
+  // Calculate CAGR for volume
+  let volumeCAGR = 0;
+  let avgAnnualGrowth = 0;
+  if (yearlyTrends.length >= 2) {
+    const firstYearVolume = yearlyTrends[0].totalVolume || 1;
+    const lastYearVolume = yearlyTrends[yearlyTrends.length - 1].totalVolume || 1;
+    const years = latestYear - earliestYear || 1;
+    volumeCAGR = (Math.pow(lastYearVolume / firstYearVolume, 1 / years) - 1) * 100;
+
+    // Calculate average year-over-year growth
+    let totalGrowth = 0;
+    let growthPeriods = 0;
+    for (let i = 1; i < yearlyTrends.length; i++) {
+      if (yearlyTrends[i - 1].avgPrice > 0) {
+        totalGrowth += ((yearlyTrends[i].avgPrice - yearlyTrends[i - 1].avgPrice) / yearlyTrends[i - 1].avgPrice) * 100;
+        growthPeriods++;
+      }
+    }
+    avgAnnualGrowth = growthPeriods > 0 ? totalGrowth / growthPeriods : 0;
+  }
+
+  return {
+    summary: {
+      totalTransactions,
+      totalVolume,
+      earliestYear,
+      latestYear,
+      avgAnnualGrowth,
+      volumeCAGR,
+    },
+    yearlyTrends,
+    quarterlyTrends,
+    regionalBreakdown,
+    repeatSales: repeatSales.slice(0, 20), // Top 20 repeat sales
+    topBrokers,
+  };
+}
+
+export async function generateTrendsInsights(
+  trendsData: MarketTrendsData
+): Promise<string[]> {
+  const insights: string[] = [];
+  const { summary, yearlyTrends, regionalBreakdown, repeatSales } = trendsData;
+
+  // Volume insights
+  if (summary.totalTransactions > 0) {
+    insights.push(
+      `The marina market has recorded ${summary.totalTransactions.toLocaleString()} transactions totaling $${(summary.totalVolume / 1000000000).toFixed(2)}B in transaction volume from ${summary.earliestYear} to ${summary.latestYear}.`
+    );
+  }
+
+  // Growth trends
+  if (summary.volumeCAGR !== 0) {
+    const direction = summary.volumeCAGR > 0 ? 'grown' : 'contracted';
+    insights.push(
+      `Transaction volume has ${direction} at a compound annual rate of ${Math.abs(summary.volumeCAGR).toFixed(1)}%.`
+    );
+  }
+
+  if (summary.avgAnnualGrowth !== 0) {
+    const direction = summary.avgAnnualGrowth > 0 ? 'increased' : 'decreased';
+    insights.push(
+      `Average sale prices have ${direction} by approximately ${Math.abs(summary.avgAnnualGrowth).toFixed(1)}% annually.`
+    );
+  }
+
+  // Peak year analysis
+  if (yearlyTrends.length > 0) {
+    const peakVolumeYear = yearlyTrends.reduce((max, y) => y.transactionCount > max.transactionCount ? y : max);
+    const peakPriceYear = yearlyTrends.reduce((max, y) => y.avgPrice > max.avgPrice ? y : max);
+    
+    insights.push(
+      `${peakVolumeYear.year} was the most active year with ${peakVolumeYear.transactionCount} transactions.`
+    );
+    
+    if (peakPriceYear.year !== peakVolumeYear.year) {
+      insights.push(
+        `${peakPriceYear.year} saw the highest average prices at $${(peakPriceYear.avgPrice / 1000000).toFixed(2)}M.`
+      );
+    }
+  }
+
+  // Regional insights
+  if (regionalBreakdown.length > 0) {
+    const topRegion = regionalBreakdown[0];
+    insights.push(
+      `${topRegion.region} leads the market with ${topRegion.marketShare.toFixed(1)}% of total transaction volume (${topRegion.transactionCount} deals).`
+    );
+  }
+
+  // Repeat sales insights
+  if (repeatSales.length > 0) {
+    const avgAppreciation = repeatSales.reduce((sum, r) => sum + r.priceAppreciation, 0) / repeatSales.length;
+    const avgHoldPeriod = repeatSales.reduce((sum, r) => sum + r.holdingPeriodYears, 0) / repeatSales.length;
+    
+    insights.push(
+      `Across ${repeatSales.length} repeat sales, properties have appreciated an average of ${avgAppreciation.toFixed(1)}% over ${avgHoldPeriod.toFixed(1)} year average holding periods.`
+    );
+  }
+
+  return insights;
+}

@@ -17,6 +17,7 @@ import CorrelationAnalysisView from "./CorrelationAnalysisView";
 import ValuationModelsView from "./ValuationModelsView";
 import { SavedFiltersMenu } from "./SavedFiltersMenu";
 import MatchedCompsView from "./MatchedCompsView";
+import TrendsView from "./TrendsView";
 import { hasValidFilters, normalizeFilters } from "@/lib/salescomps/filterUtils";
 
 interface ComparativeAnalysis {
@@ -324,18 +325,7 @@ export default function AnalyticsWorkbench() {
             </TabsContent>
 
             <TabsContent value="trends" className="mt-2" data-testid="tab-content-trends">
-              {metrics?.trends ? (
-                <TimeSeriesView
-                  priceOverTime={metrics.trends.priceOverTime}
-                  capRateOverTime={metrics.trends.capRateOverTime}
-                  isLoading={isLoading}
-                />
-              ) : (
-                <Card className="p-4 text-center border-dashed">
-                  <TrendingUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-                  <p className="text-xs text-muted-foreground">Apply filters to view time series trends</p>
-                </Card>
-              )}
+              <TrendsView />
             </TabsContent>
 
             <TabsContent value="regional" className="mt-2" data-testid="tab-content-regional">
