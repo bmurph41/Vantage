@@ -7,29 +7,31 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Loader2 } from "lucide-react";
 
-// Lazy load heavy layout components
+// Eagerly load critical pages for instant navigation (no white screen)
+import Dashboard from "@/pages/dashboard";
+import CRMDashboard from "@/pages/crm-dashboard";
+import AllProjectsSummaryPage from "@/pages/all-projects-summary";
+
+// Lazy load layout components
 const UnifiedSidebar = lazy(() => import("@/components/unified-sidebar"));
 const PendingNotificationsBanner = lazy(() => import("@/components/pending-notifications-banner"));
 const DockTalkRouter = lazy(() => import("@/docktalk/DockTalkRouter"));
 
-// Loading fallback component
+// Loading fallback component - simple spinner (no fake content)
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center h-screen">
+    <div className="flex items-center justify-center h-full min-h-[200px]">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   );
 }
 
-// Code-split all page imports for optimal bundle size
-const Dashboard = lazy(() => import("@/pages/dashboard"));
+// Code-split less frequently used pages
 const ProjectPage = lazy(() => import("@/pages/project"));
 const NotificationSettingsPage = lazy(() => import("@/pages/notification-settings"));
 const DDProgressReportPage = lazy(() => import("@/pages/dd-progress-report"));
-const AllProjectsSummaryPage = lazy(() => import("@/pages/all-projects-summary"));
 const UserSettingsPage = lazy(() => import("@/pages/user-settings"));
 const AuditLogsPage = lazy(() => import("@/pages/audit-logs"));
-const CRMDashboard = lazy(() => import("@/pages/crm-dashboard"));
 const Pipeline = lazy(() => import("@/pages/pipeline"));
 const Leads = lazy(() => import("@/pages/leads"));
 const Contacts = lazy(() => import("@/pages/contacts"));
@@ -148,11 +150,13 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
         <UnifiedSidebar />
       </Suspense>
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Suspense fallback={null}>
+        <Suspense fallback={<div className="h-10" />}>
           <PendingNotificationsBanner />
         </Suspense>
         <main className="flex-1 overflow-auto">
-          {children}
+          <Suspense fallback={<PageLoader />}>
+            {children}
+          </Suspense>
         </main>
       </div>
     </div>

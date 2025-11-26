@@ -11,6 +11,13 @@ export function startDockTalkCronJobs(storage: IStorage): void {
   dockTalkStorage = storage;
   if (isInitialized) return;
   
+  // Skip cron jobs in development mode to prevent API rate limiting and improve stability
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  if (isDevelopment) {
+    console.log('DockTalk cron jobs disabled in development mode (use manual fetch if needed)');
+    isInitialized = true;
+    return;
+  }
   
   // Initialize default RSS sources asynchronously (non-blocking)
   setImmediate(() => {

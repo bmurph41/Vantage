@@ -118,6 +118,16 @@ type PendingItem = {
   status: string;
 };
 
+type BootstrapData = {
+  persona: any;
+  features: any[];
+  pendingCounts: {
+    properties: number;
+    contacts: number;
+    companies: number;
+  };
+};
+
 export default function UnifiedSidebar() {
   const [location] = useLocation();
   const [operationsExpanded, setOperationsExpanded] = useState(false);
@@ -135,19 +145,20 @@ export default function UnifiedSidebar() {
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Fetch user persona for feature access - cached to reduce initial load
-  const { data: userPersona } = useQuery<any>({
-    queryKey: ['/api/personas/me'],
-    staleTime: 10 * 60 * 1000, // Consider fresh for 10 minutes
+  // Single consolidated bootstrap query - replaces 5 separate API calls
+  const { data: bootstrapData } = useQuery<BootstrapData>({
+    queryKey: ['/api/bootstrap'],
+    staleTime: 5 * 60 * 1000, // Consider fresh for 5 minutes
+    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
     refetchOnWindowFocus: false,
   });
 
-  // Fetch organization features for add-on access control - cached
-  const { data: orgFeatures = [] } = useQuery<any[]>({
-    queryKey: ['/api/organization/features'],
-    staleTime: 10 * 60 * 1000, // Consider fresh for 10 minutes
-    refetchOnWindowFocus: false,
-  });
+  // Extract data from bootstrap response
+  const userPersona = bootstrapData?.persona;
+  const orgFeatures = bootstrapData?.features || [];
+  const pendingPropertiesCount = bootstrapData?.pendingCounts?.properties || 0;
+  const pendingContactsCount = bootstrapData?.pendingCounts?.contacts || 0;
+  const pendingCompaniesCount = bootstrapData?.pendingCounts?.companies || 0;
 
   // Check if DockTalk is enabled for the organization
   const isDockTalkEnabled = orgFeatures.some(
@@ -178,32 +189,6 @@ export default function UnifiedSidebar() {
     
     return personas.some(p => sectionAccess[section]?.includes(p));
   };
-
-  // Fetch pending items counts - shared cache with notification banner
-  const { data: pendingProperties = [] } = useQuery<PendingItem[]>({
-    queryKey: ['/api/crm/pending-properties'],
-    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
-    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: pendingContacts = [] } = useQuery<PendingItem[]>({
-    queryKey: ['/api/crm/pending-contacts'],
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: pendingCompanies = [] } = useQuery<PendingItem[]>({
-    queryKey: ['/api/crm/pending-companies'],
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-
-  const pendingPropertiesCount = pendingProperties.filter(p => p.status === 'pending').length;
-  const pendingContactsCount = pendingContacts.filter(p => p.status === 'pending').length;
-  const pendingCompaniesCount = pendingCompanies.filter(p => p.status === 'pending').length;
 
   // Auto-expand categories based on current location
   useEffect(() => {

@@ -279,6 +279,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bootstrap endpoint - consolidates sidebar data into a single request
+  app.get("/api/bootstrap", authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      // Fetch all data in parallel for maximum speed
+      // Note: getPending*ForOrg methods already filter by status='pending'
+      const [persona, features, pendingProperties, pendingContacts, pendingCompanies] = await Promise.all([
+        personaService.getUserPersona(userId, orgId).catch(() => null),
+        storage.getOrganizationFeatures(orgId).catch(() => []),
+        storage.getPendingPropertiesForOrg(orgId).catch(() => []),
+        storage.getPendingContactsForOrg(orgId).catch(() => []),
+        storage.getPendingCompaniesForOrg(orgId).catch(() => [])
+      ]);
+
+      res.json({
+        persona,
+        features,
+        pendingCounts: {
+          properties: pendingProperties.length,
+          contacts: pendingContacts.length,
+          companies: pendingCompanies.length
+        }
+      });
+    } catch (error) {
+      console.error("Bootstrap endpoint error:", error);
+      res.status(500).json({ error: "Failed to fetch bootstrap data" });
+    }
+  });
+
   // Initialize SalesComps services
   const parserService = new ParserService();
   const compService = new CompService(storage, parserService);
