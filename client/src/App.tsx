@@ -5,10 +5,12 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import UnifiedSidebar from "@/components/unified-sidebar";
-import PendingNotificationsBanner from "@/components/pending-notifications-banner";
 import { Loader2 } from "lucide-react";
-import DockTalkRouter from "@/docktalk/DockTalkRouter";
+
+// Lazy load heavy layout components
+const UnifiedSidebar = lazy(() => import("@/components/unified-sidebar"));
+const PendingNotificationsBanner = lazy(() => import("@/components/pending-notifications-banner"));
+const DockTalkRouter = lazy(() => import("@/docktalk/DockTalkRouter"));
 
 // Loading fallback component
 function PageLoader() {
@@ -131,13 +133,24 @@ const DocumentIntelligence = lazy(() => import("@/pages/modeling/doc-intel/Docum
 // Project Workspace
 const ProjectWorkspace = lazy(() => import("@/pages/modeling/projects/workspace"));
 
+// Lightweight sidebar loader for initial render
+function SidebarLoader() {
+  return (
+    <div className="w-64 h-screen bg-gray-100 dark:bg-gray-900 animate-pulse" />
+  );
+}
+
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-gray-50">
-      <UnifiedSidebar />
+      <Suspense fallback={<SidebarLoader />}>
+        <UnifiedSidebar />
+      </Suspense>
       <div className="flex-1 flex flex-col overflow-hidden">
-        <PendingNotificationsBanner />
+        <Suspense fallback={null}>
+          <PendingNotificationsBanner />
+        </Suspense>
         <main className="flex-1 overflow-auto">
           {children}
         </main>
@@ -668,14 +681,18 @@ function Router() {
       <Route path="/docktalk">
         {() => (
           <UnifiedLayout>
-            <DockTalkRouter />
+            <Suspense fallback={<PageLoader />}>
+              <DockTalkRouter />
+            </Suspense>
           </UnifiedLayout>
         )}
       </Route>
       <Route path="/docktalk/:rest*">
         {() => (
           <UnifiedLayout>
-            <DockTalkRouter />
+            <Suspense fallback={<PageLoader />}>
+              <DockTalkRouter />
+            </Suspense>
           </UnifiedLayout>
         )}
       </Route>

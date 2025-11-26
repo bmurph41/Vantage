@@ -54,48 +54,42 @@ app.use(requestLoggingMiddleware);
       port,
       host: "0.0.0.0",
       reusePort: true,
-    }, async () => {
+    }, () => {
       log(`serving on port ${port}`);
     
-    // Start deadline monitoring service after server is ready
-    try {
-      deadlineMonitor.start();
-      log('Deadline monitoring service started');
-    } catch (error) {
-      log(`Failed to start deadline monitoring service: ${error}`);
-    }
+      // Initialize background services in parallel without blocking
+      // This allows the HTTP server to respond immediately
+      
+      // Synchronous services - start immediately
+      try {
+        deadlineMonitor.start();
+        log('Deadline monitoring service started');
+      } catch (error) {
+        log(`Failed to start deadline monitoring service: ${error}`);
+      }
 
-    // Start document reconciliation service after server is ready
-    try {
-      await reconciliationService.start();
-      log('Document reconciliation service started');
-    } catch (error) {
-      log(`Failed to start document reconciliation service: ${error}`);
-    }
+      try {
+        startDockTalkCronJobs(dockTalkStorage);
+        log('DockTalk background jobs started');
+      } catch (error) {
+        log(`Failed to start DockTalk background jobs: ${error}`);
+      }
 
-    // Initialize VDR file service directories
-    try {
-      await vdrFileService.initialize();
-      log('VDR file service initialized');
-    } catch (error) {
-      log(`Failed to initialize VDR file service: ${error}`);
-    }
+      try {
+        initializeWebSocket(server);
+        log('DockTalk WebSocket initialized');
+      } catch (error) {
+        log(`Failed to initialize DockTalk WebSocket: ${error}`);
+      }
 
-    // Start DockTalk background jobs (RSS fetching, AI enrichment, etc.)
-    try {
-      startDockTalkCronJobs(dockTalkStorage);
-      log('DockTalk background jobs started');
-    } catch (error) {
-      log(`Failed to start DockTalk background jobs: ${error}`);
-    }
+      // Async services - run in background without awaiting
+      reconciliationService.start()
+        .then(() => log('Document reconciliation service started'))
+        .catch((error) => log(`Failed to start document reconciliation service: ${error}`));
 
-    // Initialize DockTalk WebSocket for real-time article updates
-    try {
-      initializeWebSocket(server);
-      log('DockTalk WebSocket initialized');
-    } catch (error) {
-      log(`Failed to initialize DockTalk WebSocket: ${error}`);
-    }
+      vdrFileService.initialize()
+        .then(() => log('VDR file service initialized'))
+        .catch((error) => log(`Failed to initialize VDR file service: ${error}`));
 
     });
   } catch (error) {

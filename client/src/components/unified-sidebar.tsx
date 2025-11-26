@@ -135,14 +135,18 @@ export default function UnifiedSidebar() {
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Fetch user persona for feature access
+  // Fetch user persona for feature access - cached to reduce initial load
   const { data: userPersona } = useQuery<any>({
     queryKey: ['/api/personas/me'],
+    staleTime: 10 * 60 * 1000, // Consider fresh for 10 minutes
+    refetchOnWindowFocus: false,
   });
 
-  // Fetch organization features for add-on access control
+  // Fetch organization features for add-on access control - cached
   const { data: orgFeatures = [] } = useQuery<any[]>({
     queryKey: ['/api/organization/features'],
+    staleTime: 10 * 60 * 1000, // Consider fresh for 10 minutes
+    refetchOnWindowFocus: false,
   });
 
   // Check if DockTalk is enabled for the organization
