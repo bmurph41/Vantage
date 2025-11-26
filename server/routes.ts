@@ -14739,6 +14739,144 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get saved demographic locations for a modeling project
+  app.get('/api/demographics/project-locations/:modelingProjectId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { modelingProjectId } = req.params;
+      
+      const { demographicProjectLocations } = await import('@shared/schema');
+      const { eq, and, asc } = await import('drizzle-orm');
+      
+      const locations = await db
+        .select()
+        .from(demographicProjectLocations)
+        .where(and(
+          eq(demographicProjectLocations.orgId, orgId),
+          eq(demographicProjectLocations.modelingProjectId, modelingProjectId)
+        ))
+        .orderBy(asc(demographicProjectLocations.sortOrder));
+
+      res.json(locations);
+    } catch (error) {
+      console.error('Failed to fetch demographic project locations:', error);
+      res.status(500).json({ error: 'Failed to fetch demographic project locations' });
+    }
+  });
+
+  // Save demographic locations for a modeling project (bulk save/update)
+  app.post('/api/demographics/project-locations/:modelingProjectId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { modelingProjectId } = req.params;
+      const { locations } = req.body;
+
+      if (!Array.isArray(locations)) {
+        return res.status(400).json({ error: 'locations must be an array' });
+      }
+
+      const { demographicProjectLocations } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      // Delete existing locations for this project
+      await db
+        .delete(demographicProjectLocations)
+        .where(and(
+          eq(demographicProjectLocations.orgId, orgId),
+          eq(demographicProjectLocations.modelingProjectId, modelingProjectId)
+        ));
+
+      // Insert new locations
+      if (locations.length > 0) {
+        const locationsToInsert = locations.map((loc: any, index: number) => ({
+          orgId,
+          modelingProjectId,
+          address: loc.address,
+          latitude: loc.lat,
+          longitude: loc.lng,
+          label: loc.label || null,
+          analysisMode: loc.config?.analysisMode || 'distance',
+          distanceRings: loc.config?.distanceRings || [1],
+          driveTimes: loc.config?.driveTimes || [],
+          sortOrder: index,
+          createdBy: userId,
+        }));
+
+        await db.insert(demographicProjectLocations).values(locationsToInsert);
+      }
+
+      res.json({ success: true, count: locations.length });
+    } catch (error) {
+      console.error('Failed to save demographic project locations:', error);
+      res.status(500).json({ error: 'Failed to save demographic project locations' });
+    }
+  });
+
+  // Update a single demographic location configuration
+  app.patch('/api/demographics/project-locations/:locationId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { locationId } = req.params;
+      const { analysisMode, distanceRings, driveTimes, label } = req.body;
+
+      const { demographicProjectLocations } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      const updateData: any = { updatedAt: new Date() };
+      if (analysisMode !== undefined) updateData.analysisMode = analysisMode;
+      if (distanceRings !== undefined) updateData.distanceRings = distanceRings;
+      if (driveTimes !== undefined) updateData.driveTimes = driveTimes;
+      if (label !== undefined) updateData.label = label;
+
+      const [updated] = await db
+        .update(demographicProjectLocations)
+        .set(updateData)
+        .where(and(
+          eq(demographicProjectLocations.id, locationId),
+          eq(demographicProjectLocations.orgId, orgId)
+        ))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Location not found' });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Failed to update demographic location:', error);
+      res.status(500).json({ error: 'Failed to update demographic location' });
+    }
+  });
+
+  // Delete a single demographic location
+  app.delete('/api/demographics/project-locations/:locationId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { locationId } = req.params;
+
+      const { demographicProjectLocations } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      const [deleted] = await db
+        .delete(demographicProjectLocations)
+        .where(and(
+          eq(demographicProjectLocations.id, locationId),
+          eq(demographicProjectLocations.orgId, orgId)
+        ))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ error: 'Location not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete demographic location:', error);
+      res.status(500).json({ error: 'Failed to delete demographic location' });
+    }
+  });
+
   // Get recent fuel transactions for detail panel
   app.get('/api/fuel/transactions/recent', authenticateUser, async (req: any, res) => {
     try {

@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLoadScript, Autocomplete } from "@react-google-maps/api";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Users, 
   DollarSign, 
@@ -31,8 +32,18 @@ import {
   Car,
   Ruler,
   Settings,
-  RefreshCw
+  RefreshCw,
+  Save,
+  FolderOpen,
+  Building2
 } from "lucide-react";
+
+interface ModelingProject {
+  id: string;
+  marinaName: string;
+  city: string | null;
+  state: string | null;
+}
 
 interface DemographicSummary {
   totalPopulation: number;
@@ -565,13 +576,95 @@ const DRIVE_TIMES = [
   { value: 20, label: "20 Min", estimatedMiles: 12 },
 ];
 
+interface SavedLocation {
+  id: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  label: string | null;
+  analysisMode: string;
+  distanceRings: number[];
+  driveTimes: number[];
+  sortOrder: number;
+}
+
 function LocationAnalysisSection() {
+  const { toast } = useToast();
   const [selectedLocations, setSelectedLocations] = useState<SelectedLocation[]>([]);
   const [locationData, setLocationData] = useState<Map<string, Map<string, TradeAreaData>>>(new Map());
   
   const [defaultDistanceRings, setDefaultDistanceRings] = useState<number[]>([1]);
   const [defaultDriveTimes, setDefaultDriveTimes] = useState<number[]>([]);
   const [defaultAnalysisMode, setDefaultAnalysisMode] = useState<'distance' | 'drivetime'>('distance');
+  
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<ModelingProject[]>({
+    queryKey: ['/api/modeling/projects'],
+  });
+
+  const { data: savedLocations, isLoading: locationsLoading } = useQuery<SavedLocation[]>({
+    queryKey: ['/api/demographics/project-locations', selectedProjectId],
+    enabled: !!selectedProjectId,
+  });
+
+  const saveLocationsMutation = useMutation({
+    mutationFn: async () => {
+      const locationsToSave = selectedLocations.map((loc, idx) => ({
+        address: loc.address,
+        lat: loc.latitude,
+        lng: loc.longitude,
+        label: loc.label,
+        config: loc.config
+      }));
+      return apiRequest('POST', `/api/demographics/project-locations/${selectedProjectId}`, {
+        locations: locationsToSave
+      });
+    },
+    onSuccess: () => {
+      setHasUnsavedChanges(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/demographics/project-locations', selectedProjectId] });
+      toast({ title: 'Saved', description: 'Location configurations saved to project' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to save locations', variant: 'destructive' });
+    }
+  });
+
+  const locationsLoadedRef = useRef<string | null>(null);
+  const pendingFetchesRef = useRef<SelectedLocation[]>([]);
+  
+  useEffect(() => {
+    if (savedLocations && savedLocations.length > 0 && selectedProjectId && locationsLoadedRef.current !== selectedProjectId) {
+      locationsLoadedRef.current = selectedProjectId;
+      const loadedLocations: SelectedLocation[] = savedLocations.map(saved => ({
+        address: saved.address,
+        latitude: saved.latitude,
+        longitude: saved.longitude,
+        label: saved.label || undefined,
+        config: {
+          analysisMode: (saved.analysisMode as 'distance' | 'drivetime') || 'distance',
+          distanceRings: saved.distanceRings || [1],
+          driveTimes: saved.driveTimes || []
+        }
+      }));
+      setSelectedLocations(loadedLocations);
+      setLocationData(new Map());
+      setHasUnsavedChanges(false);
+      pendingFetchesRef.current = loadedLocations;
+    }
+  }, [savedLocations, selectedProjectId]);
+  
+  useEffect(() => {
+    if (pendingFetchesRef.current.length > 0) {
+      const locationsToFetch = pendingFetchesRef.current;
+      pendingFetchesRef.current = [];
+      locationsToFetch.forEach(loc => {
+        setTimeout(() => fetchAllTradeAreas(loc), 100);
+      });
+    }
+  });
 
   const fetchDemographicsMutation = useMutation({
     mutationFn: async ({ location, radiusMiles, tradeAreaKey }: { 
@@ -677,7 +770,8 @@ function LocationAnalysisSection() {
     };
     setSelectedLocations(prev => [...prev, newLocation]);
     fetchAllTradeAreas(newLocation);
-  }, [selectedLocations, defaultAnalysisMode, defaultDistanceRings, defaultDriveTimes, fetchAllTradeAreas]);
+    if (selectedProjectId) setHasUnsavedChanges(true);
+  }, [selectedLocations, defaultAnalysisMode, defaultDistanceRings, defaultDriveTimes, fetchAllTradeAreas, selectedProjectId]);
 
   const updateLocationConfig = useCallback((index: number, newConfig: LocationTradeAreaConfig) => {
     setSelectedLocations(prev => {
@@ -691,7 +785,8 @@ function LocationAnalysisSection() {
       const updatedLocation = { ...location, config: newConfig };
       fetchAllTradeAreas(updatedLocation);
     }
-  }, [selectedLocations, fetchAllTradeAreas]);
+    if (selectedProjectId) setHasUnsavedChanges(true);
+  }, [selectedLocations, fetchAllTradeAreas, selectedProjectId]);
 
   const refetchLocation = useCallback((index: number) => {
     const location = selectedLocations[index];
@@ -709,7 +804,20 @@ function LocationAnalysisSection() {
       next.delete(key);
       return next;
     });
-  }, [selectedLocations]);
+    if (selectedProjectId) setHasUnsavedChanges(true);
+  }, [selectedLocations, selectedProjectId]);
+
+  const handleProjectChange = (projectId: string) => {
+    if (hasUnsavedChanges) {
+      if (!confirm('You have unsaved changes. Switch project anyway?')) {
+        return;
+      }
+    }
+    setSelectedProjectId(projectId);
+    setSelectedLocations([]);
+    setLocationData(new Map());
+    setHasUnsavedChanges(false);
+  };
 
   const toggleDefaultDistanceRing = (miles: number) => {
     setDefaultDistanceRings(prev => {
@@ -741,12 +849,55 @@ function LocationAnalysisSection() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Globe className="h-5 w-5 text-primary" />
-            <CardTitle>Location-Based Demographics</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-primary" />
+              <CardTitle>Location-Based Demographics</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={selectedProjectId} onValueChange={handleProjectChange}>
+                <SelectTrigger className="w-64" data-testid="select-project">
+                  <Building2 className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Select a project to save locations" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectsLoading ? (
+                    <SelectItem value="" disabled>Loading projects...</SelectItem>
+                  ) : projects.length === 0 ? (
+                    <SelectItem value="" disabled>No projects found</SelectItem>
+                  ) : (
+                    projects.map(project => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.marinaName} {project.city ? `- ${project.city}, ${project.state}` : ''}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              
+              {selectedProjectId && (
+                <Button
+                  variant={hasUnsavedChanges ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => saveLocationsMutation.mutate()}
+                  disabled={saveLocationsMutation.isPending || selectedLocations.length === 0}
+                  data-testid="button-save-locations"
+                >
+                  {saveLocationsMutation.isPending ? (
+                    <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-1" />
+                  )}
+                  {hasUnsavedChanges ? 'Save Changes' : 'Saved'}
+                </Button>
+              )}
+            </div>
           </div>
           <CardDescription>
             Search for any U.S. address to analyze Census demographics with distance rings or drive times.
+            {selectedProjectId && locationsLoading && (
+              <span className="ml-2 text-primary">Loading saved locations...</span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
