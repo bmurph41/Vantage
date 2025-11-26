@@ -320,6 +320,32 @@ export const userArticleAnnotations = pgTable("docktalk_user_article_annotations
   uniqueUserArticle: index("idx_docktalk_annotations_user_article").on(table.userId, table.articleId),
 }));
 
+export const companyTypeEnum = pgEnum("docktalk_company_type", [
+  "marina_operator", 
+  "marina_owner", 
+  "boat_dealer", 
+  "marine_services", 
+  "yacht_club", 
+  "boatyard", 
+  "marine_retail",
+  "marine_finance",
+  "other"
+]);
+
+export const relationshipStageEnum = pgEnum("docktalk_relationship_stage", [
+  "tracking",
+  "interested", 
+  "in_pipeline",
+  "portfolio_holding",
+  "exited"
+]);
+
+export const alertSensitivityEnum = pgEnum("docktalk_alert_sensitivity", [
+  "all_mentions",
+  "headlines_only",
+  "high_relevance"
+]);
+
 export const portfolioCompanies = pgTable("docktalk_portfolio_companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
@@ -332,6 +358,24 @@ export const portfolioCompanies = pgTable("docktalk_portfolio_companies", {
   isActive: boolean("is_active").default(true),
   crmCompanyId: varchar("crm_company_id"), // Links to CRM companies.id (not enforced by FK to avoid circular dependency)
   crmLinkStatus: text("crm_link_status").default("unlinked"), // unlinked, linked, pending_review
+  
+  // New classification fields
+  companyType: companyTypeEnum("company_type"),
+  relationshipStage: relationshipStageEnum("relationship_stage").default("tracking"),
+  geographyFocus: text("geography_focus").array(), // Array of regions/states
+  website: text("website"),
+  parentCompany: text("parent_company"),
+  
+  // News monitoring fields
+  watchKeywords: text("watch_keywords").array(), // Additional keywords to match
+  excludedTerms: text("excluded_terms").array(), // Terms to filter out
+  
+  // Alert configuration
+  alertFrequency: alertFrequencyEnum("alert_frequency").default("daily"),
+  alertChannels: text("alert_channels").array().default(sql`ARRAY['in_app']::text[]`), // in_app, email
+  alertSensitivity: alertSensitivityEnum("alert_sensitivity").default("all_mentions"),
+  lastAlertSent: timestamp("last_alert_sent"),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -339,6 +383,8 @@ export const portfolioCompanies = pgTable("docktalk_portfolio_companies", {
   byCompany: index("idx_docktalk_portfolio_company").on(table.companyName),
   byOrg: index("idx_docktalk_portfolio_org").on(table.orgId),
   byCrmCompany: index("idx_docktalk_portfolio_crm_company").on(table.crmCompanyId),
+  byCompanyType: index("idx_docktalk_portfolio_company_type").on(table.companyType),
+  byRelationshipStage: index("idx_docktalk_portfolio_relationship_stage").on(table.relationshipStage),
 }));
 
 export const notificationSourceEnum = pgEnum("docktalk_notification_source", ["saved_search", "category_alert"]);
