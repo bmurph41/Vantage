@@ -18,24 +18,32 @@ interface StatisticsPanelProps {
   isLoading?: boolean;
 }
 
-function formatCurrency(value: number, compact: boolean = false): string {
-  if (value >= 1000000000) {
-    return `$${(value / 1000000000).toFixed(2)}B`;
+function formatCurrency(value: number | null | undefined, compact: boolean = false): string {
+  if (value === null || value === undefined || isNaN(Number(value))) {
+    return 'N/A';
   }
-  if (value >= 1000000) {
-    return `$${(value / 1000000).toFixed(2)}M`;
+  const numValue = Number(value);
+  if (numValue >= 1000000000) {
+    return `$${(numValue / 1000000000).toFixed(2)}B`;
   }
-  if (compact && value >= 1000) {
-    return `$${(value / 1000).toFixed(1)}K`;
+  if (numValue >= 1000000) {
+    return `$${(numValue / 1000000).toFixed(2)}M`;
   }
-  return `$${Math.round(value).toLocaleString('en-US')}`;
+  if (compact && numValue >= 1000) {
+    return `$${(numValue / 1000).toFixed(1)}K`;
+  }
+  return `$${Math.round(numValue).toLocaleString('en-US')}`;
 }
 
-function formatPercent(value: number): string {
-  if (value > 1) {
-    return `${value.toFixed(2)}%`;
+function formatPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined || isNaN(Number(value))) {
+    return 'N/A';
   }
-  return `${(value * 100).toFixed(2)}%`;
+  const numValue = Number(value);
+  if (numValue > 1) {
+    return `${numValue.toFixed(2)}%`;
+  }
+  return `${(numValue * 100).toFixed(2)}%`;
 }
 
 export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelProps) {
