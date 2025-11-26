@@ -12,12 +12,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Download, Search, Table2, GitCompare, X } from "lucide-react";
+import { Download, Search, Table2, GitCompare, X, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { AnalyticsFilters } from "./AnalyticsFilters";
 import ComparisonMatrix from "./ComparisonMatrix";
 import { hasValidFilters } from "@/lib/salescomps/filterUtils";
+import { generateCompsAnalysisPDF, downloadPDF, type TrendsData, type FilterCriteria } from "./CompsAnalysisPDF";
 
 interface SalesComp {
   id: string;
@@ -65,6 +66,7 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
   const { toast } = useToast();
   const [selectedCompIds, setSelectedCompIds] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const { data: matchedComps = [], isLoading } = useQuery<SalesComp[]>({
     queryKey: ["/api/sales-comps/analytics/matched-comps", filters],
@@ -226,6 +228,65 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
     });
   };
 
+  const handleExportPDF = async () => {
+    if (selectedCompIds.length === 0) {
+      toast({
+        title: "No properties selected",
+        description: "Select properties to include in the analysis report",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExportingPDF(true);
+    
+    try {
+      let trendsData: TrendsData | null = null;
+      try {
+        const trendsRes = await apiRequest("POST", "/api/sales-comps/analytics/trends", {
+          yearMin: filters.yearSoldMin,
+          yearMax: filters.yearSoldMax,
+          states: filters.states,
+          regions: filters.region,
+          profitCenters: filters.profitCenters,
+        });
+        trendsData = await trendsRes.json();
+      } catch (e) {
+        console.warn("Could not fetch trends data for PDF export", e);
+      }
+
+      const filterCriteria: FilterCriteria = {
+        states: filters.states,
+        waterTypes: filters.waterTypes,
+        regions: filters.region,
+        priceMin: filters.priceMin,
+        priceMax: filters.priceMax,
+        capacityMin: filters.capacityMin,
+        capacityMax: filters.capacityMax,
+        yearSoldMin: filters.yearSoldMin,
+        yearSoldMax: filters.yearSoldMax,
+        profitCenters: filters.profitCenters,
+      };
+
+      const blob = await generateCompsAnalysisPDF(selectedComps, trendsData, filterCriteria);
+      downloadPDF(blob, `comps-analysis-${new Date().toISOString().split('T')[0]}.pdf`);
+      
+      toast({
+        title: "Export successful",
+        description: `Generated analysis report with ${selectedComps.length} properties`,
+      });
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      toast({
+        title: "Export failed",
+        description: "Could not generate the PDF report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
   const loading = isLoading || parentLoading;
 
   if (!hasValidFilters(filters)) {
@@ -308,6 +369,20 @@ export default function MatchedCompsView({ filters, isLoading: parentLoading }: 
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                onClick={handleExportPDF}
+                disabled={isExportingPDF}
+                size="sm"
+                variant="secondary"
+                data-testid="button-export-analysis"
+              >
+                {isExportingPDF ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4 mr-2" />
+                )}
+                Export Analysis
+              </Button>
               <Button
                 onClick={handleShowComparison}
                 disabled={selectedCompIds.length < 2}
