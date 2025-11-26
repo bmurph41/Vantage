@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLoadScript, Autocomplete } from "@react-google-maps/api";
 import { apiRequest } from "@/lib/queryClient";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   Users, 
   DollarSign, 
@@ -28,7 +29,9 @@ import {
   Activity,
   Clock,
   Car,
-  Ruler
+  Ruler,
+  Settings,
+  RefreshCw
 } from "lucide-react";
 
 interface DemographicSummary {
@@ -66,11 +69,18 @@ interface LocationDemographicsResponse {
   fetchedAt: string;
 }
 
+interface LocationTradeAreaConfig {
+  distanceRings: number[];
+  driveTimes: number[];
+  analysisMode: 'distance' | 'drivetime';
+}
+
 interface SelectedLocation {
   address: string;
   latitude: number;
   longitude: number;
   label?: string;
+  config: LocationTradeAreaConfig;
 }
 
 const formatCurrency = (value: number | null | undefined): string => {
@@ -558,9 +568,10 @@ const DRIVE_TIMES = [
 function LocationAnalysisSection() {
   const [selectedLocations, setSelectedLocations] = useState<SelectedLocation[]>([]);
   const [locationData, setLocationData] = useState<Map<string, Map<string, TradeAreaData>>>(new Map());
-  const [selectedDistanceRings, setSelectedDistanceRings] = useState<number[]>([1]);
-  const [selectedDriveTimes, setSelectedDriveTimes] = useState<number[]>([]);
-  const [analysisMode, setAnalysisMode] = useState<'distance' | 'drivetime'>('distance');
+  
+  const [defaultDistanceRings, setDefaultDistanceRings] = useState<number[]>([1]);
+  const [defaultDriveTimes, setDefaultDriveTimes] = useState<number[]>([]);
+  const [defaultAnalysisMode, setDefaultAnalysisMode] = useState<'distance' | 'drivetime'>('distance');
 
   const fetchDemographicsMutation = useMutation({
     mutationFn: async ({ location, radiusMiles, tradeAreaKey }: { 
@@ -599,9 +610,10 @@ function LocationAnalysisSection() {
   const fetchAllTradeAreas = useCallback((location: SelectedLocation) => {
     const locationKey = `${location.latitude},${location.longitude}`;
     const tradeAreas = new Map<string, TradeAreaData>();
+    const config = location.config;
     
-    if (analysisMode === 'distance') {
-      selectedDistanceRings.forEach(miles => {
+    if (config.analysisMode === 'distance') {
+      config.distanceRings.forEach(miles => {
         const key = `distance-${miles}`;
         tradeAreas.set(key, {
           radiusMiles: miles,
@@ -617,7 +629,7 @@ function LocationAnalysisSection() {
         });
       });
     } else {
-      selectedDriveTimes.forEach(minutes => {
+      config.driveTimes.forEach(minutes => {
         const driveTime = DRIVE_TIMES.find(d => d.value === minutes);
         if (driveTime) {
           const key = `drivetime-${minutes}`;
@@ -638,26 +650,55 @@ function LocationAnalysisSection() {
     }
     
     setLocationData(prev => new Map(prev).set(locationKey, tradeAreas));
-  }, [analysisMode, selectedDistanceRings, selectedDriveTimes, fetchDemographicsMutation]);
+  }, [fetchDemographicsMutation]);
 
-  const handleAddLocation = useCallback((location: SelectedLocation) => {
+  const handleAddLocation = useCallback((baseLocation: Omit<SelectedLocation, 'config' | 'label'>) => {
     if (selectedLocations.length >= 5) return;
     
-    const hasSelection = analysisMode === 'distance' 
-      ? selectedDistanceRings.length > 0 
-      : selectedDriveTimes.length > 0;
+    const hasSelection = defaultAnalysisMode === 'distance' 
+      ? defaultDistanceRings.length > 0 
+      : defaultDriveTimes.length > 0;
     
     if (!hasSelection) return;
     
     const exists = selectedLocations.some(
-      l => l.latitude === location.latitude && l.longitude === location.longitude
+      l => l.latitude === baseLocation.latitude && l.longitude === baseLocation.longitude
     );
     if (exists) return;
     
-    const newLocation = { ...location, label: `Location ${selectedLocations.length + 1}` };
+    const newLocation: SelectedLocation = { 
+      ...baseLocation, 
+      label: `Location ${selectedLocations.length + 1}`,
+      config: {
+        distanceRings: [...defaultDistanceRings],
+        driveTimes: [...defaultDriveTimes],
+        analysisMode: defaultAnalysisMode
+      }
+    };
     setSelectedLocations(prev => [...prev, newLocation]);
     fetchAllTradeAreas(newLocation);
-  }, [selectedLocations, analysisMode, selectedDistanceRings, selectedDriveTimes, fetchAllTradeAreas]);
+  }, [selectedLocations, defaultAnalysisMode, defaultDistanceRings, defaultDriveTimes, fetchAllTradeAreas]);
+
+  const updateLocationConfig = useCallback((index: number, newConfig: LocationTradeAreaConfig) => {
+    setSelectedLocations(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], config: newConfig };
+      return updated;
+    });
+    
+    const location = selectedLocations[index];
+    if (location) {
+      const updatedLocation = { ...location, config: newConfig };
+      fetchAllTradeAreas(updatedLocation);
+    }
+  }, [selectedLocations, fetchAllTradeAreas]);
+
+  const refetchLocation = useCallback((index: number) => {
+    const location = selectedLocations[index];
+    if (location) {
+      fetchAllTradeAreas(location);
+    }
+  }, [selectedLocations, fetchAllTradeAreas]);
 
   const handleRemoveLocation = useCallback((index: number) => {
     const location = selectedLocations[index];
@@ -670,8 +711,8 @@ function LocationAnalysisSection() {
     });
   }, [selectedLocations]);
 
-  const toggleDistanceRing = (miles: number) => {
-    setSelectedDistanceRings(prev => {
+  const toggleDefaultDistanceRing = (miles: number) => {
+    setDefaultDistanceRings(prev => {
       if (prev.includes(miles)) {
         return prev.filter(m => m !== miles);
       }
@@ -679,8 +720,8 @@ function LocationAnalysisSection() {
     });
   };
 
-  const toggleDriveTime = (minutes: number) => {
-    setSelectedDriveTimes(prev => {
+  const toggleDefaultDriveTime = (minutes: number) => {
+    setDefaultDriveTimes(prev => {
       if (prev.includes(minutes)) {
         return prev.filter(m => m !== minutes);
       }
@@ -709,82 +750,85 @@ function LocationAnalysisSection() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Tabs value={analysisMode} onValueChange={(v) => setAnalysisMode(v as 'distance' | 'drivetime')}>
-            <TabsList className="grid w-full grid-cols-2 max-w-md">
-              <TabsTrigger value="distance" className="flex items-center gap-2" data-testid="tab-distance">
-                <Ruler className="h-4 w-4" />
-                Distance Rings
-              </TabsTrigger>
-              <TabsTrigger value="drivetime" className="flex items-center gap-2" data-testid="tab-drivetime">
-                <Car className="h-4 w-4" />
-                Drive Time
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="distance" className="mt-4">
-              <div className="space-y-3">
-                <Label className="text-sm">Select Distance Rings</Label>
-                <div className="flex flex-wrap gap-3">
-                  {DISTANCE_RINGS.map(ring => (
-                    <div key={ring.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`ring-${ring.value}`}
-                        checked={selectedDistanceRings.includes(ring.value)}
-                        onCheckedChange={() => toggleDistanceRing(ring.value)}
-                        data-testid={`checkbox-distance-${ring.value}`}
-                      />
-                      <label
-                        htmlFor={`ring-${ring.value}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-1"
-                      >
-                        <CircleDot className="h-3 w-3 text-primary" />
-                        {ring.label}
-                      </label>
-                    </div>
-                  ))}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Default Trade Area Settings (for new locations)</Label>
+            <Tabs value={defaultAnalysisMode} onValueChange={(v) => setDefaultAnalysisMode(v as 'distance' | 'drivetime')}>
+              <TabsList className="grid w-full grid-cols-2 max-w-md">
+                <TabsTrigger value="distance" className="flex items-center gap-2" data-testid="tab-distance">
+                  <Ruler className="h-4 w-4" />
+                  Distance Rings
+                </TabsTrigger>
+                <TabsTrigger value="drivetime" className="flex items-center gap-2" data-testid="tab-drivetime">
+                  <Car className="h-4 w-4" />
+                  Drive Time
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="distance" className="mt-4">
+                <div className="space-y-3">
+                  <Label className="text-sm">Select Distance Rings</Label>
+                  <div className="flex flex-wrap gap-3">
+                    {DISTANCE_RINGS.map(ring => (
+                      <div key={ring.value} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`ring-${ring.value}`}
+                          checked={defaultDistanceRings.includes(ring.value)}
+                          onCheckedChange={() => toggleDefaultDistanceRing(ring.value)}
+                          data-testid={`checkbox-distance-${ring.value}`}
+                        />
+                        <label
+                          htmlFor={`ring-${ring.value}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-1"
+                        >
+                          <CircleDot className="h-3 w-3 text-primary" />
+                          {ring.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {defaultDistanceRings.length === 0 && (
+                    <p className="text-xs text-amber-600">Select at least one distance ring</p>
+                  )}
                 </div>
-                {selectedDistanceRings.length === 0 && (
-                  <p className="text-xs text-amber-600">Select at least one distance ring</p>
-                )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="drivetime" className="mt-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Select Drive Times (up to 3)</Label>
-                  <span className="text-xs text-muted-foreground">{selectedDriveTimes.length}/3 selected</span>
+              </TabsContent>
+              
+              <TabsContent value="drivetime" className="mt-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Select Drive Times (up to 3)</Label>
+                    <span className="text-xs text-muted-foreground">{defaultDriveTimes.length}/3 selected</span>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {DRIVE_TIMES.map(time => (
+                      <div key={time.value} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`time-${time.value}`}
+                          checked={defaultDriveTimes.includes(time.value)}
+                          onCheckedChange={() => toggleDefaultDriveTime(time.value)}
+                          disabled={!defaultDriveTimes.includes(time.value) && defaultDriveTimes.length >= 3}
+                          data-testid={`checkbox-drivetime-${time.value}`}
+                        />
+                        <label
+                          htmlFor={`time-${time.value}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-1"
+                        >
+                          <Clock className="h-3 w-3 text-blue-500" />
+                          {time.label}
+                          <span className="text-xs text-muted-foreground">(~{time.estimatedMiles} mi)</span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {defaultDriveTimes.length === 0 && (
+                    <p className="text-xs text-amber-600">Select at least one drive time</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Drive times are estimated based on typical suburban driving conditions (~30 mph average).
+                  </p>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  {DRIVE_TIMES.map(time => (
-                    <div key={time.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`time-${time.value}`}
-                        checked={selectedDriveTimes.includes(time.value)}
-                        onCheckedChange={() => toggleDriveTime(time.value)}
-                        disabled={!selectedDriveTimes.includes(time.value) && selectedDriveTimes.length >= 3}
-                        data-testid={`checkbox-drivetime-${time.value}`}
-                      />
-                      <label
-                        htmlFor={`time-${time.value}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-1"
-                      >
-                        <Clock className="h-3 w-3 text-blue-500" />
-                        {time.label}
-                        <span className="text-xs text-muted-foreground">(~{time.estimatedMiles} mi)</span>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-                {selectedDriveTimes.length === 0 && (
-                  <p className="text-xs text-amber-600">Select at least one drive time</p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Drive times are estimated based on typical suburban driving conditions (~30 mph average).
-                </p>
-              </div>
-            </TabsContent>
-          </Tabs>
+              </TabsContent>
+            </Tabs>
+          </div>
 
           <div className="pt-4 border-t">
             <Label className="text-sm mb-2 block">Search Address</Label>
@@ -858,15 +902,127 @@ function LocationAnalysisSection() {
                   <MapPin className="h-4 w-4 text-primary" />
                   <CardTitle className="text-base">{loc.address}</CardTitle>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 hover:bg-destructive hover:text-destructive-foreground"
-                  onClick={() => handleRemoveLocation(locIdx)}
-                  data-testid={`button-remove-card-${locIdx}`}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        data-testid={`button-edit-config-${locIdx}`}
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80" align="end">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium text-sm">Trade Area Settings</h4>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => refetchLocation(locIdx)}
+                            disabled={hasLoading}
+                            data-testid={`button-refetch-${locIdx}`}
+                          >
+                            <RefreshCw className={`h-3 w-3 mr-1 ${hasLoading ? 'animate-spin' : ''}`} />
+                            Refresh
+                          </Button>
+                        </div>
+                        
+                        <Tabs 
+                          value={loc.config.analysisMode} 
+                          onValueChange={(v) => updateLocationConfig(locIdx, { 
+                            ...loc.config, 
+                            analysisMode: v as 'distance' | 'drivetime' 
+                          })}
+                        >
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="distance" className="text-xs">
+                              <Ruler className="h-3 w-3 mr-1" />
+                              Distance
+                            </TabsTrigger>
+                            <TabsTrigger value="drivetime" className="text-xs">
+                              <Car className="h-3 w-3 mr-1" />
+                              Drive Time
+                            </TabsTrigger>
+                          </TabsList>
+                          
+                          <TabsContent value="distance" className="mt-3">
+                            <div className="space-y-2">
+                              <Label className="text-xs">Distance Rings</Label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {DISTANCE_RINGS.map(ring => (
+                                  <div key={ring.value} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`loc-${locIdx}-ring-${ring.value}`}
+                                      checked={loc.config.distanceRings.includes(ring.value)}
+                                      onCheckedChange={() => {
+                                        const newRings = loc.config.distanceRings.includes(ring.value)
+                                          ? loc.config.distanceRings.filter(r => r !== ring.value)
+                                          : [...loc.config.distanceRings, ring.value].sort((a, b) => a - b);
+                                        updateLocationConfig(locIdx, { ...loc.config, distanceRings: newRings });
+                                      }}
+                                      data-testid={`checkbox-loc-${locIdx}-distance-${ring.value}`}
+                                    />
+                                    <label
+                                      htmlFor={`loc-${locIdx}-ring-${ring.value}`}
+                                      className="text-xs cursor-pointer"
+                                    >
+                                      {ring.label}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </TabsContent>
+                          
+                          <TabsContent value="drivetime" className="mt-3">
+                            <div className="space-y-2">
+                              <Label className="text-xs">Drive Times</Label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {DRIVE_TIMES.map(time => (
+                                  <div key={time.value} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`loc-${locIdx}-time-${time.value}`}
+                                      checked={loc.config.driveTimes.includes(time.value)}
+                                      onCheckedChange={() => {
+                                        const newTimes = loc.config.driveTimes.includes(time.value)
+                                          ? loc.config.driveTimes.filter(t => t !== time.value)
+                                          : [...loc.config.driveTimes, time.value].sort((a, b) => a - b);
+                                        if (newTimes.length <= 3) {
+                                          updateLocationConfig(locIdx, { ...loc.config, driveTimes: newTimes });
+                                        }
+                                      }}
+                                      disabled={!loc.config.driveTimes.includes(time.value) && loc.config.driveTimes.length >= 3}
+                                      data-testid={`checkbox-loc-${locIdx}-drivetime-${time.value}`}
+                                    />
+                                    <label
+                                      htmlFor={`loc-${locIdx}-time-${time.value}`}
+                                      className="text-xs cursor-pointer"
+                                    >
+                                      {time.label}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => handleRemoveLocation(locIdx)}
+                    data-testid={`button-remove-card-${locIdx}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <CardDescription className="flex items-center gap-2 flex-wrap">
                 {tradeAreas.map((ta, taIdx) => (
@@ -922,64 +1078,61 @@ function LocationAnalysisSection() {
         );
       })}
 
-      {selectedLocations.length >= 2 && (() => {
-        const firstTradeAreaKey = analysisMode === 'distance' 
-          ? `distance-${selectedDistanceRings[0]}` 
-          : `drivetime-${selectedDriveTimes[0]}`;
-        
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                Comparison Summary
-              </CardTitle>
-              <CardDescription>Key metrics comparison across selected locations (first trade area)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 px-3 font-medium">Metric</th>
-                      {selectedLocations.map((loc, idx) => (
-                        <th key={idx} className="text-right py-2 px-3 font-medium max-w-32 truncate">
-                          {loc.label || `Loc ${idx + 1}`}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { label: "Population", key: "totalPopulation", format: formatNumber },
-                      { label: "Median Age", key: "medianAge", format: (v: number) => v ? `${v.toFixed(1)} yrs` : "N/A" },
-                      { label: "Median Income", key: "medianHouseholdIncome", format: formatCurrency },
-                      { label: "Per Capita Income", key: "perCapitaIncome", format: formatCurrency },
-                      { label: "Median Home Value", key: "medianHomeValue", format: formatCurrency },
-                      { label: "Household Size", key: "householdSize", format: (v: number) => v ? v.toFixed(1) : "N/A" },
-                    ].map((metric, mIdx) => (
-                      <tr key={mIdx} className="border-b border-muted hover:bg-muted/30">
-                        <td className="py-2 px-3 font-medium">{metric.label}</td>
-                        {selectedLocations.map((loc, lIdx) => {
-                          const locKey = `${loc.latitude},${loc.longitude}`;
-                          const areaMap = locationData.get(locKey);
-                          const tradeArea = areaMap?.get(firstTradeAreaKey);
-                          const value = tradeArea?.demographics?.[metric.key as keyof DemographicSummary];
-                          return (
-                            <td key={lIdx} className="text-right py-2 px-3">
-                              {metric.format(value as number)}
-                            </td>
-                          );
-                        })}
-                      </tr>
+      {selectedLocations.length >= 2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Comparison Summary
+            </CardTitle>
+            <CardDescription>Key metrics comparison across selected locations (first trade area of each)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-3 font-medium">Metric</th>
+                    {selectedLocations.map((loc, idx) => (
+                      <th key={idx} className="text-right py-2 px-3 font-medium max-w-32 truncate">
+                        {loc.label || `Loc ${idx + 1}`}
+                      </th>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })()}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { label: "Population", key: "totalPopulation", format: formatNumber },
+                    { label: "Median Age", key: "medianAge", format: (v: number) => v ? `${v.toFixed(1)} yrs` : "N/A" },
+                    { label: "Median Income", key: "medianHouseholdIncome", format: formatCurrency },
+                    { label: "Per Capita Income", key: "perCapitaIncome", format: formatCurrency },
+                    { label: "Median Home Value", key: "medianHomeValue", format: formatCurrency },
+                    { label: "Household Size", key: "householdSize", format: (v: number) => v ? v.toFixed(1) : "N/A" },
+                  ].map((metric, mIdx) => (
+                    <tr key={mIdx} className="border-b border-muted hover:bg-muted/30">
+                      <td className="py-2 px-3 font-medium">{metric.label}</td>
+                      {selectedLocations.map((loc, lIdx) => {
+                        const locKey = `${loc.latitude},${loc.longitude}`;
+                        const areaMap = locationData.get(locKey);
+                        const firstKey = loc.config.analysisMode === 'distance'
+                          ? `distance-${loc.config.distanceRings[0]}`
+                          : `drivetime-${loc.config.driveTimes[0]}`;
+                        const tradeArea = areaMap?.get(firstKey);
+                        const value = tradeArea?.demographics?.[metric.key as keyof DemographicSummary];
+                        return (
+                          <td key={lIdx} className="text-right py-2 px-3">
+                            {metric.format(value as number)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
