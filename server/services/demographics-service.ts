@@ -563,7 +563,9 @@ export class DemographicsService {
       .select({
         id: salesComps.id,
         state: salesComps.state,
-        pricePerSlip: salesComps.pricePerSlip,
+        salePrice: salesComps.salePrice,
+        wetSlips: salesComps.wetSlips,
+        dryRacks: salesComps.dryRacks,
       })
       .from(salesComps)
       .where(eq(salesComps.orgId, orgId));
@@ -575,8 +577,10 @@ export class DemographicsService {
       if (comp.state) {
         stateCount.set(comp.state, (stateCount.get(comp.state) || 0) + 1);
       }
-      if (comp.pricePerSlip) {
-        const pps = parseFloat(comp.pricePerSlip);
+      // Calculate price per slip from sale price and total slips
+      const totalSlips = (comp.wetSlips || 0) + (comp.dryRacks || 0);
+      if (comp.salePrice && totalSlips > 0) {
+        const pps = comp.salePrice / totalSlips;
         if (pps > 0) pricesPerSlip.push(pps);
       }
     });
