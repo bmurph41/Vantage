@@ -577,10 +577,11 @@ const DRIVE_TIMES = [
 ];
 
 const RING_COLORS = [
-  { fill: 'rgba(59, 130, 246, 0.15)', stroke: '#3b82f6' },
-  { fill: 'rgba(16, 185, 129, 0.15)', stroke: '#10b981' },
-  { fill: 'rgba(245, 158, 11, 0.15)', stroke: '#f59e0b' },
-  { fill: 'rgba(239, 68, 68, 0.15)', stroke: '#ef4444' },
+  { fill: 'rgba(59, 130, 246, 0.12)', stroke: '#3b82f6', name: 'Blue' },      // Innermost (smallest)
+  { fill: 'rgba(16, 185, 129, 0.12)', stroke: '#10b981', name: 'Green' },     // 2nd ring
+  { fill: 'rgba(245, 158, 11, 0.12)', stroke: '#f59e0b', name: 'Amber' },     // 3rd ring
+  { fill: 'rgba(239, 68, 68, 0.12)', stroke: '#ef4444', name: 'Red' },        // 4th ring (outermost)
+  { fill: 'rgba(139, 92, 246, 0.12)', stroke: '#8b5cf6', name: 'Purple' },    // 5th ring (if needed)
 ];
 
 const LOCATION_COLORS = [
@@ -1093,14 +1094,17 @@ function LocationAnalysisSection() {
               >
                 {selectedLocations.map((location, locIdx) => {
                   const locationColor = LOCATION_COLORS[locIdx % LOCATION_COLORS.length];
-                  const rings = location.config.analysisMode === 'distance'
-                    ? location.config.distanceRings.map(r => r)
+                  const isDistance = location.config.analysisMode === 'distance';
+                  const rawRings = isDistance
+                    ? location.config.distanceRings.map(r => ({ value: r, label: `${r} mi` }))
                     : location.config.driveTimes.map(t => {
                         const driveTime = DRIVE_TIMES.find(d => d.value === t);
-                        return driveTime ? driveTime.estimatedMiles : t * 0.5;
+                        return { value: driveTime ? driveTime.estimatedMiles : t * 0.5, label: `${t} min` };
                       });
                   
-                  const sortedRings = [...rings].sort((a, b) => b - a);
+                  const sortedBySize = [...rawRings].sort((a, b) => a.value - b.value);
+                  const ringColorMap = new Map(sortedBySize.map((ring, idx) => [ring.value, idx]));
+                  const sortedForDrawing = [...rawRings].sort((a, b) => b.value - a.value);
                   
                   return [
                     <Marker
@@ -1116,20 +1120,20 @@ function LocationAnalysisSection() {
                         strokeWeight: 2,
                       }}
                     />,
-                    ...sortedRings.map((radiusMiles, ringIdx) => {
-                      const colorIdx = ringIdx % RING_COLORS.length;
-                      const radiusMeters = radiusMiles * 1609.34;
+                    ...sortedForDrawing.map((ring, ringIdx) => {
+                      const colorIdx = ringColorMap.get(ring.value) ?? 0;
+                      const radiusMeters = ring.value * 1609.34;
                       return (
                         <Circle
                           key={`circle-${locIdx}-${ringIdx}`}
                           center={{ lat: location.latitude, lng: location.longitude }}
                           radius={radiusMeters}
                           options={{
-                            fillColor: RING_COLORS[colorIdx].stroke,
-                            fillOpacity: 0.1,
-                            strokeColor: RING_COLORS[colorIdx].stroke,
-                            strokeOpacity: 0.8,
-                            strokeWeight: 2,
+                            fillColor: RING_COLORS[colorIdx % RING_COLORS.length].stroke,
+                            fillOpacity: 0.08,
+                            strokeColor: RING_COLORS[colorIdx % RING_COLORS.length].stroke,
+                            strokeOpacity: 0.9,
+                            strokeWeight: 2.5,
                           }}
                         />
                       );
@@ -1138,25 +1142,45 @@ function LocationAnalysisSection() {
                 })}
               </GoogleMap>
             </div>
-            <div className="mt-3 flex flex-wrap gap-4">
+            <div className="mt-4 space-y-3">
               {selectedLocations.map((location, locIdx) => {
                 const locationColor = LOCATION_COLORS[locIdx % LOCATION_COLORS.length];
                 const isDistance = location.config.analysisMode === 'distance';
-                const areas = isDistance 
-                  ? location.config.distanceRings.map(r => `${r} mi`)
-                  : location.config.driveTimes.map(t => `${t} min`);
+                const rawRings = isDistance
+                  ? location.config.distanceRings.map(r => ({ value: r, label: `${r} mi` }))
+                  : location.config.driveTimes.map(t => {
+                      const driveTime = DRIVE_TIMES.find(d => d.value === t);
+                      return { value: driveTime ? driveTime.estimatedMiles : t * 0.5, label: `${t} min` };
+                    });
+                const sortedBySize = [...rawRings].sort((a, b) => a.value - b.value);
                 
                 return (
-                  <div key={locIdx} className="flex items-center gap-2 text-sm">
-                    <div 
-                      className="w-3 h-3 rounded-full border-2 border-white shadow-sm" 
-                      style={{ backgroundColor: locationColor }}
-                    />
-                    <span className="font-medium truncate max-w-32">{location.label || location.address.split(',')[0]}</span>
-                    <span className="text-muted-foreground">
-                      ({isDistance ? <Ruler className="h-3 w-3 inline mr-1" /> : <Clock className="h-3 w-3 inline mr-1" />}
-                      {areas.join(', ')})
-                    </span>
+                  <div key={locIdx} className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div 
+                        className="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
+                        style={{ backgroundColor: locationColor }}
+                      />
+                      <span className="font-medium truncate max-w-48">{location.label || location.address.split(',')[0]}</span>
+                      <span className="text-muted-foreground text-xs">
+                        ({isDistance ? <Ruler className="h-3 w-3 inline mr-0.5" /> : <Clock className="h-3 w-3 inline mr-0.5" />}
+                        {isDistance ? 'Distance' : 'Drive Time'})
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 ml-5">
+                      {sortedBySize.map((ring, ringIdx) => {
+                        const color = RING_COLORS[ringIdx % RING_COLORS.length];
+                        return (
+                          <div key={ringIdx} className="flex items-center gap-1.5 text-xs">
+                            <div 
+                              className="w-2.5 h-2.5 rounded-full border border-white shadow-sm flex-shrink-0" 
+                              style={{ backgroundColor: color.stroke }}
+                            />
+                            <span className="text-muted-foreground">{ring.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })}
