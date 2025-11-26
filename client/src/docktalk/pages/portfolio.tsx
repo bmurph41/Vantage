@@ -22,17 +22,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Plus, Trash2, FileText, Bell, BellOff, ChevronDown, ChevronRight } from "lucide-react";
+import { 
+  Building2, Plus, Trash2, FileText, Bell, BellOff, ChevronDown, ChevronRight,
+  Link2, Unlink, Search, CheckCircle2, AlertCircle, ExternalLink, Loader2
+} from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 
 interface PortfolioCompany {
@@ -43,8 +38,25 @@ interface PortfolioCompany {
   region: string | null;
   notes: string | null;
   isActive: boolean;
+  crmCompanyId: string | null;
+  crmLinkStatus: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface CrmCompanyMatch {
+  id: string;
+  name: string;
+  domain: string | null;
+  industry: string | null;
+  website: string | null;
+  matchScore: number;
+  matchReason: string;
+}
+
+interface MatchResult {
+  exactMatch: CrmCompanyMatch | null;
+  suggestions: CrmCompanyMatch[];
 }
 
 interface Article {
@@ -65,13 +77,20 @@ export default function PortfolioCompaniesPage() {
   const [region, setRegion] = useState("");
   const [notes, setNotes] = useState("");
   const [expandedCompany, setExpandedCompany] = useState<string | null>(null);
+  
+  const [showMatchDialog, setShowMatchDialog] = useState(false);
+  const [matchResults, setMatchResults] = useState<MatchResult | null>(null);
+  const [isCheckingMatches, setIsCheckingMatches] = useState(false);
+  const [pendingCompanyData, setPendingCompanyData] = useState<any>(null);
+  
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkingCompanyId, setLinkingCompanyId] = useState<string | null>(null);
+  const [crmSearchQuery, setCrmSearchQuery] = useState("");
 
-  // Fetch portfolio companies
   const { data: companies = [], isLoading } = useQuery<PortfolioCompany[]>({
     queryKey: ['/api/docktalk/portfolio-companies'],
   });
 
-  // Fetch articles for expanded company
   const { data: companyArticles = [] } = useQuery<Article[]>({
     queryKey: ['/api/docktalk/portfolio-companies', expandedCompany, 'articles'],
     queryFn: async () => {
@@ -85,7 +104,19 @@ export default function PortfolioCompaniesPage() {
     enabled: !!expandedCompany,
   });
 
-  // Create portfolio company mutation
+  const { data: crmSearchResults = [] } = useQuery<CrmCompanyMatch[]>({
+    queryKey: ['/api/docktalk/crm-companies/search', crmSearchQuery],
+    queryFn: async () => {
+      if (!crmSearchQuery || crmSearchQuery.length < 2) return [];
+      const response = await fetch(`/api/docktalk/crm-companies/search?q=${encodeURIComponent(crmSearchQuery)}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: crmSearchQuery.length >= 2,
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: {
       companyName: string;
@@ -106,14 +137,16 @@ export default function PortfolioCompaniesPage() {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (newCompany) => {
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/portfolio-companies'] });
       setIsAddDialogOpen(false);
+      setShowMatchDialog(false);
       resetForm();
       toast({
         title: "Portfolio Company Added",
         description: "Company has been added to your portfolio tracking list.",
       });
+      return newCompany;
     },
     onError: (error: Error) => {
       toast({
@@ -124,7 +157,89 @@ export default function PortfolioCompaniesPage() {
     },
   });
 
-  // Update portfolio company mutation (for alert toggle)
+  const linkMutation = useMutation({
+    mutationFn: async ({ portfolioId, crmCompanyId }: { portfolioId: string; crmCompanyId: string }) => {
+      const response = await fetch(`/api/docktalk/portfolio-companies/${portfolioId}/link-crm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ crmCompanyId }),
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to link to CRM company');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/portfolio-companies'] });
+      setLinkDialogOpen(false);
+      setLinkingCompanyId(null);
+      setCrmSearchQuery("");
+      toast({
+        title: "Companies Linked",
+        description: "Portfolio company is now linked to the CRM company.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to link companies",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unlinkMutation = useMutation({
+    mutationFn: async (portfolioId: string) => {
+      const response = await fetch(`/api/docktalk/portfolio-companies/${portfolioId}/unlink-crm`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to unlink from CRM company');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/portfolio-companies'] });
+      toast({
+        title: "Companies Unlinked",
+        description: "Portfolio company has been unlinked from CRM.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to unlink companies",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createCrmMutation = useMutation({
+    mutationFn: async ({ portfolioId, crmData }: { portfolioId: string; crmData: any }) => {
+      const response = await fetch(`/api/docktalk/portfolio-companies/${portfolioId}/create-crm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(crmData),
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to create CRM company');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/portfolio-companies'] });
+      setShowMatchDialog(false);
+      toast({
+        title: "CRM Company Created",
+        description: "New CRM company created and linked to portfolio.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create CRM company",
+        variant: "destructive",
+      });
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<PortfolioCompany> }) => {
       const response = await fetch(`/api/docktalk/portfolio-companies/${id}`, {
@@ -133,9 +248,7 @@ export default function PortfolioCompaniesPage() {
         body: JSON.stringify(data),
         credentials: 'include',
       });
-      if (!response.ok) {
-        throw new Error('Failed to update portfolio company');
-      }
+      if (!response.ok) throw new Error('Failed to update portfolio company');
       return response.json();
     },
     onSuccess: () => {
@@ -154,16 +267,13 @@ export default function PortfolioCompaniesPage() {
     },
   });
 
-  // Delete portfolio company mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const response = await fetch(`/api/docktalk/portfolio-companies/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });
-      if (!response.ok) {
-        throw new Error('Failed to delete portfolio company');
-      }
+      if (!response.ok) throw new Error('Failed to delete portfolio company');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/portfolio-companies'] });
@@ -187,11 +297,11 @@ export default function PortfolioCompaniesPage() {
     setSector("");
     setRegion("");
     setNotes("");
+    setPendingCompanyData(null);
+    setMatchResults(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const checkForMatches = async () => {
     if (!companyName.trim()) {
       toast({
         title: "Validation Error",
@@ -201,18 +311,82 @@ export default function PortfolioCompaniesPage() {
       return;
     }
 
-    const aliasesArray = aliases
-      .split(',')
-      .map(a => a.trim())
-      .filter(Boolean);
+    setIsCheckingMatches(true);
+    
+    try {
+      const response = await fetch('/api/docktalk/portfolio-companies/match-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyName: companyName.trim() }),
+        credentials: 'include',
+      });
+      
+      if (!response.ok) throw new Error('Failed to check for matches');
+      
+      const matches: MatchResult = await response.json();
+      
+      const aliasesArray = aliases.split(',').map(a => a.trim()).filter(Boolean);
+      const companyData = {
+        companyName: companyName.trim(),
+        aliases: aliasesArray.length > 0 ? aliasesArray : undefined,
+        sector: sector.trim() || undefined,
+        region: region.trim() || undefined,
+        notes: notes.trim() || undefined,
+      };
+      
+      setPendingCompanyData(companyData);
+      
+      if (matches.exactMatch || matches.suggestions.length > 0) {
+        setMatchResults(matches);
+        setShowMatchDialog(true);
+        setIsAddDialogOpen(false);
+      } else {
+        createMutation.mutate(companyData);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to check for matching companies",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingMatches(false);
+    }
+  };
 
-    createMutation.mutate({
-      companyName: companyName.trim(),
-      aliases: aliasesArray.length > 0 ? aliasesArray : undefined,
-      sector: sector.trim() ? sector.trim() : null,
-      region: region.trim() ? region.trim() : null,
-      notes: notes.trim() ? notes.trim() : null,
-    });
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    checkForMatches();
+  };
+
+  const handleLinkAndCreate = async (crmCompanyId: string) => {
+    const result = await createMutation.mutateAsync(pendingCompanyData);
+    if (result?.id) {
+      await linkMutation.mutateAsync({ portfolioId: result.id, crmCompanyId });
+    }
+    setShowMatchDialog(false);
+    resetForm();
+  };
+
+  const handleCreateWithNewCrm = async () => {
+    const result = await createMutation.mutateAsync(pendingCompanyData);
+    if (result?.id) {
+      await createCrmMutation.mutateAsync({
+        portfolioId: result.id,
+        crmData: {
+          name: pendingCompanyData.companyName,
+          industry: pendingCompanyData.sector,
+        },
+      });
+    }
+    setShowMatchDialog(false);
+    resetForm();
+  };
+
+  const handleCreateWithoutLink = () => {
+    createMutation.mutate(pendingCompanyData);
+    setShowMatchDialog(false);
+    resetForm();
   };
 
   const handleDelete = (company: PortfolioCompany) => {
@@ -245,7 +419,7 @@ export default function PortfolioCompaniesPage() {
             <DialogHeader>
               <DialogTitle>Add Portfolio Company</DialogTitle>
               <DialogDescription>
-                Add a marina company to your portfolio tracking list. You'll receive alerts when this company appears in industry news.
+                Add a marina company to your portfolio tracking list. We'll check if it matches any existing CRM companies.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
@@ -330,16 +504,187 @@ export default function PortfolioCompaniesPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createMutation.isPending}
+                  disabled={createMutation.isPending || isCheckingMatches}
                   data-testid="button-submit-add"
                 >
-                  {createMutation.isPending ? "Adding..." : "Add Company"}
+                  {isCheckingMatches ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Checking...
+                    </>
+                  ) : createMutation.isPending ? "Adding..." : "Add Company"}
                 </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* CRM Match Dialog */}
+      <Dialog open={showMatchDialog} onOpenChange={setShowMatchDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Similar CRM Companies Found
+            </DialogTitle>
+            <DialogDescription>
+              We found companies in your CRM that may match "{pendingCompanyData?.companyName}". Would you like to link them?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4 max-h-[400px] overflow-y-auto">
+            {matchResults?.exactMatch && (
+              <div className="border-2 border-green-500/50 rounded-lg p-4 bg-green-50/50 dark:bg-green-950/20">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <span className="font-semibold text-green-700 dark:text-green-400">Exact Match</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {matchResults.exactMatch.matchScore}% match
+                      </Badge>
+                    </div>
+                    <h4 className="font-medium text-foreground">{matchResults.exactMatch.name}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {matchResults.exactMatch.industry || 'No industry'} 
+                      {matchResults.exactMatch.domain && ` • ${matchResults.exactMatch.domain}`}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {matchResults.exactMatch.matchReason}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleLinkAndCreate(matchResults.exactMatch!.id)}
+                    disabled={createMutation.isPending || linkMutation.isPending}
+                    data-testid="button-link-exact-match"
+                  >
+                    <Link2 className="h-4 w-4 mr-1" />
+                    Link
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {matchResults?.suggestions.map((match) => (
+              <div key={match.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="text-xs">
+                        {match.matchScore}% match
+                      </Badge>
+                    </div>
+                    <h4 className="font-medium text-foreground">{match.name}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {match.industry || 'No industry'} 
+                      {match.domain && ` • ${match.domain}`}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {match.matchReason}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleLinkAndCreate(match.id)}
+                    disabled={createMutation.isPending || linkMutation.isPending}
+                    data-testid={`button-link-suggestion-${match.id}`}
+                  >
+                    <Link2 className="h-4 w-4 mr-1" />
+                    Link
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={handleCreateWithoutLink}
+              disabled={createMutation.isPending}
+              className="w-full sm:w-auto"
+              data-testid="button-create-without-link"
+            >
+              Skip - Don't Link
+            </Button>
+            <Button
+              onClick={handleCreateWithNewCrm}
+              disabled={createMutation.isPending || createCrmMutation.isPending}
+              className="w-full sm:w-auto"
+              data-testid="button-create-new-crm"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Create New CRM Company
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link Existing Company Dialog */}
+      <Dialog open={linkDialogOpen} onOpenChange={(open) => {
+        setLinkDialogOpen(open);
+        if (!open) {
+          setLinkingCompanyId(null);
+          setCrmSearchQuery("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Link to CRM Company</DialogTitle>
+            <DialogDescription>
+              Search for a CRM company to link with this portfolio company.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search CRM companies..."
+                value={crmSearchQuery}
+                onChange={(e) => setCrmSearchQuery(e.target.value)}
+                className="pl-10"
+                data-testid="input-crm-search"
+              />
+            </div>
+            
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {crmSearchResults.length === 0 && crmSearchQuery.length >= 2 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No matching CRM companies found
+                </p>
+              )}
+              {crmSearchResults.map((company) => (
+                <div 
+                  key={company.id} 
+                  className="border rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                  onClick={() => {
+                    if (linkingCompanyId) {
+                      linkMutation.mutate({ portfolioId: linkingCompanyId, crmCompanyId: company.id });
+                    }
+                  }}
+                  data-testid={`crm-search-result-${company.id}`}
+                >
+                  <h4 className="font-medium text-foreground">{company.name}</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {company.industry || 'No industry'} 
+                    {company.domain && ` • ${company.domain}`}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {isLoading ? (
         <div className="space-y-4">
@@ -375,6 +720,12 @@ export default function PortfolioCompaniesPage() {
                     <CardTitle className="text-xl flex items-center gap-2">
                       <Building2 className="h-5 w-5 text-primary" />
                       {company.companyName}
+                      {company.crmCompanyId && (
+                        <Badge variant="secondary" className="text-xs ml-2" data-testid={`badge-crm-linked-${company.id}`}>
+                          <Link2 className="h-3 w-3 mr-1" />
+                          CRM Linked
+                        </Badge>
+                      )}
                     </CardTitle>
                     <div className="flex items-center gap-4 mt-2">
                       {company.sector && (
@@ -390,7 +741,32 @@ export default function PortfolioCompaniesPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    {company.crmCompanyId ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => unlinkMutation.mutate(company.id)}
+                        disabled={unlinkMutation.isPending}
+                        data-testid={`button-unlink-${company.id}`}
+                      >
+                        <Unlink className="h-4 w-4 mr-1" />
+                        Unlink
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setLinkingCompanyId(company.id);
+                          setLinkDialogOpen(true);
+                        }}
+                        data-testid={`button-link-${company.id}`}
+                      >
+                        <Link2 className="h-4 w-4 mr-1" />
+                        Link to CRM
+                      </Button>
+                    )}
                     <div className="flex items-center gap-2" data-testid={`alert-toggle-${company.id}`}>
                       <Label htmlFor={`alert-${company.id}`} className="text-sm cursor-pointer">
                         {company.isActive ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
@@ -422,7 +798,7 @@ export default function PortfolioCompaniesPage() {
               </CardHeader>
 
               <CardContent className="space-y-3">
-                {company.aliases.length > 0 && (
+                {company.aliases && company.aliases.length > 0 && (
                   <div>
                     <p className="text-sm font-medium text-muted-foreground mb-1">Aliases:</p>
                     <div className="flex flex-wrap gap-2">
