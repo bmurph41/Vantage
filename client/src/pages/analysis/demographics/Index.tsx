@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useLoadScript, Autocomplete } from "@react-google-maps/api";
+import { useLoadScript, Autocomplete, GoogleMap, Circle, Marker } from "@react-google-maps/api";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
@@ -576,6 +576,31 @@ const DRIVE_TIMES = [
   { value: 20, label: "20 Min", estimatedMiles: 12 },
 ];
 
+const RING_COLORS = [
+  { fill: 'rgba(59, 130, 246, 0.15)', stroke: '#3b82f6' },
+  { fill: 'rgba(16, 185, 129, 0.15)', stroke: '#10b981' },
+  { fill: 'rgba(245, 158, 11, 0.15)', stroke: '#f59e0b' },
+  { fill: 'rgba(239, 68, 68, 0.15)', stroke: '#ef4444' },
+];
+
+const LOCATION_COLORS = [
+  '#3b82f6',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+];
+
+const mapContainerStyle = {
+  width: '100%',
+  height: '400px',
+};
+
+const defaultMapCenter = {
+  lat: 39.8283,
+  lng: -98.5795,
+};
+
 interface SavedLocation {
   id: string;
   address: string;
@@ -1039,6 +1064,106 @@ function LocationAnalysisSection() {
           )}
         </CardContent>
       </Card>
+
+      {selectedLocations.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Trade Area Map</CardTitle>
+            </div>
+            <CardDescription>
+              Visualizing {selectedLocations.length} location{selectedLocations.length > 1 ? 's' : ''} with trade areas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg overflow-hidden border">
+              <GoogleMap
+                mapContainerStyle={mapContainerStyle}
+                center={selectedLocations.length > 0 
+                  ? { lat: selectedLocations[0].latitude, lng: selectedLocations[0].longitude }
+                  : defaultMapCenter
+                }
+                zoom={selectedLocations.length === 1 ? 10 : 8}
+                options={{
+                  mapTypeControl: true,
+                  streetViewControl: false,
+                  fullscreenControl: true,
+                }}
+              >
+                {selectedLocations.map((location, locIdx) => {
+                  const locationColor = LOCATION_COLORS[locIdx % LOCATION_COLORS.length];
+                  const rings = location.config.analysisMode === 'distance'
+                    ? location.config.distanceRings.map(r => r)
+                    : location.config.driveTimes.map(t => {
+                        const driveTime = DRIVE_TIMES.find(d => d.value === t);
+                        return driveTime ? driveTime.estimatedMiles : t * 0.5;
+                      });
+                  
+                  const sortedRings = [...rings].sort((a, b) => b - a);
+                  
+                  return [
+                    <Marker
+                      key={`marker-${locIdx}`}
+                      position={{ lat: location.latitude, lng: location.longitude }}
+                      title={location.address}
+                      icon={{
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: locationColor,
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                      }}
+                    />,
+                    ...sortedRings.map((radiusMiles, ringIdx) => {
+                      const colorIdx = ringIdx % RING_COLORS.length;
+                      const radiusMeters = radiusMiles * 1609.34;
+                      return (
+                        <Circle
+                          key={`circle-${locIdx}-${ringIdx}`}
+                          center={{ lat: location.latitude, lng: location.longitude }}
+                          radius={radiusMeters}
+                          options={{
+                            fillColor: RING_COLORS[colorIdx].stroke,
+                            fillOpacity: 0.1,
+                            strokeColor: RING_COLORS[colorIdx].stroke,
+                            strokeOpacity: 0.8,
+                            strokeWeight: 2,
+                          }}
+                        />
+                      );
+                    })
+                  ];
+                })}
+              </GoogleMap>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-4">
+              {selectedLocations.map((location, locIdx) => {
+                const locationColor = LOCATION_COLORS[locIdx % LOCATION_COLORS.length];
+                const isDistance = location.config.analysisMode === 'distance';
+                const areas = isDistance 
+                  ? location.config.distanceRings.map(r => `${r} mi`)
+                  : location.config.driveTimes.map(t => `${t} min`);
+                
+                return (
+                  <div key={locIdx} className="flex items-center gap-2 text-sm">
+                    <div 
+                      className="w-3 h-3 rounded-full border-2 border-white shadow-sm" 
+                      style={{ backgroundColor: locationColor }}
+                    />
+                    <span className="font-medium truncate max-w-32">{location.label || location.address.split(',')[0]}</span>
+                    <span className="text-muted-foreground">
+                      ({isDistance ? <Ruler className="h-3 w-3 inline mr-1" /> : <Clock className="h-3 w-3 inline mr-1" />}
+                      {areas.join(', ')})
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {fetchDemographicsMutation.isPending && (
         <div className="flex items-center justify-center py-8">
