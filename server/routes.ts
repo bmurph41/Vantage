@@ -14603,6 +14603,142 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Fetch Census demographics for a specific location (latitude/longitude)
+  app.post('/api/demographics/location', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { latitude, longitude, address, radiusMiles } = req.body;
+      
+      if (latitude === undefined || longitude === undefined) {
+        return res.status(400).json({ error: 'Latitude and longitude are required' });
+      }
+      
+      const { CensusService } = await import('./services/census-service');
+      const censusApiKey = process.env.CENSUS_API_KEY;
+      const censusService = new CensusService(censusApiKey);
+      
+      const demographics = await censusService.getDemographicsForLocation(
+        parseFloat(latitude),
+        parseFloat(longitude)
+      );
+      
+      res.json({
+        location: { latitude, longitude, address },
+        radiusMiles: radiusMiles || null,
+        demographics,
+        fetchedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Failed to fetch location demographics:', error);
+      res.status(500).json({ error: 'Failed to fetch location demographics' });
+    }
+  });
+
+  // Get demographics for a CRM property by ID
+  app.get('/api/demographics/property/:propertyId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { propertyId } = req.params;
+      
+      // Get property from CRM
+      const { crmProperties } = await import('@shared/schema');
+      const property = await db
+        .select()
+        .from(crmProperties)
+        .where(and(
+          eq(crmProperties.id, parseInt(propertyId)),
+          eq(crmProperties.orgId, orgId)
+        ))
+        .limit(1);
+      
+      if (property.length === 0) {
+        return res.status(404).json({ error: 'Property not found' });
+      }
+      
+      const prop = property[0];
+      if (!prop.latitude || !prop.longitude) {
+        return res.status(400).json({ error: 'Property does not have coordinates' });
+      }
+      
+      const { CensusService } = await import('./services/census-service');
+      const censusApiKey = process.env.CENSUS_API_KEY;
+      const censusService = new CensusService(censusApiKey);
+      
+      const demographics = await censusService.getDemographicsForLocation(
+        prop.latitude,
+        prop.longitude
+      );
+      
+      res.json({
+        property: {
+          id: prop.id,
+          name: prop.name,
+          address: prop.address,
+          city: prop.city,
+          state: prop.state,
+          latitude: prop.latitude,
+          longitude: prop.longitude
+        },
+        demographics,
+        fetchedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Failed to fetch property demographics:', error);
+      res.status(500).json({ error: 'Failed to fetch property demographics' });
+    }
+  });
+
+  // Compare demographics for multiple locations
+  app.post('/api/demographics/compare', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { locations } = req.body;
+      
+      if (!Array.isArray(locations) || locations.length === 0) {
+        return res.status(400).json({ error: 'At least one location is required' });
+      }
+      
+      if (locations.length > 5) {
+        return res.status(400).json({ error: 'Maximum 5 locations can be compared' });
+      }
+      
+      const { CensusService } = await import('./services/census-service');
+      const censusApiKey = process.env.CENSUS_API_KEY;
+      const censusService = new CensusService(censusApiKey);
+      
+      const results = await Promise.all(
+        locations.map(async (loc: { latitude: number; longitude: number; label?: string }) => {
+          try {
+            const demographics = await censusService.getDemographicsForLocation(
+              loc.latitude,
+              loc.longitude
+            );
+            return {
+              location: loc,
+              demographics,
+              success: true
+            };
+          } catch (error) {
+            return {
+              location: loc,
+              demographics: null,
+              success: false,
+              error: 'Failed to fetch demographics'
+            };
+          }
+        })
+      );
+      
+      res.json({
+        comparisons: results,
+        fetchedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Failed to compare demographics:', error);
+      res.status(500).json({ error: 'Failed to compare demographics' });
+    }
+  });
+
   // Get recent fuel transactions for detail panel
   app.get('/api/fuel/transactions/recent', authenticateUser, async (req: any, res) => {
     try {

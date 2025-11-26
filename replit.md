@@ -68,6 +68,13 @@ Preferred communication style: Simple, everyday language.
 - **Ship Store Module**: POS/inventory system with product catalog, transactions, analytics, and customer tracking, with portfolio management.
 - **Virtual Data Room (VDR) Module**: Secure document management with hierarchical folders, 5-level permissions, external user management, diligence request workflows, audit logging, and data request management (Kanban board, configurable categories, due date presets).
 - **DockTalk 2.0 Module**: Marina industry intelligence platform with AI-powered RSS aggregation, M&A deal tracking, real-time updates, sentiment analysis, and AI training system.
+- **Market Demographics Module**: Regional market analysis with state-level FRED economic indicators (population, income, employment, housing) and location-based Census demographics. Features include:
+    - **State Analysis**: FRED API integration for state-level economic data with YoY trends and 5-year CAGR.
+    - **Location Analysis**: Census Bureau API integration for granular demographics at any U.S. address (tract/county/state level).
+    - **Trade Area Analysis**: Configurable 1/3/5 mile radius demographic analysis.
+    - **Multi-Location Comparison**: Side-by-side comparison of up to 5 locations with population, income, education, and housing metrics.
+    - **Property Demographics**: Direct integration with CRM properties for automatic demographic lookups.
+    - **Caching Layer**: Automatic caching of FRED and Census API responses to minimize external calls.
 
 ## External Dependencies
 

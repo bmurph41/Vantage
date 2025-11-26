@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index, customType, decimal, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index, customType, decimal, numeric, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -9360,6 +9360,98 @@ export type InsertDemographicsCache = z.infer<typeof insertDemographicsCacheSche
 
 export type RegionalMarketStats = typeof regionalMarketStats.$inferSelect;
 export type InsertRegionalMarketStats = z.infer<typeof insertRegionalMarketStatsSchema>;
+
+// Location-based demographic summary from Census API
+export interface DemographicSummary {
+  // Core Demographics
+  totalPopulation: number;
+  totalMales?: number;
+  totalFemales?: number;
+  medianAge: number;
+  medianAgeMale?: number;
+  medianAgeFemale?: number;
+  
+  // Age Analytics
+  ageDistribution?: Record<string, number>;
+  ageByGender?: Record<string, any>;
+  generationalCohorts?: Record<string, number>;
+  
+  // Income Analytics
+  medianHouseholdIncome: number;
+  meanHouseholdIncome?: number;
+  perCapitaIncome?: number;
+  medianFamilyIncome?: number;
+  incomeDistribution?: Record<string, number>;
+  
+  // Education Analytics
+  educationLevels?: Record<string, number>;
+  
+  // Employment Analytics
+  employmentStats?: Record<string, number>;
+  industryDistribution?: Record<string, number>;
+  
+  // Housing Analytics
+  housingStats?: Record<string, number>;
+  householdSize?: number;
+  medianHomeValue?: number;
+  
+  // Race & Ethnicity
+  raceEthnicity?: Record<string, number>;
+  
+  // Geographic
+  populationDensity?: number;
+  geographicLevel?: string;
+  fipsState?: string;
+  fipsCounty?: string;
+  fipsTract?: string;
+}
+
+// Location demographics cache - stores Census API responses
+export const locationDemographicsCache = pgTable('location_demographics_cache', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Geographic identifiers
+  latitude: real('latitude').notNull(),
+  longitude: real('longitude').notNull(),
+  address: text('address'),
+  city: varchar('city', { length: 100 }),
+  stateCode: varchar('state_code', { length: 2 }),
+  zipCode: varchar('zip_code', { length: 10 }),
+  
+  // Census geography identifiers
+  fipsState: varchar('fips_state', { length: 2 }),
+  fipsCounty: varchar('fips_county', { length: 3 }),
+  fipsTract: varchar('fips_tract', { length: 6 }),
+  geographicLevel: varchar('geographic_level', { length: 20 }),
+  
+  // Trade area configuration
+  radiusMiles: real('radius_miles'), // null = point location
+  
+  // Demographic data (full Census response)
+  demographicData: jsonb('demographic_data').notNull(),
+  
+  // Cache management
+  fetchedAt: timestamp('fetched_at').notNull().defaultNow(),
+  expiresAt: timestamp('expires_at').notNull(),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('loc_demo_cache_org_idx').on(table.orgId),
+  coordsIdx: index('loc_demo_cache_coords_idx').on(table.latitude, table.longitude),
+  stateIdx: index('loc_demo_cache_state_idx').on(table.stateCode),
+  uniqueLocation: unique('loc_demo_cache_unique').on(table.orgId, table.latitude, table.longitude, table.radiusMiles),
+}));
+
+export const insertLocationDemographicsCacheSchema = createInsertSchema(locationDemographicsCache).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type LocationDemographicsCache = typeof locationDemographicsCache.$inferSelect;
+export type InsertLocationDemographicsCache = z.infer<typeof insertLocationDemographicsCacheSchema>;
 
 // ============================================================================
 // DockTalk 2.0 Schema Integration
