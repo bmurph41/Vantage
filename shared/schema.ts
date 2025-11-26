@@ -5481,6 +5481,185 @@ export const rcMetricAlerts = pgTable('rc_metric_alerts', {
   activeIdx: index('rc_metric_alerts_active_idx').on(table.isActive),
 }));
 
+// ============================================================================
+// RATE TIERS - Detailed Rate Tracking for Rate Comps
+// ============================================================================
+
+// Storage type constants for rate comps
+export const rateStorageTypes = ['wet_slip', 'dry_rack', 'mooring', 'trailer', 'rack_storage', 'lift_storage', 'kayak_sup', 'jet_ski', 'rv_space'] as const;
+export type RateStorageType = typeof rateStorageTypes[number];
+
+// Rate period constants
+export const ratePeriods = ['daily', 'weekly', 'monthly', 'seasonal', 'annual'] as const;
+export type RatePeriod = typeof ratePeriods[number];
+
+// Rate unit constants
+export const rateUnits = ['per_foot', 'flat', 'per_foot_beam', 'per_foot_loa'] as const;
+export type RateUnit = typeof rateUnits[number];
+
+// Size basis constants
+export const rateSizeBases = ['loa_range', 'exact_loa', 'beam', 'category', 'any'] as const;
+export type RateSizeBasis = typeof rateSizeBases[number];
+
+// Protection level constants
+export const rateProtectionLevels = ['open', 'protected', 'covered', 'indoor'] as const;
+export type RateProtectionLevel = typeof rateProtectionLevels[number];
+
+// Rate Tiers - detailed pricing tiers linked to rate comps (marina records)
+export const rateTiers = pgTable('rate_tiers', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  rateCompId: varchar('rate_comp_id').notNull().references(() => rateComps.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+
+  tierLabel: text('tier_label'),
+  displayOrder: integer('display_order').default(0),
+  
+  storageType: text('storage_type').notNull(),
+  
+  sizeBasis: text('size_basis').default('loa_range'),
+  loaMin: integer('loa_min'),
+  loaMax: integer('loa_max'),
+  beamMin: integer('beam_min'),
+  beamMax: integer('beam_max'),
+  draftMax: integer('draft_max'),
+  categoryLabel: text('category_label'),
+  
+  rateUnit: text('rate_unit').notNull(),
+  ratePeriod: text('rate_period').notNull(),
+  amountCents: integer('amount_cents').notNull(),
+  
+  seasonality: text('seasonality').default('annual'),
+  seasonStartMonth: integer('season_start_month'),
+  seasonEndMonth: integer('season_end_month'),
+  
+  effectiveDate: date('effective_date'),
+  expirationDate: date('expiration_date'),
+  isCurrentRate: boolean('is_current_rate').default(true),
+  
+  minTermMonths: integer('min_term_months'),
+  depositRequired: boolean('deposit_required').default(false),
+  depositAmountCents: integer('deposit_amount_cents'),
+  
+  electricIncluded: boolean('electric_included').default(false),
+  electricAmps: integer('electric_amps').array().default(sql`'{}'`),
+  electricAdditionalCents: integer('electric_additional_cents'),
+  
+  waterIncluded: boolean('water_included').default(true),
+  wifiIncluded: boolean('wifi_included').default(false),
+  pumpOutIncluded: boolean('pump_out_included').default(false),
+  
+  protectionLevel: text('protection_level'),
+  isCovered: boolean('is_covered').default(false),
+  
+  liveaboardAllowed: boolean('liveaboard_allowed'),
+  liveaboardAdditionalCents: integer('liveaboard_additional_cents'),
+  
+  taxesIncluded: boolean('taxes_included').default(false),
+  taxRate: decimal('tax_rate', { precision: 5, scale: 3 }),
+  
+  waitlistOnly: boolean('waitlist_only').default(false),
+  availabilityNotes: text('availability_notes'),
+  
+  normalizedUnit: text('normalized_unit').default('usd_per_ft_per_month'),
+  normalizedValue: integer('normalized_value'),
+  normalizedMethod: text('normalized_method'),
+  normalizedAt: timestamp('normalized_at'),
+  
+  sourceType: text('source_type'),
+  sourceUrl: text('source_url'),
+  sourceDate: date('source_date'),
+  verifiedAt: timestamp('verified_at'),
+  verifiedBy: varchar('verified_by').references(() => users.id),
+  
+  notes: text('notes'),
+  custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
+}, (table) => ({
+  rateCompIdx: index('rate_tiers_rate_comp_idx').on(table.rateCompId),
+  orgIdx: index('rate_tiers_org_idx').on(table.orgId),
+  orgStorageIdx: index('rate_tiers_org_storage_idx').on(table.orgId, table.storageType),
+  orgLoaIdx: index('rate_tiers_org_loa_idx').on(table.orgId, table.loaMin, table.loaMax),
+  orgNormalizedIdx: index('rate_tiers_org_normalized_idx').on(table.orgId, table.normalizedValue),
+  orgCurrentIdx: index('rate_tiers_org_current_idx').on(table.orgId, table.isCurrentRate),
+}));
+
+// Rate Tier Relations
+export const rateTiersRelations = relations(rateTiers, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [rateTiers.orgId],
+    references: [organizations.id],
+  }),
+  rateComp: one(rateComps, {
+    fields: [rateTiers.rateCompId],
+    references: [rateComps.id],
+  }),
+  createdByUser: one(users, {
+    fields: [rateTiers.createdBy],
+    references: [users.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [rateTiers.updatedBy],
+    references: [users.id],
+  }),
+}));
+
+// Zod schemas for Rate Tiers
+export const insertRateTierSchema = createInsertSchema(rateTiers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateRateTierSchema = insertRateTierSchema.partial().omit({
+  orgId: true,
+  rateCompId: true,
+  createdBy: true,
+});
+
+// Rate analytics filter interface
+export const rateAnalyticsFiltersSchema = z.object({
+  states: z.array(z.string()).optional(),
+  regions: z.array(z.string()).optional(),
+  waterTypes: z.array(z.string()).optional(),
+  storageTypes: z.array(z.string()).optional(),
+  
+  loaMin: z.number().optional(),
+  loaMax: z.number().optional(),
+  beamMin: z.number().optional(),
+  beamMax: z.number().optional(),
+  
+  rateUnits: z.array(z.string()).optional(),
+  ratePeriods: z.array(z.string()).optional(),
+  
+  normalizedValueMin: z.number().optional(),
+  normalizedValueMax: z.number().optional(),
+  
+  effectiveDateMin: z.string().optional(),
+  effectiveDateMax: z.string().optional(),
+  
+  electricIncluded: z.boolean().optional(),
+  protectionLevels: z.array(z.string()).optional(),
+  isCovered: z.boolean().optional(),
+  
+  isCurrentRate: z.boolean().optional(),
+  seasonality: z.array(z.string()).optional(),
+});
+
+export type RateAnalyticsFilters = z.infer<typeof rateAnalyticsFiltersSchema>;
+
+// Types for Rate Tiers
+export type RateTier = typeof rateTiers.$inferSelect;
+export type InsertRateTier = z.infer<typeof insertRateTierSchema>;
+export type UpdateRateTier = z.infer<typeof updateRateTierSchema>;
+
+// Rate Comp with tiers joined
+export type RateCompWithTiers = RateComp & {
+  tiers: RateTier[];
+};
+
 // Fuel Sales - Operations Module
 export const fuelSales = pgTable('fuel_sales', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
