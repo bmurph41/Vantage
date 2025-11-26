@@ -423,6 +423,7 @@ export const userFilterPreferences = pgTable("docktalk_user_filter_preferences",
   fromDate: text("from_date"),
   minRelevance: integer("min_relevance"),
   sortBy: text("sort_by").default("newest"),
+  customGeographyRegions: text("custom_geography_regions").array(), // User-defined custom geography regions for portfolio companies
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

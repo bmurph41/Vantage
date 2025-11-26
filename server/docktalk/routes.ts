@@ -1810,7 +1810,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     sector: z.string().optional().nullable(),
     region: z.string().optional().nullable(),
     notes: z.string().optional().nullable(),
-    companyType: z.enum(["marina_operator", "marina_owner", "boat_dealer", "marine_services", "yacht_club", "boatyard", "marine_retail", "marine_finance", "other"]).optional().nullable(),
+    companyType: z.enum(["marina_operator", "marina_owner", "marina_owner_operator", "boat_dealer", "marine_services", "yacht_club", "boatyard", "marine_retail", "marine_finance", "other"]).optional().nullable(),
     relationshipStage: z.enum(["tracking", "interested", "in_pipeline", "portfolio_holding", "exited"]).optional().nullable(),
     geographyFocus: z.array(z.string()).optional().nullable(),
     website: z.string().optional().nullable(),
@@ -2344,6 +2344,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         alertFrequency: notificationPrefs?.frequency ?? 'daily',
         subscriptionTier: user.subscriptionTier || 'free',
         categoriesFilter: filterPrefs?.categories || notificationPrefs?.categories || [],
+        customGeographyRegions: filterPrefs?.customGeographyRegions || [],
         createdAt: notificationPrefs?.createdAt?.toISOString() || new Date().toISOString(),
         updatedAt: notificationPrefs?.updatedAt?.toISOString() || new Date().toISOString(),
       });
@@ -2357,6 +2358,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     emailNotifications: z.boolean().optional(),
     alertFrequency: z.enum(["none", "immediate", "daily", "weekly"]).optional(),
     categoriesFilter: z.array(z.string()).optional(),
+    customGeographyRegions: z.array(z.string()).optional(),
   });
 
   app.patch("/api/docktalk/user-preferences", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
@@ -2390,10 +2392,12 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         }
       }
 
-      // Update filter preferences if categories are provided
-      if (data.categoriesFilter !== undefined) {
+      // Update filter preferences if categories or custom geography regions are provided
+      if (data.categoriesFilter !== undefined || data.customGeographyRegions !== undefined) {
+        const existingFilterPrefs = await dockTalkStorage.getUserFilterPreferences(user.id, user.orgId);
         await dockTalkStorage.saveUserFilterPreferences(user.id, user.orgId, {
-          categories: data.categoriesFilter,
+          categories: data.categoriesFilter ?? existingFilterPrefs?.categories ?? [],
+          customGeographyRegions: data.customGeographyRegions ?? existingFilterPrefs?.customGeographyRegions ?? [],
         });
       }
 
@@ -2407,6 +2411,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         alertFrequency: notificationPrefs?.frequency ?? 'daily',
         subscriptionTier: user.subscriptionTier || 'free',
         categoriesFilter: filterPrefs?.categories || notificationPrefs?.categories || [],
+        customGeographyRegions: filterPrefs?.customGeographyRegions || [],
         createdAt: notificationPrefs?.createdAt?.toISOString() || new Date().toISOString(),
         updatedAt: notificationPrefs?.updatedAt?.toISOString() || new Date().toISOString(),
       });

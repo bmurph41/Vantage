@@ -35,13 +35,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Building2, Plus, Trash2, FileText, Bell, BellOff, ChevronDown, ChevronRight,
   Link2, Unlink, Search, CheckCircle2, AlertCircle, Loader2, Pencil, Settings2,
-  Globe, MapPin, Tag
+  Globe, MapPin, Tag, Info, X, Settings
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { queryClient } from "@/lib/queryClient";
 
 const COMPANY_TYPES = [
-  { value: "marina_operator", label: "Marina Operator" },
-  { value: "marina_owner", label: "Marina Owner" },
+  { value: "marina_owner_operator", label: "Marina Owner-Operator" },
   { value: "boat_dealer", label: "Boat Dealer" },
   { value: "marine_services", label: "Marine Services" },
   { value: "yacht_club", label: "Yacht Club" },
@@ -52,14 +57,34 @@ const COMPANY_TYPES = [
 ];
 
 const RELATIONSHIP_STAGES = [
-  { value: "tracking", label: "Tracking" },
-  { value: "interested", label: "Interested" },
-  { value: "in_pipeline", label: "In Pipeline" },
-  { value: "portfolio_holding", label: "Portfolio Holding" },
-  { value: "exited", label: "Exited" },
+  { 
+    value: "tracking", 
+    label: "Tracking",
+    description: "Passively monitoring this company for news and developments. No active engagement or outreach."
+  },
+  { 
+    value: "interested", 
+    label: "Interested",
+    description: "Identified as a potential target. Initial research phase before formal outreach."
+  },
+  { 
+    value: "in_pipeline", 
+    label: "In Pipeline",
+    description: "Active deal in progress. Engaged in discussions, due diligence, or negotiations."
+  },
+  { 
+    value: "portfolio_holding", 
+    label: "Portfolio Holding",
+    description: "Currently owned asset in your investment portfolio. Active management and monitoring."
+  },
+  { 
+    value: "exited", 
+    label: "Exited",
+    description: "Previously owned asset that has been sold or divested. Historical tracking only."
+  },
 ];
 
-const GEOGRAPHY_REGIONS = [
+const DEFAULT_GEOGRAPHY_REGIONS = [
   "Northeast", "Southeast", "Gulf Coast", "Great Lakes", "Pacific Northwest",
   "California", "Florida", "Texas", "Mid-Atlantic", "New England"
 ];
@@ -167,6 +192,9 @@ export default function PortfolioCompaniesPage() {
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
   const [alertCompany, setAlertCompany] = useState<PortfolioCompany | null>(null);
 
+  const [geographySettingsOpen, setGeographySettingsOpen] = useState(false);
+  const [newRegionInput, setNewRegionInput] = useState("");
+
   const [formData, setFormData] = useState({
     companyName: "",
     aliases: "",
@@ -217,6 +245,72 @@ export default function PortfolioCompaniesPage() {
     },
     enabled: crmSearchQuery.length >= 2,
   });
+
+  const { data: userPreferences } = useQuery<{ customGeographyRegions?: string[] }>({
+    queryKey: ['/api/docktalk/user-preferences'],
+    queryFn: async () => {
+      const response = await fetch('/api/docktalk/user-preferences', {
+        credentials: 'include',
+      });
+      if (!response.ok) return { customGeographyRegions: [] };
+      return response.json();
+    },
+  });
+
+  const customRegions = userPreferences?.customGeographyRegions || [];
+  const allGeographyRegions = [...DEFAULT_GEOGRAPHY_REGIONS, ...customRegions.filter(r => !DEFAULT_GEOGRAPHY_REGIONS.includes(r))];
+
+  const saveCustomRegionsMutation = useMutation({
+    mutationFn: async (regions: string[]) => {
+      const response = await fetch('/api/docktalk/user-preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customGeographyRegions: regions }),
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to save custom regions');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/user-preferences'] });
+      toast({
+        title: "Regions Updated",
+        description: "Your custom geography regions have been saved.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save custom regions",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const addCustomRegion = () => {
+    const trimmed = newRegionInput.trim();
+    if (!trimmed) return;
+    if (allGeographyRegions.includes(trimmed)) {
+      toast({
+        title: "Region Exists",
+        description: "This region already exists in the list.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const newRegions = [...customRegions, trimmed];
+    saveCustomRegionsMutation.mutate(newRegions);
+    setNewRegionInput("");
+  };
+
+  const removeCustomRegion = (region: string) => {
+    const newRegions = customRegions.filter(r => r !== region);
+    saveCustomRegionsMutation.mutate(newRegions);
+    setFormData(prev => ({
+      ...prev,
+      geographyFocus: prev.geographyFocus.filter(g => g !== region)
+    }));
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -736,28 +830,57 @@ export default function PortfolioCompaniesPage() {
                             <SelectValue placeholder="Select stage..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {RELATIONSHIP_STAGES.map(stage => (
-                              <SelectItem key={stage.value} value={stage.value}>
-                                {stage.label}
-                              </SelectItem>
-                            ))}
+                            <TooltipProvider delayDuration={200}>
+                              {RELATIONSHIP_STAGES.map(stage => (
+                                <Tooltip key={stage.value}>
+                                  <TooltipTrigger asChild>
+                                    <div className="relative">
+                                      <SelectItem value={stage.value} className="pr-8">
+                                        <span className="flex items-center gap-2">
+                                          {stage.label}
+                                          <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                                        </span>
+                                      </SelectItem>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right" className="max-w-[250px]">
+                                    <p className="text-sm">{stage.description}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ))}
+                            </TooltipProvider>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
 
                     <div className="grid gap-2">
-                      <Label>Geography Focus</Label>
-                      <div className="flex flex-wrap gap-2 p-3 border rounded-md">
-                        {GEOGRAPHY_REGIONS.map(region => (
+                      <div className="flex items-center justify-between">
+                        <Label>Geography Focus</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setGeographySettingsOpen(true)}
+                          className="h-7 px-2 text-xs"
+                        >
+                          <Settings className="h-3.5 w-3.5 mr-1" />
+                          Manage Regions
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 p-3 border rounded-md max-h-[200px] overflow-y-auto">
+                        {allGeographyRegions.map(region => (
                           <div key={region} className="flex items-center space-x-2">
                             <Checkbox
                               id={`geo-${region}`}
                               checked={formData.geographyFocus.includes(region)}
                               onCheckedChange={() => toggleGeography(region)}
                             />
-                            <Label htmlFor={`geo-${region}`} className="text-sm cursor-pointer">
+                            <Label htmlFor={`geo-${region}`} className="text-sm cursor-pointer flex items-center gap-1">
                               {region}
+                              {customRegions.includes(region) && (
+                                <span className="text-xs text-muted-foreground">(custom)</span>
+                              )}
                             </Label>
                           </div>
                         ))}
@@ -1123,28 +1246,57 @@ export default function PortfolioCompaniesPage() {
                         <SelectValue placeholder="Select stage..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {RELATIONSHIP_STAGES.map(stage => (
-                          <SelectItem key={stage.value} value={stage.value}>
-                            {stage.label}
-                          </SelectItem>
-                        ))}
+                        <TooltipProvider delayDuration={200}>
+                          {RELATIONSHIP_STAGES.map(stage => (
+                            <Tooltip key={stage.value}>
+                              <TooltipTrigger asChild>
+                                <div className="relative">
+                                  <SelectItem value={stage.value} className="pr-8">
+                                    <span className="flex items-center gap-2">
+                                      {stage.label}
+                                      <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </span>
+                                  </SelectItem>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-[250px]">
+                                <p className="text-sm">{stage.description}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ))}
+                        </TooltipProvider>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
                 <div className="grid gap-2">
-                  <Label>Geography Focus</Label>
-                  <div className="flex flex-wrap gap-2 p-3 border rounded-md">
-                    {GEOGRAPHY_REGIONS.map(region => (
+                  <div className="flex items-center justify-between">
+                    <Label>Geography Focus</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setGeographySettingsOpen(true)}
+                      className="h-7 px-2 text-xs"
+                    >
+                      <Settings className="h-3.5 w-3.5 mr-1" />
+                      Manage Regions
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 p-3 border rounded-md max-h-[200px] overflow-y-auto">
+                    {allGeographyRegions.map(region => (
                       <div key={region} className="flex items-center space-x-2">
                         <Checkbox
                           id={`edit-geo-${region}`}
                           checked={formData.geographyFocus.includes(region)}
                           onCheckedChange={() => toggleGeography(region)}
                         />
-                        <Label htmlFor={`edit-geo-${region}`} className="text-sm cursor-pointer">
+                        <Label htmlFor={`edit-geo-${region}`} className="text-sm cursor-pointer flex items-center gap-1">
                           {region}
+                          {customRegions.includes(region) && (
+                            <span className="text-xs text-muted-foreground">(custom)</span>
+                          )}
                         </Label>
                       </div>
                     ))}
@@ -1281,6 +1433,96 @@ export default function PortfolioCompaniesPage() {
             </Button>
             <Button onClick={handleSaveAlertSettings} disabled={updateMutation.isPending}>
               {updateMutation.isPending ? "Saving..." : "Save Settings"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Geography Settings Dialog */}
+      <Dialog open={geographySettingsOpen} onOpenChange={setGeographySettingsOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              Manage Geography Regions
+            </DialogTitle>
+            <DialogDescription>
+              Add custom geography regions for classifying portfolio companies. These regions will be available across all your companies.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Add Custom Region</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g., Caribbean, Pacific Islands..."
+                  value={newRegionInput}
+                  onChange={(e) => setNewRegionInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addCustomRegion();
+                    }
+                  }}
+                />
+                <Button 
+                  onClick={addCustomRegion}
+                  disabled={!newRegionInput.trim() || saveCustomRegionsMutation.isPending}
+                >
+                  {saveCustomRegionsMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Default Regions</Label>
+              <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-muted/30">
+                {DEFAULT_GEOGRAPHY_REGIONS.map(region => (
+                  <Badge key={region} variant="secondary" className="text-xs">
+                    {region}
+                  </Badge>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                These default regions cannot be removed.
+              </p>
+            </div>
+
+            {customRegions.length > 0 && (
+              <div className="space-y-2">
+                <Label>Your Custom Regions</Label>
+                <div className="flex flex-wrap gap-2 p-3 border rounded-md">
+                  {customRegions.map(region => (
+                    <Badge 
+                      key={region} 
+                      variant="outline" 
+                      className="text-xs flex items-center gap-1 pr-1"
+                    >
+                      {region}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-4 w-4 p-0 hover:bg-destructive/20"
+                        onClick={() => removeCustomRegion(region)}
+                        disabled={saveCustomRegionsMutation.isPending}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGeographySettingsOpen(false)}>
+              Done
             </Button>
           </DialogFooter>
         </DialogContent>
