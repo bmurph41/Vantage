@@ -1080,6 +1080,13 @@ function LocationAnalysisSection() {
           <CardContent>
             <div className="rounded-lg overflow-hidden border">
               <GoogleMap
+                key={`map-${selectedLocations.map(l => 
+                  `${l.latitude}-${l.longitude}-${l.config.analysisMode}-${
+                    l.config.analysisMode === 'distance' 
+                      ? l.config.distanceRings.join(',') 
+                      : l.config.driveTimes.join(',')
+                  }`
+                ).join('|')}`}
                 mapContainerStyle={mapContainerStyle}
                 center={selectedLocations.length > 0 
                   ? { lat: selectedLocations[0].latitude, lng: selectedLocations[0].longitude }
@@ -1096,19 +1103,23 @@ function LocationAnalysisSection() {
                   const locationColor = LOCATION_COLORS[locIdx % LOCATION_COLORS.length];
                   const isDistance = location.config.analysisMode === 'distance';
                   const rawRings = isDistance
-                    ? location.config.distanceRings.map(r => ({ value: r, label: `${r} mi` }))
+                    ? location.config.distanceRings.map(r => ({ value: r, label: `${r} mi`, originalValue: r }))
                     : location.config.driveTimes.map(t => {
                         const driveTime = DRIVE_TIMES.find(d => d.value === t);
-                        return { value: driveTime ? driveTime.estimatedMiles : t * 0.5, label: `${t} min` };
+                        return { value: driveTime ? driveTime.estimatedMiles : t * 0.5, label: `${t} min`, originalValue: t };
                       });
                   
                   const sortedBySize = [...rawRings].sort((a, b) => a.value - b.value);
-                  const ringColorMap = new Map(sortedBySize.map((ring, idx) => [ring.value, idx]));
+                  const ringColorMap = new Map(sortedBySize.map((ring, idx) => [ring.originalValue, idx]));
                   const sortedForDrawing = [...rawRings].sort((a, b) => b.value - a.value);
+                  
+                  const configKey = isDistance 
+                    ? location.config.distanceRings.join('-') 
+                    : location.config.driveTimes.join('-');
                   
                   return [
                     <Marker
-                      key={`marker-${locIdx}`}
+                      key={`marker-${locIdx}-${location.latitude}-${location.longitude}`}
                       position={{ lat: location.latitude, lng: location.longitude }}
                       title={location.address}
                       icon={{
@@ -1120,12 +1131,12 @@ function LocationAnalysisSection() {
                         strokeWeight: 2,
                       }}
                     />,
-                    ...sortedForDrawing.map((ring, ringIdx) => {
-                      const colorIdx = ringColorMap.get(ring.value) ?? 0;
+                    ...sortedForDrawing.map((ring) => {
+                      const colorIdx = ringColorMap.get(ring.originalValue) ?? 0;
                       const radiusMeters = ring.value * 1609.34;
                       return (
                         <Circle
-                          key={`circle-${locIdx}-${ringIdx}`}
+                          key={`circle-${locIdx}-${isDistance ? 'dist' : 'drive'}-${ring.originalValue}-${configKey}`}
                           center={{ lat: location.latitude, lng: location.longitude }}
                           radius={radiusMeters}
                           options={{
@@ -1147,15 +1158,19 @@ function LocationAnalysisSection() {
                 const locationColor = LOCATION_COLORS[locIdx % LOCATION_COLORS.length];
                 const isDistance = location.config.analysisMode === 'distance';
                 const rawRings = isDistance
-                  ? location.config.distanceRings.map(r => ({ value: r, label: `${r} mi` }))
+                  ? location.config.distanceRings.map(r => ({ value: r, label: `${r} mi`, originalValue: r }))
                   : location.config.driveTimes.map(t => {
                       const driveTime = DRIVE_TIMES.find(d => d.value === t);
-                      return { value: driveTime ? driveTime.estimatedMiles : t * 0.5, label: `${t} min` };
+                      return { value: driveTime ? driveTime.estimatedMiles : t * 0.5, label: `${t} min`, originalValue: t };
                     });
                 const sortedBySize = [...rawRings].sort((a, b) => a.value - b.value);
                 
+                const configKey = isDistance 
+                  ? location.config.distanceRings.join('-') 
+                  : location.config.driveTimes.join('-');
+                
                 return (
-                  <div key={locIdx} className="flex flex-col gap-1.5">
+                  <div key={`legend-${locIdx}-${location.config.analysisMode}-${configKey}`} className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-2 text-sm">
                       <div 
                         className="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
@@ -1171,7 +1186,7 @@ function LocationAnalysisSection() {
                       {sortedBySize.map((ring, ringIdx) => {
                         const color = RING_COLORS[ringIdx % RING_COLORS.length];
                         return (
-                          <div key={ringIdx} className="flex items-center gap-1.5 text-xs">
+                          <div key={`legend-ring-${ring.originalValue}`} className="flex items-center gap-1.5 text-xs">
                             <div 
                               className="w-2.5 h-2.5 rounded-full border border-white shadow-sm flex-shrink-0" 
                               style={{ backgroundColor: color.stroke }}
