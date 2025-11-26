@@ -636,8 +636,22 @@ function LocationAnalysisSection() {
   const pendingFetchesRef = useRef<SelectedLocation[]>([]);
   
   useEffect(() => {
-    if (savedLocations && savedLocations.length > 0 && selectedProjectId && locationsLoadedRef.current !== selectedProjectId) {
-      locationsLoadedRef.current = selectedProjectId;
+    if (!selectedProjectId) {
+      locationsLoadedRef.current = null;
+      return;
+    }
+    
+    if (savedLocations === undefined) {
+      return;
+    }
+    
+    if (locationsLoadedRef.current === selectedProjectId) {
+      return;
+    }
+    
+    locationsLoadedRef.current = selectedProjectId;
+    
+    if (savedLocations.length > 0) {
       const loadedLocations: SelectedLocation[] = savedLocations.map(saved => ({
         address: saved.address,
         latitude: saved.latitude,
@@ -653,6 +667,11 @@ function LocationAnalysisSection() {
       setLocationData(new Map());
       setHasUnsavedChanges(false);
       pendingFetchesRef.current = loadedLocations;
+    } else {
+      setSelectedLocations([]);
+      setLocationData(new Map());
+      setHasUnsavedChanges(false);
+      pendingFetchesRef.current = [];
     }
   }, [savedLocations, selectedProjectId]);
   
