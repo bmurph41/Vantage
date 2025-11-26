@@ -18,14 +18,23 @@ interface StatisticsPanelProps {
   isLoading?: boolean;
 }
 
-function formatCurrency(value: number): string {
+function formatCurrency(value: number, compact: boolean = false): string {
+  if (value >= 1000000000) {
+    return `$${(value / 1000000000).toFixed(2)}B`;
+  }
   if (value >= 1000000) {
     return `$${(value / 1000000).toFixed(2)}M`;
   }
-  return `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+  if (compact && value >= 1000) {
+    return `$${(value / 1000).toFixed(1)}K`;
+  }
+  return `$${Math.round(value).toLocaleString('en-US')}`;
 }
 
 function formatPercent(value: number): string {
+  if (value > 1) {
+    return `${value.toFixed(2)}%`;
+  }
   return `${(value * 100).toFixed(2)}%`;
 }
 
@@ -64,7 +73,7 @@ export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelPro
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+            <div className="text-2xl font-bold text-foreground">
               {stats.count.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -82,15 +91,15 @@ export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelPro
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+            <div className="text-2xl font-bold text-foreground truncate">
               {formatCurrency(stats.avgPrice)}
             </div>
             <div className="flex items-center gap-1 mt-1">
               {priceChange > 0.05 && <TrendingUp className="h-3 w-3 text-green-500" />}
               {priceChange < -0.05 && <TrendingDown className="h-3 w-3 text-red-500" />}
               {Math.abs(priceChange) <= 0.05 && <Minus className="h-3 w-3 text-muted-foreground" />}
-              <p className={`text-xs ${priceChange > 0 ? 'text-green-600' : priceChange < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
-                {Math.abs(priceChange * 100).toFixed(2)}% vs median
+              <p className={`text-xs truncate ${priceChange > 0 ? 'text-green-600' : priceChange < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                {Math.abs(priceChange * 100).toFixed(1)}% vs median
               </p>
             </div>
           </CardContent>
@@ -105,7 +114,7 @@ export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelPro
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+            <div className="text-2xl font-bold text-foreground truncate">
               {formatCurrency(stats.medianPrice)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -123,11 +132,11 @@ export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelPro
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+            <div className="text-2xl font-bold text-foreground truncate">
               {formatCurrency(stats.totalValue)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Aggregate transaction volume
+            <p className="text-xs text-muted-foreground mt-1 truncate">
+              Aggregate volume
             </p>
           </CardContent>
         </Card>
@@ -141,11 +150,11 @@ export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelPro
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
-              {formatCurrency(stats.avgPricePerSlip)}
+            <div className="text-2xl font-bold text-foreground truncate">
+              {formatCurrency(stats.avgPricePerSlip, true)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Mean: {formatCurrency(stats.avgPricePerSlip)}
+              Per wet slip
             </p>
           </CardContent>
         </Card>
@@ -159,8 +168,8 @@ export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelPro
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
-              {formatCurrency(stats.medianPricePerSlip)}
+            <div className="text-2xl font-bold text-foreground truncate">
+              {formatCurrency(stats.medianPricePerSlip, true)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               50th percentile
@@ -177,7 +186,7 @@ export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelPro
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+            <div className="text-2xl font-bold text-foreground truncate">
               {stats.avgCapRate > 0 ? formatPercent(stats.avgCapRate) : 'N/A'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -195,7 +204,7 @@ export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelPro
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+            <div className="text-2xl font-bold text-foreground truncate">
               {Math.round(stats.avgCapacity).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
