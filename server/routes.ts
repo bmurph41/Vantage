@@ -17579,19 +17579,146 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Analytics endpoint
+  // Rate Comps Analytics endpoint - returns rate tier metrics
   app.post('/api/rate-comps/analytics', async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const filters: RcAnalyticsFilters = req.body;
+      const filters = req.body || {};
 
-      const metrics = await rcCalculateMetrics(orgId, filters);
-      const insights = await rcGenerateInsights(metrics, filters);
+      const tierAnalysis = await calculateRateTierMetrics(orgId, {
+        states: filters.states,
+        storageTypes: filters.storageTypes,
+        electricRequired: filters.electricIncluded,
+        protectionLevels: filters.protectionLevels,
+        sizeMin: filters.loaMin,
+        sizeMax: filters.loaMax,
+      });
 
-      res.json({ metrics, insights });
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate,
+        avgMonthlyRate: tierAnalysis.overall.avgNormalizedRate * 35,
+        medianMonthlyRate: tierAnalysis.overall.medianNormalizedRate * 35,
+        avgLoaSize: tierAnalysis.bySize 
+          ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+             tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+            (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+             tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+          : 35,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+
+      const byState = Object.entries(tierAnalysis.byState || {}).map(([state, data]: [string, any]) => ({
+        state,
+        avgRatePerFt: data.avgNormalizedRate,
+        medianRatePerFt: data.medianNormalizedRate,
+        count: data.count,
+      }));
+
+      const byStorageType = Object.entries(tierAnalysis.byStorageType || {}).map(([storageType, data]: [string, any]) => ({
+        storageType,
+        avgRatePerFt: data.avgNormalizedRate,
+        medianRatePerFt: data.medianNormalizedRate,
+        count: data.count,
+        avgMonthlyRate: data.avgNormalizedRate * 35,
+      }));
+
+      const rateRanges = [
+        { range: '$0-$10', count: 0, avgRate: 0 },
+        { range: '$10-$20', count: 0, avgRate: 0 },
+        { range: '$20-$30', count: 0, avgRate: 0 },
+        { range: '$30-$50', count: 0, avgRate: 0 },
+        { range: '$50+', count: 0, avgRate: 0 },
+      ];
+      
+      const loaRanges = [
+        { range: 'Under 25\'', count: tierAnalysis.bySize?.small.count || 0, avgRate: tierAnalysis.bySize?.small.avgRate || 0 },
+        { range: '25\'-40\'', count: tierAnalysis.bySize?.medium.count || 0, avgRate: tierAnalysis.bySize?.medium.avgRate || 0 },
+        { range: '40\'-60\'', count: tierAnalysis.bySize?.large.count || 0, avgRate: tierAnalysis.bySize?.large.avgRate || 0 },
+        { range: 'Over 60\'', count: tierAnalysis.bySize?.mega.count || 0, avgRate: tierAnalysis.bySize?.mega.avgRate || 0 },
+      ];
+
+      tierAnalysis.tiers.forEach(t => {
+        const rate = t.normalizedRate;
+        if (rate < 10) { rateRanges[0].count++; rateRanges[0].avgRate = (rateRanges[0].avgRate * (rateRanges[0].count - 1) + rate) / rateRanges[0].count; }
+        else if (rate < 20) { rateRanges[1].count++; rateRanges[1].avgRate = (rateRanges[1].avgRate * (rateRanges[1].count - 1) + rate) / rateRanges[1].count; }
+        else if (rate < 30) { rateRanges[2].count++; rateRanges[2].avgRate = (rateRanges[2].avgRate * (rateRanges[2].count - 1) + rate) / rateRanges[2].count; }
+        else if (rate < 50) { rateRanges[3].count++; rateRanges[3].avgRate = (rateRanges[3].avgRate * (rateRanges[3].count - 1) + rate) / rateRanges[3].count; }
+        else { rateRanges[4].count++; rateRanges[4].avgRate = (rateRanges[4].avgRate * (rateRanges[4].count - 1) + rate) / rateRanges[4].count; }
+      });
+
+      const seasonalityBreakdown = [
+        { seasonality: 'annual', count: 0, avgRate: 0 },
+        { seasonality: 'seasonal', count: 0, avgRate: 0 },
+        { seasonality: 'peak', count: 0, avgRate: 0 },
+      ];
+
+      tierAnalysis.tiers.forEach(t => {
+        const s = t.seasonality || 'annual';
+        const entry = seasonalityBreakdown.find(e => e.seasonality === s);
+        if (entry) {
+          entry.count++;
+          entry.avgRate = (entry.avgRate * (entry.count - 1) + t.normalizedRate) / entry.count;
+        } else {
+          seasonalityBreakdown[0].count++;
+          seasonalityBreakdown[0].avgRate = (seasonalityBreakdown[0].avgRate * (seasonalityBreakdown[0].count - 1) + t.normalizedRate) / seasonalityBreakdown[0].count;
+        }
+      });
+
+      res.json({
+        stats,
+        byState,
+        byStorageType,
+        distribution: {
+          rateRanges: rateRanges.filter(r => r.count > 0),
+          loaRanges: loaRanges.filter(r => r.count > 0),
+          seasonalityBreakdown: seasonalityBreakdown.filter(s => s.count > 0),
+        },
+      });
     } catch (error) {
       console.error("Error calculating rate comp analytics:", error);
       res.status(500).json({ message: "Failed to calculate analytics" });
+    }
+  });
+
+  // Matched rates for analytics
+  app.post('/api/rate-comps/analytics/matched-rates', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const filters = req.body || {};
+
+      const tierAnalysis = await calculateRateTierMetrics(orgId, {
+        states: filters.states,
+        storageTypes: filters.storageTypes,
+        electricRequired: filters.electricIncluded,
+        protectionLevels: filters.protectionLevels,
+        sizeMin: filters.loaMin,
+        sizeMax: filters.loaMax,
+      });
+
+      const rates = tierAnalysis.tiers.map(t => ({
+        id: t.id,
+        marina: t.marinaName,
+        state: t.state,
+        city: t.city,
+        storageType: t.storageType,
+        ratePeriod: t.ratePeriod,
+        ratePerFt: t.normalizedRate,
+        monthlyRate: t.normalizedRate * ((t.loaMin || 30) + (t.loaMax || 40)) / 2,
+        loaMin: t.loaMin,
+        loaMax: t.loaMax,
+        seasonality: t.seasonality || 'annual',
+        electricIncluded: t.electricIncluded,
+        waterIncluded: true,
+      }));
+
+      res.json({ rates, total: rates.length });
+    } catch (error) {
+      console.error("Error fetching matched rates:", error);
+      res.status(500).json({ message: "Failed to fetch matched rates" });
     }
   });
 
