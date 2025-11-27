@@ -100,6 +100,15 @@ export const assetStatusEnum = pgEnum("asset_status", ["under_management", "opti
 export const holdStrategyEnum = pgEnum("hold_strategy", ["core", "value_add", "opportunistic"]);
 export const nwcBucketTypeEnum = pgEnum("nwc_bucket_type", ["current_asset", "current_liability", "nwc_adjustment"]);
 
+// Prospecting enums
+export const prospectingActivityTypeEnum = pgEnum("prospecting_activity_type", ["call", "email", "meeting", "voicemail", "text", "linkedin", "other"]);
+export const prospectingActivityDirectionEnum = pgEnum("prospecting_activity_direction", ["outbound", "inbound", "internal"]);
+export const prospectingActivityOutcomeEnum = pgEnum("prospecting_activity_outcome", ["connected", "no_answer", "left_message", "wrong_number", "gatekeeper", "not_interested", "interested", "scheduled", "sent", "opened", "replied", "bounced"]);
+export const outreachCampaignStatusEnum = pgEnum("outreach_campaign_status", ["draft", "active", "paused", "completed", "archived"]);
+export const outreachCampaignTypeEnum = pgEnum("outreach_campaign_type", ["email", "call", "mixed"]);
+export const marketTargetStatusEnum = pgEnum("market_target_status", ["research", "active", "saturated", "paused"]);
+export const marketTargetPriorityEnum = pgEnum("market_target_priority", ["low", "medium", "high", "critical"]);
+
 // Organizations
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2251,6 +2260,163 @@ export const crmFiles = pgTable("crm_files", {
 });
 
 // ============================================================================
+// PROSPECTING & OUTREACH MODULE - Deal sourcing and activity tracking
+// ============================================================================
+
+// Prospecting Activities - Tracks all outreach touches (calls, emails, meetings, etc.)
+export const prospectingActivities = pgTable("prospecting_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  type: prospectingActivityTypeEnum("type").notNull(), // call, email, meeting, voicemail, text, linkedin, other
+  direction: prospectingActivityDirectionEnum("direction").notNull().default("outbound"), // outbound, inbound, internal
+  outcome: prospectingActivityOutcomeEnum("outcome"), // connected, no_answer, left_message, etc.
+  subject: text("subject"),
+  description: text("description"),
+  duration: integer("duration"), // Duration in seconds (for calls/meetings)
+  scheduledAt: timestamp("scheduled_at"), // When the activity was scheduled
+  completedAt: timestamp("completed_at"), // When it was actually completed
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  companyId: varchar("company_id").references(() => crmCompanies.id),
+  propertyId: varchar("property_id").references(() => crmProperties.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  campaignId: varchar("campaign_id"), // Links to outreach campaign if part of one
+  weekId: varchar("week_id"), // Links to prospecting week for weekly tracking
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("prospecting_activities_org_idx").on(table.orgId),
+  ownerIdx: index("prospecting_activities_owner_idx").on(table.ownerId),
+  typeIdx: index("prospecting_activities_type_idx").on(table.type),
+  contactIdx: index("prospecting_activities_contact_idx").on(table.contactId),
+  weekIdx: index("prospecting_activities_week_idx").on(table.weekId),
+  createdAtIdx: index("prospecting_activities_created_at_idx").on(table.createdAt),
+}));
+
+// Prospecting Weeks - Weekly activity tracking and goal setting
+export const prospectingWeeks = pgTable("prospecting_weeks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  weekStart: date("week_start").notNull(), // Monday of the week
+  weekEnd: date("week_end").notNull(), // Sunday of the week
+  // Goals
+  callsGoal: integer("calls_goal").default(50),
+  emailsGoal: integer("emails_goal").default(100),
+  meetingsGoal: integer("meetings_goal").default(10),
+  leadsGoal: integer("leads_goal").default(5),
+  // Actual counts (computed or manually updated)
+  callsActual: integer("calls_actual").default(0),
+  emailsActual: integer("emails_actual").default(0),
+  meetingsActual: integer("meetings_actual").default(0),
+  leadsActual: integer("leads_actual").default(0),
+  // Additional metrics
+  conversations: integer("conversations").default(0), // Successful connections
+  dealsCreated: integer("deals_created").default(0),
+  notes: text("notes"),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgOwnerWeekIdx: unique().on(table.orgId, table.ownerId, table.weekStart),
+  weekStartIdx: index("prospecting_weeks_week_start_idx").on(table.weekStart),
+}));
+
+// Outreach Campaigns - Email/call campaigns for systematic prospecting
+export const outreachCampaigns = pgTable("outreach_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  type: outreachCampaignTypeEnum("type").notNull().default("email"), // email, call, mixed
+  status: outreachCampaignStatusEnum("status").notNull().default("draft"), // draft, active, paused, completed, archived
+  description: text("description"),
+  // Target criteria (stored as JSON for flexibility)
+  targetCriteria: jsonb("target_criteria").default({}), // Filters for selecting targets
+  targetCount: integer("target_count").default(0), // Number of contacts in campaign
+  // Metrics
+  sentCount: integer("sent_count").default(0),
+  openedCount: integer("opened_count").default(0),
+  repliedCount: integer("replied_count").default(0),
+  bouncedCount: integer("bounced_count").default(0),
+  // Schedule
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgStatusIdx: index("outreach_campaigns_org_status_idx").on(table.orgId, table.status),
+}));
+
+// Outreach Templates - Reusable email/call scripts
+export const outreachTemplates = pgTable("outreach_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  type: text("type").notNull().default("email"), // email, call_script
+  category: text("category"), // Cold Outreach, Follow-up, Nurture, etc.
+  subject: text("subject"), // For emails
+  content: text("content").notNull(), // Template content with merge fields
+  usageCount: integer("usage_count").default(0),
+  lastUsedAt: timestamp("last_used_at"),
+  isActive: boolean("is_active").default(true),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Market Targets - Geographic/segment targets for prospecting
+export const marketTargets = pgTable("market_targets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(), // e.g., "Tampa Bay", "Great Lakes Region"
+  region: text("region"), // Broader region (e.g., "Southeast", "Midwest")
+  states: text("states").array().default(sql`ARRAY[]::text[]`), // States included
+  status: marketTargetStatusEnum("status").notNull().default("research"), // research, active, saturated, paused
+  priority: marketTargetPriorityEnum("priority").notNull().default("medium"),
+  // Market metrics
+  totalMarinas: integer("total_marinas").default(0),
+  targetedMarinas: integer("targeted_marinas").default(0),
+  contactedMarinas: integer("contacted_marinas").default(0),
+  convertedDeals: integer("converted_deals").default(0),
+  // Notes and research
+  notes: text("notes"),
+  researchNotes: jsonb("research_notes").default({}), // Structured research data
+  assignedToId: varchar("assigned_to_id").references(() => users.id),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgStatusIdx: index("market_targets_org_status_idx").on(table.orgId, table.status),
+}));
+
+// Deal Contacts Junction - Many-to-many relationship between deals and contacts with roles
+export const crmDealContacts = pgTable("crm_deal_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => crmDeals.id).notNull(),
+  contactId: varchar("contact_id").references(() => crmContacts.id).notNull(),
+  role: text("role"), // seller, buyer, broker, attorney, lender, etc.
+  isPrimary: boolean("is_primary").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueDealContact: unique().on(table.dealId, table.contactId),
+}));
+
+// Deal Companies Junction - Many-to-many relationship between deals and companies
+export const crmDealCompanies = pgTable("crm_deal_companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => crmDeals.id).notNull(),
+  companyId: varchar("company_id").references(() => crmCompanies.id).notNull(),
+  role: text("role"), // seller, buyer, broker_firm, lender, title_company, etc.
+  isPrimary: boolean("is_primary").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueDealCompany: unique().on(table.dealId, table.companyId),
+}));
+
+// ============================================================================
 // VIRTUAL DATA ROOM (VDR) - DealRoom-competitive secure document repository
 // ============================================================================
 
@@ -3815,6 +3981,71 @@ export const insertCrmFileSchema = createInsertSchema(crmFiles).omit({
 });
 export type InsertCrmFile = z.infer<typeof insertCrmFileSchema>;
 export type CrmFile = typeof crmFiles.$inferSelect;
+
+// ============================================================================
+// PROSPECTING MODULE SCHEMAS & TYPES
+// ============================================================================
+
+// Prospecting Activities schema
+export const insertProspectingActivitySchema = createInsertSchema(prospectingActivities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertProspectingActivity = z.infer<typeof insertProspectingActivitySchema>;
+export type ProspectingActivity = typeof prospectingActivities.$inferSelect;
+
+// Prospecting Weeks schema
+export const insertProspectingWeekSchema = createInsertSchema(prospectingWeeks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertProspectingWeek = z.infer<typeof insertProspectingWeekSchema>;
+export type ProspectingWeek = typeof prospectingWeeks.$inferSelect;
+
+// Outreach Campaigns schema
+export const insertOutreachCampaignSchema = createInsertSchema(outreachCampaigns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOutreachCampaign = z.infer<typeof insertOutreachCampaignSchema>;
+export type OutreachCampaign = typeof outreachCampaigns.$inferSelect;
+
+// Outreach Templates schema
+export const insertOutreachTemplateSchema = createInsertSchema(outreachTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOutreachTemplate = z.infer<typeof insertOutreachTemplateSchema>;
+export type OutreachTemplate = typeof outreachTemplates.$inferSelect;
+
+// Market Targets schema
+export const insertMarketTargetSchema = createInsertSchema(marketTargets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertMarketTarget = z.infer<typeof insertMarketTargetSchema>;
+export type MarketTarget = typeof marketTargets.$inferSelect;
+
+// Deal Contacts Junction schema
+export const insertCrmDealContactSchema = createInsertSchema(crmDealContacts).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmDealContact = z.infer<typeof insertCrmDealContactSchema>;
+export type CrmDealContact = typeof crmDealContacts.$inferSelect;
+
+// Deal Companies Junction schema
+export const insertCrmDealCompanySchema = createInsertSchema(crmDealCompanies).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmDealCompany = z.infer<typeof insertCrmDealCompanySchema>;
+export type CrmDealCompany = typeof crmDealCompanies.$inferSelect;
 
 // CRM Schema Aliases (for backward compatibility with original CRM code)
 export const insertDealSchema = insertCrmDealSchema;
