@@ -16538,7 +16538,7 @@ Current context: Project ${req.params.projectId}`;
       const salesCompsBodiesOfWater = await storage.getColumnUniqueValues(orgId, 'bodyOfWater');
       
       // Get unique values from CRM Properties for enrichment
-      const crmProperties = await storage.getCrmProperties(orgId);
+      const crmProperties = await storage.getCrmPropertiesForOrg(orgId);
       const crmStates = [...new Set(crmProperties.filter(p => p.state).map(p => p.state))];
       const crmCities = [...new Set(crmProperties.filter(p => p.city).map(p => p.city))];
       
