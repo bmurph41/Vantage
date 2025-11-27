@@ -4,8 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Filter, X, ChevronUp, MapPin, DollarSign, Building2, CalendarDays } from "lucide-react";
+import { Filter, X, MapPin, DollarSign, Building2, CalendarDays } from "lucide-react";
 import type { FilterState } from '@/lib/salescomps/types';
 import { STORAGE_TYPES, US_REGIONS, US_STATES, COUNTRIES } from "@shared/salescomps-constants";
 import debounce from "lodash.debounce";
@@ -25,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelectDropdown, type MultiSelectOption } from "@/components/ui/multi-select-dropdown";
 
 interface FiltersPanelProps {
   filters: FilterState;
@@ -402,60 +402,31 @@ export default function FiltersPanel({
             <div className="space-y-3">
               <div>
                 <Label className="text-xs font-medium text-muted-foreground mb-2 block">State/Country</Label>
-                <Select
-                  value={filters.states && filters.states.length === 1 ? filters.states[0] : "all"}
-                  onValueChange={(value) => {
-                    if (value && value !== "all") {
-                      updateFilter('states', [value]);
-                    } else {
-                      updateFilter('states', []);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-9 text-sm" data-testid="select-state">
-                    <SelectValue placeholder="All states" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    <SelectItem value="all">All states</SelectItem>
-                    {US_STATES.map((state) => (
-                      <SelectItem key={state.code} value={state.code}>
-                        {state.name}
-                      </SelectItem>
-                    ))}
-                    <Separator className="my-2" />
-                    {COUNTRIES.map((country) => (
-                      <SelectItem key={country} value={country}>
-                        {country}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelectDropdown
+                  label="State"
+                  placeholder="All states"
+                  options={[
+                    ...US_STATES.map((state) => ({ label: state.name, value: state.code })),
+                    ...COUNTRIES.map((country) => ({ label: country, value: country }))
+                  ]}
+                  value={filters.states || []}
+                  onChange={(states) => updateFilter('states', states)}
+                  triggerClassName="h-9 text-sm"
+                  testId="select-state"
+                />
               </div>
 
               <div>
                 <Label className="text-xs font-medium text-muted-foreground mb-2 block">Region</Label>
-                <Select
-                  value={filters.regions && filters.regions.length === 1 ? filters.regions[0] : "all"}
-                  onValueChange={(value) => {
-                    if (value && value !== "all") {
-                      updateFilter('regions', [value]);
-                    } else {
-                      updateFilter('regions', []);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-9 text-sm" data-testid="select-region">
-                    <SelectValue placeholder="All regions" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All regions</SelectItem>
-                    {US_REGIONS.map((region) => (
-                      <SelectItem key={region} value={region}>
-                        {region}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelectDropdown
+                  label="Region"
+                  placeholder="All regions"
+                  options={US_REGIONS.map((region) => ({ label: region, value: region }))}
+                  value={filters.regions || []}
+                  onChange={(regions) => updateFilter('regions', regions)}
+                  triggerClassName="h-9 text-sm"
+                  testId="select-region"
+                />
               </div>
             </div>
           </div>
