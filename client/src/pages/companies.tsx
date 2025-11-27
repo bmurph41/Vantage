@@ -1,19 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2 } from "lucide-react";
 import CompanyFormModal from "@/components/modals/company-form-modal";
 import CompanyDetailModal from "@/components/modals/company-detail-modal";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { FileUpload } from "@/components/file-upload";
+import KpiSettingsModal from "@/components/modals/kpi-settings-modal";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Company } from "@shared/schema";
+import type { Company, KpiConfigItem } from "@shared/schema";
 
 const industryColors = {
   technology: 'bg-blue-100 text-blue-800',
@@ -34,6 +35,45 @@ const sizeColors = {
   'enterprise': 'bg-red-100 text-red-800'
 };
 
+const PAGE_KEY = 'crm_companies';
+
+const DEFAULT_KPI_CONFIG: KpiConfigItem[] = [
+  { title: 'Total Companies', metricType: 'total_companies', icon: 'building', color: 'blue' },
+  { title: 'Portfolio Companies', metricType: 'portfolio_companies', icon: 'briefcase', color: 'purple' },
+  { title: 'Active Deals', metricType: 'active_deals', icon: 'trendingUp', color: 'green' },
+  { title: 'New This Month', metricType: 'new_this_month', icon: 'calendar', color: 'orange' },
+];
+
+const AVAILABLE_METRICS = [
+  { value: 'total_companies', label: 'Total Companies', icon: 'building', color: 'blue' },
+  { value: 'portfolio_companies', label: 'Portfolio Companies (2+ properties)', icon: 'briefcase', color: 'purple' },
+  { value: 'active_deals', label: 'Companies with Active Deals', icon: 'trendingUp', color: 'green' },
+  { value: 'new_this_month', label: 'New This Month', icon: 'calendar', color: 'orange' },
+  { value: 'with_website', label: 'With Website', icon: 'globe', color: 'teal' },
+  { value: 'with_contacts', label: 'With Contacts', icon: 'users', color: 'indigo' },
+  { value: 'with_properties', label: 'With Properties', icon: 'home', color: 'blue' },
+];
+
+const iconMap: Record<string, any> = {
+  building: Building,
+  users: Users,
+  trendingUp: TrendingUp,
+  calendar: Calendar,
+  globe: Globe,
+  briefcase: Briefcase,
+  home: Home,
+};
+
+const colorMap: Record<string, { bg: string; text: string }> = {
+  blue: { bg: 'bg-blue-100', text: 'text-blue-600' },
+  purple: { bg: 'bg-purple-100', text: 'text-purple-600' },
+  green: { bg: 'bg-green-100', text: 'text-green-600' },
+  orange: { bg: 'bg-orange-100', text: 'text-orange-600' },
+  red: { bg: 'bg-red-100', text: 'text-red-600' },
+  indigo: { bg: 'bg-indigo-100', text: 'text-indigo-600' },
+  teal: { bg: 'bg-teal-100', text: 'text-teal-600' },
+};
+
 export default function Companies() {
   const [searchTerm, setSearchTerm] = useState('');
   const [industryFilter, setIndustryFilter] = useState('all');
@@ -44,12 +84,54 @@ export default function Companies() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isKpiSettingsOpen, setIsKpiSettingsOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: companies, isLoading } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
   });
+
+  const { data: kpiPreferences } = useQuery<{ kpiConfig: KpiConfigItem[] }>({
+    queryKey: ['/api/user-preferences/kpis', PAGE_KEY],
+  });
+
+  const { data: kpiStats, isLoading: isLoadingStats } = useQuery<{
+    portfolioCompanies: number;
+    companiesWithActiveDeals: number;
+    newThisMonth: number;
+    withProperties: number;
+    withContacts: number;
+  }>({
+    queryKey: ['/api/companies/kpi-stats'],
+  });
+
+  const kpiConfig = useMemo(() => {
+    return (kpiPreferences?.kpiConfig && kpiPreferences.kpiConfig.length > 0) 
+      ? kpiPreferences.kpiConfig 
+      : DEFAULT_KPI_CONFIG;
+  }, [kpiPreferences]);
+
+  const getKpiValue = (metricType: string): number | null => {
+    switch (metricType) {
+      case 'total_companies':
+        return companies?.length || 0;
+      case 'portfolio_companies':
+        return kpiStats?.portfolioCompanies ?? null;
+      case 'active_deals':
+        return kpiStats?.companiesWithActiveDeals ?? null;
+      case 'new_this_month':
+        return kpiStats?.newThisMonth ?? null;
+      case 'with_website':
+        return companies?.filter(c => c.website).length || 0;
+      case 'with_contacts':
+        return kpiStats?.withContacts ?? null;
+      case 'with_properties':
+        return kpiStats?.withProperties ?? null;
+      default:
+        return 0;
+    }
+  };
 
   const deleteCompanyMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -338,64 +420,49 @@ export default function Companies() {
           </div>
         )}
 
-        {/* Metrics Cards */}
+        {/* Customizable KPI Cards */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-medium text-gray-500">Key Metrics</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsKpiSettingsOpen(true)}
+            className="h-7 px-2 text-gray-500 hover:text-gray-700"
+            data-testid="button-kpi-settings"
+          >
+            <Settings className="w-4 h-4 mr-1" />
+            Customize
+          </Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card className="p-4 bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Companies</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{companies?.length || 0}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <Building className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </Card>
-          
-          <Card className="p-4 bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Tech Companies</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {companies?.filter(c => getIndustryCategory(c.industry ?? undefined) === 'technology').length || 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </Card>
-          
-          <Card className="p-4 bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Large Orgs</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {companies?.filter(c => {
-                    const size = getSizeCategory(c.size ?? undefined);
-                    return size === 'large' || size === 'enterprise';
-                  }).length || 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <Users className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </Card>
-          
-          <Card className="p-4 bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">With Website</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {companies?.filter(c => c.website).length || 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <Globe className="w-6 h-6 text-orange-600" />
-              </div>
-            </div>
-          </Card>
+          {kpiConfig.map((kpi, index) => {
+            const IconComponent = iconMap[kpi.icon || 'building'] || Building;
+            const colors = colorMap[kpi.color || 'blue'] || colorMap.blue;
+            const value = getKpiValue(kpi.metricType);
+            const isLoading = value === null && isLoadingStats;
+            
+            return (
+              <Card key={index} className="p-4 bg-white" data-testid={`kpi-card-${index}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">{kpi.title}</p>
+                    {isLoading ? (
+                      <div className="flex items-center mt-1">
+                        <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                      </div>
+                    ) : (
+                      <p className="text-2xl font-bold text-gray-900 mt-1">
+                        {value?.toLocaleString() || 0}
+                      </p>
+                    )}
+                  </div>
+                  <div className={`w-12 h-12 ${colors.bg} rounded-full flex items-center justify-center`}>
+                    <IconComponent className={`w-6 h-6 ${colors.text}`} />
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Bulk Actions Toolbar */}
@@ -642,6 +709,14 @@ export default function Companies() {
           onDelete={() => {
             queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
           }}
+        />
+
+        <KpiSettingsModal
+          isOpen={isKpiSettingsOpen}
+          onClose={() => setIsKpiSettingsOpen(false)}
+          pageKey={PAGE_KEY}
+          currentConfig={kpiConfig}
+          availableMetrics={AVAILABLE_METRICS}
         />
       </main>
     </div>
