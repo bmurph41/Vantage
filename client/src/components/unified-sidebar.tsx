@@ -12,16 +12,23 @@ import { SmartSearch } from "@/components/crm/smart-search";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { PersonaSwitcher } from "@/components/PersonaSwitcher";
 
-// Relationship Management Navigation (Core CRM - All Users)
-const relationshipManagementNav = [
+// CRM Navigation (Core CRM - All Users)
+const crmNav = [
   { name: "Dashboard", href: "/crm", icon: LayoutDashboard },
   { name: "Contacts", href: "/crm/contacts", icon: Users },
   { name: "Companies", href: "/crm/companies", icon: Building },
   { name: "Properties", href: "/crm/properties", icon: Home },
+];
+
+// Deal Management Navigation
+const dealManagementNav = [
   { name: "Deals", href: "/crm/deals", icon: Handshake },
   { name: "Pipeline", href: "/crm/pipeline", icon: Layers },
   { name: "Activity Log", href: "/crm/activity", icon: History },
   { name: "Follow-Ups", href: "/crm/tasks", icon: ListTodo },
+  { name: "Marketing", href: "/crm/marketing-automation", icon: Send },
+  { name: "Analytics", href: "/crm/analytics", icon: PieChart },
+  { name: "Forecast", href: "/crm/forecast", icon: TrendingUp },
 ];
 
 // Prospecting & Outreach Navigation (Premium/Broker Add-On)
@@ -32,13 +39,6 @@ const prospectingNav = [
   { name: "Market Targets", href: "/prospecting/markets", icon: Target },
   { name: "Campaigns & Templates", href: "/prospecting/campaigns", icon: Send },
   { name: "Deal Sourcing Analytics", href: "/prospecting/analytics", icon: PieChart },
-];
-
-// CRM Analytics & Automation (Shared Tools)
-const crmAnalyticsNav = [
-  { name: "Marketing", href: "/crm/marketing-automation", icon: Send },
-  { name: "Analytics", href: "/crm/analytics", icon: PieChart },
-  { name: "Forecast", href: "/crm/forecast", icon: TrendingUp },
 ];
 
 // CRM Tools Submenu
@@ -151,6 +151,7 @@ export default function UnifiedSidebar() {
   const [rentRollExpanded, setRentRollExpanded] = useState(false);
   const [marketingExpanded, setMarketingExpanded] = useState(false);
   const [crmExpanded, setCrmExpanded] = useState(false);
+  const [dealManagementExpanded, setDealManagementExpanded] = useState(false);
   const [prospectingExpanded, setProspectingExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [ddExpanded, setDdExpanded] = useState(false);
@@ -195,7 +196,8 @@ export default function UnifiedSidebar() {
     const personas = [persona, secondaryPersona].filter(Boolean);
     
     const sectionAccess: Record<string, string[]> = {
-      crm: ['pe_investor', 'broker', 'operator', 'advisor'], // Relationship Management - ALL users
+      crm: ['pe_investor', 'broker', 'operator', 'advisor'], // CRM - ALL users
+      deal_management: ['pe_investor', 'broker', 'operator', 'advisor'], // Deal Management - ALL users
       prospecting: ['pe_investor', 'broker'], // Prospecting & Outreach - Broker add-on only
       operations: ['pe_investor', 'operator'],
       due_diligence: ['pe_investor', 'broker'],
@@ -215,9 +217,11 @@ export default function UnifiedSidebar() {
     const isShipStorePage = location.startsWith('/operations/ship-store/');
     const isRentRollPage = location.startsWith('/operations/rent-roll/') || location === '/operations/customer-analytics';
     const isMarketingPage = location.startsWith('/operations/marketing/');
-    // Relationship Management: core CRM pages (contacts, companies, properties, deals, pipeline, activity, tasks)
-    const isCrmPage = (location.startsWith('/crm/') && !location.includes('/leads')) || location === '/crm' || location.startsWith('/import-') || location === '/calendar-settings';
+    // CRM: contacts, companies, properties (core entity management)
+    const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/import-') || location === '/calendar-settings';
     const isCrmToolsPage = location === '/calendar-settings' || location.startsWith('/import-');
+    // Deal Management: deals, pipeline, activity, tasks, marketing-automation, analytics, forecast
+    const isDealManagementPage = ['/crm/deals', '/crm/pipeline', '/crm/activity', '/crm/tasks', '/crm/marketing-automation', '/crm/analytics', '/crm/forecast'].includes(location);
     // Prospecting: leads, prospecting pages
     const isProspectingPage = location.startsWith('/prospecting/') || location === '/crm/leads';
     const isDdPage = location === '/' || location === '/progress-report';
@@ -233,6 +237,7 @@ export default function UnifiedSidebar() {
     setRentRollExpanded(isRentRollPage);
     setMarketingExpanded(isMarketingPage);
     setCrmExpanded(isCrmPage);
+    setDealManagementExpanded(isDealManagementPage);
     setProspectingExpanded(isProspectingPage);
     setCrmToolsExpanded(isCrmToolsPage);
     setDdExpanded(isDdPage);
@@ -241,31 +246,30 @@ export default function UnifiedSidebar() {
     setAnalysisExpanded(isAnalysisPage);
   }, [location]);
 
-  // Create dynamic Relationship Management navigation with pending badges
-  const dynamicRelationshipNav = [
-    relationshipManagementNav[0], // Dashboard
-    relationshipManagementNav[1], // Contacts
+  // Create dynamic CRM navigation with pending badges
+  const dynamicCrmNav = [
+    crmNav[0], // Dashboard
+    crmNav[1], // Contacts
     ...(pendingContactsCount > 0 ? [{ 
       name: "Pending Contacts", 
       href: "/crm/pending-contacts", 
       icon: AlertCircle,
       badge: String(pendingContactsCount)
     }] : []),
-    relationshipManagementNav[2], // Companies
+    crmNav[2], // Companies
     ...(pendingCompaniesCount > 0 ? [{ 
       name: "Pending Companies", 
       href: "/crm/pending-companies", 
       icon: AlertCircle,
       badge: String(pendingCompaniesCount)
     }] : []),
-    relationshipManagementNav[3], // Properties
+    crmNav[3], // Properties
     ...(pendingPropertiesCount > 0 ? [{ 
       name: "Pending Properties", 
       href: "/crm/pending-properties", 
       icon: AlertCircle,
       badge: String(pendingPropertiesCount)
     }] : []),
-    ...relationshipManagementNav.slice(4), // Deals, Pipeline, Activity Log, Follow-Ups
   ];
 
   const handleNavClick = () => {
@@ -525,17 +529,13 @@ export default function UnifiedSidebar() {
               title="CRM" 
               expanded={crmExpanded} 
               onToggle={() => setCrmExpanded(!crmExpanded)}
-              isActive={(location.startsWith('/crm/') && !location.includes('/leads')) || location === '/crm' || location.startsWith('/import-') || location === '/calendar-settings'}
+              isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/import-') || location === '/calendar-settings'}
             />
-            {crmExpanded && dynamicRelationshipNav.map((item) => (
+            {crmExpanded && dynamicCrmNav.map((item) => (
               <NavLink key={item.name} item={item} />
             ))}
             {crmExpanded && (
               <>
-                {/* Analytics & Automation */}
-                {crmAnalyticsNav.map((item) => (
-                  <NavLink key={item.name} item={item} />
-                ))}
                 {/* Tools & Settings */}
                 <div className="ml-4 mt-1 mb-2">
                   <button
@@ -557,6 +557,21 @@ export default function UnifiedSidebar() {
                 </div>
               </>
             )}
+          </div>
+        )}
+        
+        {/* Deal Management Section */}
+        {canViewSection('deal_management') && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="Deal Management" 
+              expanded={dealManagementExpanded} 
+              onToggle={() => setDealManagementExpanded(!dealManagementExpanded)}
+              isActive={['/crm/deals', '/crm/pipeline', '/crm/activity', '/crm/tasks', '/crm/marketing-automation', '/crm/analytics', '/crm/forecast'].includes(location)}
+            />
+            {dealManagementExpanded && dealManagementNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
           </div>
         )}
         
