@@ -16526,6 +16526,82 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Cross-reference API - Pull enriched filter options from Sales Comps and CRM Properties
+  app.get('/api/rate-comps/cross-reference/filters', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      // Get unique values from Sales Comps for cross-referencing
+      const salesCompsStates = await storage.getColumnUniqueValues(orgId, 'state');
+      const salesCompsWaterTypes = await storage.getColumnUniqueValues(orgId, 'waterType');
+      const salesCompsRegions = await storage.getColumnUniqueValues(orgId, 'region');
+      const salesCompsBodiesOfWater = await storage.getColumnUniqueValues(orgId, 'bodyOfWater');
+      
+      // Get unique values from CRM Properties for enrichment
+      const crmProperties = await storage.getCrmProperties(orgId);
+      const crmStates = [...new Set(crmProperties.filter(p => p.state).map(p => p.state))];
+      const crmCities = [...new Set(crmProperties.filter(p => p.city).map(p => p.city))];
+      
+      // Merge and deduplicate filter options
+      const crossRefFilters = {
+        // Merged state options from all sources
+        states: {
+          salesComps: salesCompsStates,
+          crmProperties: crmStates,
+          merged: [...new Set([...salesCompsStates, ...crmStates])].sort()
+        },
+        // Water types from Sales Comps
+        waterTypes: {
+          salesComps: salesCompsWaterTypes,
+          merged: salesCompsWaterTypes
+        },
+        // Regions from Sales Comps
+        regions: {
+          salesComps: salesCompsRegions,
+          merged: salesCompsRegions
+        },
+        // Bodies of water from Sales Comps
+        bodiesOfWater: {
+          salesComps: salesCompsBodiesOfWater,
+          merged: salesCompsBodiesOfWater
+        },
+        // Cities from CRM Properties
+        cities: {
+          crmProperties: crmCities,
+          merged: crmCities
+        },
+        // Data source metadata
+        sources: {
+          salesCompsCount: salesCompsStates.length > 0 ? 'available' : 'empty',
+          crmPropertiesCount: crmProperties.length
+        }
+      };
+      
+      res.json(crossRefFilters);
+    } catch (error) {
+      console.error('Error getting cross-reference filters:', error);
+      res.status(500).json({ message: "Failed to fetch cross-reference filters" });
+    }
+  });
+
+  // Cross-reference API - Get Marina Database lookup
+  app.get('/api/rate-comps/cross-reference/marinas', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { q, limit } = req.query;
+      
+      if (!q || q.trim().length < 2) {
+        return res.json([]);
+      }
+      
+      const marinas = await storage.searchMarinas(orgId, q.trim(), limit ? parseInt(limit) : 20);
+      res.json(marinas);
+    } catch (error) {
+      console.error('Error searching marinas for cross-reference:', error);
+      res.status(500).json({ message: "Failed to search marinas" });
+    }
+  });
+
   // Custom Storage Types routes (must be before /:id route)
   app.get('/api/rate-comps/custom-storage-types', async (req: any, res) => {
     try {

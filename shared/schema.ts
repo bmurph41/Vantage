@@ -5400,6 +5400,9 @@ export const rateComps = pgTable('rate_comps', {
   // Link to CRM Property
   propertyId: varchar('property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
 
+  // Link to Marina Rate Database (for rate data consolidation)
+  marinaId: varchar('marina_id').references(() => marinaRateDatabase.id, { onDelete: 'set null' }),
+
   // Transaction parties - CRM links
   sellerCompanyId: varchar('seller_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
   sellerContactId: varchar('seller_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),

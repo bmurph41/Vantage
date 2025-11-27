@@ -13,13 +13,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Save, Plus, Trash2, DollarSign } from "lucide-react";
+import { X, Save, Plus, Trash2, DollarSign, Search, Link, Unlink } from "lucide-react";
 import { rateCompsApi } from '@/lib/ratecomps/api';
 import { queryKeys } from '@/lib/ratecomps/queryKeys';
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/ratecomps/authUtils";
 import { z } from "zod";
-import type { RateComp, InsertRateComp, UpdateRateComp } from "@shared/schema";
+import type { RateComp, InsertRateComp, UpdateRateComp, MarinaRateDatabase } from "@shared/schema";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { apiRequest } from "@/lib/queryClient";
+import debounce from "lodash.debounce";
 import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES, US_REGIONS } from "@shared/salescomps-constants";
 import { AddressInput } from "@/components/address-input";
 import { useCustomStorageTypes, useCreateCustomStorageType } from "@/hooks/ratecomps/useCustomStorageTypes";
@@ -27,6 +31,7 @@ import RateTiersEditor from "./RateTiersEditor";
 
 const compFormSchema = z.object({
   marina: z.string().min(1, "Marina name is required"),
+  marinaId: z.string().optional(), // Link to Marina Rate Database
   city: z.string().optional(),
   state: z.string().optional(),
   address: z.string().optional(),
@@ -105,6 +110,13 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   const [linkToPortfolio, setLinkToPortfolio] = useState(!!(comp?.parentPortfolioId));
   const [showRateTiersDialog, setShowRateTiersDialog] = useState(false);
   
+  // Marina lookup state
+  const [marinaSearchOpen, setMarinaSearchOpen] = useState(false);
+  const [marinaSearchQuery, setMarinaSearchQuery] = useState("");
+  const [marinaSearchResults, setMarinaSearchResults] = useState<MarinaRateDatabase[]>([]);
+  const [selectedMarina, setSelectedMarina] = useState<MarinaRateDatabase | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  
   // Portfolio mode state
   const [portfolioTabs, setPortfolioTabs] = useState<Array<{id: string, marinaName: string}>>([
     { id: '1', marinaName: '' },
@@ -137,6 +149,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     resolver: zodResolver(compFormSchema),
     defaultValues: {
       marina: comp?.marina || "",
+      marinaId: (comp as any)?.marinaId || "",
       city: comp?.city || "",
       state: comp?.state || "",
       address: comp?.address || "",
@@ -198,6 +211,73 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       setArticleUrls(comp.articleUrls && comp.articleUrls.length > 0 ? comp.articleUrls : [""]);
     }
   }, [comp]);
+
+  // Marina search function with debouncing
+  const searchMarinas = async (query: string) => {
+    if (query.length < 2) {
+      setMarinaSearchResults([]);
+      return;
+    }
+    
+    setIsSearching(true);
+    try {
+      const results = await apiRequest<MarinaRateDatabase[]>(
+        `/api/marina-database/search?q=${encodeURIComponent(query)}&limit=15`
+      );
+      setMarinaSearchResults(results || []);
+    } catch (error) {
+      console.error("Error searching marinas:", error);
+      setMarinaSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounced search handler
+  const debouncedSearch = debounce(searchMarinas, 300);
+  
+  // Handle marina search input change
+  const handleMarinaSearchChange = (value: string) => {
+    setMarinaSearchQuery(value);
+    debouncedSearch(value);
+  };
+
+  // Handle marina selection - auto-populate form fields
+  const handleMarinaSelect = (marina: MarinaRateDatabase) => {
+    setSelectedMarina(marina);
+    setMarinaSearchOpen(false);
+    setMarinaSearchQuery("");
+    
+    // Populate form fields from selected marina
+    form.setValue("marina", marina.marinaName);
+    form.setValue("marinaId", marina.id);
+    if (marina.city) form.setValue("city", marina.city);
+    if (marina.state) form.setValue("state", marina.state);
+    if (marina.address) form.setValue("address", marina.address);
+    if (marina.zip) form.setValue("zip", marina.zip);
+    if (marina.waterType) form.setValue("waterType", marina.waterType);
+    if (marina.wetSlips) form.setValue("wetSlips", marina.wetSlips);
+    if (marina.dryRacks) form.setValue("dryRacks", marina.dryRacks);
+    if (marina.bodyOfWater) form.setValue("bodyOfWater", marina.bodyOfWater);
+    if (marina.waterBodyName) form.setValue("waterBodyName", marina.waterBodyName);
+    if (marina.region) form.setValue("region", marina.region);
+    if (marina.rateSource) form.setValue("rateSource", marina.rateSource);
+    
+    toast({
+      title: "Marina Linked",
+      description: `Linked to "${marina.marinaName}" from Marina Database. Fields have been auto-populated.`,
+    });
+  };
+
+  // Handle unlinking from marina database
+  const handleMarinaUnlink = () => {
+    setSelectedMarina(null);
+    form.setValue("marinaId", "");
+    toast({
+      title: "Marina Unlinked",
+      description: "Rate comp is no longer linked to Marina Database.",
+    });
+  };
 
   const createMutation = useMutation({
     mutationFn: rateCompsApi.createComp,
@@ -320,6 +400,8 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       notes: data.notes || undefined,
       waterType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType,
       coastalType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType,
+      // Marina Database link
+      marinaId: data.marinaId || undefined,
       // Rate-focused fields
       rateCollectionDate: data.rateCollectionDate || undefined,
       rateSource: data.rateSource === "" || data.rateSource === "none-selected" ? undefined : data.rateSource,
@@ -543,11 +625,90 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           name="marina"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Marina Name *</FormLabel>
+                              <div className="flex items-center justify-between">
+                                <FormLabel>Marina Name *</FormLabel>
+                                {form.watch("marinaId") ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-green-600 flex items-center gap-1">
+                                      <Link className="h-3 w-3" />
+                                      Linked to Marina DB
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={handleMarinaUnlink}
+                                      data-testid="button-unlink-marina"
+                                    >
+                                      <Unlink className="h-3 w-3 mr-1" />
+                                      Unlink
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Popover open={marinaSearchOpen} onOpenChange={setMarinaSearchOpen}>
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 px-2 text-xs"
+                                        data-testid="button-search-marina"
+                                      >
+                                        <Search className="h-3 w-3 mr-1" />
+                                        Search Marina DB
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-80 p-0" align="end">
+                                      <Command>
+                                        <CommandInput 
+                                          placeholder="Search marinas..." 
+                                          value={marinaSearchQuery}
+                                          onValueChange={handleMarinaSearchChange}
+                                          data-testid="input-search-marina"
+                                        />
+                                        <CommandList>
+                                          {isSearching ? (
+                                            <div className="p-4 text-center text-sm text-muted-foreground">
+                                              Searching...
+                                            </div>
+                                          ) : marinaSearchResults.length === 0 && marinaSearchQuery.length >= 2 ? (
+                                            <CommandEmpty>No marinas found.</CommandEmpty>
+                                          ) : marinaSearchQuery.length < 2 ? (
+                                            <div className="p-4 text-center text-sm text-muted-foreground">
+                                              Type at least 2 characters to search
+                                            </div>
+                                          ) : (
+                                            <CommandGroup>
+                                              {marinaSearchResults.map((marina) => (
+                                                <CommandItem
+                                                  key={marina.id}
+                                                  value={marina.id}
+                                                  onSelect={() => handleMarinaSelect(marina)}
+                                                  className="cursor-pointer"
+                                                  data-testid={`marina-result-${marina.id}`}
+                                                >
+                                                  <div className="flex flex-col">
+                                                    <span className="font-medium">{marina.marinaName}</span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                      {marina.city}, {marina.state}
+                                                      {marina.wetSlips ? ` • ${marina.wetSlips} slips` : ''}
+                                                    </span>
+                                                  </div>
+                                                </CommandItem>
+                                              ))}
+                                            </CommandGroup>
+                                          )}
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                )}
+                              </div>
                               <FormControl>
                                 <Input 
                                   {...field} 
-                                  placeholder="Enter marina name..."
+                                  placeholder="Enter marina name or search Marina DB..."
                                   data-testid="input-marina"
                                 />
                               </FormControl>
