@@ -665,13 +665,17 @@ export default function Dashboard() {
       }));
 
       return apiRequest('PUT', '/api/dashboards/layout', {
-        personaTemplate: 'default',
+        personaTemplate: null,
         layout,
-        isDefault: false,
+        isDefault: true,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dashboards/layout'] });
+      toast({
+        title: "Layout saved",
+        description: "Your dashboard layout has been saved.",
+      });
     },
     onError: () => {
       toast({

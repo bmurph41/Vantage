@@ -3,7 +3,7 @@ import {
   dashboardWidgets,
   userDashboardLayouts,
 } from '@shared/schema';
-import { eq, and, inArray, gte, sql as drizzleSql } from 'drizzle-orm';
+import { eq, and, inArray, gte, isNull, sql as drizzleSql } from 'drizzle-orm';
 import type {
   DashboardWidget,
   InsertDashboardWidget,
@@ -196,15 +196,27 @@ export class DashboardService {
     orgId: string,
     data: InsertUserDashboardLayout
   ): Promise<UserDashboardLayout> {
-    // Check if layout exists for this persona template
+    // Check if layout exists for this persona template (or default layout if personaTemplate is null)
     const existing = await this.getUserDashboardLayout(
       userId,
       orgId,
-      data.personaTemplate as string
+      data.personaTemplate as string | undefined
     );
 
     if (existing) {
-      // Update existing layout
+      // Update existing layout - handle null personaTemplate properly
+      const whereCondition = data.personaTemplate
+        ? and(
+            eq(userDashboardLayouts.userId, userId),
+            eq(userDashboardLayouts.orgId, orgId),
+            eq(userDashboardLayouts.personaTemplate, data.personaTemplate as any)
+          )
+        : and(
+            eq(userDashboardLayouts.userId, userId),
+            eq(userDashboardLayouts.orgId, orgId),
+            isNull(userDashboardLayouts.personaTemplate)
+          );
+
       const [updated] = await db
         .update(userDashboardLayouts)
         .set({
@@ -213,11 +225,7 @@ export class DashboardService {
           orgId,
           lastModified: new Date(),
         })
-        .where(and(
-          eq(userDashboardLayouts.userId, userId),
-          eq(userDashboardLayouts.orgId, orgId),
-          eq(userDashboardLayouts.personaTemplate, data.personaTemplate as any)
-        ))
+        .where(whereCondition)
         .returning();
 
       return updated;
