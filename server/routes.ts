@@ -17291,6 +17291,294 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ============================================================================
+  // MARINA RATE DATABASE ROUTES
+  // ============================================================================
+
+  // List marinas with filtering, sorting, and pagination
+  app.get('/api/marina-database', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { q, states, regions, waterTypes, isActive, sortBy, sortDir, page, pageSize } = req.query;
+
+      const filters: Record<string, any> = {};
+      if (q) filters.q = q;
+      if (states) filters.states = Array.isArray(states) ? states : states.split(',');
+      if (regions) filters.regions = Array.isArray(regions) ? regions : regions.split(',');
+      if (waterTypes) filters.waterTypes = Array.isArray(waterTypes) ? waterTypes : waterTypes.split(',');
+      if (isActive !== undefined) filters.isActive = isActive === 'true';
+
+      const result = await storage.getMarinas({
+        orgId,
+        filters,
+        sortBy: sortBy || 'marinaName',
+        sortDir: sortDir || 'asc',
+        page: page ? parseInt(page) : 1,
+        pageSize: pageSize ? parseInt(pageSize) : 25
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching marinas:", error);
+      res.status(500).json({ message: "Failed to fetch marinas" });
+    }
+  });
+
+  // Search marinas for autocomplete
+  app.get('/api/marina-database/search', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { q, limit } = req.query;
+
+      if (!q || q.trim().length < 2) {
+        return res.json([]);
+      }
+
+      const marinas = await storage.searchMarinas(orgId, q.trim(), limit ? parseInt(limit) : 20);
+      res.json(marinas);
+    } catch (error) {
+      console.error("Error searching marinas:", error);
+      res.status(500).json({ message: "Failed to search marinas" });
+    }
+  });
+
+  // Get single marina
+  app.get('/api/marina-database/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const marina = await storage.getMarina(req.params.id, orgId);
+      if (!marina) return res.status(404).json({ message: "Marina not found" });
+      res.json(marina);
+    } catch (error) {
+      console.error("Error fetching marina:", error);
+      res.status(500).json({ message: "Failed to fetch marina" });
+    }
+  });
+
+  // Get marina with all rates (current and historical)
+  app.get('/api/marina-database/:id/with-rates', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const marinaWithRates = await storage.getMarinaWithRates(req.params.id, orgId);
+      if (!marinaWithRates) return res.status(404).json({ message: "Marina not found" });
+      res.json(marinaWithRates);
+    } catch (error) {
+      console.error("Error fetching marina with rates:", error);
+      res.status(500).json({ message: "Failed to fetch marina with rates" });
+    }
+  });
+
+  // Create marina
+  app.post('/api/marina-database', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const marina = await storage.createMarina({
+        ...req.body,
+        orgId,
+        createdBy: userId
+      });
+
+      res.status(201).json(marina);
+    } catch (error) {
+      console.error("Error creating marina:", error);
+      res.status(500).json({ message: "Failed to create marina" });
+    }
+  });
+
+  // Update marina
+  app.patch('/api/marina-database/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const existing = await storage.getMarina(req.params.id, orgId);
+      if (!existing) return res.status(404).json({ message: "Marina not found" });
+
+      const marina = await storage.updateMarina(req.params.id, { ...req.body, updatedBy: userId }, orgId);
+      res.json(marina);
+    } catch (error) {
+      console.error("Error updating marina:", error);
+      res.status(500).json({ message: "Failed to update marina" });
+    }
+  });
+
+  // Delete marina (soft delete)
+  app.delete('/api/marina-database/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      const existing = await storage.getMarina(req.params.id, orgId);
+      if (!existing) return res.status(404).json({ message: "Marina not found" });
+
+      await storage.deleteMarina(req.params.id, orgId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting marina:", error);
+      res.status(500).json({ message: "Failed to delete marina" });
+    }
+  });
+
+  // ============================================================================
+  // MARINA RATES ROUTES (Historical Rate Tracking)
+  // ============================================================================
+
+  // Get rates for a marina with optional filters
+  app.get('/api/marina-database/:marinaId/rates', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { marinaId } = req.params;
+      const { rateYear, storageType, isCurrentRate } = req.query;
+
+      const filters: any = {};
+      if (rateYear) filters.rateYear = parseInt(rateYear);
+      if (storageType) filters.storageType = storageType;
+      if (isCurrentRate !== undefined) filters.isCurrentRate = isCurrentRate === 'true';
+
+      const rates = await storage.getMarinaRates(marinaId, orgId, Object.keys(filters).length > 0 ? filters : undefined);
+      res.json(rates);
+    } catch (error) {
+      console.error("Error fetching marina rates:", error);
+      res.status(500).json({ message: "Failed to fetch marina rates" });
+    }
+  });
+
+  // Get rate history for a marina (all rates over time)
+  app.get('/api/marina-database/:marinaId/rate-history', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { marinaId } = req.params;
+      const { storageType } = req.query;
+
+      const history = await storage.getMarinaRateHistory(marinaId, orgId, storageType);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching marina rate history:", error);
+      res.status(500).json({ message: "Failed to fetch marina rate history" });
+    }
+  });
+
+  // Get latest/current rates for a marina
+  app.get('/api/marina-database/:marinaId/rates/current', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { marinaId } = req.params;
+
+      const rates = await storage.getLatestMarinaRates(marinaId, orgId);
+      res.json(rates);
+    } catch (error) {
+      console.error("Error fetching current marina rates:", error);
+      res.status(500).json({ message: "Failed to fetch current marina rates" });
+    }
+  });
+
+  // Create a new rate entry (marks previous rates as historical if needed)
+  app.post('/api/marina-database/:marinaId/rates', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { marinaId } = req.params;
+
+      const marina = await storage.getMarina(marinaId, orgId);
+      if (!marina) return res.status(404).json({ message: "Marina not found" });
+
+      const { storageType, rateYear, rateSeason, markPreviousAsHistorical = true } = req.body;
+
+      // If this is a current rate, mark previous rates for same type/year as historical
+      if (req.body.isCurrentRate !== false && markPreviousAsHistorical) {
+        await storage.markPreviousRatesHistorical(marinaId, storageType, rateYear, orgId);
+      }
+
+      const rate = await storage.createMarinaRate({
+        ...req.body,
+        marinaId,
+        orgId,
+        createdBy: userId,
+        isCurrentRate: req.body.isCurrentRate !== false
+      });
+
+      res.status(201).json(rate);
+    } catch (error) {
+      console.error("Error creating marina rate:", error);
+      res.status(500).json({ message: "Failed to create marina rate" });
+    }
+  });
+
+  // Bulk create rates
+  app.post('/api/marina-database/:marinaId/rates/bulk', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { marinaId } = req.params;
+
+      const marina = await storage.getMarina(marinaId, orgId);
+      if (!marina) return res.status(404).json({ message: "Marina not found" });
+
+      const { rates, markPreviousAsHistorical = true } = req.body;
+
+      if (!Array.isArray(rates) || rates.length === 0) {
+        return res.status(400).json({ message: "Invalid or empty rates array" });
+      }
+
+      // If marking previous as historical, do it for each unique storage type/year combo
+      if (markPreviousAsHistorical) {
+        const combos = new Set(rates.map((r: any) => `${r.storageType}|${r.rateYear}`));
+        for (const combo of combos) {
+          const [storageType, rateYear] = combo.split('|');
+          await storage.markPreviousRatesHistorical(marinaId, storageType, parseInt(rateYear), orgId);
+        }
+      }
+
+      const ratesToCreate = rates.map((rate: any) => ({
+        ...rate,
+        marinaId,
+        orgId,
+        createdBy: userId,
+        isCurrentRate: rate.isCurrentRate !== false
+      }));
+
+      const createdRates = await storage.bulkCreateMarinaRates(ratesToCreate);
+      res.status(201).json(createdRates);
+    } catch (error) {
+      console.error("Error bulk creating marina rates:", error);
+      res.status(500).json({ message: "Failed to create marina rates" });
+    }
+  });
+
+  // Update a rate
+  app.patch('/api/marina-rates/:id', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+
+      const existing = await storage.getMarinaRate(req.params.id, orgId);
+      if (!existing) return res.status(404).json({ message: "Rate not found" });
+
+      const rate = await storage.updateMarinaRate(req.params.id, { ...req.body, updatedBy: userId }, orgId);
+      res.json(rate);
+    } catch (error) {
+      console.error("Error updating marina rate:", error);
+      res.status(500).json({ message: "Failed to update marina rate" });
+    }
+  });
+
+  // Delete a rate
+  app.delete('/api/marina-rates/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      const existing = await storage.getMarinaRate(req.params.id, orgId);
+      if (!existing) return res.status(404).json({ message: "Rate not found" });
+
+      await storage.deleteMarinaRate(req.params.id, orgId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting marina rate:", error);
+      res.status(500).json({ message: "Failed to delete marina rate" });
+    }
+  });
+
   // Analytics endpoint
   app.post('/api/rate-comps/analytics', async (req: any, res) => {
     try {
