@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Filter, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Filter, X, ChevronDown, ChevronRight, Database, Building2, BarChart3, Info } from "lucide-react";
 import type { FilterState } from '@/lib/ratecomps/types';
 import { STORAGE_TYPES, US_REGIONS, US_STATES, COUNTRIES } from "@shared/salescomps-constants";
 import debounce from "lodash.debounce";
@@ -13,6 +15,15 @@ import throttle from "lodash.throttle";
 import SavedSearchesMenu from "./SavedSearchesMenu";
 import { useCustomStorageTypes } from "@/hooks/ratecomps/useCustomStorageTypes";
 import { MultiSelectDropdown } from "@/components/ui/multi-select-dropdown";
+
+interface CrossRefFilters {
+  states: { salesComps: string[]; crmProperties: string[]; merged: string[] };
+  waterTypes: { salesComps: string[]; merged: string[] };
+  regions: { salesComps: string[]; merged: string[] };
+  bodiesOfWater: { salesComps: string[]; merged: string[] };
+  cities: { crmProperties: string[]; merged: string[] };
+  sources: { salesCompsCount: string; crmPropertiesCount: number };
+}
 
 interface FiltersPanelProps {
   filters: FilterState;
@@ -42,6 +53,12 @@ export default function FiltersPanel({
   // Fetch custom storage types
   const { data: customStorageTypes = [] } = useCustomStorageTypes();
   const allStorageTypes = [...STORAGE_TYPES, ...customStorageTypes.map(t => t.name)];
+  
+  // Fetch cross-reference filter options from Sales Comps and CRM Properties
+  const { data: crossRefFilters } = useQuery<CrossRefFilters>({
+    queryKey: ['/api/rate-comps/cross-reference/filters'],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
   
   // Collapsible sections state - all collapsed by default
   const [openSections, setOpenSections] = useState({
@@ -238,7 +255,13 @@ export default function FiltersPanel({
     onFiltersChange({
       q: "",
       state: "",
+      states: [],
       regions: [],
+      storageTypes: [],
+      rateTypes: [],
+      seasonalities: [],
+      boatLengthMin: "",
+      boatLengthMax: "",
       saleYearMin: "",
       saleYearMax: "",
       priceMin: "",
@@ -256,6 +279,8 @@ export default function FiltersPanel({
       disclosedCapRateOnly: false,
       portfoliosOnly: false,
       columnFilters: {},
+      waterTypes: [],
+      bodiesOfWater: [],
     });
   };
 
@@ -348,6 +373,31 @@ export default function FiltersPanel({
                     {getActiveFilterCount('location')}
                   </span>
                 )}
+                {crossRefFilters && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                          <Database className="h-3 w-3" />
+                          Cross-Ref
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-[200px]">
+                        <div className="text-xs space-y-1">
+                          <p className="font-medium">Data Sources:</p>
+                          <div className="flex items-center gap-1">
+                            <BarChart3 className="h-3 w-3 text-green-500" />
+                            <span>Sales Comps: {crossRefFilters.sources.salesCompsCount === 'available' ? 'Available' : 'Empty'}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Building2 className="h-3 w-3 text-purple-500" />
+                            <span>CRM Properties: {crossRefFilters.sources.crmPropertiesCount}</span>
+                          </div>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
               {openSections.location ? 
                 <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /> : 
@@ -384,6 +434,66 @@ export default function FiltersPanel({
                   testId="select-region"
                 />
               </div>
+              {/* Water Type - Cross-Referenced from Sales Comps */}
+              {crossRefFilters && crossRefFilters.waterTypes.merged.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Water Type</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                            <BarChart3 className="h-2.5 w-2.5" />
+                            SC
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <span className="text-xs">From Sales Comps</span>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <MultiSelectDropdown
+                    label="Water Type"
+                    placeholder="All water types"
+                    options={crossRefFilters.waterTypes.merged.map((type) => ({ label: type, value: type }))}
+                    value={filters.waterTypes || []}
+                    onChange={(types) => updateFilter('waterTypes', types)}
+                    triggerClassName="h-9 text-sm"
+                    testId="select-water-type"
+                  />
+                </div>
+              )}
+              {/* Body of Water - Cross-Referenced from Sales Comps */}
+              {crossRefFilters && crossRefFilters.bodiesOfWater.merged.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Body of Water</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                            <BarChart3 className="h-2.5 w-2.5" />
+                            SC
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <span className="text-xs">From Sales Comps</span>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <MultiSelectDropdown
+                    label="Body of Water"
+                    placeholder="All bodies of water"
+                    options={crossRefFilters.bodiesOfWater.merged.map((bow) => ({ label: bow, value: bow }))}
+                    value={filters.bodiesOfWater || []}
+                    onChange={(bows) => updateFilter('bodiesOfWater', bows)}
+                    triggerClassName="h-9 text-sm"
+                    testId="select-body-of-water"
+                  />
+                </div>
+              )}
             </div>
           </CollapsibleContent>
         </div>

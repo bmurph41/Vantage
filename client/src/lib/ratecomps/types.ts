@@ -24,6 +24,9 @@ export interface FilterState {
   disclosedCapRateOnly: boolean;
   portfoliosOnly: boolean;
   columnFilters: Record<string, string[]>;
+  // Cross-referenced filters from Sales Comps and CRM Properties
+  waterTypes?: string[];
+  bodiesOfWater?: string[];
 }
 
 export interface SortState {
