@@ -55,6 +55,9 @@ import {
   type InsertRcSavedSearch, type UpdateRcSavedSearch, type InsertRcCustomStorageType, type InsertRcPendingPropertyProfile,
   type InsertRcMetricSeries, type UpdateRcMetricSeries, type InsertRcMetricPoint, type InsertRcMetricAlert, type UpdateRcMetricAlert,
   type RateTier, type InsertRateTier, type UpdateRateTier, type RateCompWithTiers,
+  marinaRateDatabase, marinaRates,
+  type MarinaRateDatabase, type InsertMarinaRateDatabase, type UpdateMarinaRateDatabase,
+  type MarinaRate, type InsertMarinaRate, type UpdateMarinaRate, type MarinaWithRates,
   type InsertFuelIntegration, type UpdateFuelIntegration, type InsertFuelImportLog,
   type InsertVdrFolder, type InsertVdrDocument, type InsertVdrDocumentPermission, type InsertVdrWatermark, type InsertVdrAuditLog,
   type InsertDiligenceRequest, type InsertRequestDocument, type InsertRequestComment, type InsertRequestTemplate,
@@ -758,6 +761,26 @@ export interface IStorage {
   bulkCreateRateTiers(tiers: InsertRateTier[]): Promise<RateTier[]>;
   getRateCompWithTiers(rateCompId: string, orgId: string): Promise<RateCompWithTiers | undefined>;
   getRateCompsWithTiers(orgId: string, filters?: Record<string, any>): Promise<RateCompWithTiers[]>;
+
+  // Marina Rate Database - US Marina Registry with Historical Rate Tracking
+  getMarinas(params: { orgId: string; filters?: Record<string, any>; sortBy?: string; sortDir?: 'asc' | 'desc'; page?: number; pageSize?: number }): Promise<{ marinas: MarinaRateDatabase[]; total: number }>;
+  getMarina(id: string, orgId: string): Promise<MarinaRateDatabase | undefined>;
+  createMarina(marina: InsertMarinaRateDatabase): Promise<MarinaRateDatabase>;
+  updateMarina(id: string, updates: UpdateMarinaRateDatabase, orgId: string): Promise<MarinaRateDatabase | undefined>;
+  deleteMarina(id: string, orgId: string): Promise<boolean>;
+  getMarinaWithRates(id: string, orgId: string): Promise<MarinaWithRates | undefined>;
+  searchMarinas(orgId: string, query: string, limit?: number): Promise<MarinaRateDatabase[]>;
+
+  // Marina Rate History
+  getMarinaRates(marinaId: string, orgId: string, filters?: { rateYear?: number; storageType?: string; isCurrentRate?: boolean }): Promise<MarinaRate[]>;
+  getMarinaRate(id: string, orgId: string): Promise<MarinaRate | undefined>;
+  createMarinaRate(rate: InsertMarinaRate): Promise<MarinaRate>;
+  updateMarinaRate(id: string, updates: UpdateMarinaRate, orgId: string): Promise<MarinaRate | undefined>;
+  deleteMarinaRate(id: string, orgId: string): Promise<boolean>;
+  getMarinaRateHistory(marinaId: string, orgId: string, storageType?: string): Promise<MarinaRate[]>;
+  getLatestMarinaRates(marinaId: string, orgId: string): Promise<MarinaRate[]>;
+  bulkCreateMarinaRates(rates: InsertMarinaRate[]): Promise<MarinaRate[]>;
+  markPreviousRatesHistorical(marinaId: string, storageType: string, rateYear: number, orgId: string): Promise<void>;
 
   // Fuel Integrations
   getFuelIntegration(orgId: string): Promise<FuelIntegration | undefined>;
@@ -6319,6 +6342,251 @@ export class DatabaseStorage implements IStorage {
       ...comp,
       tiers: tiersByCompId.get(comp.id) || []
     }));
+  }
+
+  // ============================================================================
+  // MARINA RATE DATABASE STORAGE METHODS
+  // ============================================================================
+
+  async getMarinas(params: { 
+    orgId: string; 
+    filters?: Record<string, any>; 
+    sortBy?: string; 
+    sortDir?: 'asc' | 'desc'; 
+    page?: number; 
+    pageSize?: number 
+  }): Promise<{ marinas: MarinaRateDatabase[]; total: number }> {
+    const { orgId, filters = {}, sortBy = 'marinaName', sortDir = 'asc', page = 1, pageSize = 25 } = params;
+    
+    const conditions = [eq(marinaRateDatabase.orgId, orgId), isNull(marinaRateDatabase.deletedAt)];
+    
+    if (filters.q) {
+      conditions.push(sql`(
+        ${marinaRateDatabase.marinaName} ILIKE ${`%${filters.q}%`} OR
+        ${marinaRateDatabase.city} ILIKE ${`%${filters.q}%`} OR
+        ${marinaRateDatabase.state} ILIKE ${`%${filters.q}%`}
+      )`);
+    }
+    if (filters.states && filters.states.length > 0) {
+      conditions.push(inArray(marinaRateDatabase.state, filters.states));
+    }
+    if (filters.regions && filters.regions.length > 0) {
+      conditions.push(inArray(marinaRateDatabase.region, filters.regions));
+    }
+    if (filters.waterTypes && filters.waterTypes.length > 0) {
+      conditions.push(inArray(marinaRateDatabase.waterType, filters.waterTypes));
+    }
+    if (filters.isActive !== undefined) {
+      conditions.push(eq(marinaRateDatabase.isActive, filters.isActive));
+    }
+
+    const [{ total }] = await db.select({ total: count() })
+      .from(marinaRateDatabase)
+      .where(and(...conditions));
+
+    const orderColumn = sortBy === 'marinaName' ? marinaRateDatabase.marinaName :
+                       sortBy === 'state' ? marinaRateDatabase.state :
+                       sortBy === 'city' ? marinaRateDatabase.city :
+                       sortBy === 'lastRateUpdate' ? marinaRateDatabase.lastRateUpdate :
+                       sortBy === 'wetSlips' ? marinaRateDatabase.wetSlips :
+                       marinaRateDatabase.createdAt;
+    
+    const orderFn = sortDir === 'asc' ? asc : desc;
+
+    const marinas = await db.select().from(marinaRateDatabase)
+      .where(and(...conditions))
+      .orderBy(orderFn(orderColumn))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    return { marinas, total };
+  }
+
+  async getMarina(id: string, orgId: string): Promise<MarinaRateDatabase | undefined> {
+    const [marina] = await db.select()
+      .from(marinaRateDatabase)
+      .where(and(
+        eq(marinaRateDatabase.id, id),
+        eq(marinaRateDatabase.orgId, orgId),
+        isNull(marinaRateDatabase.deletedAt)
+      ));
+    return marina || undefined;
+  }
+
+  async createMarina(marina: InsertMarinaRateDatabase): Promise<MarinaRateDatabase> {
+    const [created] = await db.insert(marinaRateDatabase)
+      .values(marina as any)
+      .returning();
+    return created;
+  }
+
+  async updateMarina(id: string, updates: UpdateMarinaRateDatabase, orgId: string): Promise<MarinaRateDatabase | undefined> {
+    const [updated] = await db.update(marinaRateDatabase)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(
+        eq(marinaRateDatabase.id, id),
+        eq(marinaRateDatabase.orgId, orgId),
+        isNull(marinaRateDatabase.deletedAt)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteMarina(id: string, orgId: string): Promise<boolean> {
+    const [deleted] = await db.update(marinaRateDatabase)
+      .set({ deletedAt: new Date() })
+      .where(and(
+        eq(marinaRateDatabase.id, id),
+        eq(marinaRateDatabase.orgId, orgId)
+      ))
+      .returning();
+    return !!deleted;
+  }
+
+  async getMarinaWithRates(id: string, orgId: string): Promise<MarinaWithRates | undefined> {
+    const marina = await this.getMarina(id, orgId);
+    if (!marina) return undefined;
+    
+    const rates = await this.getMarinaRates(id, orgId);
+    return { ...marina, rates };
+  }
+
+  async searchMarinas(orgId: string, query: string, limit: number = 20): Promise<MarinaRateDatabase[]> {
+    return await db.select()
+      .from(marinaRateDatabase)
+      .where(and(
+        eq(marinaRateDatabase.orgId, orgId),
+        isNull(marinaRateDatabase.deletedAt),
+        sql`(
+          ${marinaRateDatabase.marinaName} ILIKE ${`%${query}%`} OR
+          ${marinaRateDatabase.city} ILIKE ${`%${query}%`} OR
+          ${marinaRateDatabase.state} ILIKE ${`%${query}%`}
+        )`
+      ))
+      .orderBy(marinaRateDatabase.marinaName)
+      .limit(limit);
+  }
+
+  // Marina Rate History Methods
+  async getMarinaRates(marinaId: string, orgId: string, filters?: { rateYear?: number; storageType?: string; isCurrentRate?: boolean }): Promise<MarinaRate[]> {
+    const conditions = [
+      eq(marinaRates.marinaId, marinaId),
+      eq(marinaRates.orgId, orgId)
+    ];
+
+    if (filters?.rateYear) {
+      conditions.push(eq(marinaRates.rateYear, filters.rateYear));
+    }
+    if (filters?.storageType) {
+      conditions.push(eq(marinaRates.storageType, filters.storageType));
+    }
+    if (filters?.isCurrentRate !== undefined) {
+      conditions.push(eq(marinaRates.isCurrentRate, filters.isCurrentRate));
+    }
+
+    return await db.select()
+      .from(marinaRates)
+      .where(and(...conditions))
+      .orderBy(desc(marinaRates.rateYear), asc(marinaRates.storageType), asc(marinaRates.loaMin));
+  }
+
+  async getMarinaRate(id: string, orgId: string): Promise<MarinaRate | undefined> {
+    const [rate] = await db.select()
+      .from(marinaRates)
+      .where(and(
+        eq(marinaRates.id, id),
+        eq(marinaRates.orgId, orgId)
+      ));
+    return rate || undefined;
+  }
+
+  async createMarinaRate(rate: InsertMarinaRate): Promise<MarinaRate> {
+    const [created] = await db.insert(marinaRates)
+      .values(rate as any)
+      .returning();
+    
+    // Update marina's lastRateUpdate timestamp
+    await db.update(marinaRateDatabase)
+      .set({ lastRateUpdate: new Date(), updatedAt: new Date() })
+      .where(eq(marinaRateDatabase.id, rate.marinaId));
+    
+    return created;
+  }
+
+  async updateMarinaRate(id: string, updates: UpdateMarinaRate, orgId: string): Promise<MarinaRate | undefined> {
+    const [updated] = await db.update(marinaRates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(
+        eq(marinaRates.id, id),
+        eq(marinaRates.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteMarinaRate(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(marinaRates)
+      .where(and(
+        eq(marinaRates.id, id),
+        eq(marinaRates.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getMarinaRateHistory(marinaId: string, orgId: string, storageType?: string): Promise<MarinaRate[]> {
+    const conditions = [
+      eq(marinaRates.marinaId, marinaId),
+      eq(marinaRates.orgId, orgId)
+    ];
+
+    if (storageType) {
+      conditions.push(eq(marinaRates.storageType, storageType));
+    }
+
+    return await db.select()
+      .from(marinaRates)
+      .where(and(...conditions))
+      .orderBy(desc(marinaRates.rateYear), desc(marinaRates.rateSeason), asc(marinaRates.storageType));
+  }
+
+  async getLatestMarinaRates(marinaId: string, orgId: string): Promise<MarinaRate[]> {
+    return await db.select()
+      .from(marinaRates)
+      .where(and(
+        eq(marinaRates.marinaId, marinaId),
+        eq(marinaRates.orgId, orgId),
+        eq(marinaRates.isCurrentRate, true)
+      ))
+      .orderBy(asc(marinaRates.storageType), asc(marinaRates.loaMin));
+  }
+
+  async bulkCreateMarinaRates(rates: InsertMarinaRate[]): Promise<MarinaRate[]> {
+    if (rates.length === 0) return [];
+    
+    const created = await db.insert(marinaRates).values(rates as any).returning();
+    
+    // Update lastRateUpdate for all affected marinas
+    const marinaIds = [...new Set(rates.map(r => r.marinaId))];
+    for (const marinaId of marinaIds) {
+      await db.update(marinaRateDatabase)
+        .set({ lastRateUpdate: new Date(), updatedAt: new Date() })
+        .where(eq(marinaRateDatabase.id, marinaId));
+    }
+    
+    return created;
+  }
+
+  async markPreviousRatesHistorical(marinaId: string, storageType: string, rateYear: number, orgId: string): Promise<void> {
+    await db.update(marinaRates)
+      .set({ isCurrentRate: false, updatedAt: new Date() })
+      .where(and(
+        eq(marinaRates.marinaId, marinaId),
+        eq(marinaRates.orgId, orgId),
+        eq(marinaRates.storageType, storageType),
+        eq(marinaRates.rateYear, rateYear),
+        eq(marinaRates.isCurrentRate, true)
+      ));
   }
 
   async getFuelIntegration(orgId: string): Promise<FuelIntegration | undefined> {
