@@ -123,7 +123,6 @@ const dockTalkNav = [
 const analysisNav = [
   { name: "Sales Comps", href: "/analysis/sales-comps", icon: BarChart3 },
   { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
-  { name: "Marina Database", href: "/analysis/marina-database", icon: Anchor },
   { name: "Demographics", href: "/analysis/demographics", icon: Users },
   { name: "Capital Markets", href: "/analysis/benchmarks", icon: Target },
   { name: "Projects", href: "/analysis/projects", icon: FolderKanban },
