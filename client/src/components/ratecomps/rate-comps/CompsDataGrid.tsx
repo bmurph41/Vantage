@@ -21,6 +21,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import type { RateComp } from "@shared/schema";
+import { STORAGE_TYPE_LABELS, RATE_PERIOD_LABELS, RATE_UNIT_LABELS, PROTECTION_LEVEL_LABELS } from "@shared/ratecomps-utils";
 
 interface CompsDataGridProps {
   data: RateComp[];
@@ -42,35 +43,6 @@ interface CompsDataGridProps {
   onCompClick?: (comp: RateComp) => void;
 }
 
-const STORAGE_TYPE_LABELS: Record<string, string> = {
-  wet_slip: 'Wet Slip',
-  dry_rack: 'Dry Rack',
-  mooring: 'Mooring',
-  anchorage: 'Anchorage',
-  trailer: 'Trailer',
-  covered: 'Covered',
-  floating: 'Floating',
-};
-
-const RATE_UNIT_LABELS: Record<string, string> = {
-  per_foot: '$/ft',
-  per_foot_beam: '$/ft (beam)',
-  flat: 'Flat',
-};
-
-const RATE_PERIOD_LABELS: Record<string, string> = {
-  daily: 'Daily',
-  weekly: 'Weekly',
-  monthly: 'Monthly',
-  annually: 'Annual',
-};
-
-const PROTECTION_LABELS: Record<string, string> = {
-  open: 'Open',
-  partially_protected: 'Partial',
-  fully_protected: 'Protected',
-  covered: 'Covered',
-};
 
 export default function CompsDataGrid({
   data,
@@ -187,7 +159,7 @@ export default function CompsDataGrid({
         );
 
       case 'protectionLevel':
-        const protectionLabel = PROTECTION_LABELS[comp.protectionLevel as string] || comp.protectionLevel;
+        const protectionLabel = PROTECTION_LEVEL_LABELS[comp.protectionLevel as string] || comp.protectionLevel;
         return <span className="truncate">{protectionLabel || '—'}</span>;
 
       case 'effectiveDate':

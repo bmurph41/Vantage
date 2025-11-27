@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueries, keepPreviousData } from "@tanstack/react-query";
 import { BarChart3, FolderPlus, Trash2, ChevronLeft, ChevronRight, Filter, ChevronUp } from "lucide-react";
 import { Link } from "wouter";
 import debounce from "lodash.debounce";
@@ -129,7 +129,7 @@ export default function RateCompsIndex() {
     queryKey: queryKeys.comps.list(queryParams),
     queryFn: () => rateCompsApi.getComps(queryParams),
     retry: false,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   const data = compsData?.comps || [];
