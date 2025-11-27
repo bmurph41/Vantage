@@ -5343,22 +5343,22 @@ export const rateComps = pgTable('rate_comps', {
   waterBodyName: text('water_body_name'), // Specific name like "Gulf of America", "Lake Superior"
   waterfront: text('waterfront'),
   region: text('region'),
-  saleCondition: text('sale_condition'),
-  daysOnMarket: integer('days_on_market'),
-  broker: text('broker'),
   address: text('address'),
   zip: text('zip'),
   lat: decimal('lat', { precision: 10, scale: 7 }), // Geocoded latitude
   lng: decimal('lng', { precision: 10, scale: 7 }), // Geocoded longitude
-  seller: text('seller'),
-  company: text('company'),
-  owner: text('owner'),
-  listPrice: integer('list_price'),
   acres: integer('acres'),
   occupancy: integer('occupancy'),
   yearBuilt: integer('year_built'),
   articleUrls: text('article_urls').array().default(sql`'{}'`),
   notes: text('notes'),
+
+  // Rate-focused fields (for rate comp functionality)
+  rateCollectionDate: text('rate_collection_date'),
+  rateSource: text('rate_source'),
+  rateTrend: text('rate_trend'),
+  lastVerifiedDate: text('last_verified_date'),
+  sourceNotes: text('source_notes'),
 
   // Profit centers (revenue streams) - individual boolean columns
   profitCenterStorage: boolean('profit_center_storage').default(false),

@@ -27,16 +27,10 @@ import RateTiersEditor from "./RateTiersEditor";
 
 const compFormSchema = z.object({
   marina: z.string().min(1, "Marina name is required"),
-  salePrice: z.union([z.string(), z.number()]).optional(),
-  isPriceDisclosed: z.boolean().default(true),
-  capRate: z.union([z.string(), z.number()]).optional(),
-  isCapRateDisclosed: z.boolean().default(true),
-  noi: z.union([z.string(), z.number()]).optional(),
-  isNoiDisclosed: z.boolean().default(true),
-  saleMonth: z.union([z.string(), z.number()]).optional(),
-  saleYear: z.union([z.string(), z.number()]).optional(),
   city: z.string().optional(),
   state: z.string().optional(),
+  address: z.string().optional(),
+  zip: z.string().optional(),
   wetSlips: z.union([z.string(), z.number()]).optional(),
   dryRacks: z.union([z.string(), z.number()]).optional(),
   ioBoth: z.string().optional(),
@@ -45,29 +39,21 @@ const compFormSchema = z.object({
   waterBodyName: z.string().optional(),
   waterfront: z.string().optional(),
   region: z.string().optional(),
-  saleCondition: z.string().optional(),
-  daysOnMarket: z.union([z.string(), z.number()]).optional(),
-  broker: z.string().optional(),
-  address: z.string().optional(),
-  zip: z.string().optional(),
-  seller: z.string().optional(),
-  company: z.string().optional(),
-  owner: z.string().optional(),
-  listPrice: z.union([z.string(), z.number()]).optional(),
-  // Transaction parties
-  sellerCompany: z.string().optional(),
-  sellerPrincipal: z.string().optional(),
-  buyerCompany: z.string().optional(),
-  buyerPrincipal: z.string().optional(),
   acres: z.union([z.string(), z.number()]).optional(),
   occupancy: z.union([z.string(), z.number()]).optional(),
   yearBuilt: z.union([z.string(), z.number()]).optional(),
   articleUrls: z.array(z.string()).default([]),
   notes: z.string().optional(),
   waterType: z.string().optional(),
-  coastalType: z.string().optional(), // Legacy field
+  coastalType: z.string().optional(),
   isPortfolio: z.boolean().default(false),
   parentPortfolioId: z.string().optional(),
+  // Rate-focused fields
+  rateCollectionDate: z.string().optional(),
+  rateSource: z.string().optional(),
+  rateTrend: z.string().optional(),
+  lastVerifiedDate: z.string().optional(),
+  sourceNotes: z.string().optional(),
   // Individual profit center boolean fields
   profitCenterStorage: z.boolean().default(false),
   profitCenterEvents: z.boolean().default(false),
@@ -151,16 +137,10 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     resolver: zodResolver(compFormSchema),
     defaultValues: {
       marina: comp?.marina || "",
-      salePrice: comp?.salePrice ? Number(comp.salePrice) : "",
-      isPriceDisclosed: comp?.isPriceDisclosed ?? true,
-      capRate: comp?.capRate ? Number(comp.capRate) : "",
-      isCapRateDisclosed: comp?.isCapRateDisclosed ?? true,
-      noi: comp?.noi ? Number(comp.noi) : "",
-      isNoiDisclosed: comp?.isNoiDisclosed ?? true,
-      saleMonth: comp?.saleMonth || "",
-      saleYear: comp?.saleYear || "",
       city: comp?.city || "",
       state: comp?.state || "",
+      address: comp?.address || "",
+      zip: comp?.zip || "",
       wetSlips: comp?.wetSlips || "",
       dryRacks: comp?.dryRacks || "",
       ioBoth: (comp?.ioBoth && STORAGE_TYPES.includes(comp.ioBoth as any)) ? comp.ioBoth : undefined,
@@ -169,15 +149,6 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       waterBodyName: comp?.waterBodyName || "",
       waterfront: comp?.waterfront || "",
       region: comp?.region || "",
-      saleCondition: comp?.saleCondition || "",
-      daysOnMarket: comp?.daysOnMarket || "",
-      broker: comp?.broker || "",
-      address: comp?.address || "",
-      zip: comp?.zip || "",
-      seller: comp?.seller || "",
-      company: comp?.company || "",
-      owner: comp?.owner || "",
-      listPrice: comp?.listPrice ? Number(comp.listPrice) : "",
       acres: comp?.acres ? Number(comp.acres) : "",
       occupancy: comp?.occupancy ? Number(comp.occupancy) : "",
       yearBuilt: comp?.yearBuilt || "",
@@ -187,6 +158,12 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       coastalType: comp?.coastalType || "",
       isPortfolio: comp?.isPortfolio ?? isPortfolioMode,
       parentPortfolioId: comp?.parentPortfolioId || "",
+      // Rate-focused fields
+      rateCollectionDate: (comp as any)?.rateCollectionDate || "",
+      rateSource: (comp as any)?.rateSource || "",
+      rateTrend: (comp as any)?.rateTrend || "",
+      lastVerifiedDate: (comp as any)?.lastVerifiedDate || "",
+      sourceNotes: (comp as any)?.sourceNotes || "",
       // Individual profit center boolean fields
       profitCenterStorage: comp?.profitCenterStorage ?? false,
       profitCenterEvents: comp?.profitCenterEvents ?? false,
@@ -324,15 +301,8 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     // Convert empty strings to undefined for backend Zod schema compatibility
     const processedData = {
       ...data,
-      salePrice: data.salePrice === "" ? undefined : Number(data.salePrice),
-      capRate: data.capRate === "" ? undefined : Number(data.capRate),
-      noi: data.noi === "" ? undefined : Number(data.noi),
-      saleMonth: data.saleMonth === "" ? undefined : Number(data.saleMonth),
-      saleYear: data.saleYear === "" ? undefined : Number(data.saleYear),
       wetSlips: data.wetSlips === "" ? undefined : Number(data.wetSlips),
       dryRacks: data.dryRacks === "" ? undefined : Number(data.dryRacks),
-      daysOnMarket: data.daysOnMarket === "" ? undefined : Number(data.daysOnMarket),
-      listPrice: data.listPrice === "" ? undefined : Number(data.listPrice),
       acres: data.acres === "" ? undefined : Number(data.acres),
       occupancy: data.occupancy === "" ? undefined : Number(data.occupancy),
       yearBuilt: data.yearBuilt === "" ? undefined : Number(data.yearBuilt),
@@ -345,22 +315,17 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       waterBodyName: data.waterBodyName || undefined,
       waterfront: data.waterfront || undefined,
       region: data.region || undefined,
-      saleCondition: data.saleCondition || undefined,
-      broker: data.broker || undefined,
       address: data.address || undefined,
       zip: data.zip || undefined,
-      seller: data.seller || undefined,
-      company: data.company || undefined,
-      owner: data.owner || undefined,
-      sellerCompany: data.sellerCompany || undefined,
-      sellerPrincipal: data.sellerPrincipal || undefined,
-      buyerCompany: data.buyerCompany || undefined,
-      buyerPrincipal: data.buyerPrincipal || undefined,
       notes: data.notes || undefined,
       waterType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType,
-      coastalType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType, // Sync with waterType for backward compatibility
-      isPriceDisclosed: data.isPriceDisclosed,
-      isCapRateDisclosed: data.isCapRateDisclosed,
+      coastalType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType,
+      // Rate-focused fields
+      rateCollectionDate: data.rateCollectionDate || undefined,
+      rateSource: data.rateSource === "" || data.rateSource === "none-selected" ? undefined : data.rateSource,
+      rateTrend: data.rateTrend === "" || data.rateTrend === "none-selected" ? undefined : data.rateTrend,
+      lastVerifiedDate: data.lastVerifiedDate || undefined,
+      sourceNotes: data.sourceNotes || undefined,
       // Individual profit center boolean fields
       profitCenterStorage: data.profitCenterStorage,
       profitCenterEvents: data.profitCenterEvents,
@@ -944,49 +909,42 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
 
                 {/* Right Column */}
                 <div className="space-y-6">
-                  {/* Financial Information */}
+                  {/* Rate Information */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">Financial Information</CardTitle>
+                      <CardTitle className="text-lg">Rate Information</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-2 gap-3">
                         <FormField
                           control={form.control}
-                          name="salePrice"
-                          render={({ field }) => {
-                            const isPriceUndisclosed = !form.watch("isPriceDisclosed");
-                            return (
-                              <FormItem>
-                                <FormLabel>Sale Price</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    {...field}
-                                    value={isPriceUndisclosed ? "N/A" : field.value}
-                                    type={isPriceUndisclosed ? "text" : "number"}
-                                    placeholder="12500000"
-                                    disabled={isPriceUndisclosed}
-                                    data-testid="input-sale-price"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            );
-                          }}
+                          name="rateCollectionDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Rate Collection Date</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  type="date"
+                                  data-testid="input-rate-collection-date"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
                         
                         <FormField
                           control={form.control}
-                          name="listPrice"
+                          name="lastVerifiedDate"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>List Price</FormLabel>
+                              <FormLabel>Last Verified</FormLabel>
                               <FormControl>
                                 <Input 
                                   {...field} 
-                                  type="number"
-                                  placeholder="13750000"
-                                  data-testid="input-list-price"
+                                  type="date"
+                                  data-testid="input-last-verified-date"
                                 />
                               </FormControl>
                               <FormMessage />
@@ -998,185 +956,25 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       <div className="grid grid-cols-2 gap-3">
                         <FormField
                           control={form.control}
-                          name="noi"
-                          render={({ field }) => {
-                            const isNoiUndisclosed = !form.watch("isNoiDisclosed");
-                            return (
-                              <FormItem>
-                                <FormLabel>NOI</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    {...field}
-                                    value={isNoiUndisclosed ? "N/A" : field.value}
-                                    type={isNoiUndisclosed ? "text" : "number"}
-                                    placeholder="900000"
-                                    disabled={isNoiUndisclosed}
-                                    data-testid="input-noi"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            );
-                          }}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="capRate"
-                          render={({ field }) => {
-                            const isCapRateUndisclosed = !form.watch("isCapRateDisclosed");
-                            return (
-                              <FormItem>
-                                <FormLabel>Cap Rate (%)</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    {...field}
-                                    value={isCapRateUndisclosed ? "N/A" : field.value}
-                                    type={isCapRateUndisclosed ? "text" : "number"}
-                                    step="0.1"
-                                    placeholder="7.2"
-                                    disabled={isCapRateUndisclosed}
-                                    data-testid="input-cap-rate"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            );
-                          }}
-                        />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-3">
-                        <FormField
-                          control={form.control}
-                          name="occupancy"
+                          name="rateSource"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Occupancy (%)</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  {...field} 
-                                  type="number"
-                                  step="0.1"
-                                  placeholder="94.2"
-                                  data-testid="input-occupancy"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="daysOnMarket"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Days on Market</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  {...field} 
-                                  type="number"
-                                  placeholder="127"
-                                  data-testid="input-days-on-market"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      
-                      <div className="flex items-center gap-4">
-                        <FormField
-                          control={form.control}
-                          name="isPriceDisclosed"
-                          render={({ field }) => (
-                            <FormItem className="flex items-center space-x-2">
-                              <FormControl>
-                                <Checkbox
-                                  checked={!field.value}
-                                  onCheckedChange={(checked) => field.onChange(!checked)}
-                                  data-testid="checkbox-price-undisclosed"
-                                />
-                              </FormControl>
-                              <FormLabel className="text-sm font-normal">
-                                Price Undisclosed
-                              </FormLabel>
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="isCapRateDisclosed"
-                          render={({ field }) => (
-                            <FormItem className="flex items-center space-x-2">
-                              <FormControl>
-                                <Checkbox
-                                  checked={!field.value}
-                                  onCheckedChange={(checked) => field.onChange(!checked)}
-                                  data-testid="checkbox-cap-rate-undisclosed"
-                                />
-                              </FormControl>
-                              <FormLabel className="text-sm font-normal">
-                                Cap Rate Undisclosed
-                              </FormLabel>
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="isNoiDisclosed"
-                          render={({ field }) => (
-                            <FormItem className="flex items-center space-x-2">
-                              <FormControl>
-                                <Checkbox
-                                  checked={!field.value}
-                                  onCheckedChange={(checked) => field.onChange(!checked)}
-                                  data-testid="checkbox-noi-undisclosed"
-                                />
-                              </FormControl>
-                              <FormLabel className="text-sm font-normal">
-                                NOI Undisclosed
-                              </FormLabel>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Sale Information */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Sale Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
-                        <FormField
-                          control={form.control}
-                          name="saleMonth"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Sale Month</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value?.toString() || ""}>
+                              <FormLabel>Rate Source</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || ""}>
                                 <FormControl>
-                                  <SelectTrigger data-testid="select-sale-month">
-                                    <SelectValue placeholder="Select month" />
+                                  <SelectTrigger data-testid="select-rate-source">
+                                    <SelectValue placeholder="How were rates collected?" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="none">None</SelectItem>
-                                  {Array.from({ length: 12 }, (_, i) => {
-                                    const month = new Date(0, i).toLocaleString('en', { month: 'long' });
-                                    return (
-                                      <SelectItem key={i + 1} value={(i + 1).toString()}>
-                                        {month}
-                                      </SelectItem>
-                                    );
-                                  })}
+                                  <SelectItem value="none-selected">Select source</SelectItem>
+                                  <SelectItem value="website">Website</SelectItem>
+                                  <SelectItem value="phone">Phone Call</SelectItem>
+                                  <SelectItem value="site_visit">Site Visit</SelectItem>
+                                  <SelectItem value="rate_card">Published Rate Card</SelectItem>
+                                  <SelectItem value="broker">Broker</SelectItem>
+                                  <SelectItem value="email">Email/Quote</SelectItem>
+                                  <SelectItem value="other">Other</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />
@@ -1186,18 +984,23 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         
                         <FormField
                           control={form.control}
-                          name="saleYear"
+                          name="rateTrend"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Sale Year</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  {...field} 
-                                  type="number"
-                                  placeholder="2024"
-                                  data-testid="input-sale-year"
-                                />
-                              </FormControl>
+                              <FormLabel>Rate Trend</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-rate-trend">
+                                    <SelectValue placeholder="Overall rate trend" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="none-selected">Select trend</SelectItem>
+                                  <SelectItem value="increasing">Increasing</SelectItem>
+                                  <SelectItem value="stable">Stable</SelectItem>
+                                  <SelectItem value="decreasing">Decreasing</SelectItem>
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -1206,15 +1009,17 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       
                       <FormField
                         control={form.control}
-                        name="saleCondition"
+                        name="occupancy"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Sale Condition</FormLabel>
+                            <FormLabel>Occupancy (%)</FormLabel>
                             <FormControl>
                               <Input 
                                 {...field} 
-                                placeholder="Good condition"
-                                data-testid="input-sale-condition"
+                                type="number"
+                                step="0.1"
+                                placeholder="94.2"
+                                data-testid="input-occupancy"
                               />
                             </FormControl>
                             <FormMessage />
@@ -1224,15 +1029,16 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       
                       <FormField
                         control={form.control}
-                        name="broker"
+                        name="sourceNotes"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Broker</FormLabel>
+                            <FormLabel>Source Notes</FormLabel>
                             <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="Marina Brokers International"
-                                data-testid="input-broker"
+                              <Textarea
+                                {...field}
+                                rows={2}
+                                placeholder="Website URL, contact name, or other source details..."
+                                data-testid="textarea-source-notes"
                               />
                             </FormControl>
                             <FormMessage />
@@ -1241,96 +1047,47 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       />
                     </CardContent>
                   </Card>
+
+                  {/* Rate Tiers - Inline for Edit Mode */}
+                  {isEdit && comp && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <DollarSign className="h-5 w-5" />
+                          Rate Tiers
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="max-h-[400px] overflow-auto">
+                          <RateTiersEditor
+                            rateCompId={comp.id}
+                            marinaName={comp.marina}
+                            onTiersUpdated={() => {
+                              queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
+                            }}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {!isEdit && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <DollarSign className="h-5 w-5" />
+                          Rate Tiers
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">
+                          Save the rate comp first, then you can add detailed rate tiers.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               </div>
-
-              {/* Transaction Parties */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Transaction Parties</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-6">
-                    {/* Seller Section */}
-                    <div className="space-y-4">
-                      <h4 className="font-semibold text-sm text-gray-700">Seller</h4>
-                      <FormField
-                        control={form.control}
-                        name="sellerCompany"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Company</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="Seller company name"
-                                data-testid="input-seller-company"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="sellerPrincipal"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Principal</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="Principal contact name"
-                                data-testid="input-seller-principal"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    {/* Buyer Section */}
-                    <div className="space-y-4">
-                      <h4 className="font-semibold text-sm text-gray-700">Buyer</h4>
-                      <FormField
-                        control={form.control}
-                        name="buyerCompany"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Company</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="Buyer company name"
-                                data-testid="input-buyer-company"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="buyerPrincipal"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Principal</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="Principal contact name"
-                                data-testid="input-buyer-principal"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
 
               {/* Profit Centers & Location */}
               <Card>
@@ -1633,40 +1390,25 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-border">
-          <div className="flex items-center justify-between">
-            <div>
-              {isEdit && comp && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowRateTiersDialog(true)}
-                  data-testid="button-manage-rate-tiers"
-                >
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Manage Rate Tiers
-                </Button>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={onClose}
-                data-testid="button-cancel"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={form.handleSubmit(onSubmit)}
-                disabled={createMutation.isPending || updateMutation.isPending}
-                data-testid="button-save"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {createMutation.isPending || updateMutation.isPending
-                  ? isEdit ? 'Updating...' : 'Creating...'
-                  : isEdit ? 'Update Comp' : 'Create Comp'
-                }
-              </Button>
-            </div>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              data-testid="button-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={form.handleSubmit(onSubmit)}
+              disabled={createMutation.isPending || updateMutation.isPending}
+              data-testid="button-save"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {createMutation.isPending || updateMutation.isPending
+                ? isEdit ? 'Updating...' : 'Creating...'
+                : isEdit ? 'Update Comp' : 'Create Comp'
+              }
+            </Button>
           </div>
         </div>
       </Card>
@@ -1714,26 +1456,6 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Rate Tiers Dialog */}
-      {isEdit && comp && (
-        <Dialog open={showRateTiersDialog} onOpenChange={setShowRateTiersDialog}>
-          <DialogContent className="max-w-4xl max-h-[90vh]">
-            <DialogHeader>
-              <DialogTitle>Rate Tiers - {comp.marina}</DialogTitle>
-            </DialogHeader>
-            <div className="max-h-[70vh] overflow-auto py-4">
-              <RateTiersEditor
-                rateCompId={comp.id}
-                marinaName={comp.marina}
-                onTiersUpdated={() => {
-                  queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
-                }}
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
