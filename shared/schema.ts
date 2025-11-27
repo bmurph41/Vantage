@@ -5904,6 +5904,228 @@ export type RateCompWithTiers = RateComp & {
   tiers: RateTier[];
 };
 
+// ============================================================================
+// MARINA RATE DATABASE - US Marina Registry with Historical Rate Tracking
+// ============================================================================
+
+// Marina Rate Database - central registry of US marinas with rate tracking
+export const marinaRateDatabase = pgTable('marina_rate_database', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+
+  // Marina identification
+  marinaName: text('marina_name').notNull(),
+  address: text('address'),
+  city: text('city'),
+  state: text('state'),
+  zip: text('zip'),
+  country: text('country').default('USA'),
+  lat: decimal('lat', { precision: 10, scale: 7 }),
+  lng: decimal('lng', { precision: 10, scale: 7 }),
+  region: text('region'),
+
+  // Marina characteristics
+  waterType: text('water_type'), // 'Coastal' | 'Lake' | 'River'
+  bodyOfWater: text('body_of_water'),
+  waterBodyName: text('water_body_name'),
+  
+  // Facility counts
+  wetSlips: integer('wet_slips'),
+  dryRacks: integer('dry_racks'),
+  moorings: integer('moorings'),
+  trailerSpaces: integer('trailer_spaces'),
+  rvSpaces: integer('rv_spaces'),
+  
+  // Contact info
+  phone: text('phone'),
+  email: text('email'),
+  website: text('website'),
+  
+  // Status tracking
+  isActive: boolean('is_active').default(true),
+  lastRateUpdate: timestamp('last_rate_update'),
+  rateSource: text('rate_source'), // 'Website' | 'Phone' | 'Email' | 'Visit' | 'Broker' | 'Other'
+  
+  // CRM linkage
+  propertyId: varchar('property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
+  
+  // Additional info
+  notes: text('notes'),
+  custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
+}, (table) => ({
+  orgIdx: index('marina_rate_db_org_idx').on(table.orgId),
+  orgStateIdx: index('marina_rate_db_org_state_idx').on(table.orgId, table.state),
+  orgRegionIdx: index('marina_rate_db_org_region_idx').on(table.orgId, table.region),
+  orgActiveIdx: index('marina_rate_db_org_active_idx').on(table.orgId, table.isActive),
+  orgNameIdx: index('marina_rate_db_org_name_idx').on(table.orgId, table.marinaName),
+  propertyIdx: index('marina_rate_db_property_idx').on(table.propertyId),
+}));
+
+// Marina Rate History - stores individual rate records tied to year/season
+export const marinaRates = pgTable('marina_rates', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  marinaId: varchar('marina_id').notNull().references(() => marinaRateDatabase.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+
+  // Time period for this rate
+  rateYear: integer('rate_year').notNull(), // e.g., 2023, 2024
+  rateSeason: text('rate_season'), // e.g., 'Annual', 'Summer 2024', 'Winter 2023-24', 'Peak Season'
+  effectiveDate: date('effective_date'),
+  expirationDate: date('expiration_date'),
+  isCurrentRate: boolean('is_current_rate').default(true),
+
+  // Rate details
+  storageType: text('storage_type').notNull(), // 'wet_slip', 'dry_rack', 'mooring', etc.
+  tierLabel: text('tier_label'), // e.g., 'Up to 25ft', '26-35ft', 'Premium'
+  
+  // Size parameters
+  loaMin: integer('loa_min'),
+  loaMax: integer('loa_max'),
+  beamMin: integer('beam_min'),
+  beamMax: integer('beam_max'),
+  
+  // Pricing
+  rateUnit: text('rate_unit').notNull(), // 'per_foot', 'flat', 'per_foot_beam'
+  ratePeriod: text('rate_period').notNull(), // 'daily', 'weekly', 'monthly', 'seasonal', 'annual'
+  amountCents: integer('amount_cents').notNull(),
+  
+  // Normalized for comparison
+  normalizedMonthlyPerFoot: integer('normalized_monthly_per_foot'), // Cents per foot per month
+  
+  // Seasonality
+  seasonality: text('seasonality').default('annual'), // 'annual', 'seasonal', 'peak', 'off-peak'
+  seasonStartMonth: integer('season_start_month'),
+  seasonEndMonth: integer('season_end_month'),
+  
+  // Amenities included
+  electricIncluded: boolean('electric_included').default(false),
+  electricAmps: integer('electric_amps').array().default(sql`'{}'`),
+  waterIncluded: boolean('water_included').default(true),
+  wifiIncluded: boolean('wifi_included').default(false),
+  pumpOutIncluded: boolean('pump_out_included').default(false),
+  
+  // Protection
+  protectionLevel: text('protection_level'), // 'open', 'protected', 'covered', 'indoor'
+  isCovered: boolean('is_covered').default(false),
+  
+  // Live-aboard
+  liveaboardAllowed: boolean('liveaboard_allowed'),
+  liveaboardAdditionalCents: integer('liveaboard_additional_cents'),
+  
+  // Source/verification
+  sourceType: text('source_type'), // 'website', 'phone', 'email', 'visit', 'broker'
+  sourceUrl: text('source_url'),
+  sourceDate: date('source_date'),
+  verifiedAt: timestamp('verified_at'),
+  verifiedBy: varchar('verified_by').references(() => users.id),
+  
+  notes: text('notes'),
+  custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
+}, (table) => ({
+  marinaIdx: index('marina_rates_marina_idx').on(table.marinaId),
+  orgIdx: index('marina_rates_org_idx').on(table.orgId),
+  orgYearIdx: index('marina_rates_org_year_idx').on(table.orgId, table.rateYear),
+  orgStorageIdx: index('marina_rates_org_storage_idx').on(table.orgId, table.storageType),
+  orgCurrentIdx: index('marina_rates_org_current_idx').on(table.orgId, table.isCurrentRate),
+  marinaYearIdx: index('marina_rates_marina_year_idx').on(table.marinaId, table.rateYear),
+  marinaStorageIdx: index('marina_rates_marina_storage_idx').on(table.marinaId, table.storageType),
+  trendIdx: index('marina_rates_trend_idx').on(table.marinaId, table.storageType, table.rateYear),
+}));
+
+// Relations for Marina Rate Database
+export const marinaRateDatabaseRelations = relations(marinaRateDatabase, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [marinaRateDatabase.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [marinaRateDatabase.createdBy],
+    references: [users.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [marinaRateDatabase.updatedBy],
+    references: [users.id],
+  }),
+  property: one(crmProperties, {
+    fields: [marinaRateDatabase.propertyId],
+    references: [crmProperties.id],
+  }),
+  rates: many(marinaRates),
+}));
+
+// Relations for Marina Rates
+export const marinaRatesRelations = relations(marinaRates, ({ one }) => ({
+  marina: one(marinaRateDatabase, {
+    fields: [marinaRates.marinaId],
+    references: [marinaRateDatabase.id],
+  }),
+  organization: one(organizations, {
+    fields: [marinaRates.orgId],
+    references: [organizations.id],
+  }),
+  createdByUser: one(users, {
+    fields: [marinaRates.createdBy],
+    references: [users.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [marinaRates.updatedBy],
+    references: [users.id],
+  }),
+  verifiedByUser: one(users, {
+    fields: [marinaRates.verifiedBy],
+    references: [users.id],
+  }),
+}));
+
+// Zod schemas for Marina Rate Database
+export const insertMarinaRateDatabaseSchema = createInsertSchema(marinaRateDatabase).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+});
+
+export const updateMarinaRateDatabaseSchema = insertMarinaRateDatabaseSchema.partial().omit({
+  orgId: true,
+  createdBy: true,
+});
+
+// Zod schemas for Marina Rates
+export const insertMarinaRateSchema = createInsertSchema(marinaRates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateMarinaRateSchema = insertMarinaRateSchema.partial().omit({
+  orgId: true,
+  marinaId: true,
+  createdBy: true,
+});
+
+// Types for Marina Rate Database
+export type MarinaRateDatabase = typeof marinaRateDatabase.$inferSelect;
+export type InsertMarinaRateDatabase = z.infer<typeof insertMarinaRateDatabaseSchema>;
+export type UpdateMarinaRateDatabase = z.infer<typeof updateMarinaRateDatabaseSchema>;
+
+export type MarinaRate = typeof marinaRates.$inferSelect;
+export type InsertMarinaRate = z.infer<typeof insertMarinaRateSchema>;
+export type UpdateMarinaRate = z.infer<typeof updateMarinaRateSchema>;
+
+// Marina with rates joined
+export type MarinaWithRates = MarinaRateDatabase & {
+  rates: MarinaRate[];
+};
+
 // Fuel Sales - Operations Module
 export const fuelSales = pgTable('fuel_sales', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
