@@ -41,7 +41,9 @@ Preferred communication style: Simple, everyday language.
 - **VDR Permission System**: Hierarchical, 5-level granular permissions (no_access, view_only, view_download, view_download_print, full_access) with 60-second cache invalidation.
 
 ### Key Features
-- **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation.
+- **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation. The CRM is split into two sections:
+    - **Relationship Management** (Core CRM - all users): Dashboard, Contacts, Companies, Properties, Deals, Pipeline, Activity Log, Follow-Ups, Marketing, Analytics, Forecast.
+    - **Prospecting & Outreach** (Premium add-on - brokers/PE investors only): Prospecting Dashboard, Lead Builder, Prospecting Board, Market Targets, Campaigns & Templates, Deal Sourcing Analytics. Includes activity tracking (calls, emails, meetings), weekly goal tracking, outreach campaigns, and market territory management.
 - **Due Diligence Module**: Project management with task tracking and template management.
 - **CRM-DD Integration**: Converts CRM deals to DD projects with automated task and contact mapping.
 - **Rent Roll Module**: Manages marina unit occupancy and rental income.
