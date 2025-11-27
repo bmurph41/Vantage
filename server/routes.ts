@@ -20408,6 +20408,272 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ============================================================================
+  // DATA IMPORT WIZARD ROUTES
+  // ============================================================================
+
+  // Configure multer for import wizard file uploads
+  const importWizardUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+    fileFilter: (req, file, cb) => {
+      const allowedMimes = [
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ];
+      if (allowedMimes.includes(file.mimetype) || file.originalname.match(/\.(csv|xls|xlsx)$/)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only CSV and Excel files are allowed'));
+      }
+    },
+  });
+
+  // Parse uploaded file and return headers, sample rows, and suggested mappings
+  app.post('/api/import/parse', importWizardUpload.single('file'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const targetModule = req.body.targetModule as 'salesComps' | 'rateComps' | 'marinaDatabase';
+      const fileBuffer = req.file.buffer;
+      const fileName = req.file.originalname.toLowerCase();
+
+      let headers: string[] = [];
+      let rows: Record<string, any>[] = [];
+
+      // Parse based on file type
+      if (fileName.endsWith('.csv')) {
+        const content = fileBuffer.toString('utf-8');
+        const lines = content.split(/\r?\n/).filter(line => line.trim());
+        
+        if (lines.length > 0) {
+          headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+          
+          for (let i = 1; i < lines.length && rows.length < 1000; i++) {
+            const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+            const row: Record<string, any> = {};
+            headers.forEach((header, idx) => {
+              row[header] = values[idx] || '';
+            });
+            rows.push(row);
+          }
+        }
+      } else {
+        // Excel parsing using xlsx package
+        const XLSX = await import('xlsx');
+        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }) as any[][];
+        
+        if (jsonData.length > 0) {
+          headers = jsonData[0].map((h: any) => String(h || '').trim());
+          
+          for (let i = 1; i < jsonData.length && rows.length < 1000; i++) {
+            const row: Record<string, any> = {};
+            headers.forEach((header, idx) => {
+              row[header] = String(jsonData[i][idx] ?? '');
+            });
+            rows.push(row);
+          }
+        }
+      }
+
+      // Detect column types based on sample values
+      const columnTypes: Record<string, string> = {};
+      for (const header of headers) {
+        const sampleValues = rows.slice(0, 10).map(r => r[header]).filter(Boolean);
+        
+        if (sampleValues.every(v => /^\d{4}-\d{2}-\d{2}/.test(String(v)) || /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(String(v)))) {
+          columnTypes[header] = 'date';
+        } else if (sampleValues.every(v => /^\$?[\d,]+\.?\d*$/.test(String(v).replace(/,/g, '')))) {
+          columnTypes[header] = 'currency';
+        } else if (sampleValues.every(v => /^\d+\.?\d*%?$/.test(String(v)))) {
+          columnTypes[header] = 'number';
+        } else {
+          columnTypes[header] = 'text';
+        }
+      }
+
+      // Generate suggested mappings based on header names
+      const suggestedMappings = generateSuggestedMappings(headers, targetModule);
+
+      res.json({
+        headers,
+        rows,
+        rowCount: rows.length,
+        columnTypes,
+        suggestedMappings,
+      });
+    } catch (error) {
+      console.error('Error parsing import file:', error);
+      res.status(500).json({ error: 'Failed to parse file' });
+    }
+  });
+
+  // Check for potential conflicts/matches with existing records
+  app.post('/api/import/check-conflicts', async (req: any, res) => {
+    try {
+      const { targetModule, mappings, rows } = req.body;
+      const orgId = req.user?.orgId;
+      
+      const conflicts: Array<{
+        rowIndex: number;
+        sourceData: Record<string, any>;
+        existingRecord: Record<string, any> | null;
+        matchField: string;
+        matchValue: string;
+        action: 'skip' | 'update' | 'add';
+      }> = [];
+
+      // Find the marina/name field mapping
+      const nameMapping = mappings.find((m: any) => m.targetField === 'marina' || m.targetField === 'name');
+      if (!nameMapping) {
+        return res.json({ conflicts: [] });
+      }
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const marinaName = row[nameMapping.sourceColumn];
+        
+        if (!marinaName) continue;
+
+        let existingRecord = null;
+        
+        // Check for existing records based on target module
+        if (targetModule === 'salesComps') {
+          const existing = await storage.getSalesCompsByMarinaName(orgId, marinaName);
+          if (existing.length > 0) {
+            existingRecord = existing[0];
+          }
+        } else if (targetModule === 'rateComps') {
+          const existing = await storage.getRateCompsByMarinaName(orgId, marinaName);
+          if (existing.length > 0) {
+            existingRecord = existing[0];
+          }
+        } else if (targetModule === 'marinaDatabase') {
+          const existing = await storage.getMarinasByName(orgId, marinaName);
+          if (existing.length > 0) {
+            existingRecord = existing[0];
+          }
+        }
+
+        if (existingRecord) {
+          conflicts.push({
+            rowIndex: i,
+            sourceData: row,
+            existingRecord,
+            matchField: nameMapping.targetField,
+            matchValue: marinaName,
+            action: 'update', // Default to update
+          });
+        }
+      }
+
+      res.json({ conflicts });
+    } catch (error) {
+      console.error('Error checking conflicts:', error);
+      res.status(500).json({ error: 'Failed to check conflicts' });
+    }
+  });
+
+  // Execute the import
+  app.post('/api/import/execute', async (req: any, res) => {
+    try {
+      const { targetModule, mappings, rows, conflicts } = req.body;
+      const orgId = req.user?.orgId;
+      const userId = req.user?.id;
+
+      let imported = 0;
+      let updated = 0;
+      let skipped = 0;
+      let errors = 0;
+
+      // Build conflict action map for quick lookup
+      const conflictActions = new Map<number, string>();
+      for (const conflict of (conflicts || [])) {
+        conflictActions.set(conflict.rowIndex, conflict.action);
+      }
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const action = conflictActions.get(i) || 'add';
+
+        if (action === 'skip') {
+          skipped++;
+          continue;
+        }
+
+        try {
+          // Transform row data according to mappings
+          const transformedData: Record<string, any> = {
+            organizationId: orgId,
+          };
+
+          for (const mapping of mappings) {
+            const value = row[mapping.sourceColumn];
+            if (value !== undefined && value !== '') {
+              transformedData[mapping.targetField] = transformValue(value, mapping.targetField);
+            }
+          }
+
+          // Execute import based on target module
+          if (targetModule === 'salesComps') {
+            if (action === 'update') {
+              const conflict = conflicts?.find((c: any) => c.rowIndex === i);
+              if (conflict?.existingRecord?.id) {
+                await storage.updateSalesComp(conflict.existingRecord.id, transformedData);
+                updated++;
+              }
+            } else {
+              await storage.createSalesComp(transformedData);
+              imported++;
+            }
+          } else if (targetModule === 'rateComps') {
+            if (action === 'update') {
+              const conflict = conflicts?.find((c: any) => c.rowIndex === i);
+              if (conflict?.existingRecord?.id) {
+                await storage.updateRateComp(conflict.existingRecord.id, transformedData);
+                updated++;
+              }
+            } else {
+              await storage.createRateComp(transformedData);
+              imported++;
+            }
+          } else if (targetModule === 'marinaDatabase') {
+            if (action === 'update') {
+              const conflict = conflicts?.find((c: any) => c.rowIndex === i);
+              if (conflict?.existingRecord?.id) {
+                await storage.updateMarinaRate(conflict.existingRecord.id, transformedData);
+                updated++;
+              }
+            } else {
+              await storage.createMarinaRate(transformedData);
+              imported++;
+            }
+          }
+        } catch (rowError) {
+          console.error(`Error importing row ${i}:`, rowError);
+          errors++;
+        }
+      }
+
+      res.json({
+        imported,
+        updated,
+        skipped,
+        errors,
+        total: rows.length,
+      });
+    } catch (error) {
+      console.error('Error executing import:', error);
+      res.status(500).json({ error: 'Failed to execute import' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
@@ -20576,4 +20842,130 @@ function generateICS(events: Array<{
   ics.push('END:VCALENDAR');
 
   return ics.join('\r\n');
+}
+
+// Helper function to generate suggested column mappings based on header names
+function generateSuggestedMappings(headers: string[], targetModule: 'salesComps' | 'rateComps' | 'marinaDatabase') {
+  const mappings: Array<{ sourceColumn: string; targetField: string; confidence: number }> = [];
+
+  const targetFieldMappings: Record<string, string[]> = {
+    marina: ['marina', 'marina name', 'name', 'property', 'property name', 'facility'],
+    city: ['city', 'town', 'municipality'],
+    state: ['state', 'st', 'province'],
+    saleDate: ['sale date', 'date', 'closing date', 'transaction date', 'sold date'],
+    salePrice: ['sale price', 'price', 'purchase price', 'amount', 'total'],
+    seller: ['seller', 'vendor', 'sold by'],
+    buyer: ['buyer', 'purchaser', 'bought by'],
+    wetSlips: ['wet slips', 'wet', 'slips', 'boat slips'],
+    drySlips: ['dry slips', 'dry', 'dry storage', 'dry stacks'],
+    moorings: ['moorings', 'mooring'],
+    capRate: ['cap rate', 'cap', 'capitalization rate'],
+    noi: ['noi', 'net operating income', 'net income'],
+    grossRevenue: ['gross revenue', 'revenue', 'gross income', 'income'],
+    occupancy: ['occupancy', 'occupancy rate', 'occ'],
+    waterType: ['water type', 'water', 'freshwater', 'saltwater'],
+    bodyOfWater: ['body of water', 'lake', 'river', 'ocean', 'bay', 'waterway'],
+    transactionType: ['transaction type', 'type', 'sale type'],
+    broker: ['broker', 'agent', 'realtor'],
+    notes: ['notes', 'comments', 'description', 'remarks'],
+    storageType: ['storage type', 'storage', 'slip type'],
+    boatLengthMin: ['min length', 'minimum length', 'loa min', 'min boat'],
+    boatLengthMax: ['max length', 'maximum length', 'loa max', 'max boat'],
+    rateAmount: ['rate', 'rate amount', 'price', 'amount', 'cost'],
+    rateType: ['rate type', 'unit', 'per'],
+    ratePeriod: ['period', 'rate period', 'billing period'],
+    seasonality: ['season', 'seasonality', 'seasonal'],
+    electricIncluded: ['electric', 'electricity', 'electric included', 'power'],
+    protectionLevel: ['protection', 'protection level', 'covered', 'enclosed'],
+    effectiveDate: ['effective date', 'date', 'as of', 'valid date'],
+    address: ['address', 'street', 'location'],
+    zipCode: ['zip', 'zip code', 'postal code', 'postal'],
+    latitude: ['lat', 'latitude'],
+    longitude: ['lng', 'lon', 'longitude'],
+    website: ['website', 'web', 'url', 'site'],
+    phone: ['phone', 'telephone', 'tel', 'contact'],
+    email: ['email', 'e-mail', 'mail'],
+  };
+
+  const usedTargets = new Set<string>();
+
+  for (const header of headers) {
+    const normalizedHeader = header.toLowerCase().trim();
+
+    for (const [targetField, keywords] of Object.entries(targetFieldMappings)) {
+      if (usedTargets.has(targetField)) continue;
+
+      const match = keywords.some(keyword => {
+        const normalizedKeyword = keyword.toLowerCase();
+        return normalizedHeader === normalizedKeyword ||
+               normalizedHeader.includes(normalizedKeyword) ||
+               normalizedKeyword.includes(normalizedHeader);
+      });
+
+      if (match) {
+        mappings.push({
+          sourceColumn: header,
+          targetField,
+          confidence: normalizedHeader === keywords[0] ? 0.95 : 0.8,
+        });
+        usedTargets.add(targetField);
+        break;
+      }
+    }
+  }
+
+  return mappings;
+}
+
+// Helper function to transform values for specific field types
+function transformValue(value: string, fieldName: string): any {
+  if (!value || value === '') return null;
+
+  const currencyFields = ['salePrice', 'noi', 'grossRevenue', 'rateAmount'];
+  const percentFields = ['capRate', 'occupancy'];
+  const numberFields = ['wetSlips', 'drySlips', 'moorings', 'boatLengthMin', 'boatLengthMax', 'latitude', 'longitude'];
+  const booleanFields = ['electricIncluded'];
+  const dateFields = ['saleDate', 'effectiveDate'];
+
+  if (currencyFields.includes(fieldName)) {
+    const cleanedValue = String(value).replace(/[$,\s]/g, '');
+    const numValue = parseFloat(cleanedValue);
+    if (!isNaN(numValue)) {
+      return Math.round(numValue * 100);
+    }
+    return null;
+  }
+
+  if (percentFields.includes(fieldName)) {
+    const cleanedValue = String(value).replace(/[%\s]/g, '');
+    const numValue = parseFloat(cleanedValue);
+    if (!isNaN(numValue)) {
+      return numValue > 1 ? numValue : numValue * 100;
+    }
+    return null;
+  }
+
+  if (numberFields.includes(fieldName)) {
+    const numValue = parseFloat(String(value).replace(/[,\s]/g, ''));
+    return isNaN(numValue) ? null : numValue;
+  }
+
+  if (booleanFields.includes(fieldName)) {
+    const lowerValue = String(value).toLowerCase().trim();
+    return ['yes', 'true', '1', 'y', 'included'].includes(lowerValue);
+  }
+
+  if (dateFields.includes(fieldName)) {
+    try {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+    } catch {
+      // Return as-is if not a valid date
+    }
+    return value;
+  }
+
+  return String(value).trim();
 }

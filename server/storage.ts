@@ -3875,6 +3875,17 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(salesComps.createdAt));
   }
 
+  // Search by marina name for import conflict detection
+  async getSalesCompsByMarinaName(orgId: string, marinaName: string): Promise<SalesComp[]> {
+    return await db.select().from(salesComps)
+      .where(and(
+        eq(salesComps.orgId, orgId),
+        sql`LOWER(${salesComps.marina}) = LOWER(${marinaName})`,
+        isNull(salesComps.deletedAt)
+      ))
+      .limit(5);
+  }
+
   // Columns Operations
   async getCompColumns(orgId: string): Promise<CompColumn[]> {
     return await db.select().from(compColumns)
@@ -5803,6 +5814,17 @@ export class DatabaseStorage implements IStorage {
     return totalDeleted;
   }
 
+  // Search by marina name for import conflict detection
+  async getRateCompsByMarinaName(orgId: string, marinaName: string): Promise<RateComp[]> {
+    return await db.select().from(rateComps)
+      .where(and(
+        eq(rateComps.orgId, orgId),
+        sql`LOWER(${rateComps.marina}) = LOWER(${marinaName})`,
+        isNull(rateComps.deletedAt)
+      ))
+      .limit(5);
+  }
+
   // Columns Operations
   async getRateCompColumns(orgId: string): Promise<RateCompColumn[]> {
     return await db.select().from(rateCompColumns)
@@ -6587,6 +6609,17 @@ export class DatabaseStorage implements IStorage {
         eq(marinaRates.rateYear, rateYear),
         eq(marinaRates.isCurrentRate, true)
       ));
+  }
+
+  // Search marina database by name for import conflict detection
+  async getMarinasByName(orgId: string, name: string): Promise<MarinaRateDatabase[]> {
+    return await db.select()
+      .from(marinaRateDatabase)
+      .where(and(
+        eq(marinaRateDatabase.orgId, orgId),
+        sql`LOWER(${marinaRateDatabase.name}) = LOWER(${name})`
+      ))
+      .limit(5);
   }
 
   async getFuelIntegration(orgId: string): Promise<FuelIntegration | undefined> {

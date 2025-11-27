@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { PersonaSwitcher } from "@/components/PersonaSwitcher";
+import { AppSettingsDialog } from "@/components/settings/AppSettingsDialog";
 
 // CRM Navigation (Core CRM - All Users)
 const crmNav = [
@@ -161,6 +162,7 @@ export default function UnifiedSidebar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
 
   // Single consolidated bootstrap query - replaces 5 separate API calls
   const { data: bootstrapData } = useQuery<BootstrapData>({
@@ -683,11 +685,21 @@ export default function UnifiedSidebar() {
             <p className="text-sm font-medium text-gray-900 truncate" data-testid="user-name">User</p>
             <p className="text-xs text-gray-500 truncate" data-testid="user-role">Admin</p>
           </div>
-          <button className="text-gray-400 hover:text-gray-600 flex-shrink-0" data-testid="button-user-settings">
+          <button 
+            className="text-gray-400 hover:text-gray-600 flex-shrink-0" 
+            data-testid="button-user-settings"
+            onClick={() => setSettingsDialogOpen(true)}
+          >
             <Settings className="w-4 h-4" />
           </button>
         </div>
       </div>
+
+      {/* App Settings Dialog */}
+      <AppSettingsDialog
+        open={settingsDialogOpen}
+        onOpenChange={setSettingsDialogOpen}
+      />
 
         {/* Global Detail Drawer for Search Results */}
         {selectedEntity && (
