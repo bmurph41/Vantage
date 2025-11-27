@@ -1,20 +1,18 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import { Search, Upload as UploadIcon, Plus, Columns, Download, BarChart3, FolderPlus, Table, TrendingUp, Edit, Save, X, HelpCircle, Trash2, PanelLeftClose, PanelLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { BarChart3, FolderPlus, Trash2, ChevronLeft, ChevronRight, Filter, ChevronUp } from "lucide-react";
 import { Link } from "wouter";
 import debounce from "lodash.debounce";
 import { rateCompsApi } from "@/lib/ratecomps/api";
 import { queryKeys } from "@/lib/ratecomps/queryKeys";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/ratecomps/authUtils";
+import RateCompsHeader from "@/components/ratecomps/rate-comps/RateCompsHeader";
 import FiltersPanel from "@/components/ratecomps/rate-comps/FiltersPanel";
 import CompsDataGrid from "@/components/ratecomps/rate-comps/CompsDataGrid";
-import AnalyticsWorkbench from "@/components/ratecomps/analytics/AnalyticsWorkbench";
 import CreateEditCompDialog from "@/components/ratecomps/rate-comps/CreateEditCompDialog";
+import ViewCompModal from "@/components/ratecomps/rate-comps/ViewCompModal";
 import ColumnEditorDialog from "@/components/ratecomps/rate-comps/ColumnEditorDialog";
 import BulkEdit from "./BulkEdit";
 import Upload from "./Upload";
@@ -26,7 +24,6 @@ export default function RateCompsIndex() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // TODO: Replace with actual MarinaMatch auth when available
   const user = { role: 'Admin' };
   const isAuthenticated = true;
   const isLoading = false;
@@ -59,26 +56,23 @@ export default function RateCompsIndex() {
     portfoliosOnly: false,
     columnFilters: {},
   });
-  const [sortBy, setSortBy] = useState("saleYear");
+  const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>("desc");
   const [columnUniqueValues, setColumnUniqueValues] = useState<Record<string, string[]>>({});
   const [activeSavedSearchId, setActiveSavedSearchId] = useState<string | null>(null);
   const [activeSavedSearchName, setActiveSavedSearchName] = useState<string | null>(null);
 
-  // Fetch unique values for filterable columns
-  const filterableColumns = ['marina', 'state', 'saleYear', 'market'];
+  const filterableColumns = ['marina', 'state', 'storageType'];
   
-  // React Query for column unique values
   const columnQueries = useQueries({
     queries: filterableColumns.map(column => ({
       queryKey: ['column-values', column],
       queryFn: () => rateCompsApi.getColumnUniqueValues(column),
-      staleTime: 10 * 60 * 1000, // 10 minutes - these values don't change often
-      gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
+      staleTime: 10 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
     }))
   });
 
-  // Update column unique values when queries complete
   useEffect(() => {
     const newValues: Record<string, string[]> = {};
     filterableColumns.forEach((column, index) => {
@@ -91,21 +85,18 @@ export default function RateCompsIndex() {
   }, [columnQueries]);
   
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState("data");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [isPortfolioMode, setIsPortfolioMode] = useState(false);
   const [showColumnsDialog, setShowColumnsDialog] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showProjectAssignment, setShowProjectAssignment] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editData, setEditData] = useState<any[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [viewingComp, setViewingComp] = useState<RateComp | null>(null);
+  const [editingComp, setEditingComp] = useState<RateComp | null>(null);
 
-  // Debounce search query updates
   const debouncedSetSearch = useMemo(
     () => debounce((value: string) => {
       setDebouncedSearchQuery(value);
@@ -120,6 +111,7 @@ export default function RateCompsIndex() {
     };
   }, [searchQuery, debouncedSetSearch]);
 
+
   const queryParams = useMemo(() => ({
     q: debouncedSearchQuery,
     ...Object.fromEntries(
@@ -133,18 +125,16 @@ export default function RateCompsIndex() {
     pageSize,
   }), [debouncedSearchQuery, filters, sortBy, sortDir, page, pageSize]);
 
-  // Load paginated data
   const { data: compsData, isLoading: compsLoading, error } = useQuery({
     queryKey: queryKeys.comps.list(queryParams),
     queryFn: () => rateCompsApi.getComps(queryParams),
     retry: false,
-    keepPreviousData: true, // Keep showing old data while new data loads
+    keepPreviousData: true,
   });
 
   const data = compsData?.comps || [];
   const total = compsData?.total || 0;
 
-  // Handle API errors
   if (error && isUnauthorizedError(error as Error)) {
     toast({
       title: "Unauthorized",
@@ -172,13 +162,12 @@ export default function RateCompsIndex() {
 
   const handleSearch = (value: string) => {
     setSearchQuery(value);
-    setPage(1); // Reset to first page on search
+    setPage(1);
   };
 
   const handleFilterChange = (newFilters: FilterState) => {
     setFilters(newFilters);
-    setPage(1); // Reset to first page on filter change
-    // Clear active saved search when filters are manually changed
+    setPage(1);
     if (activeSavedSearchId) {
       setActiveSavedSearchId(null);
       setActiveSavedSearchName(null);
@@ -238,19 +227,17 @@ export default function RateCompsIndex() {
   const handleExport = () => {
     if (!data?.length) return;
     
-    // Convert data to CSV format
-    const headers = ['Marina', 'State', 'Sale Year', 'Sale Price', 'Cap Rate', 'NOI', 'Wet Slips', 'Dry Racks', 'Occupancy', 'Market'];
+    const headers = ['Marina', 'State', 'City', 'Storage Type', 'Rate', 'Period', 'Seasonality', 'Electric Included', 'Notes'];
     const csvData = data.map(comp => [
       comp.marina,
       comp.state || '',
-      comp.saleYear || '',
-      comp.salePrice || '',
-      comp.capRate || '',
-      comp.noi || '',
-      comp.wetSlips || '',
-      comp.dryRacks || '',
-      comp.occupancy || '',
-      (comp as any).market || '',
+      comp.city || '',
+      comp.storageType || '',
+      comp.rateAmount || '',
+      comp.ratePeriod || '',
+      comp.seasonality || '',
+      comp.electricIncluded ? 'Yes' : 'No',
+      comp.notes || '',
     ]);
 
     const csvContent = [headers, ...csvData]
@@ -266,281 +253,49 @@ export default function RateCompsIndex() {
     URL.revokeObjectURL(url);
   };
 
-  const handleEnterEditMode = () => {
-    // Create a deep copy of the current data for editing
-    setEditData(data.map(comp => ({ ...comp })));
-    setIsEditMode(true);
+  const handleCompClick = (comp: RateComp) => {
+    setViewingComp(comp);
   };
 
-  const handleExitEditMode = () => {
-    setIsEditMode(false);
-    setEditData([]);
+  const handleEditFromView = (comp: RateComp) => {
+    setViewingComp(null);
+    setEditingComp(comp);
+    setShowCreateDialog(true);
   };
 
-  const handleSaveChanges = async () => {
-    try {
-      // Find changed items by comparing with original data
-      const changedItems = editData.filter(editedComp => {
-        const originalComp = data.find(comp => comp.id === editedComp.id);
-        if (!originalComp) return false;
-        
-        // Check if any field has changed
-        return Object.keys(editedComp).some(key => {
-          const originalValue = originalComp[key as keyof typeof originalComp];
-          const editedValue = editedComp[key as keyof typeof editedComp];
-          return originalValue !== editedValue;
-        });
-      });
-
-      if (changedItems.length === 0) {
-        toast({
-          title: "No changes",
-          description: "No changes were made to save",
-        });
-        setIsEditMode(false);
-        setEditData([]);
-        return;
-      }
-
-      // Save each changed item
-      const savePromises = changedItems.map(async (changedComp) => {
-        const originalComp = data.find(comp => comp.id === changedComp.id);
-        if (!originalComp) return;
-
-        // Build update object with only changed fields
-        const updateData: Record<string, any> = {};
-        Object.keys(changedComp).forEach(key => {
-          const originalValue = originalComp[key as keyof typeof originalComp];
-          const editedValue = changedComp[key as keyof typeof changedComp];
-          if (originalValue !== editedValue) {
-            updateData[key] = editedValue;
-          }
-        });
-
-        // Make API call to update the comp
-        return rateCompsApi.updateComp(changedComp.id, updateData);
-      });
-
-      await Promise.all(savePromises);
-
-      // Invalidate and refetch data
-      queryClient.invalidateQueries({ 
-        queryKey: queryKeys.comps.all,
-      });
-      
-      toast({
-        title: "Success",
-        description: `${changedItems.length} item(s) saved successfully`,
-      });
-      
-      setIsEditMode(false);
-      setEditData([]);
-      
-    } catch (error) {
-      console.error('Error saving changes:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save changes",
-        variant: "destructive",
-      });
-    }
+  const handleCompUpdate = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
+    setEditingComp(null);
+    setShowCreateDialog(false);
   };
 
-  const handleCellChange = (compId: string, field: string, value: any) => {
-    setEditData(prev => 
-      prev.map(comp => 
-        comp.id === compId ? { ...comp, [field]: value } : comp
-      )
-    );
-  };
-
-  const handleCompUpdate = (updatedComp: RateComp) => {
-    // Update the editData state with the updated comp data
-    setEditData(prev => 
-      prev.map(comp => 
-        comp.id === updatedComp.id ? { ...updatedComp } : comp
-      )
-    );
-  };
 
   if (showUpload) {
     return <Upload 
       onClose={() => setShowUpload(false)} 
       onImportComplete={() => {
-        // The query cache has already been invalidated by Upload component
-        // This will trigger a fresh data fetch
       }}
     />;
   }
 
   return (
-    <div className="flex flex-1 bg-background h-screen">
-      {/* Left Sidebar - Filters (Only show on All Comps tab) */}
-      {!isSidebarCollapsed && activeTab === "data" && (
-        <div className="w-64 bg-card border-r border-border flex flex-col flex-shrink-0">
-          <div className="px-4 py-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">Rate Comps</h2>
-          </div>
-
-          <FiltersPanel 
-            filters={filters}
-            onFiltersChange={handleFilterChange}
-            activeSavedSearchId={activeSavedSearchId}
-            onActiveSavedSearchChange={handleActiveSavedSearchChange}
-          />
-        </div>
-      )}
-
-      {/* Main Content */}
+    <div className="flex flex-1 bg-background min-h-screen">
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
-          {/* Top Actions Bar */}
-          <div className="bg-card border-b border-border px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  className="mr-2"
-                  data-testid="button-toggle-sidebar"
-                >
-                  {isSidebarCollapsed ? (
-                    <PanelLeft className="h-4 w-4" />
-                  ) : (
-                    <PanelLeftClose className="h-4 w-4" />
-                  )}
-                </Button>
-                <div className="flex items-center gap-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                    <Input
-                      placeholder="Search marina, location, seller..."
-                      className="pl-10 w-72"
-                      value={searchQuery}
-                      onChange={(e) => handleSearch(e.target.value)}
-                      disabled={isEditMode}
-                      data-testid="input-search"
-                    />
-                  </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p className="text-sm">
-                        <strong>Search Tips:</strong><br/>
-                        • Type marina name, location, or seller<br/>
-                        • Use the sidebar filters for precise filtering<br/>
-                        • Click column headers to filter specific values
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  <span data-testid="text-count">{total}</span> comps found
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                {canManageColumns && !isEditMode && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowColumnsDialog(true)}
-                    data-testid="button-columns"
-                  >
-                    <Columns className="h-4 w-4 mr-2" />
-                    Columns
-                  </Button>
-                )}
+        <div className="flex-1 min-h-0 flex flex-col">
+          <RateCompsHeader 
+            searchQuery={searchQuery}
+            onSearchChange={handleSearch}
+            total={total}
+            canManageColumns={canManageColumns}
+            canCreate={canCreate}
+            onColumnsClick={() => setShowColumnsDialog(true)}
+            onExportClick={handleExport}
+            onAddCompClick={() => setShowCreateDialog(true)}
+            onUploadClick={() => setShowUpload(true)}
+            hasData={!!data?.length}
+          />
 
-                {/* Edit/Save buttons */}
-                {!isEditMode ? (
-                  <>
-                    <Button
-                      variant="secondary"
-                      onClick={handleEnterEditMode}
-                      disabled={!data?.length}
-                      data-testid="button-edit-comps"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Comps
-                    </Button>
-                    
-                    <Button
-                      variant="secondary"
-                      onClick={handleExport}
-                      disabled={!data?.length}
-                      data-testid="button-export"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="secondary"
-                      onClick={handleExitEditMode}
-                      data-testid="button-cancel-edit"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </Button>
-                    
-                    <Button
-                      onClick={handleSaveChanges}
-                      data-testid="button-save-changes"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </Button>
-                  </>
-                )}
-
-                {canCreate && !isEditMode && (
-                  <>
-                    <Button
-                      onClick={() => {
-                        setIsPortfolioMode(false);
-                        setShowCreateDialog(true);
-                      }}
-                      data-testid="button-add-comp"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Comp
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsPortfolioMode(true);
-                        setShowCreateDialog(true);
-                      }}
-                      data-testid="button-create-portfolio"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Portfolio
-                    </Button>
-                    
-                    <Button
-                      variant="default"
-                      onClick={() => setShowUpload(true)}
-                      data-testid="button-upload"
-                    >
-                      <UploadIcon className="h-4 w-4 mr-2" />
-                      Upload Comps
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Bulk Actions Bar */}
-          {selectedIds?.length > 0 && !isEditMode && (
+          {selectedIds?.length > 0 && (
             <div className="bg-card border-b border-border px-6 py-3">
               <div className="p-3 bg-muted rounded-md flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -627,26 +382,43 @@ export default function RateCompsIndex() {
             </div>
           )}
 
-          {/* Tab Navigation */}
-          <div className="px-6 border-b border-border sticky top-0 z-30 bg-background">
-            <TabsList className="grid w-full max-w-md grid-cols-2" data-testid="tabs-navigation">
-              <TabsTrigger value="data" className="flex items-center gap-2" data-testid="tab-data">
-                <Table className="h-4 w-4" />
-                Rate Comps
-              </TabsTrigger>
-              <TabsTrigger value="metrics" className="flex items-center gap-2" data-testid="tab-metrics">
-                <TrendingUp className="h-4 w-4" />
-                Analytics
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          {/* Tab Content */}
-          <TabsContent value="data" className="flex-1 min-h-0 overflow-hidden m-0 flex flex-col" data-testid="tab-content-data">
-            {/* Data Grid */}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-border">
+              <div className="flex items-center justify-end mb-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                  className="h-8 gap-2"
+                  data-testid="button-toggle-filters"
+                >
+                  {isSidebarCollapsed ? (
+                    <>
+                      <Filter className="h-4 w-4" />
+                      Show Filters
+                    </>
+                  ) : (
+                    <>
+                      <ChevronUp className="h-4 w-4" />
+                      Hide Filters
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              {!isSidebarCollapsed && (
+                <FiltersPanel 
+                  filters={filters}
+                  onFiltersChange={handleFilterChange}
+                  activeSavedSearchId={activeSavedSearchId}
+                  onActiveSavedSearchChange={handleActiveSavedSearchChange}
+                />
+              )}
+            </div>
+            
             <div className="flex-1 min-h-0 overflow-hidden">
               <CompsDataGrid
-                data={isEditMode ? editData : data}
+                data={data}
                 loading={compsLoading}
                 sortBy={sortBy}
                 sortDir={sortDir}
@@ -667,14 +439,11 @@ export default function RateCompsIndex() {
                   }));
                 }}
                 columnUniqueValues={columnUniqueValues}
-                isEditMode={isEditMode}
-                onCellChange={handleCellChange}
-                onCompUpdate={handleCompUpdate}
+                onCompClick={handleCompClick}
               />
             </div>
             
-            {/* Pagination Controls */}
-            {!isEditMode && total > 0 && (
+            {total > 0 && (
               <div className="border-t border-border bg-background px-6 py-3 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>
@@ -708,24 +477,22 @@ export default function RateCompsIndex() {
                 </div>
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="metrics" className="flex-1 overflow-auto m-0 p-0" data-testid="tab-content-metrics">
-            <div className="h-full">
-              <AnalyticsWorkbench />
-            </div>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </div>
 
-      {/* Dialogs */}
+      <ViewCompModal
+        open={!!viewingComp}
+        onClose={() => setViewingComp(null)}
+        comp={viewingComp}
+        onEdit={handleEditFromView}
+      />
+
       <CreateEditCompDialog
-        open={showCreateDialog}
-        onClose={() => {
-          setShowCreateDialog(false);
-          setIsPortfolioMode(false);
-        }}
-        isPortfolioMode={isPortfolioMode}
+        open={showCreateDialog || !!editingComp}
+        onClose={handleCompUpdate}
+        comp={editingComp || undefined}
+        onUpdate={handleCompUpdate}
       />
 
       {canManageColumns && (
@@ -735,7 +502,6 @@ export default function RateCompsIndex() {
         />
       )}
 
-      {/* Bulk Edit Modal */}
       {showBulkEdit && (
         <BulkEdit
           selectedIds={selectedIds}
@@ -743,7 +509,6 @@ export default function RateCompsIndex() {
         />
       )}
 
-      {/* Project Assignment Dialog */}
       {showProjectAssignment && (
         <ProjectAssignmentDialog
           open={showProjectAssignment}
