@@ -102,6 +102,7 @@ const RateCompsUpload = lazy(() => import("@/pages/analysis/rate-comps/Upload"))
 const RateCompsCompare = lazy(() => import("@/pages/analysis/rate-comps/Compare"));
 const RateCompsBulkEdit = lazy(() => import("@/pages/analysis/rate-comps/BulkEdit"));
 const RateCompsColumnManager = lazy(() => import("@/pages/analysis/rate-comps/ColumnManager"));
+const MarinaDatabase = lazy(() => import("@/pages/marina-database"));
 const DemographicsIndex = lazy(() => import("@/pages/analysis/demographics/Index"));
 const BenchmarksIndex = lazy(() => import("@/pages/analysis/benchmarks/Index"));
 const DebtScenariosIndex = lazy(() => import("@/pages/modeling/debt-scenarios/Index"));
@@ -863,6 +864,13 @@ function Router() {
         {(params) => (
           <UnifiedLayout>
             <RateCompsDetail {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/marina-database">
+        {() => (
+          <UnifiedLayout>
+            <MarinaDatabase />
           </UnifiedLayout>
         )}
       </Route>
