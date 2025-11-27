@@ -114,6 +114,14 @@ const VDRDashboard = lazy(() => import("@/pages/vdr/Dashboard"));
 const ProjectVDR = lazy(() => import("@/pages/vdr/ProjectVDR"));
 const DataRequest = lazy(() => import("@/pages/vdr/DataRequest"));
 
+// Prospecting & Outreach pages
+const ProspectingDashboard = lazy(() => import("@/pages/prospecting/Dashboard"));
+const ProspectingBoard = lazy(() => import("@/pages/prospecting/Board"));
+const MarketTargets = lazy(() => import("@/pages/prospecting/Markets"));
+const ProspectingCampaigns = lazy(() => import("@/pages/prospecting/Campaigns"));
+const ProspectingAnalytics = lazy(() => import("@/pages/prospecting/Analytics"));
+const ActivityLog = lazy(() => import("@/pages/activity"));
+
 // Exit Strategy Suite pages
 const ExitStrategyDashboard = lazy(() => import("@/pages/modeling/exit/Dashboard"));
 const ExitScenarios = lazy(() => import("@/pages/modeling/exit/Scenarios"));
@@ -677,6 +685,50 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <ImportHistory />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/crm/activity">
+        {() => (
+          <UnifiedLayout>
+            <ActivityLog />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* Prospecting & Outreach Routes (Premium/Broker Add-On) */}
+      <Route path="/prospecting/dashboard">
+        {() => (
+          <UnifiedLayout>
+            <ProspectingDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/prospecting/board">
+        {() => (
+          <UnifiedLayout>
+            <ProspectingBoard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/prospecting/markets">
+        {() => (
+          <UnifiedLayout>
+            <MarketTargets />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/prospecting/campaigns">
+        {() => (
+          <UnifiedLayout>
+            <ProspectingCampaigns />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/prospecting/analytics">
+        {() => (
+          <UnifiedLayout>
+            <ProspectingAnalytics />
           </UnifiedLayout>
         )}
       </Route>

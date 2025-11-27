@@ -12,16 +12,30 @@ import { SmartSearch } from "@/components/crm/smart-search";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { PersonaSwitcher } from "@/components/PersonaSwitcher";
 
-// CRM Navigation
-const crmNav = [
+// Relationship Management Navigation (Core CRM - All Users)
+const relationshipManagementNav = [
   { name: "Dashboard", href: "/crm", icon: LayoutDashboard },
-  { name: "Pipeline", href: "/crm/pipeline", icon: Layers },
-  { name: "Deals", href: "/crm/deals", icon: Handshake },
-  { name: "Leads", href: "/crm/leads", icon: UserCheck },
   { name: "Contacts", href: "/crm/contacts", icon: Users },
   { name: "Companies", href: "/crm/companies", icon: Building },
   { name: "Properties", href: "/crm/properties", icon: Home },
-  { name: "Prospecting", href: "/crm/prospecting", icon: Target },
+  { name: "Deals", href: "/crm/deals", icon: Handshake },
+  { name: "Pipeline", href: "/crm/pipeline", icon: Layers },
+  { name: "Activity Log", href: "/crm/activity", icon: History },
+  { name: "Follow-Ups", href: "/crm/tasks", icon: ListTodo },
+];
+
+// Prospecting & Outreach Navigation (Premium/Broker Add-On)
+const prospectingNav = [
+  { name: "Prospecting Dashboard", href: "/prospecting/dashboard", icon: LayoutDashboard },
+  { name: "Lead Builder", href: "/crm/leads", icon: UserCheck },
+  { name: "Prospecting Board", href: "/prospecting/board", icon: LayoutList },
+  { name: "Market Targets", href: "/prospecting/markets", icon: Target },
+  { name: "Campaigns & Templates", href: "/prospecting/campaigns", icon: Send },
+  { name: "Deal Sourcing Analytics", href: "/prospecting/analytics", icon: PieChart },
+];
+
+// CRM Analytics & Automation (Shared Tools)
+const crmAnalyticsNav = [
   { name: "Marketing", href: "/crm/marketing-automation", icon: Send },
   { name: "Analytics", href: "/crm/analytics", icon: PieChart },
   { name: "Forecast", href: "/crm/forecast", icon: TrendingUp },
@@ -136,6 +150,7 @@ export default function UnifiedSidebar() {
   const [rentRollExpanded, setRentRollExpanded] = useState(false);
   const [marketingExpanded, setMarketingExpanded] = useState(false);
   const [crmExpanded, setCrmExpanded] = useState(false);
+  const [prospectingExpanded, setProspectingExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [ddExpanded, setDdExpanded] = useState(false);
   const [vdrExpanded, setVdrExpanded] = useState(false);
@@ -179,7 +194,8 @@ export default function UnifiedSidebar() {
     const personas = [persona, secondaryPersona].filter(Boolean);
     
     const sectionAccess: Record<string, string[]> = {
-      crm: ['pe_investor', 'broker'],
+      crm: ['pe_investor', 'broker', 'operator', 'advisor'], // Relationship Management - ALL users
+      prospecting: ['pe_investor', 'broker'], // Prospecting & Outreach - Broker add-on only
       operations: ['pe_investor', 'operator'],
       due_diligence: ['pe_investor', 'broker'],
       vdr: ['pe_investor', 'broker'],
@@ -198,8 +214,11 @@ export default function UnifiedSidebar() {
     const isShipStorePage = location.startsWith('/operations/ship-store/');
     const isRentRollPage = location.startsWith('/operations/rent-roll/') || location === '/operations/customer-analytics';
     const isMarketingPage = location.startsWith('/operations/marketing/');
-    const isCrmPage = location.startsWith('/crm/') || location === '/crm' || location.startsWith('/import-') || location === '/calendar-settings';
+    // Relationship Management: core CRM pages (contacts, companies, properties, deals, pipeline, activity, tasks)
+    const isCrmPage = (location.startsWith('/crm/') && !location.includes('/leads')) || location === '/crm' || location.startsWith('/import-') || location === '/calendar-settings';
     const isCrmToolsPage = location === '/calendar-settings' || location.startsWith('/import-');
+    // Prospecting: leads, prospecting pages
+    const isProspectingPage = location.startsWith('/prospecting/') || location === '/crm/leads';
     const isDdPage = location === '/' || location === '/progress-report';
     const isVdrPage = location.startsWith('/vdr');
     const isModelingPage = location.startsWith('/modeling/');
@@ -213,6 +232,7 @@ export default function UnifiedSidebar() {
     setRentRollExpanded(isRentRollPage);
     setMarketingExpanded(isMarketingPage);
     setCrmExpanded(isCrmPage);
+    setProspectingExpanded(isProspectingPage);
     setCrmToolsExpanded(isCrmToolsPage);
     setDdExpanded(isDdPage);
     setVdrExpanded(isVdrPage);
@@ -220,32 +240,31 @@ export default function UnifiedSidebar() {
     setAnalysisExpanded(isAnalysisPage);
   }, [location]);
 
-  // Create dynamic CRM navigation with pending badges
-  // Structure: Dashboard, Pipeline, Deals, Leads, Contacts (+Pending), Companies (+Pending), Properties (+Pending), Prospecting, etc.
-  const dynamicCrmNav = [
-    ...crmNav.slice(0, 4), // Dashboard, Pipeline, Deals, Leads
-    crmNav[4], // Contacts
+  // Create dynamic Relationship Management navigation with pending badges
+  const dynamicRelationshipNav = [
+    relationshipManagementNav[0], // Dashboard
+    relationshipManagementNav[1], // Contacts
     ...(pendingContactsCount > 0 ? [{ 
       name: "Pending Contacts", 
       href: "/crm/pending-contacts", 
       icon: AlertCircle,
       badge: String(pendingContactsCount)
     }] : []),
-    crmNav[5], // Companies
+    relationshipManagementNav[2], // Companies
     ...(pendingCompaniesCount > 0 ? [{ 
       name: "Pending Companies", 
       href: "/crm/pending-companies", 
       icon: AlertCircle,
       badge: String(pendingCompaniesCount)
     }] : []),
-    crmNav[6], // Properties
+    relationshipManagementNav[3], // Properties
     ...(pendingPropertiesCount > 0 ? [{ 
       name: "Pending Properties", 
       href: "/crm/pending-properties", 
       icon: AlertCircle,
       badge: String(pendingPropertiesCount)
     }] : []),
-    ...crmNav.slice(7), // Prospecting, Marketing, Analytics, etc.
+    ...relationshipManagementNav.slice(4), // Deals, Pipeline, Activity Log, Follow-Ups
   ];
 
   const handleNavClick = () => {
@@ -498,38 +517,60 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* CRM Section */}
+        {/* Relationship Management Section (Core CRM - All Users) */}
         {canViewSection('crm') && (
           <div className="mb-2">
             <SectionHeader 
-              title="CRM" 
+              title="Relationship Management" 
               expanded={crmExpanded} 
               onToggle={() => setCrmExpanded(!crmExpanded)}
-              isActive={location.startsWith('/crm/') || location === '/crm' || location.startsWith('/import-') || location === '/calendar-settings'}
+              isActive={(location.startsWith('/crm/') && !location.includes('/leads')) || location === '/crm' || location.startsWith('/import-') || location === '/calendar-settings'}
             />
-            {crmExpanded && dynamicCrmNav.map((item) => (
+            {crmExpanded && dynamicRelationshipNav.map((item) => (
               <NavLink key={item.name} item={item} />
             ))}
             {crmExpanded && (
-              <div className="ml-4 mt-1 mb-2">
-                <button
-                  onClick={() => setCrmToolsExpanded(!crmToolsExpanded)}
-                  className={cn(
-                    "flex items-center justify-between w-full px-4 py-1.5 text-xs font-medium transition-colors rounded-lg",
-                    (location === '/calendar-settings' || location.startsWith('/import-'))
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : "text-gray-500 hover:text-gray-700"
-                  )}
-                  data-testid="toggle-tools"
-                >
-                  <span>Tools & Settings</span>
-                  {crmToolsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                </button>
-                {crmToolsExpanded && crmToolsNav.map((item) => (
+              <>
+                {/* Analytics & Automation */}
+                {crmAnalyticsNav.map((item) => (
                   <NavLink key={item.name} item={item} />
                 ))}
-              </div>
+                {/* Tools & Settings */}
+                <div className="ml-4 mt-1 mb-2">
+                  <button
+                    onClick={() => setCrmToolsExpanded(!crmToolsExpanded)}
+                    className={cn(
+                      "flex items-center justify-between w-full px-4 py-1.5 text-xs font-medium transition-colors rounded-lg",
+                      (location === '/calendar-settings' || location.startsWith('/import-'))
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "text-gray-500 hover:text-gray-700"
+                    )}
+                    data-testid="toggle-tools"
+                  >
+                    <span>Tools & Settings</span>
+                    {crmToolsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  </button>
+                  {crmToolsExpanded && crmToolsNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              </>
             )}
+          </div>
+        )}
+        
+        {/* Prospecting & Outreach Section (Premium/Broker Add-On) */}
+        {canViewSection('prospecting') && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="Prospecting" 
+              expanded={prospectingExpanded} 
+              onToggle={() => setProspectingExpanded(!prospectingExpanded)}
+              isActive={location.startsWith('/prospecting/') || location === '/crm/leads'}
+            />
+            {prospectingExpanded && prospectingNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
           </div>
         )}
         
