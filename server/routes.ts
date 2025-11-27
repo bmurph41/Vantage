@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, and, or, desc, asc, gte, lte } from "drizzle-orm";
+import { eq, and, or, desc, asc, gte, lte, sql } from "drizzle-orm";
 import { resolveRecipient } from "@shared/recipient-utils";
 import { AIRiskAnalyzer } from "./ai-risk-analyzer";
 import { AINotesEnhancer } from "./ai-notes-enhancer";
@@ -114,6 +114,8 @@ import {
   updateDashboardWidgetSchema,
   insertUserDashboardLayoutSchema,
   updateUserDashboardLayoutSchema,
+  userKpiPreferences,
+  insertUserKpiPreferencesSchema,
   insertOwnedAssetSchema,
   updateOwnedAssetSchema,
   insertAssetPerformanceSnapshotSchema,
@@ -14354,6 +14356,156 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to reset dashboard:', error);
       res.status(500).json({ error: 'Failed to reset dashboard' });
+    }
+  });
+
+  // =====================================================
+  // USER KPI PREFERENCES
+  // =====================================================
+
+  // Get user's KPI preferences for a page
+  app.get('/api/user-preferences/kpis/:pageKey', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { pageKey } = req.params;
+      
+      const [prefs] = await db
+        .select()
+        .from(userKpiPreferences)
+        .where(and(
+          eq(userKpiPreferences.userId, userId),
+          eq(userKpiPreferences.orgId, orgId),
+          eq(userKpiPreferences.pageKey, pageKey)
+        ))
+        .limit(1);
+      
+      if (!prefs) {
+        return res.status(404).json({ error: 'No KPI preferences found' });
+      }
+      
+      res.json(prefs);
+    } catch (error) {
+      console.error('Failed to fetch KPI preferences:', error);
+      res.status(500).json({ error: 'Failed to fetch KPI preferences' });
+    }
+  });
+
+  // Save or update user's KPI preferences for a page
+  app.put('/api/user-preferences/kpis/:pageKey', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { pageKey } = req.params;
+      const { kpiConfig } = req.body;
+      
+      // Validate kpiConfig
+      const parsed = insertUserKpiPreferencesSchema.parse({ pageKey, kpiConfig });
+      
+      // Check if preferences exist
+      const [existing] = await db
+        .select()
+        .from(userKpiPreferences)
+        .where(and(
+          eq(userKpiPreferences.userId, userId),
+          eq(userKpiPreferences.orgId, orgId),
+          eq(userKpiPreferences.pageKey, pageKey)
+        ))
+        .limit(1);
+      
+      let result;
+      if (existing) {
+        [result] = await db
+          .update(userKpiPreferences)
+          .set({
+            kpiConfig: parsed.kpiConfig,
+            lastModified: new Date(),
+          })
+          .where(eq(userKpiPreferences.id, existing.id))
+          .returning();
+      } else {
+        [result] = await db
+          .insert(userKpiPreferences)
+          .values({
+            userId,
+            orgId,
+            pageKey,
+            kpiConfig: parsed.kpiConfig,
+          })
+          .returning();
+      }
+      
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to save KPI preferences:', error);
+      res.status(500).json({ error: 'Failed to save KPI preferences' });
+    }
+  });
+
+  // Get companies KPI stats (for computed metrics)
+  app.get('/api/companies/kpi-stats', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      // Portfolio companies: companies with more than 1 property
+      const portfolioResult = await db.execute(sql`
+        SELECT COUNT(*) as count FROM (
+          SELECT c.id
+          FROM crm_companies c
+          JOIN crm_properties p ON p.company_id = c.id
+          WHERE c.org_id = ${orgId}
+          GROUP BY c.id
+          HAVING COUNT(p.id) > 1
+        ) as portfolio_companies
+      `);
+      
+      // Companies with active deals
+      const activeDealsResult = await db.execute(sql`
+        SELECT COUNT(DISTINCT c.id) as count
+        FROM crm_companies c
+        JOIN crm_deals d ON (d.buyer_company_id = c.id OR d.seller_company_id = c.id)
+        WHERE c.org_id = ${orgId}
+          AND d.org_id = ${orgId}
+          AND d.status NOT IN ('closed_won', 'closed_lost', 'dead')
+      `);
+      
+      // New this month
+      const newThisMonthResult = await db.execute(sql`
+        SELECT COUNT(*) as count
+        FROM crm_companies
+        WHERE org_id = ${orgId}
+          AND created_at >= date_trunc('month', CURRENT_DATE)
+      `);
+      
+      // Companies with properties
+      const withPropertiesResult = await db.execute(sql`
+        SELECT COUNT(DISTINCT c.id) as count
+        FROM crm_companies c
+        JOIN crm_properties p ON p.company_id = c.id
+        WHERE c.org_id = ${orgId}
+      `);
+      
+      // Companies with contacts
+      const withContactsResult = await db.execute(sql`
+        SELECT COUNT(DISTINCT c.id) as count
+        FROM crm_companies c
+        JOIN crm_contacts ct ON ct.company_id = c.id
+        WHERE c.org_id = ${orgId}
+      `);
+      
+      res.json({
+        portfolioCompanies: parseInt(portfolioResult.rows[0]?.count as string || '0'),
+        companiesWithActiveDeals: parseInt(activeDealsResult.rows[0]?.count as string || '0'),
+        newThisMonth: parseInt(newThisMonthResult.rows[0]?.count as string || '0'),
+        withProperties: parseInt(withPropertiesResult.rows[0]?.count as string || '0'),
+        withContacts: parseInt(withContactsResult.rows[0]?.count as string || '0'),
+      });
+    } catch (error) {
+      console.error('Failed to fetch company KPI stats:', error);
+      res.status(500).json({ error: 'Failed to fetch company KPI stats' });
     }
   });
 
