@@ -95,11 +95,21 @@ export default function MarinaDatabase() {
   // Fetch marinas
   const { data, isLoading, error } = useQuery<{ marinas: MarinaRateDatabase[]; total: number }>({
     queryKey: ["/api/marina-database", queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/marina-database?${queryParams}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch marinas");
+      return res.json();
+    }
   });
 
   // Fetch selected marina with rates
   const { data: marinaWithRates, isLoading: isLoadingRates } = useQuery<MarinaWithRates>({
     queryKey: ["/api/marina-database", selectedMarina?.id, "with-rates"],
+    queryFn: async () => {
+      const res = await fetch(`/api/marina-database/${selectedMarina!.id}/with-rates`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch marina details");
+      return res.json();
+    },
     enabled: !!selectedMarina?.id,
   });
 
