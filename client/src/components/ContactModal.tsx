@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { User, Phone, Upload } from "lucide-react";
+import { AddressInput } from "@/components/address-input";
 
 /**
  * ContactModal — Add/Edit Contact (business-focused)
@@ -360,13 +361,12 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Additional Details</h3>
               
               <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Textarea 
-                  id="address" 
-                  rows={3} 
-                  value={address} 
-                  onChange={(e) => setAddress(e.target.value)} 
-                  placeholder="123 Marina Way&#10;Key West, FL 33040" 
+                <AddressInput
+                  value={address}
+                  onChange={(value) => setAddress(value)}
+                  label="Address"
+                  placeholder="Start typing an address..."
+                  testId={isEdit ? "input-edit-address" : "input-address"}
                 />
               </div>
 

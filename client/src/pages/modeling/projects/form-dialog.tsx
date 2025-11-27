@@ -44,10 +44,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Loader2, MapPin, Check, ChevronsUpDown, User, Building2 } from 'lucide-react';
+import { Loader2, Check, ChevronsUpDown, User, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { normalizeState } from '@shared/utils/state-normalization';
+import { AddressInput, type AddressComponents } from '@/components/address-input';
 
 const formSchema = z.object({
   marinaName: z.string().min(1, 'Marina name is required'),
@@ -138,10 +139,6 @@ export default function ModelingProjectFormDialog({
   const [brokerSearch, setBrokerSearch] = useState('');
   const [brokerPopoverOpen, setBrokerPopoverOpen] = useState(false);
   const [selectedBrokerDisplay, setSelectedBrokerDisplay] = useState('');
-  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
-  const [apiReady, setApiReady] = useState(false);
-  const addressInputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   const { data: regions = [] } = useQuery<ModelingRegion[]>({
     queryKey: ['/api/modeling/regions'],
@@ -184,117 +181,20 @@ export default function ModelingProjectFormDialog({
 
   const dealSource = form.watch('dealSource');
 
-  useEffect(() => {
-    const loadGoogleMaps = async () => {
-      if (typeof google !== 'undefined' && google.maps) {
-        setApiReady(true);
-        return;
-      }
-
-      setIsLoadingAddress(true);
-      try {
-        let apiKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY;
-        
-        if (!apiKey) {
-          try {
-            const response = await fetch('/api/config/google-maps-key');
-            const data = await response.json();
-            apiKey = data.apiKey;
-          } catch (err) {
-            console.warn('Could not fetch Google Maps API key');
-          }
-        }
-        
-        if (!apiKey) {
-          setIsLoadingAddress(false);
-          return;
-        }
-
-        const { Loader } = await import('@googlemaps/js-api-loader');
-        const loader = new Loader({
-          apiKey,
-          version: 'weekly',
-          libraries: ['places'],
-        });
-
-        await loader.load();
-        setApiReady(true);
-      } catch (error) {
-        console.error('Failed to load Google Maps API:', error);
-      } finally {
-        setIsLoadingAddress(false);
-      }
-    };
-
-    if (open) {
-      loadGoogleMaps();
+  const handleAddressSelect = useCallback((components: AddressComponents) => {
+    if (components.street) {
+      form.setValue('address', components.street);
     }
-  }, [open]);
-
-  const handlePlaceChanged = useCallback(() => {
-    const place = autocompleteRef.current?.getPlace();
-    
-    if (!place || !place.address_components) {
-      return;
+    if (components.city) {
+      form.setValue('city', components.city);
     }
-
-    let streetNumber = '';
-    let route = '';
-    let city = '';
-    let state = '';
-    let zipCode = '';
-
-    place.address_components?.forEach((component) => {
-      const types = component.types;
-      
-      if (types.includes('street_number')) {
-        streetNumber = component.long_name;
-      }
-      if (types.includes('route')) {
-        route = component.long_name;
-      }
-      if (types.includes('locality')) {
-        city = component.long_name;
-      }
-      if (types.includes('administrative_area_level_1')) {
-        state = component.short_name;
-      }
-      if (types.includes('postal_code')) {
-        zipCode = component.long_name;
-      }
-    });
-
-    const streetAddress = streetNumber ? `${streetNumber} ${route}` : route;
-    
-    form.setValue('address', streetAddress);
-    form.setValue('city', city);
-    form.setValue('state', state);
-    form.setValue('zipCode', zipCode);
+    if (components.state) {
+      form.setValue('state', components.state);
+    }
+    if (components.zipCode) {
+      form.setValue('zipCode', components.zipCode);
+    }
   }, [form]);
-
-  useEffect(() => {
-    if (!apiReady || !addressInputRef.current || !open) {
-      return;
-    }
-
-    try {
-      autocompleteRef.current = new google.maps.places.Autocomplete(addressInputRef.current, {
-        types: ['address'],
-        componentRestrictions: { country: 'us' },
-        fields: ['address_components', 'formatted_address', 'geometry'],
-      });
-
-      autocompleteRef.current.addListener('place_changed', handlePlaceChanged);
-    } catch (error) {
-      console.error('Failed to initialize autocomplete:', error);
-    }
-
-    return () => {
-      if (autocompleteRef.current) {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
-      }
-    };
-  }, [apiReady, open, handlePlaceChanged]);
 
   useEffect(() => {
     if (open && project && mode === 'edit') {
@@ -466,32 +366,16 @@ export default function ModelingProjectFormDialog({
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address</FormLabel>
                   <FormControl>
-                    <div className="relative">
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                        {isLoadingAddress ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <MapPin className="w-4 h-4" />
-                        )}
-                      </div>
-                      <Input
-                        ref={addressInputRef}
-                        {...field}
-                        value={field.value || ''}
-                        placeholder="Start typing an address..."
-                        className="pl-10"
-                        data-testid="input-address"
-                        autoComplete="off"
-                      />
-                    </div>
+                    <AddressInput
+                      value={field.value || ''}
+                      onChange={(value) => field.onChange(value)}
+                      onAddressSelect={handleAddressSelect}
+                      label="Address"
+                      placeholder="Start typing an address..."
+                      testId="input-address"
+                    />
                   </FormControl>
-                  {!apiReady && !isLoadingAddress && (
-                    <p className="text-xs text-muted-foreground">
-                      Address autocomplete unavailable. Enter address manually.
-                    </p>
-                  )}
                   <FormMessage />
                 </FormItem>
               )}
