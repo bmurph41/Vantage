@@ -12,6 +12,7 @@ import debounce from "lodash.debounce";
 import throttle from "lodash.throttle";
 import SavedSearchesMenu from "./SavedSearchesMenu";
 import { useCustomStorageTypes } from "@/hooks/ratecomps/useCustomStorageTypes";
+import { MultiSelectDropdown } from "@/components/ui/multi-select-dropdown";
 
 interface FiltersPanelProps {
   filters: FilterState;
@@ -356,98 +357,33 @@ export default function FiltersPanel({
           </CollapsibleTrigger>
           <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
             <div className="mt-3 px-3 space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">State/Country</Label>
-              {filters.states && filters.states.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => updateFilter('states', [])}
-                  className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                  data-testid="button-clear-states"
-                >
-                  Clear ({filters.states.length})
-                </Button>
-              )}
-            </div>
-            <div className="max-h-64 overflow-y-auto space-y-1 border border-border rounded-md p-2">
-              {/* US States */}
-              <div className="mb-2">
-                <div className="text-xs font-semibold text-muted-foreground px-2 py-1">US States</div>
-                {US_STATES.map((state) => (
-                  <div key={state.code} className="flex items-center gap-2.5 p-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                    <Checkbox
-                      id={`state-${state.code}`}
-                      checked={filters.states?.includes(state.code) || false}
-                      onCheckedChange={(checked) => {
-                        const currentStates = filters.states || [];
-                        const newStates = checked
-                          ? [...currentStates, state.code]
-                          : currentStates.filter(s => s !== state.code);
-                        updateFilter('states', newStates);
-                      }}
-                      data-testid={`checkbox-state-${state.code.toLowerCase()}`}
-                      className="h-4 w-4"
-                    />
-                    <Label htmlFor={`state-${state.code}`} className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
-                      {state.name}
-                    </Label>
-                  </div>
-                ))}
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">State/Country</Label>
+                <MultiSelectDropdown
+                  label="State"
+                  placeholder="All states"
+                  options={[
+                    ...US_STATES.map((state) => ({ label: state.name, value: state.code })),
+                    ...COUNTRIES.map((country) => ({ label: country, value: country }))
+                  ]}
+                  value={filters.states || []}
+                  onChange={(states) => updateFilter('states', states)}
+                  triggerClassName="h-9 text-sm"
+                  testId="select-state"
+                />
               </div>
-              
-              {/* International */}
-              <div className="border-t border-border pt-2 mt-2">
-                <div className="text-xs font-semibold text-muted-foreground px-2 py-1">International</div>
-                {COUNTRIES.map((country) => (
-                  <div key={country} className="flex items-center gap-2.5 p-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                    <Checkbox
-                      id={`country-${country}`}
-                      checked={filters.states?.includes(country) || false}
-                      onCheckedChange={(checked) => {
-                        const currentStates = filters.states || [];
-                        const newStates = checked
-                          ? [...currentStates, country]
-                          : currentStates.filter(s => s !== country);
-                        updateFilter('states', newStates);
-                      }}
-                      data-testid={`checkbox-country-${country.toLowerCase().replace(/\s+/g, '-')}`}
-                      className="h-4 w-4"
-                    />
-                    <Label htmlFor={`country-${country}`} className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
-                      {country}
-                    </Label>
-                  </div>
-                ))}
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Region</Label>
+                <MultiSelectDropdown
+                  label="Region"
+                  placeholder="All regions"
+                  options={US_REGIONS.map((region) => ({ label: region, value: region }))}
+                  value={filters.regions || []}
+                  onChange={(regions) => updateFilter('regions', regions)}
+                  triggerClassName="h-9 text-sm"
+                  testId="select-region"
+                />
               </div>
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Region</Label>
-            <div className="space-y-3">
-              {US_REGIONS.map((region) => (
-                <div key={region} className="flex items-center gap-2.5 p-2.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                  <Checkbox
-                    id={`region-${region}`}
-                    checked={filters.regions?.includes(region) || false}
-                    onCheckedChange={(checked) => {
-                      const currentRegions = filters.regions || [];
-                      const newRegions = checked
-                        ? [...currentRegions, region]
-                        : currentRegions.filter(r => r !== region);
-                      updateFilter('regions', newRegions);
-                    }}
-                    data-testid={`checkbox-region-${region.toLowerCase().replace(/\s+/g, '-')}`}
-                    className="h-4 w-4"
-                  />
-                  <Label htmlFor={`region-${region}`} className="text-sm text-foreground font-medium cursor-pointer flex-1 leading-none">
-                    {region}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
             </div>
           </CollapsibleContent>
         </div>
@@ -479,79 +415,43 @@ export default function FiltersPanel({
               {/* Storage Type */}
               <div>
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Storage Type</Label>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {allStorageTypes.map(storageType => (
-                    <div key={storageType} className="flex items-center gap-2 p-1.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                      <Checkbox
-                        id={`storage-${storageType}`}
-                        checked={filters.storageTypes?.includes(storageType) || false}
-                        onCheckedChange={(checked) => {
-                          const newStorageTypes = checked
-                            ? [...(filters.storageTypes || []), storageType]
-                            : (filters.storageTypes || []).filter(s => s !== storageType);
-                          updateFilter('storageTypes', newStorageTypes);
-                        }}
-                        className="h-3.5 w-3.5"
-                        data-testid={`checkbox-storage-${storageType}`}
-                      />
-                      <Label htmlFor={`storage-${storageType}`} className="text-xs text-foreground font-medium cursor-pointer leading-none flex-1">
-                        {storageType}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                <MultiSelectDropdown
+                  label="Storage Type"
+                  placeholder="All storage types"
+                  options={allStorageTypes.map((type) => ({ label: type, value: type }))}
+                  value={filters.storageTypes || []}
+                  onChange={(types) => updateFilter('storageTypes', types)}
+                  triggerClassName="h-9 text-sm"
+                  testId="select-storage-type"
+                />
               </div>
 
               {/* Rate Type */}
               <div>
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Rate Type</Label>
-                <div className="space-y-2">
-                  {['Monthly', 'Annual', 'Daily', 'Weekly', 'Seasonal'].map(rateType => (
-                    <div key={rateType} className="flex items-center gap-2 p-1.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                      <Checkbox
-                        id={`rate-type-${rateType}`}
-                        checked={filters.rateTypes?.includes(rateType) || false}
-                        onCheckedChange={(checked) => {
-                          const newRateTypes = checked
-                            ? [...(filters.rateTypes || []), rateType]
-                            : (filters.rateTypes || []).filter(r => r !== rateType);
-                          updateFilter('rateTypes', newRateTypes);
-                        }}
-                        className="h-3.5 w-3.5"
-                        data-testid={`checkbox-rate-type-${rateType}`}
-                      />
-                      <Label htmlFor={`rate-type-${rateType}`} className="text-xs text-foreground font-medium cursor-pointer leading-none flex-1">
-                        {rateType}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                <MultiSelectDropdown
+                  label="Rate Type"
+                  placeholder="All rate types"
+                  options={['Monthly', 'Annual', 'Daily', 'Weekly', 'Seasonal'].map((type) => ({ label: type, value: type }))}
+                  value={filters.rateTypes || []}
+                  onChange={(types) => updateFilter('rateTypes', types)}
+                  triggerClassName="h-9 text-sm"
+                  testId="select-rate-type"
+                />
               </div>
 
               {/* Seasonality */}
               <div>
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Seasonality</Label>
-                <div className="space-y-2">
-                  {['Year-Round', 'Seasonal', 'Summer Only', 'Winter Only'].map(seasonality => (
-                    <div key={seasonality} className="flex items-center gap-2 p-1.5 rounded-md hover:bg-accent/30 transition-colors cursor-pointer">
-                      <Checkbox
-                        id={`seasonality-${seasonality}`}
-                        checked={filters.seasonalities?.includes(seasonality) || false}
-                        onCheckedChange={(checked) => {
-                          const newSeasonalities = checked
-                            ? [...(filters.seasonalities || []), seasonality]
-                            : (filters.seasonalities || []).filter(s => s !== seasonality);
-                          updateFilter('seasonalities', newSeasonalities);
-                        }}
-                        className="h-3.5 w-3.5"
-                        data-testid={`checkbox-seasonality-${seasonality}`}
-                      />
-                      <Label htmlFor={`seasonality-${seasonality}`} className="text-xs text-foreground font-medium cursor-pointer leading-none flex-1">
-                        {seasonality}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                <MultiSelectDropdown
+                  label="Seasonality"
+                  placeholder="All seasonalities"
+                  options={['Year-Round', 'Seasonal', 'Summer Only', 'Winter Only'].map((s) => ({ label: s, value: s }))}
+                  value={filters.seasonalities || []}
+                  onChange={(types) => updateFilter('seasonalities', types)}
+                  triggerClassName="h-9 text-sm"
+                  testId="select-seasonality"
+                />
               </div>
 
               {/* Boat Length Range */}
