@@ -518,11 +518,11 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Relationship Management Section (Core CRM - All Users) */}
+        {/* CRM Section (Core CRM - All Users) */}
         {canViewSection('crm') && (
           <div className="mb-2">
             <SectionHeader 
-              title="Relationship Management" 
+              title="CRM" 
               expanded={crmExpanded} 
               onToggle={() => setCrmExpanded(!crmExpanded)}
               isActive={(location.startsWith('/crm/') && !location.includes('/leads')) || location === '/crm' || location.startsWith('/import-') || location === '/calendar-settings'}
