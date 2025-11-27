@@ -208,6 +208,19 @@ export const userDashboardLayouts = pgTable("user_dashboard_layouts", {
   userOrgIdx: index("user_dashboard_user_org_idx").on(table.userId, table.orgId),
 }));
 
+// User KPI Preferences - Per-page KPI card configurations
+export const userKpiPreferences = pgTable("user_kpi_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  pageKey: text("page_key").notNull(), // e.g., "crm_companies", "crm_contacts"
+  kpiConfig: jsonb("kpi_config").notNull().default(sql`'[]'`), // Array of { title, metricType, icon, color }
+  lastModified: timestamp("last_modified").notNull().defaultNow(),
+}, (table) => ({
+  uniqueUserOrgPage: unique().on(table.userId, table.orgId, table.pageKey),
+  userOrgPageIdx: index("user_kpi_pref_user_org_page_idx").on(table.userId, table.orgId, table.pageKey),
+}));
+
 // Projects
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -7258,6 +7271,25 @@ export const insertUserDashboardLayoutSchema = createInsertSchema(userDashboardL
 
 export const updateUserDashboardLayoutSchema = insertUserDashboardLayoutSchema.partial();
 
+// User KPI Preferences schemas
+export const kpiConfigItemSchema = z.object({
+  title: z.string(),
+  metricType: z.enum(['total_companies', 'portfolio_companies', 'active_deals', 'new_this_month', 'with_website', 'with_contacts', 'with_properties']),
+  icon: z.string().optional(),
+  color: z.string().optional(),
+});
+
+export const insertUserKpiPreferencesSchema = createInsertSchema(userKpiPreferences).omit({
+  id: true,
+  userId: true,
+  orgId: true,
+  lastModified: true,
+}).extend({
+  kpiConfig: z.array(kpiConfigItemSchema),
+});
+
+export const updateUserKpiPreferencesSchema = insertUserKpiPreferencesSchema.partial();
+
 // Owned Assets schemas
 export const insertOwnedAssetSchema = createInsertSchema(ownedAssets).omit({
   id: true,
@@ -7296,6 +7328,11 @@ export type UpdateDashboardWidget = z.infer<typeof updateDashboardWidgetSchema>;
 export type UserDashboardLayout = typeof userDashboardLayouts.$inferSelect;
 export type InsertUserDashboardLayout = z.infer<typeof insertUserDashboardLayoutSchema>;
 export type UpdateUserDashboardLayout = z.infer<typeof updateUserDashboardLayoutSchema>;
+
+export type UserKpiPreferences = typeof userKpiPreferences.$inferSelect;
+export type InsertUserKpiPreferences = z.infer<typeof insertUserKpiPreferencesSchema>;
+export type UpdateUserKpiPreferences = z.infer<typeof updateUserKpiPreferencesSchema>;
+export type KpiConfigItem = z.infer<typeof kpiConfigItemSchema>;
 
 // Types for Owned Assets
 export type OwnedAsset = typeof ownedAssets.$inferSelect;
