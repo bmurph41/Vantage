@@ -73,16 +73,27 @@ export default function RateCompsIndex() {
     }))
   });
 
+  const columnQueryResults = columnQueries.map(q => q.data);
+  
   useEffect(() => {
     const newValues: Record<string, string[]> = {};
     filterableColumns.forEach((column, index) => {
-      const query = columnQueries[index];
-      if (query.data?.values) {
-        newValues[column] = query.data.values;
+      const data = columnQueryResults[index];
+      if (data?.values) {
+        newValues[column] = data.values;
       }
     });
-    setColumnUniqueValues(newValues);
-  }, [columnQueries]);
+    if (Object.keys(newValues).length > 0) {
+      setColumnUniqueValues(prev => {
+        const changed = filterableColumns.some((col, i) => {
+          const newVal = columnQueryResults[i]?.values;
+          const oldVal = prev[col];
+          return JSON.stringify(newVal) !== JSON.stringify(oldVal);
+        });
+        return changed ? newValues : prev;
+      });
+    }
+  }, [JSON.stringify(columnQueryResults)]);
   
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
