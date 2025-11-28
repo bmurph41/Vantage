@@ -5,18 +5,22 @@ const envSchema = z.object({
   
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().default('5000'),
+  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters').optional(),
+  SESSION_MAX_AGE_HOURS: z.string().default('24'),
   
   JWT_SECRET: z.string().min(32).optional(),
   JWT_PRIVATE_KEY: z.string().optional(),
   JWT_PUBLIC_KEY: z.string().optional(),
   JWT_ACTIVE_KID: z.string().optional(),
+  JWT_EXPIRY_HOURS: z.string().default('24'),
   
   OPENAI_API_KEY: z.string().optional(),
   SENDGRID_API_KEY: z.string().optional(),
   GOOGLE_MAPS_API_KEY: z.string().optional(),
   FRED_API_KEY: z.string().optional(),
+  CENSUS_API_KEY: z.string().optional(),
   
   QB_ENCRYPTION_KEY: z.string().optional(),
   
@@ -25,6 +29,14 @@ const envSchema = z.object({
   REPLIT_DOMAINS: z.string().optional(),
   REPLIT_DEV_DOMAIN: z.string().optional(),
   REPL_ID: z.string().optional(),
+  
+  RATE_LIMIT_WINDOW_MS: z.string().default('60000'),
+  RATE_LIMIT_MAX_REQUESTS: z.string().default('100'),
+  
+  MAX_UPLOAD_SIZE_MB: z.string().default('10'),
+  
+  ENABLE_HEALTH_CHECK: z.enum(['true', 'false']).default('true'),
+  ENABLE_METRICS: z.enum(['true', 'false']).default('true'),
 });
 
 export type Env = z.infer<typeof envSchema>;

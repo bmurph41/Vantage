@@ -32,6 +32,7 @@ import { debtScenarioService } from "./debt-scenario-service";
 import { docIntelService } from "./services/doc-intel-service";
 import { jobQueueService } from "./services/job-queue-service";
 import { cacheService } from "./services/cache-service";
+import { monitoringService } from "./services/monitoring-service";
 import { calculateAll, type TransactionClosingData } from "./services/transactionClosingEngine";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
@@ -192,6 +193,36 @@ const syncToCalendarSchema = z.object({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoints (no authentication required)
+  app.get("/health", async (_req, res) => {
+    try {
+      const health = await monitoringService.getHealthStatus();
+      const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503;
+      res.status(statusCode).json(health);
+    } catch (error: any) {
+      res.status(503).json({ status: 'unhealthy', error: error.message });
+    }
+  });
+
+  app.get("/health/ready", (_req, res) => {
+    const readiness = monitoringService.getReadinessCheck();
+    res.status(readiness.ready ? 200 : 503).json(readiness);
+  });
+
+  app.get("/health/live", (_req, res) => {
+    const liveness = monitoringService.getLivenessCheck();
+    res.status(liveness.alive ? 200 : 503).json(liveness);
+  });
+
+  app.get("/metrics", async (_req, res) => {
+    try {
+      const metrics = await monitoringService.getMetrics();
+      res.json(metrics);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Authorization helper function to verify project ownership
   // CRITICAL: Query database directly to avoid storage.getProject() interception issue with approved projects
   const authorizeProjectAccess = async (projectId: string, orgId: string) => {

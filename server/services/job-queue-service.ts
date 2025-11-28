@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { and, eq, lt, gt, desc, asc, sql, or, inArray } from 'drizzle-orm';
 import { backgroundJobs, type BackgroundJob, type InsertBackgroundJob } from '@shared/schema';
-import { logger } from '../logger';
+import { logger } from '../lib/logger';
 import { v4 as uuidv4 } from 'uuid';
 
 export type JobType = 
