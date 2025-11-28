@@ -10,6 +10,7 @@ import { db } from './db';
 import { eq, and, desc, sql, isNotNull, inArray } from 'drizzle-orm';
 import { ensureDefaultCategories } from './vdr-diligence-category-service';
 import { ensureDefaultDueDatePresets } from './vdr-due-date-preset-service';
+import { vdrAuditService } from './services/vdr-audit-service';
 
 const router = express.Router();
 
@@ -473,21 +474,20 @@ router.get('/documents/:documentId/preview', requireAuth, requireVdrAccess('view
 
     const stream = await defaultStorageProvider.download(document.storagePath);
     
-    await storage.vdr.audit.logAction({
+    await vdrAuditService.logEvent({
       projectId: document.projectId,
       orgId,
       userId,
-      action: 'document_viewed',
-      resourceType: 'document',
-      resourceId: documentId,
-      metadata: { documentName: document.filename, previewMode: true }
+      documentId,
+      eventType: 'document_viewed',
+      metadata: { documentName: document.filename, previewMode: true },
+      req,
     });
 
-    // Set headers for inline preview (not download)
     res.setHeader('Content-Type', document.mimeType);
     res.setHeader('Content-Disposition', `inline; filename="${document.filename}"`);
     res.setHeader('Content-Length', document.size);
-    res.setHeader('Cache-Control', 'private, max-age=300'); // 5-minute cache
+    res.setHeader('Cache-Control', 'private, max-age=300');
     
     stream.pipe(res);
   } catch (error: any) {
@@ -510,14 +510,14 @@ router.get('/documents/:documentId/download', requireAuth, requireVdrAccess('dow
 
     const stream = await defaultStorageProvider.download(document.storagePath);
     
-    await storage.vdr.audit.logAction({
+    await vdrAuditService.logEvent({
       projectId: document.projectId,
       orgId,
       userId,
-      action: 'document_downloaded',
-      resourceType: 'document',
-      resourceId: documentId,
-      metadata: { documentName: document.filename }
+      documentId,
+      eventType: 'document_downloaded',
+      metadata: { documentName: document.filename },
+      req,
     });
 
     res.setHeader('Content-Type', document.mimeType);
@@ -1680,6 +1680,135 @@ router.get('/due-date-presets', requireAuth, async (req: Request, res: Response)
   } catch (error: any) {
     console.error('Error fetching due date presets:', error);
     res.status(500).json({ error: 'Failed to fetch due date presets' });
+  }
+});
+
+// ============================================================================
+// COMPREHENSIVE AUDIT REPORTING ENDPOINTS
+// ============================================================================
+
+router.get('/projects/:projectId/audit-report', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const {
+      userId,
+      externalUserId,
+      eventTypes,
+      startDate,
+      endDate,
+      documentId,
+      folderId,
+      limit = '100',
+      offset = '0',
+    } = req.query;
+
+    const filters = {
+      projectId,
+      userId: userId as string | undefined,
+      externalUserId: externalUserId as string | undefined,
+      eventTypes: eventTypes ? (eventTypes as string).split(',') as any : undefined,
+      startDate: startDate ? new Date(startDate as string) : undefined,
+      endDate: endDate ? new Date(endDate as string) : undefined,
+      documentId: documentId as string | undefined,
+      folderId: folderId as string | undefined,
+      limit: parseInt(limit as string, 10),
+      offset: parseInt(offset as string, 10),
+    };
+
+    const logs = await vdrAuditService.getAuditReport(orgId, filters);
+    res.json(logs);
+  } catch (error: any) {
+    console.error('Error fetching audit report:', error);
+    res.status(500).json({ error: 'Failed to fetch audit report' });
+  }
+});
+
+router.get('/projects/:projectId/engagement-metrics', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const metrics = await vdrAuditService.getEngagementMetrics(orgId, projectId);
+    res.json(metrics);
+  } catch (error: any) {
+    console.error('Error fetching engagement metrics:', error);
+    res.status(500).json({ error: 'Failed to fetch engagement metrics' });
+  }
+});
+
+router.get('/documents/:documentId/access-summary', requireAuth, requireVdrAccess('view'), async (req: Request, res: Response) => {
+  const { documentId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const summary = await vdrAuditService.getAccessSummary(orgId, documentId);
+    res.json(summary);
+  } catch (error: any) {
+    console.error('Error fetching access summary:', error);
+    res.status(500).json({ error: 'Failed to fetch access summary' });
+  }
+});
+
+router.get('/documents/:documentId/permission-history', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { documentId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const limit = parseInt(req.query.limit as string || '100', 10);
+    const history = await vdrAuditService.getPermissionHistory(orgId, 'document', documentId, limit);
+    res.json(history);
+  } catch (error: any) {
+    console.error('Error fetching permission history:', error);
+    res.status(500).json({ error: 'Failed to fetch permission history' });
+  }
+});
+
+router.get('/folders/:folderId/permission-history', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { folderId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const limit = parseInt(req.query.limit as string || '100', 10);
+    const history = await vdrAuditService.getPermissionHistory(orgId, 'folder', folderId, limit);
+    res.json(history);
+  } catch (error: any) {
+    console.error('Error fetching permission history:', error);
+    res.status(500).json({ error: 'Failed to fetch permission history' });
+  }
+});
+
+router.get('/projects/:projectId/audit-export', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const {
+      userId,
+      externalUserId,
+      eventTypes,
+      startDate,
+      endDate,
+    } = req.query;
+
+    const filters = {
+      projectId,
+      userId: userId as string | undefined,
+      externalUserId: externalUserId as string | undefined,
+      eventTypes: eventTypes ? (eventTypes as string).split(',') as any : undefined,
+      startDate: startDate ? new Date(startDate as string) : undefined,
+      endDate: endDate ? new Date(endDate as string) : undefined,
+    };
+
+    const csv = await vdrAuditService.exportAuditLog(orgId, filters);
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="vdr-audit-${projectId}-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csv);
+  } catch (error: any) {
+    console.error('Error exporting audit log:', error);
+    res.status(500).json({ error: 'Failed to export audit log' });
   }
 });
 
