@@ -10348,6 +10348,49 @@ export type DemographicProjectLocation = typeof demographicProjectLocations.$inf
 export type InsertDemographicProjectLocation = z.infer<typeof insertDemographicProjectLocationSchema>;
 
 // ============================================================================
+// Background Jobs - Job Queue for Heavy Analytics and Processing Tasks
+// ============================================================================
+export const backgroundJobs = pgTable('background_jobs', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  type: varchar('type', { length: 50 }).notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('pending'),
+  priority: integer('priority').notNull().default(2),
+  
+  payload: jsonb('payload').notNull().default(sql`'{}'`),
+  result: jsonb('result'),
+  error: text('error'),
+  
+  orgId: varchar('org_id').references(() => organizations.id),
+  userId: varchar('user_id').references(() => users.id),
+  
+  scheduledFor: timestamp('scheduled_for').notNull().defaultNow(),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  
+  maxRetries: integer('max_retries').notNull().default(3),
+  retryCount: integer('retry_count').notNull().default(0),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  typeIdx: index('bg_jobs_type_idx').on(table.type),
+  statusIdx: index('bg_jobs_status_idx').on(table.status),
+  priorityIdx: index('bg_jobs_priority_idx').on(table.priority),
+  orgIdx: index('bg_jobs_org_idx').on(table.orgId),
+  scheduledIdx: index('bg_jobs_scheduled_idx').on(table.scheduledFor),
+  statusScheduledIdx: index('bg_jobs_status_scheduled_idx').on(table.status, table.scheduledFor),
+}));
+
+export const insertBackgroundJobSchema = createInsertSchema(backgroundJobs).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type BackgroundJob = typeof backgroundJobs.$inferSelect;
+export type InsertBackgroundJob = z.infer<typeof insertBackgroundJobSchema>;
+
+// ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular

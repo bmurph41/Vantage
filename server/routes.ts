@@ -30,6 +30,7 @@ import { dashboardService } from "./services/dashboard-service";
 import { ownedAssetsService } from "./services/owned-assets-service";
 import { debtScenarioService } from "./debt-scenario-service";
 import { docIntelService } from "./services/doc-intel-service";
+import { jobQueueService } from "./services/job-queue-service";
 import { calculateAll, type TransactionClosingData } from "./services/transactionClosingEngine";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
@@ -20907,6 +20908,110 @@ Current context: Project ${req.params.projectId}`;
       console.error('Error executing import:', error);
       res.status(500).json({ error: 'Failed to execute import' });
     }
+  });
+
+  // ==================== BACKGROUND JOB QUEUE ROUTES ====================
+  
+  app.get("/api/jobs", async (req: any, res) => {
+    try {
+      const status = req.query.status as string;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const jobs = await jobQueueService.getJobsByOrg(req.user.orgId, { 
+        status: status as any, 
+        limit, 
+        offset 
+      });
+      
+      res.json(jobs);
+    } catch (error: any) {
+      console.error("Error fetching jobs:", error);
+      res.status(500).json({ error: "Failed to fetch jobs" });
+    }
+  });
+
+  app.get("/api/jobs/stats", async (req: any, res) => {
+    try {
+      const stats = await jobQueueService.getQueueStats(req.user.orgId);
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error fetching job stats:", error);
+      res.status(500).json({ error: "Failed to fetch job stats" });
+    }
+  });
+
+  app.get("/api/jobs/:jobId", async (req: any, res) => {
+    try {
+      const job = await jobQueueService.getJob(req.params.jobId);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      if (job.orgId && job.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(job);
+    } catch (error: any) {
+      console.error("Error fetching job:", error);
+      res.status(500).json({ error: "Failed to fetch job" });
+    }
+  });
+
+  app.post("/api/jobs/:jobId/cancel", async (req: any, res) => {
+    try {
+      const job = await jobQueueService.getJob(req.params.jobId);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      if (job.orgId && job.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const cancelled = await jobQueueService.cancelJob(req.params.jobId);
+      
+      if (!cancelled) {
+        return res.status(400).json({ error: "Job cannot be cancelled" });
+      }
+      
+      res.json(cancelled);
+    } catch (error: any) {
+      console.error("Error cancelling job:", error);
+      res.status(500).json({ error: "Failed to cancel job" });
+    }
+  });
+
+  app.post("/api/jobs/:jobId/retry", async (req: any, res) => {
+    try {
+      const job = await jobQueueService.getJob(req.params.jobId);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      if (job.orgId && job.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const retried = await jobQueueService.retryJob(req.params.jobId);
+      
+      if (!retried) {
+        return res.status(400).json({ error: "Job cannot be retried" });
+      }
+      
+      res.json(retried);
+    } catch (error: any) {
+      console.error("Error retrying job:", error);
+      res.status(500).json({ error: "Failed to retry job" });
+    }
+  });
+
+  jobQueueService.start().catch(err => {
+    console.error("Failed to start job queue:", err);
   });
 
   const httpServer = createServer(app);
