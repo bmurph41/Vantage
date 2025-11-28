@@ -26,7 +26,8 @@ import {
   Calculator,
   Target,
   GitCompare,
-  History
+  History,
+  Layers
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
 
@@ -41,6 +42,7 @@ import WorkspaceDebtScenarios from './workspace/debt-scenarios';
 import WorkspaceExitStrategy from './workspace/exit-strategy';
 import ScenarioComparison from './workspace/scenario-comparison';
 import AuditTrailViewer from './workspace/audit-trail';
+import CaseConfiguration from './workspace/case-configuration';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -150,6 +152,10 @@ export default function ProjectWorkspace() {
               <Settings2 className="h-4 w-4" />
               <span className="hidden sm:inline">Inputs</span>
             </TabsTrigger>
+            <TabsTrigger value="cases" className="gap-2" data-testid="tab-cases">
+              <Layers className="h-4 w-4" />
+              <span className="hidden sm:inline">Cases</span>
+            </TabsTrigger>
             <TabsTrigger value="uploads" className="gap-2" data-testid="tab-uploads">
               <Upload className="h-4 w-4" />
               <span className="hidden sm:inline">Uploads</span>
@@ -195,6 +201,10 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="inputs" className="space-y-6">
           <WorkspaceInputs projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="cases" className="space-y-6">
+          <CaseConfiguration projectId={projectId!} />
         </TabsContent>
 
         <TabsContent value="uploads" className="space-y-6">

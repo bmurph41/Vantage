@@ -6632,6 +6632,9 @@ export const modelingProjects = pgTable('modeling_projects', {
   // Custom metrics - extensible field for user-defined metrics
   customMetrics: jsonb('custom_metrics').default(sql`'{}'`), // Flexible structure for additional fields
   
+  // Case configuration - custom labels for scenarios (base, aggressive, conservative, custom)
+  caseLabels: jsonb('case_labels').default(sql`'{"base": "Base Case", "aggressive": "Aggressive Case", "conservative": "Conservative Case", "custom": "Custom Case"}'`),
+  
   // Metadata
   notes: text('notes'),
   createdBy: varchar('created_by').notNull().references(() => users.id),
