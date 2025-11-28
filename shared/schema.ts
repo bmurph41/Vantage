@@ -9942,6 +9942,51 @@ export const modelingSensitivityMatrices = pgTable('modeling_sensitivity_matrice
   typeIdx: index('sensitivity_type_idx').on(table.analysisType),
 }));
 
+// Document Intelligence - AI-powered P&L and Rent Roll parsing
+export const documentIntelligenceJobs = pgTable('document_intelligence_jobs', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id),
+  
+  documentPath: text('document_path').notNull(),
+  documentType: text('document_type').notNull(), // 'p&l', 'rent_roll'
+  fileName: text('file_name'),
+  
+  status: text('status').notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  itemsExtracted: integer('items_extracted'),
+  errorMessage: text('error_message'),
+  
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('doc_intel_job_org_idx').on(table.orgId),
+  projectIdx: index('doc_intel_job_project_idx').on(table.modelingProjectId),
+  statusIdx: index('doc_intel_job_status_idx').on(table.status),
+}));
+
+export const documentIntelligenceResults = pgTable('document_intelligence_results', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar('job_id').notNull().references(() => documentIntelligenceJobs.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  resultType: text('result_type').notNull(), // 'p&l', 'rent_roll'
+  extractedData: jsonb('extracted_data').notNull(), // Full extraction result
+  confidence: numeric('confidence'), // Overall confidence score 0-1
+  
+  reviewStatus: text('review_status').notNull().default('pending'), // 'pending', 'approved', 'rejected'
+  reviewedBy: varchar('reviewed_by').references(() => users.id),
+  reviewedAt: timestamp('reviewed_at'),
+  modifications: jsonb('modifications'), // User modifications before approval
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  jobIdx: index('doc_intel_result_job_idx').on(table.jobId),
+  orgIdx: index('doc_intel_result_org_idx').on(table.orgId),
+  statusIdx: index('doc_intel_result_status_idx').on(table.reviewStatus),
+}));
+
 // Insert schemas for new tables
 export const insertModelingActualsSchema = createInsertSchema(modelingActuals).omit({
   id: true,
@@ -10012,6 +10057,16 @@ export const insertModelingCommentSchema = createInsertSchema(modelingComments).
   createdAt: true,
 });
 
+export const insertDocumentIntelligenceJobSchema = createInsertSchema(documentIntelligenceJobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDocumentIntelligenceResultSchema = createInsertSchema(documentIntelligenceResults).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Type exports for Operations → Modeling pipeline
 export type ModelingActuals = typeof modelingActuals.$inferSelect;
 export type InsertModelingActuals = z.infer<typeof insertModelingActualsSchema>;
@@ -10048,6 +10103,12 @@ export type InsertModelingCommentThread = z.infer<typeof insertModelingCommentTh
 
 export type ModelingComment = typeof modelingComments.$inferSelect;
 export type InsertModelingComment = z.infer<typeof insertModelingCommentSchema>;
+
+export type DocumentIntelligenceJob = typeof documentIntelligenceJobs.$inferSelect;
+export type InsertDocumentIntelligenceJob = z.infer<typeof insertDocumentIntelligenceJobSchema>;
+
+export type DocumentIntelligenceResult = typeof documentIntelligenceResults.$inferSelect;
+export type InsertDocumentIntelligenceResult = z.infer<typeof insertDocumentIntelligenceResultSchema>;
 
 // ============================================================================
 // Demographics & Market Intelligence Schema

@@ -11435,6 +11435,153 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ==================== DOCUMENT INTELLIGENCE ROUTES ====================
+
+  // Create document intelligence job from VDR document (parse P&L or Rent Roll)
+  app.post('/api/modeling/projects/:projectId/document-intelligence', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { vdrDocumentId, documentType } = req.body;
+
+      if (!vdrDocumentId || !documentType) {
+        return res.status(400).json({ error: 'vdrDocumentId and documentType are required' });
+      }
+
+      if (!['p&l', 'rent_roll'].includes(documentType)) {
+        return res.status(400).json({ error: 'documentType must be "p&l" or "rent_roll"' });
+      }
+
+      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const jobId = await documentIntelligenceService.createJobFromVdrDocument(
+        orgId,
+        userId,
+        projectId,
+        vdrDocumentId,
+        documentType
+      );
+
+      res.json({ jobId, message: 'Document intelligence job created' });
+    } catch (error: any) {
+      console.error('Failed to create document intelligence job:', error);
+      res.status(400).json({ error: error.message || 'Failed to create document intelligence job' });
+    }
+  });
+
+  // Get document intelligence jobs for a project
+  app.get('/api/modeling/projects/:projectId/document-intelligence', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+
+      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const jobs = await documentIntelligenceService.getProjectJobs(projectId, orgId);
+
+      res.json(jobs);
+    } catch (error: any) {
+      console.error('Failed to get document intelligence jobs:', error);
+      if (error.message?.includes('not found') || error.message?.includes('access denied')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: 'Failed to get document intelligence jobs' });
+    }
+  });
+
+  // Get document intelligence job status and result
+  app.get('/api/modeling/document-intelligence/:jobId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { jobId } = req.params;
+
+      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const job = await documentIntelligenceService.getJob(jobId, orgId);
+
+      if (!job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+
+      const result = job.status === 'completed' 
+        ? await documentIntelligenceService.getJobResult(jobId, orgId)
+        : null;
+
+      res.json({ job, result });
+    } catch (error) {
+      console.error('Failed to get document intelligence job:', error);
+      res.status(500).json({ error: 'Failed to get document intelligence job' });
+    }
+  });
+
+  // Approve document intelligence result
+  app.post('/api/modeling/document-intelligence/:resultId/approve', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { resultId } = req.params;
+      const { modifications } = req.body;
+
+      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      await documentIntelligenceService.approveResult(resultId, orgId, userId, modifications);
+
+      res.json({ message: 'Result approved' });
+    } catch (error) {
+      console.error('Failed to approve result:', error);
+      res.status(500).json({ error: 'Failed to approve result' });
+    }
+  });
+
+  // Reject document intelligence result
+  app.post('/api/modeling/document-intelligence/:resultId/reject', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { resultId } = req.params;
+      const { reason } = req.body;
+
+      if (!reason) {
+        return res.status(400).json({ error: 'Rejection reason is required' });
+      }
+
+      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      await documentIntelligenceService.rejectResult(resultId, orgId, userId, reason);
+
+      res.json({ message: 'Result rejected' });
+    } catch (error) {
+      console.error('Failed to reject result:', error);
+      res.status(500).json({ error: 'Failed to reject result' });
+    }
+  });
+
+  // Import approved result to modeling actuals
+  app.post('/api/modeling/document-intelligence/:resultId/import', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { resultId } = req.params;
+      const { year, month, overwriteExisting } = req.body;
+
+      if (!year) {
+        return res.status(400).json({ error: 'Year is required' });
+      }
+
+      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const result = await documentIntelligenceService.importToModelingActuals(resultId, orgId, userId, {
+        year,
+        month,
+        overwriteExisting
+      });
+
+      res.json({ 
+        message: `Imported ${result.imported} line items, skipped ${result.skipped}`,
+        imported: result.imported,
+        skipped: result.skipped
+      });
+    } catch (error: any) {
+      console.error('Failed to import to actuals:', error);
+      res.status(400).json({ error: error.message || 'Failed to import to actuals' });
+    }
+  });
+
   // ==================== COMMENT THREADS ROUTES ====================
 
   // Create a comment thread
