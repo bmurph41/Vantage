@@ -31,6 +31,7 @@ import { ownedAssetsService } from "./services/owned-assets-service";
 import { debtScenarioService } from "./debt-scenario-service";
 import { docIntelService } from "./services/doc-intel-service";
 import { jobQueueService } from "./services/job-queue-service";
+import { cacheService } from "./services/cache-service";
 import { calculateAll, type TransactionClosingData } from "./services/transactionClosingEngine";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
@@ -21012,6 +21013,42 @@ Current context: Project ${req.params.projectId}`;
 
   jobQueueService.start().catch(err => {
     console.error("Failed to start job queue:", err);
+  });
+
+  // ==================== CACHE MANAGEMENT ROUTES ====================
+  
+  app.get("/api/cache/stats", async (req: any, res) => {
+    try {
+      const stats = cacheService.getStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error fetching cache stats:", error);
+      res.status(500).json({ error: "Failed to fetch cache stats" });
+    }
+  });
+
+  app.post("/api/cache/invalidate", async (req: any, res) => {
+    try {
+      const { segment, pattern } = req.body;
+      
+      let count = 0;
+      if (segment) {
+        count = await cacheService.invalidateSegment(segment);
+      } else if (pattern) {
+        count = await cacheService.deletePattern(pattern);
+      } else {
+        cacheService.clear();
+        count = -1;
+      }
+      
+      res.json({ 
+        success: true, 
+        cleared: count === -1 ? 'all' : count 
+      });
+    } catch (error: any) {
+      console.error("Error invalidating cache:", error);
+      res.status(500).json({ error: "Failed to invalidate cache" });
+    }
   });
 
   const httpServer = createServer(app);
