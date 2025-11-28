@@ -32,6 +32,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useCaseLabels, type CaseType } from '@/hooks/useCaseLabels';
+import type { ModelingProject } from '@shared/schema';
 import {
   ClipboardList,
   TrendingUp,
@@ -93,9 +95,11 @@ export default function WorkspaceExecutiveSummary({ projectId }: WorkspaceExecut
   const [showScenarioConfig, setShowScenarioConfig] = useState(false);
   const [scenarios, setScenarios] = useState(defaultScenarios);
 
-  const { data: project } = useQuery<any>({
+  const { data: project } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
   });
+  
+  const { getLabel, getCaseColor } = useCaseLabels(project);
 
   const { data: config } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
@@ -180,20 +184,20 @@ export default function WorkspaceExecutiveSummary({ projectId }: WorkspaceExecut
             <SelectContent>
               <SelectItem value="base">
                 <div className="flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  Base Case
+                  <div className={`w-2 h-2 rounded-full ${getCaseColor('base')}`} />
+                  {getLabel('base')}
                 </div>
               </SelectItem>
               <SelectItem value="aggressive">
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
-                  Aggressive
+                  <div className={`w-2 h-2 rounded-full ${getCaseColor('aggressive')}`} />
+                  {getLabel('aggressive')}
                 </div>
               </SelectItem>
               <SelectItem value="conservative">
                 <div className="flex items-center gap-2">
-                  <TrendingDown className="h-4 w-4 text-amber-500" />
-                  Conservative
+                  <div className={`w-2 h-2 rounded-full ${getCaseColor('conservative')}`} />
+                  {getLabel('conservative')}
                 </div>
               </SelectItem>
             </SelectContent>
@@ -218,7 +222,8 @@ export default function WorkspaceExecutiveSummary({ projectId }: WorkspaceExecut
                   <div key={type} className="space-y-4">
                     <div className="flex items-center gap-2">
                       <Badge variant={type === 'base' ? 'default' : type === 'aggressive' ? 'secondary' : 'outline'}>
-                        {scenarios[type].name}
+                        <div className={`w-2 h-2 rounded-full mr-1.5 ${getCaseColor(type)}`} />
+                        {getLabel(type)}
                       </Badge>
                       <span className="text-sm text-muted-foreground">{scenarios[type].description}</span>
                     </div>
@@ -450,9 +455,9 @@ export default function WorkspaceExecutiveSummary({ projectId }: WorkspaceExecut
             <TableHeader>
               <TableRow>
                 <TableHead className="w-48">Metric</TableHead>
-                <TableHead className="text-right">Base Case</TableHead>
-                <TableHead className="text-right">Aggressive</TableHead>
-                <TableHead className="text-right">Conservative</TableHead>
+                <TableHead className="text-right">{getLabel('base')}</TableHead>
+                <TableHead className="text-right">{getLabel('aggressive')}</TableHead>
+                <TableHead className="text-right">{getLabel('conservative')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

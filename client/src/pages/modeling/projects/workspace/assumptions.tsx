@@ -40,6 +40,8 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { useCaseLabels, type CaseType } from '@/hooks/useCaseLabels';
+import type { ModelingProject } from '@shared/schema';
 import {
   Save,
   TrendingUp,
@@ -150,6 +152,13 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
   const [approvalNotes, setApprovalNotes] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
+  const { data: project } = useQuery<ModelingProject>({
+    queryKey: ['/api/modeling/projects', projectId],
+    enabled: !!projectId,
+  });
+  
+  const { getLabel, getCaseColor } = useCaseLabels(project);
+
   const { data: scenarios = [], isLoading: scenariosLoading, refetch: refetchScenarios } = useQuery<Scenario[]>({
     queryKey: ['/api/modeling/projects', projectId, 'scenarios'],
   });
@@ -255,7 +264,7 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
       if (!activeScenario) {
         return apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios`, {
           scenarioType: activeScenarioType,
-          name: scenarioTypeConfig[activeScenarioType].label,
+          name: getLabel(activeScenarioType as CaseType),
           revenueGrowthRate: Object.values(growthRates).reduce((a, b) => a + b, 0) / Object.values(growthRates).length,
           expenseGrowthRate: Object.values(expenseGrowth).reduce((a, b) => a + b, 0) / Object.values(expenseGrowth).length,
           assumptions: { growthRates, expenseGrowth, occupancy, margins },
@@ -399,7 +408,6 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
               <Tabs value={activeScenarioType} onValueChange={(v) => setActiveScenarioType(v as ScenarioType)}>
                 <TabsList>
                   {(['base', 'aggressive', 'conservative'] as ScenarioType[]).map(type => {
-                    const config = scenarioTypeConfig[type];
                     const scenario = scenarios.find(s => s.scenarioType === type && s.isCurrentVersion);
                     return (
                       <TabsTrigger 
@@ -408,8 +416,8 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                         className="flex items-center gap-2"
                         data-testid={`tab-scenario-${type}`}
                       >
-                        <span className={`w-2 h-2 rounded-full ${config.color}`} />
-                        {config.label}
+                        <span className={`w-2 h-2 rounded-full ${getCaseColor(type as CaseType)}`} />
+                        {getLabel(type as CaseType)}
                         {scenario && (
                           <span className="text-xs text-muted-foreground">(v{scenario.version})</span>
                         )}
@@ -724,7 +732,7 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
-              Version History - {scenarioTypeConfig[activeScenarioType]?.label}
+              Version History - {getLabel(activeScenarioType as CaseType)}
             </DialogTitle>
             <DialogDescription>
               View and restore previous versions of this scenario.

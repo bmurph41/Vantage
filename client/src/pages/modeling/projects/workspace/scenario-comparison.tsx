@@ -16,6 +16,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { useCaseLabels, type CaseType } from '@/hooks/useCaseLabels';
+import type { ModelingProject } from '@shared/schema';
 import {
   GitCompare,
   TrendingUp,
@@ -72,12 +74,6 @@ interface ComparisonResult {
   updatedAt: string;
 }
 
-const scenarioColors: Record<ScenarioType, string> = {
-  base: 'bg-blue-500',
-  aggressive: 'bg-green-500',
-  conservative: 'bg-amber-500',
-  custom: 'bg-purple-500',
-};
 
 const statusConfig: Record<ScenarioStatus, { label: string; icon: any; color: string }> = {
   draft: { label: 'Draft', icon: Clock, color: 'text-muted-foreground' },
@@ -113,6 +109,13 @@ const expenseCategories = [
 export default function ScenarioComparison({ projectId }: ScenarioComparisonProps) {
   const { toast } = useToast();
   const [selectedScenarios, setSelectedScenarios] = useState<string[]>([]);
+  
+  const { data: project } = useQuery<ModelingProject>({
+    queryKey: ['/api/modeling/projects', projectId],
+    enabled: !!projectId,
+  });
+  
+  const { getLabel, getCaseColor } = useCaseLabels(project);
   
   const { data: scenarios = [], isLoading } = useQuery<Scenario[]>({
     queryKey: ['/api/modeling/projects', projectId, 'scenarios'],
@@ -261,7 +264,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                         checked={isSelected}
                         onCheckedChange={() => toggleScenario(scenario.id)}
                       />
-                      <div className={`h-2 w-2 rounded-full ${scenarioColors[scenario.scenarioType]}`} />
+                      <div className={`h-2 w-2 rounded-full ${getCaseColor(scenario.scenarioType)}`} />
                     </div>
                     <Badge variant="outline" className={`text-xs ${statusConfig[scenario.status]?.color}`}>
                       <StatusIcon className="h-3 w-3 mr-1" />
@@ -306,7 +309,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                     {comparisonData.map(s => (
                       <TableHead key={s.id} className="text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <div className={`h-2 w-2 rounded-full ${scenarioColors[s.scenarioType as ScenarioType]}`} />
+                          <div className={`h-2 w-2 rounded-full ${getCaseColor(s.scenarioType as CaseType)}`} />
                           {s.name}
                         </div>
                       </TableHead>
@@ -460,7 +463,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                       {comparisonData.map(s => (
                         <TableHead key={s.id} className="text-center">
                           <div className="flex items-center justify-center gap-2">
-                            <div className={`h-2 w-2 rounded-full ${scenarioColors[s.scenarioType as ScenarioType]}`} />
+                            <div className={`h-2 w-2 rounded-full ${getCaseColor(s.scenarioType as CaseType)}`} />
                             {s.name}
                           </div>
                         </TableHead>
@@ -518,7 +521,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                       {comparisonData.map(s => (
                         <TableHead key={s.id} className="text-center">
                           <div className="flex items-center justify-center gap-2">
-                            <div className={`h-2 w-2 rounded-full ${scenarioColors[s.scenarioType as ScenarioType]}`} />
+                            <div className={`h-2 w-2 rounded-full ${getCaseColor(s.scenarioType as CaseType)}`} />
                             {s.name}
                           </div>
                         </TableHead>
@@ -576,7 +579,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                     {comparisonData.map(s => (
                       <TableHead key={s.id} className="text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <div className={`h-2 w-2 rounded-full ${scenarioColors[s.scenarioType as ScenarioType]}`} />
+                          <div className={`h-2 w-2 rounded-full ${getCaseColor(s.scenarioType as CaseType)}`} />
                           {s.name}
                         </div>
                       </TableHead>
