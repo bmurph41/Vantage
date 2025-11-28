@@ -5306,8 +5306,28 @@ Current context: Project ${req.params.projectId}`;
   // CRM Deals
   app.get("/api/crm/deals", async (req: any, res) => {
     try {
-      const deals = await storage.getCrmDealsForOrg(req.user.orgId);
-      res.json(deals);
+      let page = parseInt(req.query.page as string) || 1;
+      let pageSize = parseInt(req.query.pageSize as string) || 50;
+      
+      if (page < 1) page = 1;
+      if (pageSize < 1) pageSize = 1;
+      if (pageSize > 100) pageSize = 100;
+      
+      const sortBy = req.query.sortBy as string || 'createdAt';
+      const sortDir = (req.query.sortDir as string || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+      const search = req.query.search as string;
+      const stageId = req.query.stageId as string;
+      
+      const result = await storage.getCrmDealsForOrgPaginated(req.user.orgId, {
+        page,
+        pageSize,
+        sortBy,
+        sortDir,
+        search,
+        stageId
+      });
+      
+      res.json(result);
     } catch (error) {
       console.error("Failed to get deals:", error);
       res.status(500).json({ error: "Failed to retrieve deals" });
@@ -5604,8 +5624,28 @@ Current context: Project ${req.params.projectId}`;
   // CRM Contacts
   app.get("/api/crm/contacts", async (req: any, res) => {
     try {
-      const contacts = await storage.getCrmContactsForOrg(req.user.orgId);
-      res.json(contacts);
+      let page = parseInt(req.query.page as string) || 1;
+      let pageSize = parseInt(req.query.pageSize as string) || 50;
+      
+      if (page < 1) page = 1;
+      if (pageSize < 1) pageSize = 1;
+      if (pageSize > 100) pageSize = 100;
+      
+      const sortBy = req.query.sortBy as string || 'createdAt';
+      const sortDir = (req.query.sortDir as string || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+      const search = req.query.search as string;
+      const companyId = req.query.companyId as string;
+      
+      const result = await storage.getCrmContactsForOrgPaginated(req.user.orgId, {
+        page,
+        pageSize,
+        sortBy,
+        sortDir,
+        search,
+        companyId
+      });
+      
+      res.json(result);
     } catch (error) {
       console.error("Failed to get contacts:", error);
       res.status(500).json({ error: "Failed to retrieve contacts" });
@@ -5645,8 +5685,26 @@ Current context: Project ${req.params.projectId}`;
   // CRM Companies
   app.get("/api/crm/companies", async (req: any, res) => {
     try {
-      const companies = await storage.getCrmCompaniesForOrg(req.user.orgId);
-      res.json(companies);
+      let page = parseInt(req.query.page as string) || 1;
+      let pageSize = parseInt(req.query.pageSize as string) || 50;
+      
+      if (page < 1) page = 1;
+      if (pageSize < 1) pageSize = 1;
+      if (pageSize > 100) pageSize = 100;
+      
+      const sortBy = req.query.sortBy as string || 'createdAt';
+      const sortDir = (req.query.sortDir as string || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+      const search = req.query.search as string;
+      
+      const result = await storage.getCrmCompaniesForOrgPaginated(req.user.orgId, {
+        page,
+        pageSize,
+        sortBy,
+        sortDir,
+        search
+      });
+      
+      res.json(result);
     } catch (error) {
       console.error("Failed to get companies:", error);
       res.status(500).json({ error: "Failed to retrieve companies" });

@@ -337,6 +337,7 @@ export interface IStorage {
   // CRM - Deals
   getCrmDeal(id: string): Promise<CrmDeal | undefined>;
   getCrmDealsForOrg(orgId: string): Promise<CrmDeal[]>;
+  getCrmDealsForOrgPaginated(orgId: string, options: { page: number; pageSize: number; sortBy?: string; sortDir?: 'asc' | 'desc'; search?: string; stageId?: string }): Promise<{ data: CrmDeal[]; total: number; page: number; pageSize: number; totalPages: number }>;
   getCrmDealsByPipeline(pipelineId: string): Promise<CrmDeal[]>;
   getCrmDealsByStage(stageId: string): Promise<CrmDeal[]>;
   createCrmDeal(deal: InsertCrmDeal): Promise<CrmDeal>;
@@ -354,7 +355,7 @@ export interface IStorage {
   // CRM - Contacts
   getCrmContact(id: string): Promise<CrmContact | undefined>;
   getCrmContactsForOrg(orgId: string): Promise<CrmContact[]>;
-  getCrmContactsForOrgPaginated(orgId: string, options: { page: number; limit: number; search?: string; sortBy?: string; sortOrder?: 'asc' | 'desc' }): Promise<{ data: CrmContact[]; total: number; page: number; limit: number; totalPages: number }>;
+  getCrmContactsForOrgPaginated(orgId: string, options: { page: number; pageSize: number; sortBy?: string; sortDir?: 'asc' | 'desc'; search?: string; companyId?: string }): Promise<{ data: CrmContact[]; total: number; page: number; pageSize: number; totalPages: number }>;
   getCrmContactsByCompany(companyId: string): Promise<CrmContact[]>;
   createCrmContact(contact: InsertCrmContact): Promise<CrmContact>;
   updateCrmContact(id: string, updates: Partial<InsertCrmContact>): Promise<CrmContact>;
@@ -363,6 +364,7 @@ export interface IStorage {
   // CRM - Companies
   getCrmCompany(id: string): Promise<CrmCompany | undefined>;
   getCrmCompaniesForOrg(orgId: string): Promise<CrmCompany[]>;
+  getCrmCompaniesForOrgPaginated(orgId: string, options: { page: number; pageSize: number; sortBy?: string; sortDir?: 'asc' | 'desc'; search?: string }): Promise<{ data: CrmCompany[]; total: number; page: number; pageSize: number; totalPages: number }>;
   createCrmCompany(company: InsertCrmCompany): Promise<CrmCompany>;
   updateCrmCompany(id: string, updates: Partial<InsertCrmCompany>): Promise<CrmCompany>;
   deleteCrmCompany(id: string): Promise<void>;
@@ -2781,6 +2783,60 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(crmDeals).where(eq(crmDeals.ownerId, orgId)).orderBy(desc(crmDeals.createdAt));
   }
 
+  async getCrmDealsForOrgPaginated(
+    orgId: string,
+    options: { page: number; pageSize: number; sortBy?: string; sortDir?: 'asc' | 'desc'; search?: string; stageId?: string }
+  ): Promise<{ data: CrmDeal[]; total: number; page: number; pageSize: number; totalPages: number }> {
+    const { page, pageSize, search, sortBy = 'createdAt', sortDir = 'desc', stageId } = options;
+    const offset = (page - 1) * pageSize;
+
+    let whereConditions: any = eq(crmDeals.ownerId, orgId);
+
+    if (stageId) {
+      whereConditions = and(whereConditions, eq(crmDeals.stageId, stageId));
+    }
+
+    if (search && search.trim()) {
+      const searchTerm = `%${search.toLowerCase()}%`;
+      whereConditions = and(
+        whereConditions,
+        or(
+          sql`LOWER(${crmDeals.name}) LIKE ${searchTerm}`,
+          sql`LOWER(${crmDeals.description}) LIKE ${searchTerm}`
+        )
+      );
+    }
+
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(crmDeals)
+      .where(whereConditions);
+    
+    const total = countResult?.count || 0;
+
+    const orderColumn = sortBy === 'name' ? crmDeals.name :
+                        sortBy === 'value' ? crmDeals.value :
+                        sortBy === 'createdAt' ? crmDeals.createdAt :
+                        sortBy === 'updatedAt' ? crmDeals.updatedAt :
+                        crmDeals.createdAt;
+
+    const data = await db
+      .select()
+      .from(crmDeals)
+      .where(whereConditions)
+      .orderBy(sortDir === 'asc' ? asc(orderColumn) : desc(orderColumn))
+      .limit(pageSize)
+      .offset(offset);
+
+    return {
+      data,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
+    };
+  }
+
   async getCrmDealsByPipeline(pipelineId: string): Promise<CrmDeal[]> {
     return db.select().from(crmDeals).where(eq(crmDeals.pipelineId, pipelineId)).orderBy(desc(crmDeals.createdAt));
   }
@@ -2853,12 +2909,16 @@ export class DatabaseStorage implements IStorage {
 
   async getCrmContactsForOrgPaginated(
     orgId: string,
-    options: { page: number; limit: number; search?: string; sortBy?: string; sortOrder?: 'asc' | 'desc' }
-  ): Promise<{ data: CrmContact[]; total: number; page: number; limit: number; totalPages: number }> {
-    const { page, limit, search, sortBy = 'createdAt', sortOrder = 'desc' } = options;
-    const offset = (page - 1) * limit;
+    options: { page: number; pageSize: number; sortBy?: string; sortDir?: 'asc' | 'desc'; search?: string; companyId?: string }
+  ): Promise<{ data: CrmContact[]; total: number; page: number; pageSize: number; totalPages: number }> {
+    const { page, pageSize, search, sortBy = 'createdAt', sortDir = 'desc', companyId } = options;
+    const offset = (page - 1) * pageSize;
 
-    let whereConditions = eq(crmContacts.ownerId, orgId);
+    let whereConditions: any = eq(crmContacts.ownerId, orgId);
+
+    if (companyId) {
+      whereConditions = and(whereConditions, eq(crmContacts.companyId, companyId));
+    }
 
     if (search && search.trim()) {
       const searchTerm = `%${search.toLowerCase()}%`;
@@ -2891,16 +2951,16 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(crmContacts)
       .where(whereConditions)
-      .orderBy(sortOrder === 'asc' ? asc(orderColumn) : desc(orderColumn))
-      .limit(limit)
+      .orderBy(sortDir === 'asc' ? asc(orderColumn) : desc(orderColumn))
+      .limit(pageSize)
       .offset(offset);
 
     return {
       data,
       total,
       page,
-      limit,
-      totalPages: Math.ceil(total / limit)
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
     };
   }
 
@@ -2934,6 +2994,56 @@ export class DatabaseStorage implements IStorage {
 
   async getCrmCompaniesForOrg(orgId: string): Promise<CrmCompany[]> {
     return db.select().from(crmCompanies).where(eq(crmCompanies.ownerId, orgId)).orderBy(asc(crmCompanies.name));
+  }
+
+  async getCrmCompaniesForOrgPaginated(
+    orgId: string,
+    options: { page: number; pageSize: number; sortBy?: string; sortDir?: 'asc' | 'desc'; search?: string }
+  ): Promise<{ data: CrmCompany[]; total: number; page: number; pageSize: number; totalPages: number }> {
+    const { page, pageSize, search, sortBy = 'name', sortDir = 'asc' } = options;
+    const offset = (page - 1) * pageSize;
+
+    let whereConditions: any = eq(crmCompanies.ownerId, orgId);
+
+    if (search && search.trim()) {
+      const searchTerm = `%${search.toLowerCase()}%`;
+      whereConditions = and(
+        whereConditions,
+        or(
+          sql`LOWER(${crmCompanies.name}) LIKE ${searchTerm}`,
+          sql`LOWER(${crmCompanies.website}) LIKE ${searchTerm}`,
+          sql`LOWER(${crmCompanies.industry}) LIKE ${searchTerm}`
+        )
+      );
+    }
+
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(crmCompanies)
+      .where(whereConditions);
+    
+    const total = countResult?.count || 0;
+
+    const orderColumn = sortBy === 'name' ? crmCompanies.name :
+                        sortBy === 'createdAt' ? crmCompanies.createdAt :
+                        sortBy === 'updatedAt' ? crmCompanies.updatedAt :
+                        crmCompanies.name;
+
+    const data = await db
+      .select()
+      .from(crmCompanies)
+      .where(whereConditions)
+      .orderBy(sortDir === 'asc' ? asc(orderColumn) : desc(orderColumn))
+      .limit(pageSize)
+      .offset(offset);
+
+    return {
+      data,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
+    };
   }
 
   async createCrmCompany(company: InsertCrmCompany): Promise<CrmCompany> {
