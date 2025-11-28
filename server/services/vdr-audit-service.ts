@@ -2,7 +2,7 @@ import { db } from '../db';
 import { vdrAuditLogs, vdrDocumentPermissions, users, externalUsers, vdrDocuments, vdrFolders } from '@shared/schema';
 import { eq, and, desc, sql, inArray, isNotNull, between, or, count } from 'drizzle-orm';
 import { Request } from 'express';
-import UAParser from 'ua-parser-js';
+import * as UAParser from 'ua-parser-js';
 
 export type VdrAuditEventType = 
   | 'document_viewed'
@@ -111,7 +111,7 @@ class VdrAuditService {
     
     const userAgent = req.headers['user-agent'] || 'unknown';
     
-    const parser = new UAParser(userAgent);
+    const parser = new (UAParser as any)(userAgent);
     const result = parser.getResult();
     
     const deviceInfo = {

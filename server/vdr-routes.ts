@@ -11,6 +11,7 @@ import { eq, and, desc, sql, isNotNull, inArray } from 'drizzle-orm';
 import { ensureDefaultCategories } from './vdr-diligence-category-service';
 import { ensureDefaultDueDatePresets } from './vdr-due-date-preset-service';
 import { vdrAuditService } from './services/vdr-audit-service';
+import { vdrWatermarkService } from './services/vdr-watermark-service';
 
 const router = express.Router();
 
@@ -510,21 +511,43 @@ router.get('/documents/:documentId/download', requireAuth, requireVdrAccess('dow
 
     const stream = await defaultStorageProvider.download(document.storagePath);
     
+    const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() 
+      || req.socket?.remoteAddress 
+      || 'unknown';
+    
+    const watermarkResult = await vdrWatermarkService.applyWatermarkToDownload(
+      documentId,
+      userId,
+      null,
+      orgId,
+      stream,
+      document.mimeType,
+      ipAddress
+    );
+    
     await vdrAuditService.logEvent({
       projectId: document.projectId,
       orgId,
       userId,
       documentId,
       eventType: 'document_downloaded',
-      metadata: { documentName: document.filename },
+      metadata: { 
+        documentName: document.filename,
+        watermarkApplied: watermarkResult.watermarkApplied,
+        watermarkText: watermarkResult.watermarkText,
+      },
       req,
     });
 
     res.setHeader('Content-Type', document.mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${document.filename}"`);
-    res.setHeader('Content-Length', document.size);
     
-    stream.pipe(res);
+    if (watermarkResult.watermarkApplied && watermarkResult.watermarkText) {
+      res.setHeader('X-Watermark-Applied', 'true');
+      res.setHeader('X-Watermark-Info', encodeURIComponent(watermarkResult.watermarkText.split('\n')[0]));
+    }
+    
+    watermarkResult.stream.pipe(res);
   } catch (error: any) {
     console.error('Error downloading document:', error);
     res.status(500).json({ error: 'Failed to download document' });
@@ -1809,6 +1832,221 @@ router.get('/projects/:projectId/audit-export', requireAuth, requireVdrAccess('m
   } catch (error: any) {
     console.error('Error exporting audit log:', error);
     res.status(500).json({ error: 'Failed to export audit log' });
+  }
+});
+
+// ============================================================================
+// WATERMARK MANAGEMENT ENDPOINTS
+// ============================================================================
+
+router.get('/projects/:projectId/watermark-settings', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const settings = await vdrWatermarkService.getProjectWatermarkSettings(projectId, orgId);
+    res.json(settings);
+  } catch (error: any) {
+    console.error('Error fetching watermark settings:', error);
+    res.status(500).json({ error: 'Failed to fetch watermark settings' });
+  }
+});
+
+router.post('/projects/:projectId/watermark', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const { watermarkType, staticText, isDynamic, opacity, position, includeQrCode } = req.body;
+
+    const watermark = await vdrWatermarkService.setWatermarkConfig(orgId, userId, {
+      projectId,
+      watermarkType: watermarkType || 'dynamic',
+      staticText,
+      isDynamic: isDynamic ?? true,
+      opacity: opacity ?? 30,
+      position: position ?? 'diagonal',
+      includeQrCode: includeQrCode ?? false,
+    });
+
+    await vdrAuditService.logEvent({
+      projectId,
+      orgId,
+      userId,
+      eventType: 'watermark_applied',
+      metadata: { scope: 'project', watermarkType },
+      req,
+    });
+
+    res.json(watermark);
+  } catch (error: any) {
+    console.error('Error setting project watermark:', error);
+    res.status(500).json({ error: 'Failed to set project watermark' });
+  }
+});
+
+router.delete('/projects/:projectId/watermark', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    await vdrWatermarkService.removeWatermarkConfig(orgId, undefined, undefined, projectId);
+
+    await vdrAuditService.logEvent({
+      projectId,
+      orgId,
+      userId,
+      eventType: 'watermark_removed',
+      metadata: { scope: 'project' },
+      req,
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error removing project watermark:', error);
+    res.status(500).json({ error: 'Failed to remove project watermark' });
+  }
+});
+
+router.post('/folders/:folderId/watermark', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { folderId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const folder = await storage.vdr.folders.getFolder(folderId, orgId);
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    const { watermarkType, staticText, isDynamic, opacity, position, includeQrCode } = req.body;
+
+    const watermark = await vdrWatermarkService.setWatermarkConfig(orgId, userId, {
+      folderId,
+      watermarkType: watermarkType || 'dynamic',
+      staticText,
+      isDynamic: isDynamic ?? true,
+      opacity: opacity ?? 30,
+      position: position ?? 'diagonal',
+      includeQrCode: includeQrCode ?? false,
+    });
+
+    await vdrAuditService.logEvent({
+      projectId: folder.projectId,
+      orgId,
+      userId,
+      folderId,
+      eventType: 'watermark_applied',
+      metadata: { scope: 'folder', folderName: folder.name, watermarkType },
+      req,
+    });
+
+    res.json(watermark);
+  } catch (error: any) {
+    console.error('Error setting folder watermark:', error);
+    res.status(500).json({ error: 'Failed to set folder watermark' });
+  }
+});
+
+router.delete('/folders/:folderId/watermark', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { folderId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const folder = await storage.vdr.folders.getFolder(folderId, orgId);
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    await vdrWatermarkService.removeWatermarkConfig(orgId, undefined, folderId, undefined);
+
+    await vdrAuditService.logEvent({
+      projectId: folder.projectId,
+      orgId,
+      userId,
+      folderId,
+      eventType: 'watermark_removed',
+      metadata: { scope: 'folder', folderName: folder.name },
+      req,
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error removing folder watermark:', error);
+    res.status(500).json({ error: 'Failed to remove folder watermark' });
+  }
+});
+
+router.post('/documents/:documentId/watermark', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { documentId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const document = await storage.vdr.documents.getDocument(documentId, orgId);
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const { watermarkType, staticText, isDynamic, opacity, position, includeQrCode } = req.body;
+
+    const watermark = await vdrWatermarkService.setWatermarkConfig(orgId, userId, {
+      documentId,
+      watermarkType: watermarkType || 'dynamic',
+      staticText,
+      isDynamic: isDynamic ?? true,
+      opacity: opacity ?? 30,
+      position: position ?? 'diagonal',
+      includeQrCode: includeQrCode ?? false,
+    });
+
+    await vdrAuditService.logEvent({
+      projectId: document.projectId,
+      orgId,
+      userId,
+      documentId,
+      eventType: 'watermark_applied',
+      metadata: { scope: 'document', documentName: document.filename, watermarkType },
+      req,
+    });
+
+    res.json(watermark);
+  } catch (error: any) {
+    console.error('Error setting document watermark:', error);
+    res.status(500).json({ error: 'Failed to set document watermark' });
+  }
+});
+
+router.delete('/documents/:documentId/watermark', requireAuth, requireVdrAccess('manage'), async (req: Request, res: Response) => {
+  const { documentId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const document = await storage.vdr.documents.getDocument(documentId, orgId);
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    await vdrWatermarkService.removeWatermarkConfig(orgId, documentId, undefined, undefined);
+
+    await vdrAuditService.logEvent({
+      projectId: document.projectId,
+      orgId,
+      userId,
+      documentId,
+      eventType: 'watermark_removed',
+      metadata: { scope: 'document', documentName: document.filename },
+      req,
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error removing document watermark:', error);
+    res.status(500).json({ error: 'Failed to remove document watermark' });
   }
 });
 
