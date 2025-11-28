@@ -109,11 +109,48 @@ export const outreachCampaignTypeEnum = pgEnum("outreach_campaign_type", ["email
 export const marketTargetStatusEnum = pgEnum("market_target_status", ["research", "active", "saturated", "paused"]);
 export const marketTargetPriorityEnum = pgEnum("market_target_priority", ["low", "medium", "high", "critical"]);
 
+// SSO Provider enums
+export const ssoProviderEnum = pgEnum("sso_provider", ["okta", "azure_ad", "onelogin", "google_workspace", "custom_saml"]);
+export const mfaMethodEnum = pgEnum("mfa_method", ["totp", "sms", "email"]);
+export const sessionStatusEnum = pgEnum("session_status", ["active", "expired", "revoked"]);
+
 // Organizations
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  // SSO settings
+  ssoEnabled: boolean("sso_enabled").notNull().default(false),
+  ssoEnforced: boolean("sso_enforced").notNull().default(false), // Require SSO for all users
+  // Security settings
+  mfaRequired: boolean("mfa_required").notNull().default(false),
+  sessionTimeoutMinutes: integer("session_timeout_minutes").notNull().default(480), // 8 hours default
+  ipAllowlist: text("ip_allowlist").array(), // CIDR ranges
+  allowedEmailDomains: text("allowed_email_domains").array(), // For JIT provisioning
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// SSO Configurations - Per-organization SSO provider settings
+export const ssoConfigurations = pgTable("sso_configurations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id).unique(),
+  provider: ssoProviderEnum("provider").notNull(),
+  // SAML Configuration
+  entityId: text("entity_id"), // SP Entity ID
+  ssoUrl: text("sso_url"), // IdP SSO URL
+  sloUrl: text("slo_url"), // IdP Single Logout URL (optional)
+  certificate: text("certificate"), // IdP X.509 certificate
+  // Optional metadata URL for auto-config
+  metadataUrl: text("metadata_url"),
+  // Attribute mapping
+  attributeMapping: jsonb("attribute_mapping").default(sql`'{"email": "email", "name": "displayName", "firstName": "givenName", "lastName": "surname"}'`),
+  // Just-in-time provisioning
+  jitProvisioningEnabled: boolean("jit_provisioning_enabled").notNull().default(true),
+  defaultRole: text("default_role").notNull().default("viewer"),
+  // Status
+  isActive: boolean("is_active").notNull().default(false),
+  lastTestedAt: timestamp("last_tested_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // Users
@@ -122,16 +159,73 @@ export const users = pgTable("users", {
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
+  passwordHash: text("password_hash"), // Null if SSO-only user
   role: roleEnum("role").notNull().default("viewer"),
   tz: text("tz").notNull().default("America/New_York"),
+  // SSO linking
+  ssoSubjectId: text("sso_subject_id"), // IdP's unique user identifier
+  ssoProvider: ssoProviderEnum("sso_provider"),
+  // MFA settings
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
+  mfaSecret: text("mfa_secret"), // Encrypted TOTP secret
+  mfaBackupCodes: text("mfa_backup_codes").array(), // Encrypted backup codes
+  mfaMethod: mfaMethodEnum("mfa_method"),
   // Calendar preferences
   defaultCalendarProvider: calendarProviderEnum("default_calendar_provider"),
   calendarSyncEnabled: boolean("calendar_sync_enabled").notNull().default(true),
   // Dashboard preferences
   preferredDashboard: dashboardTypeEnum("preferred_dashboard").default("default"),
   dashboardConfig: jsonb("dashboard_config").default(sql`'{}'`), // Custom dashboard settings
+  // Account status
+  isActive: boolean("is_active").notNull().default(true),
+  lastLoginAt: timestamp("last_login_at"),
+  failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// User Sessions - Track active sessions with device info
+export const userSessions = pgTable("user_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  // Session info
+  sessionToken: text("session_token").notNull().unique(),
+  status: sessionStatusEnum("status").notNull().default("active"),
+  // Device and location info
+  deviceType: text("device_type"), // desktop, mobile, tablet
+  browser: text("browser"),
+  os: text("os"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  location: text("location"), // GeoIP city/country
+  // Timestamps
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastActivityAt: timestamp("last_activity_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  revokedAt: timestamp("revoked_at"),
+}, (table) => ({
+  userIdIdx: index("user_sessions_user_id_idx").on(table.userId),
+  sessionTokenIdx: index("user_sessions_token_idx").on(table.sessionToken),
+}));
+
+// Security Audit Log - Track auth events
+export const securityAuditLog = pgTable("security_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
+  eventType: text("event_type").notNull(), // login_success, login_failure, logout, mfa_enabled, mfa_disabled, password_change, session_revoked, sso_login, etc.
+  eventDetails: jsonb("event_details").default(sql`'{}'`),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  success: boolean("success").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("security_audit_user_id_idx").on(table.userId),
+  orgIdIdx: index("security_audit_org_id_idx").on(table.orgId),
+  eventTypeIdx: index("security_audit_event_type_idx").on(table.eventType),
+  createdAtIdx: index("security_audit_created_at_idx").on(table.createdAt),
+}));
 
 // Calendar Settings - User calendar preferences
 export const calendarSettings = pgTable("calendar_settings", {
@@ -1238,6 +1332,22 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
 });
 
+export const insertSsoConfigurationSchema = createInsertSchema(ssoConfigurations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserSessionSchema = createInsertSchema(userSessions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSecurityAuditLogSchema = createInsertSchema(securityAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertDashboardCustomModuleSchema = createInsertSchema(dashboardCustomModules).omit({
   id: true,
   createdAt: true,
@@ -1439,6 +1549,15 @@ export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type SsoConfiguration = typeof ssoConfigurations.$inferSelect;
+export type InsertSsoConfiguration = z.infer<typeof insertSsoConfigurationSchema>;
+
+export type UserSession = typeof userSessions.$inferSelect;
+export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
+
+export type SecurityAuditLog = typeof securityAuditLog.$inferSelect;
+export type InsertSecurityAuditLog = z.infer<typeof insertSecurityAuditLogSchema>;
 
 export type CalendarSettings = typeof calendarSettings.$inferSelect;
 export type InsertCalendarSettings = z.infer<typeof insertCalendarSettingsSchema>;

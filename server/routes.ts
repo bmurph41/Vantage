@@ -1,8 +1,8 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, and, or, desc, asc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, or, desc, asc, gte, lte, sql, gt } from "drizzle-orm";
 import { resolveRecipient } from "@shared/recipient-utils";
 import { AIRiskAnalyzer } from "./ai-risk-analyzer";
 import { AINotesEnhancer } from "./ai-notes-enhancer";
@@ -19,6 +19,9 @@ import { AuditService } from "./services/audit-service";
 import { setTenantContext, clearTenantContext } from "./middleware/tenant-context";
 import vdrRouter from "./vdr-routes";
 import shipStoreRouter from "./ship-store-router";
+import authRoutes from "./routes/auth-routes";
+import { enterpriseAuthService } from "./services/enterprise-auth-service";
+import { userSessions } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
 import { marketingService } from "./services/marketing-service";
@@ -212,11 +215,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     return event;
   };
-  // Middleware for authentication (simplified for demo)
+  // Enterprise authentication middleware with session support
   const authenticateUser = async (req: any, res: any, next: any) => {
     try {
-      // In production, this would validate JWT tokens or session
-      req.user = { id: "user-1", orgId: "org-1", role: "owner", email: "demo@marinamatch.com" };
+      // Check for session token in cookie
+      const sessionToken = req.cookies?.sessionToken;
+      
+      if (sessionToken) {
+        // Validate session using enterprise auth service
+        const sessionData = await enterpriseAuthService.validateSession(sessionToken);
+        
+        if (sessionData) {
+          req.user = {
+            id: sessionData.user.id,
+            orgId: sessionData.user.orgId,
+            role: sessionData.user.role,
+            email: sessionData.user.email,
+            name: sessionData.user.name,
+          };
+        }
+      }
+      
+      // Fall back to demo user in development if no session
+      if (!req.user && process.env.NODE_ENV !== 'production') {
+        req.user = { id: "user-1", orgId: "org-1", role: "owner", email: "demo@marinamatch.com", name: "Demo User" };
+      }
+      
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
       
       // Set tenant context for RLS
       if (req.user?.orgId) {
@@ -237,6 +264,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
+  // Register auth routes (no authentication required for login/register)
+  app.use("/api/auth", authRoutes);
+  
   app.use("/api/dd", authenticateUser);
   app.use("/api/crm", authenticateUser);
   app.use("/api/prospecting", authenticateUser);
