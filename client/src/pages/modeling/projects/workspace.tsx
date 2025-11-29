@@ -43,6 +43,7 @@ import WorkspaceExitStrategy from './workspace/exit-strategy';
 import ScenarioComparison from './workspace/scenario-comparison';
 import AuditTrailViewer from './workspace/audit-trail';
 import CaseConfiguration from './workspace/case-configuration';
+import DealPricing from './workspace/deal-pricing';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -172,6 +173,10 @@ export default function ProjectWorkspace() {
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Pro Forma</span>
             </TabsTrigger>
+            <TabsTrigger value="pricing" className="gap-2" data-testid="tab-pricing">
+              <DollarSign className="h-4 w-4" />
+              <span className="hidden sm:inline">Pricing</span>
+            </TabsTrigger>
             <TabsTrigger value="summary" className="gap-2" data-testid="tab-summary">
               <ClipboardList className="h-4 w-4" />
               <span className="hidden sm:inline">Summary</span>
@@ -221,6 +226,10 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="proforma" className="space-y-6">
           <WorkspaceProForma projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="pricing" className="space-y-6">
+          <DealPricing projectId={projectId!} />
         </TabsContent>
 
         <TabsContent value="summary" className="space-y-6">

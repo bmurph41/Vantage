@@ -33,6 +33,7 @@ import { docIntelService } from "./services/doc-intel-service";
 import { jobQueueService } from "./services/job-queue-service";
 import { cacheService } from "./services/cache-service";
 import { monitoringService } from "./services/monitoring-service";
+import { dealPricingService } from "./services/deal-pricing-service";
 import { calculateAll, type TransactionClosingData } from "./services/transactionClosingEngine";
 import { ParserService } from "./services/salescomps/parser";
 import { CompService } from "./services/salescomps/compService";
@@ -10676,6 +10677,75 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to save project config:', error);
       res.status(500).json({ error: 'Failed to save project config' });
+    }
+  });
+
+  // Project Workspace - Deal Pricing (bidirectional solve-for calculations)
+  app.post('/api/modeling/projects/:projectId/deal-pricing', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const {
+        manualPurchasePrice,
+        targetIRR,
+        goingInCapRate,
+        targetYearCapRate,
+        targetYear,
+        holdPeriod = 5,
+        exitCapRate = 7.5,
+        revenueGrowthRate,
+        expenseGrowthRate,
+      } = req.body;
+
+      const results = await dealPricingService.calculateAllPricingModes(
+        projectId,
+        orgId,
+        {
+          manualPurchasePrice: manualPurchasePrice ? Number(manualPurchasePrice) : undefined,
+          targetIRR: targetIRR ? Number(targetIRR) : undefined,
+          goingInCapRate: goingInCapRate ? Number(goingInCapRate) : undefined,
+          targetYearCapRate: targetYearCapRate ? Number(targetYearCapRate) : undefined,
+          targetYear: targetYear ? Number(targetYear) : undefined,
+          holdPeriod: Number(holdPeriod),
+          exitCapRate: Number(exitCapRate),
+          revenueGrowthRate: revenueGrowthRate ? Number(revenueGrowthRate) / 100 : undefined,
+          expenseGrowthRate: expenseGrowthRate ? Number(expenseGrowthRate) / 100 : undefined,
+        }
+      );
+
+      res.json(results);
+    } catch (error: any) {
+      console.error('Failed to calculate deal pricing:', error);
+      res.status(500).json({ error: error.message || 'Failed to calculate deal pricing' });
+    }
+  });
+
+  // Save deal pricing configuration
+  app.post('/api/modeling/projects/:projectId/deal-pricing/save', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { purchasePrice, year1CapRate } = req.body;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const updates: any = { updatedBy: userId };
+      if (purchasePrice !== undefined) {
+        updates.purchasePrice = String(purchasePrice);
+      }
+      if (year1CapRate !== undefined) {
+        updates.year1CapRate = String(year1CapRate);
+      }
+
+      const updated = await storage.updateModelingProject(projectId, updates, orgId);
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Failed to save deal pricing:', error);
+      res.status(500).json({ error: error.message || 'Failed to save deal pricing' });
     }
   });
 
