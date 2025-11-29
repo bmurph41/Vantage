@@ -15851,6 +15851,413 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ========================================================================
+  // QUICK ACCESS (Pinned Items, Recent Items, Favorites)
+  // ========================================================================
+
+  // Get all pinned items for user
+  app.get('/api/quick-access/pinned', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { userPinnedItems } = await import('@shared/schema');
+      
+      const items = await db.select()
+        .from(userPinnedItems)
+        .where(and(
+          eq(userPinnedItems.userId, userId),
+          eq(userPinnedItems.orgId, orgId)
+        ))
+        .orderBy(userPinnedItems.sortOrder);
+      
+      res.json(items);
+    } catch (error) {
+      console.error('Failed to fetch pinned items:', error);
+      res.status(500).json({ error: 'Failed to fetch pinned items' });
+    }
+  });
+
+  // Add a pinned item
+  app.post('/api/quick-access/pinned', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { userPinnedItems, insertUserPinnedItemSchema } = await import('@shared/schema');
+      
+      const validatedData = insertUserPinnedItemSchema.parse(req.body);
+      
+      const existingCount = await db.select({ count: sql<number>`count(*)` })
+        .from(userPinnedItems)
+        .where(and(
+          eq(userPinnedItems.userId, userId),
+          eq(userPinnedItems.orgId, orgId)
+        ));
+      
+      const sortOrder = Number(existingCount[0]?.count) || 0;
+      
+      const [newItem] = await db.insert(userPinnedItems)
+        .values({
+          ...validatedData,
+          userId,
+          orgId,
+          sortOrder,
+        })
+        .returning();
+      
+      res.json(newItem);
+    } catch (error: any) {
+      console.error('Failed to add pinned item:', error);
+      res.status(500).json({ error: error.message || 'Failed to add pinned item' });
+    }
+  });
+
+  // Update pinned item (reorder or edit)
+  app.put('/api/quick-access/pinned/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { userPinnedItems, updateUserPinnedItemSchema } = await import('@shared/schema');
+      
+      const validatedData = updateUserPinnedItemSchema.parse(req.body);
+      
+      const [updated] = await db.update(userPinnedItems)
+        .set(validatedData)
+        .where(and(
+          eq(userPinnedItems.id, id),
+          eq(userPinnedItems.userId, userId),
+          eq(userPinnedItems.orgId, orgId)
+        ))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ error: 'Pinned item not found' });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Failed to update pinned item:', error);
+      res.status(500).json({ error: error.message || 'Failed to update pinned item' });
+    }
+  });
+
+  // Remove a pinned item
+  app.delete('/api/quick-access/pinned/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { userPinnedItems } = await import('@shared/schema');
+      
+      const [deleted] = await db.delete(userPinnedItems)
+        .where(and(
+          eq(userPinnedItems.id, id),
+          eq(userPinnedItems.userId, userId),
+          eq(userPinnedItems.orgId, orgId)
+        ))
+        .returning();
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Pinned item not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to remove pinned item:', error);
+      res.status(500).json({ error: 'Failed to remove pinned item' });
+    }
+  });
+
+  // Reorder pinned items
+  app.put('/api/quick-access/pinned/reorder', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { itemIds } = req.body;
+      const { userPinnedItems } = await import('@shared/schema');
+      
+      if (!Array.isArray(itemIds)) {
+        return res.status(400).json({ error: 'itemIds must be an array' });
+      }
+      
+      for (let i = 0; i < itemIds.length; i++) {
+        await db.update(userPinnedItems)
+          .set({ sortOrder: i })
+          .where(and(
+            eq(userPinnedItems.id, itemIds[i]),
+            eq(userPinnedItems.userId, userId),
+            eq(userPinnedItems.orgId, orgId)
+          ));
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to reorder pinned items:', error);
+      res.status(500).json({ error: 'Failed to reorder pinned items' });
+    }
+  });
+
+  // Get recent items for user
+  app.get('/api/quick-access/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+      const { userRecentItems } = await import('@shared/schema');
+      
+      const items = await db.select()
+        .from(userRecentItems)
+        .where(and(
+          eq(userRecentItems.userId, userId),
+          eq(userRecentItems.orgId, orgId)
+        ))
+        .orderBy(desc(userRecentItems.accessedAt))
+        .limit(limit);
+      
+      res.json(items);
+    } catch (error) {
+      console.error('Failed to fetch recent items:', error);
+      res.status(500).json({ error: 'Failed to fetch recent items' });
+    }
+  });
+
+  // Record a recent item access (upsert)
+  app.post('/api/quick-access/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { userRecentItems, insertUserRecentItemSchema } = await import('@shared/schema');
+      
+      const validatedData = insertUserRecentItemSchema.parse(req.body);
+      
+      const [existing] = await db.select()
+        .from(userRecentItems)
+        .where(and(
+          eq(userRecentItems.userId, userId),
+          eq(userRecentItems.orgId, orgId),
+          eq(userRecentItems.itemType, validatedData.itemType),
+          validatedData.itemId ? eq(userRecentItems.itemId, validatedData.itemId) : sql`item_id IS NULL`
+        ))
+        .limit(1);
+      
+      let result;
+      if (existing) {
+        [result] = await db.update(userRecentItems)
+          .set({
+            title: validatedData.title,
+            link: validatedData.link,
+            icon: validatedData.icon,
+            accessedAt: new Date(),
+          })
+          .where(eq(userRecentItems.id, existing.id))
+          .returning();
+      } else {
+        [result] = await db.insert(userRecentItems)
+          .values({
+            ...validatedData,
+            userId,
+            orgId,
+          })
+          .returning();
+        
+        const count = await db.select({ count: sql<number>`count(*)` })
+          .from(userRecentItems)
+          .where(and(
+            eq(userRecentItems.userId, userId),
+            eq(userRecentItems.orgId, orgId)
+          ));
+        
+        if (Number(count[0]?.count) > 50) {
+          const oldItems = await db.select({ id: userRecentItems.id })
+            .from(userRecentItems)
+            .where(and(
+              eq(userRecentItems.userId, userId),
+              eq(userRecentItems.orgId, orgId)
+            ))
+            .orderBy(desc(userRecentItems.accessedAt))
+            .offset(50);
+          
+          if (oldItems.length > 0) {
+            await db.delete(userRecentItems)
+              .where(sql`id IN (${oldItems.map(i => i.id).join(',')})`);
+          }
+        }
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to record recent item:', error);
+      res.status(500).json({ error: error.message || 'Failed to record recent item' });
+    }
+  });
+
+  // Clear recent items
+  app.delete('/api/quick-access/recent', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { userRecentItems } = await import('@shared/schema');
+      
+      await db.delete(userRecentItems)
+        .where(and(
+          eq(userRecentItems.userId, userId),
+          eq(userRecentItems.orgId, orgId)
+        ));
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to clear recent items:', error);
+      res.status(500).json({ error: 'Failed to clear recent items' });
+    }
+  });
+
+  // Get all favorites for user
+  app.get('/api/quick-access/favorites', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const itemType = req.query.itemType as string | undefined;
+      const { userFavorites } = await import('@shared/schema');
+      
+      let query = db.select()
+        .from(userFavorites)
+        .where(and(
+          eq(userFavorites.userId, userId),
+          eq(userFavorites.orgId, orgId),
+          itemType ? eq(userFavorites.itemType, itemType) : sql`true`
+        ))
+        .orderBy(desc(userFavorites.favoritedAt));
+      
+      const items = await query;
+      res.json(items);
+    } catch (error) {
+      console.error('Failed to fetch favorites:', error);
+      res.status(500).json({ error: 'Failed to fetch favorites' });
+    }
+  });
+
+  // Check if an item is favorited
+  app.get('/api/quick-access/favorites/check', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { itemType, itemId } = req.query;
+      const { userFavorites } = await import('@shared/schema');
+      
+      if (!itemType || !itemId) {
+        return res.status(400).json({ error: 'itemType and itemId are required' });
+      }
+      
+      const [existing] = await db.select()
+        .from(userFavorites)
+        .where(and(
+          eq(userFavorites.userId, userId),
+          eq(userFavorites.orgId, orgId),
+          eq(userFavorites.itemType, itemType as string),
+          eq(userFavorites.itemId, itemId as string)
+        ))
+        .limit(1);
+      
+      res.json({ isFavorited: !!existing, favorite: existing || null });
+    } catch (error) {
+      console.error('Failed to check favorite status:', error);
+      res.status(500).json({ error: 'Failed to check favorite status' });
+    }
+  });
+
+  // Add a favorite (toggle on)
+  app.post('/api/quick-access/favorites', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { userFavorites, insertUserFavoriteSchema } = await import('@shared/schema');
+      
+      const validatedData = insertUserFavoriteSchema.parse(req.body);
+      
+      const [existing] = await db.select()
+        .from(userFavorites)
+        .where(and(
+          eq(userFavorites.userId, userId),
+          eq(userFavorites.orgId, orgId),
+          eq(userFavorites.itemType, validatedData.itemType),
+          eq(userFavorites.itemId, validatedData.itemId)
+        ))
+        .limit(1);
+      
+      if (existing) {
+        return res.json(existing);
+      }
+      
+      const [newFavorite] = await db.insert(userFavorites)
+        .values({
+          ...validatedData,
+          userId,
+          orgId,
+        })
+        .returning();
+      
+      res.json(newFavorite);
+    } catch (error: any) {
+      console.error('Failed to add favorite:', error);
+      res.status(500).json({ error: error.message || 'Failed to add favorite' });
+    }
+  });
+
+  // Remove a favorite (toggle off)
+  app.delete('/api/quick-access/favorites/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { userFavorites } = await import('@shared/schema');
+      
+      const [deleted] = await db.delete(userFavorites)
+        .where(and(
+          eq(userFavorites.id, id),
+          eq(userFavorites.userId, userId),
+          eq(userFavorites.orgId, orgId)
+        ))
+        .returning();
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Favorite not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to remove favorite:', error);
+      res.status(500).json({ error: 'Failed to remove favorite' });
+    }
+  });
+
+  // Remove a favorite by item type and ID
+  app.delete('/api/quick-access/favorites/item/:itemType/:itemId', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { itemType, itemId } = req.params;
+      const { userFavorites } = await import('@shared/schema');
+      
+      const [deleted] = await db.delete(userFavorites)
+        .where(and(
+          eq(userFavorites.userId, userId),
+          eq(userFavorites.orgId, orgId),
+          eq(userFavorites.itemType, itemType),
+          eq(userFavorites.itemId, itemId)
+        ))
+        .returning();
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Favorite not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to remove favorite:', error);
+      res.status(500).json({ error: 'Failed to remove favorite' });
+    }
+  });
+
+  // ========================================================================
   // OWNED ASSETS & PORTFOLIO
   // ========================================================================
 
