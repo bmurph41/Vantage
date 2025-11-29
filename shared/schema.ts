@@ -10488,6 +10488,294 @@ export type BackgroundJob = typeof backgroundJobs.$inferSelect;
 export type InsertBackgroundJob = z.infer<typeof insertBackgroundJobSchema>;
 
 // ============================================================================
+// CROSS-MODULE INTEGRATION LAYER
+// Enables full connectivity between CRM, Sales Comps, Rate Comps, DD, VDR, and Modeling
+// ============================================================================
+
+// Deal-to-Sales Comps Junction - Many-to-many for comparable analysis
+export const dealSalesComps = pgTable('deal_sales_comps', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  dealId: varchar('deal_id').notNull().references(() => crmDeals.id, { onDelete: 'cascade' }),
+  salesCompId: varchar('sales_comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
+  
+  // Comparison metadata
+  relevanceScore: integer('relevance_score'), // 0-100 relevance scoring
+  isPrimary: boolean('is_primary').default(false), // Primary comparable
+  notes: text('notes'),
+  comparisonType: varchar('comparison_type', { length: 50 }).default('similar'), // similar, aspirational, market_floor, market_ceiling
+  
+  // Auto-calculated similarity metrics
+  distanceMiles: real('distance_miles'), // Geographic distance
+  priceDifferencePercent: real('price_difference_percent'),
+  sizeDifferencePercent: real('size_difference_percent'),
+  
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('deal_sales_comps_org_idx').on(table.orgId),
+  dealIdx: index('deal_sales_comps_deal_idx').on(table.dealId),
+  compIdx: index('deal_sales_comps_comp_idx').on(table.salesCompId),
+  uniqueDealComp: unique('deal_sales_comps_unique').on(table.dealId, table.salesCompId),
+}));
+
+export const insertDealSalesCompSchema = createInsertSchema(dealSalesComps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DealSalesComp = typeof dealSalesComps.$inferSelect;
+export type InsertDealSalesComp = z.infer<typeof insertDealSalesCompSchema>;
+
+// Deal-to-Rate Comps Junction - Many-to-many for rate benchmarking
+export const dealRateComps = pgTable('deal_rate_comps', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  dealId: varchar('deal_id').notNull().references(() => crmDeals.id, { onDelete: 'cascade' }),
+  rateCompId: varchar('rate_comp_id').notNull().references(() => rateComps.id, { onDelete: 'cascade' }),
+  
+  // Comparison metadata
+  relevanceScore: integer('relevance_score'), // 0-100 relevance scoring
+  isPrimary: boolean('is_primary').default(false),
+  notes: text('notes'),
+  comparisonType: varchar('comparison_type', { length: 50 }).default('benchmark'), // benchmark, premium, discount, market_rate
+  
+  // Rate comparison metrics
+  rateVariancePercent: real('rate_variance_percent'),
+  occupancyComparison: real('occupancy_comparison'),
+  
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('deal_rate_comps_org_idx').on(table.orgId),
+  dealIdx: index('deal_rate_comps_deal_idx').on(table.dealId),
+  compIdx: index('deal_rate_comps_comp_idx').on(table.rateCompId),
+  uniqueDealComp: unique('deal_rate_comps_unique').on(table.dealId, table.rateCompId),
+}));
+
+export const insertDealRateCompSchema = createInsertSchema(dealRateComps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DealRateComp = typeof dealRateComps.$inferSelect;
+export type InsertDealRateComp = z.infer<typeof insertDealRateCompSchema>;
+
+// Deal-to-VDR Links - Connect CRM deals directly to VDR folders
+export const dealVdrLinks = pgTable('deal_vdr_links', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  dealId: varchar('deal_id').notNull().references(() => crmDeals.id, { onDelete: 'cascade' }),
+  vdrFolderId: varchar('vdr_folder_id').notNull().references(() => vdrFolders.id, { onDelete: 'cascade' }),
+  
+  // Link metadata
+  linkType: varchar('link_type', { length: 50 }).notNull().default('deal_room'), // deal_room, due_diligence, closing, archive
+  isActive: boolean('is_active').notNull().default(true),
+  
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('deal_vdr_links_org_idx').on(table.orgId),
+  dealIdx: index('deal_vdr_links_deal_idx').on(table.dealId),
+  vdrIdx: index('deal_vdr_links_vdr_idx').on(table.vdrFolderId),
+  uniqueDealVdr: unique('deal_vdr_links_unique').on(table.dealId, table.vdrFolderId),
+}));
+
+export const insertDealVdrLinkSchema = createInsertSchema(dealVdrLinks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type DealVdrLink = typeof dealVdrLinks.$inferSelect;
+export type InsertDealVdrLink = z.infer<typeof insertDealVdrLinkSchema>;
+
+// CRM Deal to DD Project Conversion Tracking
+export const dealDdConversions = pgTable('deal_dd_conversions', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  dealId: varchar('deal_id').notNull().references(() => crmDeals.id),
+  ddProjectId: varchar('dd_project_id').notNull().references(() => projects.id),
+  
+  // Conversion metadata
+  conversionType: varchar('conversion_type', { length: 50 }).notNull().default('manual'), // manual, automated, api
+  conversionStatus: varchar('conversion_status', { length: 50 }).notNull().default('completed'), // pending, completed, failed, rolled_back
+  
+  // What was migrated
+  contactsMigrated: integer('contacts_migrated').default(0),
+  documentsMigrated: integer('documents_migrated').default(0),
+  taskTemplateUsed: varchar('task_template_used'),
+  
+  // VDR auto-creation
+  vdrFolderCreated: boolean('vdr_folder_created').default(false),
+  vdrFolderId: varchar('vdr_folder_id').references(() => vdrFolders.id),
+  vdrTemplateUsed: varchar('vdr_template_used'),
+  
+  // Audit trail
+  convertedBy: varchar('converted_by').notNull().references(() => users.id),
+  convertedAt: timestamp('converted_at').notNull().defaultNow(),
+  rollbackAt: timestamp('rollback_at'),
+  rollbackBy: varchar('rollback_by').references(() => users.id),
+  rollbackReason: text('rollback_reason'),
+  
+  notes: text('notes'),
+  metadata: jsonb('metadata').default(sql`'{}'`),
+}, (table) => ({
+  orgIdx: index('deal_dd_conversions_org_idx').on(table.orgId),
+  dealIdx: index('deal_dd_conversions_deal_idx').on(table.dealId),
+  projectIdx: index('deal_dd_conversions_project_idx').on(table.ddProjectId),
+  statusIdx: index('deal_dd_conversions_status_idx').on(table.conversionStatus),
+  uniqueConversion: unique('deal_dd_conversions_unique').on(table.dealId, table.ddProjectId),
+}));
+
+export const insertDealDdConversionSchema = createInsertSchema(dealDdConversions).omit({
+  id: true,
+  convertedAt: true,
+});
+
+export type DealDdConversion = typeof dealDdConversions.$inferSelect;
+export type InsertDealDdConversion = z.infer<typeof insertDealDdConversionSchema>;
+
+// Property-to-Sales Comps Junction - Link CRM properties to sales comps
+export const propertySalesComps = pgTable('property_sales_comps', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  propertyId: varchar('property_id').notNull().references(() => crmProperties.id, { onDelete: 'cascade' }),
+  salesCompId: varchar('sales_comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
+  
+  // Comparison metadata
+  relevanceScore: integer('relevance_score'),
+  isPrimary: boolean('is_primary').default(false),
+  notes: text('notes'),
+  
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('property_sales_comps_org_idx').on(table.orgId),
+  propertyIdx: index('property_sales_comps_property_idx').on(table.propertyId),
+  compIdx: index('property_sales_comps_comp_idx').on(table.salesCompId),
+  uniquePropertyComp: unique('property_sales_comps_unique').on(table.propertyId, table.salesCompId),
+}));
+
+export const insertPropertySalesCompSchema = createInsertSchema(propertySalesComps).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PropertySalesComp = typeof propertySalesComps.$inferSelect;
+export type InsertPropertySalesComp = z.infer<typeof insertPropertySalesCompSchema>;
+
+// Property-to-Rate Comps Junction
+export const propertyRateComps = pgTable('property_rate_comps', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  propertyId: varchar('property_id').notNull().references(() => crmProperties.id, { onDelete: 'cascade' }),
+  rateCompId: varchar('rate_comp_id').notNull().references(() => rateComps.id, { onDelete: 'cascade' }),
+  
+  // Comparison metadata
+  relevanceScore: integer('relevance_score'),
+  isPrimary: boolean('is_primary').default(false),
+  notes: text('notes'),
+  
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('property_rate_comps_org_idx').on(table.orgId),
+  propertyIdx: index('property_rate_comps_property_idx').on(table.propertyId),
+  compIdx: index('property_rate_comps_comp_idx').on(table.rateCompId),
+  uniquePropertyComp: unique('property_rate_comps_unique').on(table.propertyId, table.rateCompId),
+}));
+
+export const insertPropertyRateCompSchema = createInsertSchema(propertyRateComps).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PropertyRateComp = typeof propertyRateComps.$inferSelect;
+export type InsertPropertyRateComp = z.infer<typeof insertPropertyRateCompSchema>;
+
+// Modeling Project to Comps Integration - Track multiple comps per modeling project
+export const modelingProjectComps = pgTable('modeling_project_comps', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Can reference either sales comp or rate comp
+  salesCompId: varchar('sales_comp_id').references(() => salesComps.id, { onDelete: 'cascade' }),
+  rateCompId: varchar('rate_comp_id').references(() => rateComps.id, { onDelete: 'cascade' }),
+  
+  // Comparison metadata
+  compType: varchar('comp_type', { length: 20 }).notNull(), // 'sales' or 'rate'
+  relevanceScore: integer('relevance_score'),
+  isPrimary: boolean('is_primary').default(false),
+  usedInValuation: boolean('used_in_valuation').default(false), // Whether used in cap rate or valuation calc
+  weight: real('weight').default(1.0), // Weighting for blended analysis
+  notes: text('notes'),
+  
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('modeling_project_comps_org_idx').on(table.orgId),
+  projectIdx: index('modeling_project_comps_project_idx').on(table.modelingProjectId),
+  salesCompIdx: index('modeling_project_comps_sales_idx').on(table.salesCompId),
+  rateCompIdx: index('modeling_project_comps_rate_idx').on(table.rateCompId),
+}));
+
+export const insertModelingProjectCompSchema = createInsertSchema(modelingProjectComps).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ModelingProjectComp = typeof modelingProjectComps.$inferSelect;
+export type InsertModelingProjectComp = z.infer<typeof insertModelingProjectCompSchema>;
+
+// Cross-Module Audit Trail - Track all cross-module operations
+export const crossModuleAuditLog = pgTable('cross_module_audit_log', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  
+  // Source and target modules
+  sourceModule: varchar('source_module', { length: 50 }).notNull(), // crm, sales_comps, rate_comps, dd, vdr, modeling
+  targetModule: varchar('target_module', { length: 50 }).notNull(),
+  
+  // Entity references
+  sourceEntityType: varchar('source_entity_type', { length: 50 }).notNull(), // deal, property, project, folder, etc.
+  sourceEntityId: varchar('source_entity_id').notNull(),
+  targetEntityType: varchar('target_entity_type', { length: 50 }).notNull(),
+  targetEntityId: varchar('target_entity_id').notNull(),
+  
+  // Action details
+  action: varchar('action', { length: 50 }).notNull(), // link, unlink, convert, sync, import, export
+  actionStatus: varchar('action_status', { length: 20 }).notNull().default('completed'), // pending, completed, failed
+  
+  // Context
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  metadata: jsonb('metadata').default(sql`'{}'`),
+  errorMessage: text('error_message'),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('cross_module_audit_org_idx').on(table.orgId),
+  userIdx: index('cross_module_audit_user_idx').on(table.userId),
+  sourceIdx: index('cross_module_audit_source_idx').on(table.sourceModule, table.sourceEntityType, table.sourceEntityId),
+  targetIdx: index('cross_module_audit_target_idx').on(table.targetModule, table.targetEntityType, table.targetEntityId),
+  createdIdx: index('cross_module_audit_created_idx').on(table.createdAt),
+}));
+
+export const insertCrossModuleAuditLogSchema = createInsertSchema(crossModuleAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type CrossModuleAuditLog = typeof crossModuleAuditLog.$inferSelect;
+export type InsertCrossModuleAuditLog = z.infer<typeof insertCrossModuleAuditLogSchema>;
+
+// ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular

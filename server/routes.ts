@@ -19,6 +19,7 @@ import { AuditService } from "./services/audit-service";
 import { setTenantContext, clearTenantContext } from "./middleware/tenant-context";
 import vdrRouter from "./vdr-routes";
 import shipStoreRouter from "./ship-store-router";
+import integrationRouter from "./integration-routes";
 import authRoutes from "./routes/auth-routes";
 import { enterpriseAuthService } from "./services/enterprise-auth-service";
 import { userSessions } from "@shared/schema";
@@ -332,6 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/docktalk", authenticateUser);
   app.use("/api/vdr", authenticateUser, vdrRouter);
   app.use("/api/ship-store", authenticateUser, shipStoreRouter);
+  app.use("/api/integration", authenticateUser, integrationRouter);
 
   // Auth endpoints
   app.get("/api/auth/me", authenticateUser, (req: any, res) => {
