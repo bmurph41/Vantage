@@ -116,8 +116,7 @@ const VDRDashboard = lazy(() => import("@/pages/vdr/Dashboard"));
 const ProjectVDR = lazy(() => import("@/pages/vdr/ProjectVDR"));
 const DataRequest = lazy(() => import("@/pages/vdr/DataRequest"));
 
-// Prospecting & Outreach pages
-const ProspectingDashboard = lazy(() => import("@/pages/prospecting/Dashboard"));
+// Prospecting & Outreach pages (Dashboard consolidated into Board)
 const ProspectingBoard = lazy(() => import("@/pages/prospecting/Board"));
 const MarketTargets = lazy(() => import("@/pages/prospecting/Markets"));
 const ProspectingCampaigns = lazy(() => import("@/pages/prospecting/Campaigns"));
@@ -699,10 +698,17 @@ function Router() {
       </Route>
 
       {/* Prospecting & Outreach Routes (Premium/Broker Add-On) */}
+      {/* Redirect old dashboard to board (consolidated) */}
       <Route path="/prospecting/dashboard">
+        {() => {
+          window.location.replace('/prospecting/board');
+          return null;
+        }}
+      </Route>
+      <Route path="/prospecting">
         {() => (
           <UnifiedLayout>
-            <ProspectingDashboard />
+            <ProspectingBoard />
           </UnifiedLayout>
         )}
       </Route>

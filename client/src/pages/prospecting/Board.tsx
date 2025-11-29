@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, Target, Calendar, TrendingUp, BarChart3, ChevronLeft, ChevronRight, Clock } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Edit, Trash2, Target, Calendar, TrendingUp, BarChart3, ChevronLeft, ChevronRight, Clock, Phone, Mail, Users, ArrowUpRight, ArrowDownRight, Minus, ChevronDown, ChevronUp, RefreshCcw } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import WeekProspectingModal from "@/components/modals/week-prospecting-modal";
@@ -16,6 +18,58 @@ import { ProspectingSettingsDialog } from "@/components/modals/prospecting-setti
 import { useProspectingEntries, useProspectingRealTime, useWeeklyProspectingMetrics } from "@/hooks/use-prospecting";
 import type { ProspectingEntry } from "@shared/schema";
 import { format } from "date-fns";
+
+type KpiCardProps = {
+  title: string;
+  value: string | number;
+  change?: number;
+  changeLabel?: string;
+  icon: React.ElementType;
+  color: string;
+  isLoading?: boolean;
+};
+
+function KpiCard({ title, value, change, changeLabel, icon: Icon, color, isLoading }: KpiCardProps) {
+  const getTrendIcon = () => {
+    if (change === undefined) return null;
+    if (change > 0) return <ArrowUpRight className="w-3 h-3" />;
+    if (change < 0) return <ArrowDownRight className="w-3 h-3" />;
+    return <Minus className="w-3 h-3" />;
+  };
+
+  const getTrendColor = () => {
+    if (change === undefined) return "text-gray-500";
+    if (change > 0) return "text-green-600";
+    if (change < 0) return "text-red-600";
+    return "text-gray-500";
+  };
+
+  return (
+    <Card className="bg-white" data-testid={`kpi-card-${title.toLowerCase().replace(/ /g, '-')}`}>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-500">{title}</p>
+            {isLoading ? (
+              <Skeleton className="h-6 w-16 mt-1" />
+            ) : (
+              <p className="text-xl font-bold text-gray-900 mt-0.5">{value}</p>
+            )}
+            {change !== undefined && (
+              <div className={`flex items-center mt-0.5 text-xs ${getTrendColor()}`}>
+                {getTrendIcon()}
+                <span className="ml-0.5">{Math.abs(change)}% {changeLabel || 'vs last week'}</span>
+              </div>
+            )}
+          </div>
+          <div className={`w-10 h-10 ${color} rounded-full flex items-center justify-center`}>
+            <Icon className="w-5 h-5 text-white" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 // ISO Week Date Helper Functions
 
@@ -150,10 +204,10 @@ export default function ProspectingBoard() {
   const currentQuarter = currentISOInfo.quarter;
   const currentWeek = currentISOInfo.weekInQuarter;
   
-  
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedQuarter, setSelectedQuarter] = useState(currentQuarter);
   const [selectedWeekInDropdown, setSelectedWeekInDropdown] = useState<string | null>(null);
+  const [metricsExpanded, setMetricsExpanded] = useState(true);
   
   const [editingEntry, setEditingEntry] = useState<ProspectingEntry | null>(null);
   const [weekModalOpen, setWeekModalOpen] = useState(false);
@@ -170,8 +224,29 @@ export default function ProspectingBoard() {
   // Fetch prospecting entries from database
   const { data: prospectingEntries = [], isLoading } = useProspectingEntries(selectedYear);
   
+  // Fetch dashboard stats for KPI cards
+  const { data: dashboardStats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['/api/prospecting/dashboard-stats'],
+  });
+
+  // Fetch leads for lead counts
+  const { data: leads } = useQuery({
+    queryKey: ['/api/leads'],
+  });
+  
   // Enable real-time updates
   useProspectingRealTime();
+  
+  // Calculate lead metrics
+  const leadsCount = Array.isArray(leads) ? leads.length : 0;
+  const newLeadsThisWeek = Array.isArray(leads) 
+    ? leads.filter((l: any) => {
+        const createdAt = new Date(l.createdAt);
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return createdAt >= weekAgo;
+      }).length 
+    : 0;
 
   // Check if we're viewing the current period
   const isCurrentPeriod = selectedYear === currentDate.getFullYear() && selectedQuarter === currentQuarter;
@@ -373,7 +448,8 @@ export default function ProspectingBoard() {
         <div className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900" data-testid="page-title">Weekly Prospecting Tracker</h1>
+              <h1 className="text-2xl font-bold text-gray-900" data-testid="page-title">Prospecting</h1>
+              <p className="text-gray-500 text-sm mt-1">Track your outreach velocity and lead generation</p>
             </div>
             <div className="flex items-center gap-4">
               <ProspectingSettingsDialog />
@@ -433,6 +509,136 @@ export default function ProspectingBoard() {
             </div>
           </div>
         </div>
+
+        {/* Collapsible KPI Metrics Section */}
+        <Collapsible open={metricsExpanded} onOpenChange={setMetricsExpanded}>
+          <div className="px-6 pb-4">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full flex items-center justify-between py-2 px-3 hover:bg-gray-50 rounded-lg border border-gray-200">
+                <span className="text-sm font-medium text-gray-700">Performance Metrics</span>
+                {metricsExpanded ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <KpiCard
+                  title="Total Leads"
+                  value={leadsCount}
+                  change={12}
+                  icon={Users}
+                  color="bg-blue-500"
+                  isLoading={isLoadingStats}
+                />
+                <KpiCard
+                  title="New This Week"
+                  value={newLeadsThisWeek}
+                  change={8}
+                  icon={Target}
+                  color="bg-green-500"
+                  isLoading={isLoadingStats}
+                />
+                <KpiCard
+                  title="Calls Made"
+                  value={dashboardStats?.callsMade || 0}
+                  change={-5}
+                  icon={Phone}
+                  color="bg-purple-500"
+                  isLoading={isLoadingStats}
+                />
+                <KpiCard
+                  title="Emails Sent"
+                  value={dashboardStats?.emailsSent || 0}
+                  change={15}
+                  icon={Mail}
+                  color="bg-orange-500"
+                  isLoading={isLoadingStats}
+                />
+              </div>
+              
+              {/* Weekly Goals Progress */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <Card className="bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Weekly Goals</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-600">Calls</span>
+                        <span className="font-medium">{dashboardStats?.callsMade || 0} / 50</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-200 rounded-full">
+                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(((dashboardStats?.callsMade || 0) / 50) * 100, 100)}%` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-600">Emails</span>
+                        <span className="font-medium">{dashboardStats?.emailsSent || 0} / 100</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-200 rounded-full">
+                        <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(((dashboardStats?.emailsSent || 0) / 100) * 100, 100)}%` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-600">New Leads</span>
+                        <span className="font-medium">{newLeadsThisWeek} / 20</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-200 rounded-full">
+                        <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min((newLeadsThisWeek / 20) * 100, 100)}%` }} />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Conversion Funnel</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600">Touches</span>
+                      <div className="flex items-center">
+                        <div className="w-24 h-1.5 bg-gray-200 rounded-full mr-2">
+                          <div className="w-full h-full bg-blue-500 rounded-full" />
+                        </div>
+                        <span className="text-xs font-medium">100%</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600">Conversations</span>
+                      <div className="flex items-center">
+                        <div className="w-24 h-1.5 bg-gray-200 rounded-full mr-2">
+                          <div className="w-3/4 h-full bg-green-500 rounded-full" />
+                        </div>
+                        <span className="text-xs font-medium">42%</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600">Qualified</span>
+                      <div className="flex items-center">
+                        <div className="w-24 h-1.5 bg-gray-200 rounded-full mr-2">
+                          <div className="w-1/2 h-full bg-yellow-500 rounded-full" />
+                        </div>
+                        <span className="text-xs font-medium">28%</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600">Deals Created</span>
+                      <div className="flex items-center">
+                        <div className="w-24 h-1.5 bg-gray-200 rounded-full mr-2">
+                          <div className="w-1/4 h-full bg-purple-500 rounded-full" />
+                        </div>
+                        <span className="text-xs font-medium">12%</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
 
         {/* Enhanced Quarter Navigation */}
         <div className="px-6 pb-4">

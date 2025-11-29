@@ -34,10 +34,9 @@ const dealManagementNav = [
 
 // Prospecting & Outreach Navigation (Premium/Broker Add-On)
 const prospectingNav = [
-  { name: "Prospecting Dashboard", href: "/prospecting/dashboard", icon: LayoutDashboard },
+  { name: "Prospecting", href: "/prospecting", icon: Target },
   { name: "Lead Builder", href: "/crm/leads", icon: UserCheck },
-  { name: "Prospecting Board", href: "/prospecting/board", icon: LayoutList },
-  { name: "Market Targets", href: "/prospecting/markets", icon: Target },
+  { name: "Market Targets", href: "/prospecting/markets", icon: LayoutList },
   { name: "Campaigns & Templates", href: "/prospecting/campaigns", icon: Send },
   { name: "Deal Sourcing Analytics", href: "/prospecting/analytics", icon: PieChart },
 ];
