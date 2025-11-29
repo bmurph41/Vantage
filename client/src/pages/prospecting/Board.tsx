@@ -442,7 +442,7 @@ export default function ProspectingBoard() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col min-h-full bg-gray-50">
       {/* Enhanced Header */}
       <div className="flex-shrink-0 bg-white border-b shadow-sm">
         <div className="p-6">
