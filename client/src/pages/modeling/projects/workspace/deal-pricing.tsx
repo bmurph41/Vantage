@@ -78,13 +78,11 @@ interface PricingResponse {
 }
 
 const formatCurrency = (value: number | null | undefined): string => {
-  if (value === null || value === undefined || isNaN(value)) return '$0';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+  if (value === null || value === undefined || isNaN(value)) return '$00,000,000';
+  const absValue = Math.abs(Math.round(value));
+  const paddedNum = absValue.toString().padStart(8, '0');
+  const formatted = paddedNum.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return value < 0 ? `-$${formatted}` : `$${formatted}`;
 };
 
 const formatPercent = (value: number | null | undefined): string => {
