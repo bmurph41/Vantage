@@ -1,19 +1,32 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { integrationStorage } from "./integration-storage";
 
 const router = Router();
 
-// ============================================================================
-// DEAL ↔ SALES COMPS INTEGRATION
-// ============================================================================
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    orgId: string;
+    role: string;
+  };
+}
 
-router.get("/deals/:dealId/sales-comps", async (req, res) => {
+const requireAuth = (req: AuthenticatedRequest, res: Response): { userId: string; orgId: string } | null => {
+  if (!req.user || !req.user.id || !req.user.orgId) {
+    res.status(401).json({ error: "Authentication required" });
+    return null;
+  }
+  return { userId: req.user.id, orgId: req.user.orgId };
+};
+
+router.get("/deals/:dealId/sales-comps", async (req: AuthenticatedRequest, res) => {
   try {
-    const { dealId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    const comps = await integrationStorage.getSalesCompsForDeal(dealId, orgId);
+    const { dealId } = req.params;
+    const comps = await integrationStorage.getSalesCompsForDeal(dealId, auth.orgId);
     res.json(comps);
   } catch (error: any) {
     console.error("Error fetching deal sales comps:", error);
@@ -21,11 +34,12 @@ router.get("/deals/:dealId/sales-comps", async (req, res) => {
   }
 });
 
-router.post("/deals/:dealId/sales-comps", async (req, res) => {
+router.post("/deals/:dealId/sales-comps", async (req: AuthenticatedRequest, res) => {
   try {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    
     const { dealId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
-    const userId = req.headers["x-user-id"] as string || "user-1";
     
     const schema = z.object({
       salesCompId: z.string(),
@@ -41,10 +55,10 @@ router.post("/deals/:dealId/sales-comps", async (req, res) => {
     const data = schema.parse(req.body);
     
     const link = await integrationStorage.linkDealToSalesComp({
-      orgId,
+      orgId: auth.orgId,
       dealId,
       ...data,
-      createdBy: userId,
+      createdBy: auth.userId,
     });
 
     res.status(201).json(link);
@@ -54,12 +68,17 @@ router.post("/deals/:dealId/sales-comps", async (req, res) => {
   }
 });
 
-router.delete("/deals/:dealId/sales-comps/:salesCompId", async (req, res) => {
+router.delete("/deals/:dealId/sales-comps/:salesCompId", async (req: AuthenticatedRequest, res) => {
   try {
-    const { dealId, salesCompId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    await integrationStorage.unlinkDealFromSalesComp(dealId, salesCompId, orgId);
+    const { dealId, salesCompId } = req.params;
+    
+    const deleted = await integrationStorage.unlinkDealFromSalesComp(dealId, salesCompId, auth.orgId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Link not found" });
+    }
     res.status(204).send();
   } catch (error: any) {
     console.error("Error unlinking deal from sales comp:", error);
@@ -67,16 +86,13 @@ router.delete("/deals/:dealId/sales-comps/:salesCompId", async (req, res) => {
   }
 });
 
-// ============================================================================
-// DEAL ↔ RATE COMPS INTEGRATION
-// ============================================================================
-
-router.get("/deals/:dealId/rate-comps", async (req, res) => {
+router.get("/deals/:dealId/rate-comps", async (req: AuthenticatedRequest, res) => {
   try {
-    const { dealId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    const comps = await integrationStorage.getRateCompsForDeal(dealId, orgId);
+    const { dealId } = req.params;
+    const comps = await integrationStorage.getRateCompsForDeal(dealId, auth.orgId);
     res.json(comps);
   } catch (error: any) {
     console.error("Error fetching deal rate comps:", error);
@@ -84,11 +100,12 @@ router.get("/deals/:dealId/rate-comps", async (req, res) => {
   }
 });
 
-router.post("/deals/:dealId/rate-comps", async (req, res) => {
+router.post("/deals/:dealId/rate-comps", async (req: AuthenticatedRequest, res) => {
   try {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    
     const { dealId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
-    const userId = req.headers["x-user-id"] as string || "user-1";
     
     const schema = z.object({
       rateCompId: z.string(),
@@ -103,10 +120,10 @@ router.post("/deals/:dealId/rate-comps", async (req, res) => {
     const data = schema.parse(req.body);
     
     const link = await integrationStorage.linkDealToRateComp({
-      orgId,
+      orgId: auth.orgId,
       dealId,
       ...data,
-      createdBy: userId,
+      createdBy: auth.userId,
     });
 
     res.status(201).json(link);
@@ -116,12 +133,17 @@ router.post("/deals/:dealId/rate-comps", async (req, res) => {
   }
 });
 
-router.delete("/deals/:dealId/rate-comps/:rateCompId", async (req, res) => {
+router.delete("/deals/:dealId/rate-comps/:rateCompId", async (req: AuthenticatedRequest, res) => {
   try {
-    const { dealId, rateCompId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    await integrationStorage.unlinkDealFromRateComp(dealId, rateCompId, orgId);
+    const { dealId, rateCompId } = req.params;
+    
+    const deleted = await integrationStorage.unlinkDealFromRateComp(dealId, rateCompId, auth.orgId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Link not found" });
+    }
     res.status(204).send();
   } catch (error: any) {
     console.error("Error unlinking deal from rate comp:", error);
@@ -129,16 +151,13 @@ router.delete("/deals/:dealId/rate-comps/:rateCompId", async (req, res) => {
   }
 });
 
-// ============================================================================
-// DEAL ↔ VDR INTEGRATION
-// ============================================================================
-
-router.get("/deals/:dealId/vdr-folders", async (req, res) => {
+router.get("/deals/:dealId/vdr-folders", async (req: AuthenticatedRequest, res) => {
   try {
-    const { dealId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    const folders = await integrationStorage.getVdrFoldersForDeal(dealId, orgId);
+    const { dealId } = req.params;
+    const folders = await integrationStorage.getVdrFoldersForDeal(dealId, auth.orgId);
     res.json(folders);
   } catch (error: any) {
     console.error("Error fetching deal VDR folders:", error);
@@ -146,11 +165,12 @@ router.get("/deals/:dealId/vdr-folders", async (req, res) => {
   }
 });
 
-router.post("/deals/:dealId/vdr-folders", async (req, res) => {
+router.post("/deals/:dealId/vdr-folders", async (req: AuthenticatedRequest, res) => {
   try {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    
     const { dealId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
-    const userId = req.headers["x-user-id"] as string || "user-1";
     
     const schema = z.object({
       vdrFolderId: z.string(),
@@ -160,10 +180,10 @@ router.post("/deals/:dealId/vdr-folders", async (req, res) => {
     const data = schema.parse(req.body);
     
     const link = await integrationStorage.linkDealToVdr({
-      orgId,
+      orgId: auth.orgId,
       dealId,
       ...data,
-      createdBy: userId,
+      createdBy: auth.userId,
     });
 
     res.status(201).json(link);
@@ -173,12 +193,17 @@ router.post("/deals/:dealId/vdr-folders", async (req, res) => {
   }
 });
 
-router.delete("/deals/:dealId/vdr-folders/:vdrFolderId", async (req, res) => {
+router.delete("/deals/:dealId/vdr-folders/:vdrFolderId", async (req: AuthenticatedRequest, res) => {
   try {
-    const { dealId, vdrFolderId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    await integrationStorage.unlinkDealFromVdr(dealId, vdrFolderId, orgId);
+    const { dealId, vdrFolderId } = req.params;
+    
+    const deleted = await integrationStorage.unlinkDealFromVdr(dealId, vdrFolderId, auth.orgId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Link not found" });
+    }
     res.status(204).send();
   } catch (error: any) {
     console.error("Error unlinking deal from VDR folder:", error);
@@ -186,16 +211,13 @@ router.delete("/deals/:dealId/vdr-folders/:vdrFolderId", async (req, res) => {
   }
 });
 
-// ============================================================================
-// DEAL → DD PROJECT CONVERSION
-// ============================================================================
-
-router.get("/deals/:dealId/conversions", async (req, res) => {
+router.get("/deals/:dealId/conversions", async (req: AuthenticatedRequest, res) => {
   try {
-    const { dealId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    const conversions = await integrationStorage.getDealDdConversions(dealId, orgId);
+    const { dealId } = req.params;
+    const conversions = await integrationStorage.getDealDdConversions(dealId, auth.orgId);
     res.json(conversions);
   } catch (error: any) {
     console.error("Error fetching deal conversions:", error);
@@ -203,11 +225,12 @@ router.get("/deals/:dealId/conversions", async (req, res) => {
   }
 });
 
-router.post("/deals/:dealId/convert-to-project", async (req, res) => {
+router.post("/deals/:dealId/convert-to-project", async (req: AuthenticatedRequest, res) => {
   try {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    
     const { dealId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
-    const userId = req.headers["x-user-id"] as string || "user-1";
     
     const schema = z.object({
       templateId: z.string().optional(),
@@ -217,7 +240,7 @@ router.post("/deals/:dealId/convert-to-project", async (req, res) => {
 
     const options = schema.parse(req.body);
     
-    const result = await integrationStorage.convertDealToProject(dealId, userId, orgId, options);
+    const result = await integrationStorage.convertDealToProject(dealId, auth.userId, auth.orgId, options);
     res.status(201).json(result);
   } catch (error: any) {
     console.error("Error converting deal to project:", error);
@@ -225,16 +248,13 @@ router.post("/deals/:dealId/convert-to-project", async (req, res) => {
   }
 });
 
-// ============================================================================
-// PROPERTY ↔ SALES COMPS INTEGRATION
-// ============================================================================
-
-router.get("/properties/:propertyId/sales-comps", async (req, res) => {
+router.get("/properties/:propertyId/sales-comps", async (req: AuthenticatedRequest, res) => {
   try {
-    const { propertyId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    const comps = await integrationStorage.getPropertySalesComps(propertyId, orgId);
+    const { propertyId } = req.params;
+    const comps = await integrationStorage.getPropertySalesComps(propertyId, auth.orgId);
     res.json(comps);
   } catch (error: any) {
     console.error("Error fetching property sales comps:", error);
@@ -242,11 +262,12 @@ router.get("/properties/:propertyId/sales-comps", async (req, res) => {
   }
 });
 
-router.post("/properties/:propertyId/sales-comps", async (req, res) => {
+router.post("/properties/:propertyId/sales-comps", async (req: AuthenticatedRequest, res) => {
   try {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    
     const { propertyId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
-    const userId = req.headers["x-user-id"] as string || "user-1";
     
     const schema = z.object({
       salesCompId: z.string(),
@@ -258,10 +279,10 @@ router.post("/properties/:propertyId/sales-comps", async (req, res) => {
     const data = schema.parse(req.body);
     
     const link = await integrationStorage.linkPropertyToSalesComp({
-      orgId,
+      orgId: auth.orgId,
       propertyId,
       ...data,
-      createdBy: userId,
+      createdBy: auth.userId,
     });
 
     res.status(201).json(link);
@@ -271,12 +292,17 @@ router.post("/properties/:propertyId/sales-comps", async (req, res) => {
   }
 });
 
-router.delete("/properties/:propertyId/sales-comps/:salesCompId", async (req, res) => {
+router.delete("/properties/:propertyId/sales-comps/:salesCompId", async (req: AuthenticatedRequest, res) => {
   try {
-    const { propertyId, salesCompId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    await integrationStorage.unlinkPropertyFromSalesComp(propertyId, salesCompId, orgId);
+    const { propertyId, salesCompId } = req.params;
+    
+    const deleted = await integrationStorage.unlinkPropertyFromSalesComp(propertyId, salesCompId, auth.orgId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Link not found" });
+    }
     res.status(204).send();
   } catch (error: any) {
     console.error("Error unlinking property from sales comp:", error);
@@ -284,16 +310,13 @@ router.delete("/properties/:propertyId/sales-comps/:salesCompId", async (req, re
   }
 });
 
-// ============================================================================
-// PROPERTY ↔ RATE COMPS INTEGRATION
-// ============================================================================
-
-router.get("/properties/:propertyId/rate-comps", async (req, res) => {
+router.get("/properties/:propertyId/rate-comps", async (req: AuthenticatedRequest, res) => {
   try {
-    const { propertyId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    const comps = await integrationStorage.getPropertyRateComps(propertyId, orgId);
+    const { propertyId } = req.params;
+    const comps = await integrationStorage.getPropertyRateComps(propertyId, auth.orgId);
     res.json(comps);
   } catch (error: any) {
     console.error("Error fetching property rate comps:", error);
@@ -301,11 +324,12 @@ router.get("/properties/:propertyId/rate-comps", async (req, res) => {
   }
 });
 
-router.post("/properties/:propertyId/rate-comps", async (req, res) => {
+router.post("/properties/:propertyId/rate-comps", async (req: AuthenticatedRequest, res) => {
   try {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    
     const { propertyId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
-    const userId = req.headers["x-user-id"] as string || "user-1";
     
     const schema = z.object({
       rateCompId: z.string(),
@@ -317,10 +341,10 @@ router.post("/properties/:propertyId/rate-comps", async (req, res) => {
     const data = schema.parse(req.body);
     
     const link = await integrationStorage.linkPropertyToRateComp({
-      orgId,
+      orgId: auth.orgId,
       propertyId,
       ...data,
-      createdBy: userId,
+      createdBy: auth.userId,
     });
 
     res.status(201).json(link);
@@ -330,12 +354,17 @@ router.post("/properties/:propertyId/rate-comps", async (req, res) => {
   }
 });
 
-router.delete("/properties/:propertyId/rate-comps/:rateCompId", async (req, res) => {
+router.delete("/properties/:propertyId/rate-comps/:rateCompId", async (req: AuthenticatedRequest, res) => {
   try {
-    const { propertyId, rateCompId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    await integrationStorage.unlinkPropertyFromRateComp(propertyId, rateCompId, orgId);
+    const { propertyId, rateCompId } = req.params;
+    
+    const deleted = await integrationStorage.unlinkPropertyFromRateComp(propertyId, rateCompId, auth.orgId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Link not found" });
+    }
     res.status(204).send();
   } catch (error: any) {
     console.error("Error unlinking property from rate comp:", error);
@@ -343,16 +372,13 @@ router.delete("/properties/:propertyId/rate-comps/:rateCompId", async (req, res)
   }
 });
 
-// ============================================================================
-// MODELING PROJECT ↔ COMPS INTEGRATION
-// ============================================================================
-
-router.get("/modeling-projects/:projectId/comps", async (req, res) => {
+router.get("/modeling-projects/:projectId/comps", async (req: AuthenticatedRequest, res) => {
   try {
-    const { projectId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    const comps = await integrationStorage.getModelingProjectComps(projectId, orgId);
+    const { projectId } = req.params;
+    const comps = await integrationStorage.getModelingProjectComps(projectId, auth.orgId);
     res.json(comps);
   } catch (error: any) {
     console.error("Error fetching modeling project comps:", error);
@@ -360,11 +386,12 @@ router.get("/modeling-projects/:projectId/comps", async (req, res) => {
   }
 });
 
-router.post("/modeling-projects/:projectId/comps", async (req, res) => {
+router.post("/modeling-projects/:projectId/comps", async (req: AuthenticatedRequest, res) => {
   try {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    
     const { projectId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
-    const userId = req.headers["x-user-id"] as string || "user-1";
     
     const schema = z.object({
       salesCompId: z.string().optional(),
@@ -387,10 +414,10 @@ router.post("/modeling-projects/:projectId/comps", async (req, res) => {
     }
     
     const link = await integrationStorage.linkModelingProjectToComp({
-      orgId,
+      orgId: auth.orgId,
       modelingProjectId: projectId,
       ...data,
-      createdBy: userId,
+      createdBy: auth.userId,
     });
 
     res.status(201).json(link);
@@ -400,12 +427,17 @@ router.post("/modeling-projects/:projectId/comps", async (req, res) => {
   }
 });
 
-router.delete("/modeling-projects/:projectId/comps/:compLinkId", async (req, res) => {
+router.delete("/modeling-projects/:projectId/comps/:compLinkId", async (req: AuthenticatedRequest, res) => {
   try {
-    const { compLinkId } = req.params;
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
     
-    await integrationStorage.unlinkModelingProjectFromComp(compLinkId, orgId);
+    const { compLinkId } = req.params;
+    
+    const deleted = await integrationStorage.unlinkModelingProjectFromComp(compLinkId, auth.orgId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Link not found" });
+    }
     res.status(204).send();
   } catch (error: any) {
     console.error("Error unlinking modeling project from comp:", error);
@@ -413,16 +445,14 @@ router.delete("/modeling-projects/:projectId/comps/:compLinkId", async (req, res
   }
 });
 
-// ============================================================================
-// CROSS-MODULE AUDIT LOG
-// ============================================================================
-
-router.get("/audit-log", async (req, res) => {
+router.get("/audit-log", async (req: AuthenticatedRequest, res) => {
   try {
-    const orgId = req.headers["x-org-id"] as string || "org-1";
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    
     const { sourceModule, targetModule, action, limit } = req.query;
     
-    const logs = await integrationStorage.getCrossModuleAuditLog(orgId, {
+    const logs = await integrationStorage.getCrossModuleAuditLog(auth.orgId, {
       sourceModule: sourceModule as string,
       targetModule: targetModule as string,
       action: action as string,
