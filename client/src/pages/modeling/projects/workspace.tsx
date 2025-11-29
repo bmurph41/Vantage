@@ -27,7 +27,8 @@ import {
   Target,
   GitCompare,
   History,
-  Layers
+  Layers,
+  Link2
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
 import { FavoriteButton, PinButton } from '@/components/quick-access';
@@ -47,6 +48,7 @@ import ScenarioComparison from './workspace/scenario-comparison';
 import AuditTrailViewer from './workspace/audit-trail';
 import CaseConfiguration from './workspace/case-configuration';
 import DealPricing from './workspace/deal-pricing';
+import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -227,6 +229,10 @@ export default function ProjectWorkspace() {
               <History className="h-4 w-4" />
               <span className="hidden sm:inline">Audit</span>
             </TabsTrigger>
+            <TabsTrigger value="comps" className="gap-2" data-testid="tab-comps">
+              <Link2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Comps</span>
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -280,6 +286,13 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="audit" className="space-y-6">
           <AuditTrailViewer projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="comps" className="space-y-6">
+          <ModelingProjectIntegrationPanel 
+            projectId={projectId!} 
+            projectName={project.marinaName} 
+          />
         </TabsContent>
       </Tabs>
     </div>

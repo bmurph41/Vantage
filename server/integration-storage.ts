@@ -76,9 +76,60 @@ export class IntegrationStorage implements IIntegrationStorage {
       .orderBy(desc(dealSalesComps.relevanceScore));
   }
 
+  async checkDealSalesCompExists(dealId: string, salesCompId: string, orgId: string): Promise<boolean> {
+    const [existing] = await db
+      .select({ id: dealSalesComps.id })
+      .from(dealSalesComps)
+      .where(
+        and(
+          eq(dealSalesComps.dealId, dealId),
+          eq(dealSalesComps.salesCompId, salesCompId),
+          eq(dealSalesComps.orgId, orgId)
+        )
+      )
+      .limit(1);
+    return !!existing;
+  }
+
   async linkDealToSalesComp(data: InsertDealSalesComp): Promise<DealSalesComp> {
+    const exists = await this.checkDealSalesCompExists(data.dealId, data.salesCompId, data.orgId);
+    if (exists) {
+      throw new Error("This sales comp is already linked to this deal");
+    }
     const [created] = await db.insert(dealSalesComps).values(data).returning();
     return created;
+  }
+
+  async bulkLinkDealToSalesComps(
+    dealId: string,
+    salesCompIds: string[],
+    orgId: string,
+    userId: string,
+    options?: { isPrimary?: boolean; notes?: string }
+  ): Promise<{ linked: number; skipped: number; errors: string[] }> {
+    const results = { linked: 0, skipped: 0, errors: [] as string[] };
+    
+    for (const salesCompId of salesCompIds) {
+      try {
+        const exists = await this.checkDealSalesCompExists(dealId, salesCompId, orgId);
+        if (exists) {
+          results.skipped++;
+          continue;
+        }
+        await db.insert(dealSalesComps).values({
+          orgId,
+          dealId,
+          salesCompId,
+          isPrimary: options?.isPrimary ?? false,
+          notes: options?.notes,
+          createdBy: userId,
+        });
+        results.linked++;
+      } catch (error: any) {
+        results.errors.push(`Failed to link ${salesCompId}: ${error.message}`);
+      }
+    }
+    return results;
   }
 
   async unlinkDealFromSalesComp(dealId: string, salesCompId: string, orgId: string): Promise<boolean> {
@@ -132,9 +183,60 @@ export class IntegrationStorage implements IIntegrationStorage {
       .orderBy(desc(dealRateComps.relevanceScore));
   }
 
+  async checkDealRateCompExists(dealId: string, rateCompId: string, orgId: string): Promise<boolean> {
+    const [existing] = await db
+      .select({ id: dealRateComps.id })
+      .from(dealRateComps)
+      .where(
+        and(
+          eq(dealRateComps.dealId, dealId),
+          eq(dealRateComps.rateCompId, rateCompId),
+          eq(dealRateComps.orgId, orgId)
+        )
+      )
+      .limit(1);
+    return !!existing;
+  }
+
   async linkDealToRateComp(data: InsertDealRateComp): Promise<DealRateComp> {
+    const exists = await this.checkDealRateCompExists(data.dealId, data.rateCompId, data.orgId);
+    if (exists) {
+      throw new Error("This rate comp is already linked to this deal");
+    }
     const [created] = await db.insert(dealRateComps).values(data).returning();
     return created;
+  }
+
+  async bulkLinkDealToRateComps(
+    dealId: string,
+    rateCompIds: string[],
+    orgId: string,
+    userId: string,
+    options?: { isPrimary?: boolean; notes?: string }
+  ): Promise<{ linked: number; skipped: number; errors: string[] }> {
+    const results = { linked: 0, skipped: 0, errors: [] as string[] };
+    
+    for (const rateCompId of rateCompIds) {
+      try {
+        const exists = await this.checkDealRateCompExists(dealId, rateCompId, orgId);
+        if (exists) {
+          results.skipped++;
+          continue;
+        }
+        await db.insert(dealRateComps).values({
+          orgId,
+          dealId,
+          rateCompId,
+          isPrimary: options?.isPrimary ?? false,
+          notes: options?.notes,
+          createdBy: userId,
+        });
+        results.linked++;
+      } catch (error: any) {
+        results.errors.push(`Failed to link ${rateCompId}: ${error.message}`);
+      }
+    }
+    return results;
   }
 
   async unlinkDealFromRateComp(dealId: string, rateCompId: string, orgId: string): Promise<boolean> {

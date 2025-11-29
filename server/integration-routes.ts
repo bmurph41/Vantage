@@ -86,6 +86,36 @@ router.delete("/deals/:dealId/sales-comps/:salesCompId", async (req: Authenticat
   }
 });
 
+router.post("/deals/:dealId/sales-comps/bulk", async (req: AuthenticatedRequest, res) => {
+  try {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    
+    const { dealId } = req.params;
+    
+    const schema = z.object({
+      salesCompIds: z.array(z.string()).min(1).max(50),
+      isPrimary: z.boolean().optional(),
+      notes: z.string().optional(),
+    });
+
+    const data = schema.parse(req.body);
+    
+    const result = await integrationStorage.bulkLinkDealToSalesComps(
+      dealId,
+      data.salesCompIds,
+      auth.orgId,
+      auth.userId,
+      { isPrimary: data.isPrimary, notes: data.notes }
+    );
+
+    res.status(200).json(result);
+  } catch (error: any) {
+    console.error("Error bulk linking deal to sales comps:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get("/deals/:dealId/rate-comps", async (req: AuthenticatedRequest, res) => {
   try {
     const auth = requireAuth(req, res);
@@ -147,6 +177,36 @@ router.delete("/deals/:dealId/rate-comps/:rateCompId", async (req: Authenticated
     res.status(204).send();
   } catch (error: any) {
     console.error("Error unlinking deal from rate comp:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post("/deals/:dealId/rate-comps/bulk", async (req: AuthenticatedRequest, res) => {
+  try {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    
+    const { dealId } = req.params;
+    
+    const schema = z.object({
+      rateCompIds: z.array(z.string()).min(1).max(50),
+      isPrimary: z.boolean().optional(),
+      notes: z.string().optional(),
+    });
+
+    const data = schema.parse(req.body);
+    
+    const result = await integrationStorage.bulkLinkDealToRateComps(
+      dealId,
+      data.rateCompIds,
+      auth.orgId,
+      auth.userId,
+      { isPrimary: data.isPrimary, notes: data.notes }
+    );
+
+    res.status(200).json(result);
+  } catch (error: any) {
+    console.error("Error bulk linking deal to rate comps:", error);
     res.status(500).json({ error: error.message });
   }
 });

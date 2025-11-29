@@ -14,12 +14,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   User, Building, MapPin, DollarSign, 
-  Edit, X, Clock, Check, Loader2, Anchor, Home
+  Edit, X, Clock, Check, Loader2, Anchor, Home, Link2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import type { Property, Contact, Company, Deal, Activity as ActivityType, Note } from "@shared/schema";
+import PropertyIntegrationPanel from "@/components/crm/PropertyIntegrationPanel";
 
 interface PropertyDetailModalProps {
   isOpen: boolean;
@@ -329,11 +330,15 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-6 flex-shrink-0">
+          <TabsList className="grid w-full grid-cols-7 flex-shrink-0">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="contacts" data-testid="tab-contacts">Contacts ({linkedContacts.length})</TabsTrigger>
             <TabsTrigger value="companies" data-testid="tab-companies">Companies ({linkedCompanies.length})</TabsTrigger>
             <TabsTrigger value="deals" data-testid="tab-deals">Deals ({propertyDeals.length})</TabsTrigger>
+            <TabsTrigger value="comps" data-testid="tab-comps">
+              <Link2 className="w-3 h-3 mr-1" />
+              Comps
+            </TabsTrigger>
             <TabsTrigger value="activity" data-testid="tab-activity">Activity ({activities.length})</TabsTrigger>
             <TabsTrigger value="notes" data-testid="tab-notes">Notes ({notes.length})</TabsTrigger>
           </TabsList>
@@ -601,6 +606,13 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="comps" className="mt-0">
+              <PropertyIntegrationPanel 
+                propertyId={property.id} 
+                propertyTitle={property.title} 
+              />
             </TabsContent>
 
             <TabsContent value="activity" className="mt-0 space-y-4">
