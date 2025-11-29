@@ -31,6 +31,7 @@ import { KPICard } from "@/components/dashboard/charts/KPICard";
 import { GoalProgressBar } from "@/components/dashboard/charts/GoalProgressBar";
 import { ComparisonCard } from "@/components/dashboard/charts/ComparisonCard";
 import { StatGrid } from "@/components/dashboard/charts/StatGrid";
+import { QuickAccessSection } from "@/components/quick-access";
 
 type DashboardModule = {
   id: string;
@@ -1311,6 +1312,10 @@ export default function Dashboard() {
 
         <div className="mb-6">
           <ComparisonModule />
+        </div>
+
+        <div className="mb-6">
+          <QuickAccessSection />
         </div>
 
         <DndContext
