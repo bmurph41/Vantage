@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -396,6 +396,26 @@ export default function UnifiedSidebar() {
           <div className="w-full px-4">
             <PersonaSwitcher />
           </div>
+          {/* Command Palette Trigger */}
+          <div className="w-full px-4">
+            <button
+              onClick={() => {
+                const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
+                document.dispatchEvent(event);
+              }}
+              className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-500 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-md transition-colors"
+              data-testid="command-palette-trigger"
+            >
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4" />
+                <span>Search everything...</span>
+              </div>
+              <kbd className="pointer-events-none hidden md:inline-flex h-5 select-none items-center gap-0.5 rounded border border-gray-300 bg-white px-1.5 font-mono text-[10px] font-medium text-gray-500">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </button>
+          </div>
+          {/* Quick View Search (opens drawer) */}
           <div className="w-full px-4">
             <SmartSearch 
               onResultSelect={(result) => {

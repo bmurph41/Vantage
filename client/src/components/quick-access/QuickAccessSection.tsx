@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Link } from 'wouter';
@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,10 +34,21 @@ import {
   Newspaper,
   FolderOpen,
   MapPin,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { UserPinnedItem, UserRecentItem, UserFavorite } from '@shared/schema';
+
+interface ValidatedPinnedItem extends UserPinnedItem {
+  isValid?: boolean;
+  liveData?: {
+    title: string;
+    subtitle?: string;
+    metadata?: Record<string, any>;
+  };
+}
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -84,7 +96,7 @@ function SortablePinnedItem({
   item, 
   onRemove 
 }: { 
-  item: UserPinnedItem; 
+  item: ValidatedPinnedItem; 
   onRemove: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -98,6 +110,9 @@ function SortablePinnedItem({
   };
 
   const Icon = getIcon(item.icon, item.itemType);
+  const isStale = item.isValid === false;
+  const displayTitle = item.liveData?.title || item.title;
+  const displaySubtitle = item.liveData?.subtitle || item.description;
 
   return (
     <div 
@@ -106,26 +121,44 @@ function SortablePinnedItem({
       {...attributes}
       className={cn(
         'flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors group',
-        isDragging && 'shadow-lg'
+        isDragging && 'shadow-lg',
+        isStale && 'opacity-60 border-destructive/50'
       )}
     >
       <div {...listeners} className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity">
         <GripVertical className="h-4 w-4 text-muted-foreground" />
       </div>
       <div 
-        className="h-8 w-8 rounded-md flex items-center justify-center"
+        className="h-8 w-8 rounded-md flex items-center justify-center relative"
         style={{ backgroundColor: item.color ? `${item.color}20` : 'hsl(var(--muted))' }}
       >
         <Icon className="h-4 w-4" style={{ color: item.color || 'hsl(var(--muted-foreground))' }} />
+        {isStale && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="absolute -top-1 -right-1">
+                  <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>This item no longer exists</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <Link href={item.link}>
-          <span className="font-medium text-sm hover:underline cursor-pointer truncate block" data-testid={`link-pinned-${item.id}`}>
-            {item.title}
+          <span className={cn(
+            "font-medium text-sm hover:underline cursor-pointer truncate block",
+            isStale && "line-through text-muted-foreground"
+          )} data-testid={`link-pinned-${item.id}`}>
+            {displayTitle}
           </span>
         </Link>
-        {item.description && (
-          <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+        {displaySubtitle && (
+          <p className="text-xs text-muted-foreground truncate">{displaySubtitle}</p>
         )}
       </div>
       <DropdownMenu>
@@ -135,12 +168,14 @@ function SortablePinnedItem({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <Link href={item.link}>
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Open
-            </Link>
-          </DropdownMenuItem>
+          {!isStale && (
+            <DropdownMenuItem asChild>
+              <Link href={item.link}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open
+              </Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem 
             onClick={() => onRemove(item.id)}
             className="text-destructive"
@@ -218,6 +253,7 @@ function FavoriteItemRow({
 export function QuickAccessSection() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('pinned');
+  const [isValidating, setIsValidating] = useState(false);
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -227,8 +263,18 @@ export function QuickAccessSection() {
     })
   );
 
-  const { data: pinnedItems = [], isLoading: pinnedLoading } = useQuery<UserPinnedItem[]>({
+  const { data: pinnedItems = [], isLoading: pinnedLoading, refetch: refetchPinned } = useQuery<ValidatedPinnedItem[]>({
     queryKey: ['/api/quick-access/pinned'],
+  });
+
+  const { data: validatedPinnedItems = [], refetch: refetchValidated } = useQuery<ValidatedPinnedItem[]>({
+    queryKey: ['/api/quick-access/pinned', 'validated'],
+    queryFn: async () => {
+      const response = await fetch('/api/quick-access/pinned?validate=true');
+      if (!response.ok) throw new Error('Failed to validate pinned items');
+      return response.json();
+    },
+    enabled: false,
   });
 
   const { data: recentItems = [], isLoading: recentLoading } = useQuery<UserRecentItem[]>({
@@ -238,6 +284,9 @@ export function QuickAccessSection() {
   const { data: favorites = [], isLoading: favoritesLoading } = useQuery<UserFavorite[]>({
     queryKey: ['/api/quick-access/favorites'],
   });
+
+  const displayPinnedItems = validatedPinnedItems.length > 0 ? validatedPinnedItems : pinnedItems;
+  const staleItems = displayPinnedItems.filter(item => item.isValid === false);
 
   const removePinMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/quick-access/pinned/${id}`),
@@ -260,6 +309,17 @@ export function QuickAccessSection() {
     },
   });
 
+  const cleanupMutation = useMutation({
+    mutationFn: (staleItemIds: string[]) => apiRequest('POST', '/api/quick-access/pinned/cleanup', { staleItemIds }),
+    onSuccess: (data: { deleted: number }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/quick-access/pinned'] });
+      toast({ 
+        title: 'Cleanup Complete', 
+        description: `Removed ${data.deleted} stale item${data.deleted === 1 ? '' : 's'}.` 
+      });
+    },
+  });
+
   const clearRecentMutation = useMutation({
     mutationFn: () => apiRequest('DELETE', '/api/quick-access/recent'),
     onSuccess: () => {
@@ -268,14 +328,30 @@ export function QuickAccessSection() {
     },
   });
 
+  const handleValidate = async () => {
+    setIsValidating(true);
+    try {
+      await refetchValidated();
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleCleanup = () => {
+    const staleIds = staleItems.map(item => item.id);
+    if (staleIds.length > 0) {
+      cleanupMutation.mutate(staleIds);
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = pinnedItems.findIndex(item => item.id === active.id);
-    const newIndex = pinnedItems.findIndex(item => item.id === over.id);
+    const oldIndex = displayPinnedItems.findIndex(item => item.id === active.id);
+    const newIndex = displayPinnedItems.findIndex(item => item.id === over.id);
 
-    const newOrder = [...pinnedItems];
+    const newOrder = [...displayPinnedItems];
     const [removed] = newOrder.splice(oldIndex, 1);
     newOrder.splice(newIndex, 0, removed);
 
@@ -295,6 +371,49 @@ export function QuickAccessSection() {
               Your pinned items, recent activity, and favorites
             </CardDescription>
           </div>
+          <div className="flex items-center gap-2">
+            {staleItems.length > 0 && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCleanup}
+                      disabled={cleanupMutation.isPending}
+                      className="h-8 px-2 text-destructive hover:text-destructive"
+                      data-testid="button-cleanup-stale"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      {staleItems.length}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Remove {staleItems.length} stale item{staleItems.length === 1 ? '' : 's'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleValidate}
+                    disabled={isValidating}
+                    className="h-8 w-8 p-0"
+                    data-testid="button-validate-items"
+                  >
+                    <RefreshCw className={cn("h-4 w-4", isValidating && "animate-spin")} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Check for stale items</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -303,9 +422,14 @@ export function QuickAccessSection() {
             <TabsTrigger value="pinned" className="flex-1 gap-2" data-testid="tab-pinned">
               <Pin className="h-4 w-4" />
               Pinned
-              {pinnedItems.length > 0 && (
+              {displayPinnedItems.length > 0 && (
                 <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-                  {pinnedItems.length}
+                  {displayPinnedItems.length}
+                </Badge>
+              )}
+              {staleItems.length > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 px-1.5">
+                  {staleItems.length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -331,7 +455,7 @@ export function QuickAccessSection() {
                 <Skeleton className="h-14 w-full" />
                 <Skeleton className="h-14 w-full" />
               </div>
-            ) : pinnedItems.length === 0 ? (
+            ) : displayPinnedItems.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Pin className="h-10 w-10 mx-auto mb-3 opacity-30" />
                 <p className="text-sm">No pinned items yet</p>
@@ -339,10 +463,10 @@ export function QuickAccessSection() {
               </div>
             ) : (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={pinnedItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={displayPinnedItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
                   <ScrollArea className="max-h-[300px]">
                     <div className="space-y-2">
-                      {pinnedItems.map(item => (
+                      {displayPinnedItems.map(item => (
                         <SortablePinnedItem 
                           key={item.id} 
                           item={item} 

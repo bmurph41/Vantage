@@ -40,10 +40,11 @@ export function SmartSearch({ onResultSelect }: SmartSearchProps) {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Keyboard shortcut to open (Ctrl+K or Cmd+K)
+  // Keyboard shortcut to open (Ctrl+/ for Quick View)
+  // Note: Cmd+K is reserved for the global Command Palette
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+      if (e.key === "/" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setOpen((open) => !open);
       }
@@ -110,13 +111,17 @@ export function SmartSearch({ onResultSelect }: SmartSearchProps) {
     <>
       <Button
         variant="outline"
-        className="relative w-full justify-start text-sm text-muted-foreground md:w-40 lg:w-64"
+        className="relative w-full justify-between text-sm text-muted-foreground"
         onClick={() => setOpen(true)}
         data-testid="button-open-search"
       >
-        <Search className="mr-2 h-4 w-4" />
-        <span className="hidden lg:inline-flex">Search...</span>
-        <span className="inline-flex lg:hidden">Search...</span>
+        <div className="flex items-center">
+          <Search className="mr-2 h-4 w-4" />
+          <span>Quick View...</span>
+        </div>
+        <kbd className="pointer-events-none hidden md:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+          <span className="text-xs">⌘</span>/
+        </kbd>
       </Button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>

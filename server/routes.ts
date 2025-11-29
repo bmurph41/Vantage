@@ -64,7 +64,7 @@ import {
   insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema,
   insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema,
   insertCrmTaskSchema, insertCrmFileSchema, insertCalendarSettingsSchema,
-  crmTasks, crmFiles, crmContacts, crmDeals, crmCompanies, crmPipelines, crmPipelineStages, crmActivities,
+  crmTasks, crmFiles, crmContacts, crmDeals, crmCompanies, crmPipelines, crmPipelineStages, crmActivities, crmProperties,
   type InsertCrmFile,
   insertScSavedSearchSchema,
   updateScSavedSearchSchema,
@@ -7621,11 +7621,84 @@ Current context: Project ${req.params.projectId}`;
         )
         .limit(10);
 
+      // Search properties
+      const properties = await db
+        .select({
+          id: crmProperties.id,
+          type: sql<string>`'property'`,
+          title: crmProperties.name,
+          subtitle: sql<string>`CONCAT(${crmProperties.city}, ', ', ${crmProperties.state})`,
+          description: crmProperties.propertyType,
+          data: crmProperties,
+        })
+        .from(crmProperties)
+        .where(
+          and(
+            eq(crmProperties.orgId, req.user.orgId),
+            or(
+              sql`LOWER(${crmProperties.name}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmProperties.city}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmProperties.state}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmProperties.propertyType}) LIKE ${searchTerm}`
+            )
+          )
+        )
+        .limit(10);
+
+      // Search modeling projects
+      const models = await db
+        .select({
+          id: modelingProjects.id,
+          type: sql<string>`'modelingProject'`,
+          title: modelingProjects.name,
+          subtitle: modelingProjects.status,
+          description: modelingProjects.location,
+          data: modelingProjects,
+        })
+        .from(modelingProjects)
+        .where(
+          and(
+            eq(modelingProjects.orgId, req.user.orgId),
+            or(
+              sql`LOWER(${modelingProjects.name}) LIKE ${searchTerm}`,
+              sql`LOWER(${modelingProjects.location}) LIKE ${searchTerm}`,
+              sql`LOWER(${modelingProjects.status}) LIKE ${searchTerm}`
+            )
+          )
+        )
+        .limit(10);
+
+      // Search DD projects
+      const ddProjects = await db
+        .select({
+          id: projects.id,
+          type: sql<string>`'ddProject'`,
+          title: projects.name,
+          subtitle: projects.status,
+          description: projects.dealType,
+          data: projects,
+        })
+        .from(projects)
+        .where(
+          and(
+            eq(projects.orgId, req.user.orgId),
+            or(
+              sql`LOWER(${projects.name}) LIKE ${searchTerm}`,
+              sql`LOWER(${projects.status}) LIKE ${searchTerm}`,
+              sql`LOWER(${projects.dealType}) LIKE ${searchTerm}`
+            )
+          )
+        )
+        .limit(10);
+
       // Combine and return results
       const results = [
         ...contacts.map(c => ({ ...c, type: 'contact' as const })),
         ...companies.map(c => ({ ...c, type: 'company' as const })),
         ...deals.map(d => ({ ...d, type: 'deal' as const })),
+        ...properties.map(p => ({ ...p, type: 'property' as const })),
+        ...models.map(m => ({ ...m, type: 'modelingProject' as const })),
+        ...ddProjects.map(p => ({ ...p, type: 'ddProject' as const })),
       ];
 
       res.json({ results, query });
@@ -15854,11 +15927,124 @@ Current context: Project ${req.params.projectId}`;
   // QUICK ACCESS (Pinned Items, Recent Items, Favorites)
   // ========================================================================
 
-  // Get all pinned items for user
+  // Batched validation of quick access items - groups by type and uses IN clauses for efficiency
+  async function batchValidateQuickAccessItems(items: Array<{ id: string; itemType: string; itemId: string }>, orgId: string): Promise<Map<string, { exists: boolean; liveData?: any }>> {
+    const results = new Map<string, { exists: boolean; liveData?: any }>();
+    
+    const groupedByType: Record<string, Array<{ id: string; itemId: string }>> = {};
+    for (const item of items) {
+      if (!groupedByType[item.itemType]) {
+        groupedByType[item.itemType] = [];
+      }
+      groupedByType[item.itemType].push({ id: item.id, itemId: item.itemId });
+    }
+    
+    await Promise.all(Object.entries(groupedByType).map(async ([itemType, typeItems]) => {
+      const itemIds = typeItems.map(i => i.itemId);
+      if (itemIds.length === 0) return;
+      
+      try {
+        switch (itemType) {
+          case 'deal': {
+            const deals = await db.select({ id: crmDeals.id, name: crmDeals.name, amount: crmDeals.amount, status: crmDeals.status })
+              .from(crmDeals)
+              .where(and(eq(crmDeals.orgId, orgId), sql`${crmDeals.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+            const dealsMap = new Map(deals.map(d => [d.id, d]));
+            for (const item of typeItems) {
+              const deal = dealsMap.get(item.itemId);
+              results.set(item.id, deal 
+                ? { exists: true, liveData: { title: deal.name, subtitle: deal.status, metadata: { amount: deal.amount } } }
+                : { exists: false });
+            }
+            break;
+          }
+          case 'contact': {
+            const contacts = await db.select({ id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName, email: crmContacts.email })
+              .from(crmContacts)
+              .where(and(eq(crmContacts.orgId, orgId), sql`${crmContacts.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+            const contactsMap = new Map(contacts.map(c => [c.id, c]));
+            for (const item of typeItems) {
+              const contact = contactsMap.get(item.itemId);
+              results.set(item.id, contact 
+                ? { exists: true, liveData: { title: `${contact.firstName} ${contact.lastName}`, subtitle: contact.email } }
+                : { exists: false });
+            }
+            break;
+          }
+          case 'company': {
+            const companies = await db.select({ id: crmCompanies.id, name: crmCompanies.name, industry: crmCompanies.industry })
+              .from(crmCompanies)
+              .where(and(eq(crmCompanies.orgId, orgId), sql`${crmCompanies.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+            const companiesMap = new Map(companies.map(c => [c.id, c]));
+            for (const item of typeItems) {
+              const company = companiesMap.get(item.itemId);
+              results.set(item.id, company 
+                ? { exists: true, liveData: { title: company.name, subtitle: company.industry } }
+                : { exists: false });
+            }
+            break;
+          }
+          case 'property': {
+            const properties = await db.select({ id: crmProperties.id, name: crmProperties.name, city: crmProperties.city, state: crmProperties.state })
+              .from(crmProperties)
+              .where(and(eq(crmProperties.orgId, orgId), sql`${crmProperties.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+            const propertiesMap = new Map(properties.map(p => [p.id, p]));
+            for (const item of typeItems) {
+              const property = propertiesMap.get(item.itemId);
+              results.set(item.id, property 
+                ? { exists: true, liveData: { title: property.name, subtitle: property.city ? `${property.city}, ${property.state}` : property.state } }
+                : { exists: false });
+            }
+            break;
+          }
+          case 'modelingProject': {
+            const models = await db.select({ id: modelingProjects.id, name: modelingProjects.name, status: modelingProjects.status, location: modelingProjects.location })
+              .from(modelingProjects)
+              .where(and(eq(modelingProjects.orgId, orgId), sql`${modelingProjects.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+            const modelsMap = new Map(models.map(m => [m.id, m]));
+            for (const item of typeItems) {
+              const model = modelsMap.get(item.itemId);
+              results.set(item.id, model 
+                ? { exists: true, liveData: { title: model.name, subtitle: model.status || model.location } }
+                : { exists: false });
+            }
+            break;
+          }
+          case 'ddProject': {
+            const ddProjects = await db.select({ id: projects.id, name: projects.name, status: projects.status })
+              .from(projects)
+              .where(and(eq(projects.orgId, orgId), sql`${projects.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+            const projectsMap = new Map(ddProjects.map(p => [p.id, p]));
+            for (const item of typeItems) {
+              const project = projectsMap.get(item.itemId);
+              results.set(item.id, project 
+                ? { exists: true, liveData: { title: project.name, subtitle: project.status } }
+                : { exists: false });
+            }
+            break;
+          }
+          default:
+            for (const item of typeItems) {
+              results.set(item.id, { exists: true });
+            }
+        }
+      } catch (error) {
+        console.error(`Error batch validating ${itemType} items:`, error);
+        for (const item of typeItems) {
+          results.set(item.id, { exists: true });
+        }
+      }
+    }));
+    
+    return results;
+  }
+
+  // Get all pinned items for user (with optional batched validation)
   app.get('/api/quick-access/pinned', authenticateUser, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const orgId = req.user.orgId;
+      const validate = req.query.validate === 'true';
       const { userPinnedItems } = await import('@shared/schema');
       
       const items = await db.select()
@@ -15869,10 +16055,53 @@ Current context: Project ${req.params.projectId}`;
         ))
         .orderBy(userPinnedItems.sortOrder);
       
-      res.json(items);
+      if (validate && items.length > 0) {
+        const validationResults = await batchValidateQuickAccessItems(
+          items.map(i => ({ id: i.id, itemType: i.itemType, itemId: i.itemId })),
+          orgId
+        );
+        const validatedItems = items.map(item => {
+          const validation = validationResults.get(item.id) || { exists: true };
+          return {
+            ...item,
+            isValid: validation.exists,
+            ...(validation.liveData && { liveData: validation.liveData })
+          };
+        });
+        res.json(validatedItems);
+      } else {
+        res.json(items);
+      }
     } catch (error) {
       console.error('Failed to fetch pinned items:', error);
       res.status(500).json({ error: 'Failed to fetch pinned items' });
+    }
+  });
+  
+  // Cleanup stale pinned items (call periodically or when UI detects stale items)
+  app.post('/api/quick-access/pinned/cleanup', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { staleItemIds } = req.body;
+      const { userPinnedItems } = await import('@shared/schema');
+      
+      if (!Array.isArray(staleItemIds) || staleItemIds.length === 0) {
+        return res.json({ deleted: 0 });
+      }
+      
+      const deleted = await db.delete(userPinnedItems)
+        .where(and(
+          eq(userPinnedItems.userId, userId),
+          eq(userPinnedItems.orgId, orgId),
+          sql`${userPinnedItems.id} = ANY(ARRAY[${sql.raw(staleItemIds.map((id: string) => `'${id}'`).join(','))}]::text[])`
+        ))
+        .returning();
+      
+      res.json({ deleted: deleted.length });
+    } catch (error) {
+      console.error('Failed to cleanup stale pinned items:', error);
+      res.status(500).json({ error: 'Failed to cleanup stale items' });
     }
   });
 

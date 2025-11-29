@@ -1,0 +1,405 @@
+import { useState, useEffect, useCallback } from "react";
+import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import {
+  Users,
+  Building,
+  Handshake,
+  Home,
+  Calculator,
+  ClipboardList,
+  Search,
+  Star,
+  Pin,
+  Clock,
+  LayoutDashboard,
+  Briefcase,
+  Settings,
+  FileText,
+  Target,
+  Send,
+  BarChart3,
+  Fuel,
+  Package,
+  FolderLock,
+  MessageSquare,
+} from "lucide-react";
+import debounce from "lodash.debounce";
+import { Badge } from "@/components/ui/badge";
+
+type SearchResultType = 'contact' | 'company' | 'deal' | 'property' | 'modelingProject' | 'ddProject';
+
+interface SearchResult {
+  id: string;
+  type: SearchResultType;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+}
+
+interface SearchResponse {
+  results: SearchResult[];
+  query: string;
+}
+
+const typeIcons: Record<SearchResultType, any> = {
+  contact: Users,
+  company: Building,
+  deal: Handshake,
+  property: Home,
+  modelingProject: Calculator,
+  ddProject: ClipboardList,
+};
+
+const typeLabels: Record<SearchResultType, string> = {
+  contact: 'Contact',
+  company: 'Company',
+  deal: 'Deal',
+  property: 'Property',
+  modelingProject: 'Model',
+  ddProject: 'DD Project',
+};
+
+const typeColors: Record<SearchResultType, string> = {
+  contact: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
+  company: 'bg-purple-500/20 text-purple-600 dark:text-purple-400',
+  deal: 'bg-green-500/20 text-green-600 dark:text-green-400',
+  property: 'bg-orange-500/20 text-orange-600 dark:text-orange-400',
+  modelingProject: 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400',
+  ddProject: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
+};
+
+const navigationItems = [
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, category: 'Navigation' },
+  { name: 'CRM Dashboard', href: '/crm', icon: Briefcase, category: 'CRM' },
+  { name: 'Contacts', href: '/crm/contacts', icon: Users, category: 'CRM' },
+  { name: 'Companies', href: '/crm/companies', icon: Building, category: 'CRM' },
+  { name: 'Properties', href: '/crm/properties', icon: Home, category: 'CRM' },
+  { name: 'Deals', href: '/crm/deals', icon: Handshake, category: 'CRM' },
+  { name: 'Pipeline', href: '/crm/pipeline', icon: Target, category: 'CRM' },
+  { name: 'Prospecting', href: '/prospecting', icon: Target, category: 'Prospecting' },
+  { name: 'Campaigns', href: '/prospecting/campaigns', icon: Send, category: 'Prospecting' },
+  { name: 'Modeling Projects', href: '/modeling', icon: Calculator, category: 'Modeling' },
+  { name: 'Sales Comps', href: '/sales-comps', icon: BarChart3, category: 'Analytics' },
+  { name: 'DD Projects', href: '/projects', icon: ClipboardList, category: 'Due Diligence' },
+  { name: 'Fuel Sales', href: '/operations/fuel/dashboard', icon: Fuel, category: 'Operations' },
+  { name: 'Ship Store', href: '/operations/ship-store/dashboard', icon: Package, category: 'Operations' },
+  { name: 'VDR', href: '/vdr', icon: FolderLock, category: 'Documents' },
+  { name: 'DockTalk', href: '/docktalk', icon: MessageSquare, category: 'Intelligence' },
+  { name: 'Settings', href: '/settings', icon: Settings, category: 'System' },
+];
+
+interface QuickAccessItem {
+  id: string;
+  itemType: string;
+  itemId: string;
+  title: string;
+  subtitle?: string;
+  metadata?: Record<string, any>;
+}
+
+export function CommandPalette() {
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [, navigate] = useLocation();
+
+  const debouncedSearch = useCallback(
+    debounce((value: string) => {
+      setDebouncedQuery(value);
+    }, 200),
+    []
+  );
+
+  useEffect(() => {
+    debouncedSearch(searchQuery);
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [searchQuery, debouncedSearch]);
+
+  const { data: searchResults, isLoading: isSearching } = useQuery<SearchResponse>({
+    queryKey: ['/api/search', debouncedQuery],
+    enabled: debouncedQuery.length >= 2,
+  });
+
+  const { data: pinnedItems } = useQuery<QuickAccessItem[]>({
+    queryKey: ['/api/quick-access/pinned'],
+    staleTime: 60000,
+  });
+
+  const { data: favoriteItems } = useQuery<QuickAccessItem[]>({
+    queryKey: ['/api/quick-access/favorites'],
+    staleTime: 60000,
+  });
+
+  const { data: recentItems } = useQuery<QuickAccessItem[]>({
+    queryKey: ['/api/quick-access/recent'],
+    staleTime: 30000,
+  });
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setOpen((open) => !open);
+      }
+      if (e.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
+
+  const handleSelect = (type: string, id: string) => {
+    let path = '';
+    switch (type) {
+      case 'contact':
+        path = `/crm/contacts/${id}`;
+        break;
+      case 'company':
+        path = `/crm/companies/${id}`;
+        break;
+      case 'deal':
+        path = `/crm/deals/${id}`;
+        break;
+      case 'property':
+        path = `/crm/properties/${id}`;
+        break;
+      case 'modelingProject':
+        path = `/modeling/${id}`;
+        break;
+      case 'ddProject':
+        path = `/projects/${id}`;
+        break;
+      default:
+        return;
+    }
+    setOpen(false);
+    setSearchQuery("");
+    navigate(path);
+  };
+
+  const handleNavigate = (href: string) => {
+    setOpen(false);
+    setSearchQuery("");
+    navigate(href);
+  };
+
+  const handleQuickAccessSelect = (item: QuickAccessItem) => {
+    handleSelect(item.itemType, item.itemId);
+  };
+
+  const filteredNavigation = navigationItems.filter(
+    (item) =>
+      searchQuery.length === 0 ||
+      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const groupedResults = searchResults?.results?.reduce((acc, result) => {
+    if (!acc[result.type]) {
+      acc[result.type] = [];
+    }
+    acc[result.type].push(result);
+    return acc;
+  }, {} as Record<SearchResultType, SearchResult[]>) || {};
+
+  return (
+    <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandInput
+        placeholder="Search across deals, contacts, properties, or type a command..."
+        value={searchQuery}
+        onValueChange={setSearchQuery}
+        data-testid="command-palette-input"
+      />
+      <CommandList>
+        <CommandEmpty>
+          {isSearching ? (
+            <div className="flex items-center justify-center py-4">
+              <Search className="h-4 w-4 animate-spin mr-2" />
+              Searching...
+            </div>
+          ) : searchQuery.length >= 2 ? (
+            "No results found."
+          ) : (
+            "Start typing to search..."
+          )}
+        </CommandEmpty>
+
+        {searchQuery.length < 2 && pinnedItems && pinnedItems.length > 0 && (
+          <CommandGroup heading="Pinned">
+            {pinnedItems.slice(0, 5).map((item) => {
+              const Icon = typeIcons[item.itemType as SearchResultType] || FileText;
+              return (
+                <CommandItem
+                  key={`pinned-${item.id}`}
+                  onSelect={() => handleQuickAccessSelect(item)}
+                  className="flex items-center gap-2"
+                  data-testid={`command-palette-pinned-${item.id}`}
+                >
+                  <Pin className="h-3 w-3 text-amber-500" />
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                  <span>{item.title}</span>
+                  {item.subtitle && (
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {item.subtitle}
+                    </span>
+                  )}
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        )}
+
+        {searchQuery.length < 2 && favoriteItems && favoriteItems.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Favorites">
+              {favoriteItems.slice(0, 5).map((item) => {
+                const Icon = typeIcons[item.itemType as SearchResultType] || FileText;
+                return (
+                  <CommandItem
+                    key={`fav-${item.id}`}
+                    onSelect={() => handleQuickAccessSelect(item)}
+                    className="flex items-center gap-2"
+                    data-testid={`command-palette-favorite-${item.id}`}
+                  >
+                    <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                    <span>{item.title}</span>
+                    {item.subtitle && (
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {item.subtitle}
+                      </span>
+                    )}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </>
+        )}
+
+        {searchQuery.length < 2 && recentItems && recentItems.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Recent">
+              {recentItems.slice(0, 5).map((item) => {
+                const Icon = typeIcons[item.itemType as SearchResultType] || FileText;
+                return (
+                  <CommandItem
+                    key={`recent-${item.id}`}
+                    onSelect={() => handleQuickAccessSelect(item)}
+                    className="flex items-center gap-2"
+                    data-testid={`command-palette-recent-${item.id}`}
+                  >
+                    <Clock className="h-3 w-3 text-muted-foreground" />
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                    <span>{item.title}</span>
+                    {item.subtitle && (
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {item.subtitle}
+                      </span>
+                    )}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </>
+        )}
+
+        {searchQuery.length >= 2 && Object.keys(groupedResults).length > 0 && (
+          <>
+            {Object.entries(groupedResults).map(([type, results]) => {
+              const Icon = typeIcons[type as SearchResultType];
+              return (
+                <CommandGroup key={type} heading={typeLabels[type as SearchResultType] + 's'}>
+                  {results.map((result) => (
+                    <CommandItem
+                      key={`${type}-${result.id}`}
+                      onSelect={() => handleSelect(result.type, result.id)}
+                      className="flex items-center gap-2"
+                      data-testid={`command-palette-result-${type}-${result.id}`}
+                    >
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <span className="truncate">{result.title}</span>
+                        {(result.subtitle || result.description) && (
+                          <span className="text-xs text-muted-foreground truncate">
+                            {result.subtitle || result.description}
+                          </span>
+                        )}
+                      </div>
+                      <Badge
+                        variant="secondary"
+                        className={`text-[10px] px-1.5 py-0 shrink-0 ${typeColors[result.type]}`}
+                      >
+                        {typeLabels[result.type]}
+                      </Badge>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              );
+            })}
+            <CommandSeparator />
+          </>
+        )}
+
+        {filteredNavigation.length > 0 && (
+          <CommandGroup heading="Quick Navigation">
+            {filteredNavigation.slice(0, searchQuery.length > 0 ? 10 : 6).map((item) => {
+              const Icon = item.icon;
+              return (
+                <CommandItem
+                  key={item.href}
+                  onSelect={() => handleNavigate(item.href)}
+                  className="flex items-center gap-2"
+                  data-testid={`command-palette-nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                  <span>{item.name}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {item.category}
+                  </span>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        )}
+      </CommandList>
+    </CommandDialog>
+  );
+}
+
+export function CommandPaletteTrigger() {
+  return (
+    <button
+      onClick={() => {
+        const event = new KeyboardEvent('keydown', {
+          key: 'k',
+          metaKey: true,
+          bubbles: true,
+        });
+        document.dispatchEvent(event);
+      }}
+      className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground bg-secondary/50 hover:bg-secondary rounded-md border border-border/50 transition-colors"
+      data-testid="command-palette-trigger"
+    >
+      <Search className="h-3.5 w-3.5" />
+      <span className="hidden md:inline">Search...</span>
+      <kbd className="hidden md:inline-flex pointer-events-none h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+        <span className="text-xs">⌘</span>K
+      </kbd>
+    </button>
+  );
+}

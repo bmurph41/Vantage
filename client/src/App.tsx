@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Loader2 } from "lucide-react";
+import { CommandPalette } from "@/components/CommandPalette";
 
 // Eagerly load critical pages for instant navigation (no white screen)
 import Dashboard from "@/pages/dashboard";
@@ -168,6 +169,7 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
           </Suspense>
         </main>
       </div>
+      <CommandPalette />
     </div>
   );
 }
