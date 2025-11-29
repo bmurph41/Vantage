@@ -67,6 +67,7 @@ export function FavoriteButton({
       setIsFavorited(true);
       setFavoriteId(data.id);
       queryClient.invalidateQueries({ queryKey: ['/api/quick-access/favorites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/quick-access/favorites/check', itemType, itemId] });
       toast({ title: 'Added to favorites', description: `${title} has been starred.` });
     },
     onError: () => {
@@ -80,6 +81,7 @@ export function FavoriteButton({
       setIsFavorited(false);
       setFavoriteId(null);
       queryClient.invalidateQueries({ queryKey: ['/api/quick-access/favorites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/quick-access/favorites/check', itemType, itemId] });
       toast({ title: 'Removed from favorites', description: `${title} has been removed.` });
     },
     onError: () => {

@@ -5,30 +5,41 @@ import { Users, Building2, DollarSign, TrendingUp, Phone, Mail, Calendar } from 
 import { Link } from "wouter";
 
 export default function CRMDashboard() {
-  const { data: deals = [], isLoading: dealsLoading } = useQuery({
+  const { data: dealsData, isLoading: dealsLoading } = useQuery({
     queryKey: ['/api/crm/deals'],
   });
 
-  const { data: leads = [], isLoading: leadsLoading } = useQuery({
+  const { data: leadsData, isLoading: leadsLoading } = useQuery({
     queryKey: ['/api/crm/leads'],
   });
 
-  const { data: contacts = [], isLoading: contactsLoading } = useQuery({
+  const { data: contactsData, isLoading: contactsLoading } = useQuery({
     queryKey: ['/api/crm/contacts'],
   });
 
-  const { data: companies = [], isLoading: companiesLoading } = useQuery({
+  const { data: companiesData, isLoading: companiesLoading } = useQuery({
     queryKey: ['/api/crm/companies'],
   });
 
-  const totalDealValue = deals.reduce((sum: number, deal: any) => 
-    sum + (parseFloat(deal.value || deal.amount || 0)), 0
-  );
+  const deals = Array.isArray(dealsData) ? dealsData : (dealsData?.deals || dealsData?.data || []);
+  const leads = Array.isArray(leadsData) ? leadsData : (leadsData?.leads || leadsData?.data || []);
+  const contacts = Array.isArray(contactsData) ? contactsData : (contactsData?.contacts || contactsData?.data || []);
+  const companies = Array.isArray(companiesData) ? companiesData : (companiesData?.companies || companiesData?.data || []);
+
+  const safeDeals = Array.isArray(deals) ? deals : [];
+  const safeLeads = Array.isArray(leads) ? leads : [];
+  const safeContacts = Array.isArray(contacts) ? contacts : [];
+  const safeCompanies = Array.isArray(companies) ? companies : [];
+
+  const totalDealValue = safeDeals.reduce((sum: number, deal: any) => {
+    const value = parseFloat(deal.value || deal.amount || '0');
+    return sum + (isNaN(value) ? 0 : value);
+  }, 0);
 
   const stats = [
     {
       title: "Total Deals",
-      value: deals.length,
+      value: safeDeals.length,
       icon: DollarSign,
       description: `$${totalDealValue.toLocaleString()} in pipeline`,
       link: "/crm/deals",
@@ -37,16 +48,16 @@ export default function CRMDashboard() {
     },
     {
       title: "Active Leads",
-      value: leads.filter((l: any) => l.leadStatus !== 'converted' && l.leadStatus !== 'unqualified').length,
+      value: safeLeads.filter((l: any) => l.leadStatus !== 'converted' && l.leadStatus !== 'unqualified').length,
       icon: TrendingUp,
-      description: `${leads.length} total leads`,
+      description: `${safeLeads.length} total leads`,
       link: "/crm/leads",
       color: "text-blue-600",
       bgColor: "bg-blue-100",
     },
     {
       title: "Contacts",
-      value: contacts.length,
+      value: safeContacts.length,
       icon: Users,
       description: "Active contacts",
       link: "/crm/contacts",
@@ -55,7 +66,7 @@ export default function CRMDashboard() {
     },
     {
       title: "Companies",
-      value: companies.length,
+      value: safeCompanies.length,
       icon: Building2,
       description: "Active companies",
       link: "/crm/companies",

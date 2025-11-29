@@ -32,6 +32,7 @@ import {
 import type { ModelingProject } from '@shared/schema';
 import { FavoriteButton, PinButton } from '@/components/quick-access';
 import { useTrackRecent } from '@/hooks/use-track-recent';
+import { formatCurrency } from '@/lib/formatUtils';
 
 import WorkspaceOverview from './workspace/overview';
 import WorkspaceInputs from './workspace/inputs';
@@ -100,15 +101,10 @@ export default function ProjectWorkspace() {
     );
   }
 
-  const formatCurrency = (value: number | string | null) => {
+  const formatCurrencyValue = (value: number | string | null) => {
     if (value === null || value === undefined) return '-';
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(numValue);
+    return formatCurrency(numValue);
   };
 
   return (
@@ -140,7 +136,7 @@ export default function ProjectWorkspace() {
               {project.purchasePrice && (
                 <span className="flex items-center gap-1">
                   <DollarSign className="h-3.5 w-3.5" />
-                  {formatCurrency(project.purchasePrice)}
+                  {formatCurrencyValue(project.purchasePrice)}
                 </span>
               )}
               {project.dealOutcome && (
