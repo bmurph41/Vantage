@@ -324,6 +324,60 @@ export const userKpiPreferences = pgTable("user_kpi_preferences", {
   userOrgPageIdx: index("user_kpi_pref_user_org_page_idx").on(table.userId, table.orgId, table.pageKey),
 }));
 
+// User Pinned Items - Quick access pins for dashboard
+export const userPinnedItems = pgTable("user_pinned_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  itemType: text("item_type").notNull(), // 'modeling_project', 'deal', 'sales_comp', 'report', 'page', 'custom'
+  itemId: text("item_id"), // ID of the specific item (nullable for pages/custom)
+  title: text("title").notNull(),
+  description: text("description"),
+  link: text("link").notNull(), // URL path to navigate to
+  icon: text("icon"), // Lucide icon name
+  color: text("color"), // Optional color for visual distinction
+  sortOrder: integer("sort_order").notNull().default(0),
+  pinnedAt: timestamp("pinned_at").notNull().defaultNow(),
+}, (table) => ({
+  userOrgIdx: index("user_pinned_items_user_org_idx").on(table.userId, table.orgId),
+  itemTypeIdx: index("user_pinned_items_type_idx").on(table.itemType),
+}));
+
+// User Recent Items - Track recently accessed items
+export const userRecentItems = pgTable("user_recent_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  itemType: text("item_type").notNull(), // 'modeling_project', 'deal', 'sales_comp', 'report', 'page'
+  itemId: text("item_id"), // ID of the specific item (nullable for pages)
+  title: text("title").notNull(),
+  link: text("link").notNull(),
+  icon: text("icon"),
+  accessedAt: timestamp("accessed_at").notNull().defaultNow(),
+}, (table) => ({
+  userOrgIdx: index("user_recent_items_user_org_idx").on(table.userId, table.orgId),
+  accessedIdx: index("user_recent_items_accessed_idx").on(table.accessedAt),
+  uniqueUserItem: unique().on(table.userId, table.orgId, table.itemType, table.itemId),
+}));
+
+// User Favorites - Starred items for quick access
+export const userFavorites = pgTable("user_favorites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  itemType: text("item_type").notNull(), // 'modeling_project', 'deal', 'sales_comp', 'contact', 'company', 'property'
+  itemId: text("item_id").notNull(), // ID of the specific item
+  title: text("title").notNull(),
+  subtitle: text("subtitle"), // Additional context (e.g., company name, location)
+  link: text("link").notNull(),
+  icon: text("icon"),
+  favoritedAt: timestamp("favorited_at").notNull().defaultNow(),
+}, (table) => ({
+  userOrgIdx: index("user_favorites_user_org_idx").on(table.userId, table.orgId),
+  itemTypeIdx: index("user_favorites_type_idx").on(table.itemType),
+  uniqueUserItem: unique().on(table.userId, table.orgId, table.itemType, table.itemId),
+}));
+
 // Projects
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -7868,6 +7922,36 @@ export const insertUserKpiPreferencesSchema = createInsertSchema(userKpiPreferen
 
 export const updateUserKpiPreferencesSchema = insertUserKpiPreferencesSchema.partial();
 
+// User Pinned Items schemas
+export const insertUserPinnedItemSchema = createInsertSchema(userPinnedItems).omit({
+  id: true,
+  userId: true,
+  orgId: true,
+  pinnedAt: true,
+});
+
+export const updateUserPinnedItemSchema = insertUserPinnedItemSchema.partial();
+
+// User Recent Items schemas
+export const insertUserRecentItemSchema = createInsertSchema(userRecentItems).omit({
+  id: true,
+  userId: true,
+  orgId: true,
+  accessedAt: true,
+});
+
+export const updateUserRecentItemSchema = insertUserRecentItemSchema.partial();
+
+// User Favorites schemas
+export const insertUserFavoriteSchema = createInsertSchema(userFavorites).omit({
+  id: true,
+  userId: true,
+  orgId: true,
+  favoritedAt: true,
+});
+
+export const updateUserFavoriteSchema = insertUserFavoriteSchema.partial();
+
 // Owned Assets schemas
 export const insertOwnedAssetSchema = createInsertSchema(ownedAssets).omit({
   id: true,
@@ -7911,6 +7995,19 @@ export type UserKpiPreferences = typeof userKpiPreferences.$inferSelect;
 export type InsertUserKpiPreferences = z.infer<typeof insertUserKpiPreferencesSchema>;
 export type UpdateUserKpiPreferences = z.infer<typeof updateUserKpiPreferencesSchema>;
 export type KpiConfigItem = z.infer<typeof kpiConfigItemSchema>;
+
+// Types for Quick Access (Pins, Recents, Favorites)
+export type UserPinnedItem = typeof userPinnedItems.$inferSelect;
+export type InsertUserPinnedItem = z.infer<typeof insertUserPinnedItemSchema>;
+export type UpdateUserPinnedItem = z.infer<typeof updateUserPinnedItemSchema>;
+
+export type UserRecentItem = typeof userRecentItems.$inferSelect;
+export type InsertUserRecentItem = z.infer<typeof insertUserRecentItemSchema>;
+export type UpdateUserRecentItem = z.infer<typeof updateUserRecentItemSchema>;
+
+export type UserFavorite = typeof userFavorites.$inferSelect;
+export type InsertUserFavorite = z.infer<typeof insertUserFavoriteSchema>;
+export type UpdateUserFavorite = z.infer<typeof updateUserFavoriteSchema>;
 
 // Types for Owned Assets
 export type OwnedAsset = typeof ownedAssets.$inferSelect;
