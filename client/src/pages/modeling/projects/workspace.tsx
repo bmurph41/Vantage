@@ -30,6 +30,8 @@ import {
   Layers
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
+import { FavoriteButton, PinButton } from '@/components/quick-access';
+import { useTrackRecent } from '@/hooks/use-track-recent';
 
 import WorkspaceOverview from './workspace/overview';
 import WorkspaceInputs from './workspace/inputs';
@@ -53,6 +55,15 @@ export default function ProjectWorkspace() {
   const { data: project, isLoading } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
     enabled: !!projectId,
+  });
+
+  useTrackRecent({
+    itemType: 'modeling_project',
+    itemId: projectId,
+    title: project?.marinaName || 'Modeling Project',
+    link: `/modeling/projects/${projectId}`,
+    icon: 'TrendingUp',
+    enabled: !!project && !!projectId,
   });
 
   if (isLoading) {
@@ -139,6 +150,29 @@ export default function ProjectWorkspace() {
               )}
             </div>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <PinButton
+            itemType="modeling_project"
+            itemId={projectId}
+            title={project.marinaName}
+            description={`${project.city || ''} ${project.state || ''}`.trim() || undefined}
+            link={`/modeling/projects/${projectId}`}
+            icon="TrendingUp"
+            color="#3B82F6"
+            variant="outline"
+            showLabel
+          />
+          <FavoriteButton
+            itemType="modeling_project"
+            itemId={projectId!}
+            title={project.marinaName}
+            subtitle={`${project.city || ''} ${project.state || ''}`.trim() || undefined}
+            link={`/modeling/projects/${projectId}`}
+            icon="TrendingUp"
+            variant="outline"
+            showLabel
+          />
         </div>
       </div>
 
