@@ -38,6 +38,7 @@ const Leads = lazy(() => import("@/pages/leads"));
 const Contacts = lazy(() => import("@/pages/contacts"));
 const Companies = lazy(() => import("@/pages/companies"));
 const Deals = lazy(() => import("@/pages/deals"));
+const DealWorkspace = lazy(() => import("@/pages/deal-workspace"));
 const DealDetail = lazy(() => import("@/pages/deal-detail"));
 const Properties = lazy(() => import("@/pages/properties"));
 const PendingProperties = lazy(() => import("@/pages/pending-properties"));
@@ -516,19 +517,28 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
-      <Route path="/crm/pipeline">
+      
+      {/* Unified Deal Workspace - consolidates Pipeline, Deals, and Leads */}
+      <Route path="/deal-workspace">
         {() => (
           <UnifiedLayout>
-            <Pipeline />
+            <DealWorkspace />
           </UnifiedLayout>
         )}
       </Route>
+      
+      {/* Legacy route redirects to Deal Workspace */}
+      <Route path="/crm/pipeline">
+        {() => {
+          window.location.replace('/deal-workspace?view=pipeline');
+          return null;
+        }}
+      </Route>
       <Route path="/crm/leads">
-        {() => (
-          <UnifiedLayout>
-            <Leads />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/deal-workspace?view=leads');
+          return null;
+        }}
       </Route>
       <Route path="/crm/contacts">
         {() => (
@@ -573,11 +583,10 @@ function Router() {
         )}
       </Route>
       <Route path="/crm/deals">
-        {() => (
-          <UnifiedLayout>
-            <Deals />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/deal-workspace?view=list');
+          return null;
+        }}
       </Route>
       <Route path="/crm/deals/:dealId">
         {() => (

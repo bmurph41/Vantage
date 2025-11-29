@@ -23,8 +23,7 @@ const crmNav = [
 
 // Deal Management Navigation
 const dealManagementNav = [
-  { name: "Deals", href: "/crm/deals", icon: Handshake },
-  { name: "Pipeline", href: "/crm/pipeline", icon: Layers },
+  { name: "Deal Workspace", href: "/deal-workspace", icon: Handshake },
   { name: "Activity Log", href: "/crm/activity", icon: History },
   { name: "Follow-Ups", href: "/crm/tasks", icon: ListTodo },
   { name: "Marketing", href: "/crm/marketing-automation", icon: Send },
@@ -35,7 +34,6 @@ const dealManagementNav = [
 // Prospecting & Outreach Navigation (Premium/Broker Add-On)
 const prospectingNav = [
   { name: "Prospecting", href: "/prospecting", icon: Target },
-  { name: "Lead Builder", href: "/crm/leads", icon: UserCheck },
   { name: "Market Targets", href: "/prospecting/markets", icon: LayoutList },
   { name: "Campaigns & Templates", href: "/prospecting/campaigns", icon: Send },
   { name: "Deal Sourcing Analytics", href: "/prospecting/analytics", icon: PieChart },
@@ -220,10 +218,10 @@ export default function UnifiedSidebar() {
     // CRM: contacts, companies, properties (core entity management)
     const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/import-') || location === '/calendar-settings';
     const isCrmToolsPage = location === '/calendar-settings' || location.startsWith('/import-');
-    // Deal Management: deals, pipeline, activity, tasks, marketing-automation, analytics, forecast
-    const isDealManagementPage = ['/crm/deals', '/crm/pipeline', '/crm/activity', '/crm/tasks', '/crm/marketing-automation', '/crm/analytics', '/crm/forecast'].includes(location);
-    // Prospecting: leads, prospecting pages
-    const isProspectingPage = location.startsWith('/prospecting/') || location === '/crm/leads';
+    // Deal Management: deal-workspace, activity, tasks, marketing-automation, analytics, forecast
+    const isDealManagementPage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/marketing-automation', '/crm/analytics', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
+    // Prospecting: prospecting pages only (leads are now in Deal Workspace)
+    const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting';
     const isDdPage = location === '/' || location === '/progress-report';
     const isVdrPage = location.startsWith('/vdr');
     const isModelingPage = location.startsWith('/modeling/');
