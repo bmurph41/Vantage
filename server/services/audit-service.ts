@@ -1,6 +1,6 @@
 import { db } from '../db';
-import { auditLogs } from '../../shared/schema';
-import { eq, desc } from 'drizzle-orm';
+import { auditLogs, securityAuditLog, users } from '../../shared/schema';
+import { eq, desc, and, gte, lte, like, sql, inArray, or, count } from 'drizzle-orm';
 import { Request } from 'express';
 
 export type AuditEventType = 
@@ -601,5 +601,348 @@ export class AuditService {
       severity: ['approve', 'reject', 'lock', 'delete'].includes(action) ? 'critical' : 'info',
       isSuccess: true,
     });
+  }
+
+  static async searchAuditLogs(
+    orgId: string,
+    filters: {
+      entityTypes?: string[];
+      actions?: string[];
+      userIds?: string[];
+      startDate?: Date;
+      endDate?: Date;
+      searchTerm?: string;
+      severity?: ('info' | 'warning' | 'critical')[];
+      page?: number;
+      pageSize?: number;
+    }
+  ): Promise<{ logs: any[]; total: number; page: number; pageSize: number }> {
+    const page = filters.page || 1;
+    const pageSize = Math.min(filters.pageSize || 50, 500);
+    const offset = (page - 1) * pageSize;
+
+    const conditions: any[] = [eq(auditLogs.orgId, orgId)];
+
+    if (filters.entityTypes?.length) {
+      conditions.push(inArray(auditLogs.entityType, filters.entityTypes));
+    }
+    if (filters.actions?.length) {
+      conditions.push(inArray(auditLogs.action, filters.actions));
+    }
+    if (filters.userIds?.length) {
+      conditions.push(inArray(auditLogs.userId, filters.userIds));
+    }
+    if (filters.startDate) {
+      conditions.push(gte(auditLogs.createdAt, filters.startDate));
+    }
+    if (filters.endDate) {
+      conditions.push(lte(auditLogs.createdAt, filters.endDate));
+    }
+    if (filters.searchTerm) {
+      conditions.push(
+        or(
+          like(auditLogs.action, `%${filters.searchTerm}%`),
+          like(auditLogs.entityType, `%${filters.searchTerm}%`)
+        )
+      );
+    }
+
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+
+    const [logs, countResult] = await Promise.all([
+      db
+        .select({
+          id: auditLogs.id,
+          orgId: auditLogs.orgId,
+          userId: auditLogs.userId,
+          entityType: auditLogs.entityType,
+          entityId: auditLogs.entityId,
+          action: auditLogs.action,
+          before: auditLogs.before,
+          after: auditLogs.after,
+          ipAddress: auditLogs.ipAddress,
+          userAgent: auditLogs.userAgent,
+          metadata: auditLogs.metadata,
+          createdAt: auditLogs.createdAt,
+          userName: users.name,
+          userEmail: users.email,
+        })
+        .from(auditLogs)
+        .leftJoin(users, eq(auditLogs.userId, users.id))
+        .where(whereClause)
+        .orderBy(desc(auditLogs.createdAt))
+        .limit(pageSize)
+        .offset(offset),
+      db
+        .select({ total: count() })
+        .from(auditLogs)
+        .where(whereClause),
+    ]);
+
+    return {
+      logs,
+      total: Number(countResult[0]?.total || 0),
+      page,
+      pageSize,
+    };
+  }
+
+  static async getSecurityEvents(
+    orgId: string,
+    filters: {
+      eventTypes?: string[];
+      userIds?: string[];
+      startDate?: Date;
+      endDate?: Date;
+      successOnly?: boolean;
+      page?: number;
+      pageSize?: number;
+    }
+  ): Promise<{ events: any[]; total: number }> {
+    const page = filters.page || 1;
+    const pageSize = Math.min(filters.pageSize || 50, 500);
+    const offset = (page - 1) * pageSize;
+
+    const conditions: any[] = [eq(securityAuditLog.orgId, orgId)];
+
+    if (filters.eventTypes?.length) {
+      conditions.push(inArray(securityAuditLog.eventType, filters.eventTypes));
+    }
+    if (filters.userIds?.length) {
+      conditions.push(inArray(securityAuditLog.userId, filters.userIds));
+    }
+    if (filters.startDate) {
+      conditions.push(gte(securityAuditLog.createdAt, filters.startDate));
+    }
+    if (filters.endDate) {
+      conditions.push(lte(securityAuditLog.createdAt, filters.endDate));
+    }
+    if (filters.successOnly !== undefined) {
+      conditions.push(eq(securityAuditLog.success, filters.successOnly));
+    }
+
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+
+    const [events, countResult] = await Promise.all([
+      db
+        .select({
+          id: securityAuditLog.id,
+          userId: securityAuditLog.userId,
+          orgId: securityAuditLog.orgId,
+          eventType: securityAuditLog.eventType,
+          eventDetails: securityAuditLog.eventDetails,
+          ipAddress: securityAuditLog.ipAddress,
+          userAgent: securityAuditLog.userAgent,
+          success: securityAuditLog.success,
+          createdAt: securityAuditLog.createdAt,
+          userName: users.name,
+          userEmail: users.email,
+        })
+        .from(securityAuditLog)
+        .leftJoin(users, eq(securityAuditLog.userId, users.id))
+        .where(whereClause)
+        .orderBy(desc(securityAuditLog.createdAt))
+        .limit(pageSize)
+        .offset(offset),
+      db
+        .select({ total: count() })
+        .from(securityAuditLog)
+        .where(whereClause),
+    ]);
+
+    return {
+      events,
+      total: Number(countResult[0]?.total || 0),
+    };
+  }
+
+  static async getAuditStats(orgId: string, days: number = 30): Promise<{
+    totalEvents: number;
+    eventsByType: Record<string, number>;
+    eventsByAction: Record<string, number>;
+    recentActivity: { date: string; count: number }[];
+    topUsers: { userId: string; userName: string; count: number }[];
+    securitySummary: {
+      loginSuccess: number;
+      loginFailures: number;
+      mfaEvents: number;
+      passwordChanges: number;
+    };
+  }> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const [
+      totalEventsResult,
+      eventsByTypeResult,
+      eventsByActionResult,
+      dailyActivityResult,
+      topUsersResult,
+      securityStatsResult,
+    ] = await Promise.all([
+      db
+        .select({ total: count() })
+        .from(auditLogs)
+        .where(and(eq(auditLogs.orgId, orgId), gte(auditLogs.createdAt, startDate))),
+
+      db
+        .select({ entityType: auditLogs.entityType, count: count() })
+        .from(auditLogs)
+        .where(and(eq(auditLogs.orgId, orgId), gte(auditLogs.createdAt, startDate)))
+        .groupBy(auditLogs.entityType),
+
+      db
+        .select({ action: auditLogs.action, count: count() })
+        .from(auditLogs)
+        .where(and(eq(auditLogs.orgId, orgId), gte(auditLogs.createdAt, startDate)))
+        .groupBy(auditLogs.action)
+        .limit(20),
+
+      db.execute(sql`
+        SELECT DATE(created_at) as date, COUNT(*) as count
+        FROM audit_logs
+        WHERE org_id = ${orgId} AND created_at >= ${startDate}
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC
+        LIMIT 30
+      `),
+
+      db
+        .select({ userId: auditLogs.userId, userName: users.name, count: count() })
+        .from(auditLogs)
+        .leftJoin(users, eq(auditLogs.userId, users.id))
+        .where(and(eq(auditLogs.orgId, orgId), gte(auditLogs.createdAt, startDate)))
+        .groupBy(auditLogs.userId, users.name)
+        .orderBy(desc(count()))
+        .limit(10),
+
+      db.execute(sql`
+        SELECT 
+          SUM(CASE WHEN event_type = 'login_success' THEN 1 ELSE 0 END) as login_success,
+          SUM(CASE WHEN event_type = 'login_failure' THEN 1 ELSE 0 END) as login_failures,
+          SUM(CASE WHEN event_type LIKE 'mfa%' THEN 1 ELSE 0 END) as mfa_events,
+          SUM(CASE WHEN event_type = 'password_change' THEN 1 ELSE 0 END) as password_changes
+        FROM security_audit_log
+        WHERE org_id = ${orgId} AND created_at >= ${startDate}
+      `),
+    ]);
+
+    const eventsByType: Record<string, number> = {};
+    for (const row of eventsByTypeResult) {
+      eventsByType[row.entityType] = Number(row.count);
+    }
+
+    const eventsByAction: Record<string, number> = {};
+    for (const row of eventsByActionResult) {
+      eventsByAction[row.action] = Number(row.count);
+    }
+
+    const securityRow = (securityStatsResult.rows?.[0] || {}) as any;
+
+    return {
+      totalEvents: Number(totalEventsResult[0]?.total || 0),
+      eventsByType,
+      eventsByAction,
+      recentActivity: (dailyActivityResult.rows || []).map((r: any) => ({
+        date: r.date,
+        count: Number(r.count),
+      })),
+      topUsers: topUsersResult.map((r) => ({
+        userId: r.userId,
+        userName: r.userName || 'Unknown',
+        count: Number(r.count),
+      })),
+      securitySummary: {
+        loginSuccess: Number(securityRow.login_success || 0),
+        loginFailures: Number(securityRow.login_failures || 0),
+        mfaEvents: Number(securityRow.mfa_events || 0),
+        passwordChanges: Number(securityRow.password_changes || 0),
+      },
+    };
+  }
+
+  static async exportAuditLogs(
+    orgId: string,
+    format: 'json' | 'csv',
+    filters: {
+      entityTypes?: string[];
+      startDate?: Date;
+      endDate?: Date;
+      maxRecords?: number;
+    }
+  ): Promise<{ data: string; filename: string; mimeType: string }> {
+    const maxRecords = Math.min(filters.maxRecords || 10000, 50000);
+
+    const conditions: any[] = [eq(auditLogs.orgId, orgId)];
+    if (filters.entityTypes?.length) {
+      conditions.push(inArray(auditLogs.entityType, filters.entityTypes));
+    }
+    if (filters.startDate) {
+      conditions.push(gte(auditLogs.createdAt, filters.startDate));
+    }
+    if (filters.endDate) {
+      conditions.push(lte(auditLogs.createdAt, filters.endDate));
+    }
+
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+
+    const logs = await db
+      .select({
+        id: auditLogs.id,
+        userId: auditLogs.userId,
+        entityType: auditLogs.entityType,
+        entityId: auditLogs.entityId,
+        action: auditLogs.action,
+        ipAddress: auditLogs.ipAddress,
+        createdAt: auditLogs.createdAt,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.userId, users.id))
+      .where(whereClause)
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(maxRecords);
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    if (format === 'csv') {
+      const headers = ['ID', 'Timestamp', 'User', 'Email', 'Entity Type', 'Entity ID', 'Action', 'IP Address'];
+      const rows = logs.map((log) => [
+        log.id,
+        log.createdAt.toISOString(),
+        log.userName || '',
+        log.userEmail || '',
+        log.entityType,
+        log.entityId,
+        log.action,
+        log.ipAddress || '',
+      ]);
+      
+      const escapeCSV = (val: any) => {
+        const str = String(val ?? '');
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const csvContent = [
+        headers.map(escapeCSV).join(','),
+        ...rows.map((row) => row.map(escapeCSV).join(',')),
+      ].join('\n');
+
+      return {
+        data: csvContent,
+        filename: `audit_logs_${timestamp}.csv`,
+        mimeType: 'text/csv',
+      };
+    } else {
+      return {
+        data: JSON.stringify(logs, null, 2),
+        filename: `audit_logs_${timestamp}.json`,
+        mimeType: 'application/json',
+      };
+    }
   }
 }

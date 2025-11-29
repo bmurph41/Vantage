@@ -21790,6 +21790,122 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ============================================================================
+  // COMPREHENSIVE AUDIT LOG API
+  // ============================================================================
+
+  // Search audit logs with advanced filtering
+  app.get("/api/admin/audit-logs", authenticateUser, async (req: any, res) => {
+    try {
+      const { orgId } = req.user;
+      
+      const result = await AuditService.searchAuditLogs(orgId, {
+        entityTypes: req.query.entityTypes ? String(req.query.entityTypes).split(',') : undefined,
+        actions: req.query.actions ? String(req.query.actions).split(',') : undefined,
+        userIds: req.query.userIds ? String(req.query.userIds).split(',') : undefined,
+        startDate: req.query.startDate ? new Date(String(req.query.startDate)) : undefined,
+        endDate: req.query.endDate ? new Date(String(req.query.endDate)) : undefined,
+        searchTerm: req.query.search ? String(req.query.search) : undefined,
+        page: req.query.page ? parseInt(String(req.query.page)) : 1,
+        pageSize: req.query.pageSize ? parseInt(String(req.query.pageSize)) : 50,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching audit logs:", error);
+      res.status(500).json({ error: "Failed to search audit logs" });
+    }
+  });
+
+  // Get security events (auth-related)
+  app.get("/api/admin/security-events", authenticateUser, async (req: any, res) => {
+    try {
+      const { orgId } = req.user;
+      
+      const result = await AuditService.getSecurityEvents(orgId, {
+        eventTypes: req.query.eventTypes ? String(req.query.eventTypes).split(',') : undefined,
+        userIds: req.query.userIds ? String(req.query.userIds).split(',') : undefined,
+        startDate: req.query.startDate ? new Date(String(req.query.startDate)) : undefined,
+        endDate: req.query.endDate ? new Date(String(req.query.endDate)) : undefined,
+        successOnly: req.query.successOnly ? req.query.successOnly === 'true' : undefined,
+        page: req.query.page ? parseInt(String(req.query.page)) : 1,
+        pageSize: req.query.pageSize ? parseInt(String(req.query.pageSize)) : 50,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching security events:", error);
+      res.status(500).json({ error: "Failed to fetch security events" });
+    }
+  });
+
+  // Get audit statistics for dashboard
+  app.get("/api/admin/audit-stats", authenticateUser, async (req: any, res) => {
+    try {
+      const { orgId } = req.user;
+      const days = req.query.days ? parseInt(String(req.query.days)) : 30;
+      
+      const stats = await AuditService.getAuditStats(orgId, days);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching audit stats:", error);
+      res.status(500).json({ error: "Failed to fetch audit statistics" });
+    }
+  });
+
+  // Export audit logs
+  app.get("/api/admin/audit-logs/export", authenticateUser, async (req: any, res) => {
+    try {
+      const { orgId } = req.user;
+      const format = (req.query.format as 'json' | 'csv') || 'csv';
+      
+      const exportData = await AuditService.exportAuditLogs(orgId, format, {
+        entityTypes: req.query.entityTypes ? String(req.query.entityTypes).split(',') : undefined,
+        startDate: req.query.startDate ? new Date(String(req.query.startDate)) : undefined,
+        endDate: req.query.endDate ? new Date(String(req.query.endDate)) : undefined,
+        maxRecords: req.query.maxRecords ? parseInt(String(req.query.maxRecords)) : 10000,
+      });
+
+      res.setHeader('Content-Type', exportData.mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${exportData.filename}"`);
+      res.send(exportData.data);
+    } catch (error) {
+      console.error("Error exporting audit logs:", error);
+      res.status(500).json({ error: "Failed to export audit logs" });
+    }
+  });
+
+  // Get audit log entity types (for filter dropdowns)
+  app.get("/api/admin/audit-logs/entity-types", authenticateUser, async (req: any, res) => {
+    try {
+      const entityTypes = await db
+        .selectDistinct({ entityType: auditLogs.entityType })
+        .from(auditLogs)
+        .where(eq(auditLogs.orgId, req.user.orgId));
+      
+      res.json(entityTypes.map(r => r.entityType));
+    } catch (error) {
+      console.error("Error fetching entity types:", error);
+      res.status(500).json({ error: "Failed to fetch entity types" });
+    }
+  });
+
+  // Get audit log actions (for filter dropdowns)
+  app.get("/api/admin/audit-logs/actions", authenticateUser, async (req: any, res) => {
+    try {
+      const actions = await db
+        .selectDistinct({ action: auditLogs.action })
+        .from(auditLogs)
+        .where(eq(auditLogs.orgId, req.user.orgId))
+        .limit(100);
+      
+      res.json(actions.map(r => r.action));
+    } catch (error) {
+      console.error("Error fetching actions:", error);
+      res.status(500).json({ error: "Failed to fetch actions" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
