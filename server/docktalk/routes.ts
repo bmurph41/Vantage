@@ -2973,5 +2973,385 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // ============ ENHANCED AI TRAINING ANALYTICS ============
+
+  // Get comprehensive training analytics
+  app.get("/api/docktalk/training/analytics", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const allFeedback = await db
+        .select()
+        .from(articleFeedback)
+        .where(eq(articleFeedback.orgId, req.dockTalkUser!.orgId));
+
+      const allArticles = await db
+        .select({
+          id: articles.id,
+          category: articles.category,
+          categories: articles.categories,
+          manuallyReviewed: articles.manuallyReviewed,
+          originalCategory: articles.originalCategory,
+          aiConfidence: articles.aiConfidence,
+          createdAt: articles.createdAt,
+        })
+        .from(articles)
+        .where(eq(articles.isRemoved, false))
+        .orderBy(desc(articles.createdAt))
+        .limit(1000);
+
+      // Feedback breakdown by type
+      const feedbackByType: Record<string, number> = {};
+      allFeedback.forEach(f => {
+        feedbackByType[f.feedbackType] = (feedbackByType[f.feedbackType] || 0) + 1;
+      });
+
+      // Category distribution
+      const categoryDistribution: Record<string, number> = {};
+      allArticles.forEach(a => {
+        const cat = a.category || 'Uncategorized';
+        categoryDistribution[cat] = (categoryDistribution[cat] || 0) + 1;
+      });
+
+      // Articles with corrections (for accuracy tracking)
+      const correctedArticles = allArticles.filter(a => 
+        a.manuallyReviewed && a.originalCategory && a.category !== a.originalCategory
+      );
+
+      // Category accuracy analysis
+      const categoryAccuracy: Record<string, { total: number; correct: number; accuracy: number }> = {};
+      allArticles.filter(a => a.manuallyReviewed).forEach(a => {
+        const originalCat = a.originalCategory || 'Unknown';
+        if (!categoryAccuracy[originalCat]) {
+          categoryAccuracy[originalCat] = { total: 0, correct: 0, accuracy: 0 };
+        }
+        categoryAccuracy[originalCat].total++;
+        if (a.category === a.originalCategory) {
+          categoryAccuracy[originalCat].correct++;
+        }
+      });
+      
+      Object.keys(categoryAccuracy).forEach(cat => {
+        const data = categoryAccuracy[cat];
+        data.accuracy = data.total > 0 ? (data.correct / data.total) * 100 : 0;
+      });
+
+      // Confidence distribution
+      const confidenceRanges = {
+        low: allArticles.filter(a => (a.aiConfidence || 0) < 0.5).length,
+        medium: allArticles.filter(a => (a.aiConfidence || 0) >= 0.5 && (a.aiConfidence || 0) < 0.8).length,
+        high: allArticles.filter(a => (a.aiConfidence || 0) >= 0.8).length,
+      };
+
+      // Feedback trends (last 30 days by week)
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const recentFeedback = allFeedback.filter(f => new Date(f.createdAt) >= thirtyDaysAgo);
+      
+      const weeklyFeedback: { week: string; count: number; helpful: number; negative: number }[] = [];
+      for (let i = 0; i < 4; i++) {
+        const weekStart = new Date(now.getTime() - (i + 1) * 7 * 24 * 60 * 60 * 1000);
+        const weekEnd = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+        const weekData = recentFeedback.filter(f => {
+          const fDate = new Date(f.createdAt);
+          return fDate >= weekStart && fDate < weekEnd;
+        });
+        weeklyFeedback.unshift({
+          week: `Week ${4 - i}`,
+          count: weekData.length,
+          helpful: weekData.filter(f => f.feedbackType === 'helpful').length,
+          negative: weekData.filter(f => ['irrelevant', 'spam', 'low_quality'].includes(f.feedbackType)).length,
+        });
+      }
+
+      // Model refinement readiness
+      const unprocessedFeedback = await dockTalkStorage.getUnprocessedFeedback(1000);
+      const refinementThreshold = 50;
+      const refinementReady = unprocessedFeedback.length >= refinementThreshold;
+
+      res.json({
+        totalArticles: allArticles.length,
+        totalFeedback: allFeedback.length,
+        manuallyReviewedCount: allArticles.filter(a => a.manuallyReviewed).length,
+        correctedCategoriesCount: correctedArticles.length,
+        feedbackByType,
+        categoryDistribution,
+        categoryAccuracy,
+        confidenceRanges,
+        weeklyFeedback,
+        modelRefinement: {
+          unprocessedFeedbackCount: unprocessedFeedback.length,
+          threshold: refinementThreshold,
+          readyForRefinement: refinementReady,
+          estimatedAccuracyImprovement: Math.min(5, unprocessedFeedback.length * 0.1).toFixed(1),
+        },
+        generatedAt: new Date(),
+      });
+    } catch (error) {
+      console.error("Error fetching training analytics:", error);
+      res.status(500).json({ error: "Failed to fetch training analytics" });
+    }
+  });
+
+  // Get articles pending review (low confidence or flagged)
+  app.get("/api/docktalk/training/review-queue", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const filter = req.query.filter as string || 'all';
+
+      let query = db
+        .select({
+          id: articles.id,
+          title: articles.title,
+          category: articles.category,
+          categories: articles.categories,
+          aiConfidence: articles.aiConfidence,
+          source: articles.source,
+          publishedAt: articles.publishedAt,
+          createdAt: articles.createdAt,
+        })
+        .from(articles)
+        .where(and(
+          eq(articles.isRemoved, false),
+          eq(articles.manuallyReviewed, false)
+        ));
+
+      let result;
+      if (filter === 'low_confidence') {
+        result = await db
+          .select({
+            id: articles.id,
+            title: articles.title,
+            category: articles.category,
+            categories: articles.categories,
+            aiConfidence: articles.aiConfidence,
+            source: articles.source,
+            publishedAt: articles.publishedAt,
+            createdAt: articles.createdAt,
+          })
+          .from(articles)
+          .where(and(
+            eq(articles.isRemoved, false),
+            eq(articles.manuallyReviewed, false),
+            sql`${articles.aiConfidence} < 0.6`
+          ))
+          .orderBy(sql`${articles.aiConfidence} ASC NULLS FIRST`)
+          .limit(limit);
+      } else if (filter === 'flagged') {
+        const flaggedIds = await db
+          .selectDistinct({ articleId: articleFeedback.articleId })
+          .from(articleFeedback)
+          .where(inArray(articleFeedback.feedbackType, ['wrong_category', 'low_quality', 'spam']));
+        
+        if (flaggedIds.length > 0) {
+          result = await db
+            .select({
+              id: articles.id,
+              title: articles.title,
+              category: articles.category,
+              categories: articles.categories,
+              aiConfidence: articles.aiConfidence,
+              source: articles.source,
+              publishedAt: articles.publishedAt,
+              createdAt: articles.createdAt,
+            })
+            .from(articles)
+            .where(and(
+              eq(articles.isRemoved, false),
+              inArray(articles.id, flaggedIds.map(f => f.articleId))
+            ))
+            .orderBy(desc(articles.createdAt))
+            .limit(limit);
+        } else {
+          result = [];
+        }
+      } else {
+        result = await db
+          .select({
+            id: articles.id,
+            title: articles.title,
+            category: articles.category,
+            categories: articles.categories,
+            aiConfidence: articles.aiConfidence,
+            source: articles.source,
+            publishedAt: articles.publishedAt,
+            createdAt: articles.createdAt,
+          })
+          .from(articles)
+          .where(and(
+            eq(articles.isRemoved, false),
+            eq(articles.manuallyReviewed, false)
+          ))
+          .orderBy(sql`${articles.aiConfidence} ASC NULLS FIRST`)
+          .limit(limit);
+      }
+
+      res.json({
+        articles: result,
+        filter,
+        count: result.length,
+      });
+    } catch (error) {
+      console.error("Error fetching review queue:", error);
+      res.status(500).json({ error: "Failed to fetch review queue" });
+    }
+  });
+
+  // Trigger model refinement (batch process feedback)
+  app.post("/api/docktalk/training/trigger-refinement", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const unprocessedFeedback = await dockTalkStorage.getUnprocessedFeedback(500);
+      
+      if (unprocessedFeedback.length === 0) {
+        return res.json({
+          success: true,
+          message: "No unprocessed feedback to refine",
+          processedCount: 0,
+        });
+      }
+
+      // Process feedback - mark as processed and update article metadata
+      let processedCount = 0;
+      const feedbackSummary: Record<string, number> = {};
+
+      for (const feedback of unprocessedFeedback) {
+        try {
+          // Update article based on feedback type
+          if (feedback.feedbackType === 'helpful') {
+            // Increase confidence for helpful articles
+            const article = await dockTalkStorage.getArticle(feedback.articleId);
+            if (article) {
+              const newConfidence = Math.min(1, (article.aiConfidence || 0.5) + 0.1);
+              await db.update(articles)
+                .set({ aiConfidence: newConfidence })
+                .where(eq(articles.id, feedback.articleId));
+            }
+          } else if (['irrelevant', 'spam', 'low_quality'].includes(feedback.feedbackType)) {
+            // Decrease confidence for negative feedback
+            const article = await dockTalkStorage.getArticle(feedback.articleId);
+            if (article) {
+              const newConfidence = Math.max(0, (article.aiConfidence || 0.5) - 0.15);
+              await db.update(articles)
+                .set({ aiConfidence: newConfidence })
+                .where(eq(articles.id, feedback.articleId));
+            }
+          }
+
+          await dockTalkStorage.markFeedbackProcessed(feedback.id);
+          processedCount++;
+          feedbackSummary[feedback.feedbackType] = (feedbackSummary[feedback.feedbackType] || 0) + 1;
+        } catch (err) {
+          console.error(`Error processing feedback ${feedback.id}:`, err);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Processed ${processedCount} feedback items`,
+        processedCount,
+        feedbackSummary,
+        refinedAt: new Date(),
+      });
+    } catch (error) {
+      console.error("Error triggering model refinement:", error);
+      res.status(500).json({ error: "Failed to trigger model refinement" });
+    }
+  });
+
+  // Bulk review articles (mark multiple as reviewed with category)
+  app.post("/api/docktalk/training/bulk-review", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const BulkReviewSchema = z.object({
+        articleIds: z.array(z.number().int().positive()).min(1).max(50),
+        category: z.string().min(1),
+        action: z.enum(['approve', 'correct']),
+      });
+
+      const { articleIds, category, action } = BulkReviewSchema.parse(req.body);
+
+      let updatedCount = 0;
+      for (const articleId of articleIds) {
+        try {
+          const article = await dockTalkStorage.getArticle(articleId);
+          if (article) {
+            const updateData: any = {
+              manuallyReviewed: true,
+              category: category,
+              categories: [category],
+            };
+            
+            if (action === 'correct') {
+              updateData.originalCategory = article.category || article.categories?.[0] || '';
+            }
+            
+            // Increase confidence for approved articles
+            if (action === 'approve') {
+              updateData.aiConfidence = Math.min(1, (article.aiConfidence || 0.5) + 0.2);
+            }
+
+            await dockTalkStorage.updateArticle(articleId, updateData);
+            updatedCount++;
+          }
+        } catch (err) {
+          console.error(`Error updating article ${articleId}:`, err);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Updated ${updatedCount} of ${articleIds.length} articles`,
+        updatedCount,
+        requestedCount: articleIds.length,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error in bulk review:", error);
+      res.status(500).json({ error: "Failed to bulk review articles" });
+    }
+  });
+
+  // Get category suggestions based on training data
+  app.get("/api/docktalk/training/category-suggestions", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      // Get all unique categories from manually reviewed articles
+      const reviewedArticles = await dockTalkStorage.getManuallyReviewedArticles();
+      
+      const categoryCounts: Record<string, number> = {};
+      reviewedArticles.forEach(article => {
+        const cat = article.category || article.categories?.[0];
+        if (cat) {
+          categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+        }
+      });
+
+      // Get predefined categories
+      const defaultCategories = [
+        'M&A Deals', 'Industry News', 'Market Analysis', 'Regulatory',
+        'Operations', 'Technology', 'People & Leadership', 'Sustainability',
+        'Finance', 'Real Estate'
+      ];
+
+      // Merge with user-trained categories
+      const allCategories = [...new Set([
+        ...defaultCategories,
+        ...Object.keys(categoryCounts)
+      ])];
+
+      const suggestions = allCategories.map(cat => ({
+        category: cat,
+        usageCount: categoryCounts[cat] || 0,
+        isDefault: defaultCategories.includes(cat),
+      })).sort((a, b) => b.usageCount - a.usageCount);
+
+      res.json({
+        categories: suggestions,
+        totalReviewedArticles: reviewedArticles.length,
+      });
+    } catch (error) {
+      console.error("Error fetching category suggestions:", error);
+      res.status(500).json({ error: "Failed to fetch category suggestions" });
+    }
+  });
+
   // DockTalk routes registered successfully
 }
