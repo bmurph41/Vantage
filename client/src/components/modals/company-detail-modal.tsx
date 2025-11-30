@@ -15,6 +15,7 @@ import { useState, useEffect, useRef } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { AddressInput } from "@/components/address-input";
 import type { Company, Contact, Deal, Property } from "@shared/schema";
 
 interface CompanyDetailModalProps {
@@ -385,12 +386,15 @@ export default function CompanyDetailModal({ isOpen, onClose, company }: Company
                         name="address"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>
-                              <MapPin className="w-4 h-4 inline mr-2" />
-                              Address
-                            </FormLabel>
                             <FormControl>
-                              <Input {...field} disabled={!isEditing} data-testid="input-address" />
+                              <AddressInput
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value)}
+                                label="Address"
+                                placeholder="Start typing an address..."
+                                disabled={!isEditing}
+                                testId="input-address"
+                              />
                             </FormControl>
                           </FormItem>
                         )}

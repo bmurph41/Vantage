@@ -13,6 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { AddressInput, type AddressComponents } from "@/components/address-input";
 import type { MarinaRateDatabase } from "@shared/schema";
 import { US_REGIONS, US_STATES } from "@shared/salescomps-constants";
 
@@ -215,9 +216,20 @@ export default function AddEditMarinaDialog({ open, onOpenChange, marina, onSucc
                   name="address"
                   render={({ field }) => (
                     <FormItem className="col-span-2">
-                      <FormLabel>Address</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Street address" />
+                        <AddressInput
+                          value={field.value || ""}
+                          onChange={(value) => field.onChange(value)}
+                          onAddressSelect={(components: AddressComponents) => {
+                            if (components.street) field.onChange(components.street);
+                            if (components.city) form.setValue("city", components.city);
+                            if (components.state) form.setValue("state", components.state);
+                            if (components.zipCode) form.setValue("zip", components.zipCode);
+                          }}
+                          label="Address"
+                          placeholder="Start typing an address..."
+                          testId="input-address"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
