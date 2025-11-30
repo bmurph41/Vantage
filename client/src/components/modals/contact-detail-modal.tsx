@@ -20,6 +20,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { AddressInput, type AddressComponents } from "@/components/address-input";
 import type { Contact, Company, Deal, Property, Activity as ActivityType, Note } from "@shared/schema";
 
 interface ContactDetailModalProps {
@@ -540,16 +541,25 @@ export default function ContactDetailModal({ isOpen, onClose, contact }: Contact
                     
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2 col-span-2">
-                        <Label htmlFor="address">Street Address</Label>
                         {isEditing ? (
-                          <Input
-                            id="address"
-                            {...form.register('address')}
-                            className="border-2 border-gray-300 focus:border-blue-500"
-                            data-testid="input-address"
+                          <AddressInput
+                            value={form.watch('address') || ""}
+                            onChange={(value) => form.setValue('address', value, { shouldDirty: true })}
+                            onAddressSelect={(components: AddressComponents) => {
+                              form.setValue('address', components.streetAddress || components.fullAddress || '', { shouldDirty: true });
+                              if (components.city) form.setValue('city', components.city, { shouldDirty: true });
+                              if (components.state) form.setValue('state', components.state, { shouldDirty: true });
+                              if (components.zipCode) form.setValue('zipCode', components.zipCode, { shouldDirty: true });
+                            }}
+                            label="Street Address"
+                            placeholder="Start typing an address..."
+                            testId="input-address"
                           />
                         ) : (
-                          <div className="font-medium px-3 py-2">{form.watch('address') || '-'}</div>
+                          <>
+                            <Label htmlFor="address">Street Address</Label>
+                            <div className="font-medium px-3 py-2">{form.watch('address') || '-'}</div>
+                          </>
                         )}
                       </div>
 
