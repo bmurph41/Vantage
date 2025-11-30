@@ -10776,6 +10776,59 @@ export type CrossModuleAuditLog = typeof crossModuleAuditLog.$inferSelect;
 export type InsertCrossModuleAuditLog = z.infer<typeof insertCrossModuleAuditLogSchema>;
 
 // ============================================================================
+// Target Demographics - User-defined demographic criteria for site suitability scoring
+// ============================================================================
+export const targetDemographics = pgTable('target_demographics', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  
+  // Optional project-specific override (null = organization-wide default)
+  projectId: varchar('project_id').references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Target ranges for demographic criteria (null = not considered in scoring)
+  medianAgeMin: real('median_age_min'),
+  medianAgeMax: real('median_age_max'),
+  medianIncomeMin: real('median_income_min'),
+  medianIncomeMax: real('median_income_max'),
+  populationDensityMin: real('population_density_min'),
+  populationDensityMax: real('population_density_max'),
+  householdSizeMin: real('household_size_min'),
+  householdSizeMax: real('household_size_max'),
+  educationBachelorsMin: real('education_bachelors_min'), // Percentage with Bachelor's+
+  educationBachelorsMax: real('education_bachelors_max'),
+  employmentRateMin: real('employment_rate_min'),
+  employmentRateMax: real('employment_rate_max'),
+  homeValueMin: real('home_value_min'),
+  homeValueMax: real('home_value_max'),
+  
+  // Criterion weights (0-1 scale, null = equal weighting)
+  weights: jsonb('weights').default(sql`'{}'`),
+  
+  // Metadata
+  name: varchar('name', { length: 100 }), // Optional name for this target profile
+  description: text('description'),
+  isDefault: boolean('is_default').default(false), // Whether this is the user's default profile
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('target_demographics_org_idx').on(table.orgId),
+  userIdx: index('target_demographics_user_idx').on(table.userId),
+  projectIdx: index('target_demographics_project_idx').on(table.projectId),
+  defaultIdx: index('target_demographics_default_idx').on(table.orgId, table.userId, table.isDefault),
+}));
+
+export const insertTargetDemographicsSchema = createInsertSchema(targetDemographics).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type TargetDemographics = typeof targetDemographics.$inferSelect;
+export type InsertTargetDemographics = z.infer<typeof insertTargetDemographicsSchema>;
+
+// ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular
