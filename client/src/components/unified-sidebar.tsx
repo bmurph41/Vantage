@@ -170,15 +170,9 @@ export default function UnifiedSidebar() {
 
   // Extract data from bootstrap response
   const userPersona = bootstrapData?.persona;
-  const orgFeatures = bootstrapData?.features || [];
   const pendingPropertiesCount = bootstrapData?.pendingCounts?.properties || 0;
   const pendingContactsCount = bootstrapData?.pendingCounts?.contacts || 0;
   const pendingCompaniesCount = bootstrapData?.pendingCounts?.companies || 0;
-
-  // Check if DockTalk is enabled for the organization
-  const isDockTalkEnabled = orgFeatures.some(
-    (feature: any) => feature.feature === 'docktalk' && feature.isActive
-  );
 
   // Helper function to check if user can see a section based on persona
   const canViewSection = (section: string): boolean => {
@@ -664,22 +658,20 @@ export default function UnifiedSidebar() {
             />
             {analysisExpanded && (
               <div className="ml-4 mt-1 mb-2">
-                {/* DockTalk Direct Link */}
-                {isDockTalkEnabled && (
-                  <Link 
-                    href="/docktalk"
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors",
-                      location.startsWith('/docktalk') && "bg-blue-50 border-r-3 border-blue-600 text-blue-600 font-medium"
-                    )}
-                    data-testid="nav-docktalk"
-                  >
-                    <MessageSquare className={cn("w-4 h-4 mr-3 flex-shrink-0", location.startsWith('/docktalk') && "text-blue-600")} />
-                    <span className="truncate">DockTalk</span>
-                  </Link>
-                )}
-                {/* Other Analysis Pages */}
+                {/* DockTalk - Always visible above Sales Comps */}
+                <Link 
+                  href="/docktalk"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors",
+                    location.startsWith('/docktalk') && "bg-blue-50 border-r-3 border-blue-600 text-blue-600 font-medium"
+                  )}
+                  data-testid="nav-docktalk"
+                >
+                  <MessageSquare className={cn("w-4 h-4 mr-3 flex-shrink-0", location.startsWith('/docktalk') && "text-blue-600")} />
+                  <span className="truncate">DockTalk</span>
+                </Link>
+                {/* Other Analysis Pages - Sales Comps, Rate Comps, etc. */}
                 <div>
                   {analysisNav.map((item) => (
                     <NavLink key={item.name} item={item} />
