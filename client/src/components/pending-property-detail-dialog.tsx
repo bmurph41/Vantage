@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { AddressInput, type AddressComponents } from "@/components/address-input";
 
 type PendingProperty = {
   id: string;
@@ -368,17 +369,32 @@ export function PendingPropertyDetailDialog({
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="address">Address</Label>
                         {isEditing ? (
-                          <Input
-                            id="address"
+                          <AddressInput
                             value={currentData.address || ''}
-                            onChange={(e) => setEditedData({ ...editedData, address: e.target.value })}
-                            placeholder="Enter full address..."
-                            data-testid="input-address"
+                            onChange={(value) => setEditedData({ ...editedData, address: value })}
+                            onAddressSelect={(components: AddressComponents) => {
+                              setEditedData({ 
+                                ...editedData, 
+                                address: components.streetAddress || components.fullAddress || '',
+                                city: components.city || editedData.city,
+                                state: components.state || editedData.state,
+                                compMetadata: {
+                                  ...currentData.compMetadata,
+                                  ...editedData.compMetadata,
+                                  zip: components.zipCode || (editedData.compMetadata as any)?.zip
+                                }
+                              });
+                            }}
+                            label="Address"
+                            placeholder="Start typing an address..."
+                            testId="input-address"
                           />
                         ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{currentData.address || 'N/A'}</div>
+                          <>
+                            <Label htmlFor="address">Address</Label>
+                            <div className="p-2 bg-muted rounded text-sm">{currentData.address || 'N/A'}</div>
+                          </>
                         )}
                       </div>
 
