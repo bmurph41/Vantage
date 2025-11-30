@@ -11,12 +11,355 @@ interface GeographicCodes {
   blockGroup: string;
 }
 
+interface SamplePoint {
+  lat: number;
+  lng: number;
+  weight: number;
+}
+
 export class CensusService {
   private apiKey: string;
   private baseUrl = "https://api.census.gov/data";
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || "";
+  }
+
+  async getDemographicsForRadius(
+    centerLat: number,
+    centerLng: number,
+    radiusMiles: number
+  ): Promise<DemographicSummary> {
+    if (!this.apiKey) {
+      console.log("Census API key not configured, using mock data for radius query");
+      return CensusService.getMockDemographics(centerLat, centerLng);
+    }
+
+    try {
+      const samplePoints = this.generateSamplePoints(centerLat, centerLng, radiusMiles);
+      
+      const uniqueTracts = new Map<string, { geoData: GeographicCodes; weight: number }>();
+      
+      for (const point of samplePoints) {
+        try {
+          const geoData = await this.getGeographicCodes(point.lat, point.lng);
+          const tractKey = `${geoData.state}-${geoData.county}-${geoData.tract}`;
+          
+          if (!uniqueTracts.has(tractKey)) {
+            uniqueTracts.set(tractKey, { geoData, weight: point.weight });
+          } else {
+            const existing = uniqueTracts.get(tractKey)!;
+            existing.weight += point.weight;
+          }
+        } catch (e) {
+        }
+      }
+
+      if (uniqueTracts.size === 0) {
+        return this.getDemographicsForLocation(centerLat, centerLng);
+      }
+
+      if (uniqueTracts.size === 1) {
+        const [{ geoData }] = Array.from(uniqueTracts.values());
+        return this.fetchDemographicsForGeoData(geoData);
+      }
+
+      const tractDemographics: Array<{ demographics: DemographicSummary; weight: number }> = [];
+      
+      for (const [, { geoData, weight }] of uniqueTracts) {
+        try {
+          const demographics = await this.fetchDemographicsForGeoData(geoData);
+          tractDemographics.push({ demographics, weight });
+        } catch (e) {
+        }
+      }
+
+      if (tractDemographics.length === 0) {
+        return this.getDemographicsForLocation(centerLat, centerLng);
+      }
+
+      return this.aggregateDemographics(tractDemographics);
+    } catch (error) {
+      console.error("Census radius query error:", error);
+      return this.getDemographicsForLocation(centerLat, centerLng);
+    }
+  }
+
+  private generateSamplePoints(centerLat: number, centerLng: number, radiusMiles: number): SamplePoint[] {
+    const points: SamplePoint[] = [{ lat: centerLat, lng: centerLng, weight: 2 }];
+    
+    const milesPerDegreeLat = 69.0;
+    const milesPerDegreeLng = 69.0 * Math.cos(centerLat * Math.PI / 180);
+    
+    const numRings = radiusMiles <= 1 ? 1 : radiusMiles <= 3 ? 2 : 3;
+    const pointsPerRing = radiusMiles <= 1 ? 4 : 8;
+    
+    for (let ring = 1; ring <= numRings; ring++) {
+      const ringRadius = (radiusMiles / numRings) * ring;
+      const weight = 1 / ring;
+      
+      for (let i = 0; i < pointsPerRing; i++) {
+        const angle = (2 * Math.PI * i) / pointsPerRing;
+        const latOffset = (ringRadius / milesPerDegreeLat) * Math.cos(angle);
+        const lngOffset = (ringRadius / milesPerDegreeLng) * Math.sin(angle);
+        
+        points.push({
+          lat: centerLat + latOffset,
+          lng: centerLng + lngOffset,
+          weight
+        });
+      }
+    }
+    
+    return points;
+  }
+
+  private async fetchDemographicsForGeoData(geoData: GeographicCodes): Promise<DemographicSummary> {
+    const [
+      basicDemographics,
+      incomeData,
+      ageData,
+      educationData,
+      employmentData,
+      housingData,
+      raceData,
+      industryData
+    ] = await Promise.all([
+      this.getBasicDemographics(geoData),
+      this.getIncomeData(geoData),
+      this.getAgeDistribution(geoData),
+      this.getEducationData(geoData),
+      this.getEmploymentData(geoData),
+      this.getHousingData(geoData),
+      this.getRaceEthnicityData(geoData),
+      this.getIndustryData(geoData)
+    ]);
+
+    return {
+      totalPopulation: this.parseNumber(basicDemographics.B01003_001E) || 0,
+      totalMales: this.parseNumber(basicDemographics.B01001_002E) || 0,
+      totalFemales: this.parseNumber(basicDemographics.B01001_026E) || 0,
+      medianAge: this.parseNumber(basicDemographics.B01002_001E) || 0,
+      medianAgeMale: this.parseNumber(basicDemographics.B01002_002E) || 0,
+      medianAgeFemale: this.parseNumber(basicDemographics.B01002_003E) || 0,
+      
+      ageDistribution: this.formatAgeDistribution(ageData),
+      ageByGender: this.formatAgeByGender(ageData),
+      generationalCohorts: this.formatGenerationalCohorts(ageData),
+      
+      medianHouseholdIncome: this.parseNumber(incomeData.B19013_001E) || 0,
+      meanHouseholdIncome: this.parseNumber(incomeData.B19025_001E) || 0,
+      perCapitaIncome: this.parseNumber(incomeData.B19301_001E) || 0,
+      medianFamilyIncome: this.parseNumber(incomeData.B19113_001E) || 0,
+      incomeDistribution: this.formatIncomeDistribution(incomeData),
+      
+      educationLevels: this.formatEducationLevels(educationData),
+      
+      employmentStats: this.formatEmploymentStats(employmentData),
+      industryDistribution: this.formatIndustryDistribution(industryData),
+      
+      housingStats: this.formatHousingStats(housingData),
+      householdSize: this.parseNumber(basicDemographics.B25010_001E) || 2.5,
+      medianHomeValue: this.parseNumber(housingData.B25077_001E) || 0,
+      
+      raceEthnicity: this.formatRaceEthnicity(raceData),
+      
+      populationDensity: this.calculatePopulationDensity(
+        this.parseNumber(basicDemographics.B01003_001E),
+        geoData
+      ),
+      
+      geographicLevel: geoData.tract ? "tract" : geoData.county ? "county" : "state",
+      fipsState: geoData.state,
+      fipsCounty: geoData.county,
+      fipsTract: geoData.tract
+    };
+  }
+
+  private aggregateDemographics(tractData: Array<{ demographics: DemographicSummary; weight: number }>): DemographicSummary {
+    const totalPopulation = tractData.reduce((sum, t) => sum + (t.demographics.totalPopulation || 0), 0);
+    
+    const sumCounts = (getValue: (d: DemographicSummary) => number | undefined): number => {
+      return tractData.reduce((sum, { demographics }) => sum + (getValue(demographics) || 0), 0);
+    };
+
+    const popWeightedAvg = (getValue: (d: DemographicSummary) => number | undefined): number => {
+      if (totalPopulation === 0) return 0;
+      let sum = 0;
+      for (const { demographics } of tractData) {
+        const value = getValue(demographics);
+        const pop = demographics.totalPopulation || 0;
+        if (value !== undefined && value > 0) {
+          sum += value * pop;
+        }
+      }
+      return Math.round((sum / totalPopulation) * 100) / 100;
+    };
+
+    const aggregatePercentageDistribution = (
+      getDistribution: (d: DemographicSummary) => Record<string, number> | undefined
+    ): Record<string, number> => {
+      const result: Record<string, number> = {};
+      if (totalPopulation === 0) return result;
+      
+      for (const { demographics } of tractData) {
+        const dist = getDistribution(demographics);
+        const pop = demographics.totalPopulation || 0;
+        if (!dist || !pop) continue;
+        
+        for (const [key, value] of Object.entries(dist)) {
+          if (typeof value === 'number') {
+            result[key] = (result[key] || 0) + value * pop;
+          }
+        }
+      }
+      
+      for (const key of Object.keys(result)) {
+        result[key] = Math.round((result[key] / totalPopulation) * 100) / 100;
+      }
+      
+      return result;
+    };
+
+    const aggregateAgeByGender = (): { male: Record<string, number>; female: Record<string, number> } | undefined => {
+      const firstData = tractData[0]?.demographics.ageByGender;
+      if (!firstData) return undefined;
+      
+      const male: Record<string, number> = {};
+      const female: Record<string, number> = {};
+      
+      for (const { demographics } of tractData) {
+        const ageData = demographics.ageByGender;
+        if (!ageData) continue;
+        
+        if (ageData.male) {
+          for (const [key, value] of Object.entries(ageData.male)) {
+            if (typeof value === 'number') {
+              male[key] = (male[key] || 0) + value;
+            }
+          }
+        }
+        
+        if (ageData.female) {
+          for (const [key, value] of Object.entries(ageData.female)) {
+            if (typeof value === 'number') {
+              female[key] = (female[key] || 0) + value;
+            }
+          }
+        }
+      }
+      
+      return { male, female };
+    };
+
+    const aggregateHousingStats = (): Record<string, number> | undefined => {
+      const firstStats = tractData[0]?.demographics.housingStats;
+      if (!firstStats) return undefined;
+      
+      const result: Record<string, number> = {};
+      let totalUnits = 0;
+      
+      for (const { demographics } of tractData) {
+        const stats = demographics.housingStats;
+        if (!stats) continue;
+        
+        const units = stats.totalUnits || 0;
+        totalUnits += units;
+        
+        for (const [key, value] of Object.entries(stats)) {
+          if (typeof value === 'number') {
+            if (key === 'totalUnits') {
+              result[key] = (result[key] || 0) + value;
+            } else {
+              result[key] = (result[key] || 0) + value * units;
+            }
+          }
+        }
+      }
+      
+      if (totalUnits > 0) {
+        for (const key of Object.keys(result)) {
+          if (key !== 'totalUnits') {
+            result[key] = Math.round((result[key] / totalUnits) * 100) / 100;
+          }
+        }
+      }
+      
+      return result;
+    };
+
+    const aggregateEmploymentStats = (): Record<string, number> | undefined => {
+      const firstStats = tractData[0]?.demographics.employmentStats;
+      if (!firstStats) return undefined;
+      
+      const result: Record<string, number> = {};
+      let totalLaborForce = 0;
+      
+      for (const { demographics } of tractData) {
+        const stats = demographics.employmentStats;
+        if (!stats) continue;
+        
+        const laborForce = (stats.employed || 0) + (stats.unemployed || 0);
+        totalLaborForce += laborForce;
+        
+        for (const [key, value] of Object.entries(stats)) {
+          if (typeof value === 'number') {
+            if (['employed', 'unemployed', 'notInLaborForce'].includes(key)) {
+              result[key] = (result[key] || 0) + value;
+            } else {
+              result[key] = (result[key] || 0) + value * laborForce;
+            }
+          }
+        }
+      }
+      
+      if (totalLaborForce > 0) {
+        for (const key of Object.keys(result)) {
+          if (!['employed', 'unemployed', 'notInLaborForce'].includes(key)) {
+            result[key] = Math.round((result[key] / totalLaborForce) * 100) / 100;
+          }
+        }
+      }
+      
+      return result;
+    };
+
+    return {
+      totalPopulation,
+      totalMales: sumCounts(d => d.totalMales),
+      totalFemales: sumCounts(d => d.totalFemales),
+      medianAge: popWeightedAvg(d => d.medianAge),
+      medianAgeMale: popWeightedAvg(d => d.medianAgeMale),
+      medianAgeFemale: popWeightedAvg(d => d.medianAgeFemale),
+      
+      ageDistribution: aggregatePercentageDistribution(d => d.ageDistribution),
+      ageByGender: aggregateAgeByGender(),
+      generationalCohorts: aggregatePercentageDistribution(d => d.generationalCohorts),
+      
+      medianHouseholdIncome: popWeightedAvg(d => d.medianHouseholdIncome),
+      meanHouseholdIncome: popWeightedAvg(d => d.meanHouseholdIncome),
+      perCapitaIncome: popWeightedAvg(d => d.perCapitaIncome),
+      medianFamilyIncome: popWeightedAvg(d => d.medianFamilyIncome),
+      incomeDistribution: aggregatePercentageDistribution(d => d.incomeDistribution),
+      
+      educationLevels: aggregatePercentageDistribution(d => d.educationLevels),
+      
+      employmentStats: aggregateEmploymentStats(),
+      industryDistribution: aggregatePercentageDistribution(d => d.industryDistribution),
+      
+      housingStats: aggregateHousingStats(),
+      householdSize: popWeightedAvg(d => d.householdSize),
+      medianHomeValue: popWeightedAvg(d => d.medianHomeValue),
+      
+      raceEthnicity: aggregatePercentageDistribution(d => d.raceEthnicity),
+      
+      populationDensity: undefined,
+      
+      geographicLevel: "aggregated",
+      fipsState: tractData[0]?.demographics.fipsState,
+      fipsCounty: tractData[0]?.demographics.fipsCounty,
+      fipsTract: undefined
+    };
   }
 
   async getDemographicsForLocation(latitude: number, longitude: number): Promise<DemographicSummary> {

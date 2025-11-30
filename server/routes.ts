@@ -15227,7 +15227,7 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Fetch Census demographics for a specific location (latitude/longitude)
+  // Fetch Census demographics for a specific location (latitude/longitude) with optional radius aggregation
   app.post('/api/demographics/location', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -15241,20 +15241,86 @@ Current context: Project ${req.params.projectId}`;
       const censusApiKey = process.env.CENSUS_API_KEY;
       const censusService = new CensusService(censusApiKey);
       
-      const demographics = await censusService.getDemographicsForLocation(
-        parseFloat(latitude),
-        parseFloat(longitude)
-      );
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      const radius = radiusMiles ? parseFloat(radiusMiles) : null;
+      
+      let demographics;
+      let dataSource = 'point';
+      
+      if (radius && radius > 0) {
+        demographics = await censusService.getDemographicsForRadius(lat, lng, radius);
+        dataSource = 'radius_aggregated';
+      } else {
+        demographics = await censusService.getDemographicsForLocation(lat, lng);
+      }
       
       res.json({
-        location: { latitude, longitude, address },
-        radiusMiles: radiusMiles || null,
+        location: { latitude: lat, longitude: lng, address },
+        radiusMiles: radius,
+        dataSource,
         demographics,
         fetchedAt: new Date().toISOString()
       });
     } catch (error) {
       console.error('Failed to fetch location demographics:', error);
       res.status(500).json({ error: 'Failed to fetch location demographics' });
+    }
+  });
+
+  // Calculate validated drive time radius for a location
+  app.post('/api/demographics/drivetime-radius', authenticateUser, async (req: any, res) => {
+    try {
+      const { latitude, longitude, targetMinutes } = req.body;
+      
+      if (latitude === undefined || longitude === undefined || !targetMinutes) {
+        return res.status(400).json({ error: 'Latitude, longitude, and targetMinutes are required' });
+      }
+      
+      const { driveTimeService } = await import('./services/drivetime-service');
+      
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      const minutes = parseInt(targetMinutes);
+      
+      const estimate = await driveTimeService.getEstimatedRadiusForDriveTime(lat, lng, minutes);
+      
+      res.json({
+        targetMinutes: minutes,
+        estimatedMiles: estimate.estimatedMiles,
+        calculatedMiles: estimate.calculatedMiles,
+        isEstimate: estimate.isEstimate,
+        source: estimate.source,
+        radiusMiles: estimate.calculatedMiles || estimate.estimatedMiles
+      });
+    } catch (error) {
+      console.error('Failed to calculate drive time radius:', error);
+      res.status(500).json({ error: 'Failed to calculate drive time radius' });
+    }
+  });
+
+  // Validate drive time for a proposed radius
+  app.post('/api/demographics/validate-drivetime', authenticateUser, async (req: any, res) => {
+    try {
+      const { latitude, longitude, proposedMiles, targetMinutes } = req.body;
+      
+      if (latitude === undefined || longitude === undefined || !proposedMiles || !targetMinutes) {
+        return res.status(400).json({ error: 'Latitude, longitude, proposedMiles, and targetMinutes are required' });
+      }
+      
+      const { driveTimeService } = await import('./services/drivetime-service');
+      
+      const validation = await driveTimeService.validateDriveTimeRadius(
+        parseFloat(latitude),
+        parseFloat(longitude),
+        parseFloat(proposedMiles),
+        parseInt(targetMinutes)
+      );
+      
+      res.json(validation);
+    } catch (error) {
+      console.error('Failed to validate drive time:', error);
+      res.status(500).json({ error: 'Failed to validate drive time' });
     }
   });
 

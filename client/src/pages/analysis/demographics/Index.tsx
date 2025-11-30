@@ -766,7 +766,7 @@ function LocationAnalysisSection() {
     }
   });
 
-  const fetchAllTradeAreas = useCallback((location: SelectedLocation) => {
+  const fetchAllTradeAreas = useCallback(async (location: SelectedLocation) => {
     const locationKey = `${location.latitude},${location.longitude}`;
     const tradeAreas = new Map<string, TradeAreaData>();
     const config = location.config;
@@ -788,24 +788,53 @@ function LocationAnalysisSection() {
         });
       });
     } else {
-      config.driveTimes.forEach(minutes => {
+      for (const minutes of config.driveTimes) {
         const driveTime = DRIVE_TIMES.find(d => d.value === minutes);
-        if (driveTime) {
-          const key = `drivetime-${minutes}`;
-          tradeAreas.set(key, {
-            radiusMiles: driveTime.estimatedMiles,
-            label: `${minutes} Min Drive`,
-            type: 'drivetime',
-            demographics: null,
-            isLoading: true
+        if (!driveTime) continue;
+        
+        const key = `drivetime-${minutes}`;
+        
+        let radiusMiles = driveTime.estimatedMiles;
+        let radiusSource = 'estimate';
+        
+        try {
+          const response = await fetch('/api/demographics/drivetime-radius', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              latitude: location.latitude,
+              longitude: location.longitude,
+              targetMinutes: minutes
+            })
           });
-          fetchDemographicsMutation.mutate({ 
-            location, 
-            radiusMiles: driveTime.estimatedMiles, 
-            tradeAreaKey: key 
-          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.calculatedMiles) {
+              radiusMiles = data.calculatedMiles;
+              radiusSource = 'google_api';
+            } else if (data.radiusMiles) {
+              radiusMiles = data.radiusMiles;
+            }
+          }
+        } catch (e) {
         }
-      });
+        
+        tradeAreas.set(key, {
+          radiusMiles,
+          label: `${minutes} Min Drive${radiusSource === 'google_api' ? '' : ' (est.)'}`,
+          type: 'drivetime',
+          demographics: null,
+          isLoading: true
+        });
+        
+        fetchDemographicsMutation.mutate({ 
+          location, 
+          radiusMiles, 
+          tradeAreaKey: key 
+        });
+      }
     }
     
     setLocationData(prev => new Map(prev).set(locationKey, tradeAreas));
