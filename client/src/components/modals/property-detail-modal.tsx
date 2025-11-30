@@ -19,6 +19,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { AddressInput } from "@/components/address-input";
 import type { Property, Contact, Company, Deal, Activity as ActivityType, Note } from "@shared/schema";
 import PropertyIntegrationPanel from "@/components/crm/PropertyIntegrationPanel";
 
@@ -445,19 +446,22 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address" className="font-semibold flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-gray-500" />
-                      Address
-                    </Label>
                     {isEditing ? (
-                      <Input
-                        id="address"
-                        {...form.register('address')}
-                        className="border-2 border-gray-300 focus:border-blue-500"
-                        data-testid="input-address"
+                      <AddressInput
+                        value={form.watch('address') || ""}
+                        onChange={(value) => form.setValue('address', value, { shouldDirty: true })}
+                        label="Address"
+                        placeholder="Start typing an address..."
+                        testId="input-address"
                       />
                     ) : (
-                      <div className="font-medium px-3 py-2">{form.watch('address') || '-'}</div>
+                      <>
+                        <Label htmlFor="address" className="font-semibold flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-gray-500" />
+                          Address
+                        </Label>
+                        <div className="font-medium px-3 py-2">{form.watch('address') || '-'}</div>
+                      </>
                     )}
                   </div>
 
