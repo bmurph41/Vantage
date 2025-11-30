@@ -46,7 +46,19 @@ Preferred communication style: Simple, everyday language.
     - **Prospecting & Outreach** (Premium add-on - brokers/PE investors only): Prospecting Dashboard, Lead Builder, Prospecting Board, Market Targets, Campaigns & Templates, Deal Sourcing Analytics. Includes activity tracking (calls, emails, meetings), weekly goal tracking, outreach campaigns, and market territory management.
 - **Due Diligence Module**: Project management with task tracking and template management.
 - **CRM-DD Integration**: Converts CRM deals to DD projects with automated task and contact mapping.
-- **Rent Roll Module**: Manages marina unit occupancy and rental income.
+- **Rent Roll Module**: Manages marina unit occupancy and rental income, with Customer Analytics integration.
+    - **Customer Analytics**: Real-time KPI dashboard tracking customer metrics with accurate formulas:
+        - **Total/Active/Prospect/Churned Customers**: Count by status from marina_customers table
+        - **Retention Rate**: (Active Customers / (Active + Churned)) * 100
+        - **Churn Rate**: (Churned Customers / (Active + Churned)) * 100
+        - **Avg LTV**: Comprehensive calculation from 3 revenue sources:
+            - service_usage.amount (direct transactions)
+            - slip_assignments.monthlyRate * months_active (prorated)
+            - rent_roll_entries.monthlyRate * months_active (prorated)
+        - **Avg Tenure**: Average months since joinDate for active customers
+        - **Churn Risk**: Customers with 90+ days since last activity (high: 180+, medium: 90-180)
+        - **LTV Distribution**: Customer count by revenue bucket
+        - **Customer Segments**: Breakdown by account type (monthly, seasonal, transient, annual)
 - **SalesComps Module**: Marina sales comparables with CSV import/export, Google Maps, and portfolio functionality.
 - **Modeling Projects Module**: Tracks marina valuation, links to CRM, DD, sales comps, with analytics.
     - **Operations Data Sync**: Institutional-grade pipeline for operational data (Rent Roll, Fuel Sales, Ship Store) to modeling projects.

@@ -74,13 +74,19 @@ export class CustomerAnalyticsService {
     }
 
     // Add slip assignment revenue (monthly rate * months active)
+    // Formula: monthlyRate * max(0, months between startDate and endDate/today)
+    // Skip entries without valid startDate to avoid inflating revenue
     const slipRevenue = await db
       .select({
         customerId: slipAssignments.customerId,
         slipRevenue: sql<number>`
           COALESCE(SUM(
-            CAST(${slipAssignments.monthlyRate} AS DECIMAL) * 
-            GREATEST(1, EXTRACT(EPOCH FROM AGE(COALESCE(${slipAssignments.endDate}::date, CURRENT_DATE), ${slipAssignments.startDate}::date)) / 2592000)
+            CASE 
+              WHEN ${slipAssignments.startDate} IS NOT NULL THEN
+                CAST(${slipAssignments.monthlyRate} AS DECIMAL) * 
+                GREATEST(0, EXTRACT(EPOCH FROM AGE(COALESCE(${slipAssignments.endDate}::date, CURRENT_DATE), ${slipAssignments.startDate}::date)) / 2592000)
+              ELSE 0
+            END
           ), 0)
         `,
       })
@@ -94,13 +100,19 @@ export class CustomerAnalyticsService {
     }
 
     // Add rent roll entry revenue (monthly rate * tenure)
+    // Formula: monthlyRate * max(0, months between startDate and endDate/today)
+    // Skip entries without valid startDate to avoid inflating revenue
     const rentRollRevenue = await db
       .select({
         customerId: rentRollEntries.customerId,
         rentRevenue: sql<number>`
           COALESCE(SUM(
-            CAST(${rentRollEntries.monthlyRate} AS DECIMAL) * 
-            GREATEST(1, EXTRACT(EPOCH FROM AGE(COALESCE(${rentRollEntries.endDate}::date, CURRENT_DATE), COALESCE(${rentRollEntries.startDate}::date, CURRENT_DATE))) / 2592000)
+            CASE 
+              WHEN ${rentRollEntries.startDate} IS NOT NULL THEN
+                CAST(${rentRollEntries.monthlyRate} AS DECIMAL) * 
+                GREATEST(0, EXTRACT(EPOCH FROM AGE(COALESCE(${rentRollEntries.endDate}::date, CURRENT_DATE), ${rentRollEntries.startDate}::date)) / 2592000)
+              ELSE 0
+            END
           ), 0)
         `,
       })
