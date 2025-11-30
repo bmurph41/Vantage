@@ -406,6 +406,22 @@ export default function Dashboard() {
   const [isRentRollDetailOpen, setIsRentRollDetailOpen] = useState(false);
   const [isModelingDetailOpen, setIsModelingDetailOpen] = useState(false);
   
+  // Period Comparison collapsed state with localStorage persistence
+  const [isPeriodComparisonCollapsed, setIsPeriodComparisonCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboardPeriodComparisonCollapsed');
+      return saved === 'true';
+    }
+    return false;
+  });
+
+  // Save period comparison collapsed state to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboardPeriodComparisonCollapsed', String(isPeriodComparisonCollapsed));
+    }
+  }, [isPeriodComparisonCollapsed]);
+  
   // Collapsed modules state with localStorage persistence
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
@@ -1310,14 +1326,12 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="mb-6">
-          <ComparisonModule />
-        </div>
-
+        {/* Quick Access - Always at top */}
         <div className="mb-6">
           <QuickAccessSection />
         </div>
 
+        {/* KPI Modules - User customizable modules in the middle */}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -1336,6 +1350,14 @@ export default function Dashboard() {
             </div>
           </SortableContext>
         </DndContext>
+
+        {/* Period Comparison - Collapsible section at bottom */}
+        <div className="mt-6">
+          <ComparisonModule 
+            isCollapsed={isPeriodComparisonCollapsed}
+            onToggleCollapse={() => setIsPeriodComparisonCollapsed(!isPeriodComparisonCollapsed)}
+          />
+        </div>
 
         <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-xs sm:text-sm text-blue-800">

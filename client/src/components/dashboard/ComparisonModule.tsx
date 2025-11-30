@@ -1,10 +1,16 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp } from "lucide-react";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatUtils";
 import { type TimeRange } from "./TimeRangeSelector";
+
+interface ComparisonModuleProps {
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
 
 type ComparisonMetric = {
   label: string;
@@ -31,7 +37,7 @@ const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: 'all', label: 'All Time' },
 ];
 
-export function ComparisonModule() {
+export function ComparisonModule({ isCollapsed = false, onToggleCollapse }: ComparisonModuleProps) {
   const [period1, setPeriod1] = useState<TimeRange>('30d');
   const [period2, setPeriod2] = useState<TimeRange>('90d');
 
@@ -69,80 +75,101 @@ export function ComparisonModule() {
 
   return (
     <Card className="col-span-full">
-      <CardHeader>
+      <CardHeader className={onToggleCollapse ? "cursor-pointer" : ""} onClick={onToggleCollapse}>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">Period Comparison</CardTitle>
+          <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-blue-600" />
+            Period Comparison
+          </CardTitle>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Compare:</span>
-              <Select value={period1} onValueChange={(v) => setPeriod1(v as TimeRange)}>
-                <SelectTrigger className="w-[140px] h-8" data-testid="comparison-period1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIME_RANGES.map((range) => (
-                    <SelectItem key={range.value} value={range.value}>
-                      {range.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <span className="text-gray-400">vs</span>
-            <Select value={period2} onValueChange={(v) => setPeriod2(v as TimeRange)}>
-              <SelectTrigger className="w-[140px] h-8" data-testid="comparison-period2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TIME_RANGES.map((range) => (
-                  <SelectItem key={range.value} value={range.value}>
-                    {range.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!isCollapsed && (
+              <>
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <span className="text-sm text-gray-600">Compare:</span>
+                  <Select value={period1} onValueChange={(v) => setPeriod1(v as TimeRange)}>
+                    <SelectTrigger className="w-[140px] h-8" data-testid="comparison-period1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIME_RANGES.map((range) => (
+                        <SelectItem key={range.value} value={range.value}>
+                          {range.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <span className="text-gray-400" onClick={(e) => e.stopPropagation()}>vs</span>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Select value={period2} onValueChange={(v) => setPeriod2(v as TimeRange)}>
+                    <SelectTrigger className="w-[140px] h-8" data-testid="comparison-period2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIME_RANGES.map((range) => (
+                        <SelectItem key={range.value} value={range.value}>
+                          {range.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+            {onToggleCollapse && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 w-7 p-0"
+                data-testid="toggle-period-comparison"
+              >
+                {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="text-center py-8 text-gray-500">Loading comparison data...</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {COMPARISON_METRICS.map((metric) => {
-              const value1 = data1?.[metric.module]?.[metric.key] || 0;
-              const value2 = data2?.[metric.module]?.[metric.key] || 0;
-              const change = calculateChange(value1, value2);
+      {!isCollapsed && (
+        <CardContent>
+          {isLoading ? (
+            <div className="text-center py-8 text-gray-500">Loading comparison data...</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {COMPARISON_METRICS.map((metric) => {
+                const value1 = data1?.[metric.module]?.[metric.key] || 0;
+                const value2 = data2?.[metric.module]?.[metric.key] || 0;
+                const change = calculateChange(value1, value2);
 
-              return (
-                <div key={`${metric.module}-${metric.key}`} className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs font-medium text-gray-600 mb-2">{metric.label}</p>
-                  <div className="flex items-baseline justify-between mb-1">
-                    <span className="text-sm text-gray-500">{TIME_RANGES.find(r => r.value === period1)?.label}:</span>
-                    <span className="text-lg font-bold text-gray-900">{formatValue(value1, metric.type)}</span>
+                return (
+                  <div key={`${metric.module}-${metric.key}`} className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-xs font-medium text-gray-600 mb-2">{metric.label}</p>
+                    <div className="flex items-baseline justify-between mb-1">
+                      <span className="text-sm text-gray-500">{TIME_RANGES.find(r => r.value === period1)?.label}:</span>
+                      <span className="text-lg font-bold text-gray-900">{formatValue(value1, metric.type)}</span>
+                    </div>
+                    <div className="flex items-baseline justify-between mb-2">
+                      <span className="text-sm text-gray-500">{TIME_RANGES.find(r => r.value === period2)?.label}:</span>
+                      <span className="text-lg font-bold text-gray-600">{formatValue(value2, metric.type)}</span>
+                    </div>
+                    <div className="flex items-center gap-1 pt-2 border-t border-gray-200">
+                      {change.direction === 'up' && <TrendingUp className="h-4 w-4 text-green-600" />}
+                      {change.direction === 'down' && <TrendingDown className="h-4 w-4 text-red-600" />}
+                      {change.direction === 'neutral' && <Minus className="h-4 w-4 text-gray-400" />}
+                      <span className={`text-sm font-medium ${
+                        change.direction === 'up' ? 'text-green-600' : 
+                        change.direction === 'down' ? 'text-red-600' : 
+                        'text-gray-400'
+                      }`}>
+                        {change.percent.toFixed(2)}% {change.direction === 'up' ? 'increase' : change.direction === 'down' ? 'decrease' : 'no change'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-baseline justify-between mb-2">
-                    <span className="text-sm text-gray-500">{TIME_RANGES.find(r => r.value === period2)?.label}:</span>
-                    <span className="text-lg font-bold text-gray-600">{formatValue(value2, metric.type)}</span>
-                  </div>
-                  <div className="flex items-center gap-1 pt-2 border-t border-gray-200">
-                    {change.direction === 'up' && <TrendingUp className="h-4 w-4 text-green-600" />}
-                    {change.direction === 'down' && <TrendingDown className="h-4 w-4 text-red-600" />}
-                    {change.direction === 'neutral' && <Minus className="h-4 w-4 text-gray-400" />}
-                    <span className={`text-sm font-medium ${
-                      change.direction === 'up' ? 'text-green-600' : 
-                      change.direction === 'down' ? 'text-red-600' : 
-                      'text-gray-400'
-                    }`}>
-                      {change.percent.toFixed(2)}% {change.direction === 'up' ? 'increase' : change.direction === 'down' ? 'decrease' : 'no change'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      )}
     </Card>
   );
 }
