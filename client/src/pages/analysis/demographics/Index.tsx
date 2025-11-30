@@ -13,6 +13,13 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { 
+  TargetDemographicsForm, 
+  SiteSuitabilityScore, 
+  MarketTrendAnalysis, 
+  PropertyComparisonPanel 
+} from "@/components/demographics";
+import type { TargetDemographics } from "@shared/schema";
+import { 
   Users, 
   DollarSign, 
   MapPin, 
@@ -626,10 +633,33 @@ function LocationAnalysisSection() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [comparisonTradeAreas, setComparisonTradeAreas] = useState<Record<number, string>>({});
+  const [targetDemographics, setTargetDemographics] = useState<TargetDemographics | null>(null);
+  const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
   });
+  
+  const { data: fetchedTargets } = useQuery<TargetDemographics | null>({
+    queryKey: ['/api/target-demographics', selectedProjectId || 'default'],
+    queryFn: async () => {
+      const url = selectedProjectId 
+        ? `/api/target-demographics?projectId=${selectedProjectId}` 
+        : '/api/target-demographics';
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) {
+        if (res.status === 404) return null;
+        throw new Error('Failed to fetch target demographics');
+      }
+      return res.json();
+    }
+  });
+  
+  useEffect(() => {
+    if (fetchedTargets !== undefined) {
+      setTargetDemographics(fetchedTargets);
+    }
+  }, [fetchedTargets]);
 
   const { data: savedLocations, isLoading: locationsLoading } = useQuery<SavedLocation[]>({
     queryKey: ['/api/demographics/project-locations', selectedProjectId],
@@ -959,8 +989,90 @@ function LocationAnalysisSection() {
     return Array.from(areaMap.values());
   };
 
+  const handleTargetDemographicsSave = (saved: TargetDemographics) => {
+    setTargetDemographics(saved);
+  };
+  
+  const getComparisonLocationsData = () => {
+    if (selectedLocations.length < 2) return [];
+    return selectedLocations.map((loc, idx) => {
+      const locKey = `${loc.latitude},${loc.longitude}`;
+      const areaMap = locationData.get(locKey);
+      const tradeAreasList = areaMap ? Array.from(areaMap.entries()).filter(([, ta]) => ta.demographics) : [];
+      const sortedTradeAreas = [...tradeAreasList].sort(([keyA], [keyB]) => {
+        const partsA = keyA.split('-');
+        const partsB = keyB.split('-');
+        const valA = partsA.length > 1 ? parseFloat(partsA[1]) : 0;
+        const valB = partsB.length > 1 ? parseFloat(partsB[1]) : 0;
+        return (isNaN(valA) ? 0 : valA) - (isNaN(valB) ? 0 : valB);
+      });
+      
+      const defaultKey = sortedTradeAreas[0]?.[0] || '';
+      const selectedKey = (comparisonTradeAreas[idx] && sortedTradeAreas.some(([k]) => k === comparisonTradeAreas[idx]))
+        ? comparisonTradeAreas[idx]
+        : defaultKey;
+      const tradeArea = selectedKey && areaMap ? areaMap.get(selectedKey) : null;
+      
+      return {
+        name: loc.label || loc.address.split(',')[0],
+        address: loc.address,
+        demographics: tradeArea?.demographics || null
+      };
+    });
+  };
+
   return (
     <div className="space-y-6">
+      <div className="flex gap-4 items-start">
+        <Button
+          variant={showAnalyticsPanel ? "default" : "outline"}
+          size="sm"
+          onClick={() => setShowAnalyticsPanel(!showAnalyticsPanel)}
+          className="flex items-center gap-2"
+          data-testid="button-toggle-analytics"
+        >
+          <Target className="h-4 w-4" />
+          {showAnalyticsPanel ? "Hide Analytics" : "Show Analytics"}
+        </Button>
+        {targetDemographics && (
+          <Badge variant="secondary" className="text-xs">
+            Target profile configured
+          </Badge>
+        )}
+      </div>
+      
+      {showAnalyticsPanel && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <TargetDemographicsForm
+            projectId={selectedProjectId || undefined}
+            initialData={targetDemographics || undefined}
+            onSave={handleTargetDemographicsSave}
+          />
+          
+          {selectedLocations.length > 0 && targetDemographics && (
+            <div className="space-y-4">
+              {selectedLocations.slice(0, 2).map((loc, idx) => {
+                const locKey = `${loc.latitude},${loc.longitude}`;
+                const areaMap = locationData.get(locKey);
+                const tradeAreasList = areaMap ? Array.from(areaMap.entries()).filter(([, ta]) => ta.demographics) : [];
+                const firstTradeArea = tradeAreasList[0]?.[1];
+                
+                if (!firstTradeArea?.demographics) return null;
+                
+                return (
+                  <SiteSuitabilityScore
+                    key={idx}
+                    demographics={firstTradeArea.demographics as any}
+                    targets={targetDemographics}
+                    locationName={loc.label || loc.address.split(',')[0]}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+      
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -1686,6 +1798,34 @@ function LocationAnalysisSection() {
             </div>
           </CardContent>
         </Card>
+      )}
+      
+      {showAnalyticsPanel && selectedLocations.length > 0 && (
+        <div className="space-y-6">
+          {selectedLocations.slice(0, 3).map((loc, idx) => {
+            const locKey = `${loc.latitude},${loc.longitude}`;
+            const areaMap = locationData.get(locKey);
+            const tradeAreasList = areaMap ? Array.from(areaMap.entries()).filter(([, ta]) => ta.demographics) : [];
+            const firstTradeArea = tradeAreasList[0]?.[1];
+            
+            if (!firstTradeArea?.demographics) return null;
+            
+            return (
+              <MarketTrendAnalysis
+                key={idx}
+                demographics={firstTradeArea.demographics as any}
+                locationName={loc.label || loc.address.split(',')[0]}
+              />
+            );
+          })}
+          
+          {selectedLocations.length >= 2 && (
+            <PropertyComparisonPanel
+              locations={getComparisonLocationsData().filter(l => l.demographics) as any}
+              targetDemographics={targetDemographics || undefined}
+            />
+          )}
+        </div>
       )}
     </div>
   );

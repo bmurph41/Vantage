@@ -139,7 +139,9 @@ import {
   insertTransactionClosingSummarySchema,
   insertClosingCostLineSchema,
   insertTransitionCostLineSchema,
-  insertNwcLineSchema
+  insertNwcLineSchema,
+  targetDemographics,
+  insertTargetDemographicsSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -21903,6 +21905,170 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Error fetching actions:", error);
       res.status(500).json({ error: "Failed to fetch actions" });
+    }
+  });
+
+  // ============================================================================
+  // Target Demographics API - Site Suitability Scoring
+  // ============================================================================
+
+  // Get target demographics (with optional project override)
+  app.get("/api/target-demographics", authenticateUser, async (req: any, res) => {
+    try {
+      const { orgId, id: userId } = req.user;
+      const projectId = req.query.projectId as string | undefined;
+
+      // If projectId is specified, try to get project-specific targets first
+      if (projectId) {
+        const projectTargets = await db
+          .select()
+          .from(targetDemographics)
+          .where(and(
+            eq(targetDemographics.orgId, orgId),
+            eq(targetDemographics.userId, userId),
+            eq(targetDemographics.projectId, projectId)
+          ))
+          .limit(1);
+
+        if (projectTargets.length > 0) {
+          return res.json(projectTargets[0]);
+        }
+      }
+
+      // Fall back to user's default targets
+      const defaultTargets = await db
+        .select()
+        .from(targetDemographics)
+        .where(and(
+          eq(targetDemographics.orgId, orgId),
+          eq(targetDemographics.userId, userId),
+          eq(targetDemographics.isDefault, true)
+        ))
+        .limit(1);
+
+      if (defaultTargets.length > 0) {
+        return res.json(defaultTargets[0]);
+      }
+
+      // Return null if no targets configured
+      res.json(null);
+    } catch (error) {
+      console.error("Error fetching target demographics:", error);
+      res.status(500).json({ error: "Failed to fetch target demographics" });
+    }
+  });
+
+  // Save/update target demographics
+  app.post("/api/target-demographics", authenticateUser, async (req: any, res) => {
+    try {
+      const { orgId, id: userId } = req.user;
+      const data = req.body;
+      const projectId = data.projectId as string | undefined;
+
+      // Validate the input
+      const validated = insertTargetDemographicsSchema.parse({
+        ...data,
+        orgId,
+        userId,
+        projectId: projectId || null,
+        isDefault: !projectId, // Default profile if no project specified
+      });
+
+      // Check if a record already exists for this user/project combo
+      const existingQuery = projectId
+        ? and(
+            eq(targetDemographics.orgId, orgId),
+            eq(targetDemographics.userId, userId),
+            eq(targetDemographics.projectId, projectId)
+          )
+        : and(
+            eq(targetDemographics.orgId, orgId),
+            eq(targetDemographics.userId, userId),
+            eq(targetDemographics.isDefault, true)
+          );
+
+      const existing = await db
+        .select()
+        .from(targetDemographics)
+        .where(existingQuery)
+        .limit(1);
+
+      let result;
+      if (existing.length > 0) {
+        // Update existing record
+        const updated = await db
+          .update(targetDemographics)
+          .set({
+            ...validated,
+            updatedAt: new Date(),
+          })
+          .where(eq(targetDemographics.id, existing[0].id))
+          .returning();
+        result = updated[0];
+      } else {
+        // Create new record
+        const created = await db
+          .insert(targetDemographics)
+          .values(validated)
+          .returning();
+        result = created[0];
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error saving target demographics:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid input", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to save target demographics" });
+    }
+  });
+
+  // Delete target demographics
+  app.delete("/api/target-demographics", authenticateUser, async (req: any, res) => {
+    try {
+      const { orgId, id: userId } = req.user;
+      const projectId = req.query.projectId as string | undefined;
+
+      const deleteQuery = projectId
+        ? and(
+            eq(targetDemographics.orgId, orgId),
+            eq(targetDemographics.userId, userId),
+            eq(targetDemographics.projectId, projectId)
+          )
+        : and(
+            eq(targetDemographics.orgId, orgId),
+            eq(targetDemographics.userId, userId),
+            eq(targetDemographics.isDefault, true)
+          );
+
+      await db.delete(targetDemographics).where(deleteQuery);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting target demographics:", error);
+      res.status(500).json({ error: "Failed to delete target demographics" });
+    }
+  });
+
+  // Get all target demographic profiles for a user
+  app.get("/api/target-demographics/all", authenticateUser, async (req: any, res) => {
+    try {
+      const { orgId, id: userId } = req.user;
+
+      const profiles = await db
+        .select()
+        .from(targetDemographics)
+        .where(and(
+          eq(targetDemographics.orgId, orgId),
+          eq(targetDemographics.userId, userId)
+        ))
+        .orderBy(desc(targetDemographics.isDefault), asc(targetDemographics.createdAt));
+
+      res.json(profiles);
+    } catch (error) {
+      console.error("Error fetching target demographics profiles:", error);
+      res.status(500).json({ error: "Failed to fetch target demographics profiles" });
     }
   });
 
