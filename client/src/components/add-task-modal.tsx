@@ -27,6 +27,7 @@ import { marinaDueDiligenceTaskTemplates, taskCategories, searchTasks, type Task
 import { DocumentRequirementsManagement } from "./document-requirements-management";
 import { TaskCompletionGate } from "./task-completion-gate";
 import { TaskFiles } from "./task-files";
+import { AddressInput, type AddressComponents } from "@/components/address-input";
 import type { Task } from "@shared/schema";
 
 // Task Owner Selector Component
@@ -1457,37 +1458,24 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                           </Button>
                         </div>
 
-                        {/* 
-                          GEOCODING INTEGRATION NOTES:
-                          - This container is structured for easy geocoding integration
-                          - Add 'data-geocoding-container' attribute to enable autocomplete
-                          - Individual fields have 'data-geocoding-field' attributes for mapping
-                          - Auto-fill button above is ready to trigger geocoding services
-                          - Form validation can be enhanced with address validation in the future
-                          
-                          Future Integration Steps:
-                          1. Enable the auto-fill button and add onClick handler
-                          2. Add autocomplete props to the street address input
-                          3. Implement address parsing to populate individual fields
-                          4. Add address validation using geocoding service
-                        */}
                         <div 
                           className="space-y-3"
                           data-geocoding-container="true"
                           data-testid="container-address-geocoding"
                         >
-                          <div>
-                            <Label htmlFor="companyAddress">Street Address</Label>
-                            <Input
-                              id="companyAddress"
-                              placeholder="123 Main Street"
-                              {...form.register("companyAddress")}
-                              data-testid="input-company-address"
-                              data-geocoding-field="street_address"
-                              data-geocoding-primary="true"
-                              autoComplete="street-address"
-                            />
-                          </div>
+                          <AddressInput
+                            value={form.watch("companyAddress") || ""}
+                            onChange={(value) => form.setValue("companyAddress", value, { shouldDirty: true })}
+                            onAddressSelect={(components: AddressComponents) => {
+                              form.setValue("companyAddress", components.streetAddress || components.fullAddress || '', { shouldDirty: true });
+                              if (components.city) form.setValue("companyCity", components.city, { shouldDirty: true });
+                              if (components.state) form.setValue("companyState", toStateAbbr(components.state), { shouldDirty: true });
+                              if (components.zipCode) form.setValue("companyZip", components.zipCode, { shouldDirty: true });
+                            }}
+                            label="Street Address"
+                            placeholder="Start typing an address..."
+                            testId="input-company-address"
+                          />
                           <div>
                             <Label htmlFor="companySuite">Suite/Unit</Label>
                             <Input
@@ -2188,37 +2176,24 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                           </Button>
                         </div>
 
-                        {/* 
-                          GEOCODING INTEGRATION NOTES:
-                          - This container is structured for easy geocoding integration
-                          - Add 'data-geocoding-container' attribute to enable autocomplete
-                          - Individual fields have 'data-geocoding-field' attributes for mapping
-                          - Auto-fill button above is ready to trigger geocoding services
-                          - Form validation can be enhanced with address validation in the future
-                          
-                          Future Integration Steps:
-                          1. Enable the auto-fill button and add onClick handler
-                          2. Add autocomplete props to the street address input
-                          3. Implement address parsing to populate individual fields
-                          4. Add address validation using geocoding service
-                        */}
                         <div 
                           className="space-y-3"
                           data-geocoding-container="true"
                           data-testid="container-address-geocoding"
                         >
-                          <div>
-                            <Label htmlFor="companyAddress">Street Address</Label>
-                            <Input
-                              id="companyAddress"
-                              placeholder="123 Main Street"
-                              {...form.register("companyAddress")}
-                              data-testid="input-company-address"
-                              data-geocoding-field="street_address"
-                              data-geocoding-primary="true"
-                              autoComplete="street-address"
-                            />
-                          </div>
+                          <AddressInput
+                            value={form.watch("companyAddress") || ""}
+                            onChange={(value) => form.setValue("companyAddress", value, { shouldDirty: true })}
+                            onAddressSelect={(components: AddressComponents) => {
+                              form.setValue("companyAddress", components.streetAddress || components.fullAddress || '', { shouldDirty: true });
+                              if (components.city) form.setValue("companyCity", components.city, { shouldDirty: true });
+                              if (components.state) form.setValue("companyState", toStateAbbr(components.state), { shouldDirty: true });
+                              if (components.zipCode) form.setValue("companyZip", components.zipCode, { shouldDirty: true });
+                            }}
+                            label="Street Address"
+                            placeholder="Start typing an address..."
+                            testId="input-company-address"
+                          />
                           <div>
                             <Label htmlFor="companySuite">Suite/Unit</Label>
                             <Input
