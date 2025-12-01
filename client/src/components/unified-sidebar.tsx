@@ -76,6 +76,16 @@ const shipStoreNav = [
   { name: "Reports", href: "/operations/ship-store/reports", icon: FileText },
 ];
 
+// Operations Navigation - Dockit (Marina Operations) Subcategories
+const dockitNav = [
+  { name: "Dashboard", href: "/operations/dockit", icon: LayoutDashboard },
+  { name: "Launch Schedule", href: "/operations/dockit/launches", icon: Calendar },
+  { name: "Customers", href: "/operations/dockit/customers", icon: Users },
+  { name: "Slips & Leases", href: "/operations/dockit/slips", icon: Anchor },
+  { name: "Contracts", href: "/operations/dockit/contracts", icon: FileText },
+  { name: "Data Import", href: "/operations/dockit/imports", icon: Upload },
+];
+
 // Operations Navigation - Rent Roll Subcategories
 const rentRollNav = [
   { name: "Portfolio", href: "/operations/rent-roll/portfolio", icon: Building2 },
@@ -143,6 +153,7 @@ type BootstrapData = {
 export default function UnifiedSidebar() {
   const [location] = useLocation();
   const [operationsExpanded, setOperationsExpanded] = useState(false);
+  const [dockitExpanded, setDockitExpanded] = useState(false);
   const [fuelSalesExpanded, setFuelSalesExpanded] = useState(false);
   const [shipStoreExpanded, setShipStoreExpanded] = useState(false);
   const [rentRollExpanded, setRentRollExpanded] = useState(false);
@@ -205,6 +216,7 @@ export default function UnifiedSidebar() {
   useEffect(() => {
     // Determine which section the current page belongs to
     const isOperationsPage = location.startsWith('/operations/');
+    const isDockitPage = location.startsWith('/operations/dockit');
     const isFuelSalesPage = location.startsWith('/operations/fuel/');
     const isShipStorePage = location.startsWith('/operations/ship-store/');
     const isRentRollPage = location.startsWith('/operations/rent-roll/') || location === '/operations/customer-analytics';
@@ -224,6 +236,7 @@ export default function UnifiedSidebar() {
 
     // Set expanded states - only expand the active section, collapse all others
     setOperationsExpanded(isOperationsPage);
+    setDockitExpanded(isDockitPage);
     setFuelSalesExpanded(isFuelSalesPage);
     setShipStoreExpanded(isShipStorePage);
     setRentRollExpanded(isRentRollPage);
@@ -437,6 +450,29 @@ export default function UnifiedSidebar() {
             />
             {operationsExpanded && (
             <div className="ml-4 mt-1 mb-2">
+              <button
+                onClick={() => setDockitExpanded(!dockitExpanded)}
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                  location.startsWith('/operations/dockit')
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                )}
+                data-testid="toggle-dockit"
+              >
+                <div className="flex items-center space-x-3">
+                  <Anchor className="w-5 h-5" />
+                  <span>Dockit</span>
+                </div>
+                {dockitExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              {dockitExpanded && (
+                <div className="ml-4">
+                  {dockitNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              )}
               <button
                 onClick={() => setRentRollExpanded(!rentRollExpanded)}
                 className={cn(

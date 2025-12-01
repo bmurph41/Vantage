@@ -341,6 +341,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/ship-store", authenticateUser, shipStoreRouter);
   app.use("/api/integration", authenticateUser, integrationRouter);
 
+  // Dockit Marina Operations Module - mounted at /dockit/api
+  try {
+    const { attachDockitRoutes } = await import("../modules/dockit/server/integration");
+    await attachDockitRoutes(app, (req: any, res: any, next: any) => next(), "dockit-session-secret");
+    console.log("[Dockit] Module routes registered successfully");
+  } catch (error) {
+    console.error("[Dockit] Failed to load module:", error);
+  }
+
   // Auth endpoints
   app.get("/api/auth/me", authenticateUser, (req: any, res) => {
     res.json({
