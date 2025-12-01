@@ -36,7 +36,9 @@ import {
   MapPin,
   AlertCircle,
   RefreshCw,
+  Plus,
 } from 'lucide-react';
+import { BrowseToolsModal } from './BrowseToolsModal';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { UserPinnedItem, UserRecentItem, UserFavorite } from '@shared/schema';
@@ -254,6 +256,7 @@ export function QuickAccessSection() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('pinned');
   const [isValidating, setIsValidating] = useState(false);
+  const [isBrowseToolsOpen, setIsBrowseToolsOpen] = useState(false);
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -372,6 +375,25 @@ export function QuickAccessSection() {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsBrowseToolsOpen(true)}
+                    className="h-8 gap-1.5"
+                    data-testid="button-browse-tools"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Add Tools</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Browse and pin tools & reports</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             {staleItems.length > 0 && (
               <TooltipProvider>
                 <Tooltip>
@@ -548,6 +570,11 @@ export function QuickAccessSection() {
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      <BrowseToolsModal
+        open={isBrowseToolsOpen}
+        onOpenChange={setIsBrowseToolsOpen}
+      />
     </Card>
   );
 }
