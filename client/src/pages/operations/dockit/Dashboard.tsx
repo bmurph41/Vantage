@@ -1,3 +1,4 @@
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,8 @@ import {
   DollarSign, BarChart3, CheckCircle2, PlayCircle, 
   PauseCircle, Timer, Users, ArrowUpDown
 } from "lucide-react";
-import DockitAppShell from "@/components/dockit/DockitAppShell";
+import DockitAppShell, { LaunchFilters, defaultFilters } from "@/components/dockit/DockitAppShell";
+import { startOfDay, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isAfter, parseISO } from "date-fns";
 
 interface DashboardStats {
   todaysLaunches?: number;
@@ -48,7 +50,27 @@ interface TransientSlip {
   dailyRate?: number;
 }
 
+// Helper function to filter by time frame
+function getTimeFrameStart(timeFrame: LaunchFilters['timeFrame']): Date | null {
+  const now = new Date();
+  switch (timeFrame) {
+    case 'today': return startOfDay(now);
+    case 'this_week': return startOfWeek(now, { weekStartsOn: 1 });
+    case 'this_month': return startOfMonth(now);
+    case 'this_quarter': return startOfQuarter(now);
+    case 'this_year': return startOfYear(now);
+    case 'all': return null;
+    default: return startOfDay(now);
+  }
+}
+
 export default function DockitDashboard() {
+  const [filters, setFilters] = useState<LaunchFilters>(defaultFilters);
+  
+  const handleFiltersChange = useCallback((newFilters: LaunchFilters) => {
+    setFilters(newFilters);
+  }, []);
+
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/dockit/api/dashboard/stats"],
     retry: false,
@@ -69,10 +91,61 @@ export default function DockitDashboard() {
     retry: false,
   });
 
+  // Apply filters to launches
+  const filteredLaunches = useMemo(() => {
+    let result = [...allLaunches];
+    
+    // Filter by marina
+    if (filters.marinas.length > 0) {
+      result = result.filter(l => 
+        l.marinaName && filters.marinas.some(m => 
+          l.marinaName?.toLowerCase().includes(m.toLowerCase()) || 
+          String((l as any).marinaId) === m
+        )
+      );
+    }
+    
+    // Filter by time frame
+    const timeStart = getTimeFrameStart(filters.timeFrame);
+    if (timeStart) {
+      result = result.filter(l => {
+        const launchDate = l.scheduledDate ? parseISO(l.scheduledDate) : new Date();
+        return isAfter(launchDate, timeStart);
+      });
+    }
+    
+    // Filter by customer
+    if (filters.customerId) {
+      result = result.filter(l => l.customerId === filters.customerId);
+    }
+    
+    return result;
+  }, [allLaunches, filters]);
+
+  // Apply filters to today's launches 
+  const filteredTodaysLaunches = useMemo(() => {
+    let result = [...todaysLaunches];
+    
+    if (filters.marinas.length > 0) {
+      result = result.filter(l => 
+        l.marinaName && filters.marinas.some(m => 
+          l.marinaName?.toLowerCase().includes(m.toLowerCase()) || 
+          String((l as any).marinaId) === m
+        )
+      );
+    }
+    
+    if (filters.customerId) {
+      result = result.filter(l => l.customerId === filters.customerId);
+    }
+    
+    return result;
+  }, [todaysLaunches, filters]);
+
   // Categorize launches by status
-  const queuedLaunches = allLaunches.filter(l => l.status === 'scheduled' || l.status === 'queued');
-  const inProgressLaunches = allLaunches.filter(l => l.status === 'in_progress' || l.status === 'staging');
-  const completedToday = todaysLaunches.filter(l => l.status === 'completed');
+  const queuedLaunches = filteredLaunches.filter(l => l.status === 'scheduled' || l.status === 'queued');
+  const inProgressLaunches = filteredLaunches.filter(l => l.status === 'in_progress' || l.status === 'staging');
+  const completedToday = filteredTodaysLaunches.filter(l => l.status === 'completed');
 
   const StatCard = ({ title, value, subtitle, icon: Icon, trend, isLoading, variant = "default" }: {
     title: string;
@@ -154,7 +227,12 @@ export default function DockitDashboard() {
   );
 
   return (
-    <DockitAppShell title="Launch Control" description="Real-time boat launch and haul operations">
+    <DockitAppShell 
+      title="Launch Control" 
+      description="Real-time boat launch and haul operations"
+      filters={filters}
+      onFiltersChange={handleFiltersChange}
+    >
       <div className="space-y-6">
         {/* Stats Grid - Transient Focus */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

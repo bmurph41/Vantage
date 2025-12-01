@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import DockitAppShell from "@/components/dockit/DockitAppShell";
+import DockitAppShell, { LaunchFilters, defaultFilters } from "@/components/dockit/DockitAppShell";
+import { startOfDay, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isAfter, parseISO } from "date-fns";
+
+function getTimeFrameStart(timeFrame: LaunchFilters['timeFrame']): Date | null {
+  const now = new Date();
+  switch (timeFrame) {
+    case 'today': return startOfDay(now);
+    case 'this_week': return startOfWeek(now, { weekStartsOn: 1 });
+    case 'this_month': return startOfMonth(now);
+    case 'this_quarter': return startOfQuarter(now);
+    case 'this_year': return startOfYear(now);
+    case 'all': return null;
+    default: return startOfDay(now);
+  }
+}
 
 interface Launch {
   id: string;
@@ -95,6 +109,11 @@ export default function DockitLaunches() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+  const [filters, setFilters] = useState<LaunchFilters>(defaultFilters);
+  
+  const handleFiltersChange = useCallback((newFilters: LaunchFilters) => {
+    setFilters(newFilters);
+  }, []);
 
   const { data: todaysLaunches = [], isLoading: launchesLoading } = useQuery<Launch[]>({
     queryKey: ["/dockit/api/launches/today"],
@@ -204,7 +223,12 @@ export default function DockitLaunches() {
   const pending = todaysLaunches.filter(l => l.status === 'pending' || !l.status).length;
 
   return (
-    <DockitAppShell title="Launch Queue" description="Manage boat launch and haul operations">
+    <DockitAppShell 
+      title="Launch Queue" 
+      description="Manage boat launch and haul operations"
+      filters={filters}
+      onFiltersChange={handleFiltersChange}
+    >
       <div className="space-y-6">
         {/* Header Actions */}
         <div className="flex flex-col sm:flex-row gap-4 justify-between">

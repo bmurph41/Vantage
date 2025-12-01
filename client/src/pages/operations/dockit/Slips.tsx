@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import DockitAppShell from "@/components/dockit/DockitAppShell";
+import DockitAppShell, { LaunchFilters, defaultFilters } from "@/components/dockit/DockitAppShell";
 
 interface Slip {
   id: string;
@@ -90,6 +90,11 @@ export default function DockitSlips() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [filters, setFilters] = useState<LaunchFilters>(defaultFilters);
+  
+  const handleFiltersChange = useCallback((newFilters: LaunchFilters) => {
+    setFilters(newFilters);
+  }, []);
 
   const { data: slips = [], isLoading: slipsLoading } = useQuery<Slip[]>({
     queryKey: ["/dockit/api/slips"],
@@ -191,7 +196,12 @@ export default function DockitSlips() {
   };
 
   return (
-    <DockitAppShell title="Transient Slips" description="Manage transient slip availability and short-term stays">
+    <DockitAppShell 
+      title="Transient Slips" 
+      description="Manage transient slip availability and short-term stays"
+      filters={filters}
+      onFiltersChange={handleFiltersChange}
+    >
       <Tabs defaultValue="slips" className="space-y-6">
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
           <TabsList>
