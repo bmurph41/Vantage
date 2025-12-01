@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, Upload, FileSpreadsheet, Brain, CheckCircle2, AlertCircle, Clock, Settings } from "lucide-react";
+import { ArrowLeft, Upload, FileSpreadsheet, Brain, CheckCircle2, AlertCircle, Clock, Settings, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UploadDropzone } from "./UploadDropzone";
 import { ReviewWizard } from "./ReviewWizard";
 import { CategoryManager } from "./CategoryManager";
+import { HoldingStation } from "./HoldingStation";
 import type { DocIntelUpload, PnlCategory } from "@shared/schema";
 
 interface UploadWithStats extends DocIntelUpload {
@@ -30,7 +31,7 @@ export default function DocumentIntelligence() {
   const { projectId } = useParams<{ projectId: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("uploads");
+  const [activeTab, setActiveTab] = useState("holding");
   const [selectedUpload, setSelectedUpload] = useState<string | null>(null);
 
   const { data: uploads = [], isLoading: uploadsLoading } = useQuery<UploadWithStats[]>({
@@ -121,15 +122,29 @@ export default function DocumentIntelligence() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
+          <TabsTrigger value="holding" data-testid="tab-holding">
+            <Inbox className="h-4 w-4 mr-2" />
+            Holding Station
+          </TabsTrigger>
           <TabsTrigger value="uploads" data-testid="tab-uploads">
             <Upload className="h-4 w-4 mr-2" />
-            Uploads
+            Processing
           </TabsTrigger>
           <TabsTrigger value="categories" data-testid="tab-categories">
             <Settings className="h-4 w-4 mr-2" />
             Categories
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="holding" className="space-y-6">
+          <HoldingStation
+            projectId={projectId!}
+            onProcessDocument={(uploadId) => {
+              setActiveTab("uploads");
+              setSelectedUpload(uploadId);
+            }}
+          />
+        </TabsContent>
 
         <TabsContent value="uploads" className="space-y-6">
           <Card>

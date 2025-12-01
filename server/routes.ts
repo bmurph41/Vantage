@@ -13592,13 +13592,25 @@ Current context: Project ${req.params.projectId}`;
     try {
       const orgId = req.user.orgId;
       const { projectId } = req.params;
+      const { holdingOnly, holdingStatus } = req.query;
       
       const project = await storage.getModelingProject(projectId, orgId);
       if (!project) {
         return res.status(404).json({ error: 'Modeling project not found' });
       }
       
-      const uploads = await docIntelService.getProjectUploads(orgId, projectId);
+      let uploads = await docIntelService.getProjectUploads(orgId, projectId);
+      
+      if (holdingOnly === 'true') {
+        uploads = uploads.filter((u: any) => 
+          u.holdingStatus && ['staging', 'validated', 'ready_to_process'].includes(u.holdingStatus)
+        );
+      }
+      
+      if (holdingStatus) {
+        uploads = uploads.filter((u: any) => u.holdingStatus === holdingStatus);
+      }
+      
       res.json(uploads);
     } catch (error) {
       console.error('Failed to fetch document uploads:', error);
@@ -13622,6 +13634,15 @@ Current context: Project ${req.params.projectId}`;
         return res.status(400).json({ error: 'No file uploaded' });
       }
       
+      let holdingTags: string[] = [];
+      if (req.body.tags) {
+        try {
+          holdingTags = JSON.parse(req.body.tags);
+        } catch {
+          holdingTags = [];
+        }
+      }
+      
       const upload = await docIntelService.createUpload(orgId, {
         modelingProjectId: projectId,
         filename: req.file.filename,
@@ -13632,7 +13653,10 @@ Current context: Project ${req.params.projectId}`;
         docType: req.body.docType || null,
         year: req.body.year ? parseInt(req.body.year) : null,
         uploadedBy: userId,
-        status: 'uploaded'
+        status: 'uploaded',
+        holdingStatus: req.body.holdingStatus || 'staging',
+        holdingTags: holdingTags.length > 0 ? holdingTags : null,
+        holdingNotes: req.body.notes || null,
       });
       
       res.status(201).json(upload);
@@ -13690,6 +13714,47 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to delete document:', error);
       res.status(500).json({ error: 'Failed to delete document' });
+    }
+  });
+
+  // Validate document in holding station (mark as ready for processing)
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/validate', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, uploadId } = req.params;
+      
+      const upload = await docIntelService.getUpload(orgId, uploadId);
+      if (!upload || upload.modelingProjectId !== projectId) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      
+      const validationErrors: string[] = [];
+      if (!upload.docType) {
+        validationErrors.push('Document type is required');
+      }
+      if (!upload.year) {
+        validationErrors.push('Fiscal year is required');
+      }
+      
+      const updatedUpload = await docIntelService.updateUpload(orgId, uploadId, {
+        holdingStatus: validationErrors.length === 0 ? 'validated' : 'staging',
+        validationErrors: validationErrors.length > 0 ? validationErrors : null,
+        validatedAt: validationErrors.length === 0 ? new Date() : null,
+        validatedBy: validationErrors.length === 0 ? userId : null,
+      });
+      
+      if (validationErrors.length > 0) {
+        return res.status(400).json({ 
+          error: 'Validation failed', 
+          validationErrors 
+        });
+      }
+      
+      res.json(updatedUpload);
+    } catch (error) {
+      console.error('Failed to validate document:', error);
+      res.status(500).json({ error: 'Failed to validate document' });
     }
   });
 

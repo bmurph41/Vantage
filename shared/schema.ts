@@ -9626,6 +9626,7 @@ export const docIntelDocTypeEnum = pgEnum("doc_intel_doc_type", ["pnl", "rent_ro
 export const docIntelItemStatusEnum = pgEnum("doc_intel_item_status", ["pending", "confirmed", "rejected", "needs_review"]);
 export const docIntelProcessingStatusEnum = pgEnum("doc_intel_processing_status", ["uploaded", "processing", "parsed", "reviewing", "completed", "error"]);
 export const pnlCategoryTypeEnum = pgEnum("pnl_category_type", ["revenue", "cogs", "opex", "payroll", "other_expense", "other_income"]);
+export const holdingStationStatusEnum = pgEnum("holding_station_status", ["staging", "validated", "ready_to_process", "processing", "processed"]);
 
 // P&L Categories - Hierarchical marina-specific categories (org-configurable)
 export const pnlCategories = pgTable('pnl_categories', {
@@ -9676,6 +9677,16 @@ export const docIntelUploads = pgTable('doc_intel_uploads', {
   status: docIntelProcessingStatusEnum('status').notNull().default('uploaded'),
   errorMessage: text('error_message'),
   
+  // Holding Station - Staging queue before processing
+  holdingStatus: holdingStationStatusEnum('holding_status').default('staging'),
+  holdingTags: text('holding_tags').array(), // User-defined tags for organization
+  holdingNotes: text('holding_notes'), // Notes about the document
+  isDuplicate: boolean('is_duplicate').default(false),
+  duplicateOfId: varchar('duplicate_of_id'), // Reference to original if duplicate
+  validationErrors: jsonb('validation_errors').$type<string[]>(), // Validation issues
+  validatedAt: timestamp('validated_at'),
+  validatedBy: varchar('validated_by').references(() => users.id),
+  
   // Review progress
   wizardStep: integer('wizard_step').default(1), // Current step in review wizard (1-5)
   reviewStartedAt: timestamp('review_started_at'),
@@ -9690,6 +9701,7 @@ export const docIntelUploads = pgTable('doc_intel_uploads', {
   projectIdx: index('doc_intel_uploads_project_idx').on(table.modelingProjectId),
   statusIdx: index('doc_intel_uploads_status_idx').on(table.status),
   docTypeIdx: index('doc_intel_uploads_doc_type_idx').on(table.docType),
+  holdingStatusIdx: index('doc_intel_uploads_holding_status_idx').on(table.holdingStatus),
 }));
 
 // Extracted Items - Line items parsed from documents
