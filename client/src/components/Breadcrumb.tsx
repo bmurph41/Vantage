@@ -684,12 +684,12 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
 }
 
 function DynamicBreadcrumbItem({ item, isLast }: { item: BreadcrumbItem; isLast: boolean }) {
-  const { data: project } = useQuery<{ name: string }>({
+  const { data: project } = useQuery<{ marinaName: string }>({
     queryKey: ['/api/modeling/projects', item.dynamicId],
     enabled: item.dynamicType === 'modeling-project' && !!item.dynamicId,
   });
   
-  const displayLabel = project?.name || item.label;
+  const displayLabel = project?.marinaName || item.label;
   const Icon = item.icon;
   
   if (isLast) {
