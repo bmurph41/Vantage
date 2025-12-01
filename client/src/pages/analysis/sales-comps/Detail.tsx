@@ -32,9 +32,10 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
 
-  // TODO: Implement data fetching when API is available
-  const comp = null;
-  const isLoading = false;
+  const { data: comp, isLoading, error } = useQuery({
+    queryKey: ['/api/sales-comps', compId],
+    enabled: !!compId,
+  });
 
   // TODO: Get user from MarinaMatch auth context
   const user = { role: 'Admin' };
@@ -84,11 +85,11 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
     );
   }
 
-  if (!comp) {
+  if (error || (!isLoading && !comp)) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-center">
-          <p className="text-muted-foreground">Comp not found or API integration pending</p>
+          <p className="text-muted-foreground">Sales comp not found</p>
           <Button variant="outline" onClick={() => window.history.back()} className="mt-4">
             Go Back
           </Button>
@@ -163,8 +164,51 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
 
       {/* Content */}
       <div className={contentClass}>
-        <div className="p-8 text-center text-muted-foreground">
-          Comp detail form pending API integration
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Marina Name</Label>
+              <p className="text-lg font-semibold">{comp?.marina || 'N/A'}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Location</Label>
+              <p className="text-base">{comp?.city && comp?.state ? `${comp.city}, ${comp.state}` : 'N/A'}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Address</Label>
+              <p className="text-base">{comp?.address || 'N/A'}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Sale Date</Label>
+              <p className="text-base">{comp?.saleMonth && comp?.saleYear ? `${comp.saleMonth}/${comp.saleYear}` : 'N/A'}</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Sale Price</Label>
+              <p className="text-lg font-semibold text-green-600">
+                {comp?.salePrice ? `$${Number(comp.salePrice).toLocaleString()}` : 'N/A'}
+              </p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Cap Rate</Label>
+              <p className="text-base">{comp?.capRate ? `${Number(comp.capRate).toFixed(2)}%` : 'N/A'}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Wet Slips</Label>
+              <p className="text-base">{comp?.wetSlips || 'N/A'}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Dry Racks</Label>
+              <p className="text-base">{comp?.dryRacks || 'N/A'}</p>
+            </div>
+          </div>
+          {comp?.notes && (
+            <div className="col-span-2">
+              <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
+              <p className="text-base whitespace-pre-wrap">{comp.notes}</p>
+            </div>
+          )}
         </div>
       </div>
     </Container>
