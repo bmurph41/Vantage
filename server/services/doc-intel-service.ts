@@ -476,7 +476,7 @@ class DocIntelService {
               amount = cell;
             }
           } else if (typeof cell === 'string') {
-            const trimmed = cell.trim();
+            const trimmed = sanitizeText(cell);
             
             const numericValue = this.parseNumericString(trimmed);
             if (numericValue !== null && amount === null) {
@@ -489,7 +489,7 @@ class DocIntelService {
           }
         }
 
-        const rawText = textColumns.join(' ').trim();
+        const rawText = sanitizeText(textColumns.join(' '));
         
         if (rawText.length > 2 || amount !== null) {
           items.push({
@@ -988,15 +988,15 @@ class DocIntelService {
       return header ? row[header] : undefined;
     };
 
-    const unitNumber = String(getValue('unitNumber') || '').trim();
+    const unitNumber = sanitizeText(String(getValue('unitNumber') || ''));
     if (!unitNumber) return null;
 
     const rateValue = getValue('monthlyRate');
     const monthlyRate = typeof rateValue === 'number' 
       ? rateValue 
-      : parseFloat(String(rateValue).replace(/[$,]/g, '')) || 0;
+      : parseFloat(sanitizeText(String(rateValue)).replace(/[$,]/g, '')) || 0;
 
-    const statusRaw = String(getValue('status') || '').toLowerCase();
+    const statusRaw = sanitizeText(String(getValue('status') || '')).toLowerCase();
     let status: ParsedRentRollEntry['status'] = 'active';
     if (statusRaw.includes('vacant') || statusRaw.includes('empty') || statusRaw.includes('available')) {
       status = 'vacant';
@@ -1008,7 +1008,7 @@ class DocIntelService {
 
     return {
       unitNumber,
-      tenantName: String(getValue('tenantName') || '').trim() || undefined,
+      tenantName: sanitizeText(String(getValue('tenantName') || '')) || undefined,
       monthlyRate,
       entryType,
       status,
@@ -1016,14 +1016,14 @@ class DocIntelService {
       endDate: this.parseDate(getValue('endDate')),
       sourceRow,
       boatInfo: {
-        name: String(getValue('boatName') || '').trim() || undefined,
+        name: sanitizeText(String(getValue('boatName') || '')) || undefined,
         length: parseFloat(String(getValue('boatLength') || '')) || undefined,
-        make: String(getValue('make') || '').trim() || undefined,
-        model: String(getValue('model') || '').trim() || undefined,
+        make: sanitizeText(String(getValue('make') || '')) || undefined,
+        model: sanitizeText(String(getValue('model') || '')) || undefined,
       },
       contactInfo: {
-        email: String(getValue('email') || '').trim() || undefined,
-        phone: String(getValue('phone') || '').trim() || undefined,
+        email: sanitizeText(String(getValue('email') || '')) || undefined,
+        phone: sanitizeText(String(getValue('phone') || '')) || undefined,
       },
       rawData: row,
     };
