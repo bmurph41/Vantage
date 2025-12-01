@@ -10714,6 +10714,187 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ============================================================================
+  // MODELING FINANCIAL PERIODS - Year-based financial data for pricing/yields
+  // ============================================================================
+
+  // Get all financial periods for a project
+  app.get('/api/modeling/projects/:projectId/financial-periods', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const periods = await storage.getModelingFinancialPeriods(projectId, orgId);
+      res.json(periods);
+    } catch (error) {
+      console.error('Failed to fetch financial periods:', error);
+      res.status(500).json({ error: 'Failed to fetch financial periods' });
+    }
+  });
+
+  // Get available period options for year selector (returns just period type and label)
+  app.get('/api/modeling/projects/:projectId/available-periods', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const periods = await storage.getAvailableFinancialPeriods(projectId, orgId);
+      res.json(periods);
+    } catch (error) {
+      console.error('Failed to fetch available periods:', error);
+      res.status(500).json({ error: 'Failed to fetch available periods' });
+    }
+  });
+
+  // Get a specific financial period by ID
+  app.get('/api/modeling/financial-periods/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const period = await storage.getModelingFinancialPeriod(req.params.id, orgId);
+      
+      if (!period) {
+        return res.status(404).json({ error: 'Financial period not found' });
+      }
+      
+      res.json(period);
+    } catch (error) {
+      console.error('Failed to fetch financial period:', error);
+      res.status(500).json({ error: 'Failed to fetch financial period' });
+    }
+  });
+
+  // Get financial period by label for a project
+  app.get('/api/modeling/projects/:projectId/financial-periods/by-label/:label', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, label } = req.params;
+      
+      const period = await storage.getModelingFinancialPeriodByLabel(projectId, label, orgId);
+      
+      if (!period) {
+        return res.status(404).json({ error: 'Financial period not found' });
+      }
+      
+      res.json(period);
+    } catch (error) {
+      console.error('Failed to fetch financial period by label:', error);
+      res.status(500).json({ error: 'Failed to fetch financial period by label' });
+    }
+  });
+
+  // Create a new financial period
+  app.post('/api/modeling/projects/:projectId/financial-periods', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const data = {
+        ...req.body,
+        orgId,
+        modelingProjectId: projectId,
+        createdBy: userId
+      };
+      
+      const period = await storage.createModelingFinancialPeriod(data);
+      res.status(201).json(period);
+    } catch (error) {
+      console.error('Failed to create financial period:', error);
+      res.status(500).json({ error: 'Failed to create financial period' });
+    }
+  });
+
+  // Update a financial period
+  app.patch('/api/modeling/financial-periods/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      const period = await storage.updateModelingFinancialPeriod(req.params.id, req.body, orgId);
+      
+      if (!period) {
+        return res.status(404).json({ error: 'Financial period not found' });
+      }
+      
+      res.json(period);
+    } catch (error) {
+      console.error('Failed to update financial period:', error);
+      res.status(500).json({ error: 'Failed to update financial period' });
+    }
+  });
+
+  // Delete a financial period
+  app.delete('/api/modeling/financial-periods/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await storage.deleteModelingFinancialPeriod(req.params.id, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Financial period not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete financial period:', error);
+      res.status(500).json({ error: 'Failed to delete financial period' });
+    }
+  });
+
+  // Recalculate yields for a financial period (based on purchase price and NOI)
+  app.post('/api/modeling/financial-periods/:id/recalculate', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { purchasePrice, totalUnits } = req.body;
+      
+      const period = await storage.getModelingFinancialPeriod(req.params.id, orgId);
+      if (!period) {
+        return res.status(404).json({ error: 'Financial period not found' });
+      }
+      
+      // Calculate yields
+      const noi = period.noi ? Number(period.noi) : 0;
+      const price = purchasePrice || Number(period.purchasePrice) || 0;
+      const units = totalUnits || period.totalUnits || 0;
+      const revenue = period.totalRevenue ? Number(period.totalRevenue) : 0;
+      
+      const capRate = price > 0 ? noi / price : 0;
+      const pricePerUnit = units > 0 ? price / units : 0;
+      const noiMargin = revenue > 0 ? noi / revenue : 0;
+      
+      const updated = await storage.updateModelingFinancialPeriod(
+        req.params.id,
+        {
+          purchasePrice: price.toString(),
+          capRate: capRate.toString(),
+          pricePerUnit: pricePerUnit.toString(),
+          noiMargin: noiMargin.toString(),
+          totalUnits: units,
+          lastCalculatedAt: new Date()
+        },
+        orgId
+      );
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Failed to recalculate financial period:', error);
+      res.status(500).json({ error: 'Failed to recalculate financial period' });
+    }
+  });
+
   // Project Workspace - Configuration
   app.get('/api/modeling/projects/:projectId/config', authenticateUser, async (req: any, res) => {
     try {

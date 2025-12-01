@@ -64,6 +64,7 @@ import {
   type InsertExternalUser, type InsertExternalUserProjectAccess,
   type ModelingRegion, type InsertModelingRegion, type UpdateModelingRegion,
   type ModelingProject, type InsertModelingProject, type UpdateModelingProject,
+  modelingFinancialPeriods, type ModelingFinancialPeriod, type InsertModelingFinancialPeriod, type UpdateModelingFinancialPeriod,
   type ExitScenario, type InsertExitScenario, type UpdateExitScenario,
   type ExitTaxCalculation, type InsertExitTaxCalculation, type UpdateExitTaxCalculation,
   type ExitSellerFinancing, type InsertExitSellerFinancing, type UpdateExitSellerFinancing,
@@ -841,6 +842,15 @@ export interface IStorage {
     dealsByBroker: Array<{ brokerId: string; brokerName: string; count: number; totalValue: number }>;
     dealsByRegion: Array<{ region: string; count: number; totalValue: number }>;
   }>;
+
+  // Modeling Financial Periods - Year-based financial summaries for pricing calculations
+  getModelingFinancialPeriods(modelingProjectId: string, orgId: string): Promise<ModelingFinancialPeriod[]>;
+  getModelingFinancialPeriod(id: string, orgId: string): Promise<ModelingFinancialPeriod | undefined>;
+  getModelingFinancialPeriodByLabel(modelingProjectId: string, periodLabel: string, orgId: string): Promise<ModelingFinancialPeriod | undefined>;
+  createModelingFinancialPeriod(data: InsertModelingFinancialPeriod): Promise<ModelingFinancialPeriod>;
+  updateModelingFinancialPeriod(id: string, data: UpdateModelingFinancialPeriod, orgId: string): Promise<ModelingFinancialPeriod | undefined>;
+  deleteModelingFinancialPeriod(id: string, orgId: string): Promise<boolean>;
+  getAvailableFinancialPeriods(modelingProjectId: string, orgId: string): Promise<Array<{ periodType: string; periodLabel: string; periodYear: number | null }>>;
 
   // Exit Strategy Suite - Exit Scenarios
   getExitScenarios(modelingProjectId: string, orgId: string): Promise<ExitScenario[]>;
@@ -7207,6 +7217,86 @@ export class DatabaseStorage implements IStorage {
       capRateDistribution,
       priceDistribution
     };
+  }
+
+  // ============================================================================
+  // MODELING FINANCIAL PERIODS - Year-based financial summaries
+  // ============================================================================
+
+  async getModelingFinancialPeriods(modelingProjectId: string, orgId: string): Promise<ModelingFinancialPeriod[]> {
+    return await db.select()
+      .from(modelingFinancialPeriods)
+      .where(and(
+        eq(modelingFinancialPeriods.modelingProjectId, modelingProjectId),
+        eq(modelingFinancialPeriods.orgId, orgId)
+      ))
+      .orderBy(asc(modelingFinancialPeriods.sortOrder));
+  }
+
+  async getModelingFinancialPeriod(id: string, orgId: string): Promise<ModelingFinancialPeriod | undefined> {
+    const [period] = await db.select()
+      .from(modelingFinancialPeriods)
+      .where(and(
+        eq(modelingFinancialPeriods.id, id),
+        eq(modelingFinancialPeriods.orgId, orgId)
+      ));
+    return period || undefined;
+  }
+
+  async getModelingFinancialPeriodByLabel(modelingProjectId: string, periodLabel: string, orgId: string): Promise<ModelingFinancialPeriod | undefined> {
+    const [period] = await db.select()
+      .from(modelingFinancialPeriods)
+      .where(and(
+        eq(modelingFinancialPeriods.modelingProjectId, modelingProjectId),
+        eq(modelingFinancialPeriods.periodLabel, periodLabel),
+        eq(modelingFinancialPeriods.orgId, orgId)
+      ));
+    return period || undefined;
+  }
+
+  async createModelingFinancialPeriod(data: InsertModelingFinancialPeriod): Promise<ModelingFinancialPeriod> {
+    const [created] = await db.insert(modelingFinancialPeriods)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateModelingFinancialPeriod(id: string, data: UpdateModelingFinancialPeriod, orgId: string): Promise<ModelingFinancialPeriod | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(modelingFinancialPeriods)
+      .set(updateData as any)
+      .where(and(
+        eq(modelingFinancialPeriods.id, id),
+        eq(modelingFinancialPeriods.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteModelingFinancialPeriod(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(modelingFinancialPeriods)
+      .where(and(
+        eq(modelingFinancialPeriods.id, id),
+        eq(modelingFinancialPeriods.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getAvailableFinancialPeriods(modelingProjectId: string, orgId: string): Promise<Array<{ periodType: string; periodLabel: string; periodYear: number | null }>> {
+    const periods = await db.select({
+      periodType: modelingFinancialPeriods.periodType,
+      periodLabel: modelingFinancialPeriods.periodLabel,
+      periodYear: modelingFinancialPeriods.periodYear
+    })
+      .from(modelingFinancialPeriods)
+      .where(and(
+        eq(modelingFinancialPeriods.modelingProjectId, modelingProjectId),
+        eq(modelingFinancialPeriods.orgId, orgId)
+      ))
+      .orderBy(asc(modelingFinancialPeriods.sortOrder));
+    
+    return periods;
   }
 
   // ============================================================================
