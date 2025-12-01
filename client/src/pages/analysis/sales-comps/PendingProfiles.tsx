@@ -64,21 +64,26 @@ export default function PendingProfiles() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: pendingProfiles = [], isLoading } = useQuery<PendingPropertyProfile[]>({
+  const { data: pendingProfilesData, isLoading } = useQuery<PendingPropertyProfile[]>({
     queryKey: ['/api/sales-comps/pending-property-profiles'],
     staleTime: 60 * 1000,
     refetchInterval: 2 * 60 * 1000,
   });
 
-  const { data: salesComps = [] } = useQuery<SalesComp[]>({
+  const { data: salesCompsData } = useQuery<SalesComp[]>({
     queryKey: ['/api/sales-comps'],
     staleTime: 60 * 1000,
   });
 
-  const { data: properties = [] } = useQuery<Property[]>({
+  const { data: propertiesData } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
     staleTime: 60 * 1000,
   });
+
+  // Ensure arrays are always valid even if API returns null/undefined
+  const pendingProfiles = Array.isArray(pendingProfilesData) ? pendingProfilesData : [];
+  const salesComps = Array.isArray(salesCompsData) ? salesCompsData : [];
+  const properties = Array.isArray(propertiesData) ? propertiesData : [];
 
   const createPropertyMutation = useMutation({
     mutationFn: async ({ profileId, compId }: { profileId: string; compId: string }) => {
@@ -212,11 +217,22 @@ export default function PendingProfiles() {
       </div>
 
       {pendingCount === 0 ? (
-        <Alert>
-          <AlertDescription>
-            No pending property profiles to create. When you import sales comps, any that don't have matching properties will appear here.
-          </AlertDescription>
-        </Alert>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="rounded-full bg-green-100 p-3 mb-4">
+              <Check className="h-6 w-6 text-green-600" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">All caught up!</h3>
+            <p className="text-muted-foreground max-w-md">
+              No pending property profiles to create. When you import sales comps, any that don't have matching properties will appear here.
+            </p>
+            <Link href="/analysis/sales-comps">
+              <Button variant="outline" className="mt-4" data-testid="button-view-sales-comps">
+                View Sales Comps
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       ) : (
         <Card>
           <CardHeader>
