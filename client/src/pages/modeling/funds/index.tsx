@@ -282,10 +282,7 @@ function CreateFundDialog({
 
   const createFundMutation = useMutation({
     mutationFn: async (data: CreateFundForm) => {
-      return await apiRequest('/api/funds', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      return await apiRequest('POST', '/api/funds', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/funds'] });
