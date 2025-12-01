@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'wouter';
-import { ChevronRight, Home, Anchor } from 'lucide-react';
+import { ChevronRight, Anchor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BreadcrumbItem {
@@ -9,370 +9,365 @@ interface BreadcrumbItem {
 }
 
 const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
-  '/dashboard': [
-    { label: 'Dashboard', icon: Home },
-  ],
+  '/dashboard': [],
   '/projects': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Due Diligence' },
   ],
   '/projects/summary': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Due Diligence' },
   ],
   '/dd/projects': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Due Diligence' },
   ],
   '/crm': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM' },
   ],
   '/crm/deals': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM', href: '/crm' },
     { label: 'Deals' },
   ],
   '/crm/pipeline': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM', href: '/crm' },
     { label: 'Pipeline' },
   ],
   '/crm/contacts': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM', href: '/crm' },
     { label: 'Contacts' },
   ],
   '/crm/companies': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM', href: '/crm' },
     { label: 'Companies' },
   ],
   '/crm/properties': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM', href: '/crm' },
     { label: 'Properties' },
   ],
   '/crm/leads': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM', href: '/crm' },
     { label: 'Leads' },
   ],
   '/crm/analytics': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM', href: '/crm' },
     { label: 'Analytics' },
   ],
   '/crm/forecast': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM', href: '/crm' },
     { label: 'Forecast' },
   ],
   '/crm/activity': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM', href: '/crm' },
     { label: 'Activity' },
   ],
   '/crm/tasks': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM', href: '/crm' },
     { label: 'Tasks' },
   ],
   '/crm/marketing': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'CRM', href: '/crm' },
     { label: 'Marketing Automation' },
   ],
   '/prospecting': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Prospecting' },
   ],
   '/prospecting/board': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Prospecting', href: '/prospecting' },
     { label: 'Board' },
   ],
   '/prospecting/markets': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Prospecting', href: '/prospecting' },
     { label: 'Market Targets' },
   ],
   '/prospecting/campaigns': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Prospecting', href: '/prospecting' },
     { label: 'Campaigns' },
   ],
   '/prospecting/analytics': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Prospecting', href: '/prospecting' },
     { label: 'Analytics' },
   ],
   '/modeling': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling' },
   ],
   '/modeling/projects': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Projects' },
   ],
   '/modeling/portfolio': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Portfolio' },
   ],
   '/modeling/exit': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Exit Strategy' },
   ],
   '/modeling/exit/scenarios': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Exit Strategy', href: '/modeling/exit' },
     { label: 'Scenarios' },
   ],
   '/modeling/exit/tax': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Exit Strategy', href: '/modeling/exit' },
     { label: 'Tax Calculator' },
   ],
   '/modeling/exit/net-proceeds': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Exit Strategy', href: '/modeling/exit' },
     { label: 'Net Proceeds' },
   ],
   '/modeling/exit/1031': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Exit Strategy', href: '/modeling/exit' },
     { label: '1031 Exchange' },
   ],
   '/modeling/exit/dst': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Exit Strategy', href: '/modeling/exit' },
     { label: 'DST Analysis' },
   ],
+  '/modeling/exit/seller-financing': [
+    { label: 'Modeling', href: '/modeling' },
+    { label: 'Exit Strategy', href: '/modeling/exit' },
+    { label: 'Seller Financing' },
+  ],
+  '/modeling/exit/earnout': [
+    { label: 'Modeling', href: '/modeling' },
+    { label: 'Exit Strategy', href: '/modeling/exit' },
+    { label: 'Earnout' },
+  ],
   '/modeling/exit/waterfall': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Exit Strategy', href: '/modeling/exit' },
     { label: 'Waterfall' },
   ],
   '/modeling/exit/irr': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Exit Strategy', href: '/modeling/exit' },
     { label: 'IRR Calculator' },
   ],
   '/modeling/exit/sensitivity': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Exit Strategy', href: '/modeling/exit' },
     { label: 'Sensitivity' },
   ],
+  '/modeling/exit/ai-insights': [
+    { label: 'Modeling', href: '/modeling' },
+    { label: 'Exit Strategy', href: '/modeling/exit' },
+    { label: 'AI Insights' },
+  ],
   '/modeling/doc-intel': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Document Intelligence' },
   ],
   '/modeling/debt-scenarios': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Debt Scenarios' },
   ],
   '/modeling/settings': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Modeling', href: '/modeling' },
     { label: 'Settings' },
   ],
   '/analysis/sales-comps': [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Analysis' },
     { label: 'Sales Comps' },
   ],
   '/analysis/sales-comps/analytics': [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Analysis' },
     { label: 'Sales Comps', href: '/analysis/sales-comps' },
     { label: 'Analytics' },
   ],
   '/analysis/sales-comps/upload': [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Analysis' },
     { label: 'Sales Comps', href: '/analysis/sales-comps' },
     { label: 'Upload' },
   ],
   '/analysis/sales-comps/compare': [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Analysis' },
     { label: 'Sales Comps', href: '/analysis/sales-comps' },
     { label: 'Compare' },
   ],
+  '/analysis/sales-comps/bulk-edit': [
+    { label: 'Sales Comps', href: '/analysis/sales-comps' },
+    { label: 'Bulk Edit' },
+  ],
+  '/analysis/sales-comps/columns': [
+    { label: 'Sales Comps', href: '/analysis/sales-comps' },
+    { label: 'Column Manager' },
+  ],
+  '/analysis/sales-comps/projects': [
+    { label: 'Sales Comps', href: '/analysis/sales-comps' },
+    { label: 'Projects' },
+  ],
   '/analysis/rate-comps': [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Analysis' },
     { label: 'Rate Comps' },
   ],
   '/analysis/rate-comps/analytics': [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Analysis' },
     { label: 'Rate Comps', href: '/analysis/rate-comps' },
     { label: 'Analytics' },
   ],
+  '/analysis/rate-comps/upload': [
+    { label: 'Rate Comps', href: '/analysis/rate-comps' },
+    { label: 'Upload' },
+  ],
+  '/analysis/rate-comps/compare': [
+    { label: 'Rate Comps', href: '/analysis/rate-comps' },
+    { label: 'Compare' },
+  ],
+  '/analysis/rate-comps/bulk-edit': [
+    { label: 'Rate Comps', href: '/analysis/rate-comps' },
+    { label: 'Bulk Edit' },
+  ],
+  '/analysis/rate-comps/columns': [
+    { label: 'Rate Comps', href: '/analysis/rate-comps' },
+    { label: 'Column Manager' },
+  ],
   '/analysis/demographics': [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Analysis' },
-    { label: 'Demographics' },
+    { label: 'Market Demographics' },
   ],
   '/analysis/benchmarks': [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Analysis' },
     { label: 'Benchmarks' },
   ],
   '/operations/dockit': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Launch Operations', icon: Anchor },
   ],
   '/operations/dockit/launches': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Launch Operations', href: '/operations/dockit', icon: Anchor },
     { label: 'Launch Queue' },
   ],
   '/operations/dockit/slips': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Launch Operations', href: '/operations/dockit', icon: Anchor },
     { label: 'Transient Slips' },
   ],
   '/rent-roll': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Rent Roll' },
   ],
   '/rent-roll/customers': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Rent Roll', href: '/rent-roll' },
     { label: 'Customer Analytics' },
   ],
   '/rent-roll/portfolio': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Rent Roll', href: '/rent-roll' },
     { label: 'Portfolio' },
   ],
   '/rent-roll/projects': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Rent Roll', href: '/rent-roll' },
     { label: 'Projects' },
   ],
   '/fuel': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Fuel Operations' },
   ],
   '/fuel/transactions': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Fuel Operations', href: '/fuel' },
     { label: 'Transactions' },
   ],
   '/fuel/inventory': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Fuel Operations', href: '/fuel' },
     { label: 'Inventory' },
   ],
   '/fuel/analytics': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Fuel Operations', href: '/fuel' },
     { label: 'Analytics' },
   ],
   '/fuel/reports': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Fuel Operations', href: '/fuel' },
     { label: 'Reports' },
   ],
+  '/fuel/model': [
+    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Financial Model' },
+  ],
+  '/fuel/settings': [
+    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Settings' },
+  ],
+  '/fuel/import-history': [
+    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Import History' },
+  ],
+  '/fuel/audit': [
+    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Audit Trail' },
+  ],
   '/ship-store': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Ship Store' },
   ],
   '/ship-store/pos': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Ship Store', href: '/ship-store' },
     { label: 'Point of Sale' },
   ],
   '/ship-store/inventory': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Ship Store', href: '/ship-store' },
     { label: 'Inventory' },
   ],
   '/ship-store/transactions': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Ship Store', href: '/ship-store' },
     { label: 'Transactions' },
   ],
+  '/ship-store/checkout': [
+    { label: 'Ship Store', href: '/ship-store' },
+    { label: 'Checkout' },
+  ],
   '/ship-store/analytics': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Ship Store', href: '/ship-store' },
     { label: 'Analytics' },
   ],
   '/ship-store/reports': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Ship Store', href: '/ship-store' },
     { label: 'Reports' },
   ],
   '/marketing': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Marketing' },
   ],
   '/marketing/campaigns': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Marketing', href: '/marketing' },
     { label: 'Campaigns' },
   ],
   '/marketing/expenses': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Marketing', href: '/marketing' },
     { label: 'Expenses' },
   ],
   '/marketing/attribution': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Marketing', href: '/marketing' },
     { label: 'Attribution' },
   ],
   '/marketing/email': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Marketing', href: '/marketing' },
     { label: 'Email Campaigns' },
   ],
+  '/marketing/settings': [
+    { label: 'Marketing', href: '/marketing' },
+    { label: 'Settings' },
+  ],
   '/vdr': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Virtual Data Room' },
   ],
   '/vdr/data-request': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Virtual Data Room', href: '/vdr' },
     { label: 'Data Request' },
   ],
   '/docktalk': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'DockTalk' },
   ],
   '/docktalk/feed': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'DockTalk', href: '/docktalk' },
     { label: 'News Feed' },
   ],
   '/docktalk/deals': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'DockTalk', href: '/docktalk' },
     { label: 'M&A Deals' },
   ],
+  '/docktalk/sources': [
+    { label: 'DockTalk', href: '/docktalk' },
+    { label: 'Sources' },
+  ],
+  '/docktalk/training': [
+    { label: 'DockTalk', href: '/docktalk' },
+    { label: 'AI Training' },
+  ],
   '/user/settings': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'User Settings' },
   ],
   '/audit-logs': [
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Audit Logs' },
+  ],
+  '/marina-database': [
+    { label: 'Marina Database' },
   ],
 };
 
@@ -400,21 +395,26 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
         .split('-')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
-      return [...parentBreadcrumbs.slice(0, -1), { ...parentBreadcrumbs[parentBreadcrumbs.length - 1], href: parentPath }, { label: formattedLabel }];
+      if (parentBreadcrumbs.length > 0) {
+        return [...parentBreadcrumbs.slice(0, -1), { ...parentBreadcrumbs[parentBreadcrumbs.length - 1], href: parentPath }, { label: formattedLabel }];
+      }
+      return [{ label: formattedLabel }];
     }
   }
 
-  return [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: segments.length > 0 ? segments[segments.length - 1].charAt(0).toUpperCase() + segments[segments.length - 1].slice(1) : 'Page' },
-  ];
+  if (segments.length > 0) {
+    const lastSegment = segments[segments.length - 1];
+    return [{ label: lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' ') }];
+  }
+
+  return [];
 }
 
 export function Breadcrumb() {
   const [location] = useLocation();
   const breadcrumbs = getBreadcrumbsForPath(location);
 
-  if (location === '/dashboard' || location === '/') {
+  if (location === '/dashboard' || location === '/' || breadcrumbs.length === 0) {
     return null;
   }
 
