@@ -3,9 +3,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, ChevronDown, ChevronUp, Plus, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -19,6 +20,8 @@ import { formatCurrency, formatNumber } from "@/lib/formatUtils";
 import { CRMCharts } from "@/components/dashboard/CRMCharts";
 import { RevenueCharts } from "@/components/dashboard/RevenueCharts";
 import { AddModuleModal } from "@/components/dashboard/AddModuleModal";
+import { WidgetBuilder } from "@/components/dashboard/WidgetBuilder";
+import { SavedLayoutsPanel } from "@/components/dashboard/SavedLayoutsPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DetailPanel } from "@/components/dashboard/DetailPanel";
 import { DataTable, Column } from "@/components/dashboard/DataTable";
@@ -395,7 +398,26 @@ export default function Dashboard() {
       localStorage.setItem('dashboardTimeRange', timeRange);
     }
   }, [timeRange]);
+
+  // Sales Comps year filter state with localStorage persistence
+  const currentYear = new Date().getFullYear();
+  const [salesCompsYear, setSalesCompsYear] = useState<number | 'all'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboardSalesCompsYear');
+      return saved === 'all' ? 'all' : saved ? parseInt(saved) : currentYear;
+    }
+    return currentYear;
+  });
+
+  // Save sales comps year to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboardSalesCompsYear', String(salesCompsYear));
+    }
+  }, [salesCompsYear]);
+
   const [isAddModuleModalOpen, setIsAddModuleModalOpen] = useState(false);
+  const [isWidgetBuilderOpen, setIsWidgetBuilderOpen] = useState(false);
   const [isCRMDetailOpen, setIsCRMDetailOpen] = useState(false);
   const [isSalesCompsDetailOpen, setIsSalesCompsDetailOpen] = useState(false);
   const [isFuelDetailOpen, setIsFuelDetailOpen] = useState(false);
@@ -469,6 +491,62 @@ export default function Dashboard() {
     queryKey: ['/api/analysis/sales-comps/recent', timeRange],
     queryFn: () => fetch(`/api/analysis/sales-comps/recent?timeRange=${timeRange}`).then(res => res.json()),
     enabled: isSalesCompsDetailOpen,
+  });
+
+  // Fetch year-filtered sales comps metrics using widget query engine
+  const { data: salesCompsMetrics, isLoading: salesCompsMetricsLoading } = useQuery({
+    queryKey: ['/api/dashboards/widgets/query', 'sales_comps', 'total_count', salesCompsYear],
+    queryFn: async () => {
+      const defaultResult = {
+        totalComps: 0,
+        compsTrend: undefined,
+        avgPrice: 0,
+        avgPriceTrend: undefined,
+        avgPricePerSlip: 0,
+        avgPricePerSlipTrend: undefined,
+      };
+
+      const fetchMetric = async (metricKey: string) => {
+        const response = await fetch('/api/dashboards/widgets/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            moduleKey: 'sales_comps',
+            metricKey,
+            filters: salesCompsYear !== 'all' ? { year: salesCompsYear } : {},
+            options: {
+              timeRangeType: salesCompsYear !== 'all' ? 'current_year' : 'all_time',
+              enableComparison: true,
+              comparisonType: 'yoy',
+            },
+          }),
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${metricKey}`);
+        }
+        const data = await response.json();
+        return { value: Number(data.value) || 0, trend: data.trend };
+      };
+
+      try {
+        const countResult = await fetchMetric('total_count');
+        const priceResult = await fetchMetric('avg_price');
+        const pricePerSlipResult = await fetchMetric('avg_price_per_slip');
+
+        return {
+          totalComps: countResult.value,
+          compsTrend: countResult.trend,
+          avgPrice: priceResult.value,
+          avgPriceTrend: priceResult.trend,
+          avgPricePerSlip: pricePerSlipResult.value,
+          avgPricePerSlipTrend: pricePerSlipResult.trend,
+        };
+      } catch (error) {
+        console.error('Failed to fetch sales comps metrics:', error);
+        return defaultResult;
+      }
+    },
+    retry: 1,
   });
 
   // Fetch recent fuel transactions for detail panel
@@ -881,53 +959,82 @@ export default function Dashboard() {
       icon: TrendingUp,
       link: '/analysis/sales-comps/analytics',
       data: dashboardData?.salesComps,
-      renderContent: (data) => (
-        <div className="space-y-4">
-          <MetricGrid columns={2}>
-            <EnhancedMetricCard
-              label="Recent Comps"
-              value={data?.totalComps || 0}
-              type="number"
-              size="md"
-              variant="primary"
-              icon={TrendingUp}
-              testId="comps-total"
-              tooltip="Number of sales comparables in selected period"
-              onClick={() => setIsSalesCompsDetailOpen(true)}
-              clickable={true}
-              trend={data?.compsTrend}
-              trendLabel={timeRange === '7d' ? 'vs last week' : timeRange === '30d' ? 'vs last month' : timeRange === '90d' ? 'vs last quarter' : 'vs last year'}
-            />
-            <EnhancedMetricCard
-              label="Avg. Price"
-              value={data?.avgPricePerSlip || 0}
-              type="currency"
-              size="md"
-              testId="comps-avg-price"
-              tooltip="Average sale price across all comparables"
-              onClick={() => setIsSalesCompsDetailOpen(true)}
-              clickable={true}
-              comparison={{
-                label: 'Median Price',
-                value: data?.medianPricePerSlip || 0,
-                type: 'currency'
-              }}
-            />
-          </MetricGrid>
-          {data?.recentComps && data.recentComps.length > 0 && (
-            <ModuleSection title="Recent Comps" description="Most recently added comparables">
-              <DataList
-                items={data.recentComps.slice(0, 3).map((comp: any) => ({
-                  label: comp.marina || 'Unnamed Marina',
-                  value: formatCurrency(comp.salePrice || 0),
-                  badge: comp.state ? comp.state.substring(0, 2).toUpperCase() : undefined,
-                }))}
-                maxItems={3}
-              />
-            </ModuleSection>
-          )}
-        </div>
-      ),
+      renderContent: (data) => {
+        const displayMetrics = salesCompsMetrics || data;
+        const yearOptions = Array.from({ length: 10 }, (_, i) => currentYear - i);
+        
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span className="text-xs text-gray-600">Filter by Year</span>
+              </div>
+              <Select
+                value={String(salesCompsYear)}
+                onValueChange={(value) => setSalesCompsYear(value === 'all' ? 'all' : parseInt(value))}
+              >
+                <SelectTrigger className="w-[100px] h-7 text-xs" data-testid="sales-comps-year-filter">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  {yearOptions.map((year) => (
+                    <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {salesCompsMetricsLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : (
+              <MetricGrid columns={2}>
+                <EnhancedMetricCard
+                  label={salesCompsYear === 'all' ? 'Total Comps' : `${salesCompsYear} Comps`}
+                  value={displayMetrics?.totalComps || 0}
+                  type="number"
+                  size="md"
+                  variant="primary"
+                  icon={TrendingUp}
+                  testId="comps-total"
+                  tooltip={salesCompsYear === 'all' ? 'Total sales comparables' : `Number of sales comparables in ${salesCompsYear}`}
+                  onClick={() => setIsSalesCompsDetailOpen(true)}
+                  clickable={true}
+                  trend={displayMetrics?.compsTrend}
+                  trendLabel={salesCompsYear === 'all' ? 'overall' : 'vs prior year'}
+                />
+                <EnhancedMetricCard
+                  label="Avg. Price"
+                  value={displayMetrics?.avgPricePerSlip || displayMetrics?.avgPrice || 0}
+                  type="currency"
+                  size="md"
+                  testId="comps-avg-price"
+                  tooltip={salesCompsYear === 'all' ? 'Average sale price across all comparables' : `Average sale price in ${salesCompsYear}`}
+                  onClick={() => setIsSalesCompsDetailOpen(true)}
+                  clickable={true}
+                  trend={displayMetrics?.avgPricePerSlipTrend || displayMetrics?.avgPriceTrend}
+                  trendLabel={salesCompsYear === 'all' ? 'overall' : 'vs prior year'}
+                />
+              </MetricGrid>
+            )}
+            {data?.recentComps && data.recentComps.length > 0 && (
+              <ModuleSection title="Recent Comps" description="Most recently added comparables">
+                <DataList
+                  items={data.recentComps.slice(0, 3).map((comp: any) => ({
+                    label: comp.marina || 'Unnamed Marina',
+                    value: formatCurrency(comp.salePrice || 0),
+                    badge: comp.state ? comp.state.substring(0, 2).toUpperCase() : undefined,
+                  }))}
+                  maxItems={3}
+                />
+              </ModuleSection>
+            )}
+          </div>
+        );
+      },
     },
     {
       id: 'vdr-activity',
@@ -1322,6 +1429,34 @@ export default function Dashboard() {
               <Plus className="h-4 w-4 mr-2" />
               Add Module
             </Button>
+            <Button
+              size="sm"
+              onClick={() => setIsWidgetBuilderOpen(true)}
+              data-testid="button-create-widget"
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Create Widget
+            </Button>
+            <SavedLayoutsPanel
+              currentModuleOrder={moduleOrder}
+              currentCollapsedModules={Array.from(collapsedModules)}
+              currentVisibleModules={selectedModules}
+              onLoadLayout={(layoutData) => {
+                if (layoutData.moduleOrder) {
+                  setModuleOrder(layoutData.moduleOrder);
+                }
+                if (layoutData.collapsedModules) {
+                  setCollapsedModules(new Set(layoutData.collapsedModules));
+                }
+                if (layoutData.visibleModules) {
+                  queryClient.setQueryData(['/api/dashboards/modules'], { selectedModules: layoutData.visibleModules });
+                  saveModulesMutation.mutate(layoutData.visibleModules);
+                }
+                queryClient.invalidateQueries({ queryKey: ['/api/dashboards/data'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/dashboards/widgets/query'] });
+              }}
+            />
             <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
           </div>
         </div>
@@ -1374,6 +1509,18 @@ export default function Dashboard() {
         customModules={customModules}
         onCreateCustomModule={(data) => createCustomModuleMutation.mutate(data)}
         onDeleteCustomModule={(id) => deleteCustomModuleMutation.mutate(id)}
+      />
+
+      <WidgetBuilder
+        open={isWidgetBuilderOpen}
+        onOpenChange={setIsWidgetBuilderOpen}
+        onSave={async (widgetData) => {
+          console.log('Widget saved:', widgetData);
+          toast({
+            title: 'Widget Created',
+            description: `Your custom widget "${widgetData.title}" has been created.`,
+          });
+        }}
       />
 
       <DetailPanel

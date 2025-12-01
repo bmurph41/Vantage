@@ -2,8 +2,13 @@ import { db } from '../db';
 import {
   dashboardWidgets,
   userDashboardLayouts,
+  dashboardModuleMetrics,
+  dashboardCustomWidgets,
+  dashboardSavedLayouts,
+  dashboardWidgetTemplates,
+  salesComps,
 } from '@shared/schema';
-import { eq, and, inArray, gte, isNull, sql as drizzleSql } from 'drizzle-orm';
+import { eq, and, inArray, gte, lte, isNull, sql as drizzleSql, desc, asc, between } from 'drizzle-orm';
 import type {
   DashboardWidget,
   InsertDashboardWidget,
@@ -11,6 +16,19 @@ import type {
   UserDashboardLayout,
   InsertUserDashboardLayout,
   UpdateUserDashboardLayout,
+  DashboardModuleMetric,
+  InsertDashboardModuleMetric,
+  UpdateDashboardModuleMetric,
+  DashboardCustomWidget,
+  InsertDashboardCustomWidget,
+  UpdateDashboardCustomWidget,
+  DashboardSavedLayout,
+  InsertDashboardSavedLayout,
+  UpdateDashboardSavedLayout,
+  DashboardWidgetTemplate,
+  InsertDashboardWidgetTemplate,
+  UpdateDashboardWidgetTemplate,
+  WidgetFilters,
 } from '@shared/schema';
 
 export type TimeRange = '7d' | '30d' | '90d' | 'ytd' | 'all';
@@ -1168,6 +1186,1092 @@ export class DashboardService {
       kpiValue: 0,
       message: 'Preview data generation for this combination is not yet available',
     };
+  }
+
+  // ================================================================================
+  // WIDGET CUSTOMIZATION SYSTEM - Institutional-Grade Dashboard Framework
+  // ================================================================================
+
+  // --------------------------------------------------------------------------------
+  // Module Metrics Registry
+  // --------------------------------------------------------------------------------
+
+  /**
+   * Get all available metrics for a module
+   */
+  async getModuleMetrics(moduleKey?: string): Promise<DashboardModuleMetric[]> {
+    const conditions = moduleKey
+      ? and(
+          eq(dashboardModuleMetrics.moduleKey, moduleKey),
+          eq(dashboardModuleMetrics.isActive, true)
+        )
+      : eq(dashboardModuleMetrics.isActive, true);
+
+    const metrics = await db
+      .select()
+      .from(dashboardModuleMetrics)
+      .where(conditions)
+      .orderBy(asc(dashboardModuleMetrics.displayOrder));
+
+    return metrics;
+  }
+
+  /**
+   * Get metric by module and key
+   */
+  async getMetricByKey(moduleKey: string, metricKey: string): Promise<DashboardModuleMetric | null> {
+    const [metric] = await db
+      .select()
+      .from(dashboardModuleMetrics)
+      .where(and(
+        eq(dashboardModuleMetrics.moduleKey, moduleKey),
+        eq(dashboardModuleMetrics.metricKey, metricKey)
+      ))
+      .limit(1);
+
+    return metric || null;
+  }
+
+  /**
+   * Initialize metric registry with default metrics for all modules
+   */
+  async initializeMetricRegistry(): Promise<void> {
+    const defaultMetrics: InsertDashboardModuleMetric[] = [
+      // Sales Comps metrics
+      {
+        moduleKey: 'sales_comps',
+        metricKey: 'total_count',
+        title: 'Total Comparables',
+        description: 'Total number of sales comparables in the database',
+        aggregationType: 'count',
+        valueType: 'number',
+        icon: 'BarChart3',
+        filterDimensions: ['year', 'state', 'region', 'water_type', 'profit_center'],
+        groupableDimensions: ['year', 'quarter', 'state', 'region'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'volume',
+        displayOrder: 1,
+      },
+      {
+        moduleKey: 'sales_comps',
+        metricKey: 'avg_price',
+        title: 'Average Sale Price',
+        description: 'Average sale price across all comparables',
+        aggregationType: 'avg',
+        valueType: 'currency',
+        icon: 'DollarSign',
+        filterDimensions: ['year', 'state', 'region', 'water_type', 'profit_center'],
+        groupableDimensions: ['year', 'quarter', 'state', 'region'],
+        comparisonOptions: ['yoy', 'mom', 'prior_period'],
+        metricGroup: 'pricing',
+        displayOrder: 2,
+      },
+      {
+        moduleKey: 'sales_comps',
+        metricKey: 'median_price',
+        title: 'Median Sale Price',
+        description: 'Median sale price across all comparables',
+        aggregationType: 'median',
+        valueType: 'currency',
+        icon: 'DollarSign',
+        filterDimensions: ['year', 'state', 'region', 'water_type', 'profit_center'],
+        groupableDimensions: ['year', 'quarter', 'state', 'region'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'pricing',
+        displayOrder: 3,
+      },
+      {
+        moduleKey: 'sales_comps',
+        metricKey: 'avg_price_per_slip',
+        title: 'Avg. Price Per Slip',
+        description: 'Average sale price per slip',
+        aggregationType: 'avg',
+        valueType: 'currency',
+        icon: 'Anchor',
+        filterDimensions: ['year', 'state', 'region', 'water_type'],
+        groupableDimensions: ['year', 'quarter', 'state', 'region'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'pricing',
+        displayOrder: 4,
+      },
+      {
+        moduleKey: 'sales_comps',
+        metricKey: 'avg_cap_rate',
+        title: 'Average Cap Rate',
+        description: 'Average capitalization rate',
+        aggregationType: 'avg',
+        valueType: 'percentage',
+        icon: 'Percent',
+        filterDimensions: ['year', 'state', 'region', 'water_type'],
+        groupableDimensions: ['year', 'quarter', 'state', 'region'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'performance',
+        displayOrder: 5,
+      },
+      {
+        moduleKey: 'sales_comps',
+        metricKey: 'total_volume',
+        title: 'Total Transaction Volume',
+        description: 'Sum of all sale prices',
+        aggregationType: 'sum',
+        valueType: 'currency',
+        icon: 'TrendingUp',
+        filterDimensions: ['year', 'state', 'region', 'water_type'],
+        groupableDimensions: ['year', 'quarter', 'state', 'region'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'volume',
+        displayOrder: 6,
+      },
+      // Rate Comps metrics
+      {
+        moduleKey: 'rate_comps',
+        metricKey: 'total_count',
+        title: 'Total Rate Comparables',
+        description: 'Number of rate comparables in database',
+        aggregationType: 'count',
+        valueType: 'number',
+        icon: 'BarChart3',
+        filterDimensions: ['year', 'state', 'region', 'slip_size'],
+        groupableDimensions: ['year', 'state', 'region'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'volume',
+        displayOrder: 1,
+      },
+      {
+        moduleKey: 'rate_comps',
+        metricKey: 'avg_rate_per_foot',
+        title: 'Avg. Rate Per Foot',
+        description: 'Average rate per linear foot',
+        aggregationType: 'avg',
+        valueType: 'currency',
+        icon: 'Ruler',
+        filterDimensions: ['year', 'state', 'region', 'slip_size'],
+        groupableDimensions: ['year', 'quarter', 'state'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'pricing',
+        displayOrder: 2,
+      },
+      // Demographics metrics
+      {
+        moduleKey: 'demographics',
+        metricKey: 'locations_analyzed',
+        title: 'Locations Analyzed',
+        description: 'Number of locations with demographic data',
+        aggregationType: 'count',
+        valueType: 'number',
+        icon: 'MapPin',
+        filterDimensions: ['state', 'region'],
+        groupableDimensions: ['state', 'region'],
+        comparisonOptions: [],
+        metricGroup: 'activity',
+        displayOrder: 1,
+      },
+      {
+        moduleKey: 'demographics',
+        metricKey: 'avg_population',
+        title: 'Avg. Trade Area Population',
+        description: 'Average population in trade areas',
+        aggregationType: 'avg',
+        valueType: 'number',
+        icon: 'Users',
+        filterDimensions: ['state', 'region', 'trade_area_miles'],
+        groupableDimensions: ['state', 'region'],
+        comparisonOptions: [],
+        metricGroup: 'market',
+        displayOrder: 2,
+      },
+      {
+        moduleKey: 'demographics',
+        metricKey: 'avg_median_income',
+        title: 'Avg. Median Income',
+        description: 'Average median household income in trade areas',
+        aggregationType: 'avg',
+        valueType: 'currency',
+        icon: 'DollarSign',
+        filterDimensions: ['state', 'region', 'trade_area_miles'],
+        groupableDimensions: ['state', 'region'],
+        comparisonOptions: [],
+        metricGroup: 'market',
+        displayOrder: 3,
+      },
+      // DockTalk metrics
+      {
+        moduleKey: 'docktalk',
+        metricKey: 'total_deals',
+        title: 'Tracked Deals',
+        description: 'Number of M&A deals being tracked',
+        aggregationType: 'count',
+        valueType: 'number',
+        icon: 'FileText',
+        filterDimensions: ['year', 'status'],
+        groupableDimensions: ['year', 'quarter', 'status'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'activity',
+        displayOrder: 1,
+      },
+      {
+        moduleKey: 'docktalk',
+        metricKey: 'articles_today',
+        title: 'Articles Today',
+        description: 'Number of articles processed today',
+        aggregationType: 'count',
+        valueType: 'number',
+        icon: 'Newspaper',
+        filterDimensions: [],
+        groupableDimensions: [],
+        comparisonOptions: ['prior_period'],
+        metricGroup: 'activity',
+        displayOrder: 2,
+      },
+      // VDR metrics
+      {
+        moduleKey: 'vdr',
+        metricKey: 'active_rooms',
+        title: 'Active Data Rooms',
+        description: 'Number of active virtual data rooms',
+        aggregationType: 'count',
+        valueType: 'number',
+        icon: 'Database',
+        filterDimensions: ['status'],
+        groupableDimensions: ['status'],
+        comparisonOptions: ['prior_period'],
+        metricGroup: 'activity',
+        displayOrder: 1,
+      },
+      {
+        moduleKey: 'vdr',
+        metricKey: 'total_documents',
+        title: 'Total Documents',
+        description: 'Number of documents in all data rooms',
+        aggregationType: 'count',
+        valueType: 'number',
+        icon: 'File',
+        filterDimensions: ['status', 'category'],
+        groupableDimensions: ['category'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'volume',
+        displayOrder: 2,
+      },
+      // Fuel metrics
+      {
+        moduleKey: 'fuel',
+        metricKey: 'total_gallons',
+        title: 'Total Gallons Sold',
+        description: 'Total gallons of fuel sold',
+        aggregationType: 'sum',
+        valueType: 'number',
+        icon: 'Fuel',
+        filterDimensions: ['year', 'month', 'fuel_type', 'marina'],
+        groupableDimensions: ['year', 'quarter', 'month', 'fuel_type', 'marina'],
+        comparisonOptions: ['yoy', 'mom', 'prior_period'],
+        metricGroup: 'volume',
+        displayOrder: 1,
+      },
+      {
+        moduleKey: 'fuel',
+        metricKey: 'total_revenue',
+        title: 'Fuel Revenue',
+        description: 'Total revenue from fuel sales',
+        aggregationType: 'sum',
+        valueType: 'currency',
+        icon: 'DollarSign',
+        filterDimensions: ['year', 'month', 'fuel_type', 'marina'],
+        groupableDimensions: ['year', 'quarter', 'month', 'fuel_type', 'marina'],
+        comparisonOptions: ['yoy', 'mom', 'prior_period'],
+        metricGroup: 'revenue',
+        displayOrder: 2,
+      },
+      // Ship Store metrics
+      {
+        moduleKey: 'ship_store',
+        metricKey: 'total_transactions',
+        title: 'Total Transactions',
+        description: 'Number of store transactions',
+        aggregationType: 'count',
+        valueType: 'number',
+        icon: 'ShoppingCart',
+        filterDimensions: ['year', 'month', 'category', 'marina'],
+        groupableDimensions: ['year', 'quarter', 'month', 'category'],
+        comparisonOptions: ['yoy', 'mom', 'prior_period'],
+        metricGroup: 'volume',
+        displayOrder: 1,
+      },
+      {
+        moduleKey: 'ship_store',
+        metricKey: 'total_revenue',
+        title: 'Store Revenue',
+        description: 'Total revenue from store sales',
+        aggregationType: 'sum',
+        valueType: 'currency',
+        icon: 'DollarSign',
+        filterDimensions: ['year', 'month', 'category', 'marina'],
+        groupableDimensions: ['year', 'quarter', 'month', 'category'],
+        comparisonOptions: ['yoy', 'mom', 'prior_period'],
+        metricGroup: 'revenue',
+        displayOrder: 2,
+      },
+      // Rent Roll metrics
+      {
+        moduleKey: 'rent_roll',
+        metricKey: 'occupancy_rate',
+        title: 'Occupancy Rate',
+        description: 'Percentage of occupied slips',
+        aggregationType: 'avg',
+        valueType: 'percentage',
+        icon: 'Percent',
+        filterDimensions: ['marina', 'slip_type'],
+        groupableDimensions: ['marina', 'slip_type'],
+        comparisonOptions: ['prior_period'],
+        metricGroup: 'performance',
+        displayOrder: 1,
+      },
+      {
+        moduleKey: 'rent_roll',
+        metricKey: 'monthly_revenue',
+        title: 'Monthly Revenue',
+        description: 'Total monthly rental revenue',
+        aggregationType: 'sum',
+        valueType: 'currency',
+        icon: 'DollarSign',
+        filterDimensions: ['marina', 'slip_type'],
+        groupableDimensions: ['marina', 'slip_type', 'month'],
+        comparisonOptions: ['yoy', 'mom', 'prior_period'],
+        metricGroup: 'revenue',
+        displayOrder: 2,
+      },
+      // Modeling metrics
+      {
+        moduleKey: 'modeling',
+        metricKey: 'active_projects',
+        title: 'Active Projects',
+        description: 'Number of active modeling projects',
+        aggregationType: 'count',
+        valueType: 'number',
+        icon: 'Briefcase',
+        filterDimensions: ['status', 'year'],
+        groupableDimensions: ['status', 'year'],
+        comparisonOptions: ['prior_period'],
+        metricGroup: 'activity',
+        displayOrder: 1,
+      },
+      {
+        moduleKey: 'modeling',
+        metricKey: 'total_aum',
+        title: 'Total AUM',
+        description: 'Total assets under management across projects',
+        aggregationType: 'sum',
+        valueType: 'currency',
+        icon: 'Building2',
+        filterDimensions: ['status', 'year'],
+        groupableDimensions: ['status', 'year', 'state'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'portfolio',
+        displayOrder: 2,
+      },
+      // Due Diligence metrics
+      {
+        moduleKey: 'due_diligence',
+        metricKey: 'total_tasks',
+        title: 'Total Tasks',
+        description: 'Number of DD tasks',
+        aggregationType: 'count',
+        valueType: 'number',
+        icon: 'CheckSquare',
+        filterDimensions: ['status', 'project', 'category'],
+        groupableDimensions: ['status', 'project', 'category'],
+        comparisonOptions: ['prior_period'],
+        metricGroup: 'activity',
+        displayOrder: 1,
+      },
+      {
+        moduleKey: 'due_diligence',
+        metricKey: 'completion_rate',
+        title: 'Completion Rate',
+        description: 'Percentage of completed tasks',
+        aggregationType: 'avg',
+        valueType: 'percentage',
+        icon: 'Percent',
+        filterDimensions: ['project', 'category'],
+        groupableDimensions: ['project', 'category'],
+        comparisonOptions: ['prior_period'],
+        metricGroup: 'performance',
+        displayOrder: 2,
+      },
+      // CRM metrics
+      {
+        moduleKey: 'crm',
+        metricKey: 'active_deals',
+        title: 'Active Deals',
+        description: 'Number of active deals in pipeline',
+        aggregationType: 'count',
+        valueType: 'number',
+        icon: 'Target',
+        filterDimensions: ['stage', 'year'],
+        groupableDimensions: ['stage', 'year', 'quarter'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'pipeline',
+        displayOrder: 1,
+      },
+      {
+        moduleKey: 'crm',
+        metricKey: 'pipeline_value',
+        title: 'Pipeline Value',
+        description: 'Total value of active deals',
+        aggregationType: 'sum',
+        valueType: 'currency',
+        icon: 'DollarSign',
+        filterDimensions: ['stage', 'year'],
+        groupableDimensions: ['stage', 'year', 'quarter'],
+        comparisonOptions: ['yoy', 'prior_period'],
+        metricGroup: 'pipeline',
+        displayOrder: 2,
+      },
+    ];
+
+    // Insert metrics, ignoring duplicates
+    for (const metric of defaultMetrics) {
+      try {
+        await db
+          .insert(dashboardModuleMetrics)
+          .values(metric)
+          .onConflictDoNothing();
+      } catch (err) {
+        // Ignore duplicate key errors
+      }
+    }
+  }
+
+  // --------------------------------------------------------------------------------
+  // Custom Widgets CRUD
+  // --------------------------------------------------------------------------------
+
+  /**
+   * Get all custom widgets for a user
+   */
+  async getUserCustomWidgets(userId: string, orgId: string): Promise<DashboardCustomWidget[]> {
+    const widgets = await db
+      .select()
+      .from(dashboardCustomWidgets)
+      .where(and(
+        eq(dashboardCustomWidgets.userId, userId),
+        eq(dashboardCustomWidgets.orgId, orgId),
+        eq(dashboardCustomWidgets.isVisible, true)
+      ))
+      .orderBy(asc(dashboardCustomWidgets.sortOrder));
+
+    return widgets;
+  }
+
+  /**
+   * Get custom widget by ID
+   */
+  async getCustomWidget(id: string): Promise<DashboardCustomWidget | null> {
+    const [widget] = await db
+      .select()
+      .from(dashboardCustomWidgets)
+      .where(eq(dashboardCustomWidgets.id, id))
+      .limit(1);
+
+    return widget || null;
+  }
+
+  /**
+   * Create a custom widget
+   */
+  async createCustomWidget(
+    userId: string,
+    orgId: string,
+    data: InsertDashboardCustomWidget
+  ): Promise<DashboardCustomWidget> {
+    const [widget] = await db
+      .insert(dashboardCustomWidgets)
+      .values({
+        ...data,
+        userId,
+        orgId,
+      })
+      .returning();
+
+    return widget;
+  }
+
+  /**
+   * Update a custom widget
+   */
+  async updateCustomWidget(
+    id: string,
+    userId: string,
+    orgId: string,
+    data: UpdateDashboardCustomWidget
+  ): Promise<DashboardCustomWidget | null> {
+    const [widget] = await db
+      .update(dashboardCustomWidgets)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(dashboardCustomWidgets.id, id),
+        eq(dashboardCustomWidgets.userId, userId),
+        eq(dashboardCustomWidgets.orgId, orgId)
+      ))
+      .returning();
+
+    return widget || null;
+  }
+
+  /**
+   * Delete a custom widget
+   */
+  async deleteCustomWidget(id: string, userId: string, orgId: string): Promise<boolean> {
+    const result = await db
+      .delete(dashboardCustomWidgets)
+      .where(and(
+        eq(dashboardCustomWidgets.id, id),
+        eq(dashboardCustomWidgets.userId, userId),
+        eq(dashboardCustomWidgets.orgId, orgId)
+      ));
+
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  /**
+   * Update widget order
+   */
+  async updateWidgetOrder(
+    userId: string,
+    orgId: string,
+    widgetOrder: Array<{ id: string; sortOrder: number }>
+  ): Promise<void> {
+    for (const { id, sortOrder } of widgetOrder) {
+      await db
+        .update(dashboardCustomWidgets)
+        .set({ sortOrder, updatedAt: new Date() })
+        .where(and(
+          eq(dashboardCustomWidgets.id, id),
+          eq(dashboardCustomWidgets.userId, userId),
+          eq(dashboardCustomWidgets.orgId, orgId)
+        ));
+    }
+  }
+
+  // --------------------------------------------------------------------------------
+  // Saved Layouts CRUD
+  // --------------------------------------------------------------------------------
+
+  /**
+   * Get all saved layouts for a user
+   */
+  async getUserSavedLayouts(userId: string, orgId: string): Promise<DashboardSavedLayout[]> {
+    const layouts = await db
+      .select()
+      .from(dashboardSavedLayouts)
+      .where(and(
+        eq(dashboardSavedLayouts.userId, userId),
+        eq(dashboardSavedLayouts.orgId, orgId),
+        eq(dashboardSavedLayouts.isActive, true)
+      ))
+      .orderBy(desc(dashboardSavedLayouts.isDefault), asc(dashboardSavedLayouts.layoutName));
+
+    return layouts;
+  }
+
+  /**
+   * Get a saved layout by ID
+   */
+  async getSavedLayout(id: string): Promise<DashboardSavedLayout | null> {
+    const [layout] = await db
+      .select()
+      .from(dashboardSavedLayouts)
+      .where(eq(dashboardSavedLayouts.id, id))
+      .limit(1);
+
+    return layout || null;
+  }
+
+  /**
+   * Get default saved layout for a user
+   */
+  async getDefaultSavedLayout(userId: string, orgId: string): Promise<DashboardSavedLayout | null> {
+    const [layout] = await db
+      .select()
+      .from(dashboardSavedLayouts)
+      .where(and(
+        eq(dashboardSavedLayouts.userId, userId),
+        eq(dashboardSavedLayouts.orgId, orgId),
+        eq(dashboardSavedLayouts.isDefault, true)
+      ))
+      .limit(1);
+
+    return layout || null;
+  }
+
+  /**
+   * Create a saved layout
+   */
+  async createSavedLayout(
+    userId: string,
+    orgId: string,
+    data: InsertDashboardSavedLayout
+  ): Promise<DashboardSavedLayout> {
+    // If this is marked as default, unset other defaults
+    if (data.isDefault) {
+      await db
+        .update(dashboardSavedLayouts)
+        .set({ isDefault: false })
+        .where(and(
+          eq(dashboardSavedLayouts.userId, userId),
+          eq(dashboardSavedLayouts.orgId, orgId)
+        ));
+    }
+
+    const [layout] = await db
+      .insert(dashboardSavedLayouts)
+      .values({
+        ...data,
+        userId,
+        orgId,
+      })
+      .returning();
+
+    return layout;
+  }
+
+  /**
+   * Update a saved layout
+   */
+  async updateSavedLayout(
+    id: string,
+    userId: string,
+    orgId: string,
+    data: UpdateDashboardSavedLayout
+  ): Promise<DashboardSavedLayout | null> {
+    // If setting as default, unset other defaults
+    if (data.isDefault) {
+      await db
+        .update(dashboardSavedLayouts)
+        .set({ isDefault: false })
+        .where(and(
+          eq(dashboardSavedLayouts.userId, userId),
+          eq(dashboardSavedLayouts.orgId, orgId)
+        ));
+    }
+
+    const [layout] = await db
+      .update(dashboardSavedLayouts)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(dashboardSavedLayouts.id, id),
+        eq(dashboardSavedLayouts.userId, userId),
+        eq(dashboardSavedLayouts.orgId, orgId)
+      ))
+      .returning();
+
+    return layout || null;
+  }
+
+  /**
+   * Delete a saved layout
+   */
+  async deleteSavedLayout(id: string, userId: string, orgId: string): Promise<boolean> {
+    const result = await db
+      .delete(dashboardSavedLayouts)
+      .where(and(
+        eq(dashboardSavedLayouts.id, id),
+        eq(dashboardSavedLayouts.userId, userId),
+        eq(dashboardSavedLayouts.orgId, orgId)
+      ));
+
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // --------------------------------------------------------------------------------
+  // Widget Templates
+  // --------------------------------------------------------------------------------
+
+  /**
+   * Get available widget templates
+   */
+  async getWidgetTemplates(
+    moduleKey?: string,
+    category?: string
+  ): Promise<DashboardWidgetTemplate[]> {
+    let conditions = eq(dashboardWidgetTemplates.isActive, true);
+    
+    if (moduleKey) {
+      conditions = and(conditions, eq(dashboardWidgetTemplates.moduleKey, moduleKey)) as any;
+    }
+    
+    if (category) {
+      conditions = and(conditions, eq(dashboardWidgetTemplates.category, category)) as any;
+    }
+
+    const templates = await db
+      .select()
+      .from(dashboardWidgetTemplates)
+      .where(conditions)
+      .orderBy(desc(dashboardWidgetTemplates.popularityScore));
+
+    return templates;
+  }
+
+  /**
+   * Create widget from template
+   */
+  async createWidgetFromTemplate(
+    userId: string,
+    orgId: string,
+    templateId: string,
+    customName?: string
+  ): Promise<DashboardCustomWidget | null> {
+    const [template] = await db
+      .select()
+      .from(dashboardWidgetTemplates)
+      .where(eq(dashboardWidgetTemplates.id, templateId))
+      .limit(1);
+
+    if (!template) return null;
+
+    // Increment template popularity
+    await db
+      .update(dashboardWidgetTemplates)
+      .set({ popularityScore: (template.popularityScore || 0) + 1 })
+      .where(eq(dashboardWidgetTemplates.id, templateId));
+
+    // Create widget from template
+    const widget = await this.createCustomWidget(userId, orgId, {
+      widgetName: customName || template.templateName,
+      moduleKey: template.moduleKey,
+      metricKey: template.metricKey,
+      filters: template.filters as any,
+      timeRangeType: template.timeRangeType || 'current_year',
+      timeRangeValue: template.timeRangeValue as any,
+      enableComparison: template.enableComparison || false,
+      comparisonType: template.comparisonType,
+      groupBy: template.groupBy,
+      displaySize: template.displaySize as any,
+      displayStyle: template.displayStyle || 'card',
+      chartType: template.chartType,
+      showTrend: template.showTrend ?? true,
+      accentColor: template.accentColor,
+      icon: template.icon,
+      templateId,
+    });
+
+    return widget;
+  }
+
+  // --------------------------------------------------------------------------------
+  // Widget Query Engine - Fetches actual data for widgets
+  // --------------------------------------------------------------------------------
+
+  /**
+   * Execute widget query and return aggregated data
+   */
+  async executeWidgetQuery(
+    orgId: string,
+    moduleKey: string,
+    metricKey: string,
+    filters: WidgetFilters = {},
+    options: {
+      timeRangeType?: string;
+      timeRangeValue?: any;
+      groupBy?: string;
+      enableComparison?: boolean;
+      comparisonType?: string;
+    } = {}
+  ): Promise<{
+    value: number;
+    previousValue?: number;
+    trend?: number;
+    groupedData?: Array<{ label: string; value: number }>;
+    details?: any[];
+  }> {
+    const { timeRangeType, timeRangeValue, groupBy, enableComparison, comparisonType } = options;
+
+    // Calculate year filter
+    let yearFilter: number | null = null;
+    let yearRange: { start: number; end: number } | null = null;
+    const currentYear = new Date().getFullYear();
+
+    if (filters.year) {
+      yearFilter = filters.year;
+    } else if (timeRangeType === 'current_year') {
+      yearFilter = currentYear;
+    } else if (timeRangeType === 'last_n_years' && timeRangeValue?.years) {
+      yearRange = {
+        start: currentYear - timeRangeValue.years + 1,
+        end: currentYear,
+      };
+    } else if (timeRangeType === 'custom_range' && timeRangeValue?.startYear && timeRangeValue?.endYear) {
+      yearRange = {
+        start: timeRangeValue.startYear,
+        end: timeRangeValue.endYear,
+      };
+    }
+
+    // Module-specific query execution
+    switch (moduleKey) {
+      case 'sales_comps':
+        return this.executeSalesCompsQuery(orgId, metricKey, filters, yearFilter, yearRange, groupBy, enableComparison, comparisonType);
+      
+      // Add more module adapters as needed
+      default:
+        return { value: 0 };
+    }
+  }
+
+  /**
+   * Sales Comps query adapter
+   */
+  private async executeSalesCompsQuery(
+    orgId: string,
+    metricKey: string,
+    filters: WidgetFilters,
+    yearFilter: number | null,
+    yearRange: { start: number; end: number } | null,
+    groupBy?: string,
+    enableComparison?: boolean,
+    comparisonType?: string
+  ): Promise<{
+    value: number;
+    previousValue?: number;
+    trend?: number;
+    groupedData?: Array<{ label: string; value: number }>;
+    details?: any[];
+  }> {
+    // Build where conditions
+    const conditions: any[] = [eq(salesComps.orgId, orgId)];
+
+    if (yearFilter) {
+      conditions.push(eq(salesComps.saleYear, yearFilter));
+    } else if (yearRange) {
+      conditions.push(between(salesComps.saleYear, yearRange.start, yearRange.end));
+    }
+
+    if (filters.states && filters.states.length > 0) {
+      conditions.push(inArray(salesComps.state, filters.states));
+    }
+
+    if (filters.waterType) {
+      conditions.push(eq(salesComps.waterType, filters.waterType));
+    }
+
+    const whereCondition = conditions.length > 1 ? and(...conditions) : conditions[0];
+
+    // Execute query based on metric type
+    let result: { value: number; previousValue?: number; trend?: number; groupedData?: Array<{ label: string; value: number }>; details?: any[] } = { value: 0 };
+
+    switch (metricKey) {
+      case 'total_count': {
+        const [countResult] = await db
+          .select({ count: drizzleSql<number>`COUNT(*)` })
+          .from(salesComps)
+          .where(whereCondition);
+        result.value = Number(countResult?.count) || 0;
+
+        // Get previous period for comparison
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const prevConditions = conditions.map(c => 
+            c === eq(salesComps.saleYear, yearFilter) 
+              ? eq(salesComps.saleYear, yearFilter - 1) 
+              : c
+          );
+          const [prevResult] = await db
+            .select({ count: drizzleSql<number>`COUNT(*)` })
+            .from(salesComps)
+            .where(prevConditions.length > 1 ? and(...prevConditions) : prevConditions[0]);
+          result.previousValue = Number(prevResult?.count) || 0;
+          result.trend = result.previousValue > 0 
+            ? ((result.value - result.previousValue) / result.previousValue) * 100 
+            : 0;
+        }
+        break;
+      }
+
+      case 'avg_price': {
+        const [avgResult] = await db
+          .select({ avg: drizzleSql<number>`AVG(${salesComps.salePrice})` })
+          .from(salesComps)
+          .where(whereCondition);
+        result.value = Number(avgResult?.avg) || 0;
+
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const prevConditions = conditions.map(c => 
+            c === eq(salesComps.saleYear, yearFilter) 
+              ? eq(salesComps.saleYear, yearFilter - 1) 
+              : c
+          );
+          const [prevResult] = await db
+            .select({ avg: drizzleSql<number>`AVG(${salesComps.salePrice})` })
+            .from(salesComps)
+            .where(prevConditions.length > 1 ? and(...prevConditions) : prevConditions[0]);
+          result.previousValue = Number(prevResult?.avg) || 0;
+          result.trend = result.previousValue > 0 
+            ? ((result.value - result.previousValue) / result.previousValue) * 100 
+            : 0;
+        }
+        break;
+      }
+
+      case 'median_price': {
+        const [medianResult] = await db
+          .select({ median: drizzleSql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${salesComps.salePrice})` })
+          .from(salesComps)
+          .where(whereCondition);
+        result.value = Number(medianResult?.median) || 0;
+        break;
+      }
+
+      case 'avg_price_per_slip': {
+        // Calculate price per slip as salePrice / wetSlips (only for rows with valid wetSlips > 0)
+        const [avgResult] = await db
+          .select({ 
+            avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.wetSlips} > 0 THEN ${salesComps.salePrice}::decimal / ${salesComps.wetSlips} ELSE NULL END)` 
+          })
+          .from(salesComps)
+          .where(whereCondition);
+        result.value = Number(avgResult?.avg) || 0;
+
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const prevConditions = conditions.map(c => 
+            c === eq(salesComps.saleYear, yearFilter) 
+              ? eq(salesComps.saleYear, yearFilter - 1) 
+              : c
+          );
+          const [prevResult] = await db
+            .select({ 
+              avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.wetSlips} > 0 THEN ${salesComps.salePrice}::decimal / ${salesComps.wetSlips} ELSE NULL END)` 
+            })
+            .from(salesComps)
+            .where(prevConditions.length > 1 ? and(...prevConditions) : prevConditions[0]);
+          result.previousValue = Number(prevResult?.avg) || 0;
+          result.trend = result.previousValue > 0 
+            ? ((result.value - result.previousValue) / result.previousValue) * 100 
+            : 0;
+        }
+        break;
+      }
+
+      case 'avg_cap_rate': {
+        const [avgResult] = await db
+          .select({ avg: drizzleSql<number>`AVG(${salesComps.capRate})` })
+          .from(salesComps)
+          .where(whereCondition);
+        result.value = Number(avgResult?.avg) || 0;
+        break;
+      }
+
+      case 'total_volume': {
+        const [sumResult] = await db
+          .select({ sum: drizzleSql<number>`SUM(${salesComps.salePrice})` })
+          .from(salesComps)
+          .where(whereCondition);
+        result.value = Number(sumResult?.sum) || 0;
+
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const prevConditions = conditions.map(c => 
+            c === eq(salesComps.saleYear, yearFilter) 
+              ? eq(salesComps.saleYear, yearFilter - 1) 
+              : c
+          );
+          const [prevResult] = await db
+            .select({ sum: drizzleSql<number>`SUM(${salesComps.salePrice})` })
+            .from(salesComps)
+            .where(prevConditions.length > 1 ? and(...prevConditions) : prevConditions[0]);
+          result.previousValue = Number(prevResult?.sum) || 0;
+          result.trend = result.previousValue > 0 
+            ? ((result.value - result.previousValue) / result.previousValue) * 100 
+            : 0;
+        }
+        break;
+      }
+    }
+
+    // Handle grouping if requested
+    if (groupBy === 'year') {
+      const groupedResult = await db
+        .select({
+          label: salesComps.saleYear,
+          value: drizzleSql<number>`COUNT(*)`,
+        })
+        .from(salesComps)
+        .where(eq(salesComps.orgId, orgId))
+        .groupBy(salesComps.saleYear)
+        .orderBy(asc(salesComps.saleYear));
+
+      result.groupedData = groupedResult.map(r => ({
+        label: String(r.label),
+        value: Number(r.value),
+      }));
+    } else if (groupBy === 'state') {
+      const groupedResult = await db
+        .select({
+          label: salesComps.state,
+          value: drizzleSql<number>`COUNT(*)`,
+        })
+        .from(salesComps)
+        .where(eq(salesComps.orgId, orgId))
+        .groupBy(salesComps.state)
+        .orderBy(desc(drizzleSql<number>`COUNT(*)`));
+
+      result.groupedData = groupedResult
+        .filter(r => r.label)
+        .map(r => ({
+          label: String(r.label),
+          value: Number(r.value),
+        }));
+    }
+
+    return result;
+  }
+
+  /**
+   * Batch execute multiple widget queries
+   */
+  async batchExecuteWidgetQueries(
+    orgId: string,
+    widgets: Array<{
+      id: string;
+      moduleKey: string;
+      metricKey: string;
+      filters: WidgetFilters;
+      options: any;
+    }>
+  ): Promise<Map<string, any>> {
+    const results = new Map<string, any>();
+
+    // Execute queries in parallel with concurrency limit
+    const batchSize = 5;
+    for (let i = 0; i < widgets.length; i += batchSize) {
+      const batch = widgets.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (widget) => {
+          try {
+            const data = await this.executeWidgetQuery(
+              orgId,
+              widget.moduleKey,
+              widget.metricKey,
+              widget.filters,
+              widget.options
+            );
+            return { id: widget.id, data };
+          } catch (error) {
+            console.error(`Error executing widget query ${widget.id}:`, error);
+            return { id: widget.id, data: { value: 0, error: true } };
+          }
+        })
+      );
+
+      for (const { id, data } of batchResults) {
+        results.set(id, data);
+      }
+    }
+
+    return results;
   }
 }
 

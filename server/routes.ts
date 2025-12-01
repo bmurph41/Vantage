@@ -122,6 +122,10 @@ import {
   updateDashboardWidgetSchema,
   insertUserDashboardLayoutSchema,
   updateUserDashboardLayoutSchema,
+  insertDashboardCustomWidgetSchema,
+  updateDashboardCustomWidgetSchema,
+  insertDashboardSavedLayoutSchema,
+  updateDashboardSavedLayoutSchema,
   userKpiPreferences,
   insertUserKpiPreferencesSchema,
   insertOwnedAssetSchema,
@@ -14771,6 +14775,471 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to reset dashboard:', error);
       res.status(500).json({ error: 'Failed to reset dashboard' });
+    }
+  });
+
+  // =====================================================
+  // DASHBOARD WIDGET CUSTOMIZATION SYSTEM
+  // =====================================================
+
+  // Initialize metric registry (admin)
+  app.post('/api/dashboards/metrics/initialize', authenticateUser, async (req: any, res) => {
+    try {
+      await dashboardService.initializeMetricRegistry();
+      res.json({ success: true, message: 'Metric registry initialized' });
+    } catch (error) {
+      console.error('Failed to initialize metric registry:', error);
+      res.status(500).json({ error: 'Failed to initialize metric registry' });
+    }
+  });
+
+  // Get available metrics (optionally filtered by module)
+  app.get('/api/dashboards/metrics', authenticateUser, async (req: any, res) => {
+    try {
+      const moduleKey = req.query.module as string | undefined;
+      const metrics = await dashboardService.getModuleMetrics(moduleKey);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Failed to fetch metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch metrics' });
+    }
+  });
+
+  // Get specific metric by module and key
+  app.get('/api/dashboards/metrics/:moduleKey/:metricKey', authenticateUser, async (req: any, res) => {
+    try {
+      const { moduleKey, metricKey } = req.params;
+      const metric = await dashboardService.getMetricByKey(moduleKey, metricKey);
+      
+      if (!metric) {
+        return res.status(404).json({ error: 'Metric not found' });
+      }
+      
+      res.json(metric);
+    } catch (error) {
+      console.error('Failed to fetch metric:', error);
+      res.status(500).json({ error: 'Failed to fetch metric' });
+    }
+  });
+
+  // Get user's custom widgets
+  app.get('/api/dashboards/custom-widgets', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const widgets = await dashboardService.getUserCustomWidgets(userId, orgId);
+      res.json(widgets);
+    } catch (error) {
+      console.error('Failed to fetch custom widgets:', error);
+      res.status(500).json({ error: 'Failed to fetch custom widgets' });
+    }
+  });
+
+  // Get single custom widget
+  app.get('/api/dashboards/custom-widgets/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const widget = await dashboardService.getCustomWidget(id);
+      
+      if (!widget) {
+        return res.status(404).json({ error: 'Widget not found' });
+      }
+      
+      res.json(widget);
+    } catch (error) {
+      console.error('Failed to fetch custom widget:', error);
+      res.status(500).json({ error: 'Failed to fetch custom widget' });
+    }
+  });
+
+  // Create custom widget
+  app.post('/api/dashboards/custom-widgets', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const data = insertDashboardCustomWidgetSchema.parse(req.body);
+      const widget = await dashboardService.createCustomWidget(userId, orgId, data);
+      res.status(201).json(widget);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create custom widget:', error);
+      res.status(500).json({ error: 'Failed to create custom widget' });
+    }
+  });
+
+  // Update custom widget
+  app.patch('/api/dashboards/custom-widgets/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const data = updateDashboardCustomWidgetSchema.parse(req.body);
+      const widget = await dashboardService.updateCustomWidget(id, userId, orgId, data);
+      
+      if (!widget) {
+        return res.status(404).json({ error: 'Widget not found' });
+      }
+      
+      res.json(widget);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update custom widget:', error);
+      res.status(500).json({ error: 'Failed to update custom widget' });
+    }
+  });
+
+  // Delete custom widget
+  app.delete('/api/dashboards/custom-widgets/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const success = await dashboardService.deleteCustomWidget(id, userId, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Widget not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete custom widget:', error);
+      res.status(500).json({ error: 'Failed to delete custom widget' });
+    }
+  });
+
+  // Update widget order
+  app.put('/api/dashboards/custom-widgets/order', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { widgetOrder } = req.body;
+      
+      if (!Array.isArray(widgetOrder)) {
+        return res.status(400).json({ error: 'widgetOrder must be an array' });
+      }
+      
+      await dashboardService.updateWidgetOrder(userId, orgId, widgetOrder);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to update widget order:', error);
+      res.status(500).json({ error: 'Failed to update widget order' });
+    }
+  });
+
+  // Get saved layouts
+  app.get('/api/dashboards/saved-layouts', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const layouts = await dashboardService.getUserSavedLayouts(userId, orgId);
+      res.json(layouts);
+    } catch (error) {
+      console.error('Failed to fetch saved layouts:', error);
+      res.status(500).json({ error: 'Failed to fetch saved layouts' });
+    }
+  });
+
+  // Get single saved layout
+  app.get('/api/dashboards/saved-layouts/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const layout = await dashboardService.getSavedLayout(id);
+      
+      if (!layout) {
+        return res.status(404).json({ error: 'Layout not found' });
+      }
+      
+      res.json(layout);
+    } catch (error) {
+      console.error('Failed to fetch saved layout:', error);
+      res.status(500).json({ error: 'Failed to fetch saved layout' });
+    }
+  });
+
+  // Create saved layout
+  app.post('/api/dashboards/saved-layouts', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const data = insertDashboardSavedLayoutSchema.parse(req.body);
+      const layout = await dashboardService.createSavedLayout(userId, orgId, data);
+      res.status(201).json(layout);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create saved layout:', error);
+      res.status(500).json({ error: 'Failed to create saved layout' });
+    }
+  });
+
+  // Update saved layout
+  app.patch('/api/dashboards/saved-layouts/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const data = updateDashboardSavedLayoutSchema.parse(req.body);
+      const layout = await dashboardService.updateSavedLayout(id, userId, orgId, data);
+      
+      if (!layout) {
+        return res.status(404).json({ error: 'Layout not found' });
+      }
+      
+      res.json(layout);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update saved layout:', error);
+      res.status(500).json({ error: 'Failed to update saved layout' });
+    }
+  });
+
+  // Delete saved layout
+  app.delete('/api/dashboards/saved-layouts/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const success = await dashboardService.deleteSavedLayout(id, userId, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Layout not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete saved layout:', error);
+      res.status(500).json({ error: 'Failed to delete saved layout' });
+    }
+  });
+
+  // Get widget templates
+  app.get('/api/dashboards/widget-templates', authenticateUser, async (req: any, res) => {
+    try {
+      const moduleKey = req.query.module as string | undefined;
+      const category = req.query.category as string | undefined;
+      const templates = await dashboardService.getWidgetTemplates(moduleKey, category);
+      res.json(templates);
+    } catch (error) {
+      console.error('Failed to fetch widget templates:', error);
+      res.status(500).json({ error: 'Failed to fetch widget templates' });
+    }
+  });
+
+  // Create widget from template
+  app.post('/api/dashboards/widget-templates/:templateId/create', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { templateId } = req.params;
+      const { customName } = req.body;
+      
+      const widget = await dashboardService.createWidgetFromTemplate(userId, orgId, templateId, customName);
+      
+      if (!widget) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      
+      res.status(201).json(widget);
+    } catch (error) {
+      console.error('Failed to create widget from template:', error);
+      res.status(500).json({ error: 'Failed to create widget from template' });
+    }
+  });
+
+  // Get available modules and their metrics for the widget builder
+  app.get('/api/dashboards/module-metrics', authenticateUser, async (req: any, res) => {
+    try {
+      const modules = [
+        {
+          key: 'sales_comps',
+          name: 'Sales Comps',
+          icon: 'TrendingUp',
+          metrics: [
+            { key: 'total_count', label: 'Total Comps', type: 'count', format: 'number', description: 'Total number of sales comparables' },
+            { key: 'avg_price', label: 'Average Price', type: 'avg', format: 'currency', description: 'Average sale price' },
+            { key: 'median_price', label: 'Median Price', type: 'avg', format: 'currency', description: 'Median sale price' },
+            { key: 'avg_price_per_slip', label: 'Avg Price/Slip', type: 'avg', format: 'currency', description: 'Average price per wet slip' },
+            { key: 'avg_cap_rate', label: 'Average Cap Rate', type: 'avg', format: 'percent', description: 'Average capitalization rate' },
+            { key: 'total_volume', label: 'Total Volume', type: 'sum', format: 'currency', description: 'Total sales volume' },
+          ],
+          filters: [
+            { key: 'year', label: 'Year', type: 'year' },
+            { key: 'states', label: 'State', type: 'state' },
+            { key: 'waterType', label: 'Water Type', type: 'category', options: [
+              { value: 'Coastal', label: 'Coastal' },
+              { value: 'Lake', label: 'Lake' },
+              { value: 'River', label: 'River' },
+            ]},
+          ],
+        },
+        {
+          key: 'crm',
+          name: 'CRM Pipeline',
+          icon: 'Users',
+          metrics: [
+            { key: 'total_deals', label: 'Total Deals', type: 'count', format: 'number', description: 'Total number of deals' },
+            { key: 'active_deals', label: 'Active Deals', type: 'count', format: 'number', description: 'Deals in progress' },
+            { key: 'total_value', label: 'Pipeline Value', type: 'sum', format: 'currency', description: 'Total value of all deals' },
+            { key: 'won_value', label: 'Won Value', type: 'sum', format: 'currency', description: 'Total value of won deals' },
+            { key: 'avg_deal_size', label: 'Avg Deal Size', type: 'avg', format: 'currency', description: 'Average deal value' },
+            { key: 'win_rate', label: 'Win Rate', type: 'percentage', format: 'percent', description: 'Percentage of deals won' },
+          ],
+          filters: [
+            { key: 'stage', label: 'Stage', type: 'status' },
+            { key: 'owner', label: 'Owner', type: 'category' },
+          ],
+        },
+        {
+          key: 'due_diligence',
+          name: 'Due Diligence',
+          icon: 'FileText',
+          metrics: [
+            { key: 'total_projects', label: 'Total Projects', type: 'count', format: 'number', description: 'Total DD projects' },
+            { key: 'active_projects', label: 'Active Projects', type: 'count', format: 'number', description: 'Projects in progress' },
+            { key: 'completed_tasks', label: 'Completed Tasks', type: 'count', format: 'number', description: 'Tasks completed' },
+            { key: 'pending_tasks', label: 'Pending Tasks', type: 'count', format: 'number', description: 'Tasks awaiting action' },
+            { key: 'completion_rate', label: 'Completion Rate', type: 'percentage', format: 'percent', description: 'Task completion percentage' },
+          ],
+          filters: [
+            { key: 'status', label: 'Status', type: 'status' },
+          ],
+        },
+        {
+          key: 'fuel',
+          name: 'Fuel Operations',
+          icon: 'Fuel',
+          metrics: [
+            { key: 'total_revenue', label: 'Total Revenue', type: 'sum', format: 'currency', description: 'Total fuel revenue' },
+            { key: 'total_gallons', label: 'Total Gallons', type: 'sum', format: 'number', description: 'Total gallons sold' },
+            { key: 'avg_price_per_gallon', label: 'Avg Price/Gallon', type: 'avg', format: 'currency', description: 'Average price per gallon' },
+            { key: 'transaction_count', label: 'Transactions', type: 'count', format: 'number', description: 'Number of transactions' },
+          ],
+          filters: [
+            { key: 'fuelType', label: 'Fuel Type', type: 'category' },
+            { key: 'dateRange', label: 'Date Range', type: 'range' },
+          ],
+        },
+        {
+          key: 'ship_store',
+          name: 'Ship Store',
+          icon: 'ShoppingCart',
+          metrics: [
+            { key: 'total_revenue', label: 'Total Revenue', type: 'sum', format: 'currency', description: 'Total store revenue' },
+            { key: 'transaction_count', label: 'Transactions', type: 'count', format: 'number', description: 'Number of sales' },
+            { key: 'avg_transaction', label: 'Avg Transaction', type: 'avg', format: 'currency', description: 'Average transaction value' },
+            { key: 'items_sold', label: 'Items Sold', type: 'count', format: 'number', description: 'Total items sold' },
+          ],
+          filters: [
+            { key: 'category', label: 'Category', type: 'category' },
+            { key: 'dateRange', label: 'Date Range', type: 'range' },
+          ],
+        },
+        {
+          key: 'rent_roll',
+          name: 'Rent Roll',
+          icon: 'Home',
+          metrics: [
+            { key: 'total_units', label: 'Total Units', type: 'count', format: 'number', description: 'Total rental units' },
+            { key: 'occupied_units', label: 'Occupied Units', type: 'count', format: 'number', description: 'Units currently occupied' },
+            { key: 'occupancy_rate', label: 'Occupancy Rate', type: 'percentage', format: 'percent', description: 'Occupancy percentage' },
+            { key: 'monthly_revenue', label: 'Monthly Revenue', type: 'sum', format: 'currency', description: 'Monthly rental revenue' },
+            { key: 'avg_rent', label: 'Average Rent', type: 'avg', format: 'currency', description: 'Average monthly rent' },
+          ],
+          filters: [
+            { key: 'unitType', label: 'Unit Type', type: 'category' },
+            { key: 'status', label: 'Status', type: 'status' },
+          ],
+        },
+        {
+          key: 'vdr',
+          name: 'Virtual Data Room',
+          icon: 'Database',
+          metrics: [
+            { key: 'total_documents', label: 'Total Documents', type: 'count', format: 'number', description: 'Total uploaded documents' },
+            { key: 'active_rooms', label: 'Active Rooms', type: 'count', format: 'number', description: 'Active data rooms' },
+            { key: 'pending_requests', label: 'Pending Requests', type: 'count', format: 'number', description: 'Diligence requests pending' },
+            { key: 'external_users', label: 'External Users', type: 'count', format: 'number', description: 'External users with access' },
+          ],
+          filters: [
+            { key: 'project', label: 'Project', type: 'category' },
+          ],
+        },
+        {
+          key: 'docktalk',
+          name: 'DockTalk Intelligence',
+          icon: 'Radio',
+          metrics: [
+            { key: 'total_deals', label: 'M&A Deals', type: 'count', format: 'number', description: 'Total tracked M&A deals' },
+            { key: 'articles_count', label: 'Articles', type: 'count', format: 'number', description: 'Industry articles' },
+            { key: 'new_deals', label: 'New Deals', type: 'count', format: 'number', description: 'Deals added this period' },
+          ],
+          filters: [
+            { key: 'category', label: 'Category', type: 'category' },
+          ],
+        },
+      ];
+      
+      res.json({ modules });
+    } catch (error) {
+      console.error('Failed to get module metrics:', error);
+      res.status(500).json({ error: 'Failed to get module metrics' });
+    }
+  });
+
+  // Execute widget query (get data for a widget)
+  app.post('/api/dashboards/widgets/query', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { moduleKey, metricKey, filters, options } = req.body;
+      
+      if (!moduleKey || !metricKey) {
+        return res.status(400).json({ error: 'moduleKey and metricKey are required' });
+      }
+      
+      const result = await dashboardService.executeWidgetQuery(
+        orgId,
+        moduleKey,
+        metricKey,
+        filters || {},
+        options || {}
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Failed to execute widget query:', error);
+      res.status(500).json({ error: 'Failed to execute widget query' });
+    }
+  });
+
+  // Batch execute widget queries
+  app.post('/api/dashboards/widgets/batch-query', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { widgets } = req.body;
+      
+      if (!Array.isArray(widgets)) {
+        return res.status(400).json({ error: 'widgets must be an array' });
+      }
+      
+      const results = await dashboardService.batchExecuteWidgetQueries(orgId, widgets);
+      
+      // Convert Map to object for JSON response
+      const resultObj: Record<string, any> = {};
+      results.forEach((value, key) => {
+        resultObj[key] = value;
+      });
+      
+      res.json(resultObj);
+    } catch (error) {
+      console.error('Failed to batch execute widget queries:', error);
+      res.status(500).json({ error: 'Failed to batch execute widget queries' });
     }
   });
 

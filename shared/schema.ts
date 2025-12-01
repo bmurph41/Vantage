@@ -378,6 +378,182 @@ export const userFavorites = pgTable("user_favorites", {
   uniqueUserItem: unique().on(table.userId, table.orgId, table.itemType, table.itemId),
 }));
 
+// ============================================================================
+// Dashboard Customization System - Institutional-Grade Widget Framework
+// ============================================================================
+
+// Dashboard Module Metrics - Registry of available metrics per module
+export const dashboardModuleMetrics = pgTable("dashboard_module_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  moduleKey: text("module_key").notNull(), // 'sales_comps', 'rate_comps', 'demographics', 'capital_markets', 'docktalk', 'vdr', 'fuel', 'ship_store', 'rent_roll', 'modeling', 'due_diligence', 'crm'
+  metricKey: text("metric_key").notNull(), // 'total_count', 'avg_price', 'median_price', 'total_volume', 'avg_cap_rate', etc.
+  title: text("title").notNull(),
+  description: text("description"),
+  aggregationType: text("aggregation_type").notNull(), // 'count', 'sum', 'avg', 'median', 'min', 'max', 'latest'
+  valueType: text("value_type").notNull(), // 'number', 'currency', 'percentage', 'date'
+  icon: text("icon"), // Lucide icon name
+  
+  // Available filter dimensions for this metric
+  filterDimensions: jsonb("filter_dimensions").default(sql`'[]'`), // ['year', 'state', 'region', 'water_type', 'profit_center', 'status']
+  
+  // Groupable dimensions for breakdowns
+  groupableDimensions: jsonb("groupable_dimensions").default(sql`'[]'`), // ['year', 'quarter', 'month', 'state', 'region']
+  
+  // Comparison periods available
+  comparisonOptions: jsonb("comparison_options").default(sql`'["yoy", "mom", "qoq", "prior_period"]'`),
+  
+  // Default widget configuration
+  defaultConfig: jsonb("default_config").default(sql`'{}'`),
+  
+  // Display settings
+  defaultSize: jsonb("default_size").default(sql`'{"cols": 1, "rows": 1}'`),
+  minSize: jsonb("min_size").default(sql`'{"cols": 1, "rows": 1}'`),
+  maxSize: jsonb("max_size").default(sql`'{"cols": 4, "rows": 4}'`),
+  
+  // Ordering and grouping
+  displayOrder: integer("display_order").default(0),
+  metricGroup: text("metric_group"), // 'pricing', 'volume', 'performance', 'activity', 'trends'
+  
+  // Feature flags
+  isActive: boolean("is_active").notNull().default(true),
+  isPremium: boolean("is_premium").notNull().default(false),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  moduleMetricIdx: index("dashboard_module_metrics_module_idx").on(table.moduleKey),
+  uniqueModuleMetric: unique().on(table.moduleKey, table.metricKey),
+}));
+
+// Dashboard Custom Widgets - User's custom widget instances with configurations
+export const dashboardCustomWidgets = pgTable("dashboard_custom_widgets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  
+  // Widget identity
+  widgetName: text("widget_name").notNull(), // User-defined name
+  moduleKey: text("module_key").notNull(),
+  metricKey: text("metric_key").notNull(),
+  
+  // Filter configuration
+  filters: jsonb("filters").default(sql`'{}'`), // { year: 2024, state: ['FL', 'TX'], region: 'Southeast' }
+  
+  // Time range settings
+  timeRangeType: text("time_range_type").default('all_time'), // 'all_time', 'current_year', 'last_n_years', 'custom_range', 'ytd', 'rolling_12m'
+  timeRangeValue: jsonb("time_range_value").default(sql`'{}'`), // { years: 3 } or { startYear: 2020, endYear: 2024 }
+  
+  // Comparison settings
+  enableComparison: boolean("enable_comparison").default(false),
+  comparisonType: text("comparison_type"), // 'yoy', 'mom', 'qoq', 'prior_period', 'custom'
+  comparisonPeriod: jsonb("comparison_period").default(sql`'{}'`), // { offset: -1, unit: 'year' }
+  
+  // Grouping/breakdown settings
+  groupBy: text("group_by"), // 'year', 'quarter', 'month', 'state', 'region', null for no grouping
+  
+  // Display settings
+  displaySize: jsonb("display_size").default(sql`'{"cols": 1, "rows": 1}'`),
+  displayStyle: text("display_style").default('card'), // 'card', 'chart', 'table', 'sparkline'
+  chartType: text("chart_type"), // 'bar', 'line', 'pie', 'area'
+  showTrend: boolean("show_trend").default(true),
+  showSparkline: boolean("show_sparkline").default(false),
+  
+  // Card appearance
+  accentColor: text("accent_color"), // hex color for card accent
+  icon: text("icon"), // Override default metric icon
+  
+  // Visibility and ordering
+  isVisible: boolean("is_visible").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  
+  // Template reference (if created from template)
+  templateId: varchar("template_id"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userOrgIdx: index("dashboard_custom_widgets_user_org_idx").on(table.userId, table.orgId),
+  moduleIdx: index("dashboard_custom_widgets_module_idx").on(table.moduleKey),
+}));
+
+// Dashboard Saved Layouts - Named layout configurations for quick switching
+export const dashboardSavedLayouts = pgTable("dashboard_saved_layouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  
+  // Layout identity
+  layoutName: text("layout_name").notNull(),
+  description: text("description"),
+  icon: text("icon"), // Lucide icon for layout selector
+  
+  // Layout configuration
+  widgetOrder: jsonb("widget_order").default(sql`'[]'`), // Array of widget IDs in display order
+  gridConfig: jsonb("grid_config").default(sql`'{}'`), // { cols: 4, gap: 16, rowHeight: 'auto' }
+  
+  // Widget positions (for grid layout)
+  widgetPositions: jsonb("widget_positions").default(sql`'{}'`), // { widgetId: { x: 0, y: 0, cols: 2, rows: 1 } }
+  
+  // Included standard modules (from fixed module cards)
+  enabledModules: jsonb("enabled_modules").default(sql`'[]'`), // ['sales_comps', 'modeling', 'vdr']
+  moduleOrder: jsonb("module_order").default(sql`'[]'`), // Order of module cards
+  
+  // Layout settings
+  showQuickAccess: boolean("show_quick_access").default(true),
+  showActivityFeed: boolean("show_activity_feed").default(true),
+  compactMode: boolean("compact_mode").default(false),
+  
+  // Status flags
+  isDefault: boolean("is_default").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userOrgIdx: index("dashboard_saved_layouts_user_org_idx").on(table.userId, table.orgId),
+  defaultIdx: index("dashboard_saved_layouts_default_idx").on(table.userId, table.orgId, table.isDefault),
+}));
+
+// Dashboard Widget Templates - Pre-built widget configurations for quick add
+export const dashboardWidgetTemplates = pgTable("dashboard_widget_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Template identity
+  templateName: text("template_name").notNull(),
+  description: text("description"),
+  moduleKey: text("module_key").notNull(),
+  metricKey: text("metric_key").notNull(),
+  
+  // Pre-configured settings (same structure as custom widgets)
+  filters: jsonb("filters").default(sql`'{}'`),
+  timeRangeType: text("time_range_type").default('current_year'),
+  timeRangeValue: jsonb("time_range_value").default(sql`'{}'`),
+  enableComparison: boolean("enable_comparison").default(true),
+  comparisonType: text("comparison_type").default('yoy'),
+  groupBy: text("group_by"),
+  displaySize: jsonb("display_size").default(sql`'{"cols": 1, "rows": 1}'`),
+  displayStyle: text("display_style").default('card'),
+  chartType: text("chart_type"),
+  showTrend: boolean("show_trend").default(true),
+  accentColor: text("accent_color"),
+  icon: text("icon"),
+  
+  // Template metadata
+  category: text("category"), // 'acquisition', 'portfolio', 'market', 'operations'
+  tags: text("tags").array().default(sql`'{}'`),
+  popularityScore: integer("popularity_score").default(0),
+  
+  // Visibility
+  isGlobal: boolean("is_global").notNull().default(true), // Available to all users
+  createdBy: varchar("created_by").references(() => users.id), // For org-specific templates
+  orgId: varchar("org_id").references(() => organizations.id), // For org-specific templates
+  
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  moduleIdx: index("dashboard_widget_templates_module_idx").on(table.moduleKey),
+  categoryIdx: index("dashboard_widget_templates_category_idx").on(table.category),
+}));
+
 // Projects
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -7929,6 +8105,107 @@ export const insertUserDashboardLayoutSchema = createInsertSchema(userDashboardL
 
 export const updateUserDashboardLayoutSchema = insertUserDashboardLayoutSchema.partial();
 
+// Dashboard Module Metrics schemas
+export const insertDashboardModuleMetricSchema = createInsertSchema(dashboardModuleMetrics).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const updateDashboardModuleMetricSchema = insertDashboardModuleMetricSchema.partial();
+
+// Dashboard Custom Widgets schemas
+export const widgetFiltersSchema = z.object({
+  year: z.number().optional(),
+  years: z.array(z.number()).optional(),
+  state: z.array(z.string()).optional(),
+  states: z.array(z.string()).optional(),
+  region: z.string().optional(),
+  regions: z.array(z.string()).optional(),
+  waterType: z.string().optional(),
+  profitCenters: z.array(z.string()).optional(),
+  status: z.string().optional(),
+  priceMin: z.number().optional(),
+  priceMax: z.number().optional(),
+  capacityMin: z.number().optional(),
+  capacityMax: z.number().optional(),
+}).passthrough();
+
+export const widgetTimeRangeValueSchema = z.object({
+  years: z.number().optional(),
+  startYear: z.number().optional(),
+  endYear: z.number().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+}).passthrough();
+
+export const widgetComparisonPeriodSchema = z.object({
+  offset: z.number().optional(),
+  unit: z.enum(['year', 'quarter', 'month', 'week', 'day']).optional(),
+}).passthrough();
+
+export const widgetDisplaySizeSchema = z.object({
+  cols: z.number().min(1).max(4).default(1),
+  rows: z.number().min(1).max(4).default(1),
+});
+
+export const insertDashboardCustomWidgetSchema = createInsertSchema(dashboardCustomWidgets).omit({
+  id: true,
+  userId: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  filters: widgetFiltersSchema.optional(),
+  timeRangeValue: widgetTimeRangeValueSchema.optional(),
+  comparisonPeriod: widgetComparisonPeriodSchema.optional(),
+  displaySize: widgetDisplaySizeSchema.optional(),
+});
+
+export const updateDashboardCustomWidgetSchema = insertDashboardCustomWidgetSchema.partial();
+
+// Dashboard Saved Layouts schemas
+export const widgetPositionSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  cols: z.number(),
+  rows: z.number(),
+});
+
+export const gridConfigSchema = z.object({
+  cols: z.number().default(4),
+  gap: z.number().default(16),
+  rowHeight: z.union([z.number(), z.literal('auto')]).default('auto'),
+});
+
+export const insertDashboardSavedLayoutSchema = createInsertSchema(dashboardSavedLayouts).omit({
+  id: true,
+  userId: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  widgetOrder: z.array(z.string()).optional(),
+  gridConfig: gridConfigSchema.optional(),
+  widgetPositions: z.record(z.string(), widgetPositionSchema).optional(),
+  enabledModules: z.array(z.string()).optional(),
+  moduleOrder: z.array(z.string()).optional(),
+});
+
+export const updateDashboardSavedLayoutSchema = insertDashboardSavedLayoutSchema.partial();
+
+// Dashboard Widget Templates schemas
+export const insertDashboardWidgetTemplateSchema = createInsertSchema(dashboardWidgetTemplates).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  filters: widgetFiltersSchema.optional(),
+  timeRangeValue: widgetTimeRangeValueSchema.optional(),
+  displaySize: widgetDisplaySizeSchema.optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+export const updateDashboardWidgetTemplateSchema = insertDashboardWidgetTemplateSchema.partial();
+
 // User KPI Preferences schemas
 export const kpiConfigItemSchema = z.object({
   title: z.string(),
@@ -8016,6 +8293,30 @@ export type UpdateDashboardWidget = z.infer<typeof updateDashboardWidgetSchema>;
 export type UserDashboardLayout = typeof userDashboardLayouts.$inferSelect;
 export type InsertUserDashboardLayout = z.infer<typeof insertUserDashboardLayoutSchema>;
 export type UpdateUserDashboardLayout = z.infer<typeof updateUserDashboardLayoutSchema>;
+
+// Types for Dashboard Customization System
+export type DashboardModuleMetric = typeof dashboardModuleMetrics.$inferSelect;
+export type InsertDashboardModuleMetric = z.infer<typeof insertDashboardModuleMetricSchema>;
+export type UpdateDashboardModuleMetric = z.infer<typeof updateDashboardModuleMetricSchema>;
+
+export type DashboardCustomWidget = typeof dashboardCustomWidgets.$inferSelect;
+export type InsertDashboardCustomWidget = z.infer<typeof insertDashboardCustomWidgetSchema>;
+export type UpdateDashboardCustomWidget = z.infer<typeof updateDashboardCustomWidgetSchema>;
+
+export type DashboardSavedLayout = typeof dashboardSavedLayouts.$inferSelect;
+export type InsertDashboardSavedLayout = z.infer<typeof insertDashboardSavedLayoutSchema>;
+export type UpdateDashboardSavedLayout = z.infer<typeof updateDashboardSavedLayoutSchema>;
+
+export type DashboardWidgetTemplate = typeof dashboardWidgetTemplates.$inferSelect;
+export type InsertDashboardWidgetTemplate = z.infer<typeof insertDashboardWidgetTemplateSchema>;
+export type UpdateDashboardWidgetTemplate = z.infer<typeof updateDashboardWidgetTemplateSchema>;
+
+export type WidgetFilters = z.infer<typeof widgetFiltersSchema>;
+export type WidgetTimeRangeValue = z.infer<typeof widgetTimeRangeValueSchema>;
+export type WidgetComparisonPeriod = z.infer<typeof widgetComparisonPeriodSchema>;
+export type WidgetDisplaySize = z.infer<typeof widgetDisplaySizeSchema>;
+export type WidgetPosition = z.infer<typeof widgetPositionSchema>;
+export type GridConfig = z.infer<typeof gridConfigSchema>;
 
 export type UserKpiPreferences = typeof userKpiPreferences.$inferSelect;
 export type InsertUserKpiPreferences = z.infer<typeof insertUserKpiPreferencesSchema>;
