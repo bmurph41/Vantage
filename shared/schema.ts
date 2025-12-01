@@ -9616,6 +9616,1038 @@ export type ExitActivity = typeof exitActivities.$inferSelect;
 export type InsertExitActivity = z.infer<typeof insertExitActivitySchema>;
 
 // ============================================================================
+// CAPITAL STACK & INSTITUTIONAL UNDERWRITING
+// Comprehensive capital structure modeling for PE/institutional acquisitions
+// Includes debt tranches, equity layers, waterfall distributions, and IC workflows
+// ============================================================================
+
+// Enums for Capital Stack
+export const debtTrancheTypeEnum = pgEnum("debt_tranche_type", ["senior", "mezzanine", "bridge", "construction", "sba", "cmbs", "credit_union", "other"]);
+export const equityLayerTypeEnum = pgEnum("equity_layer_type", ["common", "preferred", "promote", "co_invest"]);
+export const capitalStackStatusEnum = pgEnum("capital_stack_status", ["draft", "active", "closed", "archived"]);
+export const icMemoStatusEnum = pgEnum("ic_memo_status", ["draft", "pending_review", "under_review", "approved", "rejected", "revision_requested"]);
+export const icVoteTypeEnum = pgEnum("ic_vote_type", ["approve", "reject", "abstain", "conditional_approve"]);
+export const varianceAlertSeverityEnum = pgEnum("variance_alert_severity", ["info", "warning", "critical"]);
+export const covenantTypeEnum = pgEnum("covenant_type", ["dscr", "ltv", "debt_yield", "occupancy", "noi", "capex_reserve", "custom"]);
+export const covenantStatusEnum = pgEnum("covenant_status", ["in_compliance", "watch", "breach", "waived"]);
+export const exitReadinessStatusEnum = pgEnum("exit_readiness_status", ["not_ready", "preparing", "market_ready", "actively_marketing", "under_loi"]);
+
+// Capital Stack - Master configuration for a deal's capital structure
+export const capitalStacks = pgTable('capital_stacks', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  status: capitalStackStatusEnum('status').notNull().default('draft'),
+  
+  // Total deal metrics
+  purchasePrice: decimal('purchase_price', { precision: 18, scale: 2 }).notNull(),
+  closingCosts: decimal('closing_costs', { precision: 18, scale: 2 }).default('0'),
+  capexReserves: decimal('capex_reserves', { precision: 18, scale: 2 }).default('0'),
+  workingCapital: decimal('working_capital', { precision: 18, scale: 2 }).default('0'),
+  totalCapitalization: decimal('total_capitalization', { precision: 18, scale: 2 }).notNull(),
+  
+  // Calculated metrics (denormalized for performance)
+  totalDebt: decimal('total_debt', { precision: 18, scale: 2 }).default('0'),
+  totalEquity: decimal('total_equity', { precision: 18, scale: 2 }).default('0'),
+  blendedDebtRate: decimal('blended_debt_rate', { precision: 8, scale: 4 }),
+  ltv: decimal('ltv', { precision: 8, scale: 4 }),
+  debtYield: decimal('debt_yield', { precision: 8, scale: 4 }),
+  
+  // Assumptions
+  holdPeriodYears: integer('hold_period_years').default(5),
+  exitCapRate: decimal('exit_cap_rate', { precision: 8, scale: 4 }),
+  noiGrowthRate: decimal('noi_growth_rate', { precision: 8, scale: 4 }).default('0.02'),
+  
+  isActive: boolean('is_active').default(true).notNull(),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('capital_stacks_org_idx').on(table.orgId),
+  projectIdx: index('capital_stacks_project_idx').on(table.modelingProjectId),
+  statusIdx: index('capital_stacks_status_idx').on(table.status),
+}));
+
+// Debt Tranches - Individual debt layers in the capital stack
+export const debtTranches = pgTable('debt_tranches', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  capitalStackId: varchar('capital_stack_id').notNull().references(() => capitalStacks.id, { onDelete: 'cascade' }),
+  
+  name: text('name').notNull(),
+  trancheType: debtTrancheTypeEnum('tranche_type').notNull(),
+  lenderName: text('lender_name'),
+  
+  // Loan terms
+  principal: decimal('principal', { precision: 18, scale: 2 }).notNull(),
+  interestRate: decimal('interest_rate', { precision: 8, scale: 4 }).notNull(),
+  spreadBps: integer('spread_bps').default(0), // Spread over index
+  indexRate: text('index_rate'), // e.g., "SOFR", "Prime"
+  floorRate: decimal('floor_rate', { precision: 8, scale: 4 }),
+  
+  // Structure
+  amortizationYears: integer('amortization_years'),
+  termYears: integer('term_years').notNull(),
+  interestOnlyMonths: integer('interest_only_months').default(0),
+  
+  // Fees
+  originationFeePct: decimal('origination_fee_pct', { precision: 8, scale: 4 }).default('0.01'),
+  exitFeePct: decimal('exit_fee_pct', { precision: 8, scale: 4 }).default('0'),
+  prepaymentPenalty: text('prepayment_penalty'), // Description of prepayment terms
+  
+  // Covenants
+  minDscr: decimal('min_dscr', { precision: 8, scale: 4 }),
+  maxLtv: decimal('max_ltv', { precision: 8, scale: 4 }),
+  minDebtYield: decimal('min_debt_yield', { precision: 8, scale: 4 }),
+  
+  // Priority
+  priority: integer('priority').notNull().default(1), // 1 = most senior
+  
+  // Calculated fields
+  annualDebtService: decimal('annual_debt_service', { precision: 18, scale: 2 }),
+  monthlyPayment: decimal('monthly_payment', { precision: 18, scale: 2 }),
+  
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('debt_tranches_org_idx').on(table.orgId),
+  capitalStackIdx: index('debt_tranches_capital_stack_idx').on(table.capitalStackId),
+  typeIdx: index('debt_tranches_type_idx').on(table.trancheType),
+}));
+
+// Equity Layers - GP/LP equity structure with promote/waterfall tiers
+export const equityLayers = pgTable('equity_layers', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  capitalStackId: varchar('capital_stack_id').notNull().references(() => capitalStacks.id, { onDelete: 'cascade' }),
+  
+  name: text('name').notNull(),
+  layerType: equityLayerTypeEnum('layer_type').notNull(),
+  
+  // Contribution
+  commitmentAmount: decimal('commitment_amount', { precision: 18, scale: 2 }).notNull(),
+  fundedAmount: decimal('funded_amount', { precision: 18, scale: 2 }).default('0'),
+  ownershipPct: decimal('ownership_pct', { precision: 8, scale: 4 }).notNull(),
+  
+  // Returns
+  preferredReturn: decimal('preferred_return', { precision: 8, scale: 4 }), // Annual pref rate
+  preferredReturnType: text('preferred_return_type'), // 'cumulative', 'non_cumulative', 'compounding'
+  isParticipating: boolean('is_participating').default(true), // Participates after pref
+  
+  // Waterfall position
+  waterfallPriority: integer('waterfall_priority').notNull().default(1),
+  catchUpPct: decimal('catch_up_pct', { precision: 8, scale: 4 }), // GP catch-up percentage
+  
+  // Promote structure (for GP layers)
+  promoteTiers: jsonb('promote_tiers').$type<{
+    irrHurdle: number;
+    gpSplit: number;
+    lpSplit: number;
+  }[]>(),
+  
+  // Investor info
+  investorName: text('investor_name'),
+  investorType: text('investor_type'), // 'gp', 'lp', 'co_invest', 'fundOfFunds'
+  
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('equity_layers_org_idx').on(table.orgId),
+  capitalStackIdx: index('equity_layers_capital_stack_idx').on(table.capitalStackId),
+  typeIdx: index('equity_layers_type_idx').on(table.layerType),
+}));
+
+// Capital Stack Projections - Year-by-year pro forma tied to capital structure
+export const capitalStackProjections = pgTable('capital_stack_projections', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  capitalStackId: varchar('capital_stack_id').notNull().references(() => capitalStacks.id, { onDelete: 'cascade' }),
+  
+  year: integer('year').notNull(), // 0 = acquisition, 1+ = operating years
+  
+  // Operating metrics
+  grossRevenue: decimal('gross_revenue', { precision: 18, scale: 2 }),
+  operatingExpenses: decimal('operating_expenses', { precision: 18, scale: 2 }),
+  noi: decimal('noi', { precision: 18, scale: 2 }),
+  capex: decimal('capex', { precision: 18, scale: 2 }).default('0'),
+  ncf: decimal('ncf', { precision: 18, scale: 2 }), // Net cash flow after capex
+  
+  // Debt service
+  totalDebtService: decimal('total_debt_service', { precision: 18, scale: 2 }),
+  principalPaydown: decimal('principal_paydown', { precision: 18, scale: 2 }),
+  interestExpense: decimal('interest_expense', { precision: 18, scale: 2 }),
+  
+  // Cash available
+  cashFlowBeforeDebt: decimal('cash_flow_before_debt', { precision: 18, scale: 2 }),
+  cashFlowAfterDebt: decimal('cash_flow_after_debt', { precision: 18, scale: 2 }),
+  
+  // Distributions
+  lpDistribution: decimal('lp_distribution', { precision: 18, scale: 2 }),
+  gpDistribution: decimal('gp_distribution', { precision: 18, scale: 2 }),
+  totalDistribution: decimal('total_distribution', { precision: 18, scale: 2 }),
+  
+  // Coverage ratios
+  dscr: decimal('dscr', { precision: 8, scale: 4 }),
+  debtYield: decimal('debt_yield', { precision: 8, scale: 4 }),
+  
+  // Valuations (for exit year)
+  exitValue: decimal('exit_value', { precision: 18, scale: 2 }),
+  loanPayoff: decimal('loan_payoff', { precision: 18, scale: 2 }),
+  netSaleProceeds: decimal('net_sale_proceeds', { precision: 18, scale: 2 }),
+  
+  // Returns
+  cumulativeCashFlow: decimal('cumulative_cash_flow', { precision: 18, scale: 2 }),
+  equityMultiple: decimal('equity_multiple', { precision: 8, scale: 4 }),
+  irr: decimal('irr', { precision: 8, scale: 4 }),
+  cashOnCash: decimal('cash_on_cash', { precision: 8, scale: 4 }),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('capital_stack_projections_org_idx').on(table.orgId),
+  capitalStackIdx: index('capital_stack_projections_capital_stack_idx').on(table.capitalStackId),
+  yearIdx: index('capital_stack_projections_year_idx').on(table.year),
+}));
+
+// ============================================================================
+// INVESTMENT COMMITTEE (IC) WORKSPACE
+// Approval workflows, memos, voting, and audit trails for institutional deals
+// ============================================================================
+
+// IC Committee Members - Who can vote on deals
+export const icCommitteeMembers = pgTable('ic_committee_members', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  
+  role: text('role').notNull(), // 'chair', 'voting_member', 'observer', 'advisor'
+  title: text('title'), // e.g., "Managing Partner", "CIO"
+  votingWeight: decimal('voting_weight', { precision: 5, scale: 2 }).default('1.0'),
+  isRequired: boolean('is_required').default(false), // Must vote for quorum
+  
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('ic_committee_members_org_idx').on(table.orgId),
+  userIdx: index('ic_committee_members_user_idx').on(table.userId),
+  activeIdx: index('ic_committee_members_active_idx').on(table.isActive),
+}));
+
+// IC Memos - Investment committee memoranda for deals
+export const icMemos = pgTable('ic_memos', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  capitalStackId: varchar('capital_stack_id').references(() => capitalStacks.id),
+  
+  // Memo info
+  title: text('title').notNull(),
+  memoNumber: text('memo_number'), // Auto-generated IC-2024-001 format
+  version: integer('version').notNull().default(1),
+  status: icMemoStatusEnum('status').notNull().default('draft'),
+  
+  // Content sections (structured for PDF generation)
+  executiveSummary: text('executive_summary'),
+  investmentThesis: text('investment_thesis'),
+  marketOverview: text('market_overview'),
+  propertyDescription: text('property_description'),
+  financialSummary: jsonb('financial_summary').$type<{
+    purchasePrice: number;
+    capRate: number;
+    noi: number;
+    pricePerSlip: number;
+    targetIrr: number;
+    targetEquityMultiple: number;
+  }>(),
+  
+  // Auto-populated sections
+  rentRollSummary: jsonb('rent_roll_summary').$type<{
+    totalUnits: number;
+    occupancyRate: number;
+    monthlyRevenue: number;
+    averageRent: number;
+  }>(),
+  dueDiligenceStatus: jsonb('due_diligence_status').$type<{
+    totalTasks: number;
+    completedTasks: number;
+    criticalIssues: string[];
+  }>(),
+  
+  riskFactors: text('risk_factors').array(),
+  mitigationStrategies: text('mitigation_strategies'),
+  recommendation: text('recommendation'), // 'proceed', 'pass', 'conditional'
+  conditions: text('conditions').array(), // Conditions for approval
+  
+  // Voting requirements
+  quorumRequired: integer('quorum_required').default(3),
+  approvalsRequired: integer('approvals_required').default(2),
+  
+  // Approval tracking
+  submittedAt: timestamp('submitted_at'),
+  submittedBy: varchar('submitted_by').references(() => users.id),
+  reviewDeadline: timestamp('review_deadline'),
+  approvedAt: timestamp('approved_at'),
+  rejectedAt: timestamp('rejected_at'),
+  
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('ic_memos_org_idx').on(table.orgId),
+  projectIdx: index('ic_memos_project_idx').on(table.modelingProjectId),
+  statusIdx: index('ic_memos_status_idx').on(table.status),
+  submittedIdx: index('ic_memos_submitted_idx').on(table.submittedAt),
+}));
+
+// IC Votes - Individual votes on memos
+export const icVotes = pgTable('ic_votes', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  memoId: varchar('memo_id').notNull().references(() => icMemos.id, { onDelete: 'cascade' }),
+  memberId: varchar('member_id').notNull().references(() => icCommitteeMembers.id),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  
+  vote: icVoteTypeEnum('vote').notNull(),
+  comments: text('comments'),
+  conditions: text('conditions').array(), // For conditional approvals
+  
+  votedAt: timestamp('voted_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('ic_votes_org_idx').on(table.orgId),
+  memoIdx: index('ic_votes_memo_idx').on(table.memoId),
+  memberIdx: index('ic_votes_member_idx').on(table.memberId),
+  uniqueVote: unique('ic_votes_memo_member').on(table.memoId, table.memberId),
+}));
+
+// IC Comments - Discussion threads on memos
+export const icComments = pgTable('ic_comments', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  memoId: varchar('memo_id').notNull().references(() => icMemos.id, { onDelete: 'cascade' }),
+  parentId: varchar('parent_id'), // For threaded replies
+  
+  userId: varchar('user_id').notNull().references(() => users.id),
+  content: text('content').notNull(),
+  
+  // Mentions and references
+  mentions: text('mentions').array(), // User IDs mentioned
+  section: text('section'), // Which memo section this relates to
+  
+  isResolved: boolean('is_resolved').default(false),
+  resolvedBy: varchar('resolved_by').references(() => users.id),
+  resolvedAt: timestamp('resolved_at'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('ic_comments_org_idx').on(table.orgId),
+  memoIdx: index('ic_comments_memo_idx').on(table.memoId),
+  parentIdx: index('ic_comments_parent_idx').on(table.parentId),
+  resolvedIdx: index('ic_comments_resolved_idx').on(table.isResolved),
+}));
+
+// ============================================================================
+// MODEL VS ACTUAL VARIANCE TRACKING
+// Track performance against underwriting assumptions with alerts
+// ============================================================================
+
+// Underwriting Assumptions - Baseline assumptions to track against
+export const underwritingAssumptions = pgTable('underwriting_assumptions', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  capitalStackId: varchar('capital_stack_id').references(() => capitalStacks.id),
+  
+  // Assumption period
+  year: integer('year').notNull(),
+  month: integer('month'), // Optional for monthly tracking
+  period: text('period'), // 'annual', 'quarterly', 'monthly'
+  
+  // Revenue assumptions
+  grossPotentialRevenue: decimal('gross_potential_revenue', { precision: 18, scale: 2 }),
+  occupancyRate: decimal('occupancy_rate', { precision: 8, scale: 4 }),
+  effectiveGrossRevenue: decimal('effective_gross_revenue', { precision: 18, scale: 2 }),
+  
+  // Expense assumptions
+  operatingExpenses: decimal('operating_expenses', { precision: 18, scale: 2 }),
+  expenseRatio: decimal('expense_ratio', { precision: 8, scale: 4 }),
+  
+  // NOI and below
+  noi: decimal('noi', { precision: 18, scale: 2 }),
+  capex: decimal('capex', { precision: 18, scale: 2 }),
+  debtService: decimal('debt_service', { precision: 18, scale: 2 }),
+  cashFlow: decimal('cash_flow', { precision: 18, scale: 2 }),
+  
+  // Segment breakdown
+  slipRevenue: decimal('slip_revenue', { precision: 18, scale: 2 }),
+  fuelRevenue: decimal('fuel_revenue', { precision: 18, scale: 2 }),
+  shipStoreRevenue: decimal('ship_store_revenue', { precision: 18, scale: 2 }),
+  otherRevenue: decimal('other_revenue', { precision: 18, scale: 2 }),
+  
+  // Lock status
+  isLocked: boolean('is_locked').default(false),
+  lockedAt: timestamp('locked_at'),
+  lockedBy: varchar('locked_by').references(() => users.id),
+  
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('underwriting_assumptions_org_idx').on(table.orgId),
+  projectIdx: index('underwriting_assumptions_project_idx').on(table.modelingProjectId),
+  yearIdx: index('underwriting_assumptions_year_idx').on(table.year),
+}));
+
+// Actual Performance - Recorded actuals to compare against assumptions
+export const actualPerformance = pgTable('actual_performance', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  assumptionId: varchar('assumption_id').references(() => underwritingAssumptions.id),
+  
+  // Period
+  year: integer('year').notNull(),
+  month: integer('month'),
+  period: text('period'),
+  periodStart: date('period_start'),
+  periodEnd: date('period_end'),
+  
+  // Revenue actuals
+  grossPotentialRevenue: decimal('gross_potential_revenue', { precision: 18, scale: 2 }),
+  occupancyRate: decimal('occupancy_rate', { precision: 8, scale: 4 }),
+  effectiveGrossRevenue: decimal('effective_gross_revenue', { precision: 18, scale: 2 }),
+  
+  // Expense actuals
+  operatingExpenses: decimal('operating_expenses', { precision: 18, scale: 2 }),
+  expenseRatio: decimal('expense_ratio', { precision: 8, scale: 4 }),
+  
+  // NOI and below
+  noi: decimal('noi', { precision: 18, scale: 2 }),
+  capex: decimal('capex', { precision: 18, scale: 2 }),
+  debtService: decimal('debt_service', { precision: 18, scale: 2 }),
+  cashFlow: decimal('cash_flow', { precision: 18, scale: 2 }),
+  
+  // Segment breakdown
+  slipRevenue: decimal('slip_revenue', { precision: 18, scale: 2 }),
+  fuelRevenue: decimal('fuel_revenue', { precision: 18, scale: 2 }),
+  shipStoreRevenue: decimal('ship_store_revenue', { precision: 18, scale: 2 }),
+  otherRevenue: decimal('other_revenue', { precision: 18, scale: 2 }),
+  
+  // Source tracking
+  dataSource: text('data_source'), // 'manual', 'rent_roll_sync', 'fuel_sync', 'ship_store_sync'
+  syncedAt: timestamp('synced_at'),
+  
+  notes: text('notes'),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('actual_performance_org_idx').on(table.orgId),
+  projectIdx: index('actual_performance_project_idx').on(table.modelingProjectId),
+  yearIdx: index('actual_performance_year_idx').on(table.year),
+  assumptionIdx: index('actual_performance_assumption_idx').on(table.assumptionId),
+}));
+
+// Variance Alerts - Threshold-based alerts when actuals deviate from assumptions
+export const varianceAlerts = pgTable('variance_alerts', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  actualPerformanceId: varchar('actual_performance_id').references(() => actualPerformance.id),
+  
+  metric: text('metric').notNull(), // 'occupancy', 'noi', 'revenue', etc.
+  assumedValue: decimal('assumed_value', { precision: 18, scale: 2 }),
+  actualValue: decimal('actual_value', { precision: 18, scale: 2 }),
+  variancePct: decimal('variance_pct', { precision: 8, scale: 4 }),
+  varianceAmount: decimal('variance_amount', { precision: 18, scale: 2 }),
+  
+  severity: varianceAlertSeverityEnum('severity').notNull(),
+  thresholdPct: decimal('threshold_pct', { precision: 8, scale: 4 }), // Threshold that triggered
+  
+  message: text('message').notNull(),
+  recommendation: text('recommendation'),
+  
+  // Resolution
+  isResolved: boolean('is_resolved').default(false),
+  resolvedBy: varchar('resolved_by').references(() => users.id),
+  resolvedAt: timestamp('resolved_at'),
+  resolutionNotes: text('resolution_notes'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('variance_alerts_org_idx').on(table.orgId),
+  projectIdx: index('variance_alerts_project_idx').on(table.modelingProjectId),
+  severityIdx: index('variance_alerts_severity_idx').on(table.severity),
+  resolvedIdx: index('variance_alerts_resolved_idx').on(table.isResolved),
+}));
+
+// ============================================================================
+// PORTFOLIO RISK DASHBOARD
+// Aggregate portfolio metrics, covenant tracking, and risk analysis
+// ============================================================================
+
+// Portfolio Definitions - Group projects into portfolios
+export const portfolios = pgTable('portfolios', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  fundName: text('fund_name'), // Associated fund
+  vintage: integer('vintage'), // Investment year
+  
+  // Portfolio targets
+  targetIrr: decimal('target_irr', { precision: 8, scale: 4 }),
+  targetEquityMultiple: decimal('target_equity_multiple', { precision: 8, scale: 4 }),
+  targetHoldPeriod: integer('target_hold_period'),
+  
+  // Aggregate metrics (denormalized, updated via triggers/sync)
+  totalAssets: integer('total_assets').default(0),
+  totalInvested: decimal('total_invested', { precision: 18, scale: 2 }).default('0'),
+  currentValue: decimal('current_value', { precision: 18, scale: 2 }).default('0'),
+  totalNoi: decimal('total_noi', { precision: 18, scale: 2 }).default('0'),
+  weightedCapRate: decimal('weighted_cap_rate', { precision: 8, scale: 4 }),
+  portfolioIrr: decimal('portfolio_irr', { precision: 8, scale: 4 }),
+  
+  isActive: boolean('is_active').default(true).notNull(),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('portfolios_org_idx').on(table.orgId),
+  vintageIdx: index('portfolios_vintage_idx').on(table.vintage),
+}));
+
+// Portfolio Assets - Link projects to portfolios
+export const portfolioAssets = pgTable('portfolio_assets', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  portfolioId: varchar('portfolio_id').notNull().references(() => portfolios.id, { onDelete: 'cascade' }),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id),
+  
+  // Acquisition info
+  acquisitionDate: date('acquisition_date'),
+  acquisitionPrice: decimal('acquisition_price', { precision: 18, scale: 2 }),
+  equityInvested: decimal('equity_invested', { precision: 18, scale: 2 }),
+  
+  // Current valuation
+  currentValue: decimal('current_value', { precision: 18, scale: 2 }),
+  currentNoi: decimal('current_noi', { precision: 18, scale: 2 }),
+  impliedCapRate: decimal('implied_cap_rate', { precision: 8, scale: 4 }),
+  
+  // Location for geographic analysis
+  state: text('state'),
+  region: text('region'),
+  market: text('market'),
+  
+  // Asset-level metrics
+  occupancyRate: decimal('occupancy_rate', { precision: 8, scale: 4 }),
+  debtBalance: decimal('debt_balance', { precision: 18, scale: 2 }),
+  ltv: decimal('ltv', { precision: 8, scale: 4 }),
+  dscr: decimal('dscr', { precision: 8, scale: 4 }),
+  
+  // Status
+  status: text('status').default('active'), // 'active', 'under_loi', 'sold'
+  
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('portfolio_assets_org_idx').on(table.orgId),
+  portfolioIdx: index('portfolio_assets_portfolio_idx').on(table.portfolioId),
+  projectIdx: index('portfolio_assets_project_idx').on(table.modelingProjectId),
+  stateIdx: index('portfolio_assets_state_idx').on(table.state),
+  uniqueAsset: unique('portfolio_assets_portfolio_project').on(table.portfolioId, table.modelingProjectId),
+}));
+
+// Covenant Tracking - Monitor loan covenants across portfolio
+export const covenantTracking = pgTable('covenant_tracking', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  debtTrancheId: varchar('debt_tranche_id').references(() => debtTranches.id),
+  
+  covenantType: covenantTypeEnum('covenant_type').notNull(),
+  covenantName: text('covenant_name').notNull(),
+  
+  // Threshold
+  requiredValue: decimal('required_value', { precision: 18, scale: 4 }).notNull(),
+  comparisonOperator: text('comparison_operator').notNull(), // 'gte', 'lte', 'eq'
+  
+  // Current status
+  currentValue: decimal('current_value', { precision: 18, scale: 4 }),
+  status: covenantStatusEnum('status').notNull().default('in_compliance'),
+  cushionPct: decimal('cushion_pct', { precision: 8, scale: 4 }), // How far from breach
+  
+  // Testing schedule
+  testingFrequency: text('testing_frequency'), // 'monthly', 'quarterly', 'annual'
+  lastTestedAt: timestamp('last_tested_at'),
+  nextTestDate: date('next_test_date'),
+  
+  // Breach history
+  lastBreachDate: date('last_breach_date'),
+  breachCount: integer('breach_count').default(0),
+  
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('covenant_tracking_org_idx').on(table.orgId),
+  projectIdx: index('covenant_tracking_project_idx').on(table.modelingProjectId),
+  typeIdx: index('covenant_tracking_type_idx').on(table.covenantType),
+  statusIdx: index('covenant_tracking_status_idx').on(table.status),
+}));
+
+// ============================================================================
+// LP PORTAL & INVESTOR REPORTING
+// Investor management, capital accounts, and distribution tracking
+// ============================================================================
+
+// LP Investors - Limited partner tracking
+export const lpInvestors = pgTable('lp_investors', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Investor info
+  name: text('name').notNull(),
+  entityType: text('entity_type'), // 'individual', 'trust', 'llc', 'corporation', 'fund_of_funds'
+  taxId: text('tax_id'), // EIN or SSN (encrypted)
+  
+  // Contact
+  contactName: text('contact_name'),
+  email: text('email'),
+  phone: text('phone'),
+  address: jsonb('address').$type<{
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  }>(),
+  
+  // Accreditation
+  isAccredited: boolean('is_accredited').default(true),
+  accreditationDate: date('accreditation_date'),
+  accreditationExpiry: date('accreditation_expiry'),
+  
+  // Portal access
+  portalUserId: varchar('portal_user_id').references(() => users.id),
+  lastLoginAt: timestamp('last_login_at'),
+  
+  notes: text('notes'),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('lp_investors_org_idx').on(table.orgId),
+  emailIdx: index('lp_investors_email_idx').on(table.email),
+  activeIdx: index('lp_investors_active_idx').on(table.isActive),
+}));
+
+// LP Commitments - Investor commitments to specific investments/funds
+export const lpCommitments = pgTable('lp_commitments', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  investorId: varchar('investor_id').notNull().references(() => lpInvestors.id),
+  portfolioId: varchar('portfolio_id').references(() => portfolios.id),
+  modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id),
+  equityLayerId: varchar('equity_layer_id').references(() => equityLayers.id),
+  
+  // Commitment details
+  commitmentAmount: decimal('commitment_amount', { precision: 18, scale: 2 }).notNull(),
+  fundedAmount: decimal('funded_amount', { precision: 18, scale: 2 }).default('0'),
+  unfundedCommitment: decimal('unfunded_commitment', { precision: 18, scale: 2 }),
+  ownershipPct: decimal('ownership_pct', { precision: 8, scale: 6 }),
+  
+  // Dates
+  commitmentDate: date('commitment_date'),
+  firstFundingDate: date('first_funding_date'),
+  
+  // Status
+  status: text('status').default('active'), // 'pending', 'active', 'fully_funded', 'redeemed'
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('lp_commitments_org_idx').on(table.orgId),
+  investorIdx: index('lp_commitments_investor_idx').on(table.investorId),
+  portfolioIdx: index('lp_commitments_portfolio_idx').on(table.portfolioId),
+  projectIdx: index('lp_commitments_project_idx').on(table.modelingProjectId),
+}));
+
+// LP Distributions - Distribution history per investor
+export const lpDistributions = pgTable('lp_distributions', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  commitmentId: varchar('commitment_id').notNull().references(() => lpCommitments.id),
+  investorId: varchar('investor_id').notNull().references(() => lpInvestors.id),
+  
+  // Distribution details
+  distributionDate: date('distribution_date').notNull(),
+  distributionType: text('distribution_type').notNull(), // 'operating', 'return_of_capital', 'capital_gain', 'refinance'
+  
+  grossAmount: decimal('gross_amount', { precision: 18, scale: 2 }).notNull(),
+  withholding: decimal('withholding', { precision: 18, scale: 2 }).default('0'),
+  netAmount: decimal('net_amount', { precision: 18, scale: 2 }).notNull(),
+  
+  // Waterfall tier this came from
+  waterfallTier: text('waterfall_tier'),
+  
+  // Cumulative tracking
+  cumulativeDistributed: decimal('cumulative_distributed', { precision: 18, scale: 2 }),
+  remainingBasis: decimal('remaining_basis', { precision: 18, scale: 2 }),
+  
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('lp_distributions_org_idx').on(table.orgId),
+  commitmentIdx: index('lp_distributions_commitment_idx').on(table.commitmentId),
+  investorIdx: index('lp_distributions_investor_idx').on(table.investorId),
+  dateIdx: index('lp_distributions_date_idx').on(table.distributionDate),
+}));
+
+// LP Capital Accounts - Point-in-time capital account balances
+export const lpCapitalAccounts = pgTable('lp_capital_accounts', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  commitmentId: varchar('commitment_id').notNull().references(() => lpCommitments.id),
+  investorId: varchar('investor_id').notNull().references(() => lpInvestors.id),
+  
+  // Period
+  periodEnd: date('period_end').notNull(),
+  
+  // Balances
+  beginningBalance: decimal('beginning_balance', { precision: 18, scale: 2 }).notNull(),
+  contributions: decimal('contributions', { precision: 18, scale: 2 }).default('0'),
+  distributions: decimal('distributions', { precision: 18, scale: 2 }).default('0'),
+  income: decimal('income', { precision: 18, scale: 2 }).default('0'),
+  unrealizedGainLoss: decimal('unrealized_gain_loss', { precision: 18, scale: 2 }).default('0'),
+  endingBalance: decimal('ending_balance', { precision: 18, scale: 2 }).notNull(),
+  
+  // NAV per unit
+  navPerUnit: decimal('nav_per_unit', { precision: 18, scale: 6 }),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('lp_capital_accounts_org_idx').on(table.orgId),
+  commitmentIdx: index('lp_capital_accounts_commitment_idx').on(table.commitmentId),
+  investorIdx: index('lp_capital_accounts_investor_idx').on(table.investorId),
+  periodIdx: index('lp_capital_accounts_period_idx').on(table.periodEnd),
+}));
+
+// ============================================================================
+// EXIT READINESS SCORING
+// Track asset readiness for exit with checklists and scoring
+// ============================================================================
+
+// Exit Readiness Assessments - Overall readiness scoring per asset
+export const exitReadinessAssessments = pgTable('exit_readiness_assessments', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Overall scoring
+  overallScore: integer('overall_score'), // 0-100
+  status: exitReadinessStatusEnum('status').notNull().default('not_ready'),
+  
+  // Category scores
+  documentationScore: integer('documentation_score'),
+  financialScore: integer('financial_score'),
+  operationalScore: integer('operational_score'),
+  legalScore: integer('legal_score'),
+  marketTimingScore: integer('market_timing_score'),
+  
+  // Market analysis
+  currentMarketCapRate: decimal('current_market_cap_rate', { precision: 8, scale: 4 }),
+  suggestedListingPrice: decimal('suggested_listing_price', { precision: 18, scale: 2 }),
+  optimalExitWindow: text('optimal_exit_window'), // e.g., "Q2-Q3 2025"
+  
+  // Recommendations
+  topIssues: text('top_issues').array(),
+  recommendations: jsonb('recommendations').$type<{
+    category: string;
+    issue: string;
+    action: string;
+    priority: 'high' | 'medium' | 'low';
+    estimatedDays: number;
+  }[]>(),
+  
+  // Timeline
+  estimatedTimeToReady: integer('estimated_time_to_ready'), // Days
+  targetExitDate: date('target_exit_date'),
+  
+  assessedBy: varchar('assessed_by').references(() => users.id),
+  assessedAt: timestamp('assessed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('exit_readiness_assessments_org_idx').on(table.orgId),
+  projectIdx: index('exit_readiness_assessments_project_idx').on(table.modelingProjectId),
+  statusIdx: index('exit_readiness_assessments_status_idx').on(table.status),
+  scoreIdx: index('exit_readiness_assessments_score_idx').on(table.overallScore),
+}));
+
+// Exit Readiness Checklist Items - Individual checklist items
+export const exitReadinessChecklist = pgTable('exit_readiness_checklist', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  assessmentId: varchar('assessment_id').notNull().references(() => exitReadinessAssessments.id, { onDelete: 'cascade' }),
+  
+  category: text('category').notNull(), // 'documentation', 'financial', 'operational', 'legal', 'market'
+  item: text('item').notNull(),
+  description: text('description'),
+  
+  // Status
+  isComplete: boolean('is_complete').default(false),
+  completedBy: varchar('completed_by').references(() => users.id),
+  completedAt: timestamp('completed_at'),
+  
+  // Scoring impact
+  weight: integer('weight').default(1), // Impact on category score
+  
+  // Notes
+  notes: text('notes'),
+  blockers: text('blockers'),
+  
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('exit_readiness_checklist_org_idx').on(table.orgId),
+  assessmentIdx: index('exit_readiness_checklist_assessment_idx').on(table.assessmentId),
+  categoryIdx: index('exit_readiness_checklist_category_idx').on(table.category),
+  completeIdx: index('exit_readiness_checklist_complete_idx').on(table.isComplete),
+}));
+
+// ============================================================================
+// PE INSTITUTIONAL MODULE - Insert Schemas and Types
+// ============================================================================
+
+export const insertCapitalStackSchema = createInsertSchema(capitalStacks).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  createdBy: true,
+}).extend({
+  purchasePrice: z.string().or(z.number()),
+  closingCosts: z.string().or(z.number()).optional(),
+  capexReserves: z.string().or(z.number()).optional(),
+  workingCapital: z.string().or(z.number()).optional(),
+  totalCapitalization: z.string().or(z.number()),
+  totalDebt: z.string().or(z.number()).optional(),
+  totalEquity: z.string().or(z.number()).optional(),
+  exitCapRate: z.string().or(z.number()).optional(),
+  noiGrowthRate: z.string().or(z.number()).optional(),
+});
+export const updateCapitalStackSchema = insertCapitalStackSchema.partial();
+
+export const insertDebtTrancheSchema = createInsertSchema(debtTranches).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  principal: z.string().or(z.number()),
+  interestRate: z.string().or(z.number()),
+  originationFeePct: z.string().or(z.number()).optional(),
+  minDscr: z.string().or(z.number()).optional(),
+  maxLtv: z.string().or(z.number()).optional(),
+});
+export const updateDebtTrancheSchema = insertDebtTrancheSchema.partial();
+
+export const insertEquityLayerSchema = createInsertSchema(equityLayers).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  commitmentAmount: z.string().or(z.number()),
+  fundedAmount: z.string().or(z.number()).optional(),
+  ownershipPct: z.string().or(z.number()),
+  preferredReturn: z.string().or(z.number()).optional(),
+});
+export const updateEquityLayerSchema = insertEquityLayerSchema.partial();
+
+export const insertIcMemoSchema = createInsertSchema(icMemos).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  createdBy: true,
+  submittedAt: true,
+  submittedBy: true,
+  approvedAt: true,
+  rejectedAt: true,
+});
+export const updateIcMemoSchema = insertIcMemoSchema.partial();
+
+export const insertIcVoteSchema = createInsertSchema(icVotes).omit({
+  id: true,
+  orgId: true,
+  votedAt: true,
+});
+
+export const insertIcCommentSchema = createInsertSchema(icComments).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  resolvedBy: true,
+  resolvedAt: true,
+});
+
+export const insertUnderwritingAssumptionSchema = createInsertSchema(underwritingAssumptions).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  lockedAt: true,
+  lockedBy: true,
+});
+
+export const insertActualPerformanceSchema = createInsertSchema(actualPerformance).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  createdBy: true,
+  syncedAt: true,
+});
+
+export const insertPortfolioSchema = createInsertSchema(portfolios).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  createdBy: true,
+});
+export const updatePortfolioSchema = insertPortfolioSchema.partial();
+
+export const insertPortfolioAssetSchema = createInsertSchema(portfolioAssets).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCovenantTrackingSchema = createInsertSchema(covenantTracking).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLpInvestorSchema = createInsertSchema(lpInvestors).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+});
+export const updateLpInvestorSchema = insertLpInvestorSchema.partial();
+
+export const insertLpCommitmentSchema = createInsertSchema(lpCommitments).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLpDistributionSchema = createInsertSchema(lpDistributions).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+});
+
+export const insertExitReadinessAssessmentSchema = createInsertSchema(exitReadinessAssessments).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  assessedBy: true,
+  assessedAt: true,
+});
+
+export const insertExitReadinessChecklistSchema = createInsertSchema(exitReadinessChecklist).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  completedBy: true,
+  completedAt: true,
+});
+
+// Type exports
+export type CapitalStack = typeof capitalStacks.$inferSelect;
+export type InsertCapitalStack = z.infer<typeof insertCapitalStackSchema>;
+export type UpdateCapitalStack = z.infer<typeof updateCapitalStackSchema>;
+
+export type DebtTranche = typeof debtTranches.$inferSelect;
+export type InsertDebtTranche = z.infer<typeof insertDebtTrancheSchema>;
+export type UpdateDebtTranche = z.infer<typeof updateDebtTrancheSchema>;
+
+export type EquityLayer = typeof equityLayers.$inferSelect;
+export type InsertEquityLayer = z.infer<typeof insertEquityLayerSchema>;
+export type UpdateEquityLayer = z.infer<typeof updateEquityLayerSchema>;
+
+export type CapitalStackProjection = typeof capitalStackProjections.$inferSelect;
+
+export type IcCommitteeMember = typeof icCommitteeMembers.$inferSelect;
+
+export type IcMemo = typeof icMemos.$inferSelect;
+export type InsertIcMemo = z.infer<typeof insertIcMemoSchema>;
+export type UpdateIcMemo = z.infer<typeof updateIcMemoSchema>;
+
+export type IcVote = typeof icVotes.$inferSelect;
+export type InsertIcVote = z.infer<typeof insertIcVoteSchema>;
+
+export type IcComment = typeof icComments.$inferSelect;
+export type InsertIcComment = z.infer<typeof insertIcCommentSchema>;
+
+export type UnderwritingAssumption = typeof underwritingAssumptions.$inferSelect;
+export type InsertUnderwritingAssumption = z.infer<typeof insertUnderwritingAssumptionSchema>;
+
+export type ActualPerformance = typeof actualPerformance.$inferSelect;
+export type InsertActualPerformance = z.infer<typeof insertActualPerformanceSchema>;
+
+export type VarianceAlert = typeof varianceAlerts.$inferSelect;
+
+export type Portfolio = typeof portfolios.$inferSelect;
+export type InsertPortfolio = z.infer<typeof insertPortfolioSchema>;
+export type UpdatePortfolio = z.infer<typeof updatePortfolioSchema>;
+
+export type PortfolioAsset = typeof portfolioAssets.$inferSelect;
+export type InsertPortfolioAsset = z.infer<typeof insertPortfolioAssetSchema>;
+
+export type CovenantTracking = typeof covenantTracking.$inferSelect;
+export type InsertCovenantTracking = z.infer<typeof insertCovenantTrackingSchema>;
+
+export type LpInvestor = typeof lpInvestors.$inferSelect;
+export type InsertLpInvestor = z.infer<typeof insertLpInvestorSchema>;
+export type UpdateLpInvestor = z.infer<typeof updateLpInvestorSchema>;
+
+export type LpCommitment = typeof lpCommitments.$inferSelect;
+export type InsertLpCommitment = z.infer<typeof insertLpCommitmentSchema>;
+
+export type LpDistribution = typeof lpDistributions.$inferSelect;
+export type InsertLpDistribution = z.infer<typeof insertLpDistributionSchema>;
+
+export type LpCapitalAccount = typeof lpCapitalAccounts.$inferSelect;
+
+export type ExitReadinessAssessment = typeof exitReadinessAssessments.$inferSelect;
+export type InsertExitReadinessAssessment = z.infer<typeof insertExitReadinessAssessmentSchema>;
+
+export type ExitReadinessChecklistItem = typeof exitReadinessChecklist.$inferSelect;
+export type InsertExitReadinessChecklistItem = z.infer<typeof insertExitReadinessChecklistSchema>;
+
+// ============================================================================
 // DOCUMENT INTELLIGENCE - AI-Powered Financial Document Parsing
 // Provides smart import for P&L, Rent Roll, and other financial documents
 // with line item extraction, categorization, and learning from user feedback
