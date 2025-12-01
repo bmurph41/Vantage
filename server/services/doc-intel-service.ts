@@ -540,14 +540,21 @@ class DocIntelService {
       const extractedItems: DocIntelExtractedItem[] = [];
 
       for (const item of parsedItems) {
+        const cleanedRawText = sanitizeText(item.rawText);
+        const cleanedDate = sanitizeText(item.extractedDate);
+        
+        if (!cleanedRawText && item.amount === null) {
+          continue;
+        }
+
         const [extracted] = await db
           .insert(docIntelExtractedItems)
           .values({
             orgId,
             uploadId,
-            rawText: item.rawText,
+            rawText: cleanedRawText || '(no description)',
             amount: item.amount?.toString() || null,
-            extractedDate: item.extractedDate,
+            extractedDate: cleanedDate || undefined,
             sourcePage: item.sourcePage,
             sourceRow: item.sourceRow,
             status: 'pending',
