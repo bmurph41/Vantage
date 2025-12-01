@@ -11192,7 +11192,50 @@ Current context: Project ${req.params.projectId}`;
         periodNOI,
         periodRevenue,
         periodExpenses,
+        useNormalizedData = true,
       } = req.body;
+
+      let adjustedNOI = periodNOI ? Number(periodNOI) : undefined;
+      let adjustedRevenue = periodRevenue ? Number(periodRevenue) : undefined;
+      let adjustedExpenses = periodExpenses ? Number(periodExpenses) : undefined;
+
+      if (useNormalizedData && periodLabel) {
+        try {
+          const adjustments = await storage.getActiveAdjustmentsForPeriod(projectId, periodLabel, orgId);
+          if (adjustments.length > 0) {
+            for (const adj of adjustments) {
+              const target = (adj.targetIdentifier || '').toLowerCase();
+              const value = Number(adj.adjustmentValue) || 0;
+              const adjType = adj.adjustmentType;
+
+              if (target === 'revenue' || target.includes('revenue')) {
+                const base = adjustedRevenue || 0;
+                if (adjType === 'absolute') adjustedRevenue = base + value;
+                else if (adjType === 'percentage') adjustedRevenue = base * (1 + value / 100);
+                else if (adjType === 'replace') adjustedRevenue = value;
+              } else if (target === 'expenses' || target.includes('expense')) {
+                const base = adjustedExpenses || 0;
+                if (adjType === 'absolute') adjustedExpenses = base + value;
+                else if (adjType === 'percentage') adjustedExpenses = base * (1 + value / 100);
+                else if (adjType === 'replace') adjustedExpenses = value;
+              } else if (target === 'noi' || target.includes('noi')) {
+                const base = adjustedNOI || 0;
+                if (adjType === 'absolute') adjustedNOI = base + value;
+                else if (adjType === 'percentage') adjustedNOI = base * (1 + value / 100);
+                else if (adjType === 'replace') adjustedNOI = value;
+              }
+            }
+            if (adjustedRevenue !== undefined && adjustedExpenses !== undefined) {
+              const recalcNOI = adjustedRevenue - adjustedExpenses;
+              if (adjustedNOI === undefined || adjustedNOI === (periodNOI ? Number(periodNOI) : undefined)) {
+                adjustedNOI = recalcNOI;
+              }
+            }
+          }
+        } catch (adjError) {
+          console.warn('Failed to apply period adjustments:', adjError);
+        }
+      }
 
       const results = await dealPricingService.calculateAllPricingModes(
         projectId,
@@ -11208,13 +11251,16 @@ Current context: Project ${req.params.projectId}`;
           revenueGrowthRate: revenueGrowthRate ? Number(revenueGrowthRate) / 100 : undefined,
           expenseGrowthRate: expenseGrowthRate ? Number(expenseGrowthRate) / 100 : undefined,
           periodLabel,
-          periodNOI: periodNOI ? Number(periodNOI) : undefined,
-          periodRevenue: periodRevenue ? Number(periodRevenue) : undefined,
-          periodExpenses: periodExpenses ? Number(periodExpenses) : undefined,
+          periodNOI: adjustedNOI,
+          periodRevenue: adjustedRevenue,
+          periodExpenses: adjustedExpenses,
         }
       );
 
-      res.json(results);
+      res.json({
+        ...results,
+        usingNormalizedData: useNormalizedData,
+      });
     } catch (error: any) {
       console.error('Failed to calculate deal pricing:', error);
       res.status(500).json({ error: error.message || 'Failed to calculate deal pricing' });
@@ -11247,6 +11293,132 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error('Failed to save deal pricing:', error);
       res.status(500).json({ error: error.message || 'Failed to save deal pricing' });
+    }
+  });
+
+  // Project Workspace - Period Adjustments (Analytics & Normalization)
+  app.get('/api/modeling/projects/:projectId/period-adjustments', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { periodLabel } = req.query;
+
+      const adjustments = await storage.getModelingPeriodAdjustments(projectId, orgId, periodLabel as string);
+      res.json(adjustments);
+    } catch (error: any) {
+      console.error('Failed to fetch period adjustments:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch period adjustments' });
+    }
+  });
+
+  app.post('/api/modeling/projects/:projectId/period-adjustments', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const {
+        periodLabel,
+        scope,
+        targetIdentifier,
+        targetLabel,
+        adjustmentType,
+        adjustmentValue,
+        originalValue,
+        adjustedValue,
+        reason,
+        isActive = true
+      } = req.body;
+
+      const adjustment = await storage.createModelingPeriodAdjustment({
+        id: crypto.randomUUID(),
+        orgId,
+        modelingProjectId: projectId,
+        periodLabel,
+        scope,
+        targetIdentifier,
+        targetLabel,
+        adjustmentType,
+        adjustmentValue: String(adjustmentValue),
+        originalValue: originalValue ? String(originalValue) : null,
+        adjustedValue: adjustedValue ? String(adjustedValue) : null,
+        reason,
+        isActive,
+        createdBy: userId,
+      });
+
+      res.json(adjustment);
+    } catch (error: any) {
+      console.error('Failed to create period adjustment:', error);
+      res.status(500).json({ error: error.message || 'Failed to create period adjustment' });
+    }
+  });
+
+  app.patch('/api/modeling/projects/:projectId/period-adjustments/:adjustmentId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, adjustmentId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const adjustment = await storage.getModelingPeriodAdjustment(adjustmentId, orgId);
+      if (!adjustment) {
+        return res.status(404).json({ error: 'Adjustment not found' });
+      }
+
+      const {
+        adjustmentType,
+        adjustmentValue,
+        originalValue,
+        adjustedValue,
+        reason,
+        isActive
+      } = req.body;
+
+      const updates: any = { updatedBy: userId };
+      if (adjustmentType !== undefined) updates.adjustmentType = adjustmentType;
+      if (adjustmentValue !== undefined) updates.adjustmentValue = String(adjustmentValue);
+      if (originalValue !== undefined) updates.originalValue = String(originalValue);
+      if (adjustedValue !== undefined) updates.adjustedValue = String(adjustedValue);
+      if (reason !== undefined) updates.reason = reason;
+      if (isActive !== undefined) updates.isActive = isActive;
+
+      const updated = await storage.updateModelingPeriodAdjustment(adjustmentId, updates, orgId);
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Failed to update period adjustment:', error);
+      res.status(500).json({ error: error.message || 'Failed to update period adjustment' });
+    }
+  });
+
+  app.delete('/api/modeling/projects/:projectId/period-adjustments/:adjustmentId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, adjustmentId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const deleted = await storage.deleteModelingPeriodAdjustment(adjustmentId, orgId);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Adjustment not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to delete period adjustment:', error);
+      res.status(500).json({ error: error.message || 'Failed to delete period adjustment' });
     }
   });
 

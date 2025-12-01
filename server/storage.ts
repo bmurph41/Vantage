@@ -7376,6 +7376,18 @@ export class DatabaseStorage implements IStorage {
     return this.updateModelingPeriodAdjustment(id, { isActive } as UpdateModelingPeriodAdjustment, orgId);
   }
 
+  async getProjectPeriodAdjustmentsByScope(projectId: string, periodLabel: string, scope: string): Promise<ModelingPeriodAdjustment[]> {
+    return db.select()
+      .from(modelingPeriodAdjustments)
+      .where(and(
+        eq(modelingPeriodAdjustments.modelingProjectId, projectId),
+        eq(modelingPeriodAdjustments.periodLabel, periodLabel),
+        eq(modelingPeriodAdjustments.scope, scope as any),
+        eq(modelingPeriodAdjustments.isActive, true)
+      ))
+      .orderBy(modelingPeriodAdjustments.targetLabel);
+  }
+
   // ============================================================================
   // MODELING ANALYTICS - Aggregations for drill-down analytics
   // ============================================================================

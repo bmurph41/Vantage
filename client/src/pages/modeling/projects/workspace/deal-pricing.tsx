@@ -33,6 +33,8 @@ import {
   Info,
   ArrowRight,
   CheckCircle2,
+  SlidersHorizontal,
+  AlertTriangle,
 } from 'lucide-react';
 import type { ModelingProject, ModelingFinancialPeriod } from '@shared/schema';
 import debounce from 'lodash.debounce';
@@ -120,11 +122,21 @@ export default function DealPricing({ projectId }: DealPricingProps) {
   const [expenseGrowthRate, setExpenseGrowthRate] = useState<string>('2.0');
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [selectedPeriodData, setSelectedPeriodData] = useState<ModelingFinancialPeriod | null>(null);
+  const [useNormalizedData, setUseNormalizedData] = useState<boolean>(true);
 
   const { data: project } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
     enabled: !!projectId,
   });
+
+  const { data: adjustments } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'period-adjustments'],
+    enabled: !!projectId,
+  });
+
+  const activeAdjustmentsCount = adjustments?.filter(
+    adj => !selectedPeriod || adj.periodLabel === selectedPeriod
+  ).length || 0;
 
   const handlePeriodChange = useCallback((periodLabel: string, periodData: ModelingFinancialPeriod | null) => {
     setSelectedPeriod(periodLabel);
@@ -181,10 +193,11 @@ export default function DealPricing({ projectId }: DealPricingProps) {
         exitCapRate: parsePercentInput(exitCapRate) || 7.5,
         revenueGrowthRate: parsePercentInput(revenueGrowthRate),
         expenseGrowthRate: parsePercentInput(expenseGrowthRate),
+        useNormalizedData,
         ...periodOverrides,
       });
     }, 500),
-    [manualPurchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriod, exitCapRate, revenueGrowthRate, expenseGrowthRate, selectedPeriod, selectedPeriodData]
+    [manualPurchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriod, exitCapRate, revenueGrowthRate, expenseGrowthRate, selectedPeriod, selectedPeriodData, useNormalizedData]
   );
 
   useEffect(() => {
@@ -232,6 +245,53 @@ export default function DealPricing({ projectId }: DealPricingProps) {
           </Button>
         </div>
       </div>
+
+      {activeAdjustmentsCount > 0 && (
+        <Card className="bg-amber-500/10 border-amber-500/30">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <SlidersHorizontal className="h-5 w-5 text-amber-600" />
+                <div>
+                  <p className="font-medium text-sm">
+                    {activeAdjustmentsCount} Normalization Adjustment{activeAdjustmentsCount !== 1 ? 's' : ''} Active
+                    {selectedPeriod ? ` for ${selectedPeriod}` : ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {useNormalizedData 
+                      ? 'Financial calculations include normalized adjustments'
+                      : 'Using raw financial data (normalizations disabled)'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setUseNormalizedData(!useNormalizedData)}
+                  className="text-xs"
+                  data-testid="button-toggle-normalization"
+                >
+                  {useNormalizedData ? 'Use Raw Data' : 'Use Normalized'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const tabsList = document.querySelector('[data-testid="tab-analytics"]') as HTMLElement;
+                    if (tabsList) tabsList.click();
+                  }}
+                  className="text-xs gap-1"
+                  data-testid="button-view-analytics"
+                >
+                  <SlidersHorizontal className="h-3 w-3" />
+                  View Analytics
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {(pricingData?.projectFinancials || selectedPeriodData) && (
         <Card className="bg-muted/50">
