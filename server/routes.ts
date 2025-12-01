@@ -15336,6 +15336,566 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ============================================================================
+  // PE FUND MANAGEMENT - Fund Lifecycle, Investor Capital Accounts, Deal Allocations
+  // ============================================================================
+
+  // === Funds CRUD ===
+  app.get('/api/funds', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundService } = await import('./services/fund-service');
+      const funds = await fundService.getFundsByOrg(orgId);
+      res.json(funds);
+    } catch (error) {
+      console.error('Failed to fetch funds:', error);
+      res.status(500).json({ error: 'Failed to fetch funds' });
+    }
+  });
+
+  app.get('/api/funds/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const fund = await fundService.getFundWithDetails(orgId, id);
+      if (!fund) {
+        return res.status(404).json({ error: 'Fund not found' });
+      }
+      res.json(fund);
+    } catch (error) {
+      console.error('Failed to fetch fund:', error);
+      res.status(500).json({ error: 'Failed to fetch fund' });
+    }
+  });
+
+  app.post('/api/funds', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { fundService } = await import('./services/fund-service');
+      const fund = await fundService.createFund(orgId, userId, req.body);
+      res.status(201).json(fund);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create fund:', error);
+      res.status(500).json({ error: 'Failed to create fund' });
+    }
+  });
+
+  app.patch('/api/funds/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const fund = await fundService.updateFund(orgId, id, req.body);
+      if (!fund) {
+        return res.status(404).json({ error: 'Fund not found' });
+      }
+      res.json(fund);
+    } catch (error) {
+      console.error('Failed to update fund:', error);
+      res.status(500).json({ error: 'Failed to update fund' });
+    }
+  });
+
+  app.delete('/api/funds/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const success = await fundService.deleteFund(orgId, id);
+      if (!success) {
+        return res.status(404).json({ error: 'Fund not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete fund:', error);
+      res.status(500).json({ error: 'Failed to delete fund' });
+    }
+  });
+
+  // === Fund Metrics ===
+  app.get('/api/funds/:fundId/metrics', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const metrics = await fundService.calculateFundMetrics(orgId, fundId);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Failed to calculate fund metrics:', error);
+      res.status(500).json({ error: 'Failed to calculate fund metrics' });
+    }
+  });
+
+  app.post('/api/funds/:fundId/recalculate', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      await fundService.recalculateFundMetrics(orgId, fundId);
+      const fund = await fundService.getFundWithDetails(orgId, fundId);
+      res.json(fund);
+    } catch (error) {
+      console.error('Failed to recalculate fund metrics:', error);
+      res.status(500).json({ error: 'Failed to recalculate fund metrics' });
+    }
+  });
+
+  // === Fund Investors ===
+  app.get('/api/funds/:fundId/investors', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const investors = await fundService.getInvestorsByFund(orgId, fundId);
+      res.json(investors);
+    } catch (error) {
+      console.error('Failed to fetch fund investors:', error);
+      res.status(500).json({ error: 'Failed to fetch fund investors' });
+    }
+  });
+
+  app.get('/api/funds/:fundId/investors/:investorId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { investorId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const investor = await fundService.getInvestor(orgId, investorId);
+      if (!investor) {
+        return res.status(404).json({ error: 'Investor not found' });
+      }
+      res.json(investor);
+    } catch (error) {
+      console.error('Failed to fetch investor:', error);
+      res.status(500).json({ error: 'Failed to fetch investor' });
+    }
+  });
+
+  app.post('/api/funds/:fundId/investors', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const investor = await fundService.createInvestor(orgId, {
+        ...req.body,
+        fundId,
+      });
+      res.status(201).json(investor);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create investor:', error);
+      res.status(500).json({ error: 'Failed to create investor' });
+    }
+  });
+
+  app.patch('/api/funds/:fundId/investors/:investorId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { investorId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const investor = await fundService.updateInvestor(orgId, investorId, req.body);
+      if (!investor) {
+        return res.status(404).json({ error: 'Investor not found' });
+      }
+      res.json(investor);
+    } catch (error) {
+      console.error('Failed to update investor:', error);
+      res.status(500).json({ error: 'Failed to update investor' });
+    }
+  });
+
+  app.delete('/api/funds/:fundId/investors/:investorId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { investorId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const success = await fundService.deleteInvestor(orgId, investorId);
+      if (!success) {
+        return res.status(404).json({ error: 'Investor not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete investor:', error);
+      res.status(500).json({ error: 'Failed to delete investor' });
+    }
+  });
+
+  // === Investor Capital Accounts ===
+  app.get('/api/funds/:fundId/capital-accounts', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const accounts = await fundService.getInvestorCapitalAccounts(orgId, fundId);
+      res.json(accounts);
+    } catch (error) {
+      console.error('Failed to fetch capital accounts:', error);
+      res.status(500).json({ error: 'Failed to fetch capital accounts' });
+    }
+  });
+
+  // === Fund Deal Allocations ===
+  app.get('/api/funds/:fundId/allocations', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const allocations = await fundService.getAllocationsByFund(orgId, fundId);
+      res.json(allocations);
+    } catch (error) {
+      console.error('Failed to fetch fund allocations:', error);
+      res.status(500).json({ error: 'Failed to fetch fund allocations' });
+    }
+  });
+
+  app.get('/api/modeling/projects/:projectId/fund-allocations', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const allocations = await fundService.getAllocationsByProject(orgId, projectId);
+      res.json(allocations);
+    } catch (error) {
+      console.error('Failed to fetch project fund allocations:', error);
+      res.status(500).json({ error: 'Failed to fetch project fund allocations' });
+    }
+  });
+
+  app.get('/api/funds/:fundId/allocations/:allocationId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { allocationId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const allocation = await fundService.getDealAllocation(orgId, allocationId);
+      if (!allocation) {
+        return res.status(404).json({ error: 'Deal allocation not found' });
+      }
+      res.json(allocation);
+    } catch (error) {
+      console.error('Failed to fetch deal allocation:', error);
+      res.status(500).json({ error: 'Failed to fetch deal allocation' });
+    }
+  });
+
+  app.post('/api/funds/:fundId/allocations', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const allocation = await fundService.createDealAllocation(orgId, {
+        ...req.body,
+        fundId,
+      });
+      res.status(201).json(allocation);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create deal allocation:', error);
+      res.status(500).json({ error: 'Failed to create deal allocation' });
+    }
+  });
+
+  app.patch('/api/funds/:fundId/allocations/:allocationId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { allocationId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const allocation = await fundService.updateDealAllocation(orgId, allocationId, req.body);
+      if (!allocation) {
+        return res.status(404).json({ error: 'Deal allocation not found' });
+      }
+      res.json(allocation);
+    } catch (error) {
+      console.error('Failed to update deal allocation:', error);
+      res.status(500).json({ error: 'Failed to update deal allocation' });
+    }
+  });
+
+  app.delete('/api/funds/:fundId/allocations/:allocationId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { allocationId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const success = await fundService.deleteDealAllocation(orgId, allocationId);
+      if (!success) {
+        return res.status(404).json({ error: 'Deal allocation not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete deal allocation:', error);
+      res.status(500).json({ error: 'Failed to delete deal allocation' });
+    }
+  });
+
+  // === Fund Capital Movements ===
+  app.get('/api/funds/:fundId/capital-movements', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const movements = await fundService.getCapitalMovementsByFund(orgId, fundId);
+      res.json(movements);
+    } catch (error) {
+      console.error('Failed to fetch capital movements:', error);
+      res.status(500).json({ error: 'Failed to fetch capital movements' });
+    }
+  });
+
+  app.get('/api/funds/:fundId/capital-movements/:movementId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { movementId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const movement = await fundService.getCapitalMovement(orgId, movementId);
+      if (!movement) {
+        return res.status(404).json({ error: 'Capital movement not found' });
+      }
+      res.json(movement);
+    } catch (error) {
+      console.error('Failed to fetch capital movement:', error);
+      res.status(500).json({ error: 'Failed to fetch capital movement' });
+    }
+  });
+
+  app.post('/api/funds/:fundId/capital-movements', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const movement = await fundService.createCapitalMovement(orgId, userId, {
+        ...req.body,
+        fundId,
+      });
+      res.status(201).json(movement);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create capital movement:', error);
+      res.status(500).json({ error: 'Failed to create capital movement' });
+    }
+  });
+
+  app.patch('/api/funds/:fundId/capital-movements/:movementId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { movementId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const movement = await fundService.updateCapitalMovement(orgId, movementId, req.body);
+      if (!movement) {
+        return res.status(404).json({ error: 'Capital movement not found' });
+      }
+      res.json(movement);
+    } catch (error) {
+      console.error('Failed to update capital movement:', error);
+      res.status(500).json({ error: 'Failed to update capital movement' });
+    }
+  });
+
+  app.delete('/api/funds/:fundId/capital-movements/:movementId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { movementId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const success = await fundService.deleteCapitalMovement(orgId, movementId);
+      if (!success) {
+        return res.status(404).json({ error: 'Capital movement not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete capital movement:', error);
+      res.status(500).json({ error: 'Failed to delete capital movement' });
+    }
+  });
+
+  // === Fund Cash Flows (for IRR) ===
+  app.get('/api/funds/:fundId/cash-flows', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const cashFlows = await fundService.getCashFlowsByFund(orgId, fundId);
+      res.json(cashFlows);
+    } catch (error) {
+      console.error('Failed to fetch cash flows:', error);
+      res.status(500).json({ error: 'Failed to fetch cash flows' });
+    }
+  });
+
+  app.post('/api/funds/:fundId/cash-flows', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const cashFlow = await fundService.createCashFlow(orgId, {
+        ...req.body,
+        fundId,
+      });
+      res.status(201).json(cashFlow);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create cash flow:', error);
+      res.status(500).json({ error: 'Failed to create cash flow' });
+    }
+  });
+
+  // === Fund Capital Stack Templates ===
+  app.get('/api/funds/:fundId/capital-stack-templates', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const templates = await fundService.getTemplatesByFund(orgId, fundId);
+      res.json(templates);
+    } catch (error) {
+      console.error('Failed to fetch capital stack templates:', error);
+      res.status(500).json({ error: 'Failed to fetch capital stack templates' });
+    }
+  });
+
+  app.get('/api/funds/capital-stack-templates/:templateId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { templateId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const template = await fundService.getCapitalStackTemplate(orgId, templateId);
+      if (!template) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error('Failed to fetch capital stack template:', error);
+      res.status(500).json({ error: 'Failed to fetch capital stack template' });
+    }
+  });
+
+  app.post('/api/funds/:fundId/capital-stack-templates', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const template = await fundService.createCapitalStackTemplate(orgId, userId, {
+        ...req.body,
+        fundId,
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create capital stack template:', error);
+      res.status(500).json({ error: 'Failed to create capital stack template' });
+    }
+  });
+
+  app.patch('/api/funds/capital-stack-templates/:templateId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { templateId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const template = await fundService.updateCapitalStackTemplate(orgId, templateId, req.body);
+      if (!template) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error('Failed to update capital stack template:', error);
+      res.status(500).json({ error: 'Failed to update capital stack template' });
+    }
+  });
+
+  app.delete('/api/funds/capital-stack-templates/:templateId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { templateId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const success = await fundService.deleteCapitalStackTemplate(orgId, templateId);
+      if (!success) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete capital stack template:', error);
+      res.status(500).json({ error: 'Failed to delete capital stack template' });
+    }
+  });
+
+  // === Fund Waterfall Calculations ===
+  app.get('/api/funds/:fundId/waterfall', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const waterfall = await fundService.getLatestWaterfallCalculation(orgId, fundId);
+      res.json(waterfall);
+    } catch (error) {
+      console.error('Failed to fetch waterfall calculation:', error);
+      res.status(500).json({ error: 'Failed to fetch waterfall calculation' });
+    }
+  });
+
+  app.get('/api/funds/:fundId/waterfall/history', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const history = await fundService.getWaterfallHistory(orgId, fundId);
+      res.json(history);
+    } catch (error) {
+      console.error('Failed to fetch waterfall history:', error);
+      res.status(500).json({ error: 'Failed to fetch waterfall history' });
+    }
+  });
+
+  app.post('/api/funds/:fundId/waterfall/calculate', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      
+      const fund = await fundService.getFund(orgId, fundId);
+      if (!fund) {
+        return res.status(404).json({ error: 'Fund not found' });
+      }
+      
+      const metrics = await fundService.calculateFundMetrics(orgId, fundId);
+      
+      const totalDistributable = req.body.totalDistributable || (metrics.distributedCapital + metrics.nav);
+      const yearsHeld = req.body.yearsHeld || 1;
+      
+      const result = fundService.calculateWaterfallDistribution(
+        totalDistributable,
+        metrics.calledCapital,
+        parseFloat(fund.preferredReturn?.toString() || '0.08'),
+        parseFloat(fund.gpCatchUpPct?.toString() || '1.00'),
+        fund.promoteTiers || [{ irrHurdle: 0.08, gpSplit: 0.20, lpSplit: 0.80 }],
+        yearsHeld
+      );
+      
+      const stored = await fundService.storeWaterfallCalculation(orgId, fundId, result, metrics);
+      
+      res.json({
+        ...result,
+        storedCalculation: stored,
+        fundMetrics: metrics
+      });
+    } catch (error) {
+      console.error('Failed to calculate waterfall:', error);
+      res.status(500).json({ error: 'Failed to calculate waterfall' });
+    }
+  });
+
+  // ============================================================================
   // DEBT SCENARIOS - Debt Structure Analysis & Sensitivity Modeling
   // ============================================================================
 
