@@ -2097,15 +2097,16 @@ export class DashboardService {
       }
 
       case 'avg_price': {
+        // Exclude undisclosed prices ($0, null, or isPriceDisclosed = false)
         const [avgResult] = await db
-          .select({ avg: drizzleSql<number>`AVG(${salesComps.salePrice})` })
+          .select({ avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.salePrice} > 0 AND (${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL) THEN ${salesComps.salePrice} ELSE NULL END)` })
           .from(salesComps)
           .where(whereCondition);
         result.value = Number(avgResult?.avg) || 0;
 
         if (enableComparison && comparisonType === 'yoy' && yearFilter) {
           const [prevResult] = await db
-            .select({ avg: drizzleSql<number>`AVG(${salesComps.salePrice})` })
+            .select({ avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.salePrice} > 0 AND (${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL) THEN ${salesComps.salePrice} ELSE NULL END)` })
             .from(salesComps)
             .where(prevWhereCondition);
           result.previousValue = Number(prevResult?.avg) || 0;
@@ -2117,19 +2118,22 @@ export class DashboardService {
       }
 
       case 'median_price': {
+        // Exclude undisclosed prices ($0, null, or isPriceDisclosed = false)
+        const priceConditions = [...conditions, drizzleSql`${salesComps.salePrice} > 0`, drizzleSql`(${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL)`];
+        const priceWhereCondition = priceConditions.length > 1 ? and(...priceConditions) : priceConditions[0];
         const [medianResult] = await db
           .select({ median: drizzleSql<number>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${salesComps.salePrice})` })
           .from(salesComps)
-          .where(whereCondition);
+          .where(priceWhereCondition);
         result.value = Number(medianResult?.median) || 0;
         break;
       }
 
       case 'avg_price_per_slip': {
-        // Calculate price per slip as salePrice / wetSlips (only for rows with valid wetSlips > 0)
+        // Calculate price per slip as salePrice / wetSlips (only for rows with valid wetSlips > 0 and disclosed prices)
         const [avgResult] = await db
           .select({ 
-            avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.wetSlips} > 0 THEN ${salesComps.salePrice}::decimal / ${salesComps.wetSlips} ELSE NULL END)` 
+            avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.wetSlips} > 0 AND ${salesComps.salePrice} > 0 AND (${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL) THEN ${salesComps.salePrice}::decimal / ${salesComps.wetSlips} ELSE NULL END)` 
           })
           .from(salesComps)
           .where(whereCondition);
@@ -2138,7 +2142,7 @@ export class DashboardService {
         if (enableComparison && comparisonType === 'yoy' && yearFilter) {
           const [prevResult] = await db
             .select({ 
-              avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.wetSlips} > 0 THEN ${salesComps.salePrice}::decimal / ${salesComps.wetSlips} ELSE NULL END)` 
+              avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.wetSlips} > 0 AND ${salesComps.salePrice} > 0 AND (${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL) THEN ${salesComps.salePrice}::decimal / ${salesComps.wetSlips} ELSE NULL END)` 
             })
             .from(salesComps)
             .where(prevWhereCondition);
@@ -2160,15 +2164,16 @@ export class DashboardService {
       }
 
       case 'total_volume': {
+        // Exclude undisclosed prices ($0, null, or isPriceDisclosed = false)
         const [sumResult] = await db
-          .select({ sum: drizzleSql<number>`SUM(${salesComps.salePrice})` })
+          .select({ sum: drizzleSql<number>`SUM(CASE WHEN ${salesComps.salePrice} > 0 AND (${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL) THEN ${salesComps.salePrice} ELSE 0 END)` })
           .from(salesComps)
           .where(whereCondition);
         result.value = Number(sumResult?.sum) || 0;
 
         if (enableComparison && comparisonType === 'yoy' && yearFilter) {
           const [prevResult] = await db
-            .select({ sum: drizzleSql<number>`SUM(${salesComps.salePrice})` })
+            .select({ sum: drizzleSql<number>`SUM(CASE WHEN ${salesComps.salePrice} > 0 AND (${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL) THEN ${salesComps.salePrice} ELSE 0 END)` })
             .from(salesComps)
             .where(prevWhereCondition);
           result.previousValue = Number(prevResult?.sum) || 0;
