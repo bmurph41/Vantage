@@ -15123,23 +15123,24 @@ Current context: Project ${req.params.projectId}`;
     try {
       const orgId = req.user.orgId;
       const { salesComps } = await import('@shared/schema');
-      const { desc } = await import('drizzle-orm');
+      const { desc, isNull, and } = await import('drizzle-orm');
       
       const comps = await db
         .select({
           id: salesComps.id,
-          propertyName: salesComps.propertyName,
+          marina: salesComps.marina,
           city: salesComps.city,
           state: salesComps.state,
           salePrice: salesComps.salePrice,
-          slipCount: salesComps.slipCount,
-          pricePerSlip: salesComps.pricePerSlip,
+          wetSlips: salesComps.wetSlips,
+          dryRacks: salesComps.dryRacks,
+          capRate: salesComps.capRate,
           saleYear: salesComps.saleYear,
           saleMonth: salesComps.saleMonth,
           createdAt: salesComps.createdAt,
         })
         .from(salesComps)
-        .where(eq(salesComps.orgId, orgId))
+        .where(and(eq(salesComps.orgId, orgId), isNull(salesComps.deletedAt)))
         .orderBy(desc(salesComps.createdAt))
         .limit(20);
 
@@ -15598,30 +15599,33 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Get recent DockTalk articles for detail panel
+  // Get recent DockTalk deals for detail panel
   app.get('/api/docktalk/articles/recent', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { docktalkArticles } = await import('@shared/schema');
-      const { desc } = await import('drizzle-orm');
+      const { docktalkDeals } = await import('@shared/schema');
+      const { desc, isNull, and } = await import('drizzle-orm');
       
-      const articles = await db
+      const deals = await db
         .select({
-          id: docktalkArticles.id,
-          title: docktalkArticles.title,
-          publishedDate: docktalkArticles.publishedDate,
-          category: docktalkArticles.category,
-          sourceUrl: docktalkArticles.sourceUrl,
-          createdAt: docktalkArticles.createdAt,
+          id: docktalkDeals.id,
+          buyer: docktalkDeals.buyer,
+          seller: docktalkDeals.seller,
+          transactionType: docktalkDeals.transactionType,
+          dealStatus: docktalkDeals.dealStatus,
+          assetDescription: docktalkDeals.assetDescription,
+          closingDate: docktalkDeals.closingDate,
+          createdAt: docktalkDeals.createdAt,
         })
-        .from(docktalkArticles)
-        .orderBy(desc(docktalkArticles.publishedDate))
+        .from(docktalkDeals)
+        .where(and(eq(docktalkDeals.orgId, orgId), isNull(docktalkDeals.deletedAt)))
+        .orderBy(desc(docktalkDeals.createdAt))
         .limit(20);
 
-      res.json(articles);
+      res.json(deals);
     } catch (error) {
-      console.error('Failed to fetch recent DockTalk articles:', error);
-      res.status(500).json({ error: 'Failed to fetch recent DockTalk articles' });
+      console.error('Failed to fetch recent DockTalk deals:', error);
+      res.status(500).json({ error: 'Failed to fetch recent DockTalk deals' });
     }
   });
 
@@ -15635,15 +15639,16 @@ Current context: Project ${req.params.projectId}`;
       const documents = await db
         .select({
           id: vdrDocuments.id,
-          fileName: vdrDocuments.fileName,
-          fileSize: vdrDocuments.fileSize,
+          filename: vdrDocuments.filename,
+          size: vdrDocuments.size,
+          mimeType: vdrDocuments.mimeType,
           uploadedBy: vdrDocuments.uploadedBy,
-          projectId: vdrDocuments.vdrProjectId,
+          projectId: vdrDocuments.projectId,
           projectName: projects.name,
           createdAt: vdrDocuments.createdAt,
         })
         .from(vdrDocuments)
-        .innerJoin(projects, eq(vdrDocuments.vdrProjectId, projects.id))
+        .innerJoin(projects, eq(vdrDocuments.projectId, projects.id))
         .where(eq(vdrDocuments.orgId, orgId))
         .orderBy(desc(vdrDocuments.createdAt))
         .limit(20);
@@ -15687,21 +15692,22 @@ Current context: Project ${req.params.projectId}`;
     try {
       const orgId = req.user.orgId;
       const { tasks, projects } = await import('@shared/schema');
-      const { desc, eq } = await import('drizzle-orm');
+      const { desc, isNull, and } = await import('drizzle-orm');
       
       const recentTasks = await db
         .select({
           id: tasks.id,
           title: tasks.title,
           status: tasks.status,
-          dueDate: tasks.dueDate,
+          deadline: tasks.deadline,
+          assignee: tasks.assignee,
           projectId: tasks.projectId,
           projectName: projects.name,
           createdAt: tasks.createdAt,
         })
         .from(tasks)
         .innerJoin(projects, eq(tasks.projectId, projects.id))
-        .where(eq(projects.orgId, orgId))
+        .where(and(eq(projects.orgId, orgId), isNull(projects.deletedAt)))
         .orderBy(desc(tasks.createdAt))
         .limit(20);
 
@@ -15716,7 +15722,7 @@ Current context: Project ${req.params.projectId}`;
   app.get('/api/rent-roll/entries/recent', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { rentRollEntries } = await import('@shared/schema');
+      const { rentRollEntries, rentRolls } = await import('@shared/schema');
       const { desc } = await import('drizzle-orm');
       
       const entries = await db
@@ -15726,7 +15732,8 @@ Current context: Project ${req.params.projectId}`;
           tenantName: rentRollEntries.tenantName,
           monthlyRate: rentRollEntries.monthlyRate,
           status: rentRollEntries.status,
-          leaseEndDate: rentRollEntries.leaseEndDate,
+          endDate: rentRollEntries.endDate,
+          entryType: rentRollEntries.entryType,
           createdAt: rentRollEntries.createdAt,
         })
         .from(rentRollEntries)
@@ -15751,11 +15758,13 @@ Current context: Project ${req.params.projectId}`;
       const projects = await db
         .select({
           id: modelingProjects.id,
-          propertyName: modelingProjects.propertyName,
-          clientName: modelingProjects.clientName,
-          projectType: modelingProjects.projectType,
+          marinaName: modelingProjects.marinaName,
+          city: modelingProjects.city,
+          state: modelingProjects.state,
+          purchasePrice: modelingProjects.purchasePrice,
+          year1CapRate: modelingProjects.year1CapRate,
+          ebitda: modelingProjects.ebitda,
           dealOutcome: modelingProjects.dealOutcome,
-          estimatedValue: modelingProjects.estimatedValue,
           createdAt: modelingProjects.createdAt,
         })
         .from(modelingProjects)
