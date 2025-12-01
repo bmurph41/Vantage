@@ -492,7 +492,7 @@ function CreateFundDialog({
   );
 }
 
-function FundCard({ fund, onClick }: { fund: Fund; onClick: () => void }) {
+function FundCard({ fund }: { fund: Fund }) {
   const committed = parseFloat(fund.committedCapital || '0');
   const target = parseFloat(fund.targetSize || '0');
   const called = parseFloat(fund.calledCapital || '0');
@@ -502,11 +502,11 @@ function FundCard({ fund, onClick }: { fund: Fund; onClick: () => void }) {
   const deploymentProgress = committed > 0 ? (called / committed) * 100 : 0;
 
   return (
-    <Card 
-      className="cursor-pointer hover:shadow-md transition-shadow" 
-      onClick={onClick}
-      data-testid={`card-fund-${fund.id}`}
-    >
+    <Link href={`/modeling/funds/${fund.id}`}>
+      <Card 
+        className="cursor-pointer hover:shadow-md transition-shadow" 
+        data-testid={`card-fund-${fund.id}`}
+      >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div>
@@ -570,7 +570,8 @@ function FundCard({ fund, onClick }: { fund: Fund; onClick: () => void }) {
           </div>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </Link>
   );
 }
 
@@ -860,29 +861,10 @@ function FundDetailView({ fund }: { fund: Fund }) {
 }
 
 export default function FundManagement() {
-  const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const { toast } = useToast();
 
   const { data: funds, isLoading, error } = useQuery<Fund[]>({
     queryKey: ['/api/funds'],
-  });
-
-  const { data: selectedFund, isLoading: isLoadingDetail } = useQuery<Fund>({
-    queryKey: ['/api/funds', selectedFundId],
-    enabled: !!selectedFundId,
-  });
-
-  const recalculateMutation = useMutation({
-    mutationFn: async (fundId: string) => {
-      return await apiRequest(`/api/funds/${fundId}/recalculate`, {
-        method: 'POST',
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/funds', selectedFundId] });
-      toast({ title: 'Metrics recalculated' });
-    },
   });
 
   if (isLoading) {
@@ -934,26 +916,6 @@ export default function FundManagement() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {selectedFundId && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => recalculateMutation.mutate(selectedFundId)}
-                disabled={recalculateMutation.isPending}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${recalculateMutation.isPending ? 'animate-spin' : ''}`} />
-                Recalculate
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedFundId(null)}
-              >
-                Back to Funds
-              </Button>
-            </>
-          )}
           <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-new-fund">
             <Plus className="h-4 w-4 mr-2" />
             New Fund
@@ -961,36 +923,26 @@ export default function FundManagement() {
         </div>
       </div>
 
-      {selectedFundId && selectedFund ? (
-        <FundDetailView fund={selectedFund} />
+      {funds && funds.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {funds.map((fund) => (
+            <FundCard key={fund.id} fund={fund} />
+          ))}
+        </div>
       ) : (
-        <>
-          {funds && funds.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {funds.map((fund) => (
-                <FundCard 
-                  key={fund.id} 
-                  fund={fund} 
-                  onClick={() => setSelectedFundId(fund.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Briefcase className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <h3 className="text-lg font-medium mb-2">No funds yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Create your first fund to start tracking capital, investors, and deal allocations.
-                </p>
-                <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-first-fund">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Your First Fund
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Briefcase className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg font-medium mb-2">No funds yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Create your first fund to start tracking capital, investors, and deal allocations.
+            </p>
+            <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-first-fund">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Your First Fund
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       <CreateFundDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />

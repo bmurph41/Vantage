@@ -120,6 +120,7 @@ const ExitStrategiesIndex = lazy(() => import("@/pages/modeling/exit-strategies"
 const ModelingProjectsIndex = lazy(() => import("@/pages/modeling/projects"));
 const ModelingPortfolio = lazy(() => import("@/pages/modeling/portfolio"));
 const ModelingFunds = lazy(() => import("@/pages/modeling/funds"));
+const FundDetail = lazy(() => import("@/pages/modeling/funds/[fundId]"));
 const LPPortal = lazy(() => import("@/pages/modeling/lp-portal"));
 const ModelingSettings = lazy(() => import("@/pages/modeling/settings"));
 const TransactionClosingPage = lazy(() => import("@/pages/modeling/projects/transaction-closing"));
@@ -977,6 +978,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <ModelingFunds />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/funds/:fundId">
+        {() => (
+          <UnifiedLayout>
+            <FundDetail />
           </UnifiedLayout>
         )}
       </Route>
