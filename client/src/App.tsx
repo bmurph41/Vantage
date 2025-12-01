@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Loader2 } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
+import { Breadcrumb } from "@/components/Breadcrumb";
 
 // Eagerly load critical pages for instant navigation (no white screen)
 import Dashboard from "@/pages/dashboard";
@@ -169,6 +170,7 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
         <Suspense fallback={<div className="h-10" />}>
           <PendingNotificationsBanner />
         </Suspense>
+        <Breadcrumb />
         <main className="flex-1 overflow-auto">
           <Suspense fallback={<PageLoader />}>
             {children}
