@@ -164,7 +164,7 @@ export class FundService {
       this.getInvestorsByFund(orgId, fundId),
       db.select({
         allocation: fundDealAllocations,
-        projectName: modelingProjects.name,
+        projectName: modelingProjects.marinaName,
       })
         .from(fundDealAllocations)
         .leftJoin(modelingProjects, eq(fundDealAllocations.modelingProjectId, modelingProjects.id))

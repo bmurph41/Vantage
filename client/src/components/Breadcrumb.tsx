@@ -8,7 +8,7 @@ interface BreadcrumbItem {
   href?: string;
   icon?: React.ComponentType<{ className?: string }>;
   isDynamic?: boolean;
-  dynamicType?: 'modeling-project';
+  dynamicType?: 'modeling-project' | 'fund';
   dynamicId?: string;
 }
 
@@ -207,6 +207,14 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
   '/modeling/settings': [
     CATEGORIES.MODELING,
     { label: 'Settings' },
+  ],
+  '/modeling/funds': [
+    CATEGORIES.MODELING,
+    { label: 'Fund Management' },
+  ],
+  '/modeling/lp-portal': [
+    CATEGORIES.MODELING,
+    { label: 'LP Portal' },
   ],
   
   '/analysis/sales-comps': [
@@ -636,6 +644,31 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
     return [DASHBOARD_ITEM, ...items];
   }
 
+  const fundMatch = path.match(/^\/modeling\/funds\/([a-f0-9-]+)(\/.*)?$/i);
+  if (fundMatch) {
+    const fundId = fundMatch[1];
+    const subPath = fundMatch[2] || '';
+    
+    items = [
+      CATEGORIES.MODELING,
+      { label: 'Fund Management', href: '/modeling/funds' },
+      { label: fundId, isDynamic: true, dynamicType: 'fund', dynamicId: fundId },
+    ];
+    
+    if (subPath) {
+      const subSegments = subPath.split('/').filter(Boolean);
+      subSegments.forEach(seg => {
+        const formattedLabel = seg
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        items.push({ label: formattedLabel });
+      });
+    }
+    
+    return [DASHBOARD_ITEM, ...items];
+  }
+
   if (ROUTE_MAPPINGS[path]) {
     items = ROUTE_MAPPINGS[path];
   } else {
@@ -689,7 +722,14 @@ function DynamicBreadcrumbItem({ item, isLast }: { item: BreadcrumbItem; isLast:
     enabled: item.dynamicType === 'modeling-project' && !!item.dynamicId,
   });
   
-  const displayLabel = project?.marinaName || item.label;
+  const { data: fund } = useQuery<{ name: string }>({
+    queryKey: ['/api/funds', item.dynamicId],
+    enabled: item.dynamicType === 'fund' && !!item.dynamicId,
+  });
+  
+  const displayLabel = item.dynamicType === 'fund' 
+    ? (fund?.name || item.label) 
+    : (project?.marinaName || item.label);
   const Icon = item.icon;
   
   if (isLast) {
