@@ -635,6 +635,10 @@ function LocationAnalysisSection() {
   const [comparisonTradeAreas, setComparisonTradeAreas] = useState<Record<number, string>>({});
   const [targetDemographics, setTargetDemographics] = useState<TargetDemographics | null>(null);
   const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
+  
+  const [mainViewTab, setMainViewTab] = useState<'overview' | 'comparison'>('overview');
+  const [activeLocationIndex, setActiveLocationIndex] = useState<number>(0);
+  const [comparisonSelections, setComparisonSelections] = useState<number[]>([]);
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
@@ -1256,181 +1260,604 @@ function LocationAnalysisSection() {
             />
           </div>
 
-          {selectedLocations.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-2">
-              {selectedLocations.map((loc, idx) => (
-                <Badge 
-                  key={idx} 
-                  variant="secondary" 
-                  className="flex items-center gap-1 pr-1"
-                >
-                  <MapPin className="h-3 w-3" />
-                  <span className="max-w-40 truncate">{loc.address || `Location ${idx + 1}`}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-4 w-4 ml-1 hover:bg-destructive hover:text-destructive-foreground"
-                    onClick={() => handleRemoveLocation(idx)}
-                    data-testid={`button-remove-location-${idx}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </Badge>
-              ))}
-              {selectedLocations.length < 5 && (
-                <Badge variant="outline" className="text-muted-foreground">
-                  <Plus className="h-3 w-3 mr-1" />
-                  {5 - selectedLocations.length} more available
-                </Badge>
-              )}
-            </div>
-          )}
         </CardContent>
       </Card>
 
       {selectedLocations.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              <CardTitle className="text-base">Trade Area Map</CardTitle>
-            </div>
-            <CardDescription>
-              Visualizing {selectedLocations.length} location{selectedLocations.length > 1 ? 's' : ''} with trade areas
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg overflow-hidden border">
-              <GoogleMap
-                key={`map-${selectedLocations.map(l => 
-                  `${l.latitude}-${l.longitude}-${l.config.analysisMode}-${
-                    l.config.analysisMode === 'distance' 
-                      ? l.config.distanceRings.join(',') 
-                      : l.config.driveTimes.join(',')
-                  }`
-                ).join('|')}`}
-                mapContainerStyle={mapContainerStyle}
-                center={selectedLocations.length > 0 
-                  ? { lat: selectedLocations[0].latitude, lng: selectedLocations[0].longitude }
-                  : defaultMapCenter
-                }
-                zoom={selectedLocations.length === 1 ? 10 : 8}
-                options={{
-                  mapTypeControl: true,
-                  streetViewControl: false,
-                  fullscreenControl: true,
-                }}
-              >
-                {selectedLocations.map((location, locIdx) => {
-                  const locationColor = LOCATION_COLORS[locIdx % LOCATION_COLORS.length];
-                  const isDistance = location.config.analysisMode === 'distance';
-                  const rawRings = isDistance
-                    ? location.config.distanceRings.map(r => ({ value: r, label: `${r} mi`, originalValue: r }))
-                    : location.config.driveTimes.map(t => {
-                        const driveTime = DRIVE_TIMES.find(d => d.value === t);
-                        return { value: driveTime ? driveTime.estimatedMiles : t * 0.5, label: `${t} min`, originalValue: t };
-                      });
-                  
-                  const sortedBySize = [...rawRings].sort((a, b) => a.value - b.value);
-                  const ringColorMap = new Map(sortedBySize.map((ring, idx) => [ring.originalValue, idx]));
-                  const sortedForDrawing = [...rawRings].sort((a, b) => b.value - a.value);
-                  
-                  const configKey = isDistance 
-                    ? location.config.distanceRings.join('-') 
-                    : location.config.driveTimes.join('-');
-                  
-                  return [
-                    <Marker
-                      key={`marker-${locIdx}-${location.latitude}-${location.longitude}`}
-                      position={{ lat: location.latitude, lng: location.longitude }}
-                      title={location.address}
-                      icon={{
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 8,
-                        fillColor: locationColor,
-                        fillOpacity: 1,
-                        strokeColor: '#ffffff',
-                        strokeWeight: 2,
-                      }}
-                    />,
-                    ...sortedForDrawing.map((ring) => {
-                      const colorIdx = ringColorMap.get(ring.originalValue) ?? 0;
-                      const radiusMeters = ring.value * 1609.34;
-                      return (
-                        <Circle
-                          key={`circle-${locIdx}-${isDistance ? 'dist' : 'drive'}-${ring.originalValue}-${configKey}`}
-                          center={{ lat: location.latitude, lng: location.longitude }}
-                          radius={radiusMeters}
-                          options={{
-                            fillColor: RING_COLORS[colorIdx % RING_COLORS.length].stroke,
-                            fillOpacity: 0.08,
-                            strokeColor: RING_COLORS[colorIdx % RING_COLORS.length].stroke,
-                            strokeOpacity: 0.9,
-                            strokeWeight: 2.5,
-                          }}
-                        />
-                      );
-                    })
-                  ];
-                })}
-              </GoogleMap>
-            </div>
-            <div className="mt-4 space-y-3">
-              {selectedLocations.map((location, locIdx) => {
-                const locationColor = LOCATION_COLORS[locIdx % LOCATION_COLORS.length];
-                const isDistance = location.config.analysisMode === 'distance';
-                const rawRings = isDistance
-                  ? location.config.distanceRings.map(r => ({ value: r, label: `${r} mi`, originalValue: r }))
-                  : location.config.driveTimes.map(t => {
-                      const driveTime = DRIVE_TIMES.find(d => d.value === t);
-                      return { value: driveTime ? driveTime.estimatedMiles : t * 0.5, label: `${t} min`, originalValue: t };
-                    });
-                const sortedBySize = [...rawRings].sort((a, b) => a.value - b.value);
-                
-                const configKey = isDistance 
-                  ? location.config.distanceRings.join('-') 
-                  : location.config.driveTimes.join('-');
-                
-                return (
-                  <div key={`legend-${locIdx}-${location.config.analysisMode}-${configKey}`} className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-2 text-sm">
-                      <div 
-                        className="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
-                        style={{ backgroundColor: locationColor }}
-                      />
-                      <span className="font-medium truncate max-w-48">{location.label || location.address.split(',')[0]}</span>
-                      <span className="text-muted-foreground text-xs">
-                        ({isDistance ? <Ruler className="h-3 w-3 inline mr-0.5" /> : <Clock className="h-3 w-3 inline mr-0.5" />}
-                        {isDistance ? 'Distance' : 'Drive Time'})
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2 ml-5">
-                      {sortedBySize.map((ring, ringIdx) => {
-                        const color = RING_COLORS[ringIdx % RING_COLORS.length];
-                        return (
-                          <div key={`legend-ring-${ring.originalValue}`} className="flex items-center gap-1.5 text-xs">
-                            <div 
-                              className="w-2.5 h-2.5 rounded-full border border-white shadow-sm flex-shrink-0" 
-                              style={{ backgroundColor: color.stroke }}
-                            />
-                            <span className="text-muted-foreground">{ring.label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        <Tabs value={mainViewTab} onValueChange={(v) => setMainViewTab(v as 'overview' | 'comparison')} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
+              <MapPin className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="comparison" className="flex items-center gap-2" data-testid="tab-comparison">
+              <BarChart3 className="h-4 w-4" />
+              Comparison
+              {selectedLocations.length >= 2 && (
+                <Badge variant="secondary" className="ml-1 text-xs">{selectedLocations.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-      {fetchDemographicsMutation.isPending && (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <span className="ml-3 text-muted-foreground">Loading demographics...</span>
-        </div>
+          <TabsContent value="overview" className="mt-4">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 lg:col-span-3">
+                <Card>
+                  <CardHeader className="py-3">
+                    <CardTitle className="text-sm flex items-center justify-between">
+                      <span>Locations ({selectedLocations.length})</span>
+                      {selectedLocations.length < 5 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{5 - selectedLocations.length} available
+                        </Badge>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-2 space-y-1">
+                    {selectedLocations.map((loc, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setActiveLocationIndex(idx)}
+                        className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${
+                          activeLocationIndex === idx
+                            ? 'bg-primary/10 border border-primary'
+                            : 'hover:bg-muted border border-transparent'
+                        }`}
+                        data-testid={`location-item-${idx}`}
+                      >
+                        <div 
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: LOCATION_COLORS[idx % LOCATION_COLORS.length] }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {loc.label || loc.address.split(',')[0]}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {loc.config.analysisMode === 'distance' 
+                              ? `${loc.config.distanceRings.length} ring${loc.config.distanceRings.length !== 1 ? 's' : ''}`
+                              : `${loc.config.driveTimes.length} drive time${loc.config.driveTimes.length !== 1 ? 's' : ''}`
+                            }
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 flex-shrink-0 hover:bg-destructive hover:text-destructive-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveLocation(idx);
+                            if (activeLocationIndex >= selectedLocations.length - 1) {
+                              setActiveLocationIndex(Math.max(0, selectedLocations.length - 2));
+                            }
+                          }}
+                          data-testid={`button-remove-location-${idx}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="col-span-12 lg:col-span-9 space-y-4">
+                {selectedLocations[activeLocationIndex] && (() => {
+                  const activeLoc = selectedLocations[activeLocationIndex];
+                  const tradeAreas = getLocationTradeAreas(activeLoc);
+                  const hasLoading = tradeAreas.some(ta => ta.isLoading);
+                  const loadedAreas = tradeAreas.filter(ta => ta.demographics);
+                  const locationColor = LOCATION_COLORS[activeLocationIndex % LOCATION_COLORS.length];
+                  const isDistance = activeLoc.config.analysisMode === 'distance';
+                  
+                  return (
+                    <>
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: locationColor }}
+                              />
+                              <CardTitle className="text-base">{activeLoc.label || activeLoc.address.split(',')[0]}</CardTitle>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {isDistance ? `${activeLoc.config.distanceRings.length} Distance Ring${activeLoc.config.distanceRings.length !== 1 ? 's' : ''}` : `${activeLoc.config.driveTimes.length} Drive Time${activeLoc.config.driveTimes.length !== 1 ? 's' : ''}`}
+                              </Badge>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-7">
+                                    <Settings className="h-3 w-3 mr-1" />
+                                    Settings
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80" align="end">
+                                  <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="font-medium text-sm">Trade Area Settings</h4>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => refetchLocation(activeLocationIndex)}
+                                        disabled={hasLoading}
+                                      >
+                                        <RefreshCw className={`h-3 w-3 mr-1 ${hasLoading ? 'animate-spin' : ''}`} />
+                                        Refresh
+                                      </Button>
+                                    </div>
+                                    
+                                    <Tabs 
+                                      value={activeLoc.config.analysisMode} 
+                                      onValueChange={(v) => updateLocationConfig(activeLocationIndex, { 
+                                        ...activeLoc.config, 
+                                        analysisMode: v as 'distance' | 'drivetime' 
+                                      })}
+                                    >
+                                      <TabsList className="grid w-full grid-cols-2">
+                                        <TabsTrigger value="distance" className="text-xs">
+                                          <Ruler className="h-3 w-3 mr-1" />
+                                          Distance
+                                        </TabsTrigger>
+                                        <TabsTrigger value="drivetime" className="text-xs">
+                                          <Car className="h-3 w-3 mr-1" />
+                                          Drive Time
+                                        </TabsTrigger>
+                                      </TabsList>
+                                      
+                                      <TabsContent value="distance" className="mt-3">
+                                        <div className="space-y-2">
+                                          <Label className="text-xs">Distance Rings</Label>
+                                          <div className="grid grid-cols-2 gap-2">
+                                            {DISTANCE_RINGS.map(ring => {
+                                              const isSelected = activeLoc.config.distanceRings.includes(ring.value);
+                                              return (
+                                                <label
+                                                  key={ring.value}
+                                                  htmlFor={`active-ring-${ring.value}`}
+                                                  className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs cursor-pointer transition-colors ${
+                                                    isSelected
+                                                      ? 'bg-primary/10 border-primary text-primary'
+                                                      : 'bg-background border-border hover:border-primary/50'
+                                                  }`}
+                                                >
+                                                  <Checkbox
+                                                    id={`active-ring-${ring.value}`}
+                                                    checked={isSelected}
+                                                    onCheckedChange={() => {
+                                                      const newRings = isSelected
+                                                        ? activeLoc.config.distanceRings.filter(r => r !== ring.value)
+                                                        : [...activeLoc.config.distanceRings, ring.value].sort((a, b) => a - b);
+                                                      updateLocationConfig(activeLocationIndex, { ...activeLoc.config, distanceRings: newRings });
+                                                    }}
+                                                    className="h-3.5 w-3.5"
+                                                  />
+                                                  <span>{ring.label}</span>
+                                                </label>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      </TabsContent>
+                                      
+                                      <TabsContent value="drivetime" className="mt-3">
+                                        <div className="space-y-2">
+                                          <Label className="text-xs">Drive Times</Label>
+                                          <div className="grid grid-cols-2 gap-2">
+                                            {DRIVE_TIMES.map(time => {
+                                              const isSelected = activeLoc.config.driveTimes.includes(time.value);
+                                              const isDisabled = !isSelected && activeLoc.config.driveTimes.length >= 3;
+                                              return (
+                                                <label
+                                                  key={time.value}
+                                                  htmlFor={`active-time-${time.value}`}
+                                                  className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs cursor-pointer transition-colors ${
+                                                    isDisabled
+                                                      ? 'opacity-50 cursor-not-allowed bg-muted'
+                                                      : isSelected
+                                                        ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                                                        : 'bg-background border-border hover:border-blue-300'
+                                                  }`}
+                                                >
+                                                  <Checkbox
+                                                    id={`active-time-${time.value}`}
+                                                    checked={isSelected}
+                                                    onCheckedChange={() => {
+                                                      const newTimes = isSelected
+                                                        ? activeLoc.config.driveTimes.filter(t => t !== time.value)
+                                                        : [...activeLoc.config.driveTimes, time.value].sort((a, b) => a - b);
+                                                      if (newTimes.length <= 3) {
+                                                        updateLocationConfig(activeLocationIndex, { ...activeLoc.config, driveTimes: newTimes });
+                                                      }
+                                                    }}
+                                                    disabled={isDisabled}
+                                                    className="h-3.5 w-3.5"
+                                                  />
+                                                  <span>{time.label}</span>
+                                                </label>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      </TabsContent>
+                                    </Tabs>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </div>
+                          <CardDescription className="text-xs">
+                            {activeLoc.address}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="rounded-lg overflow-hidden border" style={{ height: '300px' }}>
+                            <GoogleMap
+                              key={`single-map-${activeLocationIndex}-${activeLoc.latitude}-${activeLoc.longitude}-${activeLoc.config.analysisMode}-${
+                                activeLoc.config.analysisMode === 'distance' 
+                                  ? activeLoc.config.distanceRings.join(',') 
+                                  : activeLoc.config.driveTimes.join(',')
+                              }`}
+                              mapContainerStyle={{ width: '100%', height: '100%' }}
+                              center={{ lat: activeLoc.latitude, lng: activeLoc.longitude }}
+                              zoom={11}
+                              options={{
+                                mapTypeControl: false,
+                                streetViewControl: false,
+                                fullscreenControl: true,
+                              }}
+                            >
+                              <Marker
+                                position={{ lat: activeLoc.latitude, lng: activeLoc.longitude }}
+                                title={activeLoc.address}
+                                icon={{
+                                  path: google.maps.SymbolPath.CIRCLE,
+                                  scale: 8,
+                                  fillColor: locationColor,
+                                  fillOpacity: 1,
+                                  strokeColor: '#ffffff',
+                                  strokeWeight: 2,
+                                }}
+                              />
+                              {(() => {
+                                const rawRings = isDistance
+                                  ? activeLoc.config.distanceRings.map(r => ({ value: r, originalValue: r }))
+                                  : activeLoc.config.driveTimes.map(t => {
+                                      const driveTime = DRIVE_TIMES.find(d => d.value === t);
+                                      return { value: driveTime ? driveTime.estimatedMiles : t * 0.5, originalValue: t };
+                                    });
+                                const sortedBySize = [...rawRings].sort((a, b) => a.value - b.value);
+                                const ringColorMap = new Map(sortedBySize.map((ring, idx) => [ring.originalValue, idx]));
+                                const sortedForDrawing = [...rawRings].sort((a, b) => b.value - a.value);
+                                
+                                return sortedForDrawing.map((ring) => {
+                                  const colorIdx = ringColorMap.get(ring.originalValue) ?? 0;
+                                  const radiusMeters = ring.value * 1609.34;
+                                  return (
+                                    <Circle
+                                      key={`single-circle-${ring.originalValue}`}
+                                      center={{ lat: activeLoc.latitude, lng: activeLoc.longitude }}
+                                      radius={radiusMeters}
+                                      options={{
+                                        fillColor: RING_COLORS[colorIdx % RING_COLORS.length].stroke,
+                                        fillOpacity: 0.08,
+                                        strokeColor: RING_COLORS[colorIdx % RING_COLORS.length].stroke,
+                                        strokeOpacity: 0.9,
+                                        strokeWeight: 2.5,
+                                      }}
+                                    />
+                                  );
+                                });
+                              })()}
+                            </GoogleMap>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {hasLoading && (
+                        <div className="flex items-center justify-center py-4">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                          <span className="ml-2 text-sm text-muted-foreground">Loading demographics...</span>
+                        </div>
+                      )}
+
+                      {loadedAreas.length > 0 && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm">Demographics by Trade Area</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <Tabs defaultValue={loadedAreas[0]?.label}>
+                              <TabsList className="flex flex-wrap h-auto gap-1">
+                                {loadedAreas.map((tradeArea, taIdx) => {
+                                  const sortedRings = isDistance
+                                    ? [...activeLoc.config.distanceRings].sort((a, b) => a - b)
+                                    : [...activeLoc.config.driveTimes].sort((a, b) => a - b);
+                                  const keyParts = tradeArea.label.split(' ');
+                                  const parsedValue = keyParts.length > 0 ? parseFloat(keyParts[0]) : NaN;
+                                  const ringValue = isNaN(parsedValue) ? (sortedRings[0] || 0) : parsedValue;
+                                  const colorIdx = sortedRings.indexOf(ringValue);
+                                  const ringColor = RING_COLORS[colorIdx >= 0 ? colorIdx : taIdx];
+                                  
+                                  return (
+                                    <TabsTrigger 
+                                      key={tradeArea.label} 
+                                      value={tradeArea.label}
+                                      className="text-xs px-3 py-1.5 data-[state=active]:text-white"
+                                      style={{ 
+                                        '--active-bg': ringColor.stroke,
+                                      } as React.CSSProperties}
+                                    >
+                                      <div 
+                                        className="w-2 h-2 rounded-full mr-1.5"
+                                        style={{ backgroundColor: ringColor.stroke }}
+                                      />
+                                      {tradeArea.label}
+                                    </TabsTrigger>
+                                  );
+                                })}
+                              </TabsList>
+                              
+                              {loadedAreas.map((tradeArea, taIdx) => {
+                                const sortedRings = isDistance
+                                  ? [...activeLoc.config.distanceRings].sort((a, b) => a - b)
+                                  : [...activeLoc.config.driveTimes].sort((a, b) => a - b);
+                                const keyParts = tradeArea.label.split(' ');
+                                const parsedValue = keyParts.length > 0 ? parseFloat(keyParts[0]) : NaN;
+                                const ringValue = isNaN(parsedValue) ? (sortedRings[0] || 0) : parsedValue;
+                                const colorIdx = sortedRings.indexOf(ringValue);
+                                const ringColor = RING_COLORS[colorIdx >= 0 ? colorIdx : taIdx];
+                                
+                                return (
+                                  <TabsContent key={tradeArea.label} value={tradeArea.label} className="mt-4">
+                                    <div className="space-y-4">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <div 
+                                            className="w-3 h-3 rounded-full border border-white shadow-sm"
+                                            style={{ backgroundColor: ringColor.stroke }}
+                                          />
+                                          <span className="font-medium text-sm">{tradeArea.label}</span>
+                                          <Badge variant="outline" className="text-xs">
+                                            ~{tradeArea.radiusMiles.toFixed(1)} mile radius
+                                          </Badge>
+                                        </div>
+                                        {tradeArea.demographics && (
+                                          <Badge className="text-xs" style={{ backgroundColor: ringColor.stroke }}>
+                                            Pop: {formatNumber(tradeArea.demographics.totalPopulation)}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      
+                                      {tradeArea.demographics && (
+                                        <TradeAreaDemographicsDisplay data={tradeArea.demographics} />
+                                      )}
+                                    </div>
+                                  </TabsContent>
+                                );
+                              })}
+                            </Tabs>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="comparison" className="mt-4">
+            {selectedLocations.length < 2 ? (
+              <Card className="border-dashed">
+                <CardContent className="py-12 text-center">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="text-lg font-medium mb-2">Add More Locations to Compare</h3>
+                  <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                    Add at least 2 locations to compare their demographics side by side. You can add up to 5 locations.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <Card className="mb-4">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Target className="h-4 w-4" />
+                      All Locations Map
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-lg overflow-hidden border" style={{ height: '300px' }}>
+                      <GoogleMap
+                        key={`comparison-map-${selectedLocations.length}`}
+                        mapContainerStyle={{ width: '100%', height: '100%' }}
+                        center={selectedLocations.length > 0 
+                          ? { lat: selectedLocations[0].latitude, lng: selectedLocations[0].longitude }
+                          : defaultMapCenter
+                        }
+                        zoom={selectedLocations.length === 1 ? 10 : 7}
+                        options={{
+                          mapTypeControl: false,
+                          streetViewControl: false,
+                          fullscreenControl: true,
+                        }}
+                      >
+                        {selectedLocations.map((location, locIdx) => {
+                          const locationColor = LOCATION_COLORS[locIdx % LOCATION_COLORS.length];
+                          return (
+                            <Marker
+                              key={`marker-${locIdx}`}
+                              position={{ lat: location.latitude, lng: location.longitude }}
+                              title={location.address}
+                              icon={{
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 10,
+                                fillColor: locationColor,
+                                fillOpacity: 1,
+                                strokeColor: '#ffffff',
+                                strokeWeight: 2,
+                              }}
+                            />
+                          );
+                        })}
+                      </GoogleMap>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedLocations.map((loc, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 text-xs">
+                          <div 
+                            className="w-2.5 h-2.5 rounded-full"
+                            style={{ backgroundColor: LOCATION_COLORS[idx % LOCATION_COLORS.length] }}
+                          />
+                          <span className="text-muted-foreground">{loc.label || loc.address.split(',')[0]}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-primary" />
+                      Side-by-Side Comparison
+                    </CardTitle>
+                    <CardDescription>Compare demographics across all locations - select which trade area to compare for each</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-3 font-medium w-36">Metric</th>
+                            {selectedLocations.map((loc, idx) => {
+                              const locKey = `${loc.latitude},${loc.longitude}`;
+                              const areaMap = locationData.get(locKey);
+                              const tradeAreasList = areaMap ? Array.from(areaMap.entries()).filter(([, ta]) => ta.demographics) : [];
+                              const isDistance = loc.config.analysisMode === 'distance';
+                              const sortedRings = isDistance
+                                ? [...loc.config.distanceRings].sort((a, b) => a - b)
+                                : [...loc.config.driveTimes].sort((a, b) => a - b);
+                              
+                              const sortedTradeAreas = [...tradeAreasList].sort(([keyA], [keyB]) => {
+                                const partsA = keyA.split('-');
+                                const partsB = keyB.split('-');
+                                const valA = partsA.length > 1 ? parseFloat(partsA[1]) : 0;
+                                const valB = partsB.length > 1 ? parseFloat(partsB[1]) : 0;
+                                return (isNaN(valA) ? 0 : valA) - (isNaN(valB) ? 0 : valB);
+                              });
+                              
+                              const defaultKey = sortedTradeAreas[0]?.[0] || '';
+                              const selectedKey = (comparisonTradeAreas[idx] && sortedTradeAreas.some(([k]) => k === comparisonTradeAreas[idx])) 
+                                ? comparisonTradeAreas[idx] 
+                                : defaultKey;
+                              
+                              return (
+                                <th key={idx} className="py-2 px-2 font-medium min-w-44">
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <div 
+                                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: LOCATION_COLORS[idx % LOCATION_COLORS.length] }}
+                                      />
+                                      <span className="text-xs text-muted-foreground truncate max-w-40">
+                                        {loc.label || loc.address.split(',')[0]}
+                                      </span>
+                                    </div>
+                                    {sortedTradeAreas.length > 0 && (
+                                      <Select
+                                        value={selectedKey}
+                                        onValueChange={(value) => {
+                                          setComparisonTradeAreas(prev => ({ ...prev, [idx]: value }));
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-7 text-xs" data-testid={`select-compare-area-${idx}`}>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {sortedTradeAreas.map(([key, ta]) => {
+                                            const keyParts = key.split('-');
+                                            const parsedRingValue = keyParts.length > 1 ? parseFloat(keyParts[1]) : NaN;
+                                            const ringValue = isNaN(parsedRingValue) ? (sortedRings[0] || 0) : parsedRingValue;
+                                            const colorIdx = sortedRings.indexOf(ringValue);
+                                            const ringColor = RING_COLORS[colorIdx >= 0 ? colorIdx : 0];
+                                            
+                                            return (
+                                              <SelectItem key={key} value={key}>
+                                                <div className="flex items-center gap-2">
+                                                  <div 
+                                                    className="w-2 h-2 rounded-full"
+                                                    style={{ backgroundColor: ringColor.stroke }}
+                                                  />
+                                                  <span>{ta.label}</span>
+                                                </div>
+                                              </SelectItem>
+                                            );
+                                          })}
+                                        </SelectContent>
+                                      </Select>
+                                    )}
+                                  </div>
+                                </th>
+                              );
+                            })}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[
+                            { label: "Population", key: "totalPopulation", format: formatNumber },
+                            { label: "Median Age", key: "medianAge", format: (v: number) => v ? `${v.toFixed(1)} yrs` : "N/A" },
+                            { label: "Median Income", key: "medianHouseholdIncome", format: formatCurrency },
+                            { label: "Per Capita Income", key: "perCapitaIncome", format: formatCurrency },
+                            { label: "Median Home Value", key: "medianHomeValue", format: formatCurrency },
+                            { label: "Household Size", key: "householdSize", format: (v: number) => v ? v.toFixed(1) : "N/A" },
+                          ].map((metric, mIdx) => (
+                            <tr key={mIdx} className="border-b border-muted hover:bg-muted/30">
+                              <td className="py-2 px-3 font-medium">{metric.label}</td>
+                              {selectedLocations.map((loc, lIdx) => {
+                                const locKey = `${loc.latitude},${loc.longitude}`;
+                                const areaMap = locationData.get(locKey);
+                                const isDistance = loc.config.analysisMode === 'distance';
+                                const sortedRings = isDistance
+                                  ? [...loc.config.distanceRings].sort((a, b) => a - b)
+                                  : [...loc.config.driveTimes].sort((a, b) => a - b);
+                                
+                                const tradeAreasList = areaMap ? Array.from(areaMap.entries()).filter(([, ta]) => ta.demographics) : [];
+                                const sortedTradeAreas = [...tradeAreasList].sort(([keyA], [keyB]) => {
+                                  const partsA = keyA.split('-');
+                                  const partsB = keyB.split('-');
+                                  const valA = partsA.length > 1 ? parseFloat(partsA[1]) : 0;
+                                  const valB = partsB.length > 1 ? parseFloat(partsB[1]) : 0;
+                                  return (isNaN(valA) ? 0 : valA) - (isNaN(valB) ? 0 : valB);
+                                });
+                                
+                                const defaultKey = sortedTradeAreas[0]?.[0] || '';
+                                const selectedKey = (comparisonTradeAreas[lIdx] && sortedTradeAreas.some(([k]) => k === comparisonTradeAreas[lIdx]))
+                                  ? comparisonTradeAreas[lIdx]
+                                  : defaultKey;
+                                const tradeArea = selectedKey && areaMap ? areaMap.get(selectedKey) : null;
+                                const value = tradeArea?.demographics?.[metric.key as keyof DemographicSummary];
+                                
+                                return (
+                                  <td key={lIdx} className="text-right py-2 px-3">
+                                    <span>{metric.format(value as number)}</span>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
       )}
 
       {selectedLocations.length === 0 && !fetchDemographicsMutation.isPending && (
@@ -1445,419 +1872,13 @@ function LocationAnalysisSection() {
         </Card>
       )}
 
-      {selectedLocations.length > 0 && selectedLocations.map((loc, locIdx) => {
-        const tradeAreas = getLocationTradeAreas(loc);
-        const hasLoading = tradeAreas.some(ta => ta.isLoading);
-        const loadedAreas = tradeAreas.filter(ta => ta.demographics);
-        
-        return (
-          <Card key={locIdx} className="overflow-hidden">
-            <CardHeader className="bg-muted/30">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-base">{loc.address}</CardTitle>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        data-testid={`button-edit-config-${locIdx}`}
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80" align="end">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium text-sm">Trade Area Settings</h4>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => refetchLocation(locIdx)}
-                            disabled={hasLoading}
-                            data-testid={`button-refetch-${locIdx}`}
-                          >
-                            <RefreshCw className={`h-3 w-3 mr-1 ${hasLoading ? 'animate-spin' : ''}`} />
-                            Refresh
-                          </Button>
-                        </div>
-                        
-                        <Tabs 
-                          value={loc.config.analysisMode} 
-                          onValueChange={(v) => updateLocationConfig(locIdx, { 
-                            ...loc.config, 
-                            analysisMode: v as 'distance' | 'drivetime' 
-                          })}
-                        >
-                          <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="distance" className="text-xs">
-                              <Ruler className="h-3 w-3 mr-1" />
-                              Distance
-                            </TabsTrigger>
-                            <TabsTrigger value="drivetime" className="text-xs">
-                              <Car className="h-3 w-3 mr-1" />
-                              Drive Time
-                            </TabsTrigger>
-                          </TabsList>
-                          
-                          <TabsContent value="distance" className="mt-3">
-                            <div className="space-y-2">
-                              <Label className="text-xs">Distance Rings</Label>
-                              <div className="grid grid-cols-2 gap-2">
-                                {DISTANCE_RINGS.map(ring => {
-                                  const isSelected = loc.config.distanceRings.includes(ring.value);
-                                  return (
-                                    <label
-                                      key={ring.value}
-                                      htmlFor={`loc-${locIdx}-ring-${ring.value}`}
-                                      className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs cursor-pointer transition-colors ${
-                                        isSelected
-                                          ? 'bg-primary/10 border-primary text-primary'
-                                          : 'bg-background border-border hover:border-primary/50'
-                                      }`}
-                                    >
-                                      <Checkbox
-                                        id={`loc-${locIdx}-ring-${ring.value}`}
-                                        checked={isSelected}
-                                        onCheckedChange={() => {
-                                          const newRings = isSelected
-                                            ? loc.config.distanceRings.filter(r => r !== ring.value)
-                                            : [...loc.config.distanceRings, ring.value].sort((a, b) => a - b);
-                                          updateLocationConfig(locIdx, { ...loc.config, distanceRings: newRings });
-                                        }}
-                                        data-testid={`checkbox-loc-${locIdx}-distance-${ring.value}`}
-                                        className="h-3.5 w-3.5"
-                                      />
-                                      <span>{ring.label}</span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </TabsContent>
-                          
-                          <TabsContent value="drivetime" className="mt-3">
-                            <div className="space-y-2">
-                              <Label className="text-xs">Drive Times</Label>
-                              <div className="grid grid-cols-2 gap-2">
-                                {DRIVE_TIMES.map(time => {
-                                  const isSelected = loc.config.driveTimes.includes(time.value);
-                                  const isDisabled = !isSelected && loc.config.driveTimes.length >= 3;
-                                  return (
-                                    <label
-                                      key={time.value}
-                                      htmlFor={`loc-${locIdx}-time-${time.value}`}
-                                      className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs cursor-pointer transition-colors ${
-                                        isDisabled
-                                          ? 'opacity-50 cursor-not-allowed bg-muted'
-                                          : isSelected
-                                            ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                                            : 'bg-background border-border hover:border-blue-300'
-                                      }`}
-                                    >
-                                      <Checkbox
-                                        id={`loc-${locIdx}-time-${time.value}`}
-                                        checked={isSelected}
-                                        onCheckedChange={() => {
-                                          const newTimes = isSelected
-                                            ? loc.config.driveTimes.filter(t => t !== time.value)
-                                            : [...loc.config.driveTimes, time.value].sort((a, b) => a - b);
-                                          if (newTimes.length <= 3) {
-                                            updateLocationConfig(locIdx, { ...loc.config, driveTimes: newTimes });
-                                          }
-                                        }}
-                                        disabled={isDisabled}
-                                        data-testid={`checkbox-loc-${locIdx}-drivetime-${time.value}`}
-                                        className="h-3.5 w-3.5"
-                                      />
-                                      <span>{time.label}</span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </TabsContent>
-                        </Tabs>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 hover:bg-destructive hover:text-destructive-foreground"
-                    onClick={() => handleRemoveLocation(locIdx)}
-                    data-testid={`button-remove-card-${locIdx}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <CardDescription className="flex items-center gap-2 flex-wrap">
-                {tradeAreas.map((ta, taIdx) => (
-                  <Badge 
-                    key={taIdx} 
-                    variant={ta.isLoading ? "outline" : "secondary"}
-                    className="text-xs"
-                  >
-                    {ta.type === 'distance' ? (
-                      <CircleDot className="h-3 w-3 mr-1" />
-                    ) : (
-                      <Clock className="h-3 w-3 mr-1" />
-                    )}
-                    {ta.label}
-                    {ta.isLoading && <span className="ml-1 animate-pulse">...</span>}
-                  </Badge>
-                ))}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4">
-              {hasLoading && loadedAreas.length === 0 && (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  <span className="ml-2 text-sm text-muted-foreground">Loading demographics...</span>
-                </div>
-              )}
-              
-              {loadedAreas.length > 0 && (
-                <Tabs defaultValue={loadedAreas[0]?.label || ''} className="w-full">
-                  <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
-                    {(() => {
-                      const isDistance = loc.config.analysisMode === 'distance';
-                      const sortedRings = isDistance
-                        ? [...loc.config.distanceRings].sort((a, b) => a - b)
-                        : [...loc.config.driveTimes].sort((a, b) => a - b);
-                      
-                      return loadedAreas.map((tradeArea, taIdx) => {
-                        const ringValue = isDistance
-                          ? parseFloat(tradeArea.label.replace(' Mile Radius', ''))
-                          : parseFloat(tradeArea.label.replace(' Min Drive', ''));
-                        const colorIdx = sortedRings.indexOf(ringValue);
-                        const ringColor = RING_COLORS[colorIdx >= 0 ? colorIdx : 0];
-                        
-                        return (
-                          <TabsTrigger
-                            key={tradeArea.label}
-                            value={tradeArea.label}
-                            className="flex items-center gap-2 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-1.5"
-                            data-testid={`tab-trade-area-${taIdx}`}
-                          >
-                            <div 
-                              className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-white/50"
-                              style={{ backgroundColor: ringColor.stroke }}
-                            />
-                            {tradeArea.type === 'distance' ? (
-                              <CircleDot className="h-3 w-3" />
-                            ) : (
-                              <Clock className="h-3 w-3" />
-                            )}
-                            <span>{tradeArea.label}</span>
-                          </TabsTrigger>
-                        );
-                      });
-                    })()}
-                  </TabsList>
-                  
-                  {loadedAreas.map((tradeArea, taIdx) => {
-                    const isDistance = loc.config.analysisMode === 'distance';
-                    const sortedRings = isDistance
-                      ? [...loc.config.distanceRings].sort((a, b) => a - b)
-                      : [...loc.config.driveTimes].sort((a, b) => a - b);
-                    const ringValue = isDistance
-                      ? parseFloat(tradeArea.label.replace(' Mile Radius', ''))
-                      : parseFloat(tradeArea.label.replace(' Min Drive', ''));
-                    const colorIdx = sortedRings.indexOf(ringValue);
-                    const ringColor = RING_COLORS[colorIdx >= 0 ? colorIdx : 0];
-                    
-                    return (
-                      <TabsContent 
-                        key={tradeArea.label} 
-                        value={tradeArea.label}
-                        className="mt-4"
-                      >
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div 
-                                className="w-3 h-3 rounded-full border border-white shadow-sm"
-                                style={{ backgroundColor: ringColor.stroke }}
-                              />
-                              <span className="font-medium text-sm">{tradeArea.label}</span>
-                              <Badge variant="outline" className="text-xs">
-                                ~{tradeArea.radiusMiles.toFixed(1)} mile radius
-                              </Badge>
-                            </div>
-                            {tradeArea.demographics && (
-                              <Badge className="text-xs" style={{ backgroundColor: ringColor.stroke }}>
-                                Pop: {formatNumber(tradeArea.demographics.totalPopulation)}
-                              </Badge>
-                            )}
-                          </div>
-                          
-                          {tradeArea.demographics && (
-                            <TradeAreaDemographicsDisplay data={tradeArea.demographics} />
-                          )}
-                        </div>
-                      </TabsContent>
-                    );
-                  })}
-                </Tabs>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
-
-      {selectedLocations.length >= 2 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Comparison Summary
-            </CardTitle>
-            <CardDescription>Compare demographics across locations - select which trade area to compare for each</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-3 font-medium w-36">Metric</th>
-                    {selectedLocations.map((loc, idx) => {
-                      const locKey = `${loc.latitude},${loc.longitude}`;
-                      const areaMap = locationData.get(locKey);
-                      const tradeAreasList = areaMap ? Array.from(areaMap.entries()).filter(([, ta]) => ta.demographics) : [];
-                      const isDistance = loc.config.analysisMode === 'distance';
-                      const sortedRings = isDistance
-                        ? [...loc.config.distanceRings].sort((a, b) => a - b)
-                        : [...loc.config.driveTimes].sort((a, b) => a - b);
-                      
-                      const sortedTradeAreas = [...tradeAreasList].sort(([keyA], [keyB]) => {
-                        const partsA = keyA.split('-');
-                        const partsB = keyB.split('-');
-                        const valA = partsA.length > 1 ? parseFloat(partsA[1]) : 0;
-                        const valB = partsB.length > 1 ? parseFloat(partsB[1]) : 0;
-                        return (isNaN(valA) ? 0 : valA) - (isNaN(valB) ? 0 : valB);
-                      });
-                      
-                      const defaultKey = sortedTradeAreas[0]?.[0] || '';
-                      const selectedKey = (comparisonTradeAreas[idx] && sortedTradeAreas.some(([k]) => k === comparisonTradeAreas[idx])) 
-                        ? comparisonTradeAreas[idx] 
-                        : defaultKey;
-                      
-                      return (
-                        <th key={idx} className="py-2 px-2 font-medium min-w-44">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground truncate max-w-40">
-                              {loc.label || loc.address.split(',')[0]}
-                            </span>
-                            {sortedTradeAreas.length > 0 && (
-                              <Select
-                                value={selectedKey}
-                                onValueChange={(value) => {
-                                  setComparisonTradeAreas(prev => ({ ...prev, [idx]: value }));
-                                }}
-                              >
-                                <SelectTrigger className="h-7 text-xs" data-testid={`select-compare-area-${idx}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {sortedTradeAreas.map(([key, ta]) => {
-                                    const keyParts = key.split('-');
-                                    const parsedRingValue = keyParts.length > 1 ? parseFloat(keyParts[1]) : NaN;
-                                    const ringValue = isNaN(parsedRingValue) ? (sortedRings[0] || 0) : parsedRingValue;
-                                    const colorIdx = sortedRings.indexOf(ringValue);
-                                    const ringColor = RING_COLORS[colorIdx >= 0 ? colorIdx : 0];
-                                    
-                                    return (
-                                      <SelectItem key={key} value={key}>
-                                        <div className="flex items-center gap-2">
-                                          <div 
-                                            className="w-2 h-2 rounded-full"
-                                            style={{ backgroundColor: ringColor.stroke }}
-                                          />
-                                          <span>{ta.label}</span>
-                                        </div>
-                                      </SelectItem>
-                                    );
-                                  })}
-                                </SelectContent>
-                              </Select>
-                            )}
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { label: "Population", key: "totalPopulation", format: formatNumber },
-                    { label: "Median Age", key: "medianAge", format: (v: number) => v ? `${v.toFixed(1)} yrs` : "N/A" },
-                    { label: "Median Income", key: "medianHouseholdIncome", format: formatCurrency },
-                    { label: "Per Capita Income", key: "perCapitaIncome", format: formatCurrency },
-                    { label: "Median Home Value", key: "medianHomeValue", format: formatCurrency },
-                    { label: "Household Size", key: "householdSize", format: (v: number) => v ? v.toFixed(1) : "N/A" },
-                  ].map((metric, mIdx) => (
-                    <tr key={mIdx} className="border-b border-muted hover:bg-muted/30">
-                      <td className="py-2 px-3 font-medium">{metric.label}</td>
-                      {selectedLocations.map((loc, lIdx) => {
-                        const locKey = `${loc.latitude},${loc.longitude}`;
-                        const areaMap = locationData.get(locKey);
-                        const isDistance = loc.config.analysisMode === 'distance';
-                        const sortedRings = isDistance
-                          ? [...loc.config.distanceRings].sort((a, b) => a - b)
-                          : [...loc.config.driveTimes].sort((a, b) => a - b);
-                        
-                        const tradeAreasList = areaMap ? Array.from(areaMap.entries()).filter(([, ta]) => ta.demographics) : [];
-                        const sortedTradeAreas = [...tradeAreasList].sort(([keyA], [keyB]) => {
-                          const partsA = keyA.split('-');
-                          const partsB = keyB.split('-');
-                          const valA = partsA.length > 1 ? parseFloat(partsA[1]) : 0;
-                          const valB = partsB.length > 1 ? parseFloat(partsB[1]) : 0;
-                          return (isNaN(valA) ? 0 : valA) - (isNaN(valB) ? 0 : valB);
-                        });
-                        
-                        const defaultKey = sortedTradeAreas[0]?.[0] || '';
-                        const selectedKey = (comparisonTradeAreas[lIdx] && sortedTradeAreas.some(([k]) => k === comparisonTradeAreas[lIdx]))
-                          ? comparisonTradeAreas[lIdx]
-                          : defaultKey;
-                        const tradeArea = selectedKey && areaMap ? areaMap.get(selectedKey) : null;
-                        const value = tradeArea?.demographics?.[metric.key as keyof DemographicSummary];
-                        
-                        const keyParts = selectedKey ? selectedKey.split('-') : [];
-                        const parsedRingValue = keyParts.length > 1 ? parseFloat(keyParts[1]) : NaN;
-                        const ringValue = isNaN(parsedRingValue) ? (sortedRings[0] || 0) : parsedRingValue;
-                        const colorIdx = sortedRings.indexOf(ringValue);
-                        const ringColor = RING_COLORS[colorIdx >= 0 ? colorIdx : 0];
-                        
-                        return (
-                          <td key={lIdx} className="text-right py-2 px-3">
-                            <div className="flex items-center justify-end gap-2">
-                              {mIdx === 0 && (
-                                <div 
-                                  className="w-2 h-2 rounded-full flex-shrink-0"
-                                  style={{ backgroundColor: ringColor.stroke }}
-                                />
-                              )}
-                              <span>{metric.format(value as number)}</span>
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+      {fetchDemographicsMutation.isPending && selectedLocations.length === 0 && (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <span className="ml-3 text-muted-foreground">Loading demographics...</span>
+        </div>
       )}
-      
+
       {showAnalyticsPanel && selectedLocations.length > 0 && (
         <div className="space-y-6">
           {selectedLocations.slice(0, 3).map((loc, idx) => {
