@@ -1592,27 +1592,39 @@ router.post('/projects/:projectId/data-requests/bulk-update', requireAuth, async
   }
 });
 
-// Get team members for assignee selection (Deal Team only)
+// Get team members for assignee selection
 router.get('/projects/:projectId/team-members', requireAuth, async (req: Request, res: Response) => {
   const { projectId } = req.params;
   const orgId = (req.user as any).orgId;
 
   try {
-    // Get internal users from projectContacts who are on the deal team
-    const dealTeamContacts = await db.select({
-      id: contacts.id,
-      name: contacts.name,
-      email: contacts.email,
-      role: projectContacts.role,
-      customRole: projectContacts.customRole,
+    // Get organization users (internal team members who can be assignees)
+    const orgUsers = await db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
       type: sql<string>`'internal'`,
     })
-    .from(projectContacts)
-    .innerJoin(contacts, eq(projectContacts.contactId, contacts.id))
+    .from(users)
     .where(and(
-      eq(projectContacts.projectId, projectId),
-      eq(contacts.orgId, orgId),
-      eq(contacts.onDealTeam, true)
+      eq(users.orgId, orgId),
+      eq(users.isActive, true)
+    ));
+
+    // Get project-specific deal members
+    const { projectDealMembers } = await import('@shared/schema');
+    const dealMembers = await db.select({
+      id: projectDealMembers.id,
+      name: projectDealMembers.name,
+      email: projectDealMembers.email,
+      role: projectDealMembers.role,
+      type: sql<string>`'deal_member'`,
+    })
+    .from(projectDealMembers)
+    .where(and(
+      eq(projectDealMembers.projectId, projectId),
+      eq(projectDealMembers.orgId, orgId)
     ));
 
     // Get external users with access to this project
@@ -1635,12 +1647,114 @@ router.get('/projects/:projectId/team-members', requireAuth, async (req: Request
     ));
 
     res.json({
-      internal: dealTeamContacts,
+      internal: orgUsers,
+      dealMembers: dealMembers,
       external: externalUsersData,
     });
   } catch (error: any) {
     console.error('Error fetching team members:', error);
     res.status(500).json({ error: 'Failed to fetch team members' });
+  }
+});
+
+// Add a new deal member to a project
+const addDealMemberSchema = z.object({
+  name: z.string().min(1, 'Name is required').transform(s => s.trim()),
+  email: z.string().email().optional().nullable().transform(val => val?.trim() || null),
+  phone: z.string().optional().nullable().transform(val => val?.trim() || null),
+  role: z.string().optional().nullable().transform(val => val?.trim() || null),
+});
+
+router.post('/projects/:projectId/deal-members', requireAuth, async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+  
+  const parseResult = addDealMemberSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    return res.status(400).json({ error: parseResult.error.errors[0].message });
+  }
+  
+  const { name, email, phone, role } = parseResult.data;
+
+  try {
+    const { projectDealMembers, pendingContacts } = await import('@shared/schema');
+    
+    // First create a pending contact in CRM for review
+    const [pendingContact] = await db.insert(pendingContacts)
+      .values({
+        orgId,
+        fullName: name,
+        email,
+        phone,
+        sourceType: 'deal_member',
+        sourceId: projectId,
+        sourceMetadata: { projectId, role },
+        status: 'pending',
+        createdBy: userId,
+      })
+      .returning();
+    
+    // Create the project deal member with link to pending contact
+    const [dealMember] = await db.insert(projectDealMembers)
+      .values({
+        projectId,
+        orgId,
+        name,
+        email,
+        phone,
+        role,
+        pendingContactId: pendingContact.id,
+        createdBy: userId,
+      })
+      .returning();
+
+    res.json(dealMember);
+  } catch (error: any) {
+    console.error('Error adding deal member:', error);
+    res.status(500).json({ error: 'Failed to add deal member' });
+  }
+});
+
+// Get deal members for a project
+router.get('/projects/:projectId/deal-members', requireAuth, async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const { projectDealMembers } = await import('@shared/schema');
+    const dealMembers = await db.select()
+      .from(projectDealMembers)
+      .where(and(
+        eq(projectDealMembers.projectId, projectId),
+        eq(projectDealMembers.orgId, orgId)
+      ));
+
+    res.json(dealMembers);
+  } catch (error: any) {
+    console.error('Error fetching deal members:', error);
+    res.status(500).json({ error: 'Failed to fetch deal members' });
+  }
+});
+
+// Delete a deal member from a project
+router.delete('/projects/:projectId/deal-members/:memberId', requireAuth, async (req: Request, res: Response) => {
+  const { projectId, memberId } = req.params;
+  const orgId = (req.user as any).orgId;
+
+  try {
+    const { projectDealMembers } = await import('@shared/schema');
+    await db.delete(projectDealMembers)
+      .where(and(
+        eq(projectDealMembers.id, memberId),
+        eq(projectDealMembers.projectId, projectId),
+        eq(projectDealMembers.orgId, orgId)
+      ));
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting deal member:', error);
+    res.status(500).json({ error: 'Failed to delete deal member' });
   }
 });
 

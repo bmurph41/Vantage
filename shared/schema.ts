@@ -698,6 +698,25 @@ export const projectContacts = pgTable("project_contacts", {
   };
 });
 
+// Project Deal Members - Custom deal team members manually added to a project
+export const projectDealMembers = pgTable("project_deal_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  role: text("role"), // Free-form role/title
+  notes: text("notes"),
+  // Link to pending contact created for CRM review
+  pendingContactId: varchar("pending_contact_id").references(() => pendingContacts.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("project_deal_members_project").on(table.projectId),
+  orgIdx: index("project_deal_members_org").on(table.orgId),
+}));
+
 // Project Pending Contacts (Join table for associating pending contacts with projects)
 export const projectPendingContacts = pgTable("project_pending_contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1653,6 +1672,13 @@ export type UpdateDDContact = z.infer<typeof updateDDContactSchema>;
 
 export type ProjectContact = typeof projectContacts.$inferSelect;
 export type InsertProjectContact = z.infer<typeof insertProjectContactSchema>;
+
+export const insertProjectDealMemberSchema = createInsertSchema(projectDealMembers).omit({
+  id: true,
+  createdAt: true,
+});
+export type ProjectDealMember = typeof projectDealMembers.$inferSelect;
+export type InsertProjectDealMember = z.infer<typeof insertProjectDealMemberSchema>;
 
 export type ProjectPendingContact = typeof projectPendingContacts.$inferSelect;
 export type InsertProjectPendingContact = z.infer<typeof insertProjectPendingContactSchema>;

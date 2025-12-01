@@ -3,12 +3,16 @@ import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { 
@@ -45,15 +49,29 @@ interface TeamMember {
   id: string;
   name: string;
   email: string;
-  type: 'internal' | 'external';
+  type: 'internal' | 'external' | 'deal_member';
   role?: string;
 }
+
+interface TeamMembersResponse {
+  internal: TeamMember[];
+  dealMembers: TeamMember[];
+  external: TeamMember[];
+}
+
+const addDealMemberFormSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email format').optional().or(z.literal('')),
+  phone: z.string().optional(),
+  role: z.string().optional(),
+});
 
 export default function DataRequest() {
   const { projectId } = useParams();
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DataRequestItem | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -68,6 +86,15 @@ export default function DataRequest() {
     priority: "medium" as DataRequestPriority,
     assigneeId: "",
     externalAssigneeId: "",
+  });
+  const dealMemberForm = useForm<z.infer<typeof addDealMemberFormSchema>>({
+    resolver: zodResolver(addDealMemberFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      role: "",
+    },
   });
 
   const { data: project } = useQuery<any>({
@@ -84,9 +111,29 @@ export default function DataRequest() {
     enabled: !!projectId,
   });
 
-  const { data: teamMembers } = useQuery<{ internal: TeamMember[]; external: TeamMember[] }>({
+  const { data: teamMembers, refetch: refetchTeamMembers } = useQuery<TeamMembersResponse>({
     queryKey: ['/api/vdr/projects', projectId, 'team-members'],
     enabled: !!projectId,
+  });
+
+  const addDealMemberMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof addDealMemberFormSchema>) => {
+      const result = await apiRequest('POST', `/api/vdr/projects/${projectId}/deal-members`, data);
+      return result.json();
+    },
+    onSuccess: () => {
+      refetchTeamMembers();
+      setIsAddMemberDialogOpen(false);
+      dealMemberForm.reset();
+      toast({ title: "Success", description: "Team member added to the deal" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to add team member", 
+        variant: "destructive" 
+      });
+    },
   });
 
   const { data: categories = [] } = useQuery<Array<{ id: string; name: string; description: string }>>({
@@ -214,6 +261,7 @@ export default function DataRequest() {
       if (filterAssignee === "unassigned" && (item.assigneeId || item.externalAssigneeId)) return false;
       if (filterAssignee.startsWith("internal:") && item.assigneeId !== filterAssignee.replace("internal:", "")) return false;
       if (filterAssignee.startsWith("external:") && item.externalAssigneeId !== filterAssignee.replace("external:", "")) return false;
+      if (filterAssignee.startsWith("deal:") && item.externalAssigneeId !== filterAssignee.replace("deal:", "")) return false;
     }
     
     // Priority filter
@@ -267,14 +315,41 @@ export default function DataRequest() {
     }
   };
 
+  const getAssigneeSelectValue = (): string => {
+    if (formData.assigneeId) {
+      return `internal:${formData.assigneeId}`;
+    }
+    if (formData.externalAssigneeId) {
+      // Check if it's a deal member or external user
+      if (teamMembers?.dealMembers?.some(m => m.id === formData.externalAssigneeId)) {
+        return `deal:${formData.externalAssigneeId}`;
+      }
+      return `external:${formData.externalAssigneeId}`;
+    }
+    return "unassigned";
+  };
+
   const getAssigneeName = (item: DataRequestItem) => {
     if (item.assigneeId && teamMembers?.internal) {
       const assignee = teamMembers.internal.find(u => u.id === item.assigneeId);
       return assignee?.name || 'Unknown';
     }
-    if (item.externalAssigneeId && teamMembers?.external) {
-      const assignee = teamMembers.external.find(u => u.id === item.externalAssigneeId);
-      return assignee ? `${assignee.name} (${assignee.role || 'External'})` : 'Unknown';
+    if (item.externalAssigneeId) {
+      // Check deal members first
+      if (teamMembers?.dealMembers) {
+        const dealMember = teamMembers.dealMembers.find(u => u.id === item.externalAssigneeId);
+        if (dealMember) {
+          return dealMember.role ? `${dealMember.name} (${dealMember.role})` : dealMember.name;
+        }
+      }
+      // Then check external users
+      if (teamMembers?.external) {
+        const assignee = teamMembers.external.find(u => u.id === item.externalAssigneeId);
+        if (assignee) {
+          return `${assignee.name} (${assignee.role || 'External'})`;
+        }
+      }
+      return 'Unknown';
     }
     return 'Unassigned';
   };
@@ -392,16 +467,29 @@ export default function DataRequest() {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="assignee">Assignee *</Label>
+                    <div className="flex items-center justify-between mb-1">
+                      <Label htmlFor="assignee">Assignee *</Label>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 text-xs text-blue-600 hover:text-blue-700"
+                        onClick={() => setIsAddMemberDialogOpen(true)}
+                        data-testid="button-add-deal-member"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add New Deal Member
+                      </Button>
+                    </div>
                     <Select 
-                      value={formData.assigneeId || formData.externalAssigneeId || "unassigned"} 
+                      value={getAssigneeSelectValue()} 
                       onValueChange={(value) => {
                         if (value === "unassigned") {
                           setFormData({ ...formData, assigneeId: "", externalAssigneeId: "" });
                         } else if (value.startsWith("internal:")) {
                           setFormData({ ...formData, assigneeId: value.replace("internal:", ""), externalAssigneeId: "" });
-                        } else if (value.startsWith("external:")) {
-                          setFormData({ ...formData, assigneeId: "", externalAssigneeId: value.replace("external:", "") });
+                        } else if (value.startsWith("external:") || value.startsWith("deal:")) {
+                          setFormData({ ...formData, assigneeId: "", externalAssigneeId: value.replace("external:", "").replace("deal:", "") });
                         }
                       }}
                     >
@@ -411,24 +499,34 @@ export default function DataRequest() {
                       <SelectContent>
                         <SelectItem value="unassigned">Unassigned</SelectItem>
                         {teamMembers?.internal && teamMembers.internal.length > 0 && (
-                          <>
-                            <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Internal Team</div>
+                          <SelectGroup>
+                            <SelectLabel>Internal Team</SelectLabel>
                             {teamMembers.internal.map(member => (
                               <SelectItem key={member.id} value={`internal:${member.id}`}>
                                 {member.name} ({member.email})
                               </SelectItem>
                             ))}
-                          </>
+                          </SelectGroup>
+                        )}
+                        {teamMembers?.dealMembers && teamMembers.dealMembers.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel>Deal Team Members</SelectLabel>
+                            {teamMembers.dealMembers.map(member => (
+                              <SelectItem key={member.id} value={`deal:${member.id}`}>
+                                {member.name} {member.role ? `- ${member.role}` : ''} {member.email ? `(${member.email})` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         )}
                         {teamMembers?.external && teamMembers.external.length > 0 && (
-                          <>
-                            <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">External Users</div>
+                          <SelectGroup>
+                            <SelectLabel>External Users</SelectLabel>
                             {teamMembers.external.map(member => (
                               <SelectItem key={member.id} value={`external:${member.id}`}>
                                 {member.name} - {member.role || 'External'} ({member.email})
                               </SelectItem>
                             ))}
-                          </>
+                          </SelectGroup>
                         )}
                       </SelectContent>
                     </Select>
@@ -494,24 +592,34 @@ export default function DataRequest() {
                   <SelectItem value="all">All Assignees</SelectItem>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
                   {teamMembers?.internal && teamMembers.internal.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Internal Team</div>
+                    <SelectGroup>
+                      <SelectLabel>Internal Team</SelectLabel>
                       {teamMembers.internal.map(member => (
                         <SelectItem key={member.id} value={`internal:${member.id}`}>
                           {member.name}
                         </SelectItem>
                       ))}
-                    </>
+                    </SelectGroup>
+                  )}
+                  {teamMembers?.dealMembers && teamMembers.dealMembers.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>Deal Team Members</SelectLabel>
+                      {teamMembers.dealMembers.map(member => (
+                        <SelectItem key={member.id} value={`deal:${member.id}`}>
+                          {member.name} {member.role ? `(${member.role})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   )}
                   {teamMembers?.external && teamMembers.external.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">External Users</div>
+                    <SelectGroup>
+                      <SelectLabel>External Users</SelectLabel>
                       {teamMembers.external.map(member => (
                         <SelectItem key={member.id} value={`external:${member.id}`}>
                           {member.name} ({member.role})
                         </SelectItem>
                       ))}
-                    </>
+                    </SelectGroup>
                   )}
                 </SelectContent>
               </Select>
@@ -576,8 +684,8 @@ export default function DataRequest() {
                             bulkUpdateMutation.mutate({ assigneeId: null, externalAssigneeId: null });
                           } else if (value.startsWith("internal:")) {
                             bulkUpdateMutation.mutate({ assigneeId: value.replace("internal:", ""), externalAssigneeId: null });
-                          } else if (value.startsWith("external:")) {
-                            bulkUpdateMutation.mutate({ assigneeId: null, externalAssigneeId: value.replace("external:", "") });
+                          } else if (value.startsWith("external:") || value.startsWith("deal:")) {
+                            bulkUpdateMutation.mutate({ assigneeId: null, externalAssigneeId: value.replace("external:", "").replace("deal:", "") });
                           }
                         }}
                       >
@@ -587,24 +695,34 @@ export default function DataRequest() {
                         <SelectContent>
                           <SelectItem value="unassigned">Unassigned</SelectItem>
                           {teamMembers?.internal && teamMembers.internal.length > 0 && (
-                            <>
-                              <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Internal Team</div>
+                            <SelectGroup>
+                              <SelectLabel>Internal Team</SelectLabel>
                               {teamMembers.internal.map(member => (
                                 <SelectItem key={member.id} value={`internal:${member.id}`}>
                                   {member.name}
                                 </SelectItem>
                               ))}
-                            </>
+                            </SelectGroup>
+                          )}
+                          {teamMembers?.dealMembers && teamMembers.dealMembers.length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Deal Team Members</SelectLabel>
+                              {teamMembers.dealMembers.map(member => (
+                                <SelectItem key={member.id} value={`deal:${member.id}`}>
+                                  {member.name} {member.role ? `(${member.role})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
                           )}
                           {teamMembers?.external && teamMembers.external.length > 0 && (
-                            <>
-                              <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">External Users</div>
+                            <SelectGroup>
+                              <SelectLabel>External Users</SelectLabel>
                               {teamMembers.external.map(member => (
                                 <SelectItem key={member.id} value={`external:${member.id}`}>
                                   {member.name}
                                 </SelectItem>
                               ))}
-                            </>
+                            </SelectGroup>
                           )}
                         </SelectContent>
                       </Select>
@@ -954,6 +1072,97 @@ export default function DataRequest() {
           ))
         )}
       </div>
+
+      {/* Add New Deal Member Dialog */}
+      <Dialog open={isAddMemberDialogOpen} onOpenChange={(open) => {
+        setIsAddMemberDialogOpen(open);
+        if (!open) dealMemberForm.reset();
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Deal Team Member</DialogTitle>
+            <DialogDescription>
+              Add a new person to the deal team. They will also be added to your CRM as a pending contact for review.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...dealMemberForm}>
+            <form onSubmit={dealMemberForm.handleSubmit((data) => addDealMemberMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={dealMemberForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Full name" data-testid="input-member-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={dealMemberForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="email" placeholder="email@example.com" data-testid="input-member-email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={dealMemberForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="(555) 555-5555" data-testid="input-member-phone" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={dealMemberForm.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role / Title</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g., Seller's Attorney, Environmental Consultant" data-testid="input-member-role" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  onClick={() => {
+                    setIsAddMemberDialogOpen(false);
+                    dealMemberForm.reset();
+                  }}
+                  data-testid="button-cancel-member"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={addDealMemberMutation.isPending}
+                  data-testid="button-save-member"
+                >
+                  {addDealMemberMutation.isPending ? "Adding..." : "Add Member"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
