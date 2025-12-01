@@ -56,34 +56,34 @@ export default function PendingNotificationsBanner() {
   const pendingCompaniesCount = pendingCompanies.filter(p => p.status === 'pending').length;
   const pendingProfilesCount = pendingProfiles.filter((p: PendingPropertyProfile) => p.status === 'pending').length;
 
-  // Notification configurations
+  // Notification configurations - each specifies entity type and links to respective pending page
   const notifications = [
     {
       id: 'profiles',
       count: pendingProfilesCount,
-      message: (count: number) => `${count} sales comp${count !== 1 ? 's' : ''} need property profile${count !== 1 ? 's' : ''}`,
-      linkText: 'Create profiles',
-      href: '/crm/properties',
+      message: (count: number) => `${count} sales comp${count !== 1 ? 's' : ''} need${count === 1 ? 's' : ''} property profile${count !== 1 ? 's' : ''} created`,
+      linkText: 'Create property profiles',
+      href: '/analysis/sales-comps/pending-profiles',
     },
     {
       id: 'properties',
       count: pendingPropertiesCount,
       message: (count: number) => `${count} propert${count !== 1 ? 'ies' : 'y'} pending review`,
-      linkText: 'Review properties',
+      linkText: 'Review pending properties',
       href: '/crm/pending-properties',
     },
     {
       id: 'contacts',
       count: pendingContactsCount,
       message: (count: number) => `${count} contact${count !== 1 ? 's' : ''} pending review`,
-      linkText: 'Review contacts',
+      linkText: 'Review pending contacts',
       href: '/crm/pending-contacts',
     },
     {
       id: 'companies',
       count: pendingCompaniesCount,
       message: (count: number) => `${count} compan${count !== 1 ? 'ies' : 'y'} pending review`,
-      linkText: 'Review companies',
+      linkText: 'Review pending companies',
       href: '/crm/pending-companies',
     },
   ];

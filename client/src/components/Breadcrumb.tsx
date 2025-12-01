@@ -239,6 +239,11 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
     { label: 'Sales Comps', href: '/analysis/sales-comps' },
     { label: 'Projects' },
   ],
+  '/analysis/sales-comps/pending-profiles': [
+    CATEGORIES.ANALYSIS,
+    { label: 'Sales Comps', href: '/analysis/sales-comps' },
+    { label: 'Pending Profiles' },
+  ],
   '/analysis/rate-comps': [
     CATEGORIES.ANALYSIS,
     { label: 'Rate Comps' },
