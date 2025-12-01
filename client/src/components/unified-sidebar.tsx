@@ -163,6 +163,7 @@ export default function UnifiedSidebar() {
   const [vdrExpanded, setVdrExpanded] = useState(false);
   const [modelingExpanded, setModelingExpanded] = useState(false);
   const [analysisExpanded, setAnalysisExpanded] = useState(false);
+  const [pendingExpanded, setPendingExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -221,6 +222,7 @@ export default function UnifiedSidebar() {
     // CRM: contacts, companies, properties (core entity management)
     const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/import-') || location === '/calendar-settings';
     const isCrmToolsPage = location === '/calendar-settings' || location.startsWith('/import-');
+    const isPendingPage = location.includes('/pending-');
     // Deal Management: deal-workspace, activity, tasks, marketing-automation, analytics, forecast
     const isDealManagementPage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/marketing-automation', '/crm/analytics', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
     // Prospecting: prospecting pages only (leads are now in Deal Workspace)
@@ -242,37 +244,39 @@ export default function UnifiedSidebar() {
     setDealManagementExpanded(isDealManagementPage);
     setProspectingExpanded(isProspectingPage);
     setCrmToolsExpanded(isCrmToolsPage);
+    setPendingExpanded(isPendingPage);
     setDdExpanded(isDdPage);
     setVdrExpanded(isVdrPage);
     setModelingExpanded(isModelingPage);
     setAnalysisExpanded(isAnalysisPage);
   }, [location]);
 
-  // Create dynamic CRM navigation with pending badges
-  const dynamicCrmNav = [
-    crmNav[0], // Dashboard
-    crmNav[1], // Contacts
+  // Check if there are any pending items to show the Pending section
+  const totalPendingCount = pendingPropertiesCount + pendingContactsCount + pendingCompaniesCount;
+  const hasPendingItems = totalPendingCount > 0;
+
+  // Pending navigation items - only used when there are pending items
+  const pendingNav = [
     ...(pendingContactsCount > 0 ? [{ 
-      name: "Pending Contacts", 
+      name: "Contacts", 
       href: "/crm/pending-contacts", 
-      icon: AlertCircle,
+      icon: Users,
       badge: String(pendingContactsCount)
     }] : []),
-    crmNav[2], // Companies
     ...(pendingCompaniesCount > 0 ? [{ 
-      name: "Pending Companies", 
+      name: "Companies", 
       href: "/crm/pending-companies", 
-      icon: AlertCircle,
+      icon: Building,
       badge: String(pendingCompaniesCount)
     }] : []),
-    crmNav[3], // Properties
     ...(pendingPropertiesCount > 0 ? [{ 
-      name: "Pending Properties", 
+      name: "Properties", 
       href: "/crm/pending-properties", 
-      icon: AlertCircle,
+      icon: Home,
       badge: String(pendingPropertiesCount)
     }] : []),
   ];
+
 
   const handleNavClick = () => {
     setMobileMenuOpen(false);
@@ -576,11 +580,38 @@ export default function UnifiedSidebar() {
               onToggle={() => setCrmExpanded(!crmExpanded)}
               isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/import-') || location === '/calendar-settings'}
             />
-            {crmExpanded && dynamicCrmNav.map((item) => (
+            {crmExpanded && crmNav.map((item) => (
               <NavLink key={item.name} item={item} />
             ))}
             {crmExpanded && (
               <>
+                {/* Pending Section - Only visible when there are pending items */}
+                {hasPendingItems && (
+                  <div className="ml-4 mt-1 mb-2">
+                    <button
+                      onClick={() => setPendingExpanded(!pendingExpanded)}
+                      className={cn(
+                        "flex items-center justify-between w-full px-4 py-1.5 text-xs font-medium transition-colors rounded-lg",
+                        location.includes('/pending-')
+                          ? "bg-amber-500 text-white hover:bg-amber-600"
+                          : "text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100"
+                      )}
+                      data-testid="toggle-pending"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>Pending Review</span>
+                        <span className="ml-1 px-1.5 py-0.5 bg-amber-200 text-amber-800 text-xs rounded-full font-semibold">
+                          {totalPendingCount}
+                        </span>
+                      </div>
+                      {pendingExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    </button>
+                    {pendingExpanded && pendingNav.map((item) => (
+                      <NavLink key={item.name} item={item} />
+                    ))}
+                  </div>
+                )}
                 {/* Tools & Settings */}
                 <div className="ml-4 mt-1 mb-2">
                   <button
