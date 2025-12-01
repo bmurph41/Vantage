@@ -1482,6 +1482,118 @@ router.post('/projects/:projectId/data-requests', requireAuth, async (req: Reque
   }
 });
 
+// Create a new data request item with file attachment
+router.post('/projects/:projectId/data-requests-with-files', requireAuth, upload.array('files', 10), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const files = req.files as Express.Multer.File[];
+    const { folderId, category, documentName, description, dueDate, priority, assigneeId, externalAssigneeId } = req.body;
+
+    if (!folderId) {
+      return res.status(400).json({ error: 'Folder ID is required for file uploads' });
+    }
+
+    // Verify folder exists and belongs to project
+    const folder = await storage.vdr.folders.getFolder(folderId, orgId);
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+    if (folder.projectId !== projectId) {
+      return res.status(400).json({ error: 'Folder does not belong to this project' });
+    }
+
+    // Create the data request item first
+    const itemData = {
+      projectId,
+      orgId,
+      createdBy: userId,
+      category: category || 'General',
+      documentName: documentName || 'Untitled Request',
+      description: description || null,
+      dueDate: dueDate || null,
+      priority: priority || 'medium',
+      assigneeId: assigneeId || null,
+      externalAssigneeId: externalAssigneeId || null,
+    };
+
+    const item = await storage.vdr.dataRequests.createItem(itemData);
+
+    // Upload files and link to the data request item
+    const uploadedDocuments = [];
+    if (files && files.length > 0) {
+      for (const file of files) {
+        try {
+          const fileInfo = await vdrFileService.processUpload(
+            file.path,
+            file.originalname,
+            file.mimetype,
+            file.size,
+            orgId,
+            projectId
+          );
+
+          const document = await storage.vdr.documents.createDocument({
+            folderId,
+            projectId,
+            orgId,
+            filename: file.originalname,
+            originalFilename: file.originalname,
+            description: `Attached to data request: ${documentName}`,
+            mimeType: fileInfo.mimeType,
+            size: fileInfo.size,
+            storagePath: fileInfo.storagePath,
+            checksum: fileInfo.checksum,
+            version: 1,
+            isCurrentVersion: true,
+            uploadedBy: userId
+          });
+
+          uploadedDocuments.push(document);
+
+          await storage.vdr.audit.logAction({
+            projectId,
+            orgId,
+            userId,
+            action: 'document_uploaded',
+            resourceType: 'document',
+            resourceId: document.id,
+            metadata: { 
+              documentName: document.filename,
+              size: document.size,
+              mimeType: document.mimeType,
+              linkedToDataRequest: item.id
+            }
+          });
+        } catch (uploadError: any) {
+          console.error('Error uploading file:', file.originalname, uploadError);
+        }
+      }
+
+      // Link the first uploaded document to the data request item
+      if (uploadedDocuments.length > 0) {
+        await storage.vdr.dataRequests.linkDocument(item.id, uploadedDocuments[0].id, orgId);
+        // Also mark as received since we have files
+        await storage.vdr.dataRequests.updateItem(item.id, { 
+          status: 'received',
+          isInDataRoom: true,
+          receivedDate: new Date().toISOString().split('T')[0]
+        }, orgId);
+      }
+    }
+
+    res.json({
+      ...item,
+      uploadedDocuments
+    });
+  } catch (error: any) {
+    console.error('Error creating data request with files:', error);
+    res.status(500).json({ error: error.message || 'Failed to create data request with files' });
+  }
+});
+
 // Update a data request item
 router.patch('/data-requests/:id', requireAuth, async (req: Request, res: Response) => {
   const { id } = req.params;
