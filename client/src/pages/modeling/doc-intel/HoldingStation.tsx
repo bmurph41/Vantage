@@ -15,7 +15,9 @@ import {
   Play,
   X,
   Filter,
-  SortAsc
+  SortAsc,
+  Pencil,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,6 +73,7 @@ interface HoldingStationProps {
 interface StagedFile {
   file: File;
   id: string;
+  displayName: string;
   docType: DocType;
   year: string;
   tags: string[];
@@ -107,6 +110,8 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
   const [filterStatus, setFilterStatus] = useState<HoldingStatus | "all">("all");
   const [filterDocType, setFilterDocType] = useState<DocType | "all">("all");
   const [newTag, setNewTag] = useState("");
+  const [editingFileName, setEditingFileName] = useState<string | null>(null);
+  const [tempFileName, setTempFileName] = useState("");
 
   const { data: holdingQueue = [], isLoading, refetch } = useQuery<DocIntelUpload[]>({
     queryKey: ["/api/modeling/projects", projectId, "documents", "holding"],
@@ -126,6 +131,7 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
       formData.append("tags", JSON.stringify(stagedFile.tags));
       formData.append("notes", stagedFile.notes);
       formData.append("holdingStatus", "staging");
+      formData.append("displayName", stagedFile.displayName);
 
       const response = await fetch(`/api/modeling/projects/${projectId}/documents`, {
         method: "POST",
@@ -185,6 +191,7 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
     const newStagedFiles: StagedFile[] = acceptedFiles.map((file) => ({
       file,
       id: crypto.randomUUID(),
+      displayName: file.name,
       docType: guessDocType(file.name),
       year: new Date().getFullYear().toString(),
       tags: [],
@@ -244,6 +251,24 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
 
   const removeTagFromStagedFile = (id: string, tag: string) => {
     setStagedFiles((prev) => prev.map((f) => (f.id === id ? { ...f, tags: f.tags.filter((t) => t !== tag) } : f)));
+  };
+
+  const startRenaming = (id: string, currentName: string) => {
+    setEditingFileName(id);
+    setTempFileName(currentName);
+  };
+
+  const saveRename = (id: string) => {
+    if (tempFileName.trim()) {
+      updateStagedFile(id, { displayName: tempFileName.trim() });
+    }
+    setEditingFileName(null);
+    setTempFileName("");
+  };
+
+  const cancelRename = () => {
+    setEditingFileName(null);
+    setTempFileName("");
   };
 
   const uploadAllStaged = async () => {
@@ -348,8 +373,67 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
                       <div className="flex items-start gap-4">
                         <FileSpreadsheet className="h-10 w-10 text-green-600 flex-shrink-0" />
                         <div className="flex-1 min-w-0 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium truncate">{staged.file.name}</p>
+                          <div className="flex items-center justify-between gap-2">
+                            {editingFileName === staged.id ? (
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <Input
+                                  value={tempFileName}
+                                  onChange={(e) => setTempFileName(e.target.value)}
+                                  className="h-8 flex-1"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveRename(staged.id);
+                                    if (e.key === 'Escape') cancelRename();
+                                  }}
+                                  data-testid={`input-rename-file-${staged.id}`}
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => saveRename(staged.id)}
+                                  data-testid={`button-save-rename-${staged.id}`}
+                                >
+                                  <Check className="h-4 w-4 text-green-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={cancelRename}
+                                  data-testid={`button-cancel-rename-${staged.id}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <p className="font-medium truncate cursor-default">
+                                        {staged.displayName}
+                                      </p>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Original: {staged.file.name}</p>
+                                      {staged.displayName !== staged.file.name && (
+                                        <p className="text-xs text-muted-foreground">Renamed to: {staged.displayName}</p>
+                                      )}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 flex-shrink-0"
+                                  onClick={() => startRenaming(staged.id, staged.displayName)}
+                                  data-testid={`button-edit-filename-${staged.id}`}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"

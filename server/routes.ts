@@ -13645,12 +13645,14 @@ Current context: Project ${req.params.projectId}`;
       
       const checkProjectOnly = req.body.checkProjectOnly === 'true';
       
+      const displayName = req.body.displayName?.trim() || req.file.originalname;
+      
       const result = await docIntelService.createUploadWithDuplicateCheck(
         orgId, 
         {
           modelingProjectId: projectId,
           filename: req.file.filename,
-          originalName: req.file.originalname,
+          originalName: displayName,
           storagePath: req.file.path,
           mimeType: req.file.mimetype,
           fileSize: req.file.size,
