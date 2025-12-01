@@ -10089,6 +10089,73 @@ export const modelingFinancialPeriods = pgTable('modeling_financial_periods', {
   ),
 }));
 
+// Adjustment scope and type enums for normalization
+export const adjustmentScopeEnum = pgEnum("adjustment_scope", [
+  "line_item",    // Adjustment applies to a specific line item
+  "subcategory",  // Adjustment applies to a subcategory/department
+  "category"      // Adjustment applies to an entire category (Revenue, COGS, Expenses)
+]);
+
+export const adjustmentTypeEnum = pgEnum("adjustment_type", [
+  "absolute",     // Add/subtract a fixed dollar amount
+  "percentage",   // Adjust by a percentage (e.g., +10% or -5%)
+  "replace"       // Replace the original value entirely
+]);
+
+// Modeling Period Adjustments - Store normalization adjustments for financial periods
+// These adjustments allow users to "normalize" financial data by adjusting unusual items
+export const modelingPeriodAdjustments = pgTable('modeling_period_adjustments', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Period this adjustment applies to
+  periodLabel: text('period_label').notNull(), // e.g., "2024", "T12", "Year 1"
+  
+  // Scope of adjustment
+  scope: adjustmentScopeEnum('scope').notNull(),
+  
+  // Target identifier based on scope:
+  // - line_item: "category|subcategory|lineItemDescription" 
+  // - subcategory: "category|subcategory"
+  // - category: "category"
+  targetIdentifier: text('target_identifier').notNull(),
+  
+  // Human-readable label for the target
+  targetLabel: text('target_label').notNull(),
+  
+  // Adjustment configuration
+  adjustmentType: adjustmentTypeEnum('adjustment_type').notNull(),
+  adjustmentValue: decimal('adjustment_value', { precision: 15, scale: 2 }).notNull(),
+  
+  // Original value before adjustment (for reference/display)
+  originalValue: decimal('original_value', { precision: 15, scale: 2 }),
+  
+  // Calculated adjusted value
+  adjustedValue: decimal('adjusted_value', { precision: 15, scale: 2 }),
+  
+  // Reason for the adjustment (required for audit trail)
+  reason: text('reason').notNull(),
+  
+  // Whether this adjustment is currently active
+  isActive: boolean('is_active').default(true).notNull(),
+  
+  // Audit fields
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('period_adj_org_idx').on(table.orgId),
+  projectIdx: index('period_adj_project_idx').on(table.modelingProjectId),
+  periodIdx: index('period_adj_period_idx').on(table.periodLabel),
+  scopeIdx: index('period_adj_scope_idx').on(table.scope),
+  activeIdx: index('period_adj_active_idx').on(table.isActive),
+  uniqueAdjustment: unique('period_adj_unique').on(
+    table.modelingProjectId, table.periodLabel, table.scope, table.targetIdentifier
+  ),
+}));
+
 // Operations Data Sync Jobs - Track sync operations from Operations modules
 export const operationsDataSyncJobs = pgTable('operations_data_sync_jobs', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -11150,6 +11217,19 @@ export const updateModelingFinancialPeriodSchema = insertModelingFinancialPeriod
 export type ModelingFinancialPeriod = typeof modelingFinancialPeriods.$inferSelect;
 export type InsertModelingFinancialPeriod = z.infer<typeof insertModelingFinancialPeriodSchema>;
 export type UpdateModelingFinancialPeriod = z.infer<typeof updateModelingFinancialPeriodSchema>;
+
+// Modeling Period Adjustments - Schema and Types
+export const insertModelingPeriodAdjustmentSchema = createInsertSchema(modelingPeriodAdjustments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateModelingPeriodAdjustmentSchema = insertModelingPeriodAdjustmentSchema.partial();
+
+export type ModelingPeriodAdjustment = typeof modelingPeriodAdjustments.$inferSelect;
+export type InsertModelingPeriodAdjustment = z.infer<typeof insertModelingPeriodAdjustmentSchema>;
+export type UpdateModelingPeriodAdjustment = z.infer<typeof updateModelingPeriodAdjustmentSchema>;
 
 // Cross-Module Audit Trail - Track all cross-module operations
 export const crossModuleAuditLog = pgTable('cross_module_audit_log', {
