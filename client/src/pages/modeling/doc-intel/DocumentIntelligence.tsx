@@ -45,7 +45,7 @@ export default function DocumentIntelligence() {
 
   const initMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/modeling/doc-intel/init", { method: "POST" });
+      return apiRequest("POST", "/api/modeling/doc-intel/init");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/doc-intel/categories"] });

@@ -47,11 +47,7 @@ export function CategoryManager() {
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<PnlCategory>) => {
-      return apiRequest("/api/modeling/doc-intel/categories", {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", "/api/modeling/doc-intel/categories", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/doc-intel/categories"] });
@@ -65,11 +61,7 @@ export function CategoryManager() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<PnlCategory> }) => {
-      return apiRequest(`/api/modeling/doc-intel/categories/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("PATCH", `/api/modeling/doc-intel/categories/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/doc-intel/categories"] });
@@ -83,7 +75,7 @@ export function CategoryManager() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/modeling/doc-intel/categories/${id}`, { method: "DELETE" });
+      return apiRequest("DELETE", `/api/modeling/doc-intel/categories/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/doc-intel/categories"] });

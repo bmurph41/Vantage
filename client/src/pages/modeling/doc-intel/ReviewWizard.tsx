@@ -46,7 +46,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
 
   const parseMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/modeling/projects/${projectId}/documents/${upload.id}/parse`, { method: "POST" });
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${upload.id}/parse`);
     },
     onSuccess: () => {
       toast({ title: "Parsed successfully", description: "Line items have been extracted from the document." });
@@ -59,7 +59,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
 
   const categorizeMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/modeling/projects/${projectId}/documents/${upload.id}/categorize`, { method: "POST" });
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${upload.id}/categorize`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", upload.id, "items"] });
@@ -74,11 +74,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
 
   const confirmItemMutation = useMutation({
     mutationFn: async ({ itemId, categoryId, amount }: { itemId: string; categoryId: string; amount?: number }) => {
-      return apiRequest(`/api/modeling/projects/${projectId}/documents/${upload.id}/items/${itemId}/confirm`, {
-        method: "POST",
-        body: JSON.stringify({ categoryId, amount }),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${upload.id}/items/${itemId}/confirm`, { categoryId, amount });
     },
     onSuccess: () => {
       refetchItems();
@@ -87,9 +83,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
 
   const rejectItemMutation = useMutation({
     mutationFn: async (itemId: string) => {
-      return apiRequest(`/api/modeling/projects/${projectId}/documents/${upload.id}/items/${itemId}/reject`, {
-        method: "POST",
-      });
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${upload.id}/items/${itemId}/reject`);
     },
     onSuccess: () => {
       refetchItems();
@@ -98,11 +92,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
 
   const autoConfirmMutation = useMutation({
     mutationFn: async (threshold: number) => {
-      return apiRequest(`/api/modeling/projects/${projectId}/documents/${upload.id}/items/confirm-high-confidence`, {
-        method: "POST",
-        body: JSON.stringify({ threshold }),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${upload.id}/items/confirm-high-confidence`, { threshold });
     },
     onSuccess: (data: { confirmed: number }) => {
       refetchItems();
@@ -112,11 +102,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
 
   const importMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/modeling/projects/${projectId}/documents/${upload.id}/import`, {
-        method: "POST",
-        body: JSON.stringify({ fiscalYear: upload.year }),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${upload.id}/import`, { fiscalYear: upload.year });
     },
     onSuccess: (data: { imported: number }) => {
       toast({ title: "Import complete", description: `${data.imported} line items imported to P&L.` });
