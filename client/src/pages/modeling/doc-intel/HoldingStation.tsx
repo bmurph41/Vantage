@@ -150,11 +150,7 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
 
   const updateDocumentMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<DocIntelUpload> }) => {
-      return apiRequest(`/api/modeling/projects/${projectId}/documents/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("PATCH", `/api/modeling/projects/${projectId}/documents/${id}`, updates);
     },
     onSuccess: () => {
       refetch();
@@ -165,9 +161,7 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
 
   const deleteDocumentMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/modeling/projects/${projectId}/documents/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/modeling/projects/${projectId}/documents/${id}`);
     },
     onSuccess: () => {
       refetch();
@@ -177,9 +171,7 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
 
   const validateDocumentMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/modeling/projects/${projectId}/documents/${id}/validate`, {
-        method: "POST",
-      });
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${id}/validate`);
     },
     onSuccess: () => {
       refetch();
