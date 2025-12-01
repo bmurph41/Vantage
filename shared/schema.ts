@@ -12372,6 +12372,442 @@ export type TargetDemographics = typeof targetDemographics.$inferSelect;
 export type InsertTargetDemographics = z.infer<typeof insertTargetDemographicsSchema>;
 
 // ============================================================================
+// PE FUND MANAGEMENT
+// Fund lifecycle tracking with committed capital, allocations, investor accounts,
+// cash flow ledger, waterfall distributions, and fund-level IRR/TVPI calculations
+// ============================================================================
+
+export const fundStatusEnum = pgEnum("fund_status", ["raising", "investing", "harvesting", "closed", "liquidated"]);
+export const fundInvestorTypeEnum = pgEnum("fund_investor_type", ["gp", "lp", "co_invest", "feeder", "fund_of_funds", "anchor"]);
+export const capitalMovementTypeEnum = pgEnum("capital_movement_type", ["call", "contribution", "distribution", "recycling", "return_of_capital", "fee", "expense"]);
+export const waterfallStyleEnum = pgEnum("waterfall_style", ["european", "american", "deal_by_deal"]);
+
+// Funds - Master fund entity for PE/real estate funds
+export const funds = pgTable('funds', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Fund identity
+  name: text('name').notNull(),
+  shortName: varchar('short_name', { length: 50 }),
+  description: text('description'),
+  fundNumber: integer('fund_number'), // e.g., "Fund III"
+  status: fundStatusEnum('status').notNull().default('raising'),
+  
+  // Fund sizing
+  targetSize: decimal('target_size', { precision: 18, scale: 2 }),
+  hardCap: decimal('hard_cap', { precision: 18, scale: 2 }),
+  committedCapital: decimal('committed_capital', { precision: 18, scale: 2 }).default('0'),
+  calledCapital: decimal('called_capital', { precision: 18, scale: 2 }).default('0'),
+  distributedCapital: decimal('distributed_capital', { precision: 18, scale: 2 }).default('0'),
+  recycledCapital: decimal('recycled_capital', { precision: 18, scale: 2 }).default('0'),
+  
+  // Fund timeline
+  vintage: integer('vintage').notNull(), // Year of first close
+  firstCloseDate: timestamp('first_close_date'),
+  finalCloseDate: timestamp('final_close_date'),
+  investmentPeriodYears: integer('investment_period_years').default(4),
+  fundLifeYears: integer('fund_life_years').default(10),
+  extensionYears: integer('extension_years').default(2),
+  
+  // Fees
+  managementFeePct: decimal('management_fee_pct', { precision: 6, scale: 4 }).default('0.02'),
+  managementFeeBase: text('management_fee_base').default('committed'), // 'committed', 'called', 'invested', 'nav'
+  carriedInterestPct: decimal('carried_interest_pct', { precision: 6, scale: 4 }).default('0.20'),
+  
+  // Waterfall configuration (fund-level defaults)
+  waterfallStyle: waterfallStyleEnum('waterfall_style').default('european'),
+  preferredReturn: decimal('preferred_return', { precision: 8, scale: 4 }).default('0.08'),
+  gpCatchUpPct: decimal('gp_catch_up_pct', { precision: 6, scale: 4 }).default('1.00'), // 100% catch-up until GP at promote %
+  
+  // Multi-tier promote structure (fund-level)
+  promoteTiers: jsonb('promote_tiers').$type<{
+    irrHurdle: number;
+    gpSplit: number;
+    lpSplit: number;
+  }[]>().default([
+    { irrHurdle: 0.08, gpSplit: 0.20, lpSplit: 0.80 },
+    { irrHurdle: 0.12, gpSplit: 0.25, lpSplit: 0.75 },
+    { irrHurdle: 0.18, gpSplit: 0.30, lpSplit: 0.70 },
+  ]),
+  
+  // Recycling provisions
+  recyclingAllowed: boolean('recycling_allowed').default(true),
+  recyclingLimitPct: decimal('recycling_limit_pct', { precision: 6, scale: 4 }).default('0.25'), // % of committed
+  recyclingPeriodMonths: integer('recycling_period_months').default(48),
+  
+  // Investment guidelines
+  maxSingleInvestmentPct: decimal('max_single_investment_pct', { precision: 6, scale: 4 }).default('0.20'),
+  minInvestmentSize: decimal('min_investment_size', { precision: 18, scale: 2 }),
+  maxInvestmentSize: decimal('max_investment_size', { precision: 18, scale: 2 }),
+  geographicFocus: text('geographic_focus'),
+  sectorFocus: text('sector_focus'),
+  
+  // Performance metrics (denormalized for dashboard)
+  grossIrr: decimal('gross_irr', { precision: 8, scale: 4 }),
+  netIrr: decimal('net_irr', { precision: 8, scale: 4 }),
+  grossMoic: decimal('gross_moic', { precision: 8, scale: 4 }),
+  netMoic: decimal('net_moic', { precision: 8, scale: 4 }),
+  tvpi: decimal('tvpi', { precision: 8, scale: 4 }), // Total Value to Paid-In
+  dpi: decimal('dpi', { precision: 8, scale: 4 }), // Distributions to Paid-In
+  rvpi: decimal('rvpi', { precision: 8, scale: 4 }), // Residual Value to Paid-In
+  pme: decimal('pme', { precision: 8, scale: 4 }), // Public Market Equivalent
+  
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('funds_org_idx').on(table.orgId),
+  statusIdx: index('funds_status_idx').on(table.status),
+  vintageIdx: index('funds_vintage_idx').on(table.vintage),
+}));
+
+// Fund Investors - LP/GP commitments and capital accounts
+export const fundInvestors = pgTable('fund_investors', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  fundId: varchar('fund_id').notNull().references(() => funds.id, { onDelete: 'cascade' }),
+  
+  // Investor identity
+  investorName: text('investor_name').notNull(),
+  investorType: fundInvestorTypeEnum('investor_type').notNull(),
+  legalEntityName: text('legal_entity_name'),
+  taxId: varchar('tax_id', { length: 50 }),
+  
+  // CRM integration
+  crmContactId: varchar('crm_contact_id').references(() => crmContacts.id),
+  crmCompanyId: varchar('crm_company_id').references(() => crmCompanies.id),
+  
+  // Commitment
+  commitmentAmount: decimal('commitment_amount', { precision: 18, scale: 2 }).notNull(),
+  commitmentDate: timestamp('commitment_date'),
+  commitmentPct: decimal('commitment_pct', { precision: 8, scale: 6 }), // % of total fund
+  
+  // Capital account (running balances)
+  calledCapital: decimal('called_capital', { precision: 18, scale: 2 }).default('0'),
+  unfundedCommitment: decimal('unfunded_commitment', { precision: 18, scale: 2 }),
+  distributedCapital: decimal('distributed_capital', { precision: 18, scale: 2 }).default('0'),
+  returnedCapital: decimal('return_of_capital', { precision: 18, scale: 2 }).default('0'),
+  preferredReturnAccrued: decimal('preferred_return_accrued', { precision: 18, scale: 2 }).default('0'),
+  preferredReturnPaid: decimal('preferred_return_paid', { precision: 18, scale: 2 }).default('0'),
+  capitalAccountBalance: decimal('capital_account_balance', { precision: 18, scale: 2 }).default('0'),
+  
+  // Carried interest (for GPs)
+  carriedInterestPct: decimal('carried_interest_pct', { precision: 8, scale: 4 }),
+  carriedInterestEarned: decimal('carried_interest_earned', { precision: 18, scale: 2 }).default('0'),
+  carriedInterestPaid: decimal('carried_interest_paid', { precision: 18, scale: 2 }).default('0'),
+  
+  // Side letter terms
+  hasReducedFees: boolean('has_reduced_fees').default(false),
+  feeDiscount: decimal('fee_discount', { precision: 6, scale: 4 }),
+  hasMfn: boolean('has_mfn').default(false), // Most Favored Nation
+  coInvestRights: text('co_invest_rights'), // 'pro_rata', 'negotiated', 'none'
+  
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fund_investors_org_idx').on(table.orgId),
+  fundIdx: index('fund_investors_fund_idx').on(table.fundId),
+  typeIdx: index('fund_investors_type_idx').on(table.investorType),
+}));
+
+// Fund Deal Allocations - Link funds to modeling projects
+export const fundDealAllocations = pgTable('fund_deal_allocations', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  fundId: varchar('fund_id').notNull().references(() => funds.id, { onDelete: 'cascade' }),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Allocation details
+  allocationPct: decimal('allocation_pct', { precision: 8, scale: 6 }).notNull(), // Fund's share of deal
+  allocatedEquity: decimal('allocated_equity', { precision: 18, scale: 2 }).notNull(),
+  fundedAmount: decimal('funded_amount', { precision: 18, scale: 2 }).default('0'),
+  
+  // Basis tracking
+  costBasis: decimal('cost_basis', { precision: 18, scale: 2 }),
+  currentValue: decimal('current_value', { precision: 18, scale: 2 }),
+  unrealizedGain: decimal('unrealized_gain', { precision: 18, scale: 2 }),
+  realizedGain: decimal('realized_gain', { precision: 18, scale: 2 }).default('0'),
+  
+  // Deal-level returns
+  dealIrr: decimal('deal_irr', { precision: 8, scale: 4 }),
+  dealMoic: decimal('deal_moic', { precision: 8, scale: 4 }),
+  
+  // Timing
+  investmentDate: timestamp('investment_date'),
+  expectedExitDate: timestamp('expected_exit_date'),
+  actualExitDate: timestamp('actual_exit_date'),
+  exitStatus: varchar('exit_status', { length: 20 }).default('active'), // active, exited, written_off
+  
+  // Capital stack inheritance
+  usesFundCapitalStack: boolean('uses_fund_capital_stack').default(true),
+  capitalStackTemplateId: varchar('capital_stack_template_id').references(() => fundCapitalStackTemplates.id),
+  
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fund_deal_allocations_org_idx').on(table.orgId),
+  fundIdx: index('fund_deal_allocations_fund_idx').on(table.fundId),
+  projectIdx: index('fund_deal_allocations_project_idx').on(table.modelingProjectId),
+  uniqueFundProject: unique('fund_deal_allocations_unique').on(table.fundId, table.modelingProjectId),
+}));
+
+// Fund Capital Movements - Cash flow ledger for calls, contributions, distributions
+export const fundCapitalMovements = pgTable('fund_capital_movements', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  fundId: varchar('fund_id').notNull().references(() => funds.id, { onDelete: 'cascade' }),
+  fundInvestorId: varchar('fund_investor_id').references(() => fundInvestors.id, { onDelete: 'cascade' }),
+  
+  // Movement details
+  movementType: capitalMovementTypeEnum('movement_type').notNull(),
+  movementDate: timestamp('movement_date').notNull(),
+  dueDate: timestamp('due_date'),
+  
+  // Amounts
+  amount: decimal('amount', { precision: 18, scale: 2 }).notNull(),
+  preferredReturn: decimal('preferred_return', { precision: 18, scale: 2 }).default('0'),
+  returnOfCapital: decimal('return_of_capital', { precision: 18, scale: 2 }).default('0'),
+  carriedInterest: decimal('carried_interest', { precision: 18, scale: 2 }).default('0'),
+  
+  // Deal attribution
+  dealAllocationId: varchar('deal_allocation_id').references(() => fundDealAllocations.id),
+  
+  // Recycling tracking
+  isRecyclable: boolean('is_recyclable').default(false),
+  recycledAmount: decimal('recycled_amount', { precision: 18, scale: 2 }).default('0'),
+  
+  // Call specifics
+  callNumber: integer('call_number'),
+  callPurpose: text('call_purpose'), // 'investment', 'fees', 'expenses'
+  
+  // Status
+  status: varchar('status', { length: 20 }).default('pending'), // pending, completed, cancelled
+  
+  description: text('description'),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fund_capital_movements_org_idx').on(table.orgId),
+  fundIdx: index('fund_capital_movements_fund_idx').on(table.fundId),
+  investorIdx: index('fund_capital_movements_investor_idx').on(table.fundInvestorId),
+  dateIdx: index('fund_capital_movements_date_idx').on(table.movementDate),
+  typeIdx: index('fund_capital_movements_type_idx').on(table.movementType),
+}));
+
+// Fund Cash Flows - Consolidated dated cash flows for IRR calculation
+export const fundCashFlows = pgTable('fund_cash_flows', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  fundId: varchar('fund_id').notNull().references(() => funds.id, { onDelete: 'cascade' }),
+  
+  // Cash flow details
+  flowDate: timestamp('flow_date').notNull(),
+  flowType: varchar('flow_type', { length: 20 }).notNull(), // 'inflow' or 'outflow'
+  
+  // Amounts (negative = outflow from investor, positive = inflow to investor)
+  grossAmount: decimal('gross_amount', { precision: 18, scale: 2 }).notNull(),
+  netAmount: decimal('net_amount', { precision: 18, scale: 2 }).notNull(),
+  
+  // Breakdowns
+  investmentAmount: decimal('investment_amount', { precision: 18, scale: 2 }).default('0'),
+  managementFees: decimal('management_fees', { precision: 18, scale: 2 }).default('0'),
+  expenses: decimal('expenses', { precision: 18, scale: 2 }).default('0'),
+  preferredReturn: decimal('preferred_return', { precision: 18, scale: 2 }).default('0'),
+  returnOfCapital: decimal('return_of_capital', { precision: 18, scale: 2 }).default('0'),
+  gainDistribution: decimal('gain_distribution', { precision: 18, scale: 2 }).default('0'),
+  carriedInterest: decimal('carried_interest', { precision: 18, scale: 2 }).default('0'),
+  
+  // Running balances (for performance calculation)
+  cumulativeContributions: decimal('cumulative_contributions', { precision: 18, scale: 2 }),
+  cumulativeDistributions: decimal('cumulative_distributions', { precision: 18, scale: 2 }),
+  runningNav: decimal('running_nav', { precision: 18, scale: 2 }),
+  
+  // Attribution
+  dealAllocationId: varchar('deal_allocation_id').references(() => fundDealAllocations.id),
+  capitalMovementId: varchar('capital_movement_id').references(() => fundCapitalMovements.id),
+  
+  description: text('description'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fund_cash_flows_org_idx').on(table.orgId),
+  fundIdx: index('fund_cash_flows_fund_idx').on(table.fundId),
+  dateIdx: index('fund_cash_flows_date_idx').on(table.flowDate),
+}));
+
+// Fund Capital Stack Templates - Reusable capital structure for deals
+export const fundCapitalStackTemplates = pgTable('fund_capital_stack_templates', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  fundId: varchar('fund_id').references(() => funds.id, { onDelete: 'cascade' }),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  isDefault: boolean('is_default').default(false),
+  
+  // Default leverage assumptions
+  targetLtv: decimal('target_ltv', { precision: 6, scale: 4 }).default('0.65'),
+  
+  // Debt template
+  debtTemplates: jsonb('debt_templates').$type<{
+    name: string;
+    trancheType: string;
+    interestRate: number;
+    termYears: number;
+    amortizationYears: number | null;
+    interestOnlyMonths: number;
+    principalPct: number; // % of total debt
+    priority: number;
+  }[]>(),
+  
+  // Equity template
+  equityTemplates: jsonb('equity_templates').$type<{
+    name: string;
+    layerType: string;
+    investorType: string;
+    ownershipPct: number;
+    preferredReturn: number | null;
+    preferredReturnType: string | null;
+    isParticipating: boolean;
+    waterfallPriority: number;
+    promoteTiers?: { irrHurdle: number; gpSplit: number; lpSplit: number }[];
+  }[]>(),
+  
+  // Waterfall configuration
+  waterfallStyle: waterfallStyleEnum('waterfall_style').default('european'),
+  preferredReturn: decimal('preferred_return', { precision: 8, scale: 4 }).default('0.08'),
+  gpCatchUpPct: decimal('gp_catch_up_pct', { precision: 6, scale: 4 }).default('1.00'),
+  promoteTiers: jsonb('promote_tiers').$type<{
+    irrHurdle: number;
+    gpSplit: number;
+    lpSplit: number;
+  }[]>(),
+  
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fund_capital_stack_templates_org_idx').on(table.orgId),
+  fundIdx: index('fund_capital_stack_templates_fund_idx').on(table.fundId),
+}));
+
+// Fund Waterfall Calculations - Stored waterfall tier calculations
+export const fundWaterfallCalculations = pgTable('fund_waterfall_calculations', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  fundId: varchar('fund_id').notNull().references(() => funds.id, { onDelete: 'cascade' }),
+  
+  calculationDate: timestamp('calculation_date').notNull(),
+  periodEnd: timestamp('period_end'),
+  
+  // Total values
+  totalContributions: decimal('total_contributions', { precision: 18, scale: 2 }),
+  totalDistributions: decimal('total_distributions', { precision: 18, scale: 2 }),
+  unrealizedValue: decimal('unrealized_value', { precision: 18, scale: 2 }),
+  totalValue: decimal('total_value', { precision: 18, scale: 2 }),
+  
+  // Waterfall tiers
+  returnOfCapital: decimal('return_of_capital', { precision: 18, scale: 2 }),
+  preferredReturnAmount: decimal('preferred_return_amount', { precision: 18, scale: 2 }),
+  gpCatchUp: decimal('gp_catch_up', { precision: 18, scale: 2 }),
+  
+  // Promote tier breakdown
+  promoteTierBreakdown: jsonb('promote_tier_breakdown').$type<{
+    tier: number;
+    irrHurdle: number;
+    lpAmount: number;
+    gpAmount: number;
+  }[]>(),
+  
+  // LP/GP split
+  totalLpDistribution: decimal('total_lp_distribution', { precision: 18, scale: 2 }),
+  totalGpDistribution: decimal('total_gp_distribution', { precision: 18, scale: 2 }),
+  
+  // Performance metrics
+  grossIrr: decimal('gross_irr', { precision: 8, scale: 4 }),
+  netIrr: decimal('net_irr', { precision: 8, scale: 4 }),
+  tvpi: decimal('tvpi', { precision: 8, scale: 4 }),
+  dpi: decimal('dpi', { precision: 8, scale: 4 }),
+  rvpi: decimal('rvpi', { precision: 8, scale: 4 }),
+  
+  isLatest: boolean('is_latest').default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('fund_waterfall_calculations_org_idx').on(table.orgId),
+  fundIdx: index('fund_waterfall_calculations_fund_idx').on(table.fundId),
+  dateIdx: index('fund_waterfall_calculations_date_idx').on(table.calculationDate),
+  latestIdx: index('fund_waterfall_calculations_latest_idx').on(table.fundId, table.isLatest),
+}));
+
+// Insert schemas and types for Fund Management
+export const insertFundSchema = createInsertSchema(funds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateFundSchema = insertFundSchema.partial();
+export type Fund = typeof funds.$inferSelect;
+export type InsertFund = z.infer<typeof insertFundSchema>;
+export type UpdateFund = z.infer<typeof updateFundSchema>;
+
+export const insertFundInvestorSchema = createInsertSchema(fundInvestors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateFundInvestorSchema = insertFundInvestorSchema.partial();
+export type FundInvestor = typeof fundInvestors.$inferSelect;
+export type InsertFundInvestor = z.infer<typeof insertFundInvestorSchema>;
+export type UpdateFundInvestor = z.infer<typeof updateFundInvestorSchema>;
+
+export const insertFundDealAllocationSchema = createInsertSchema(fundDealAllocations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateFundDealAllocationSchema = insertFundDealAllocationSchema.partial();
+export type FundDealAllocation = typeof fundDealAllocations.$inferSelect;
+export type InsertFundDealAllocation = z.infer<typeof insertFundDealAllocationSchema>;
+export type UpdateFundDealAllocation = z.infer<typeof updateFundDealAllocationSchema>;
+
+export const insertFundCapitalMovementSchema = createInsertSchema(fundCapitalMovements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateFundCapitalMovementSchema = insertFundCapitalMovementSchema.partial();
+export type FundCapitalMovement = typeof fundCapitalMovements.$inferSelect;
+export type InsertFundCapitalMovement = z.infer<typeof insertFundCapitalMovementSchema>;
+export type UpdateFundCapitalMovement = z.infer<typeof updateFundCapitalMovementSchema>;
+
+export const insertFundCashFlowSchema = createInsertSchema(fundCashFlows).omit({
+  id: true,
+  createdAt: true,
+});
+export type FundCashFlow = typeof fundCashFlows.$inferSelect;
+export type InsertFundCashFlow = z.infer<typeof insertFundCashFlowSchema>;
+
+export const insertFundCapitalStackTemplateSchema = createInsertSchema(fundCapitalStackTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateFundCapitalStackTemplateSchema = insertFundCapitalStackTemplateSchema.partial();
+export type FundCapitalStackTemplate = typeof fundCapitalStackTemplates.$inferSelect;
+export type InsertFundCapitalStackTemplate = z.infer<typeof insertFundCapitalStackTemplateSchema>;
+export type UpdateFundCapitalStackTemplate = z.infer<typeof updateFundCapitalStackTemplateSchema>;
+
+export const insertFundWaterfallCalculationSchema = createInsertSchema(fundWaterfallCalculations).omit({
+  id: true,
+  createdAt: true,
+});
+export type FundWaterfallCalculation = typeof fundWaterfallCalculations.$inferSelect;
+export type InsertFundWaterfallCalculation = z.infer<typeof insertFundWaterfallCalculationSchema>;
+
+// ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular
