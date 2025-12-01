@@ -15393,11 +15393,8 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const persona = await personaService.getUserPersona(userId, orgId);
       
-      if (!persona) {
-        return res.status(404).json({ error: 'No persona assigned' });
-      }
-      
-      res.json(persona);
+      // Return null with 200 status if no persona assigned (not 404)
+      res.json(persona || null);
     } catch (error) {
       console.error('Failed to fetch user persona:', error);
       res.status(500).json({ error: 'Failed to fetch user persona' });
