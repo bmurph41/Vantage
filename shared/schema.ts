@@ -10010,6 +10010,85 @@ export const modelingActuals = pgTable('modeling_actuals', {
   ),
 }));
 
+// Financial Period Type - defines the type of financial period
+export const financialPeriodTypeEnum = pgEnum("financial_period_type", [
+  "calendar_year",    // Full calendar year (2023, 2024, 2025, etc.)
+  "t12",              // Trailing 12 months
+  "year_1",           // First year of pro forma projection
+  "custom"            // User-defined period
+]);
+
+// Modeling Financial Periods - Aggregated financial summaries by period for pricing/yield calculations
+export const modelingFinancialPeriods = pgTable('modeling_financial_periods', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Period identification
+  periodType: financialPeriodTypeEnum('period_type').notNull(),
+  periodLabel: text('period_label').notNull(), // Display label: "2024", "T12", "Year 1", etc.
+  periodYear: integer('period_year'), // Calendar year if applicable (null for T12, Year 1)
+  periodStartDate: date('period_start_date'), // Actual date range for the period
+  periodEndDate: date('period_end_date'),
+  sortOrder: integer('sort_order').default(0), // For ordering in dropdown
+  
+  // Revenue metrics
+  totalRevenue: decimal('total_revenue', { precision: 15, scale: 2 }),
+  wetSlipRevenue: decimal('wet_slip_revenue', { precision: 15, scale: 2 }),
+  dryStorageRevenue: decimal('dry_storage_revenue', { precision: 15, scale: 2 }),
+  fuelRevenue: decimal('fuel_revenue', { precision: 15, scale: 2 }),
+  shipStoreRevenue: decimal('ship_store_revenue', { precision: 15, scale: 2 }),
+  otherRevenue: decimal('other_revenue', { precision: 15, scale: 2 }),
+  
+  // Expense metrics
+  totalExpenses: decimal('total_expenses', { precision: 15, scale: 2 }),
+  operatingExpenses: decimal('operating_expenses', { precision: 15, scale: 2 }),
+  payrollExpenses: decimal('payroll_expenses', { precision: 15, scale: 2 }),
+  utilitiesExpenses: decimal('utilities_expenses', { precision: 15, scale: 2 }),
+  insuranceExpenses: decimal('insurance_expenses', { precision: 15, scale: 2 }),
+  maintenanceExpenses: decimal('maintenance_expenses', { precision: 15, scale: 2 }),
+  managementFees: decimal('management_fees', { precision: 15, scale: 2 }),
+  otherExpenses: decimal('other_expenses', { precision: 15, scale: 2 }),
+  
+  // Profitability metrics
+  grossProfit: decimal('gross_profit', { precision: 15, scale: 2 }),
+  noi: decimal('noi', { precision: 15, scale: 2 }), // Net Operating Income
+  ebitda: decimal('ebitda', { precision: 15, scale: 2 }),
+  
+  // Pricing inputs for this period
+  purchasePrice: decimal('purchase_price', { precision: 15, scale: 2 }),
+  
+  // Calculated yields based on period NOI and purchase price
+  capRate: decimal('cap_rate', { precision: 5, scale: 4 }), // e.g., 0.0725 = 7.25%
+  pricePerUnit: decimal('price_per_unit', { precision: 15, scale: 2 }),
+  noiMargin: decimal('noi_margin', { precision: 5, scale: 4 }), // NOI / Total Revenue
+  
+  // Occupancy metrics (if applicable)
+  occupancyRate: decimal('occupancy_rate', { precision: 5, scale: 4 }),
+  totalUnits: integer('total_units'),
+  occupiedUnits: integer('occupied_units'),
+  
+  // Data quality indicators
+  isProjected: boolean('is_projected').default(false), // true for Year 1 or future projections
+  dataCompleteness: decimal('data_completeness', { precision: 5, scale: 2 }), // 0-100% completeness score
+  lastCalculatedAt: timestamp('last_calculated_at'),
+  
+  // Audit fields
+  notes: text('notes'),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('modeling_fin_periods_org_idx').on(table.orgId),
+  projectIdx: index('modeling_fin_periods_project_idx').on(table.modelingProjectId),
+  periodTypeIdx: index('modeling_fin_periods_type_idx').on(table.periodType),
+  periodYearIdx: index('modeling_fin_periods_year_idx').on(table.periodYear),
+  sortOrderIdx: index('modeling_fin_periods_sort_idx').on(table.sortOrder),
+  uniquePeriod: unique('modeling_fin_periods_unique').on(
+    table.modelingProjectId, table.periodType, table.periodLabel
+  ),
+}));
+
 // Operations Data Sync Jobs - Track sync operations from Operations modules
 export const operationsDataSyncJobs = pgTable('operations_data_sync_jobs', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -11058,6 +11137,19 @@ export const insertModelingProjectCompSchema = createInsertSchema(modelingProjec
 
 export type ModelingProjectComp = typeof modelingProjectComps.$inferSelect;
 export type InsertModelingProjectComp = z.infer<typeof insertModelingProjectCompSchema>;
+
+// Modeling Financial Periods - Schema and Types
+export const insertModelingFinancialPeriodSchema = createInsertSchema(modelingFinancialPeriods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateModelingFinancialPeriodSchema = insertModelingFinancialPeriodSchema.partial();
+
+export type ModelingFinancialPeriod = typeof modelingFinancialPeriods.$inferSelect;
+export type InsertModelingFinancialPeriod = z.infer<typeof insertModelingFinancialPeriodSchema>;
+export type UpdateModelingFinancialPeriod = z.infer<typeof updateModelingFinancialPeriodSchema>;
 
 // Cross-Module Audit Trail - Track all cross-module operations
 export const crossModuleAuditLog = pgTable('cross_module_audit_log', {
