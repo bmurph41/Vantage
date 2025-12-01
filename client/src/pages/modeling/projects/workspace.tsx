@@ -28,7 +28,8 @@ import {
   GitCompare,
   History,
   Layers,
-  Link2
+  Link2,
+  SlidersHorizontal
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
 import { FavoriteButton, PinButton } from '@/components/quick-access';
@@ -48,6 +49,7 @@ import ScenarioComparison from './workspace/scenario-comparison';
 import AuditTrailViewer from './workspace/audit-trail';
 import CaseConfiguration from './workspace/case-configuration';
 import DealPricing from './workspace/deal-pricing';
+import AnalyticsNormalization from './workspace/analytics-normalization';
 import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
 
 export default function ProjectWorkspace() {
@@ -201,6 +203,10 @@ export default function ProjectWorkspace() {
               <FileSpreadsheet className="h-4 w-4" />
               <span className="hidden sm:inline">Historical</span>
             </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-2" data-testid="tab-analytics">
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Analytics</span>
+            </TabsTrigger>
             <TabsTrigger value="proforma" className="gap-2" data-testid="tab-proforma">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Pro Forma</span>
@@ -258,6 +264,10 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="historical" className="space-y-6">
           <WorkspaceHistoricalPL projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-6">
+          <AnalyticsNormalization projectId={projectId!} />
         </TabsContent>
 
         <TabsContent value="proforma" className="space-y-6">
