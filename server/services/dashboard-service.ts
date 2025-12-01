@@ -2043,8 +2043,8 @@ export class DashboardService {
     groupedData?: Array<{ label: string; value: number }>;
     details?: any[];
   }> {
-    // Build base conditions (without year filter)
-    const baseConditions: any[] = [eq(salesComps.orgId, orgId)];
+    // Build base conditions (without year filter) - exclude soft-deleted records
+    const baseConditions: any[] = [eq(salesComps.orgId, orgId), isNull(salesComps.deletedAt)];
 
     if (filters.states && filters.states.length > 0) {
       baseConditions.push(inArray(salesComps.state, filters.states));
