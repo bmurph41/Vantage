@@ -28,7 +28,7 @@ export default function DockitDashboard() {
   const quickActions = [
     { name: "Schedule Launch", href: "/operations/dockit/launches", icon: Calendar, color: "bg-blue-500" },
     { name: "Add Customer", href: "/operations/dockit/customers", icon: Users, color: "bg-green-500" },
-    { name: "Record Payment", href: "/operations/dockit/payments", icon: CreditCard, color: "bg-purple-500" },
+    { name: "Manage Slips", href: "/operations/dockit/slips", icon: Anchor, color: "bg-purple-500" },
     { name: "Import Data", href: "/operations/dockit/imports", icon: Upload, color: "bg-orange-500" },
   ];
 
