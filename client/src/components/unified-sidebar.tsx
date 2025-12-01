@@ -76,14 +76,11 @@ const shipStoreNav = [
   { name: "Reports", href: "/operations/ship-store/reports", icon: FileText },
 ];
 
-// Operations Navigation - Dockit (Marina Operations) Subcategories
+// Operations Navigation - Dockit (Launch Operations) Subcategories
 const dockitNav = [
-  { name: "Dashboard", href: "/operations/dockit", icon: LayoutDashboard },
-  { name: "Launch Schedule", href: "/operations/dockit/launches", icon: Calendar },
-  { name: "Customers", href: "/operations/dockit/customers", icon: Users },
-  { name: "Slips & Leases", href: "/operations/dockit/slips", icon: Anchor },
-  { name: "Contracts", href: "/operations/dockit/contracts", icon: FileText },
-  { name: "Data Import", href: "/operations/dockit/imports", icon: Upload },
+  { name: "Launch Control", href: "/operations/dockit", icon: LayoutDashboard },
+  { name: "Launch Queue", href: "/operations/dockit/launches", icon: Calendar },
+  { name: "Transient Slips", href: "/operations/dockit/slips", icon: Anchor },
 ];
 
 // Operations Navigation - Rent Roll Subcategories

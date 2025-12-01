@@ -727,5 +727,161 @@ export async function registerDockitRoutes(
     }
   });
 
+  // ==========================================
+  // CRM Integration
+  // ==========================================
+  
+  // Link a Dockit customer to a CRM contact
+  app.post(`${prefix}/customers/:id/link-crm`, dockitAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { crmContactId, crmCompanyId } = req.body;
+      
+      const customer = await storage.getCustomer(id);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      
+      const updated = await storage.updateCustomer(id, {
+        crmContactId,
+        crmCompanyId,
+        lastCrmSync: new Date(),
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error linking CRM contact:", error);
+      res.status(400).json({ message: error.message || "Failed to link CRM contact" });
+    }
+  });
+  
+  // Get launch history for a customer (for CRM timeline)
+  app.get(`${prefix}/customers/:id/launch-history`, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const launches = await storage.getLaunchesByCustomer(id);
+      
+      // Format for CRM activity timeline
+      const activities = launches.map(launch => ({
+        type: launch.status === 'completed' ? 'completed_launch' : 'scheduled_launch',
+        launchType: (launch as any).launchType || 'launch',
+        date: launch.scheduledTime,
+        completedAt: launch.actualLaunchTime,
+        status: launch.status,
+        boatId: launch.boatId,
+        marinaId: launch.marinaId,
+        notes: launch.notes,
+        staffAssigned: launch.staffAssigned,
+      }));
+      
+      res.json(activities);
+    } catch (error) {
+      console.error("Error fetching launch history:", error);
+      res.status(500).json({ message: "Failed to fetch launch history" });
+    }
+  });
+  
+  // Sync customer data from CRM contact
+  app.post(`${prefix}/crm/sync-from-contact`, dockitAuth, async (req, res) => {
+    try {
+      const { crmContactId, firstName, lastName, email, phone, address, crmCompanyId } = req.body;
+      
+      // Check if customer already exists with this CRM contact ID
+      const existingCustomers = await storage.getCustomers();
+      const existing = existingCustomers.find(c => (c as any).crmContactId === crmContactId);
+      
+      if (existing) {
+        // Update existing customer
+        const updated = await storage.updateCustomer(existing.id, {
+          firstName,
+          lastName,
+          email,
+          phone,
+          address,
+          crmCompanyId,
+          lastCrmSync: new Date(),
+        });
+        res.json({ action: 'updated', customer: updated });
+      } else {
+        // Create new customer from CRM contact
+        const customer = await storage.createCustomer({
+          firstName,
+          lastName,
+          email,
+          phone,
+          address,
+          crmContactId,
+          crmCompanyId,
+          syncedFromCrm: true,
+        } as any);
+        res.status(201).json({ action: 'created', customer });
+      }
+    } catch (error: any) {
+      console.error("Error syncing from CRM:", error);
+      res.status(400).json({ message: error.message || "Failed to sync from CRM" });
+    }
+  });
+  
+  // Get transient stats for Rent Roll integration
+  app.get(`${prefix}/stats/transient`, async (_req, res) => {
+    try {
+      const slips = await storage.getSlips();
+      const launches = await storage.getLaunches();
+      
+      // Filter for transient slips only
+      const transientSlips = slips.filter((s: any) => s.slipType === 'transient' || !s.slipType);
+      const occupied = transientSlips.filter((s: any) => s.status === 'occupied' || s.currentBoatId);
+      
+      // Calculate transient revenue from daily rates
+      const dailyRevenue = transientSlips.reduce((sum: number, slip: any) => {
+        if (slip.status === 'occupied' && slip.dailyRate) {
+          return sum + parseFloat(slip.dailyRate);
+        }
+        return sum;
+      }, 0);
+      
+      // Calculate launch fees (assuming $50 per launch as default)
+      const todaysLaunches = launches.filter((l: any) => {
+        const launchDate = new Date(l.scheduledTime);
+        const today = new Date();
+        return launchDate.toDateString() === today.toDateString() && l.status === 'completed';
+      });
+      
+      const launchRevenue = todaysLaunches.length * 50; // Default $50 per launch
+      
+      res.json({
+        transientSlips: transientSlips.length,
+        transientOccupied: occupied.length,
+        transientOccupancyRate: transientSlips.length > 0 
+          ? Math.round((occupied.length / transientSlips.length) * 100) 
+          : 0,
+        dailyRevenue,
+        launchRevenue,
+        totalTransientRevenue: dailyRevenue + launchRevenue,
+        todaysLaunchCount: todaysLaunches.length,
+      });
+    } catch (error) {
+      console.error("Error fetching transient stats:", error);
+      res.status(500).json({ message: "Failed to fetch transient stats" });
+    }
+  });
+  
+  // Get employee list (for launch assignments)
+  app.get(`${prefix}/employees`, async (_req, res) => {
+    try {
+      // Return a list of marina employees for assignment
+      // In a real implementation, this would come from a staff table
+      res.json([
+        { id: '1', name: 'John Smith', role: 'Dock Master' },
+        { id: '2', name: 'Mike Johnson', role: 'Launch Operator' },
+        { id: '3', name: 'Sarah Williams', role: 'Launch Operator' },
+        { id: '4', name: 'Tom Davis', role: 'Fuel Attendant' },
+      ]);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      res.status(500).json({ message: "Failed to fetch employees" });
+    }
+  });
+
   console.log(`[Dockit] Registered core API routes under ${prefix}`);
 }

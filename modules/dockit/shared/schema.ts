@@ -31,6 +31,10 @@ export const customers = pgTable("dockit_customers", {
   stripeCustomerId: text("stripe_customer_id"),
   autopayEnabled: boolean("autopay_enabled").default(false),
   accountStatus: text("account_status").default("active"),
+  crmContactId: integer("crm_contact_id"),
+  crmCompanyId: integer("crm_company_id"),
+  syncedFromCrm: boolean("synced_from_crm").default(false),
+  lastCrmSync: timestamp("last_crm_sync"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -35,7 +35,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Calendar, Clock, Ship, Plus, Search, CheckCircle2, PlayCircle, CircleDashed, MoreHorizontal } from "lucide-react";
+import { Calendar, Clock, Ship, Plus, Search, CheckCircle2, PlayCircle, CircleDashed, MoreHorizontal, Users, Timer, ArrowRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +53,13 @@ interface Launch {
   status: string;
   launchType: string;
   notes?: string;
+  assignedEmployee?: string;
+  marinaId?: string;
+  marinaName?: string;
+  customerName?: string;
+  boatName?: string;
+  completedAt?: string;
+  startedAt?: string;
 }
 
 interface Customer {
@@ -67,12 +74,18 @@ interface Boat {
   customerId: string;
 }
 
+interface Employee {
+  id: string;
+  name: string;
+}
+
 const launchSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
   boatId: z.string().min(1, "Boat is required"),
   scheduledDate: z.string().min(1, "Date is required"),
   scheduledTime: z.string().optional(),
   launchType: z.enum(["launch", "haul"]),
+  assignedEmployee: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -103,6 +116,11 @@ export default function DockitLaunches() {
     retry: false,
   });
 
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: ["/dockit/api/employees"],
+    retry: false,
+  });
+
   const form = useForm<LaunchFormData>({
     resolver: zodResolver(launchSchema),
     defaultValues: {
@@ -111,6 +129,7 @@ export default function DockitLaunches() {
       scheduledDate: new Date().toISOString().split('T')[0],
       scheduledTime: "",
       launchType: "launch",
+      assignedEmployee: "",
       notes: "",
     },
   });
@@ -185,7 +204,7 @@ export default function DockitLaunches() {
   const pending = todaysLaunches.filter(l => l.status === 'pending' || !l.status).length;
 
   return (
-    <DockitAppShell title="Launch Schedule" description="Manage boat launches and haul-outs">
+    <DockitAppShell title="Launch Queue" description="Manage boat launch and haul operations">
       <div className="space-y-6">
         {/* Header Actions */}
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
@@ -328,6 +347,39 @@ export default function DockitLaunches() {
                       )}
                     />
                   </div>
+
+                  <FormField
+                    control={form.control}
+                    name="assignedEmployee"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assign Employee (optional)</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-employee">
+                              <SelectValue placeholder="Select employee" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">Unassigned</SelectItem>
+                            {employees.map((emp) => (
+                              <SelectItem key={emp.id} value={emp.name}>
+                                {emp.name}
+                              </SelectItem>
+                            ))}
+                            {employees.length === 0 && (
+                              <>
+                                <SelectItem value="John Smith">John Smith</SelectItem>
+                                <SelectItem value="Mike Johnson">Mike Johnson</SelectItem>
+                                <SelectItem value="Sarah Williams">Sarah Williams</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}

@@ -67,13 +67,10 @@ const RentRoll = lazy(() => import("@/pages/operations/RentRoll"));
 const RentRollPortfolio = lazy(() => import("@/pages/operations/rent-roll/Portfolio"));
 const RentRollProjects = lazy(() => import("@/pages/operations/rent-roll/Projects"));
 
-// Dockit (Marina Operations Module)
+// Dockit (Launch Operations Module)
 const DockitDashboard = lazy(() => import("@/pages/operations/dockit/Dashboard"));
 const DockitLaunches = lazy(() => import("@/pages/operations/dockit/Launches"));
-const DockitCustomers = lazy(() => import("@/pages/operations/dockit/Customers"));
 const DockitSlips = lazy(() => import("@/pages/operations/dockit/Slips"));
-const DockitContracts = lazy(() => import("@/pages/operations/dockit/Contracts"));
-const DockitImports = lazy(() => import("@/pages/operations/dockit/Imports"));
 const FuelSalesDashboard = lazy(() => import("@/pages/operations/fuel/Dashboard"));
 const FuelSalesTransactions = lazy(() => import("@/pages/operations/fuel/Transactions"));
 const FuelSalesInventory = lazy(() => import("@/pages/operations/fuel/Inventory"));
@@ -343,13 +340,6 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
-      <Route path="/operations/dockit/customers">
-        {() => (
-          <UnifiedLayout>
-            <DockitCustomers />
-          </UnifiedLayout>
-        )}
-      </Route>
       <Route path="/operations/dockit/slips">
         {() => (
           <UnifiedLayout>
@@ -357,21 +347,6 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
-      <Route path="/operations/dockit/contracts">
-        {() => (
-          <UnifiedLayout>
-            <DockitContracts />
-          </UnifiedLayout>
-        )}
-      </Route>
-      <Route path="/operations/dockit/imports">
-        {() => (
-          <UnifiedLayout>
-            <DockitImports />
-          </UnifiedLayout>
-        )}
-      </Route>
-
       <Route path="/operations/rent-roll">
         {() => (
           <UnifiedLayout>

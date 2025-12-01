@@ -49,13 +49,18 @@ interface Slip {
   number: string;
   section?: string;
   type?: string;
+  slipType?: string;
   maxLength?: string;
   maxBeam?: string;
   maxDraft?: string;
   monthlyRate?: string;
+  dailyRate?: string;
   status?: string;
   utilities?: string[];
   currentBoatId?: string;
+  currentOccupant?: string;
+  checkInDate?: string;
+  checkOutDate?: string;
 }
 
 interface Lease {
@@ -72,10 +77,11 @@ const slipSchema = z.object({
   number: z.string().min(1, "Slip number is required"),
   section: z.string().optional(),
   type: z.string().optional(),
+  slipType: z.string().default("transient"),
   maxLength: z.string().optional(),
   maxBeam: z.string().optional(),
   maxDraft: z.string().optional(),
-  monthlyRate: z.string().optional(),
+  dailyRate: z.string().optional(),
 });
 
 type SlipFormData = z.infer<typeof slipSchema>;
@@ -101,10 +107,11 @@ export default function DockitSlips() {
       number: "",
       section: "",
       type: "standard",
+      slipType: "transient",
       maxLength: "",
       maxBeam: "",
       maxDraft: "",
-      monthlyRate: "",
+      dailyRate: "",
     },
   });
 
@@ -184,7 +191,7 @@ export default function DockitSlips() {
   };
 
   return (
-    <DockitAppShell title="Slips & Leases" description="Manage marina slips and lease agreements">
+    <DockitAppShell title="Transient Slips" description="Manage transient slip availability and short-term stays">
       <Tabs defaultValue="slips" className="space-y-6">
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
           <TabsList>
@@ -306,12 +313,12 @@ export default function DockitSlips() {
 
                   <FormField
                     control={form.control}
-                    name="monthlyRate"
+                    name="dailyRate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Monthly Rate ($)</FormLabel>
+                        <FormLabel>Daily Rate ($)</FormLabel>
                         <FormControl>
-                          <Input {...field} type="number" placeholder="500" />
+                          <Input {...field} type="number" placeholder="75" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -451,7 +458,10 @@ export default function DockitSlips() {
                       <div className="text-sm text-muted-foreground space-y-1">
                         {slip.section && <p>Section: {slip.section}</p>}
                         <p>Size: {slip.maxLength || 'N/A'}' x {slip.maxBeam || 'N/A'}'</p>
-                        {slip.monthlyRate && <p className="font-medium text-foreground">${slip.monthlyRate}/mo</p>}
+                        {slip.dailyRate && <p className="font-medium text-foreground">${slip.dailyRate}/day</p>}
+                        {slip.currentOccupant && (
+                          <p className="text-blue-600">{slip.currentOccupant}</p>
+                        )}
                       </div>
                     </div>
                   ))}
