@@ -629,7 +629,8 @@ export class DashboardService {
     const { vdrDocuments, vdrDataRequestItems, projects } = await import('@shared/schema');
     const { sql, count } = await import('drizzle-orm');
     
-    const docConditions = [eq(vdrDocuments.orgId, orgId)];
+    // Filter out soft-deleted documents
+    const docConditions = [eq(vdrDocuments.orgId, orgId), isNull(vdrDocuments.deletedAt)];
     if (dateFilter) {
       docConditions.push(gte(vdrDocuments.createdAt, dateFilter.startDate));
     }
@@ -659,7 +660,8 @@ export class DashboardService {
     const { salesComps } = await import('@shared/schema');
     const { sql, count, avg, desc } = await import('drizzle-orm');
     
-    const conditions = [eq(salesComps.orgId, orgId)];
+    // Filter out soft-deleted records
+    const conditions = [eq(salesComps.orgId, orgId), isNull(salesComps.deletedAt)];
     if (dateFilter) {
       conditions.push(gte(salesComps.createdAt, dateFilter.startDate));
     }
@@ -681,19 +683,22 @@ export class DashboardService {
 
   private async getDockTalkData(orgId: string, dateFilter: TimeRangeFilter | null) {
     const { docktalkDeals } = await import('@shared/schema');
-    const { desc } = await import('drizzle-orm');
+    const { desc, count } = await import('drizzle-orm');
     
-    let dealQuery = db.select().from(docktalkDeals);
-    
+    // Filter out soft-deleted deals
+    const conditions: any[] = [isNull(docktalkDeals.deletedAt)];
     if (dateFilter) {
-      dealQuery = dealQuery.where(gte(docktalkDeals.announcedDate, dateFilter.startDate));
+      conditions.push(gte(docktalkDeals.announcedDate, dateFilter.startDate));
     }
     
-    const deals = await dealQuery.orderBy(desc(docktalkDeals.announcedDate)).limit(5);
+    const [deals, totalResult] = await Promise.all([
+      db.select().from(docktalkDeals).where(and(...conditions)).orderBy(desc(docktalkDeals.announcedDate)).limit(5),
+      db.select({ count: count() }).from(docktalkDeals).where(and(...conditions)),
+    ]);
 
     return {
       recentDeals: deals,
-      totalDeals: deals.length,
+      totalDeals: Number(totalResult[0]?.count) || 0,
     };
   }
 
