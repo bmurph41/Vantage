@@ -10895,6 +10895,228 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ============================================================================
+  // MODELING PERIOD ADJUSTMENTS - Normalization adjustments for financial periods
+  // ============================================================================
+
+  // Get all adjustments for a project (optionally filtered by period)
+  app.get('/api/modeling/projects/:projectId/adjustments', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { periodLabel } = req.query;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const adjustments = await storage.getModelingPeriodAdjustments(
+        projectId, 
+        orgId, 
+        periodLabel as string | undefined
+      );
+      res.json(adjustments);
+    } catch (error) {
+      console.error('Failed to fetch adjustments:', error);
+      res.status(500).json({ error: 'Failed to fetch adjustments' });
+    }
+  });
+
+  // Get active adjustments for a specific period
+  app.get('/api/modeling/projects/:projectId/adjustments/period/:periodLabel', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, periodLabel } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const adjustments = await storage.getActiveAdjustmentsForPeriod(projectId, periodLabel, orgId);
+      res.json(adjustments);
+    } catch (error) {
+      console.error('Failed to fetch adjustments for period:', error);
+      res.status(500).json({ error: 'Failed to fetch adjustments for period' });
+    }
+  });
+
+  // Create a new adjustment
+  app.post('/api/modeling/projects/:projectId/adjustments', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const data = {
+        ...req.body,
+        orgId,
+        modelingProjectId: projectId,
+        createdBy: userId
+      };
+      
+      const adjustment = await storage.createModelingPeriodAdjustment(data);
+      res.status(201).json(adjustment);
+    } catch (error: any) {
+      console.error('Failed to create adjustment:', error);
+      if (error.code === '23505') {
+        return res.status(409).json({ error: 'An adjustment for this target already exists for this period' });
+      }
+      res.status(500).json({ error: 'Failed to create adjustment' });
+    }
+  });
+
+  // Update an adjustment
+  app.patch('/api/modeling/adjustments/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      
+      const adjustment = await storage.updateModelingPeriodAdjustment(
+        req.params.id,
+        { ...req.body, updatedBy: userId },
+        orgId
+      );
+      
+      if (!adjustment) {
+        return res.status(404).json({ error: 'Adjustment not found' });
+      }
+      
+      res.json(adjustment);
+    } catch (error) {
+      console.error('Failed to update adjustment:', error);
+      res.status(500).json({ error: 'Failed to update adjustment' });
+    }
+  });
+
+  // Toggle adjustment active state
+  app.patch('/api/modeling/adjustments/:id/toggle', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { isActive } = req.body;
+      
+      const adjustment = await storage.toggleAdjustmentActive(req.params.id, isActive, orgId);
+      
+      if (!adjustment) {
+        return res.status(404).json({ error: 'Adjustment not found' });
+      }
+      
+      res.json(adjustment);
+    } catch (error) {
+      console.error('Failed to toggle adjustment:', error);
+      res.status(500).json({ error: 'Failed to toggle adjustment' });
+    }
+  });
+
+  // Delete an adjustment
+  app.delete('/api/modeling/adjustments/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const success = await storage.deleteModelingPeriodAdjustment(req.params.id, orgId);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'Adjustment not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete adjustment:', error);
+      res.status(500).json({ error: 'Failed to delete adjustment' });
+    }
+  });
+
+  // ============================================================================
+  // MODELING ANALYTICS - Drill-down analytics for financial data
+  // ============================================================================
+
+  // Get category-level aggregations
+  app.get('/api/modeling/projects/:projectId/analytics/categories', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const categories = await storage.getActualsAggregationByCategory(projectId, orgId);
+      res.json(categories);
+    } catch (error) {
+      console.error('Failed to fetch category analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch category analytics' });
+    }
+  });
+
+  // Get subcategory-level (department) aggregations for a category
+  app.get('/api/modeling/projects/:projectId/analytics/categories/:category/subcategories', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, category } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const subcategories = await storage.getActualsAggregationBySubcategory(projectId, category, orgId);
+      res.json(subcategories);
+    } catch (error) {
+      console.error('Failed to fetch subcategory analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch subcategory analytics' });
+    }
+  });
+
+  // Get line item-level aggregations for a subcategory
+  app.get('/api/modeling/projects/:projectId/analytics/categories/:category/subcategories/:subcategory/line-items', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, category, subcategory } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const lineItems = await storage.getActualsAggregationByLineItem(projectId, category, subcategory, orgId);
+      res.json(lineItems);
+    } catch (error) {
+      console.error('Failed to fetch line item analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch line item analytics' });
+    }
+  });
+
+  // Get financial summary with adjustments applied
+  app.get('/api/modeling/projects/:projectId/analytics/summary/:periodLabel', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, periodLabel } = req.params;
+      const applyAdjustments = req.query.applyAdjustments !== 'false';
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const summary = await storage.getFinancialSummaryWithAdjustments(
+        projectId,
+        periodLabel,
+        orgId,
+        applyAdjustments
+      );
+      res.json(summary);
+    } catch (error) {
+      console.error('Failed to fetch financial summary:', error);
+      res.status(500).json({ error: 'Failed to fetch financial summary' });
+    }
+  });
+
   // Project Workspace - Configuration
   app.get('/api/modeling/projects/:projectId/config', authenticateUser, async (req: any, res) => {
     try {

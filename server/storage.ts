@@ -65,6 +65,8 @@ import {
   type ModelingRegion, type InsertModelingRegion, type UpdateModelingRegion,
   type ModelingProject, type InsertModelingProject, type UpdateModelingProject,
   modelingFinancialPeriods, type ModelingFinancialPeriod, type InsertModelingFinancialPeriod, type UpdateModelingFinancialPeriod,
+  modelingPeriodAdjustments, type ModelingPeriodAdjustment, type InsertModelingPeriodAdjustment, type UpdateModelingPeriodAdjustment,
+  modelingActuals, type ModelingActuals,
   type ExitScenario, type InsertExitScenario, type UpdateExitScenario,
   type ExitTaxCalculation, type InsertExitTaxCalculation, type UpdateExitTaxCalculation,
   type ExitSellerFinancing, type InsertExitSellerFinancing, type UpdateExitSellerFinancing,
@@ -7297,6 +7299,352 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(modelingFinancialPeriods.sortOrder));
     
     return periods;
+  }
+
+  // ============================================================================
+  // MODELING PERIOD ADJUSTMENTS - Normalization adjustments for financial periods
+  // ============================================================================
+
+  async getModelingPeriodAdjustments(modelingProjectId: string, orgId: string, periodLabel?: string): Promise<ModelingPeriodAdjustment[]> {
+    const conditions = [
+      eq(modelingPeriodAdjustments.modelingProjectId, modelingProjectId),
+      eq(modelingPeriodAdjustments.orgId, orgId)
+    ];
+    
+    if (periodLabel) {
+      conditions.push(eq(modelingPeriodAdjustments.periodLabel, periodLabel));
+    }
+    
+    return await db.select()
+      .from(modelingPeriodAdjustments)
+      .where(and(...conditions))
+      .orderBy(desc(modelingPeriodAdjustments.createdAt));
+  }
+
+  async getActiveAdjustmentsForPeriod(modelingProjectId: string, periodLabel: string, orgId: string): Promise<ModelingPeriodAdjustment[]> {
+    return await db.select()
+      .from(modelingPeriodAdjustments)
+      .where(and(
+        eq(modelingPeriodAdjustments.modelingProjectId, modelingProjectId),
+        eq(modelingPeriodAdjustments.periodLabel, periodLabel),
+        eq(modelingPeriodAdjustments.orgId, orgId),
+        eq(modelingPeriodAdjustments.isActive, true)
+      ))
+      .orderBy(modelingPeriodAdjustments.scope, modelingPeriodAdjustments.targetLabel);
+  }
+
+  async getModelingPeriodAdjustment(id: string, orgId: string): Promise<ModelingPeriodAdjustment | undefined> {
+    const [adjustment] = await db.select()
+      .from(modelingPeriodAdjustments)
+      .where(and(
+        eq(modelingPeriodAdjustments.id, id),
+        eq(modelingPeriodAdjustments.orgId, orgId)
+      ));
+    return adjustment || undefined;
+  }
+
+  async createModelingPeriodAdjustment(data: InsertModelingPeriodAdjustment): Promise<ModelingPeriodAdjustment> {
+    const [created] = await db.insert(modelingPeriodAdjustments)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateModelingPeriodAdjustment(id: string, data: UpdateModelingPeriodAdjustment, orgId: string): Promise<ModelingPeriodAdjustment | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(modelingPeriodAdjustments)
+      .set(updateData as any)
+      .where(and(
+        eq(modelingPeriodAdjustments.id, id),
+        eq(modelingPeriodAdjustments.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteModelingPeriodAdjustment(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(modelingPeriodAdjustments)
+      .where(and(
+        eq(modelingPeriodAdjustments.id, id),
+        eq(modelingPeriodAdjustments.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async toggleAdjustmentActive(id: string, isActive: boolean, orgId: string): Promise<ModelingPeriodAdjustment | undefined> {
+    return this.updateModelingPeriodAdjustment(id, { isActive } as UpdateModelingPeriodAdjustment, orgId);
+  }
+
+  // ============================================================================
+  // MODELING ANALYTICS - Aggregations for drill-down analytics
+  // ============================================================================
+
+  async getActualsAggregationByCategory(modelingProjectId: string, orgId: string): Promise<{
+    category: string;
+    totalAmount: number;
+    avgMonthlyAmount: number;
+    minMonthlyAmount: number;
+    maxMonthlyAmount: number;
+    monthCount: number;
+    subcategories: string[];
+  }[]> {
+    const actuals = await db.select()
+      .from(modelingActuals)
+      .where(and(
+        eq(modelingActuals.modelingProjectId, modelingProjectId),
+        eq(modelingActuals.orgId, orgId)
+      ));
+
+    const categoryMap = new Map<string, {
+      totalAmount: number;
+      monthlyAmounts: number[];
+      subcategories: Set<string>;
+    }>();
+
+    for (const actual of actuals) {
+      const key = actual.category;
+      if (!categoryMap.has(key)) {
+        categoryMap.set(key, {
+          totalAmount: 0,
+          monthlyAmounts: [],
+          subcategories: new Set()
+        });
+      }
+      const cat = categoryMap.get(key)!;
+      const amount = Number(actual.amount) || 0;
+      cat.totalAmount += amount;
+      cat.monthlyAmounts.push(amount);
+      cat.subcategories.add(actual.subcategory);
+    }
+
+    return Array.from(categoryMap.entries()).map(([category, data]) => ({
+      category,
+      totalAmount: data.totalAmount,
+      avgMonthlyAmount: data.monthlyAmounts.length > 0 ? data.totalAmount / data.monthlyAmounts.length : 0,
+      minMonthlyAmount: data.monthlyAmounts.length > 0 ? Math.min(...data.monthlyAmounts) : 0,
+      maxMonthlyAmount: data.monthlyAmounts.length > 0 ? Math.max(...data.monthlyAmounts) : 0,
+      monthCount: data.monthlyAmounts.length,
+      subcategories: Array.from(data.subcategories)
+    }));
+  }
+
+  async getActualsAggregationBySubcategory(modelingProjectId: string, category: string, orgId: string): Promise<{
+    subcategory: string;
+    totalAmount: number;
+    avgMonthlyAmount: number;
+    minMonthlyAmount: number;
+    maxMonthlyAmount: number;
+    monthCount: number;
+    lineItems: string[];
+    yearlyTotals: { year: number; total: number }[];
+  }[]> {
+    const actuals = await db.select()
+      .from(modelingActuals)
+      .where(and(
+        eq(modelingActuals.modelingProjectId, modelingProjectId),
+        eq(modelingActuals.category, category),
+        eq(modelingActuals.orgId, orgId)
+      ));
+
+    const subcategoryMap = new Map<string, {
+      totalAmount: number;
+      monthlyAmounts: number[];
+      lineItems: Set<string>;
+      yearlyTotals: Map<number, number>;
+    }>();
+
+    for (const actual of actuals) {
+      const key = actual.subcategory;
+      if (!subcategoryMap.has(key)) {
+        subcategoryMap.set(key, {
+          totalAmount: 0,
+          monthlyAmounts: [],
+          lineItems: new Set(),
+          yearlyTotals: new Map()
+        });
+      }
+      const sub = subcategoryMap.get(key)!;
+      const amount = Number(actual.amount) || 0;
+      sub.totalAmount += amount;
+      sub.monthlyAmounts.push(amount);
+      if (actual.lineItemDescription) {
+        sub.lineItems.add(actual.lineItemDescription);
+      }
+      const yearTotal = sub.yearlyTotals.get(actual.year) || 0;
+      sub.yearlyTotals.set(actual.year, yearTotal + amount);
+    }
+
+    return Array.from(subcategoryMap.entries()).map(([subcategory, data]) => ({
+      subcategory,
+      totalAmount: data.totalAmount,
+      avgMonthlyAmount: data.monthlyAmounts.length > 0 ? data.totalAmount / data.monthlyAmounts.length : 0,
+      minMonthlyAmount: data.monthlyAmounts.length > 0 ? Math.min(...data.monthlyAmounts) : 0,
+      maxMonthlyAmount: data.monthlyAmounts.length > 0 ? Math.max(...data.monthlyAmounts) : 0,
+      monthCount: data.monthlyAmounts.length,
+      lineItems: Array.from(data.lineItems),
+      yearlyTotals: Array.from(data.yearlyTotals.entries())
+        .map(([year, total]) => ({ year, total }))
+        .sort((a, b) => a.year - b.year)
+    }));
+  }
+
+  async getActualsAggregationByLineItem(modelingProjectId: string, category: string, subcategory: string, orgId: string): Promise<{
+    lineItem: string;
+    totalAmount: number;
+    avgMonthlyAmount: number;
+    minMonthlyAmount: number;
+    maxMonthlyAmount: number;
+    monthCount: number;
+    monthlyData: { year: number; month: number; amount: number }[];
+    trend: 'increasing' | 'decreasing' | 'stable';
+  }[]> {
+    const actuals = await db.select()
+      .from(modelingActuals)
+      .where(and(
+        eq(modelingActuals.modelingProjectId, modelingProjectId),
+        eq(modelingActuals.category, category),
+        eq(modelingActuals.subcategory, subcategory),
+        eq(modelingActuals.orgId, orgId)
+      ))
+      .orderBy(modelingActuals.year, modelingActuals.month);
+
+    const lineItemMap = new Map<string, {
+      totalAmount: number;
+      monthlyAmounts: number[];
+      monthlyData: { year: number; month: number; amount: number }[];
+    }>();
+
+    for (const actual of actuals) {
+      const key = actual.lineItemDescription || subcategory;
+      if (!lineItemMap.has(key)) {
+        lineItemMap.set(key, {
+          totalAmount: 0,
+          monthlyAmounts: [],
+          monthlyData: []
+        });
+      }
+      const item = lineItemMap.get(key)!;
+      const amount = Number(actual.amount) || 0;
+      item.totalAmount += amount;
+      item.monthlyAmounts.push(amount);
+      item.monthlyData.push({ year: actual.year, month: actual.month, amount });
+    }
+
+    return Array.from(lineItemMap.entries()).map(([lineItem, data]) => {
+      // Calculate trend based on first half vs second half averages
+      const midpoint = Math.floor(data.monthlyAmounts.length / 2);
+      const firstHalf = data.monthlyAmounts.slice(0, midpoint);
+      const secondHalf = data.monthlyAmounts.slice(midpoint);
+      const firstAvg = firstHalf.length > 0 ? firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length : 0;
+      const secondAvg = secondHalf.length > 0 ? secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length : 0;
+      
+      let trend: 'increasing' | 'decreasing' | 'stable' = 'stable';
+      if (secondAvg > firstAvg * 1.1) trend = 'increasing';
+      else if (secondAvg < firstAvg * 0.9) trend = 'decreasing';
+
+      return {
+        lineItem,
+        totalAmount: data.totalAmount,
+        avgMonthlyAmount: data.monthlyAmounts.length > 0 ? data.totalAmount / data.monthlyAmounts.length : 0,
+        minMonthlyAmount: data.monthlyAmounts.length > 0 ? Math.min(...data.monthlyAmounts) : 0,
+        maxMonthlyAmount: data.monthlyAmounts.length > 0 ? Math.max(...data.monthlyAmounts) : 0,
+        monthCount: data.monthlyAmounts.length,
+        monthlyData: data.monthlyData,
+        trend
+      };
+    });
+  }
+
+  async getFinancialSummaryWithAdjustments(
+    modelingProjectId: string,
+    periodLabel: string,
+    orgId: string,
+    applyAdjustments: boolean = true
+  ): Promise<{
+    rawTotals: { revenue: number; cogs: number; expenses: number; noi: number };
+    adjustedTotals: { revenue: number; cogs: number; expenses: number; noi: number };
+    adjustments: ModelingPeriodAdjustment[];
+    adjustmentImpact: { revenue: number; cogs: number; expenses: number; noi: number };
+  }> {
+    // Get raw actuals data
+    const actuals = await db.select()
+      .from(modelingActuals)
+      .where(and(
+        eq(modelingActuals.modelingProjectId, modelingProjectId),
+        eq(modelingActuals.orgId, orgId)
+      ));
+
+    // Calculate raw totals
+    let rawRevenue = 0, rawCogs = 0, rawExpenses = 0;
+    for (const actual of actuals) {
+      const amount = Number(actual.amount) || 0;
+      if (actual.category.toLowerCase() === 'revenue') rawRevenue += amount;
+      else if (actual.category.toLowerCase() === 'cogs') rawCogs += amount;
+      else if (actual.category.toLowerCase() === 'expense' || actual.category.toLowerCase() === 'expenses') rawExpenses += amount;
+    }
+    const rawNoi = rawRevenue - rawCogs - rawExpenses;
+
+    // Get active adjustments for this period
+    const adjustments = applyAdjustments 
+      ? await this.getActiveAdjustmentsForPeriod(modelingProjectId, periodLabel, orgId)
+      : [];
+
+    // Apply adjustments
+    let revenueAdjustment = 0, cogsAdjustment = 0, expenseAdjustment = 0;
+    
+    for (const adj of adjustments) {
+      const [category] = adj.targetIdentifier.split('|');
+      let adjustmentAmount = 0;
+      
+      // Calculate the adjustment amount based on type
+      const originalValue = Number(adj.originalValue) || 0;
+      const adjValue = Number(adj.adjustmentValue) || 0;
+      
+      switch (adj.adjustmentType) {
+        case 'absolute':
+          adjustmentAmount = adjValue;
+          break;
+        case 'percentage':
+          adjustmentAmount = originalValue * (adjValue / 100);
+          break;
+        case 'replace':
+          adjustmentAmount = adjValue - originalValue;
+          break;
+      }
+      
+      // Apply to appropriate category
+      if (category.toLowerCase() === 'revenue') revenueAdjustment += adjustmentAmount;
+      else if (category.toLowerCase() === 'cogs') cogsAdjustment += adjustmentAmount;
+      else if (category.toLowerCase() === 'expense' || category.toLowerCase() === 'expenses') expenseAdjustment += adjustmentAmount;
+    }
+
+    const adjustedRevenue = rawRevenue + revenueAdjustment;
+    const adjustedCogs = rawCogs + cogsAdjustment;
+    const adjustedExpenses = rawExpenses + expenseAdjustment;
+    const adjustedNoi = adjustedRevenue - adjustedCogs - adjustedExpenses;
+
+    return {
+      rawTotals: {
+        revenue: rawRevenue,
+        cogs: rawCogs,
+        expenses: rawExpenses,
+        noi: rawNoi
+      },
+      adjustedTotals: {
+        revenue: adjustedRevenue,
+        cogs: adjustedCogs,
+        expenses: adjustedExpenses,
+        noi: adjustedNoi
+      },
+      adjustments,
+      adjustmentImpact: {
+        revenue: revenueAdjustment,
+        cogs: cogsAdjustment,
+        expenses: expenseAdjustment,
+        noi: revenueAdjustment - cogsAdjustment - expenseAdjustment
+      }
+    };
   }
 
   // ============================================================================
