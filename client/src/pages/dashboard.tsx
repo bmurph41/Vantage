@@ -1013,15 +1013,15 @@ export default function Dashboard() {
                   trendLabel={salesCompsYear === 'all' ? 'overall' : 'vs prior year'}
                 />
                 <EnhancedMetricCard
-                  label="Avg. Price"
-                  value={displayMetrics?.avgPricePerSlip || displayMetrics?.avgPrice || 0}
+                  label="Avg. Sale Price"
+                  value={displayMetrics?.avgPrice || 0}
                   type="currency"
                   size="md"
                   testId="comps-avg-price"
                   tooltip={salesCompsYear === 'all' ? 'Average sale price across all comparables' : `Average sale price in ${salesCompsYear}`}
                   onClick={() => setIsSalesCompsDetailOpen(true)}
                   clickable={true}
-                  trend={displayMetrics?.avgPricePerSlipTrend || displayMetrics?.avgPriceTrend}
+                  trend={displayMetrics?.avgPriceTrend}
                   trendLabel={salesCompsYear === 'all' ? 'overall' : 'vs prior year'}
                 />
               </MetricGrid>
