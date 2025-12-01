@@ -34,10 +34,55 @@ const WIZARD_STEPS = [
   { id: 4, title: "Import", description: "Save to P&L data", icon: Download },
 ];
 
+function getStepFromStatus(status: string): number {
+  switch (status) {
+    case 'completed':
+      return 4;
+    case 'reviewing':
+      return 3;
+    case 'parsed':
+      return 2;
+    case 'processing':
+    case 'validated':
+    case 'uploaded':
+    case 'error':
+    default:
+      return 1;
+  }
+}
+
+function getMaxAllowedStep(status: string): number {
+  switch (status) {
+    case 'completed':
+      return 4;
+    case 'reviewing':
+      return 4;
+    case 'parsed':
+      return 3;
+    default:
+      return 1;
+  }
+}
+
 export function ReviewWizard({ projectId, upload, categories, onClose, onComplete }: ReviewWizardProps) {
   const { toast } = useToast();
-  const [currentStep, setCurrentStep] = useState(upload.wizardStep || 1);
+  const [currentStep, setCurrentStep] = useState(() => getStepFromStatus(upload.status));
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  
+  const maxAllowedStep = getMaxAllowedStep(upload.status);
+  
+  useEffect(() => {
+    const newStep = getStepFromStatus(upload.status);
+    if (newStep > currentStep) {
+      setCurrentStep(newStep);
+    }
+  }, [upload.status]);
+  
+  const handleStepClick = (stepId: number) => {
+    if (stepId <= maxAllowedStep) {
+      setCurrentStep(stepId);
+    }
+  };
 
   const { data: items = [], isLoading: itemsLoading, refetch: refetchItems } = useQuery<ExtractedItemWithCategory[]>({
     queryKey: ["/api/modeling/projects", projectId, "documents", upload.id, "items", "withCategories=true"],
@@ -154,25 +199,41 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
       </div>
 
       <div className="flex items-center justify-between bg-muted/50 p-4 rounded-lg">
-        {WIZARD_STEPS.map((step, index) => (
-          <div key={step.id} className="flex items-center">
-            <div className={`flex items-center gap-2 ${step.id <= currentStep ? "text-primary" : "text-muted-foreground"}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step.id < currentStep ? "bg-primary text-primary-foreground" :
-                step.id === currentStep ? "border-2 border-primary" : "border-2 border-muted-foreground/30"
-              }`}>
-                {step.id < currentStep ? <Check className="h-4 w-4" /> : <step.icon className="h-4 w-4" />}
-              </div>
-              <div className="hidden md:block">
-                <p className="font-medium text-sm">{step.title}</p>
-                <p className="text-xs text-muted-foreground">{step.description}</p>
-              </div>
+        {WIZARD_STEPS.map((step, index) => {
+          const isAccessible = step.id <= maxAllowedStep;
+          const isCompleted = step.id < currentStep;
+          const isCurrent = step.id === currentStep;
+          
+          return (
+            <div key={step.id} className="flex items-center">
+              <button
+                onClick={() => handleStepClick(step.id)}
+                disabled={!isAccessible}
+                className={`flex items-center gap-2 transition-colors ${
+                  isAccessible 
+                    ? (isCurrent || isCompleted ? "text-primary hover:text-primary/80" : "text-muted-foreground hover:text-muted-foreground/80")
+                    : "text-muted-foreground/40 cursor-not-allowed"
+                }`}
+                data-testid={`wizard-step-${step.id}`}
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                  isCompleted ? "bg-primary text-primary-foreground" :
+                  isCurrent ? "border-2 border-primary" : 
+                  isAccessible ? "border-2 border-muted-foreground/30" : "border-2 border-muted-foreground/20"
+                }`}>
+                  {isCompleted ? <Check className="h-4 w-4" /> : <step.icon className="h-4 w-4" />}
+                </div>
+                <div className="hidden md:block text-left">
+                  <p className="font-medium text-sm">{step.title}</p>
+                  <p className="text-xs text-muted-foreground">{step.description}</p>
+                </div>
+              </button>
+              {index < WIZARD_STEPS.length - 1 && (
+                <Separator className="w-12 mx-4" />
+              )}
             </div>
-            {index < WIZARD_STEPS.length - 1 && (
-              <Separator className="w-12 mx-4" />
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {currentStep === 1 && (
@@ -184,6 +245,13 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {upload.status === 'error' && upload.errorMessage && (
+              <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-lg">
+                <p className="text-sm text-destructive font-medium">Previous parsing attempt failed:</p>
+                <p className="text-sm text-destructive/80 mt-1">{upload.errorMessage}</p>
+                <p className="text-sm text-muted-foreground mt-2">Click "Parse Document" below to try again.</p>
+              </div>
+            )}
             <div className="bg-muted p-4 rounded-lg">
               <div className="flex items-center gap-4 mb-4">
                 <FileSpreadsheet className="h-12 w-12 text-green-600" />
@@ -201,7 +269,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
             </div>
             <div className="flex justify-end">
               <Button onClick={() => parseMutation.mutate()} disabled={parseMutation.isPending} data-testid="button-parse">
-                {parseMutation.isPending ? "Parsing..." : "Parse Document"}
+                {parseMutation.isPending ? "Parsing..." : upload.status === 'error' ? "Retry Parsing" : "Parse Document"}
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
