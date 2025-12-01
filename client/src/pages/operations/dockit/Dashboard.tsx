@@ -12,7 +12,7 @@ import {
   PauseCircle, Timer, Users, ArrowUpDown
 } from "lucide-react";
 import DockitAppShell, { LaunchFilters, defaultFilters } from "@/components/dockit/DockitAppShell";
-import { startOfDay, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isAfter, parseISO } from "date-fns";
+import { startOfDay, startOfWeek, startOfMonth, startOfQuarter, startOfYear, endOfDay, endOfWeek, endOfMonth, endOfQuarter, endOfYear, isWithinInterval, parseISO } from "date-fns";
 
 interface DashboardStats {
   todaysLaunches?: number;
@@ -50,17 +50,24 @@ interface TransientSlip {
   dailyRate?: number;
 }
 
-// Helper function to filter by time frame
-function getTimeFrameStart(timeFrame: LaunchFilters['timeFrame']): Date | null {
+// Helper function to get time frame interval (start and end dates)
+function getTimeFrameInterval(timeFrame: LaunchFilters['timeFrame']): { start: Date; end: Date } | null {
   const now = new Date();
   switch (timeFrame) {
-    case 'today': return startOfDay(now);
-    case 'this_week': return startOfWeek(now, { weekStartsOn: 1 });
-    case 'this_month': return startOfMonth(now);
-    case 'this_quarter': return startOfQuarter(now);
-    case 'this_year': return startOfYear(now);
-    case 'all': return null;
-    default: return startOfDay(now);
+    case 'today': 
+      return { start: startOfDay(now), end: endOfDay(now) };
+    case 'this_week': 
+      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+    case 'this_month': 
+      return { start: startOfMonth(now), end: endOfMonth(now) };
+    case 'this_quarter': 
+      return { start: startOfQuarter(now), end: endOfQuarter(now) };
+    case 'this_year': 
+      return { start: startOfYear(now), end: endOfYear(now) };
+    case 'all': 
+      return null;
+    default: 
+      return { start: startOfDay(now), end: endOfDay(now) };
   }
 }
 
@@ -105,12 +112,12 @@ export default function DockitDashboard() {
       );
     }
     
-    // Filter by time frame
-    const timeStart = getTimeFrameStart(filters.timeFrame);
-    if (timeStart) {
+    // Filter by time frame (inclusive interval)
+    const interval = getTimeFrameInterval(filters.timeFrame);
+    if (interval) {
       result = result.filter(l => {
         const launchDate = l.scheduledDate ? parseISO(l.scheduledDate) : new Date();
-        return isAfter(launchDate, timeStart);
+        return isWithinInterval(launchDate, interval);
       });
     }
     

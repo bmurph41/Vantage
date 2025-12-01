@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -173,17 +173,41 @@ export default function DockitSlips() {
     createSlipMutation.mutate(data);
   };
 
-  const filteredSlips = slips.filter((slip) => {
-    const searchLower = search.toLowerCase();
-    return (
-      slip.number?.toLowerCase().includes(searchLower) ||
-      slip.section?.toLowerCase().includes(searchLower)
-    );
-  });
+  // Apply filters to slips
+  const filteredSlips = useMemo(() => {
+    let result = [...slips];
+    
+    // Filter by marina (if slips have marina association)
+    if (filters.marinas.length > 0) {
+      result = result.filter(slip => 
+        (slip as any).marinaId && filters.marinas.includes(String((slip as any).marinaId))
+      );
+    }
+    
+    // Filter by customer/occupant
+    if (filters.customerId) {
+      result = result.filter(slip => 
+        slip.currentOccupant === filters.customerId || 
+        (slip as any).customerId === filters.customerId
+      );
+    }
+    
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      result = result.filter(slip =>
+        slip.number?.toLowerCase().includes(searchLower) ||
+        slip.section?.toLowerCase().includes(searchLower) ||
+        slip.currentOccupant?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return result;
+  }, [slips, filters, search]);
 
-  const occupiedCount = slips.filter(s => s.status === 'occupied' || s.currentBoatId).length;
-  const availableCount = slips.length - occupiedCount;
-  const occupancyRate = slips.length > 0 ? Math.round((occupiedCount / slips.length) * 100) : 0;
+  const occupiedCount = filteredSlips.filter(s => s.status === 'occupied' || s.currentBoatId).length;
+  const availableCount = filteredSlips.length - occupiedCount;
+  const occupancyRate = filteredSlips.length > 0 ? Math.round((occupiedCount / filteredSlips.length) * 100) : 0;
 
   const getStatusBadge = (slip: Slip) => {
     if (slip.status === 'occupied' || slip.currentBoatId) {

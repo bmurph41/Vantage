@@ -43,18 +43,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import DockitAppShell, { LaunchFilters, defaultFilters } from "@/components/dockit/DockitAppShell";
-import { startOfDay, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isAfter, parseISO } from "date-fns";
+import { startOfDay, startOfWeek, startOfMonth, startOfQuarter, startOfYear, endOfDay, endOfWeek, endOfMonth, endOfQuarter, endOfYear, isWithinInterval, parseISO } from "date-fns";
 
-function getTimeFrameStart(timeFrame: LaunchFilters['timeFrame']): Date | null {
+function getTimeFrameInterval(timeFrame: LaunchFilters['timeFrame']): { start: Date; end: Date } | null {
   const now = new Date();
   switch (timeFrame) {
-    case 'today': return startOfDay(now);
-    case 'this_week': return startOfWeek(now, { weekStartsOn: 1 });
-    case 'this_month': return startOfMonth(now);
-    case 'this_quarter': return startOfQuarter(now);
-    case 'this_year': return startOfYear(now);
-    case 'all': return null;
-    default: return startOfDay(now);
+    case 'today': 
+      return { start: startOfDay(now), end: endOfDay(now) };
+    case 'this_week': 
+      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+    case 'this_month': 
+      return { start: startOfMonth(now), end: endOfMonth(now) };
+    case 'this_quarter': 
+      return { start: startOfQuarter(now), end: endOfQuarter(now) };
+    case 'this_year': 
+      return { start: startOfYear(now), end: endOfYear(now) };
+    case 'all': 
+      return null;
+    default: 
+      return { start: startOfDay(now), end: endOfDay(now) };
   }
 }
 
@@ -140,6 +147,87 @@ export default function DockitLaunches() {
     retry: false,
   });
 
+  // Apply filters to launches
+  const filteredTodaysLaunches = useMemo(() => {
+    let result = [...todaysLaunches];
+    
+    // Filter by marina
+    if (filters.marinas.length > 0) {
+      result = result.filter(l => 
+        (l.marinaName && filters.marinas.some(m => 
+          l.marinaName?.toLowerCase().includes(m.toLowerCase()) || 
+          String(l.marinaId) === m
+        )) || (l.marinaId && filters.marinas.includes(String(l.marinaId)))
+      );
+    }
+    
+    // Filter by time frame (inclusive interval)
+    const interval = getTimeFrameInterval(filters.timeFrame);
+    if (interval) {
+      result = result.filter(l => {
+        const launchDate = l.scheduledDate ? parseISO(l.scheduledDate) : new Date();
+        return isWithinInterval(launchDate, interval);
+      });
+    }
+    
+    // Filter by customer
+    if (filters.customerId) {
+      result = result.filter(l => l.customerId === filters.customerId);
+    }
+    
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      result = result.filter(l => 
+        l.customerName?.toLowerCase().includes(searchLower) ||
+        l.boatName?.toLowerCase().includes(searchLower) ||
+        l.marinaName?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return result;
+  }, [todaysLaunches, filters, search]);
+
+  const filteredQueue = useMemo(() => {
+    let result = [...queue];
+    
+    // Filter by marina
+    if (filters.marinas.length > 0) {
+      result = result.filter(l => 
+        (l.marinaName && filters.marinas.some(m => 
+          l.marinaName?.toLowerCase().includes(m.toLowerCase()) || 
+          String(l.marinaId) === m
+        )) || (l.marinaId && filters.marinas.includes(String(l.marinaId)))
+      );
+    }
+    
+    // Filter by time frame (inclusive interval)
+    const interval = getTimeFrameInterval(filters.timeFrame);
+    if (interval) {
+      result = result.filter(l => {
+        const launchDate = l.scheduledDate ? parseISO(l.scheduledDate) : new Date();
+        return isWithinInterval(launchDate, interval);
+      });
+    }
+    
+    // Filter by customer
+    if (filters.customerId) {
+      result = result.filter(l => l.customerId === filters.customerId);
+    }
+    
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      result = result.filter(l => 
+        l.customerName?.toLowerCase().includes(searchLower) ||
+        l.boatName?.toLowerCase().includes(searchLower) ||
+        l.marinaName?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return result;
+  }, [queue, filters, search]);
+
   const form = useForm<LaunchFormData>({
     resolver: zodResolver(launchSchema),
     defaultValues: {
@@ -218,9 +306,9 @@ export default function DockitLaunches() {
     }
   };
 
-  const completedToday = todaysLaunches.filter(l => l.status === 'completed').length;
-  const inProgress = todaysLaunches.filter(l => l.status === 'in_progress').length;
-  const pending = todaysLaunches.filter(l => l.status === 'pending' || !l.status).length;
+  const completedToday = filteredTodaysLaunches.filter(l => l.status === 'completed').length;
+  const inProgress = filteredTodaysLaunches.filter(l => l.status === 'in_progress').length;
+  const pending = filteredTodaysLaunches.filter(l => l.status === 'pending' || !l.status).length;
 
   return (
     <DockitAppShell 
@@ -484,7 +572,7 @@ export default function DockitLaunches() {
               Today's Launch Queue
             </CardTitle>
             <CardDescription>
-              {launchesLoading ? "Loading..." : `${todaysLaunches.length} launches scheduled for today`}
+              {launchesLoading ? "Loading..." : `${filteredTodaysLaunches.length} launches scheduled`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -494,17 +582,17 @@ export default function DockitLaunches() {
                   <Skeleton key={i} className="h-16 w-full" />
                 ))}
               </div>
-            ) : todaysLaunches.length === 0 ? (
+            ) : filteredTodaysLaunches.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-center">
                 <Ship className="h-12 w-12 text-muted-foreground/50 mb-3" />
-                <p className="text-muted-foreground">No launches scheduled for today</p>
+                <p className="text-muted-foreground">No launches match the current filters</p>
                 <Button variant="link" className="mt-2" onClick={() => setIsScheduleDialogOpen(true)}>
-                  Schedule the first launch
+                  Schedule a launch
                 </Button>
               </div>
             ) : (
               <div className="space-y-3">
-                {todaysLaunches.map((launch) => {
+                {filteredTodaysLaunches.map((launch) => {
                   const customer = customers.find(c => c.id === launch.customerId);
                   const boat = boats.find(b => b.id === launch.boatId);
                   
