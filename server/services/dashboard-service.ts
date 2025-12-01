@@ -2043,24 +2043,33 @@ export class DashboardService {
     groupedData?: Array<{ label: string; value: number }>;
     details?: any[];
   }> {
-    // Build where conditions
-    const conditions: any[] = [eq(salesComps.orgId, orgId)];
+    // Build base conditions (without year filter)
+    const baseConditions: any[] = [eq(salesComps.orgId, orgId)];
 
+    if (filters.states && filters.states.length > 0) {
+      baseConditions.push(inArray(salesComps.state, filters.states));
+    }
+
+    if (filters.waterType) {
+      baseConditions.push(eq(salesComps.waterType, filters.waterType));
+    }
+
+    // Build current period conditions
+    const conditions = [...baseConditions];
     if (yearFilter) {
       conditions.push(eq(salesComps.saleYear, yearFilter));
     } else if (yearRange) {
       conditions.push(between(salesComps.saleYear, yearRange.start, yearRange.end));
     }
 
-    if (filters.states && filters.states.length > 0) {
-      conditions.push(inArray(salesComps.state, filters.states));
-    }
-
-    if (filters.waterType) {
-      conditions.push(eq(salesComps.waterType, filters.waterType));
+    // Build previous period conditions for YoY comparison
+    const prevConditions = [...baseConditions];
+    if (yearFilter) {
+      prevConditions.push(eq(salesComps.saleYear, yearFilter - 1));
     }
 
     const whereCondition = conditions.length > 1 ? and(...conditions) : conditions[0];
+    const prevWhereCondition = prevConditions.length > 1 ? and(...prevConditions) : prevConditions[0];
 
     // Execute query based on metric type
     let result: { value: number; previousValue?: number; trend?: number; groupedData?: Array<{ label: string; value: number }>; details?: any[] } = { value: 0 };
@@ -2075,19 +2084,14 @@ export class DashboardService {
 
         // Get previous period for comparison
         if (enableComparison && comparisonType === 'yoy' && yearFilter) {
-          const prevConditions = conditions.map(c => 
-            c === eq(salesComps.saleYear, yearFilter) 
-              ? eq(salesComps.saleYear, yearFilter - 1) 
-              : c
-          );
           const [prevResult] = await db
             .select({ count: drizzleSql<number>`COUNT(*)` })
             .from(salesComps)
-            .where(prevConditions.length > 1 ? and(...prevConditions) : prevConditions[0]);
+            .where(prevWhereCondition);
           result.previousValue = Number(prevResult?.count) || 0;
           result.trend = result.previousValue > 0 
             ? ((result.value - result.previousValue) / result.previousValue) * 100 
-            : 0;
+            : (result.value > 0 ? 100 : 0);
         }
         break;
       }
@@ -2100,19 +2104,14 @@ export class DashboardService {
         result.value = Number(avgResult?.avg) || 0;
 
         if (enableComparison && comparisonType === 'yoy' && yearFilter) {
-          const prevConditions = conditions.map(c => 
-            c === eq(salesComps.saleYear, yearFilter) 
-              ? eq(salesComps.saleYear, yearFilter - 1) 
-              : c
-          );
           const [prevResult] = await db
             .select({ avg: drizzleSql<number>`AVG(${salesComps.salePrice})` })
             .from(salesComps)
-            .where(prevConditions.length > 1 ? and(...prevConditions) : prevConditions[0]);
+            .where(prevWhereCondition);
           result.previousValue = Number(prevResult?.avg) || 0;
           result.trend = result.previousValue > 0 
             ? ((result.value - result.previousValue) / result.previousValue) * 100 
-            : 0;
+            : (result.value > 0 ? 100 : 0);
         }
         break;
       }
@@ -2137,21 +2136,16 @@ export class DashboardService {
         result.value = Number(avgResult?.avg) || 0;
 
         if (enableComparison && comparisonType === 'yoy' && yearFilter) {
-          const prevConditions = conditions.map(c => 
-            c === eq(salesComps.saleYear, yearFilter) 
-              ? eq(salesComps.saleYear, yearFilter - 1) 
-              : c
-          );
           const [prevResult] = await db
             .select({ 
               avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.wetSlips} > 0 THEN ${salesComps.salePrice}::decimal / ${salesComps.wetSlips} ELSE NULL END)` 
             })
             .from(salesComps)
-            .where(prevConditions.length > 1 ? and(...prevConditions) : prevConditions[0]);
+            .where(prevWhereCondition);
           result.previousValue = Number(prevResult?.avg) || 0;
           result.trend = result.previousValue > 0 
             ? ((result.value - result.previousValue) / result.previousValue) * 100 
-            : 0;
+            : (result.value > 0 ? 100 : 0);
         }
         break;
       }
@@ -2173,19 +2167,14 @@ export class DashboardService {
         result.value = Number(sumResult?.sum) || 0;
 
         if (enableComparison && comparisonType === 'yoy' && yearFilter) {
-          const prevConditions = conditions.map(c => 
-            c === eq(salesComps.saleYear, yearFilter) 
-              ? eq(salesComps.saleYear, yearFilter - 1) 
-              : c
-          );
           const [prevResult] = await db
             .select({ sum: drizzleSql<number>`SUM(${salesComps.salePrice})` })
             .from(salesComps)
-            .where(prevConditions.length > 1 ? and(...prevConditions) : prevConditions[0]);
+            .where(prevWhereCondition);
           result.previousValue = Number(prevResult?.sum) || 0;
           result.trend = result.previousValue > 0 
             ? ((result.value - result.previousValue) / result.previousValue) * 100 
-            : 0;
+            : (result.value > 0 ? 100 : 0);
         }
         break;
       }

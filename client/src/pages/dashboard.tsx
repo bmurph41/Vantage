@@ -486,10 +486,16 @@ export default function Dashboard() {
     enabled: isCRMDetailOpen,
   });
 
-  // Fetch recent sales comps for detail panel
+  // Fetch recent sales comps for detail panel (filtered by selected year if not 'all')
   const { data: recentComps, isLoading: compsLoading } = useQuery({
-    queryKey: ['/api/analysis/sales-comps/recent', timeRange],
-    queryFn: () => fetch(`/api/analysis/sales-comps/recent?timeRange=${timeRange}`).then(res => res.json()),
+    queryKey: ['/api/analysis/sales-comps/recent', timeRange, salesCompsYear],
+    queryFn: () => {
+      const params = new URLSearchParams({ timeRange });
+      if (salesCompsYear !== 'all') {
+        params.set('year', String(salesCompsYear));
+      }
+      return fetch(`/api/analysis/sales-comps/recent?${params.toString()}`).then(res => res.json());
+    },
     enabled: isSalesCompsDetailOpen,
   });
 
@@ -1635,8 +1641,8 @@ export default function Dashboard() {
       <DetailPanel
         open={isSalesCompsDetailOpen}
         onOpenChange={setIsSalesCompsDetailOpen}
-        title="Sales Comps Details"
-        description="Recent marina sales comparables"
+        title={salesCompsYear === 'all' ? 'Sales Comps Details' : `${salesCompsYear} Sales Comps`}
+        description={salesCompsYear === 'all' ? 'All marina sales comparables' : `Marina sales comparables from ${salesCompsYear}`}
         icon={TrendingUp}
         sourceLink={`/analysis/sales-comps/analytics?timeRange=${timeRange}`}
         sourceLinkText="Go to Sales Comps"

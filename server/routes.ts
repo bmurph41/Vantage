@@ -15587,12 +15587,18 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Get recent sales comps for detail panel
+  // Get recent sales comps for detail panel (with optional year filter)
   app.get('/api/analysis/sales-comps/recent', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const year = req.query.year ? parseInt(req.query.year as string) : null;
       const { salesComps } = await import('@shared/schema');
       const { desc, isNull, and } = await import('drizzle-orm');
+      
+      const conditions: any[] = [eq(salesComps.orgId, orgId), isNull(salesComps.deletedAt)];
+      if (year) {
+        conditions.push(eq(salesComps.saleYear, year));
+      }
       
       const comps = await db
         .select({
@@ -15609,9 +15615,9 @@ Current context: Project ${req.params.projectId}`;
           createdAt: salesComps.createdAt,
         })
         .from(salesComps)
-        .where(and(eq(salesComps.orgId, orgId), isNull(salesComps.deletedAt)))
+        .where(and(...conditions))
         .orderBy(desc(salesComps.createdAt))
-        .limit(20);
+        .limit(50);
 
       res.json(comps);
     } catch (error) {
