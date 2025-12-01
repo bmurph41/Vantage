@@ -7,6 +7,10 @@ import {
   docIntelLearningRules,
   docIntelTrainingExamples,
   pnlLines,
+  rentRolls,
+  rentRollEntries,
+  marinaCustomers,
+  crmContacts,
   type PnlCategory,
   type InsertPnlCategory,
   type DocIntelUpload,
@@ -20,7 +24,10 @@ import {
   type DocIntelLearningRule,
   type InsertDocIntelLearningRule,
   type PnlLine,
-  type InsertPnlLine
+  type InsertPnlLine,
+  type RentRoll,
+  type RentRollEntry,
+  type MarinaCustomer
 } from '@shared/schema';
 import { eq, and, sql, desc, asc } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
@@ -34,6 +41,28 @@ interface ParsedLineItem {
   extractedDate?: string;
   sourcePage?: number;
   sourceRow: number;
+}
+
+interface ParsedRentRollEntry {
+  unitNumber: string;
+  tenantName?: string;
+  monthlyRate: number;
+  entryType: 'wet_slip' | 'dry_storage' | 'rack' | 'mooring' | 'other';
+  status: 'active' | 'vacant' | 'reserved' | 'pending';
+  startDate?: string;
+  endDate?: string;
+  sourceRow: number;
+  boatInfo?: {
+    name?: string;
+    length?: number;
+    make?: string;
+    model?: string;
+  };
+  contactInfo?: {
+    email?: string;
+    phone?: string;
+  };
+  rawData: Record<string, any>;
 }
 
 interface CategoryMatch {
@@ -870,6 +899,451 @@ class DocIntelService {
       highConfidence: items.filter(i => i.confidenceScore && parseFloat(i.confidenceScore) >= 0.9).length,
       lowConfidence: items.filter(i => !i.confidenceScore || parseFloat(i.confidenceScore) < 0.7).length,
     };
+  }
+
+  // ============================================================================
+  // RENT ROLL MODULE SYNC
+  // ============================================================================
+
+  async parseRentRollFile(filePath: string): Promise<ParsedRentRollEntry[]> {
+    const workbook = XLSX.readFile(filePath);
+    const entries: ParsedRentRollEntry[] = [];
+
+    for (const sheetName of workbook.SheetNames) {
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as Record<string, any>[];
+      
+      const headerMapping = this.detectRentRollHeaders(jsonData);
+      
+      for (let rowIndex = 0; rowIndex < jsonData.length; rowIndex++) {
+        const row = jsonData[rowIndex];
+        const entry = this.extractRentRollEntry(row, headerMapping, rowIndex + 2);
+        if (entry) {
+          entries.push(entry);
+        }
+      }
+    }
+
+    return entries;
+  }
+
+  private detectRentRollHeaders(data: Record<string, any>[]): Record<string, string> {
+    if (data.length === 0) return {};
+
+    const firstRow = data[0];
+    const headers = Object.keys(firstRow);
+    const mapping: Record<string, string> = {};
+
+    const patterns = {
+      unitNumber: /slip|unit|space|dock|berth|rack|number|#|id/i,
+      tenantName: /tenant|customer|name|owner|renter|lessee|client/i,
+      monthlyRate: /rate|rent|fee|monthly|payment|cost|price|amount/i,
+      status: /status|state|active|occupied|vacant/i,
+      startDate: /start|begin|commence|lease\s*start|move.*in/i,
+      endDate: /end|expire|expiry|lease\s*end|move.*out/i,
+      boatName: /boat|vessel|yacht|craft|ship/i,
+      boatLength: /length|size|loa|feet|ft/i,
+      email: /email|e-mail|mail/i,
+      phone: /phone|tel|mobile|cell|contact/i,
+      make: /make|manufacturer|brand/i,
+      model: /model/i,
+    };
+
+    for (const [field, pattern] of Object.entries(patterns)) {
+      for (const header of headers) {
+        if (pattern.test(header)) {
+          mapping[field] = header;
+          break;
+        }
+      }
+    }
+
+    return mapping;
+  }
+
+  private extractRentRollEntry(
+    row: Record<string, any>, 
+    headerMapping: Record<string, string>,
+    sourceRow: number
+  ): ParsedRentRollEntry | null {
+    const getValue = (field: string): any => {
+      const header = headerMapping[field];
+      return header ? row[header] : undefined;
+    };
+
+    const unitNumber = String(getValue('unitNumber') || '').trim();
+    if (!unitNumber) return null;
+
+    const rateValue = getValue('monthlyRate');
+    const monthlyRate = typeof rateValue === 'number' 
+      ? rateValue 
+      : parseFloat(String(rateValue).replace(/[$,]/g, '')) || 0;
+
+    const statusRaw = String(getValue('status') || '').toLowerCase();
+    let status: ParsedRentRollEntry['status'] = 'active';
+    if (statusRaw.includes('vacant') || statusRaw.includes('empty') || statusRaw.includes('available')) {
+      status = 'vacant';
+    } else if (statusRaw.includes('reserved') || statusRaw.includes('pending')) {
+      status = 'reserved';
+    }
+
+    const entryType = this.inferEntryType(unitNumber, row);
+
+    return {
+      unitNumber,
+      tenantName: String(getValue('tenantName') || '').trim() || undefined,
+      monthlyRate,
+      entryType,
+      status,
+      startDate: this.parseDate(getValue('startDate')),
+      endDate: this.parseDate(getValue('endDate')),
+      sourceRow,
+      boatInfo: {
+        name: String(getValue('boatName') || '').trim() || undefined,
+        length: parseFloat(String(getValue('boatLength') || '')) || undefined,
+        make: String(getValue('make') || '').trim() || undefined,
+        model: String(getValue('model') || '').trim() || undefined,
+      },
+      contactInfo: {
+        email: String(getValue('email') || '').trim() || undefined,
+        phone: String(getValue('phone') || '').trim() || undefined,
+      },
+      rawData: row,
+    };
+  }
+
+  private inferEntryType(unitNumber: string, row: Record<string, any>): ParsedRentRollEntry['entryType'] {
+    const allValues = Object.values(row).join(' ').toLowerCase();
+    
+    if (/rack|dry\s*storage/i.test(allValues)) return 'dry_storage';
+    if (/mooring/i.test(allValues)) return 'mooring';
+    if (/slip|dock|berth|pier/i.test(allValues)) return 'wet_slip';
+    
+    if (/^[A-Z]?\d{1,3}[A-Z]?$/i.test(unitNumber)) return 'wet_slip';
+    if (/^R?\d{1,4}$/i.test(unitNumber)) return 'dry_storage';
+    
+    return 'wet_slip';
+  }
+
+  private parseDate(value: any): string | undefined {
+    if (!value) return undefined;
+    
+    if (typeof value === 'number') {
+      const date = XLSX.SSF.parse_date_code(value);
+      if (date) {
+        return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+      }
+    }
+    
+    if (value instanceof Date) {
+      return value.toISOString().split('T')[0];
+    }
+    
+    const dateStr = String(value).trim();
+    const parsed = new Date(dateStr);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toISOString().split('T')[0];
+    }
+    
+    return undefined;
+  }
+
+  async importRentRollToModule(
+    orgId: string,
+    uploadId: string,
+    options: {
+      rentRollId?: string;
+      rentRollName?: string;
+      effectiveDate?: string;
+      createCustomers?: boolean;
+      linkToCrm?: boolean;
+    }
+  ): Promise<{
+    rentRoll: RentRoll;
+    entries: RentRollEntry[];
+    customers: MarinaCustomer[];
+    matchedContacts: { customerId: string; contactId: string }[];
+    errors: { row: number; message: string }[];
+  }> {
+    const upload = await this.getUpload(orgId, uploadId);
+    if (!upload) {
+      throw new Error('Upload not found');
+    }
+    
+    if (upload.docType !== 'rent_roll') {
+      throw new Error('Document is not classified as a Rent Roll');
+    }
+
+    const parsedEntries = await this.parseRentRollFile(upload.storagePath);
+    
+    let rentRoll: RentRoll;
+    if (options.rentRollId) {
+      const [existing] = await db
+        .select()
+        .from(rentRolls)
+        .where(and(
+          eq(rentRolls.id, options.rentRollId),
+          eq(rentRolls.orgId, orgId)
+        ));
+      if (!existing) {
+        throw new Error('Rent Roll not found');
+      }
+      rentRoll = existing;
+    } else {
+      const [newRentRoll] = await db
+        .insert(rentRolls)
+        .values({
+          orgId,
+          name: options.rentRollName || `Import - ${upload.originalName}`,
+          context: 'valuation',
+          effectiveDate: options.effectiveDate || new Date().toISOString().split('T')[0],
+        })
+        .returning();
+      rentRoll = newRentRoll;
+    }
+
+    const entries: RentRollEntry[] = [];
+    const customers: MarinaCustomer[] = [];
+    const matchedContacts: { customerId: string; contactId: string }[] = [];
+    const errors: { row: number; message: string }[] = [];
+
+    for (const parsed of parsedEntries) {
+      try {
+        let customerId: string | null = null;
+
+        if (options.createCustomers && parsed.tenantName && parsed.status !== 'vacant') {
+          const existingCustomer = await this.findOrCreateCustomer(
+            orgId,
+            parsed.tenantName,
+            parsed.contactInfo,
+            options.linkToCrm
+          );
+          
+          if (existingCustomer) {
+            customerId = existingCustomer.customer.id;
+            customers.push(existingCustomer.customer);
+            
+            if (existingCustomer.matchedContactId) {
+              matchedContacts.push({
+                customerId: existingCustomer.customer.id,
+                contactId: existingCustomer.matchedContactId,
+              });
+            }
+          }
+        }
+
+        const [entry] = await db
+          .insert(rentRollEntries)
+          .values({
+            orgId,
+            rentRollId: rentRoll.id,
+            unitNumber: parsed.unitNumber,
+            tenantName: parsed.tenantName || null,
+            customerId,
+            monthlyRate: String(parsed.monthlyRate),
+            entryType: parsed.entryType,
+            status: parsed.status,
+            startDate: parsed.startDate || null,
+            endDate: parsed.endDate || null,
+          })
+          .returning();
+        
+        entries.push(entry);
+      } catch (error) {
+        errors.push({
+          row: parsed.sourceRow,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    await this.updateUpload(orgId, uploadId, {
+      status: 'completed',
+      holdingStatus: 'processed',
+    });
+
+    return { rentRoll, entries, customers, matchedContacts, errors };
+  }
+
+  private async findOrCreateCustomer(
+    orgId: string,
+    tenantName: string,
+    contactInfo?: { email?: string; phone?: string },
+    linkToCrm?: boolean
+  ): Promise<{ customer: MarinaCustomer; matchedContactId?: string } | null> {
+    if (!tenantName.trim()) return null;
+
+    const nameParts = tenantName.trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    let matchedContactId: string | undefined;
+    
+    if (linkToCrm && (contactInfo?.email || tenantName)) {
+      const matchConditions = [];
+      
+      if (contactInfo?.email) {
+        matchConditions.push(sql`LOWER(${crmContacts.email}) = LOWER(${contactInfo.email})`);
+      }
+      
+      if (firstName && lastName) {
+        matchConditions.push(sql`(
+          LOWER(${crmContacts.firstName}) = LOWER(${firstName}) 
+          AND LOWER(${crmContacts.lastName}) = LOWER(${lastName})
+        )`);
+      }
+
+      if (matchConditions.length > 0) {
+        const [contact] = await db
+          .select()
+          .from(crmContacts)
+          .where(and(
+            eq(crmContacts.orgId, orgId),
+            sql`(${sql.join(matchConditions, sql` OR `)})`
+          ))
+          .limit(1);
+        
+        if (contact) {
+          matchedContactId = contact.id;
+        }
+      }
+    }
+
+    const existingByEmail = contactInfo?.email ? await db
+      .select()
+      .from(marinaCustomers)
+      .where(and(
+        eq(marinaCustomers.orgId, orgId),
+        sql`LOWER(${marinaCustomers.email}) = LOWER(${contactInfo.email})`
+      ))
+      .limit(1) : [];
+
+    if (existingByEmail.length > 0) {
+      return { 
+        customer: existingByEmail[0], 
+        matchedContactId 
+      };
+    }
+
+    const existingByName = await db
+      .select()
+      .from(marinaCustomers)
+      .where(and(
+        eq(marinaCustomers.orgId, orgId),
+        sql`LOWER(${marinaCustomers.firstName}) = LOWER(${firstName})`,
+        sql`LOWER(${marinaCustomers.lastName}) = LOWER(${lastName})`
+      ))
+      .limit(1);
+
+    if (existingByName.length > 0) {
+      if (matchedContactId && !existingByName[0].contactId) {
+        await db
+          .update(marinaCustomers)
+          .set({ contactId: matchedContactId, updatedAt: new Date() })
+          .where(eq(marinaCustomers.id, existingByName[0].id));
+      }
+      return { 
+        customer: existingByName[0], 
+        matchedContactId 
+      };
+    }
+
+    const count = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(marinaCustomers)
+      .where(eq(marinaCustomers.orgId, orgId));
+    
+    const customerNumber = `C${String((count[0]?.count || 0) + 1).padStart(5, '0')}`;
+
+    const [newCustomer] = await db
+      .insert(marinaCustomers)
+      .values({
+        orgId,
+        customerNumber,
+        firstName,
+        lastName,
+        email: contactInfo?.email || null,
+        phone: contactInfo?.phone || null,
+        status: 'active',
+        accountType: 'monthly',
+        joinDate: new Date().toISOString().split('T')[0],
+        contactId: matchedContactId || null,
+      })
+      .returning();
+
+    return { 
+      customer: newCustomer, 
+      matchedContactId 
+    };
+  }
+
+  async matchTenantsToCrmContacts(
+    orgId: string,
+    tenantNames: string[]
+  ): Promise<{
+    matched: { tenantName: string; contactId: string; contactName: string; confidence: number }[];
+    unmatched: string[];
+  }> {
+    const contacts = await db
+      .select()
+      .from(crmContacts)
+      .where(eq(crmContacts.orgId, orgId));
+
+    const matched: { tenantName: string; contactId: string; contactName: string; confidence: number }[] = [];
+    const unmatched: string[] = [];
+
+    for (const tenantName of tenantNames) {
+      if (!tenantName.trim()) {
+        unmatched.push(tenantName);
+        continue;
+      }
+
+      const normalizedTenant = tenantName.toLowerCase().trim();
+      let bestMatch: { contact: typeof contacts[0]; confidence: number } | null = null;
+
+      for (const contact of contacts) {
+        const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.toLowerCase().trim();
+        
+        if (fullName === normalizedTenant) {
+          bestMatch = { contact, confidence: 1.0 };
+          break;
+        }
+
+        if (contact.email && normalizedTenant.includes(contact.email.toLowerCase())) {
+          bestMatch = { contact, confidence: 0.95 };
+          break;
+        }
+
+        const nameParts = normalizedTenant.split(/\s+/);
+        const firstName = (contact.firstName || '').toLowerCase();
+        const lastName = (contact.lastName || '').toLowerCase();
+        
+        if (nameParts.includes(firstName) && nameParts.includes(lastName)) {
+          if (!bestMatch || bestMatch.confidence < 0.85) {
+            bestMatch = { contact, confidence: 0.85 };
+          }
+        }
+
+        if (lastName && normalizedTenant.includes(lastName) && lastName.length > 3) {
+          if (!bestMatch || bestMatch.confidence < 0.6) {
+            bestMatch = { contact, confidence: 0.6 };
+          }
+        }
+      }
+
+      if (bestMatch && bestMatch.confidence >= 0.6) {
+        matched.push({
+          tenantName,
+          contactId: bestMatch.contact.id,
+          contactName: `${bestMatch.contact.firstName || ''} ${bestMatch.contact.lastName || ''}`.trim(),
+          confidence: bestMatch.confidence,
+        });
+      } else {
+        unmatched.push(tenantName);
+      }
+    }
+
+    return { matched, unmatched };
   }
 }
 

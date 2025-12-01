@@ -13913,6 +13913,106 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Import Rent Roll document to Rent Roll module with customer creation and CRM linking
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/import-rent-roll', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, uploadId } = req.params;
+      const { 
+        rentRollId, 
+        rentRollName, 
+        effectiveDate, 
+        createCustomers = true, 
+        linkToCrm = true 
+      } = req.body;
+      
+      const result = await docIntelService.importRentRollToModule(orgId, uploadId, {
+        rentRollId,
+        rentRollName,
+        effectiveDate,
+        createCustomers,
+        linkToCrm,
+      });
+      
+      res.json({
+        success: true,
+        rentRoll: result.rentRoll,
+        stats: {
+          entriesImported: result.entries.length,
+          customersCreated: result.customers.length,
+          contactsLinked: result.matchedContacts.length,
+          errors: result.errors.length,
+        },
+        entries: result.entries,
+        customers: result.customers,
+        matchedContacts: result.matchedContacts,
+        errors: result.errors,
+      });
+    } catch (error) {
+      console.error('Failed to import rent roll:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to import rent roll' 
+      });
+    }
+  });
+
+  // Preview rent roll document parsing (without importing)
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/preview-rent-roll', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, uploadId } = req.params;
+      
+      const upload = await docIntelService.getUpload(orgId, uploadId);
+      if (!upload) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      
+      const parsed = await docIntelService.parseRentRollFile(upload.storagePath);
+      
+      const tenantNames = parsed
+        .filter(p => p.tenantName && p.status !== 'vacant')
+        .map(p => p.tenantName as string);
+      
+      const uniqueTenants = [...new Set(tenantNames)];
+      const crmMatches = await docIntelService.matchTenantsToCrmContacts(orgId, uniqueTenants);
+      
+      res.json({
+        entries: parsed,
+        summary: {
+          totalUnits: parsed.length,
+          occupiedUnits: parsed.filter(p => p.status !== 'vacant').length,
+          vacantUnits: parsed.filter(p => p.status === 'vacant').length,
+          totalMonthlyRevenue: parsed.reduce((sum, p) => sum + p.monthlyRate, 0),
+          uniqueTenants: uniqueTenants.length,
+        },
+        crmMatching: crmMatches,
+      });
+    } catch (error) {
+      console.error('Failed to preview rent roll:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to preview rent roll' 
+      });
+    }
+  });
+
+  // Match tenant names to CRM contacts
+  app.post('/api/modeling/doc-intel/match-tenants', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { tenantNames } = req.body;
+      
+      if (!Array.isArray(tenantNames)) {
+        return res.status(400).json({ error: 'tenantNames must be an array' });
+      }
+      
+      const result = await docIntelService.matchTenantsToCrmContacts(orgId, tenantNames);
+      res.json(result);
+    } catch (error) {
+      console.error('Failed to match tenants:', error);
+      res.status(500).json({ error: 'Failed to match tenants to CRM contacts' });
+    }
+  });
+
   // Get P&L Lines for a project
   app.get('/api/modeling/projects/:projectId/pnl-lines', authenticateUser, async (req: any, res) => {
     try {
