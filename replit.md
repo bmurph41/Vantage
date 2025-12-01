@@ -82,15 +82,18 @@ Preferred communication style: Simple, everyday language.
 - **Ship Store Module**: POS/inventory system with product catalog, transactions, analytics, and customer tracking, with portfolio management.
 - **Virtual Data Room (VDR) Module**: Secure document management with hierarchical folders, 5-level permissions, external user management, diligence request workflows, audit logging, and data request management (Kanban board, configurable categories, due date presets).
 - **DockTalk 2.0 Module**: Marina industry intelligence platform with AI-powered RSS aggregation, M&A deal tracking, real-time updates, sentiment analysis, and AI training system.
-- **Dockit Module**: Marina operations management integrated under Operations section. Located in `modules/dockit/` with namespaced tables (dockit_*). Features:
-    - **Dashboard**: Real-time marina operations overview with KPIs (customers, launches, slip occupancy, payments).
-    - **Launch Scheduling**: Boat launch and haul queue management.
-    - **Customer Management**: Marina member database with contact info, boats, and payment history.
-    - **Slips & Leases**: Slip inventory and lease contract management.
-    - **Contracts**: Digital contract creation and management with templates.
-    - **Data Import**: CSV/Excel import pipeline for bulk data migration.
+- **Launch Operations Module** (formerly Dockit): Focused marina launch operations integrated under Operations section. Located in `modules/dockit/` with namespaced tables (dockit_*). Features:
+    - **Launch Control Dashboard**: Active launch queue, staging queue, and completed launches with transient-focused KPIs.
+    - **Launch Queue Management**: Boat launch and haul scheduling with employee assignment and timestamp tracking.
+    - **Transient Slips**: Daily rate transient slip management with check-in/check-out tracking.
+    - **CRM Integration**: Dockit customers sync with CRM contacts via crmContactId/crmCompanyId fields. Endpoints:
+        - POST `/dockit/api/customers/:id/link-crm` - Link customer to CRM contact
+        - POST `/dockit/api/crm/sync-from-contact` - Create/update Dockit customer from CRM data
+        - GET `/dockit/api/customers/:id/launch-history` - Launch activity for CRM timeline
+    - **Rent Roll Integration**: Transient occupancy and revenue sync via `/dockit/api/stats/transient` endpoint.
+    - **Employee Tracking**: Staff assignment for launches with `/dockit/api/employees` endpoint.
+    - **External App Webhooks**: Prepared for Dockwa/Snag-a-Slip integration.
     - **API Namespace**: All routes mounted under `/dockit/api/*` for isolation.
-    - **Integration Design**: Prepared for future Rent Roll and CRM sync without disrupting existing functionality.
 - **Market Demographics Module**: Regional market analysis with state-level FRED economic indicators (population, income, employment, housing) and location-based Census demographics. Features include:
     - **State Analysis**: FRED API integration for state-level economic data with YoY trends and 5-year CAGR.
     - **Location Analysis**: Census Bureau API integration for granular demographics at any U.S. address (tract/county/state level).
