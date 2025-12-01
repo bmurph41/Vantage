@@ -406,6 +406,30 @@ export class FundService {
     }));
   }
 
+  async getAllocationByProject(
+    orgId: string,
+    modelingProjectId: string
+  ): Promise<(FundDealAllocation & { fundName?: string }) | null> {
+    const results = await db.select({
+      allocation: fundDealAllocations,
+      fundName: funds.name,
+    })
+      .from(fundDealAllocations)
+      .leftJoin(funds, eq(fundDealAllocations.fundId, funds.id))
+      .where(and(
+        eq(fundDealAllocations.modelingProjectId, modelingProjectId),
+        eq(fundDealAllocations.orgId, orgId)
+      ))
+      .limit(1);
+
+    if (results.length === 0) return null;
+    
+    return {
+      ...results[0].allocation,
+      fundName: results[0].fundName || undefined,
+    };
+  }
+
   async updateDealAllocation(
     orgId: string,
     allocationId: string,

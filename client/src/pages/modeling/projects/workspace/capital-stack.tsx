@@ -41,9 +41,14 @@ import {
   Info,
   ArrowUpDown,
   Copy,
-  Settings2
+  Settings2,
+  Briefcase,
+  Link,
+  Unlink
 } from 'lucide-react';
-import type { CapitalStack, DebtTranche, EquityLayer, CapitalStackProjection } from '@shared/schema';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import type { CapitalStack, DebtTranche, EquityLayer, CapitalStackProjection, Fund, FundDealAllocation, FundCapitalStackTemplate } from '@shared/schema';
 
 interface CapitalStackWorkspaceProps {
   projectId: string;
@@ -158,9 +163,27 @@ export default function CapitalStackWorkspace({ projectId }: CapitalStackWorkspa
   const [promoteTiers, setPromoteTiers] = useState<{ irrHurdle: number; gpSplit: number; lpSplit: number }[]>([
     { irrHurdle: 0.08, gpSplit: 0.20, lpSplit: 0.80 },
   ]);
+  const [showFundInheritance, setShowFundInheritance] = useState(false);
+  const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   const { data: stacks, isLoading: stacksLoading } = useQuery<CapitalStack[]>({
     queryKey: ['/api/modeling/projects', projectId, 'capital-stacks'],
+  });
+
+  // Fund management queries for capital stack inheritance
+  const { data: funds } = useQuery<Fund[]>({
+    queryKey: ['/api/funds'],
+  });
+
+  const { data: dealAllocation } = useQuery<FundDealAllocation>({
+    queryKey: ['/api/funds/allocations/by-project', projectId],
+    enabled: !!projectId,
+  });
+
+  const { data: fundTemplates } = useQuery<FundCapitalStackTemplate[]>({
+    queryKey: ['/api/funds', selectedFundId, 'capital-stack-templates'],
+    enabled: !!selectedFundId,
   });
 
   const { data: stackDetails, isLoading: detailsLoading } = useQuery<{
@@ -403,6 +426,89 @@ export default function CapitalStackWorkspace({ projectId }: CapitalStackWorkspa
     },
   });
 
+  // Fund inheritance mutations
+  const linkFundMutation = useMutation({
+    mutationFn: async (data: { fundId: string; templateId?: string }) => {
+      const allocationResult = await apiRequest(`/api/funds/allocations`, {
+        method: 'POST',
+        body: JSON.stringify({
+          fundId: data.fundId,
+          modelingProjectId: projectId,
+          allocationPct: '1.0',
+          allocatedEquity: '0',
+          usesFundCapitalStack: true,
+          capitalStackTemplateId: data.templateId || null,
+        }),
+      });
+      
+      if (data.templateId) {
+        await apiRequest(`/api/modeling/projects/${projectId}/capital-stacks/apply-template`, {
+          method: 'POST',
+          body: JSON.stringify({ templateId: data.templateId }),
+        });
+      }
+      
+      return allocationResult;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/funds/allocations/by-project', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/funds'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'capital-stacks'] });
+      setShowFundInheritance(false);
+      toast({ title: 'Fund linked successfully', description: 'This deal now inherits the fund\'s capital structure' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to link fund', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const unlinkFundMutation = useMutation({
+    mutationFn: async (allocationId: string) => {
+      return apiRequest(`/api/funds/allocations/${allocationId}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/funds/allocations/by-project', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/funds'] });
+      toast({ title: 'Fund unlinked', description: 'This deal will now use its own capital structure' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to unlink fund', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const toggleInheritanceMutation = useMutation({
+    mutationFn: async (useInheritance: boolean) => {
+      if (!dealAllocation) throw new Error('No fund allocation found');
+      return apiRequest(`/api/funds/allocations/${dealAllocation.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ usesFundCapitalStack: useInheritance }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/funds/allocations/by-project', projectId] });
+      toast({ title: 'Inheritance setting updated' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to update inheritance', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const applyTemplateMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      return apiRequest(`/api/modeling/projects/${projectId}/capital-stacks/apply-template`, {
+        method: 'POST',
+        body: JSON.stringify({ templateId }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'capital-stacks'] });
+      toast({ title: 'Template applied', description: 'Capital stack created from fund template' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to apply template', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const handleDebtSubmit = (data: DebtTrancheFormData) => {
     const payload = {
       name: data.name,
@@ -603,15 +709,219 @@ export default function CapitalStackWorkspace({ projectId }: CapitalStackWorkspa
         </Dialog>
       </div>
 
+      {/* Fund Inheritance Section */}
+      <Card className="border-dashed">
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Briefcase className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">Fund Inheritance</h3>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Link this deal to a fund to inherit its capital structure, waterfall terms, and promote splits. Fund-level returns will aggregate this deal's performance.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {dealAllocation 
+                    ? `Linked to fund • ${dealAllocation.usesFundCapitalStack ? 'Inheriting fund structure' : 'Using deal-specific structure'}`
+                    : 'Not linked to a fund'
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {dealAllocation ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Inherit Fund Structure</span>
+                    <Switch
+                      checked={dealAllocation.usesFundCapitalStack ?? true}
+                      onCheckedChange={(checked) => toggleInheritanceMutation.mutate(checked)}
+                      disabled={toggleInheritanceMutation.isPending}
+                      data-testid="toggle-fund-inheritance"
+                    />
+                  </div>
+                  <Separator orientation="vertical" className="h-6" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => dealAllocation && unlinkFundMutation.mutate(dealAllocation.id)}
+                    disabled={unlinkFundMutation.isPending}
+                    data-testid="button-unlink-fund"
+                  >
+                    <Unlink className="h-4 w-4 mr-2" />
+                    Unlink
+                  </Button>
+                </>
+              ) : (
+                <Dialog open={showFundInheritance} onOpenChange={setShowFundInheritance}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid="button-link-fund">
+                      <Link className="h-4 w-4 mr-2" />
+                      Link to Fund
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Link Deal to Fund</DialogTitle>
+                      <DialogDescription>
+                        Select a fund to link this deal to. The deal will inherit the fund's capital structure and waterfall terms.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div>
+                        <Label>Select Fund</Label>
+                        <Select onValueChange={setSelectedFundId} value={selectedFundId || ''}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose a fund..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {funds?.map((fund) => (
+                              <SelectItem key={fund.id} value={fund.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{fund.name}</span>
+                                  {fund.vintage && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Vintage {fund.vintage}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {selectedFundId && fundTemplates && fundTemplates.length > 0 && (
+                        <div>
+                          <Label>Capital Stack Template (Optional)</Label>
+                          <Select onValueChange={setSelectedTemplateId} value={selectedTemplateId || ''}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Use fund's default template" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {fundTemplates.map((template) => (
+                                <SelectItem key={template.id} value={template.id}>
+                                  <div className="flex items-center gap-2">
+                                    <span>{template.name}</span>
+                                    {template.isDefault && (
+                                      <Badge variant="outline" className="text-xs">Default</Badge>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Templates define standard debt/equity structures and waterfall terms
+                          </p>
+                        </div>
+                      )}
+                      
+                      {selectedFundId && (
+                        <Alert>
+                          <Briefcase className="h-4 w-4" />
+                          <AlertTitle>Fund Attribution</AlertTitle>
+                          <AlertDescription>
+                            This deal's returns will be included in fund-level IRR, TVPI, and DPI calculations.
+                            Capital calls and distributions will be tracked at the fund level.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setShowFundInheritance(false)}>
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={() => selectedFundId && linkFundMutation.mutate({ 
+                          fundId: selectedFundId, 
+                          templateId: selectedTemplateId || undefined 
+                        })}
+                        disabled={!selectedFundId || linkFundMutation.isPending}
+                      >
+                        {linkFundMutation.isPending ? 'Linking...' : 'Link Fund'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+          </div>
+          
+          {/* Fund Template Actions when linked */}
+          {dealAllocation && dealAllocation.usesFundCapitalStack && fundTemplates && fundTemplates.length > 0 && (
+            <div className="mt-4 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Apply Fund Template</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select onValueChange={setSelectedTemplateId} value={selectedTemplateId || ''}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select template..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fundTemplates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                          {template.isDefault && ' (Default)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    size="sm"
+                    onClick={() => selectedTemplateId && applyTemplateMutation.mutate(selectedTemplateId)}
+                    disabled={!selectedTemplateId || applyTemplateMutation.isPending}
+                  >
+                    {applyTemplateMutation.isPending ? 'Applying...' : 'Apply'}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Applying a template will create a new capital stack with the fund's standard debt/equity structure
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {(!stacks || stacks.length === 0) ? (
         <Card className="p-8 text-center">
           <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No Capital Stacks</h3>
           <p className="text-muted-foreground mb-4">Create a capital stack to model debt and equity structure with waterfall distributions</p>
-          <Button onClick={() => setShowCreateStack(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Capital Stack
-          </Button>
+          <div className="flex justify-center gap-3">
+            <Button onClick={() => setShowCreateStack(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Capital Stack
+            </Button>
+            {dealAllocation && fundTemplates && fundTemplates.length > 0 && (
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  const defaultTemplate = fundTemplates.find(t => t.isDefault) || fundTemplates[0];
+                  if (defaultTemplate) applyTemplateMutation.mutate(defaultTemplate.id);
+                }}
+                disabled={applyTemplateMutation.isPending}
+              >
+                <Briefcase className="h-4 w-4 mr-2" />
+                Use Fund Template
+              </Button>
+            )}
+          </div>
         </Card>
       ) : (
         <div className="grid grid-cols-12 gap-6">

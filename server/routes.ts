@@ -15895,6 +15895,165 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get deal allocation by modeling project ID
+  app.get('/api/funds/allocations/by-project/:projectId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const allocation = await fundService.getAllocationByProject(orgId, projectId);
+      if (!allocation) {
+        return res.status(404).json({ error: 'No fund allocation found for this project' });
+      }
+      res.json(allocation);
+    } catch (error) {
+      console.error('Failed to fetch deal allocation by project:', error);
+      res.status(500).json({ error: 'Failed to fetch deal allocation' });
+    }
+  });
+
+  // Create fund allocation (link project to fund)
+  app.post('/api/funds/allocations', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { fundService } = await import('./services/fund-service');
+      const allocation = await fundService.createDealAllocation(orgId, {
+        ...req.body,
+        orgId,
+      });
+      res.status(201).json(allocation);
+    } catch (error) {
+      console.error('Failed to create fund allocation:', error);
+      res.status(500).json({ error: 'Failed to create fund allocation' });
+    }
+  });
+
+  // Update fund allocation (toggle inheritance, change template, etc.)
+  app.patch('/api/funds/allocations/:allocationId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { allocationId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const updated = await fundService.updateDealAllocation(orgId, allocationId, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: 'Allocation not found' });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error('Failed to update fund allocation:', error);
+      res.status(500).json({ error: 'Failed to update fund allocation' });
+    }
+  });
+
+  // Delete fund allocation (unlink project from fund)
+  app.delete('/api/funds/allocations/:allocationId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { allocationId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      await fundService.deleteDealAllocation(orgId, allocationId);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Failed to delete fund allocation:', error);
+      res.status(500).json({ error: 'Failed to delete fund allocation' });
+    }
+  });
+
+  // Apply capital stack template to modeling project
+  app.post('/api/modeling/projects/:projectId/capital-stacks/apply-template', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { templateId } = req.body;
+      
+      if (!templateId) {
+        return res.status(400).json({ error: 'Template ID is required' });
+      }
+      
+      const { fundService } = await import('./services/fund-service');
+      const template = await fundService.getCapitalStackTemplate(orgId, templateId);
+      
+      if (!template) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      
+      // Create a new capital stack based on the template
+      const modelingProject = await storage.getModelingProject(projectId, orgId);
+      if (!modelingProject) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      // Get or estimate purchase price from the project
+      const purchasePrice = parseFloat(modelingProject.purchasePrice?.toString() || '10000000');
+      const targetLtv = parseFloat(template.targetLtv?.toString() || '0.65');
+      const totalDebt = purchasePrice * targetLtv;
+      const totalEquity = purchasePrice - totalDebt;
+      
+      // Create capital stack
+      const stack = await storage.createCapitalStack({
+        orgId,
+        modelingProjectId: projectId,
+        name: `${template.name} - Applied`,
+        description: `Created from fund template: ${template.name}`,
+        purchasePrice: purchasePrice.toString(),
+        closingCosts: (purchasePrice * 0.015).toString(),
+        capexReserves: (purchasePrice * 0.02).toString(),
+        workingCapital: (purchasePrice * 0.005).toString(),
+        totalCapitalization: (purchasePrice * 1.04).toString(),
+        holdPeriodYears: 5,
+        exitCapRate: '0.07',
+        noiGrowthRate: '0.02',
+        status: 'active',
+        createdBy: userId,
+      });
+      
+      // Create debt tranches from template
+      const debtTemplates = template.debtTemplates || [];
+      for (const debtTemplate of debtTemplates) {
+        await storage.createDebtTranche({
+          capitalStackId: stack.id,
+          name: debtTemplate.name,
+          trancheType: debtTemplate.trancheType,
+          principal: (totalDebt * (debtTemplate.principalPct || 1)).toString(),
+          interestRate: debtTemplate.interestRate.toString(),
+          termYears: debtTemplate.termYears,
+          amortizationYears: debtTemplate.amortizationYears || null,
+          interestOnlyMonths: debtTemplate.interestOnlyMonths || 0,
+          priority: debtTemplate.priority,
+        });
+      }
+      
+      // Create equity layers from template
+      const equityTemplates = template.equityTemplates || [];
+      for (const equityTemplate of equityTemplates) {
+        await storage.createEquityLayer({
+          capitalStackId: stack.id,
+          name: equityTemplate.name,
+          layerType: equityTemplate.layerType,
+          investorType: equityTemplate.investorType,
+          commitmentAmount: (totalEquity * (equityTemplate.ownershipPct || 0)).toString(),
+          fundedAmount: '0',
+          ownershipPct: (equityTemplate.ownershipPct * 100).toString(),
+          preferredReturn: equityTemplate.preferredReturn?.toString() || null,
+          preferredReturnType: equityTemplate.preferredReturnType || null,
+          isParticipating: equityTemplate.isParticipating ?? true,
+          promoteTiers: equityTemplate.promoteTiers || null,
+          waterfallPriority: equityTemplate.waterfallPriority,
+        });
+      }
+      
+      res.status(201).json({ 
+        message: 'Template applied successfully',
+        capitalStack: stack
+      });
+    } catch (error) {
+      console.error('Failed to apply capital stack template:', error);
+      res.status(500).json({ error: 'Failed to apply capital stack template' });
+    }
+  });
+
   // ============================================================================
   // DEBT SCENARIOS - Debt Structure Analysis & Sensitivity Modeling
   // ============================================================================

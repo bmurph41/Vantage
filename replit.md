@@ -1,7 +1,7 @@
 # MarinaMatch Platform
 
 ## Overview
-MarinaMatch is a full-stack platform designed to manage marina acquisition projects. It integrates comprehensive CRM functionalities with Due Diligence Tracking, enabling deal pipeline management, lead and contact tracking, and automated due diligence workflows. The platform aims to streamline the acquisition process from initial lead to project completion, offering a unified solution for managing complex marina transactions. Key capabilities include CRM, Due Diligence, Rent Roll, Sales Comps, Modeling Projects (with advanced Exit Strategy Suite and Document Intelligence), Marketing, Fuel Sales, Ship Store, and a Virtual Data Room (VDR).
+MarinaMatch is a comprehensive full-stack platform designed to manage marina acquisition projects. It offers a unified solution for streamlining the acquisition process, from initial lead generation to project completion, by integrating robust CRM functionalities with advanced Due Diligence Tracking. The platform supports deal pipeline management, lead and contact tracking, and automated due diligence workflows. Key capabilities include CRM, Due Diligence, Rent Roll management, Sales Comparables, advanced Modeling Projects with an Exit Strategy Suite and AI-powered Document Intelligence, Marketing automation, Fuel Sales, Ship Store management, and a secure Virtual Data Room (VDR). The platform aims to centralize complex marina transaction management, enhance efficiency, and provide deep analytical insights to drive successful acquisitions.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -16,101 +16,51 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend
 - **Frameworks**: React 18 with TypeScript, Wouter for routing.
-- **UI/Styling**: shadcn/ui (built on Radix UI), Tailwind CSS with CSS variables, Lucide-React for icons. Full mobile optimization.
+- **UI/Styling**: shadcn/ui (built on Radix UI), Tailwind CSS with CSS variables, Lucide-React for icons, mobile optimization.
 - **State Management**: TanStack Query for server state.
 - **Form Handling**: React Hook Form with Zod validation.
 
 ### Backend
 - **Framework**: Express.js with TypeScript.
-- **API**: RESTful design, consistent error handling, logging.
+- **API**: RESTful design with consistent error handling and logging.
 - **Database ORM**: Drizzle ORM.
 - **Authentication**: Session-based, multi-tenant.
-- **File Uploads**: Multer-based, 10MB limit, stored locally.
+- **File Uploads**: Multer-based, 10MB limit, local storage.
 
 ### Data Storage
 - **Database**: PostgreSQL with Neon serverless hosting.
-- **ORM**: Drizzle ORM with schema-first approach.
-- **Schema**: Multi-tenant architecture for organizations, users, projects, tasks.
-- **Migrations**: Drizzle Kit.
+- **ORM**: Drizzle ORM with schema-first approach and Drizzle Kit for migrations.
+- **Schema**: Multi-tenant architecture supporting organizations, users, projects, and tasks.
 - **Webhook Idempotency**: In-memory storage for 24-hour retention.
 
 ### Authentication and Authorization
-- **Multi-tenancy**: Organization-based data isolation, role-based access control (Owner, Editor, Viewer).
+- **Multi-tenancy**: Organization-based data isolation with role-based access control (Owner, Editor, Viewer).
 - **Session Management**: Express sessions with PostgreSQL session store.
 - **Security**: Zod schema validation, SQL injection prevention, RBAC middleware, audit trails.
-- **VDR Permission System**: Hierarchical, 5-level granular permissions (no_access, view_only, view_download, view_download_print, full_access) with 60-second cache invalidation.
+- **VDR Permission System**: Hierarchical, 5-level granular permissions with 60-second cache invalidation.
 
 ### Key Features
-- **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation. The CRM is split into two sections:
-    - **Relationship Management** (Core CRM - all users): Dashboard, Contacts, Companies, Properties, Deals, Pipeline, Activity Log, Follow-Ups, Marketing, Analytics, Forecast.
-    - **Prospecting & Outreach** (Premium add-on - brokers/PE investors only): Prospecting Dashboard, Lead Builder, Prospecting Board, Market Targets, Campaigns & Templates, Deal Sourcing Analytics. Includes activity tracking (calls, emails, meetings), weekly goal tracking, outreach campaigns, and market territory management.
-- **Due Diligence Module**: Project management with task tracking and template management.
-- **CRM-DD Integration**: Converts CRM deals to DD projects with automated task and contact mapping.
-- **Rent Roll Module**: Manages marina unit occupancy and rental income, with Customer Analytics integration.
-    - **Customer Analytics**: Real-time KPI dashboard tracking customer metrics with accurate formulas:
-        - **Total/Active/Prospect/Churned Customers**: Count by status from marina_customers table
-        - **Retention Rate**: (Active Customers / (Active + Churned)) * 100
-        - **Churn Rate**: (Churned Customers / (Active + Churned)) * 100
-        - **Avg LTV**: Comprehensive calculation from 3 revenue sources:
-            - service_usage.amount (direct transactions)
-            - slip_assignments.monthlyRate * months_active (prorated)
-            - rent_roll_entries.monthlyRate * months_active (prorated)
-        - **Avg Tenure**: Average months since joinDate for active customers
-        - **Churn Risk**: Customers with 90+ days since last activity (high: 180+, medium: 90-180)
-        - **LTV Distribution**: Customer count by revenue bucket
-        - **Customer Segments**: Breakdown by account type (monthly, seasonal, transient, annual)
+- **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation. Includes relationship management and a premium prospecting/outreach add-on.
+- **Due Diligence Module**: Project management with task tracking and template management, integrated with CRM for deal conversion.
+- **Rent Roll Module**: Manages marina unit occupancy and rental income, with real-time Customer Analytics (LTV, retention, churn, tenure, churn risk).
 - **SalesComps Module**: Marina sales comparables with CSV import/export, Google Maps, and portfolio functionality.
-- **Modeling Projects Module**: Tracks marina valuation, links to CRM, DD, sales comps, with analytics.
-    - **Dynamic Year Selector**: Project-specific financial period selection (calendar year, T12, projected, fiscal year) that drives deal pricing calculations. Color-coded badges distinguish period types. Selected period data (revenue, expenses, NOI) flows through to purchase price and yield calculations via `modelingFinancialPeriods` table.
-    - **Operations Data Sync**: Institutional-grade pipeline for operational data (Rent Roll, Fuel Sales, Ship Store) to modeling projects.
-    - **Exit Strategy Suite**: Integrated tools for exit analysis (Tax Calculator, Net Proceeds, 1031 Exchange, DST Analysis, Seller Financing, Earnout Modeling, Waterfall Analysis, IRR, Sensitivity Analysis, AI Insights).
-    - **Document Intelligence**: AI-powered document parsing for P&L and Rent Roll with QuickBooks-style review workflow, hierarchical categorization, and confidence scoring.
-    - **Scenario Versioning**: Version history for Base/Aggressive/Conservative scenarios with audit trail, approval workflows (draft → pending → approved/rejected), and version comparison. Scenario locking prevents edits to approved scenarios.
-    - **QuickBooks Integration**: OAuth2 connection flow for QuickBooks Online, P&L sync to modeling actuals with automatic category mapping, encrypted token storage.
-    - **Approval Notifications**: In-app notification system for scenario approval requests with SendGrid email integration, multi-approver support, and approval statistics.
-    - **Portfolio Roll-ups**: Aggregate views across multiple modeling projects with portfolio summary (value, NOI, cap rates, IRR), breakdown by region/state/status/year, multi-year projections, and performance analysis.
-    - **Pro Forma Engine**: Real-time projections calculated from modeling actuals and scenario assumptions with historical P&L data binding.
-    - **Sensitivity Matrix Storage**: Persisted sensitivity analysis results with scenario versioning for cap rate and growth rate scenarios.
-    - **Benchmark Comparison**: Compares project metrics against sales comps database with portfolio risk metrics (concentration, vintage, geographic exposure).
-    - **Multi-Approver Workflows**: IC committee support with quorum requirements and parallel sign-offs for institutional approval processes.
-    - **Comment Threads**: Inline scenario discussions for IC feedback with mentions, resolution tracking, and full audit trail.
-    - **VDR Integration**: Auto-populates Virtual Data Room with modeling outputs (IC memos, pro formas, scenario comparisons) for deal closing.
-    - **Debt Sensitivity Analysis**: Interest rate scenarios across lender structures (bank, credit union, CMBS, bridge, SBA) with DSCR calculations.
-    - **Waterfall Customization**: Configurable LP/GP splits, hurdle rates, catch-up provisions with European/American waterfall support and IRR calculations.
-    - **External API**: Export-ready data feeds (JSON, CSV, XML) for downstream reporting systems with webhook payload generation.
-    - **Capital Stack Builder**: Multi-tranche debt and equity structure modeling with:
-        - **Debt Tranches**: Senior, mezzanine, bridge, construction, SBA, CMBS, credit union loan modeling with priority ordering, interest rates, amortization schedules, I/O periods, and automatic debt service calculations.
-        - **Equity Layers**: Common, preferred, promote, and co-invest equity layers with commitment amounts, ownership percentages, preferred returns, and waterfall priority.
-        - **Financial Calculations**: Blended debt rate, LTV, debt yield, DSCR, monthly/annual debt service using amortization formulas with I/O period support.
-        - **Cash Flow Projections**: Year-by-year projections with NOI growth, debt service, cash flow after debt, DSCR, cash-on-cash returns, exit value calculations, and net sale proceeds.
-        - **Return Metrics**: IRR calculation using Newton-Raphson method, equity multiple, and waterfall distributions between LP/GP with preferred returns and promote structures.
-        - **Automatic Recalculation**: Metrics auto-update when debt tranches or equity layers are added, modified, or deleted.
-- **Marketing Module**: Tracks campaigns, expenses, lead attribution, and integrates with email platforms.
-- **Fuel Sales Module**: Manages fuel operations, transactions, inventory, and analytics, with portfolio management.
-- **Ship Store Module**: POS/inventory system with product catalog, transactions, analytics, and customer tracking, with portfolio management.
-- **Virtual Data Room (VDR) Module**: Secure document management with hierarchical folders, 5-level permissions, external user management, diligence request workflows, audit logging, and data request management (Kanban board, configurable categories, due date presets).
-- **DockTalk 2.0 Module**: Marina industry intelligence platform with AI-powered RSS aggregation, M&A deal tracking, real-time updates, sentiment analysis, and AI training system.
-- **Launch Operations Module** (formerly Dockit): Focused marina launch operations integrated under Operations section. Located in `modules/dockit/` with namespaced tables (dockit_*). Features:
-    - **Launch Control Dashboard**: Active launch queue, staging queue, and completed launches with transient-focused KPIs.
-    - **Launch Queue Management**: Boat launch and haul scheduling with employee assignment and timestamp tracking.
-    - **Transient Slips**: Daily rate transient slip management with check-in/check-out tracking.
-    - **CRM Integration**: Dockit customers sync with CRM contacts via crmContactId/crmCompanyId fields. Endpoints:
-        - POST `/dockit/api/customers/:id/link-crm` - Link customer to CRM contact
-        - POST `/dockit/api/crm/sync-from-contact` - Create/update Dockit customer from CRM data
-        - GET `/dockit/api/customers/:id/launch-history` - Launch activity for CRM timeline
-    - **Rent Roll Integration**: Transient occupancy and revenue sync via `/dockit/api/stats/transient` endpoint.
-    - **Employee Tracking**: Staff assignment for launches with `/dockit/api/employees` endpoint.
-    - **External App Webhooks**: Prepared for Dockwa/Snag-a-Slip integration.
-    - **API Namespace**: All routes mounted under `/dockit/api/*` for isolation.
-- **Market Demographics Module**: Regional market analysis with state-level FRED economic indicators (population, income, employment, housing) and location-based Census demographics. Features include:
-    - **State Analysis**: FRED API integration for state-level economic data with YoY trends and 5-year CAGR.
-    - **Location Analysis**: Census Bureau API integration for granular demographics at any U.S. address (tract/county/state level).
-    - **Trade Area Analysis**: Configurable distance rings (1/3/5/10 miles) or drive times (5/10/15/20 minutes) with per-location customization.
-    - **Per-Location Configuration**: Each location can have its own trade area settings (distance rings vs drive times) editable via settings popover.
-    - **Project Persistence**: Location configurations are saved per modeling project with project selector and save/load functionality.
-    - **Multi-Location Comparison**: Side-by-side comparison of up to 5 locations with population, income, education, and housing metrics.
-    - **Property Demographics**: Direct integration with CRM properties for automatic demographic lookups.
-    - **Caching Layer**: Automatic caching of FRED and Census API responses to minimize external calls.
+- **Modeling Projects Module**: Tracks marina valuation, integrated with CRM, DD, and sales comps. Features include:
+    - **Dynamic Year Selector**: Project-specific financial period selection.
+    - **Operations Data Sync**: Institutional-grade pipeline for operational data.
+    - **Exit Strategy Suite**: Tools for exit analysis (Tax Calculator, Net Proceeds, 1031 Exchange, Waterfall Analysis, IRR).
+    - **Document Intelligence**: AI-powered document parsing for P&L and Rent Roll.
+    - **Scenario Versioning**: Version history for financial scenarios (Base/Aggressive/Conservative) with approval workflows and locking.
+    - **QuickBooks Integration**: OAuth2 for P&L sync with category mapping.
+    - **Capital Stack Builder**: Multi-tranche debt and equity structure modeling with detailed financial calculations and fund inheritance.
+    - **Pro Forma Engine**: Real-time projections from actuals and assumptions.
+    - **Portfolio Roll-ups**: Aggregate views and performance analysis across projects.
+- **Fund Management Module**: Tracks PE fund lifecycle, capital allocation, fund-level returns, and investor capital accounts with a dedicated LP Portal.
+- **Marketing Module**: Tracks campaigns, expenses, and lead attribution.
+- **Fuel Sales & Ship Store Modules**: POS/inventory systems with analytics and portfolio management.
+- **Virtual Data Room (VDR) Module**: Secure document management with hierarchical folders, granular permissions, external user management, diligence request workflows, and audit logging.
+- **DockTalk 2.0 Module**: Marina industry intelligence platform with AI-powered RSS aggregation, M&A deal tracking, sentiment analysis.
+- **Launch Operations Module (Dockit)**: Manages marina launch and haul scheduling, transient slips, employee assignments, with CRM and Rent Roll integration.
+- **Market Demographics Module**: Regional market analysis using FRED and Census Bureau APIs for state-level economic indicators and location-based demographics with configurable trade areas and caching.
 
 ## External Dependencies
 
@@ -123,10 +73,8 @@ Preferred communication style: Simple, everyday language.
 - **react-hook-form**: Form library.
 - **multer**: File upload middleware.
 - **@dnd-kit**: Drag and drop toolkit.
-- **date-fns**: Date utility library.
-- **date-fns-tz**: Timezone support.
-- **zod**: TypeScript-first schema validation.
-- **@hookform/resolvers**: Validation resolvers for React Hook Form.
+- **date-fns**, **date-fns-tz**: Date and timezone utilities.
+- **zod**: Schema validation.
 
 ### UI and Component Libraries
 - **@radix-ui/react-***: Headless UI primitives.
@@ -135,13 +83,15 @@ Preferred communication style: Simple, everyday language.
 - **shadcn/ui**: Component library.
 
 ### Development and Build Tools
-- **vite**: Build tool and development server.
+- **vite**: Build tool.
 - **typescript**: Static type checking.
 - **drizzle-kit**: Database migration and introspection.
 
-### AI/External Services (DockTalk 2.0)
-- **Anthropic AI**
-- **OpenAI**
+### AI/External Services
+- **Anthropic AI**, **OpenAI**: AI services for DockTalk 2.0.
 - **Cheerio**: Web scraping.
-- **RSS Parser**
+- **RSS Parser**: RSS feed processing.
 - **Resend**: Email service.
+- **FRED API**: Federal Reserve Economic Data.
+- **Census Bureau API**: Demographic data.
+- **QuickBooks API**: Financial data synchronization.
