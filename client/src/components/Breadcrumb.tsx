@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Anchor, LayoutDashboard, Users, Briefcase, Target, Settings as SettingsIcon, FolderKanban, FolderLock, TrendingUp, MessageSquare, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -6,6 +7,9 @@ interface BreadcrumbItem {
   label: string;
   href?: string;
   icon?: React.ComponentType<{ className?: string }>;
+  isDynamic?: boolean;
+  dynamicType?: 'modeling-project';
+  dynamicId?: string;
 }
 
 const DASHBOARD_ITEM: BreadcrumbItem = { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard };
@@ -607,6 +611,31 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
 function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
   let items: BreadcrumbItem[] = [];
 
+  const modelingProjectMatch = path.match(/^\/modeling\/projects\/([a-f0-9-]+)(\/.*)?$/i);
+  if (modelingProjectMatch) {
+    const projectId = modelingProjectMatch[1];
+    const subPath = modelingProjectMatch[2] || '';
+    
+    items = [
+      CATEGORIES.MODELING,
+      { label: 'Projects', href: '/modeling/projects' },
+      { label: projectId, isDynamic: true, dynamicType: 'modeling-project', dynamicId: projectId },
+    ];
+    
+    if (subPath) {
+      const subSegments = subPath.split('/').filter(Boolean);
+      subSegments.forEach(seg => {
+        const formattedLabel = seg
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        items.push({ label: formattedLabel });
+      });
+    }
+    
+    return [DASHBOARD_ITEM, ...items];
+  }
+
   if (ROUTE_MAPPINGS[path]) {
     items = ROUTE_MAPPINGS[path];
   } else {
@@ -654,6 +683,44 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
   return [];
 }
 
+function DynamicBreadcrumbItem({ item, isLast }: { item: BreadcrumbItem; isLast: boolean }) {
+  const { data: project } = useQuery<{ name: string }>({
+    queryKey: ['/api/modeling/projects', item.dynamicId],
+    enabled: item.dynamicType === 'modeling-project' && !!item.dynamicId,
+  });
+  
+  const displayLabel = project?.name || item.label;
+  const Icon = item.icon;
+  
+  if (isLast) {
+    return (
+      <span
+        className={cn(
+          'flex items-center gap-1.5 text-primary font-medium max-w-[200px] truncate',
+          Icon && 'gap-1'
+        )}
+        title={displayLabel}
+      >
+        {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+        {displayLabel}
+      </span>
+    );
+  }
+  
+  return (
+    <span
+      className={cn(
+        'flex items-center gap-1.5 text-gray-500 max-w-[200px] truncate',
+        Icon && 'gap-1'
+      )}
+      title={displayLabel}
+    >
+      {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+      {displayLabel}
+    </span>
+  );
+}
+
 export function Breadcrumb() {
   const [location] = useLocation();
   const breadcrumbs = getBreadcrumbsForPath(location);
@@ -678,7 +745,9 @@ export function Breadcrumb() {
               {index > 0 && (
                 <ChevronRight className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
               )}
-              {isLast ? (
+              {item.isDynamic ? (
+                <DynamicBreadcrumbItem item={item} isLast={isLast} />
+              ) : isLast ? (
                 <span
                   className={cn(
                     'flex items-center gap-1.5 text-primary font-medium',
