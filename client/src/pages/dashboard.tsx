@@ -877,7 +877,7 @@ export default function Dashboard() {
     },
     {
       id: 'sales-comps',
-      title: 'Sales Comps Intelligence',
+      title: 'Sales Comps',
       icon: TrendingUp,
       link: '/analysis/sales-comps/analytics',
       data: dashboardData?.salesComps,
@@ -899,12 +899,12 @@ export default function Dashboard() {
               trendLabel={timeRange === '7d' ? 'vs last week' : timeRange === '30d' ? 'vs last month' : timeRange === '90d' ? 'vs last quarter' : 'vs last year'}
             />
             <EnhancedMetricCard
-              label="Avg Price/Slip"
+              label="Avg. Price"
               value={data?.avgPricePerSlip || 0}
               type="currency"
               size="md"
               testId="comps-avg-price"
-              tooltip="Average price per slip across all comparables"
+              tooltip="Average sale price across all comparables"
               onClick={() => setIsSalesCompsDetailOpen(true)}
               clickable={true}
               comparison={{
@@ -915,12 +915,12 @@ export default function Dashboard() {
             />
           </MetricGrid>
           {data?.recentComps && data.recentComps.length > 0 && (
-            <ModuleSection title="Latest Comparables" description="Most recent marina sales">
+            <ModuleSection title="Recent Comps" description="Most recently added comparables">
               <DataList
                 items={data.recentComps.slice(0, 3).map((comp: any) => ({
-                  label: comp.propertyName || 'Unnamed Marina',
-                  value: formatCurrency(comp.pricePerSlip || 0) + '/slip',
-                  badge: comp.location ? comp.location.substring(0, 2).toUpperCase() : undefined,
+                  label: comp.marina || 'Unnamed Marina',
+                  value: formatCurrency(comp.salePrice || 0),
+                  badge: comp.state ? comp.state.substring(0, 2).toUpperCase() : undefined,
                 }))}
                 maxItems={3}
               />

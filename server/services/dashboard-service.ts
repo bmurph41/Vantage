@@ -671,7 +671,7 @@ export class DashboardService {
         totalComps: count(),
         avgSalePrice: avg(salesComps.salePrice),
       }).from(salesComps).where(and(...conditions)),
-      db.select().from(salesComps).where(and(...conditions)).orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth)).limit(5),
+      db.select().from(salesComps).where(and(...conditions)).orderBy(desc(salesComps.createdAt)).limit(5),
     ]);
 
     return {
