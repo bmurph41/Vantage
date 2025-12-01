@@ -73,6 +73,14 @@ interface CategoryMatch {
   ruleType: 'pattern' | 'learning' | 'ai';
 }
 
+function sanitizeText(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .replace(/\u0000/g, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .trim();
+}
+
 export const MARINA_DEFAULT_CATEGORIES = [
   { categoryType: 'revenue', name: 'Revenue', sortOrder: 1, isDefault: true, children: [
     { name: 'Wet Slip Revenue', sortOrder: 1 },
