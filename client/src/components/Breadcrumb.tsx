@@ -250,38 +250,38 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
     { label: 'Projects' },
   ],
   '/fuel': [
-    { label: 'Fuel Operations' },
+    { label: 'Fuel Dock' },
   ],
   '/fuel/transactions': [
-    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Fuel Dock', href: '/fuel' },
     { label: 'Transactions' },
   ],
   '/fuel/inventory': [
-    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Fuel Dock', href: '/fuel' },
     { label: 'Inventory' },
   ],
   '/fuel/analytics': [
-    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Fuel Dock', href: '/fuel' },
     { label: 'Analytics' },
   ],
   '/fuel/reports': [
-    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Fuel Dock', href: '/fuel' },
     { label: 'Reports' },
   ],
   '/fuel/model': [
-    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Fuel Dock', href: '/fuel' },
     { label: 'Financial Model' },
   ],
   '/fuel/settings': [
-    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Fuel Dock', href: '/fuel' },
     { label: 'Settings' },
   ],
   '/fuel/import-history': [
-    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Fuel Dock', href: '/fuel' },
     { label: 'Import History' },
   ],
   '/fuel/audit': [
-    { label: 'Fuel Operations', href: '/fuel' },
+    { label: 'Fuel Dock', href: '/fuel' },
     { label: 'Audit Trail' },
   ],
   '/ship-store': [
