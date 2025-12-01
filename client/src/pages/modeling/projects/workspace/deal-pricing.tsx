@@ -34,8 +34,9 @@ import {
   ArrowRight,
   CheckCircle2,
 } from 'lucide-react';
-import type { ModelingProject } from '@shared/schema';
+import type { ModelingProject, ModelingFinancialPeriod } from '@shared/schema';
 import debounce from 'lodash.debounce';
+import YearSelector from '@/components/modeling/YearSelector';
 
 interface DealPricingProps {
   projectId: string;
@@ -117,11 +118,18 @@ export default function DealPricing({ projectId }: DealPricingProps) {
   const [exitCapRate, setExitCapRate] = useState<string>('7.5');
   const [revenueGrowthRate, setRevenueGrowthRate] = useState<string>('3.0');
   const [expenseGrowthRate, setExpenseGrowthRate] = useState<string>('2.0');
+  const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
+  const [selectedPeriodData, setSelectedPeriodData] = useState<ModelingFinancialPeriod | null>(null);
 
   const { data: project } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
     enabled: !!projectId,
   });
+
+  const handlePeriodChange = useCallback((periodLabel: string, periodData: ModelingFinancialPeriod | null) => {
+    setSelectedPeriod(periodLabel);
+    setSelectedPeriodData(periodData);
+  }, []);
 
   const { data: config } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
@@ -189,59 +197,93 @@ export default function DealPricing({ projectId }: DealPricingProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold">Deal Pricing</h2>
           <p className="text-sm text-muted-foreground">
             Price the deal from multiple angles - enter a price, target IRR, or cap rate
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => debouncedCalculate()}
-          disabled={calculateMutation.isPending}
-          data-testid="button-refresh-pricing"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${calculateMutation.isPending ? 'animate-spin' : ''}`} />
-          Recalculate
-        </Button>
+        <div className="flex items-center gap-3">
+          <YearSelector
+            projectId={projectId}
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={handlePeriodChange}
+            showAddButton={true}
+            size="sm"
+          />
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => debouncedCalculate()}
+            disabled={calculateMutation.isPending}
+            data-testid="button-refresh-pricing"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${calculateMutation.isPending ? 'animate-spin' : ''}`} />
+            Recalculate
+          </Button>
+        </div>
       </div>
 
-      {pricingData?.projectFinancials && (
+      {(pricingData?.projectFinancials || selectedPeriodData) && (
         <Card className="bg-muted/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Info className="h-4 w-4" />
-              Project Financials
+              {selectedPeriod ? `${selectedPeriod} Financials` : 'Project Financials'}
+              {selectedPeriodData && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {selectedPeriodData.periodType?.replace('_', ' ') || 'Period'}
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
               <div>
-                <p className="text-muted-foreground">Year 1 NOI</p>
-                <p className="font-semibold text-lg" data-testid="text-year1-noi">
-                  {formatCurrency(pricingData.projectFinancials.year1NOI)}
+                <p className="text-muted-foreground">
+                  {selectedPeriod ? `${selectedPeriod} NOI` : 'Year 1 NOI'}
+                </p>
+                <p className="font-semibold text-lg" data-testid="text-period-noi">
+                  {selectedPeriodData?.noi 
+                    ? formatCurrency(Number(selectedPeriodData.noi))
+                    : formatCurrency(pricingData?.projectFinancials?.year1NOI)}
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground">Base Revenue</p>
-                <p className="font-semibold text-lg">
-                  {formatCurrency(pricingData.projectFinancials.baseRevenue)}
+                <p className="text-muted-foreground">Total Revenue</p>
+                <p className="font-semibold text-lg" data-testid="text-period-revenue">
+                  {selectedPeriodData?.totalRevenue
+                    ? formatCurrency(Number(selectedPeriodData.totalRevenue))
+                    : formatCurrency(pricingData?.projectFinancials?.baseRevenue)}
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground">Base Expenses</p>
-                <p className="font-semibold text-lg">
-                  {formatCurrency(pricingData.projectFinancials.baseExpenses)}
+                <p className="text-muted-foreground">Total Expenses</p>
+                <p className="font-semibold text-lg" data-testid="text-period-expenses">
+                  {selectedPeriodData?.totalExpenses
+                    ? formatCurrency(Number(selectedPeriodData.totalExpenses))
+                    : formatCurrency(pricingData?.projectFinancials?.baseExpenses)}
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground">Stored Price</p>
-                <p className="font-semibold text-lg">
-                  {pricingData.projectFinancials.storedPurchasePrice 
-                    ? formatCurrency(pricingData.projectFinancials.storedPurchasePrice)
-                    : 'Not set'}
+                <p className="text-muted-foreground">Cap Rate</p>
+                <p className="font-semibold text-lg" data-testid="text-period-cap-rate">
+                  {selectedPeriodData?.capRate
+                    ? formatPercent(Number(selectedPeriodData.capRate) * 100)
+                    : pricingData?.fromPurchasePrice?.year1CapRate
+                      ? formatPercent(pricingData.fromPurchasePrice.year1CapRate)
+                      : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Purchase Price</p>
+                <p className="font-semibold text-lg" data-testid="text-period-price">
+                  {selectedPeriodData?.purchasePrice 
+                    ? formatCurrency(Number(selectedPeriodData.purchasePrice))
+                    : pricingData?.projectFinancials?.storedPurchasePrice 
+                      ? formatCurrency(pricingData.projectFinancials.storedPurchasePrice)
+                      : 'Not set'}
                 </p>
               </div>
             </div>
