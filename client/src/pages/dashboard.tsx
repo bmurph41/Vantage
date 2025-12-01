@@ -1511,10 +1511,10 @@ export default function Dashboard() {
             data={recentComps || []}
             columns={[
               {
-                key: 'propertyName',
-                header: 'Property',
+                key: 'marina',
+                header: 'Marina',
                 render: (comp: any) => (
-                  <div className="font-medium">{comp.propertyName || 'Unnamed'}</div>
+                  <div className="font-medium">{comp.marina || 'Unnamed'}</div>
                 ),
               },
               {
@@ -1534,10 +1534,10 @@ export default function Dashboard() {
                 ),
               },
               {
-                key: 'pricePerSlip',
-                header: 'Price/Slip',
+                key: 'capRate',
+                header: 'Cap Rate',
                 render: (comp: any) => (
-                  <div className="text-gray-600">{formatCurrency(Number(comp.pricePerSlip || 0))}</div>
+                  <div className="text-gray-600">{comp.capRate ? `${Number(comp.capRate).toFixed(2)}%` : 'N/A'}</div>
                 ),
               },
             ]}
@@ -1638,32 +1638,39 @@ export default function Dashboard() {
             data={recentArticles || []}
             columns={[
               {
-                key: 'publishedDate',
+                key: 'createdAt',
                 header: 'Date',
-                render: (article: any) => (
-                  <div className="font-medium">{new Date(article.publishedDate).toLocaleDateString()}</div>
+                render: (deal: any) => (
+                  <div className="font-medium">{deal.createdAt ? new Date(deal.createdAt).toLocaleDateString() : 'N/A'}</div>
                 ),
               },
               {
-                key: 'title',
-                header: 'Title',
-                render: (article: any) => (
-                  <div className="text-gray-900 font-medium max-w-md truncate">{article.title}</div>
+                key: 'buyer',
+                header: 'Buyer',
+                render: (deal: any) => (
+                  <div className="text-gray-900 font-medium max-w-md truncate">{deal.buyer || 'Unknown'}</div>
                 ),
               },
               {
-                key: 'category',
-                header: 'Category',
-                render: (article: any) => (
+                key: 'seller',
+                header: 'Seller',
+                render: (deal: any) => (
+                  <div className="text-gray-600 max-w-md truncate">{deal.seller || 'Unknown'}</div>
+                ),
+              },
+              {
+                key: 'dealStatus',
+                header: 'Status',
+                render: (deal: any) => (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                    {article.category}
+                    {deal.dealStatus || deal.transactionType || 'N/A'}
                   </span>
                 ),
               },
             ]}
-            onRowClick={(article: any) => { setIsDockTalkDetailOpen(false); navigate(`/docktalk`); }}
+            onRowClick={(deal: any) => { setIsDockTalkDetailOpen(false); navigate(`/docktalk`); }}
             getRowLink={() => `/docktalk`}
-            emptyMessage="No recent articles found"
+            emptyMessage="No recent deals found"
           />
         )}
       </DetailPanel>
@@ -1701,10 +1708,10 @@ export default function Dashboard() {
                 ),
               },
               {
-                key: 'fileName',
+                key: 'filename',
                 header: 'File Name',
                 render: (doc: any) => (
-                  <div className="text-gray-900 font-medium max-w-md truncate">{doc.fileName}</div>
+                  <div className="text-gray-900 font-medium max-w-md truncate">{doc.filename}</div>
                 ),
               },
               {
@@ -1715,10 +1722,10 @@ export default function Dashboard() {
                 ),
               },
               {
-                key: 'fileSize',
+                key: 'size',
                 header: 'Size',
                 render: (doc: any) => (
-                  <div className="text-gray-600">{(doc.fileSize / 1024 / 1024).toFixed(2)} MB</div>
+                  <div className="text-gray-600">{doc.size ? (doc.size / 1024 / 1024).toFixed(2) + ' MB' : 'N/A'}</div>
                 ),
               },
             ]}
@@ -1851,11 +1858,11 @@ export default function Dashboard() {
                 ),
               },
               {
-                key: 'dueDate',
-                header: 'Due Date',
+                key: 'deadline',
+                header: 'Deadline',
                 render: (task: any) => (
                   <div className="text-gray-600">
-                    {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No date'}
+                    {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'No date'}
                   </div>
                 ),
               },
@@ -1962,34 +1969,39 @@ export default function Dashboard() {
             data={recentModelingProjects || []}
             columns={[
               {
-                key: 'propertyName',
-                header: 'Property',
+                key: 'marinaName',
+                header: 'Marina',
                 render: (project: any) => (
-                  <div className="text-gray-900 font-medium">{project.propertyName}</div>
+                  <div className="text-gray-900 font-medium">{project.marinaName}</div>
                 ),
               },
               {
-                key: 'clientName',
-                header: 'Client',
+                key: 'location',
+                header: 'Location',
                 render: (project: any) => (
-                  <div className="text-gray-600">{project.clientName}</div>
+                  <div className="text-gray-600">{project.city && project.state ? `${project.city}, ${project.state}` : 'N/A'}</div>
                 ),
               },
               {
-                key: 'projectType',
-                header: 'Type',
+                key: 'dealOutcome',
+                header: 'Status',
                 render: (project: any) => (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                    {project.projectType}
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                    project.dealOutcome === 'closed' ? 'bg-green-100 text-green-800' : 
+                    project.dealOutcome === 'active' ? 'bg-blue-100 text-blue-800' : 
+                    project.dealOutcome === 'passed' ? 'bg-red-100 text-red-800' : 
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {project.dealOutcome || 'N/A'}
                   </span>
                 ),
               },
               {
-                key: 'estimatedValue',
-                header: 'Est. Value',
+                key: 'purchasePrice',
+                header: 'Purchase Price',
                 render: (project: any) => (
                   <div className="text-gray-900 font-semibold">
-                    {project.estimatedValue ? formatCurrency(Number(project.estimatedValue)) : 'TBD'}
+                    {project.purchasePrice ? formatCurrency(Number(project.purchasePrice)) : 'TBD'}
                   </div>
                 ),
               },
