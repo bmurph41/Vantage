@@ -69,6 +69,30 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
+function formatCurrencyInput(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num) || num === 0) return '';
+  return num.toLocaleString('en-US');
+}
+
+function parseCurrencyInput(value: string): number {
+  const cleaned = value.replace(/[,$\s]/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
+function formatPercentInput(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '';
+  return (num * 100).toFixed(2);
+}
+
+function parsePercentInput(value: string): number {
+  const cleaned = value.replace(/[%\s]/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num / 100;
+}
+
 interface FundMetrics {
   committedCapital: number;
   calledCapital: number;
@@ -343,14 +367,19 @@ function CreateFundDialog({
                 name="targetSize"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Target Size ($)</FormLabel>
+                    <FormLabel>Target Size</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        {...field} 
-                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                        data-testid="input-fund-target-size" 
-                      />
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                        <Input 
+                          type="text"
+                          className="pl-7"
+                          placeholder="00,000,000"
+                          value={formatCurrencyInput(field.value || 0)}
+                          onChange={(e) => field.onChange(parseCurrencyInput(e.target.value))}
+                          data-testid="input-fund-target-size" 
+                        />
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -386,15 +415,19 @@ function CreateFundDialog({
                 name="managementFeePct"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mgmt Fee %</FormLabel>
+                    <FormLabel>Mgmt Fee</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01"
-                        {...field} 
-                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                        data-testid="input-fund-mgmt-fee" 
-                      />
+                      <div className="relative">
+                        <Input 
+                          type="text"
+                          className="pr-7"
+                          placeholder="0.00"
+                          value={formatPercentInput(field.value || 0)}
+                          onChange={(e) => field.onChange(parsePercentInput(e.target.value))}
+                          data-testid="input-fund-mgmt-fee" 
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -405,15 +438,19 @@ function CreateFundDialog({
                 name="carriedInterestPct"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Carry %</FormLabel>
+                    <FormLabel>Carry</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01"
-                        {...field} 
-                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                        data-testid="input-fund-carry" 
-                      />
+                      <div className="relative">
+                        <Input 
+                          type="text"
+                          className="pr-7"
+                          placeholder="0.00"
+                          value={formatPercentInput(field.value || 0)}
+                          onChange={(e) => field.onChange(parsePercentInput(e.target.value))}
+                          data-testid="input-fund-carry" 
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -424,15 +461,19 @@ function CreateFundDialog({
                 name="preferredReturn"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Pref Return %</FormLabel>
+                    <FormLabel>Pref Return</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01"
-                        {...field} 
-                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                        data-testid="input-fund-pref-return" 
-                      />
+                      <div className="relative">
+                        <Input 
+                          type="text"
+                          className="pr-7"
+                          placeholder="0.00"
+                          value={formatPercentInput(field.value || 0)}
+                          onChange={(e) => field.onChange(parsePercentInput(e.target.value))}
+                          data-testid="input-fund-pref-return" 
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
