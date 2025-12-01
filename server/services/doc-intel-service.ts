@@ -711,18 +711,25 @@ class DocIntelService {
     itemId: string, 
     categoryId: string, 
     userId: string,
-    amount?: number
+    amount?: number,
+    department?: string
   ): Promise<DocIntelExtractedItem> {
+    const updateData: Record<string, any> = {
+      status: 'confirmed',
+      categoryConfirmed: categoryId,
+      amountConfirmed: amount?.toString(),
+      confirmedBy: userId,
+      confirmedAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    if (department) {
+      updateData.departmentConfirmed = department;
+    }
+
     const [item] = await db
       .update(docIntelExtractedItems)
-      .set({
-        status: 'confirmed',
-        categoryConfirmed: categoryId,
-        amountConfirmed: amount?.toString(),
-        confirmedBy: userId,
-        confirmedAt: new Date(),
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(and(
         eq(docIntelExtractedItems.id, itemId),
         eq(docIntelExtractedItems.orgId, orgId)
@@ -756,6 +763,45 @@ class DocIntelService {
       ))
       .returning();
     return item;
+  }
+
+  async excludeItem(orgId: string, itemId: string): Promise<DocIntelExtractedItem> {
+    const [item] = await db
+      .update(docIntelExtractedItems)
+      .set({
+        status: 'excluded',
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(docIntelExtractedItems.id, itemId),
+        eq(docIntelExtractedItems.orgId, orgId)
+      ))
+      .returning();
+    return item;
+  }
+
+  async approveDocument(orgId: string, uploadId: string, userId: string, notes?: string): Promise<DocIntelUpload> {
+    const updateData: Record<string, any> = {
+      status: 'approved',
+      approvedAt: new Date(),
+      approvedBy: userId,
+      updatedAt: new Date(),
+    };
+
+    if (notes) {
+      updateData.approvalNotes = notes;
+    }
+
+    const [upload] = await db
+      .update(docIntelUploads)
+      .set(updateData)
+      .where(and(
+        eq(docIntelUploads.id, uploadId),
+        eq(docIntelUploads.orgId, orgId)
+      ))
+      .returning();
+
+    return upload;
   }
 
   async confirmAllHighConfidence(orgId: string, uploadId: string, userId: string, threshold = 0.9): Promise<number> {
@@ -850,6 +896,30 @@ class DocIntelService {
     return lines.map(line => ({
       ...line,
       category: line.categoryId ? categoryMap.get(line.categoryId) : undefined,
+    }));
+  }
+
+  async getPnlSummaryByCategory(orgId: string, projectId: string): Promise<{ categoryId: string; amount: number }[]> {
+    const lines = await db
+      .select()
+      .from(pnlLines)
+      .where(and(
+        eq(pnlLines.orgId, orgId),
+        eq(pnlLines.modelingProjectId, projectId)
+      ));
+
+    const categoryTotals = new Map<string, number>();
+
+    for (const line of lines) {
+      if (!line.categoryId) continue;
+      const existing = categoryTotals.get(line.categoryId) || 0;
+      const amount = parseFloat(line.amount || '0');
+      categoryTotals.set(line.categoryId, existing + amount);
+    }
+
+    return Array.from(categoryTotals.entries()).map(([categoryId, amount]) => ({
+      categoryId,
+      amount,
     }));
   }
 

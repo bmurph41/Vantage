@@ -10655,10 +10655,11 @@ export type InsertExitReadinessChecklistItem = z.infer<typeof insertExitReadines
 
 // Enums for Document Intelligence
 export const docIntelDocTypeEnum = pgEnum("doc_intel_doc_type", ["pnl", "rent_roll", "balance_sheet", "rate_sheet", "invoice", "other"]);
-export const docIntelItemStatusEnum = pgEnum("doc_intel_item_status", ["pending", "confirmed", "rejected", "needs_review"]);
-export const docIntelProcessingStatusEnum = pgEnum("doc_intel_processing_status", ["uploaded", "processing", "parsed", "reviewing", "completed", "error"]);
+export const docIntelItemStatusEnum = pgEnum("doc_intel_item_status", ["pending", "confirmed", "rejected", "needs_review", "excluded"]);
+export const docIntelProcessingStatusEnum = pgEnum("doc_intel_processing_status", ["uploaded", "processing", "parsed", "reviewing", "approved", "applied", "completed", "error"]);
 export const pnlCategoryTypeEnum = pgEnum("pnl_category_type", ["revenue", "cogs", "opex", "payroll", "other_expense", "other_income"]);
 export const holdingStationStatusEnum = pgEnum("holding_station_status", ["staging", "validated", "ready_to_process", "processing", "processed"]);
+export const docIntelDepartmentEnum = pgEnum("doc_intel_department", ["marina_ops", "fuel_dock", "ship_store", "restaurant", "boat_sales", "service_dept", "storage", "admin", "other"]);
 
 // P&L Categories - Hierarchical marina-specific categories (org-configurable)
 export const pnlCategories = pgTable('pnl_categories', {
@@ -10724,6 +10725,13 @@ export const docIntelUploads = pgTable('doc_intel_uploads', {
   reviewStartedAt: timestamp('review_started_at'),
   reviewCompletedAt: timestamp('review_completed_at'),
   
+  // Approval workflow
+  approvalNotes: text('approval_notes'), // Notes from reviewer before applying
+  approvedAt: timestamp('approved_at'),
+  approvedBy: varchar('approved_by').references(() => users.id),
+  appliedAt: timestamp('applied_at'), // When data was written to model
+  appliedBy: varchar('applied_by').references(() => users.id),
+  
   // Metadata
   uploadedBy: varchar('uploaded_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -10754,12 +10762,19 @@ export const docIntelExtractedItems = pgTable('doc_intel_extracted_items', {
   confidenceScore: decimal('confidence_score', { precision: 5, scale: 4 }), // 0.0000 to 1.0000
   matchedRuleId: varchar('matched_rule_id'), // Which rule triggered this suggestion
   
+  // Department assignment (AI suggested + user confirmed)
+  departmentSuggested: docIntelDepartmentEnum('department_suggested'),
+  departmentConfirmed: docIntelDepartmentEnum('department_confirmed'),
+  
   // User confirmation
   status: docIntelItemStatusEnum('status').notNull().default('pending'),
   categoryConfirmed: varchar('category_confirmed').references(() => pnlCategories.id),
   amountConfirmed: decimal('amount_confirmed', { precision: 18, scale: 2 }),
   confirmedBy: varchar('confirmed_by').references(() => users.id),
   confirmedAt: timestamp('confirmed_at'),
+  
+  // Review notes
+  reviewNotes: text('review_notes'),
   
   // Destination mapping
   targetTable: text('target_table'), // e.g., 'pnl_lines', 'rent_roll_entries'

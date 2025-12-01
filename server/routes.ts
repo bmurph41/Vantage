@@ -13847,19 +13847,19 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Confirm an extracted item (assign category)
+  // Confirm an extracted item (assign category and optionally department)
   app.post('/api/modeling/projects/:projectId/documents/:uploadId/items/:itemId/confirm', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { itemId } = req.params;
-      const { categoryId, amount } = req.body;
+      const { categoryId, amount, department } = req.body;
       
       if (!categoryId) {
         return res.status(400).json({ error: 'categoryId is required' });
       }
       
-      const item = await docIntelService.confirmItem(orgId, itemId, categoryId, userId, amount);
+      const item = await docIntelService.confirmItem(orgId, itemId, categoryId, userId, amount, department);
       res.json(item);
     } catch (error) {
       console.error('Failed to confirm item:', error);
@@ -13881,6 +13881,20 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Exclude an extracted item (different from reject - marks as excluded from import)
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/items/:itemId/exclude', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { itemId } = req.params;
+      
+      const item = await docIntelService.excludeItem(orgId, itemId);
+      res.json(item);
+    } catch (error) {
+      console.error('Failed to exclude item:', error);
+      res.status(500).json({ error: 'Failed to exclude item' });
+    }
+  });
+
   // Auto-confirm high confidence items
   app.post('/api/modeling/projects/:projectId/documents/:uploadId/items/confirm-high-confidence', authenticateUser, async (req: any, res) => {
     try {
@@ -13894,6 +13908,24 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to auto-confirm items:', error);
       res.status(500).json({ error: 'Failed to auto-confirm items' });
+    }
+  });
+
+  // --- APPROVAL WORKFLOW ---
+
+  // Approve a document for import (marks document as ready to apply)
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/approve', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { uploadId } = req.params;
+      const { notes } = req.body;
+      
+      const upload = await docIntelService.approveDocument(orgId, uploadId, userId, notes);
+      res.json(upload);
+    } catch (error) {
+      console.error('Failed to approve document:', error);
+      res.status(500).json({ error: 'Failed to approve document' });
     }
   });
 
@@ -14031,6 +14063,25 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to fetch P&L lines:', error);
       res.status(500).json({ error: 'Failed to fetch P&L lines' });
+    }
+  });
+
+  // Get P&L Summary by category for variance preview
+  app.get('/api/modeling/projects/:projectId/pnl-summary', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+      
+      const summary = await docIntelService.getPnlSummaryByCategory(orgId, projectId);
+      res.json(summary);
+    } catch (error) {
+      console.error('Failed to fetch P&L summary:', error);
+      res.status(500).json({ error: 'Failed to fetch P&L summary' });
     }
   });
 

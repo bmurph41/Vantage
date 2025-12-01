@@ -48,7 +48,7 @@ Preferred communication style: Simple, everyday language.
     - **Dynamic Year Selector**: Project-specific financial period selection.
     - **Operations Data Sync**: Institutional-grade pipeline for operational data.
     - **Exit Strategy Suite**: Tools for exit analysis (Tax Calculator, Net Proceeds, 1031 Exchange, Waterfall Analysis, IRR).
-    - **Document Intelligence**: AI-powered document parsing for P&L and Rent Roll.
+    - **Document Intelligence**: AI-powered document parsing for P&L and Rent Roll with 5-step review workflow (Parse → Categorize → Review Items → Variance Preview → Approve & Apply), department assignment, and formal approval before data application.
     - **Scenario Versioning**: Version history for financial scenarios (Base/Aggressive/Conservative) with approval workflows and locking.
     - **QuickBooks Integration**: OAuth2 for P&L sync with category mapping.
     - **Capital Stack Builder**: Multi-tranche debt and equity structure modeling with detailed financial calculations and fund inheritance.
