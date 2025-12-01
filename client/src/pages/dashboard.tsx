@@ -35,6 +35,7 @@ import { GoalProgressBar } from "@/components/dashboard/charts/GoalProgressBar";
 import { ComparisonCard } from "@/components/dashboard/charts/ComparisonCard";
 import { StatGrid } from "@/components/dashboard/charts/StatGrid";
 import { QuickAccessSection } from "@/components/quick-access";
+import { FundSelector } from "@/components/dashboard/FundSelector";
 
 type DashboardModule = {
   id: string;
@@ -1465,6 +1466,11 @@ export default function Dashboard() {
             />
             <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
           </div>
+        </div>
+
+        {/* Fund Context Selector - Shows current fund and key metrics */}
+        <div className="mb-6">
+          <FundSelector />
         </div>
 
         {/* Quick Access - Always at top */}
