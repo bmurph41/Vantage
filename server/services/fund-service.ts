@@ -108,27 +108,31 @@ export class FundService {
   async createFund(
     orgId: string,
     userId: string,
-    data: InsertFund
+    data: any
   ): Promise<Fund> {
-    const validated = insertFundSchema.parse(data);
-
-    const [result] = await db.insert(funds).values({
-      ...validated,
+    const transformedData = {
+      ...data,
       orgId,
       createdBy: userId,
-      targetSize: validated.targetSize ? String(validated.targetSize) : null,
-      hardCap: validated.hardCap ? String(validated.hardCap) : null,
-      committedCapital: validated.committedCapital ? String(validated.committedCapital) : '0',
-      calledCapital: validated.calledCapital ? String(validated.calledCapital) : '0',
-      distributedCapital: validated.distributedCapital ? String(validated.distributedCapital) : '0',
-      recycledCapital: validated.recycledCapital ? String(validated.recycledCapital) : '0',
-      managementFeePct: validated.managementFeePct ? String(validated.managementFeePct) : '0.02',
-      carriedInterestPct: validated.carriedInterestPct ? String(validated.carriedInterestPct) : '0.20',
-      preferredReturn: validated.preferredReturn ? String(validated.preferredReturn) : '0.08',
-      gpCatchUpPct: validated.gpCatchUpPct ? String(validated.gpCatchUpPct) : '1.00',
-      recyclingLimitPct: validated.recyclingLimitPct ? String(validated.recyclingLimitPct) : '0.25',
-      maxSingleInvestmentPct: validated.maxSingleInvestmentPct ? String(validated.maxSingleInvestmentPct) : '0.20',
-    }).returning();
+      targetSize: data.targetSize != null ? String(data.targetSize) : null,
+      hardCap: data.hardCap != null ? String(data.hardCap) : null,
+      committedCapital: data.committedCapital != null ? String(data.committedCapital) : '0',
+      calledCapital: data.calledCapital != null ? String(data.calledCapital) : '0',
+      distributedCapital: data.distributedCapital != null ? String(data.distributedCapital) : '0',
+      recycledCapital: data.recycledCapital != null ? String(data.recycledCapital) : '0',
+      managementFeePct: data.managementFeePct != null ? String(data.managementFeePct) : '0.02',
+      carriedInterestPct: data.carriedInterestPct != null ? String(data.carriedInterestPct) : '0.20',
+      preferredReturn: data.preferredReturn != null ? String(data.preferredReturn) : '0.08',
+      gpCatchUpPct: data.gpCatchUpPct != null ? String(data.gpCatchUpPct) : '1.00',
+      recyclingLimitPct: data.recyclingLimitPct != null ? String(data.recyclingLimitPct) : '0.25',
+      maxSingleInvestmentPct: data.maxSingleInvestmentPct != null ? String(data.maxSingleInvestmentPct) : '0.20',
+      minInvestmentSize: data.minInvestmentSize != null ? String(data.minInvestmentSize) : null,
+      maxInvestmentSize: data.maxInvestmentSize != null ? String(data.maxInvestmentSize) : null,
+    };
+
+    const validated = insertFundSchema.parse(transformedData);
+
+    const [result] = await db.insert(funds).values(validated).returning();
 
     return result;
   }
