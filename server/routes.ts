@@ -13618,7 +13618,7 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Upload new document for processing
+  // Upload new document for processing (with SHA-256 duplicate detection)
   app.post('/api/modeling/projects/:projectId/documents', authenticateUser, docIntelUpload.single('file'), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -13643,23 +13643,37 @@ Current context: Project ${req.params.projectId}`;
         }
       }
       
-      const upload = await docIntelService.createUpload(orgId, {
-        modelingProjectId: projectId,
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        storagePath: req.file.path,
-        mimeType: req.file.mimetype,
-        fileSize: req.file.size,
-        docType: req.body.docType || null,
-        year: req.body.year ? parseInt(req.body.year) : null,
-        uploadedBy: userId,
-        status: 'uploaded',
-        holdingStatus: req.body.holdingStatus || 'staging',
-        holdingTags: holdingTags.length > 0 ? holdingTags : null,
-        holdingNotes: req.body.notes || null,
-      });
+      const checkProjectOnly = req.body.checkProjectOnly === 'true';
       
-      res.status(201).json(upload);
+      const result = await docIntelService.createUploadWithDuplicateCheck(
+        orgId, 
+        {
+          modelingProjectId: projectId,
+          filename: req.file.filename,
+          originalName: req.file.originalname,
+          storagePath: req.file.path,
+          mimeType: req.file.mimetype,
+          fileSize: req.file.size,
+          docType: req.body.docType || null,
+          year: req.body.year ? parseInt(req.body.year) : null,
+          uploadedBy: userId,
+          status: 'uploaded',
+          holdingStatus: req.body.holdingStatus || 'staging',
+          holdingTags: holdingTags.length > 0 ? holdingTags : null,
+          holdingNotes: req.body.notes || null,
+        },
+        checkProjectOnly
+      );
+      
+      res.status(201).json({
+        ...result.upload,
+        isDuplicate: result.isDuplicate,
+        originalUpload: result.originalUpload ? {
+          id: result.originalUpload.id,
+          originalName: result.originalUpload.originalName,
+          createdAt: result.originalUpload.createdAt,
+        } : null,
+      });
     } catch (error) {
       console.error('Failed to upload document:', error);
       res.status(500).json({ error: 'Failed to upload document' });

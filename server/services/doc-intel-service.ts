@@ -25,6 +25,7 @@ import {
 import { eq, and, sql, desc, asc } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import path from 'path';
 
 interface ParsedLineItem {
@@ -292,12 +293,77 @@ class DocIntelService {
     return true;
   }
 
+  async computeFileHash(filePath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash('sha256');
+      const stream = fs.createReadStream(filePath);
+      stream.on('data', (data) => hash.update(data));
+      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('error', reject);
+    });
+  }
+
+  async findDuplicateByHash(orgId: string, hash: string, projectId?: string): Promise<DocIntelUpload | null> {
+    const conditions = [
+      eq(docIntelUploads.orgId, orgId),
+      eq(docIntelUploads.hashSha256, hash)
+    ];
+    
+    if (projectId) {
+      conditions.push(eq(docIntelUploads.modelingProjectId, projectId));
+    }
+
+    const [existing] = await db
+      .select()
+      .from(docIntelUploads)
+      .where(and(...conditions))
+      .limit(1);
+    
+    return existing || null;
+  }
+
   async createUpload(orgId: string, data: InsertDocIntelUpload): Promise<DocIntelUpload> {
     const [upload] = await db
       .insert(docIntelUploads)
       .values({ ...data, orgId })
       .returning();
     return upload;
+  }
+
+  async createUploadWithDuplicateCheck(
+    orgId: string, 
+    data: InsertDocIntelUpload & { storagePath: string },
+    checkProjectOnly: boolean = false
+  ): Promise<{ upload: DocIntelUpload; isDuplicate: boolean; originalUpload?: DocIntelUpload }> {
+    const hash = await this.computeFileHash(data.storagePath);
+    const existingUpload = await this.findDuplicateByHash(
+      orgId, 
+      hash, 
+      checkProjectOnly ? data.modelingProjectId : undefined
+    );
+
+    if (existingUpload) {
+      const [upload] = await db
+        .insert(docIntelUploads)
+        .values({ 
+          ...data, 
+          orgId,
+          hashSha256: hash,
+          isDuplicate: true,
+          duplicateOfId: existingUpload.id,
+          holdingStatus: 'staging',
+        })
+        .returning();
+      
+      return { upload, isDuplicate: true, originalUpload: existingUpload };
+    }
+
+    const [upload] = await db
+      .insert(docIntelUploads)
+      .values({ ...data, orgId, hashSha256: hash })
+      .returning();
+    
+    return { upload, isDuplicate: false };
   }
 
   async getUpload(orgId: string, uploadId: string): Promise<DocIntelUpload | null> {
