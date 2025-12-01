@@ -30,10 +30,10 @@ import {
   type MarinaCustomer
 } from '@shared/schema';
 import { eq, and, sql, desc, asc } from 'drizzle-orm';
-import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import path from 'path';
+import * as XLSX from 'xlsx';
 
 interface ParsedLineItem {
   rawText: string;
@@ -440,7 +440,8 @@ class DocIntelService {
   }
 
   async parseExcelFile(filePath: string): Promise<ParsedLineItem[]> {
-    const workbook = XLSX.readFile(filePath);
+    const buffer = fs.readFileSync(filePath);
+    const workbook = XLSX.read(buffer);
     const items: ParsedLineItem[] = [];
     let globalRow = 0;
 
@@ -906,7 +907,8 @@ class DocIntelService {
   // ============================================================================
 
   async parseRentRollFile(filePath: string): Promise<ParsedRentRollEntry[]> {
-    const workbook = XLSX.readFile(filePath);
+    const buffer = fs.readFileSync(filePath);
+    const workbook = XLSX.read(buffer);
     const entries: ParsedRentRollEntry[] = [];
 
     for (const sheetName of workbook.SheetNames) {
