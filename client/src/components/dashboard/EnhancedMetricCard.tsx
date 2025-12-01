@@ -86,13 +86,14 @@ export function EnhancedMetricCard({
   };
 
   const formatTrendValue = (trendVal: number): string => {
-    // Trends use explicit trendFormat if provided, otherwise auto-detect
-    const normalized = normalizePercent(trendVal, trendFormat);
+    // Backend returns trend as a percentage value (e.g., 21.43 for 21.43% change)
+    // Convert to decimal for Intl.NumberFormat percentage style
+    const decimal = trendVal / 100;
     return new Intl.NumberFormat('en-US', {
       style: 'percent',
       minimumFractionDigits: 0,
       maximumFractionDigits: 1,
-    }).format(Math.abs(normalized));
+    }).format(Math.abs(decimal));
   };
 
   const sizeClasses = {
