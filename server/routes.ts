@@ -10966,6 +10966,10 @@ Current context: Project ${req.params.projectId}`;
         exitCapRate = 7.5,
         revenueGrowthRate,
         expenseGrowthRate,
+        periodLabel,
+        periodNOI,
+        periodRevenue,
+        periodExpenses,
       } = req.body;
 
       const results = await dealPricingService.calculateAllPricingModes(
@@ -10981,6 +10985,10 @@ Current context: Project ${req.params.projectId}`;
           exitCapRate: Number(exitCapRate),
           revenueGrowthRate: revenueGrowthRate ? Number(revenueGrowthRate) / 100 : undefined,
           expenseGrowthRate: expenseGrowthRate ? Number(expenseGrowthRate) / 100 : undefined,
+          periodLabel,
+          periodNOI: periodNOI ? Number(periodNOI) : undefined,
+          periodRevenue: periodRevenue ? Number(periodRevenue) : undefined,
+          periodExpenses: periodExpenses ? Number(periodExpenses) : undefined,
         }
       );
 

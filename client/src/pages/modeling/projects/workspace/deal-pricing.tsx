@@ -164,6 +164,13 @@ export default function DealPricing({ projectId }: DealPricingProps) {
 
   const debouncedCalculate = useCallback(
     debounce(() => {
+      const periodOverrides = selectedPeriodData ? {
+        periodLabel: selectedPeriod,
+        periodNOI: selectedPeriodData.noi ? Number(selectedPeriodData.noi) : undefined,
+        periodRevenue: selectedPeriodData.totalRevenue ? Number(selectedPeriodData.totalRevenue) : undefined,
+        periodExpenses: selectedPeriodData.totalExpenses ? Number(selectedPeriodData.totalExpenses) : undefined,
+      } : {};
+      
       calculateMutation.mutate({
         manualPurchasePrice: manualPurchasePrice ? parseCurrencyInput(manualPurchasePrice) : undefined,
         targetIRR: targetIRR ? parsePercentInput(targetIRR) : undefined,
@@ -174,9 +181,10 @@ export default function DealPricing({ projectId }: DealPricingProps) {
         exitCapRate: parsePercentInput(exitCapRate) || 7.5,
         revenueGrowthRate: parsePercentInput(revenueGrowthRate),
         expenseGrowthRate: parsePercentInput(expenseGrowthRate),
+        ...periodOverrides,
       });
     }, 500),
-    [manualPurchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriod, exitCapRate, revenueGrowthRate, expenseGrowthRate]
+    [manualPurchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriod, exitCapRate, revenueGrowthRate, expenseGrowthRate, selectedPeriod, selectedPeriodData]
   );
 
   useEffect(() => {

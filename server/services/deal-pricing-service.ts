@@ -257,6 +257,10 @@ class DealPricingService {
       exitCapRate: number;
       revenueGrowthRate?: number;
       expenseGrowthRate?: number;
+      periodLabel?: string;
+      periodNOI?: number;
+      periodRevenue?: number;
+      periodExpenses?: number;
     }
   ): Promise<{
     fromPurchasePrice: PricingResult | null;
@@ -268,12 +272,20 @@ class DealPricingService {
       baseRevenue: number;
       baseExpenses: number;
       storedPurchasePrice: number | null;
+      selectedPeriod?: string;
     };
     noiProjections: number[];
   }> {
-    const financials = await this.getProjectFinancials(projectId, orgId);
+    const baseFinancials = await this.getProjectFinancials(projectId, orgId);
     const revenueGrowth = inputs.revenueGrowthRate ?? 0.03;
     const expenseGrowth = inputs.expenseGrowthRate ?? 0.02;
+    
+    const financials = {
+      ...baseFinancials,
+      year1NOI: inputs.periodNOI ?? baseFinancials.year1NOI,
+      baseRevenue: inputs.periodRevenue ?? baseFinancials.baseRevenue,
+      baseExpenses: inputs.periodExpenses ?? baseFinancials.baseExpenses,
+    };
     
     const noiProjections = this.projectNOI(
       financials.year1NOI,
@@ -388,7 +400,8 @@ class DealPricingService {
         year1NOI: financials.year1NOI,
         baseRevenue: financials.baseRevenue,
         baseExpenses: financials.baseExpenses,
-        storedPurchasePrice: financials.purchasePrice,
+        storedPurchasePrice: baseFinancials.purchasePrice,
+        selectedPeriod: inputs.periodLabel,
       },
       noiProjections,
     };
