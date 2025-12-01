@@ -1173,23 +1173,26 @@ function LocationAnalysisSection() {
               <TabsContent value="distance" className="mt-4">
                 <div className="space-y-3">
                   <Label className="text-sm">Select Distance Rings</Label>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-4">
                     {DISTANCE_RINGS.map(ring => (
-                      <div key={ring.value} className="flex items-center space-x-2">
+                      <label
+                        key={ring.value}
+                        htmlFor={`ring-${ring.value}`}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
+                          defaultDistanceRings.includes(ring.value)
+                            ? 'bg-primary/10 border-primary text-primary'
+                            : 'bg-background border-border hover:border-primary/50'
+                        }`}
+                      >
                         <Checkbox
                           id={`ring-${ring.value}`}
                           checked={defaultDistanceRings.includes(ring.value)}
                           onCheckedChange={() => toggleDefaultDistanceRing(ring.value)}
                           data-testid={`checkbox-distance-${ring.value}`}
+                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                         />
-                        <label
-                          htmlFor={`ring-${ring.value}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-1"
-                        >
-                          <CircleDot className="h-3 w-3 text-primary" />
-                          {ring.label}
-                        </label>
-                      </div>
+                        <span className="text-sm font-medium">{ring.label}</span>
+                      </label>
                     ))}
                   </div>
                   {defaultDistanceRings.length === 0 && (
@@ -1204,26 +1207,35 @@ function LocationAnalysisSection() {
                     <Label className="text-sm">Select Drive Times (up to 3)</Label>
                     <span className="text-xs text-muted-foreground">{defaultDriveTimes.length}/3 selected</span>
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    {DRIVE_TIMES.map(time => (
-                      <div key={time.value} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`time-${time.value}`}
-                          checked={defaultDriveTimes.includes(time.value)}
-                          onCheckedChange={() => toggleDefaultDriveTime(time.value)}
-                          disabled={!defaultDriveTimes.includes(time.value) && defaultDriveTimes.length >= 3}
-                          data-testid={`checkbox-drivetime-${time.value}`}
-                        />
+                  <div className="flex flex-wrap gap-4">
+                    {DRIVE_TIMES.map(time => {
+                      const isSelected = defaultDriveTimes.includes(time.value);
+                      const isDisabled = !isSelected && defaultDriveTimes.length >= 3;
+                      return (
                         <label
+                          key={time.value}
                           htmlFor={`time-${time.value}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-1"
+                          className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
+                            isDisabled 
+                              ? 'opacity-50 cursor-not-allowed bg-muted'
+                              : isSelected
+                                ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                                : 'bg-background border-border hover:border-blue-300'
+                          }`}
                         >
-                          <Clock className="h-3 w-3 text-blue-500" />
-                          {time.label}
+                          <Checkbox
+                            id={`time-${time.value}`}
+                            checked={isSelected}
+                            onCheckedChange={() => toggleDefaultDriveTime(time.value)}
+                            disabled={isDisabled}
+                            data-testid={`checkbox-drivetime-${time.value}`}
+                            className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                          />
+                          <span className="text-sm font-medium">{time.label}</span>
                           <span className="text-xs text-muted-foreground">(~{time.estimatedMiles} mi)</span>
                         </label>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   {defaultDriveTimes.length === 0 && (
                     <p className="text-xs text-amber-600">Select at least one drive time</p>
@@ -1497,27 +1509,34 @@ function LocationAnalysisSection() {
                             <div className="space-y-2">
                               <Label className="text-xs">Distance Rings</Label>
                               <div className="grid grid-cols-2 gap-2">
-                                {DISTANCE_RINGS.map(ring => (
-                                  <div key={ring.value} className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id={`loc-${locIdx}-ring-${ring.value}`}
-                                      checked={loc.config.distanceRings.includes(ring.value)}
-                                      onCheckedChange={() => {
-                                        const newRings = loc.config.distanceRings.includes(ring.value)
-                                          ? loc.config.distanceRings.filter(r => r !== ring.value)
-                                          : [...loc.config.distanceRings, ring.value].sort((a, b) => a - b);
-                                        updateLocationConfig(locIdx, { ...loc.config, distanceRings: newRings });
-                                      }}
-                                      data-testid={`checkbox-loc-${locIdx}-distance-${ring.value}`}
-                                    />
+                                {DISTANCE_RINGS.map(ring => {
+                                  const isSelected = loc.config.distanceRings.includes(ring.value);
+                                  return (
                                     <label
+                                      key={ring.value}
                                       htmlFor={`loc-${locIdx}-ring-${ring.value}`}
-                                      className="text-xs cursor-pointer"
+                                      className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs cursor-pointer transition-colors ${
+                                        isSelected
+                                          ? 'bg-primary/10 border-primary text-primary'
+                                          : 'bg-background border-border hover:border-primary/50'
+                                      }`}
                                     >
-                                      {ring.label}
+                                      <Checkbox
+                                        id={`loc-${locIdx}-ring-${ring.value}`}
+                                        checked={isSelected}
+                                        onCheckedChange={() => {
+                                          const newRings = isSelected
+                                            ? loc.config.distanceRings.filter(r => r !== ring.value)
+                                            : [...loc.config.distanceRings, ring.value].sort((a, b) => a - b);
+                                          updateLocationConfig(locIdx, { ...loc.config, distanceRings: newRings });
+                                        }}
+                                        data-testid={`checkbox-loc-${locIdx}-distance-${ring.value}`}
+                                        className="h-3.5 w-3.5"
+                                      />
+                                      <span>{ring.label}</span>
                                     </label>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           </TabsContent>
@@ -1526,30 +1545,40 @@ function LocationAnalysisSection() {
                             <div className="space-y-2">
                               <Label className="text-xs">Drive Times</Label>
                               <div className="grid grid-cols-2 gap-2">
-                                {DRIVE_TIMES.map(time => (
-                                  <div key={time.value} className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id={`loc-${locIdx}-time-${time.value}`}
-                                      checked={loc.config.driveTimes.includes(time.value)}
-                                      onCheckedChange={() => {
-                                        const newTimes = loc.config.driveTimes.includes(time.value)
-                                          ? loc.config.driveTimes.filter(t => t !== time.value)
-                                          : [...loc.config.driveTimes, time.value].sort((a, b) => a - b);
-                                        if (newTimes.length <= 3) {
-                                          updateLocationConfig(locIdx, { ...loc.config, driveTimes: newTimes });
-                                        }
-                                      }}
-                                      disabled={!loc.config.driveTimes.includes(time.value) && loc.config.driveTimes.length >= 3}
-                                      data-testid={`checkbox-loc-${locIdx}-drivetime-${time.value}`}
-                                    />
+                                {DRIVE_TIMES.map(time => {
+                                  const isSelected = loc.config.driveTimes.includes(time.value);
+                                  const isDisabled = !isSelected && loc.config.driveTimes.length >= 3;
+                                  return (
                                     <label
+                                      key={time.value}
                                       htmlFor={`loc-${locIdx}-time-${time.value}`}
-                                      className="text-xs cursor-pointer"
+                                      className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs cursor-pointer transition-colors ${
+                                        isDisabled
+                                          ? 'opacity-50 cursor-not-allowed bg-muted'
+                                          : isSelected
+                                            ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                                            : 'bg-background border-border hover:border-blue-300'
+                                      }`}
                                     >
-                                      {time.label}
+                                      <Checkbox
+                                        id={`loc-${locIdx}-time-${time.value}`}
+                                        checked={isSelected}
+                                        onCheckedChange={() => {
+                                          const newTimes = isSelected
+                                            ? loc.config.driveTimes.filter(t => t !== time.value)
+                                            : [...loc.config.driveTimes, time.value].sort((a, b) => a - b);
+                                          if (newTimes.length <= 3) {
+                                            updateLocationConfig(locIdx, { ...loc.config, driveTimes: newTimes });
+                                          }
+                                        }}
+                                        disabled={isDisabled}
+                                        data-testid={`checkbox-loc-${locIdx}-drivetime-${time.value}`}
+                                        className="h-3.5 w-3.5"
+                                      />
+                                      <span>{time.label}</span>
                                     </label>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           </TabsContent>
