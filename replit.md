@@ -61,6 +61,7 @@ Preferred communication style: Simple, everyday language.
         - **Customer Segments**: Breakdown by account type (monthly, seasonal, transient, annual)
 - **SalesComps Module**: Marina sales comparables with CSV import/export, Google Maps, and portfolio functionality.
 - **Modeling Projects Module**: Tracks marina valuation, links to CRM, DD, sales comps, with analytics.
+    - **Dynamic Year Selector**: Project-specific financial period selection (calendar year, T12, projected, fiscal year) that drives deal pricing calculations. Color-coded badges distinguish period types. Selected period data (revenue, expenses, NOI) flows through to purchase price and yield calculations via `modelingFinancialPeriods` table.
     - **Operations Data Sync**: Institutional-grade pipeline for operational data (Rent Roll, Fuel Sales, Ship Store) to modeling projects.
     - **Exit Strategy Suite**: Integrated tools for exit analysis (Tax Calculator, Net Proceeds, 1031 Exchange, DST Analysis, Seller Financing, Earnout Modeling, Waterfall Analysis, IRR, Sensitivity Analysis, AI Insights).
     - **Document Intelligence**: AI-powered document parsing for P&L and Rent Roll with QuickBooks-style review workflow, hierarchical categorization, and confidence scoring.
