@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'wouter';
-import { ChevronRight, Anchor } from 'lucide-react';
+import { ChevronRight, Anchor, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BreadcrumbItem {
@@ -7,6 +7,8 @@ interface BreadcrumbItem {
   href?: string;
   icon?: React.ComponentType<{ className?: string }>;
 }
+
+const DASHBOARD_ITEM: BreadcrumbItem = { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard };
 
 const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
   '/dashboard': [],
@@ -372,39 +374,50 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
 };
 
 function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
+  let items: BreadcrumbItem[] = [];
+
   if (ROUTE_MAPPINGS[path]) {
-    return ROUTE_MAPPINGS[path];
-  }
-
-  for (const [pattern, items] of Object.entries(ROUTE_MAPPINGS)) {
-    const regexPattern = pattern.replace(/:[^/]+/g, '[^/]+');
-    const regex = new RegExp(`^${regexPattern}$`);
-    if (regex.test(path)) {
-      return items;
-    }
-  }
-
-  const segments = path.split('/').filter(Boolean);
-  
-  if (segments.length >= 2) {
-    const parentPath = '/' + segments.slice(0, -1).join('/');
-    const parentBreadcrumbs = ROUTE_MAPPINGS[parentPath];
-    if (parentBreadcrumbs) {
-      const lastSegment = segments[segments.length - 1];
-      const formattedLabel = lastSegment
-        .split('-')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-      if (parentBreadcrumbs.length > 0) {
-        return [...parentBreadcrumbs.slice(0, -1), { ...parentBreadcrumbs[parentBreadcrumbs.length - 1], href: parentPath }, { label: formattedLabel }];
+    items = ROUTE_MAPPINGS[path];
+  } else {
+    for (const [pattern, mappedItems] of Object.entries(ROUTE_MAPPINGS)) {
+      const regexPattern = pattern.replace(/:[^/]+/g, '[^/]+');
+      const regex = new RegExp(`^${regexPattern}$`);
+      if (regex.test(path)) {
+        items = mappedItems;
+        break;
       }
-      return [{ label: formattedLabel }];
+    }
+
+    if (items.length === 0) {
+      const segments = path.split('/').filter(Boolean);
+      
+      if (segments.length >= 2) {
+        const parentPath = '/' + segments.slice(0, -1).join('/');
+        const parentBreadcrumbs = ROUTE_MAPPINGS[parentPath];
+        if (parentBreadcrumbs) {
+          const lastSegment = segments[segments.length - 1];
+          const formattedLabel = lastSegment
+            .split('-')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          if (parentBreadcrumbs.length > 0) {
+            items = [...parentBreadcrumbs.slice(0, -1), { ...parentBreadcrumbs[parentBreadcrumbs.length - 1], href: parentPath }, { label: formattedLabel }];
+          } else {
+            items = [{ label: formattedLabel }];
+          }
+        }
+      }
+
+      if (items.length === 0 && path.split('/').filter(Boolean).length > 0) {
+        const segments = path.split('/').filter(Boolean);
+        const lastSegment = segments[segments.length - 1];
+        items = [{ label: lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' ') }];
+      }
     }
   }
 
-  if (segments.length > 0) {
-    const lastSegment = segments[segments.length - 1];
-    return [{ label: lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' ') }];
+  if (items.length > 0) {
+    return [DASHBOARD_ITEM, ...items];
   }
 
   return [];
