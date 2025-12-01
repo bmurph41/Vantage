@@ -171,11 +171,14 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
 
   const validateDocumentMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${id}/validate`);
+      const result = await apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${id}/validate`);
+      return { id, result };
     },
-    onSuccess: () => {
+    onSuccess: ({ id }) => {
       refetch();
-      toast({ title: "Validated", description: "Document has been validated and is ready for processing." });
+      toast({ title: "Validated", description: "Opening Review Wizard to parse document..." });
+      // Auto-navigate to Review Wizard for seamless workflow
+      setTimeout(() => onProcessDocument(id), 500);
     },
   });
 
