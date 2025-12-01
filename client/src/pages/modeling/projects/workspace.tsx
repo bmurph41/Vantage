@@ -50,6 +50,7 @@ import AuditTrailViewer from './workspace/audit-trail';
 import CaseConfiguration from './workspace/case-configuration';
 import DealPricing from './workspace/deal-pricing';
 import AnalyticsNormalization from './workspace/analytics-normalization';
+import CapitalStackWorkspace from './workspace/capital-stack';
 import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
 
 export default function ProjectWorkspace() {
@@ -223,6 +224,10 @@ export default function ProjectWorkspace() {
               <Calculator className="h-4 w-4" />
               <span className="hidden sm:inline">Debt</span>
             </TabsTrigger>
+            <TabsTrigger value="capital" className="gap-2" data-testid="tab-capital">
+              <Building2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Capital</span>
+            </TabsTrigger>
             <TabsTrigger value="exit" className="gap-2" data-testid="tab-exit">
               <Target className="h-4 w-4" />
               <span className="hidden sm:inline">Exit</span>
@@ -284,6 +289,10 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="debt" className="space-y-6">
           <WorkspaceDebtScenarios projectId={projectId!} />
+        </TabsContent>
+
+        <TabsContent value="capital" className="space-y-6">
+          <CapitalStackWorkspace projectId={projectId!} />
         </TabsContent>
 
         <TabsContent value="exit" className="space-y-6">

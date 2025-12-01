@@ -15082,6 +15082,260 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ============================================================================
+  // CAPITAL STACK - Multi-Tranche Debt & Equity Structure with Waterfall
+  // ============================================================================
+
+  // Get all capital stacks for a modeling project
+  app.get('/api/modeling/projects/:projectId/capital-stacks', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const stacks = await capitalStackService.getCapitalStacksByProject(orgId, projectId);
+      res.json(stacks);
+    } catch (error) {
+      console.error('Failed to fetch capital stacks:', error);
+      res.status(500).json({ error: 'Failed to fetch capital stacks' });
+    }
+  });
+
+  // Get single capital stack with details (debt tranches, equity layers, projections)
+  app.get('/api/modeling/capital-stacks/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const stack = await capitalStackService.getCapitalStackWithDetails(orgId, id);
+      if (!stack) {
+        return res.status(404).json({ error: 'Capital stack not found' });
+      }
+      res.json(stack);
+    } catch (error) {
+      console.error('Failed to fetch capital stack:', error);
+      res.status(500).json({ error: 'Failed to fetch capital stack' });
+    }
+  });
+
+  // Create new capital stack
+  app.post('/api/modeling/projects/:projectId/capital-stacks', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const stack = await capitalStackService.createCapitalStack(orgId, userId, {
+        ...req.body,
+        modelingProjectId: projectId,
+      });
+      res.status(201).json(stack);
+    } catch (error) {
+      console.error('Failed to create capital stack:', error);
+      res.status(500).json({ error: 'Failed to create capital stack' });
+    }
+  });
+
+  // Update capital stack
+  app.patch('/api/modeling/capital-stacks/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const stack = await capitalStackService.updateCapitalStack(orgId, id, req.body);
+      if (!stack) {
+        return res.status(404).json({ error: 'Capital stack not found' });
+      }
+      res.json(stack);
+    } catch (error) {
+      console.error('Failed to update capital stack:', error);
+      res.status(500).json({ error: 'Failed to update capital stack' });
+    }
+  });
+
+  // Delete capital stack
+  app.delete('/api/modeling/capital-stacks/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const success = await capitalStackService.deleteCapitalStack(orgId, id);
+      if (!success) {
+        return res.status(404).json({ error: 'Capital stack not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete capital stack:', error);
+      res.status(500).json({ error: 'Failed to delete capital stack' });
+    }
+  });
+
+  // === Debt Tranches ===
+  app.get('/api/modeling/capital-stacks/:stackId/debt-tranches', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { stackId } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const tranches = await capitalStackService.getDebtTranches(orgId, stackId);
+      res.json(tranches);
+    } catch (error) {
+      console.error('Failed to fetch debt tranches:', error);
+      res.status(500).json({ error: 'Failed to fetch debt tranches' });
+    }
+  });
+
+  app.post('/api/modeling/capital-stacks/:stackId/debt-tranches', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { stackId } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const tranche = await capitalStackService.createDebtTranche(orgId, {
+        ...req.body,
+        capitalStackId: stackId,
+      });
+      res.status(201).json(tranche);
+    } catch (error) {
+      console.error('Failed to create debt tranche:', error);
+      res.status(500).json({ error: 'Failed to create debt tranche' });
+    }
+  });
+
+  app.patch('/api/modeling/debt-tranches/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const tranche = await capitalStackService.updateDebtTranche(orgId, id, req.body);
+      if (!tranche) {
+        return res.status(404).json({ error: 'Debt tranche not found' });
+      }
+      res.json(tranche);
+    } catch (error) {
+      console.error('Failed to update debt tranche:', error);
+      res.status(500).json({ error: 'Failed to update debt tranche' });
+    }
+  });
+
+  app.delete('/api/modeling/debt-tranches/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const success = await capitalStackService.deleteDebtTranche(orgId, id);
+      if (!success) {
+        return res.status(404).json({ error: 'Debt tranche not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete debt tranche:', error);
+      res.status(500).json({ error: 'Failed to delete debt tranche' });
+    }
+  });
+
+  // === Equity Layers ===
+  app.get('/api/modeling/capital-stacks/:stackId/equity-layers', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { stackId } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const layers = await capitalStackService.getEquityLayers(orgId, stackId);
+      res.json(layers);
+    } catch (error) {
+      console.error('Failed to fetch equity layers:', error);
+      res.status(500).json({ error: 'Failed to fetch equity layers' });
+    }
+  });
+
+  app.post('/api/modeling/capital-stacks/:stackId/equity-layers', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { stackId } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const layer = await capitalStackService.createEquityLayer(orgId, {
+        ...req.body,
+        capitalStackId: stackId,
+      });
+      res.status(201).json(layer);
+    } catch (error) {
+      console.error('Failed to create equity layer:', error);
+      res.status(500).json({ error: 'Failed to create equity layer' });
+    }
+  });
+
+  app.patch('/api/modeling/equity-layers/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const layer = await capitalStackService.updateEquityLayer(orgId, id, req.body);
+      if (!layer) {
+        return res.status(404).json({ error: 'Equity layer not found' });
+      }
+      res.json(layer);
+    } catch (error) {
+      console.error('Failed to update equity layer:', error);
+      res.status(500).json({ error: 'Failed to update equity layer' });
+    }
+  });
+
+  app.delete('/api/modeling/equity-layers/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const success = await capitalStackService.deleteEquityLayer(orgId, id);
+      if (!success) {
+        return res.status(404).json({ error: 'Equity layer not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete equity layer:', error);
+      res.status(500).json({ error: 'Failed to delete equity layer' });
+    }
+  });
+
+  // === Projections ===
+  app.get('/api/modeling/capital-stacks/:stackId/projections', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { stackId } = req.params;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const projections = await capitalStackService.getProjections(orgId, stackId);
+      res.json(projections);
+    } catch (error) {
+      console.error('Failed to fetch projections:', error);
+      res.status(500).json({ error: 'Failed to fetch projections' });
+    }
+  });
+
+  app.post('/api/modeling/capital-stacks/:stackId/projections/generate', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { stackId } = req.params;
+      const { noi } = req.body;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const projections = await capitalStackService.generateProjections(orgId, stackId, parseFloat(noi));
+      res.json(projections);
+    } catch (error) {
+      console.error('Failed to generate projections:', error);
+      res.status(500).json({ error: 'Failed to generate projections' });
+    }
+  });
+
+  // === Metrics ===
+  app.get('/api/modeling/capital-stacks/:stackId/metrics', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { stackId } = req.params;
+      const noi = parseFloat(req.query.noi as string) || 0;
+      const { capitalStackService } = await import('./services/capital-stack-service');
+      const metrics = await capitalStackService.getCapitalStackMetrics(orgId, stackId, noi);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Failed to fetch capital stack metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch capital stack metrics' });
+    }
+  });
+
+  // ============================================================================
   // DEBT SCENARIOS - Debt Structure Analysis & Sensitivity Modeling
   // ============================================================================
 

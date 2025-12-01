@@ -78,6 +78,13 @@ Preferred communication style: Simple, everyday language.
     - **Debt Sensitivity Analysis**: Interest rate scenarios across lender structures (bank, credit union, CMBS, bridge, SBA) with DSCR calculations.
     - **Waterfall Customization**: Configurable LP/GP splits, hurdle rates, catch-up provisions with European/American waterfall support and IRR calculations.
     - **External API**: Export-ready data feeds (JSON, CSV, XML) for downstream reporting systems with webhook payload generation.
+    - **Capital Stack Builder**: Multi-tranche debt and equity structure modeling with:
+        - **Debt Tranches**: Senior, mezzanine, bridge, construction, SBA, CMBS, credit union loan modeling with priority ordering, interest rates, amortization schedules, I/O periods, and automatic debt service calculations.
+        - **Equity Layers**: Common, preferred, promote, and co-invest equity layers with commitment amounts, ownership percentages, preferred returns, and waterfall priority.
+        - **Financial Calculations**: Blended debt rate, LTV, debt yield, DSCR, monthly/annual debt service using amortization formulas with I/O period support.
+        - **Cash Flow Projections**: Year-by-year projections with NOI growth, debt service, cash flow after debt, DSCR, cash-on-cash returns, exit value calculations, and net sale proceeds.
+        - **Return Metrics**: IRR calculation using Newton-Raphson method, equity multiple, and waterfall distributions between LP/GP with preferred returns and promote structures.
+        - **Automatic Recalculation**: Metrics auto-update when debt tranches or equity layers are added, modified, or deleted.
 - **Marketing Module**: Tracks campaigns, expenses, lead attribution, and integrates with email platforms.
 - **Fuel Sales Module**: Manages fuel operations, transactions, inventory, and analytics, with portfolio management.
 - **Ship Store Module**: POS/inventory system with product catalog, transactions, analytics, and customer tracking, with portfolio management.
