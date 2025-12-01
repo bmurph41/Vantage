@@ -1492,17 +1492,37 @@ router.post('/projects/:projectId/data-requests-with-files', requireAuth, upload
     const files = req.files as Express.Multer.File[];
     const { folderId, category, documentName, description, dueDate, priority, assigneeId, externalAssigneeId } = req.body;
 
-    if (!folderId) {
-      return res.status(400).json({ error: 'Folder ID is required for file uploads' });
+    // Validate required fields
+    if (!category || typeof category !== 'string' || category.trim() === '') {
+      return res.status(400).json({ error: 'Category is required' });
+    }
+    if (!documentName || typeof documentName !== 'string' || documentName.trim() === '') {
+      return res.status(400).json({ error: 'Document name is required' });
+    }
+    if (!dueDate) {
+      return res.status(400).json({ error: 'Due date is required' });
+    }
+    if (!priority || !['low', 'medium', 'high', 'urgent'].includes(priority)) {
+      return res.status(400).json({ error: 'Valid priority is required (low, medium, high, urgent)' });
+    }
+    if (!assigneeId && !externalAssigneeId) {
+      return res.status(400).json({ error: 'An assignee is required' });
     }
 
-    // Verify folder exists and belongs to project
-    const folder = await storage.vdr.folders.getFolder(folderId, orgId);
-    if (!folder) {
-      return res.status(404).json({ error: 'Folder not found' });
-    }
-    if (folder.projectId !== projectId) {
-      return res.status(400).json({ error: 'Folder does not belong to this project' });
+    // Validate folder if files are uploaded
+    if (files && files.length > 0) {
+      if (!folderId) {
+        return res.status(400).json({ error: 'Folder ID is required when uploading files' });
+      }
+
+      // Verify folder exists and belongs to project
+      const folder = await storage.vdr.folders.getFolder(folderId, orgId);
+      if (!folder) {
+        return res.status(404).json({ error: 'Folder not found' });
+      }
+      if (folder.projectId !== projectId) {
+        return res.status(400).json({ error: 'Folder does not belong to this project' });
+      }
     }
 
     // Create the data request item first
@@ -1510,9 +1530,9 @@ router.post('/projects/:projectId/data-requests-with-files', requireAuth, upload
       projectId,
       orgId,
       createdBy: userId,
-      category: category || 'General',
-      documentName: documentName || 'Untitled Request',
-      description: description || null,
+      category: category.trim(),
+      documentName: documentName.trim(),
+      description: description ? description.trim() : null,
       dueDate: dueDate || null,
       priority: priority || 'medium',
       assigneeId: assigneeId || null,
@@ -1572,7 +1592,9 @@ router.post('/projects/:projectId/data-requests-with-files', requireAuth, upload
         }
       }
 
-      // Link the first uploaded document to the data request item
+      // Link the first uploaded document to the data request item as the primary document
+      // Note: Schema supports single linkedDocumentId per request. All files are uploaded
+      // to the VDR folder and can be accessed there. The linked document indicates the primary attachment.
       if (uploadedDocuments.length > 0) {
         await storage.vdr.dataRequests.linkDocument(item.id, uploadedDocuments[0].id, orgId);
         // Also mark as received since we have files
@@ -1584,9 +1606,11 @@ router.post('/projects/:projectId/data-requests-with-files', requireAuth, upload
       }
     }
 
+    // Return the created item with all uploaded documents for reference
     res.json({
       ...item,
-      uploadedDocuments
+      uploadedDocuments,
+      uploadedCount: uploadedDocuments.length
     });
   } catch (error: any) {
     console.error('Error creating data request with files:', error);

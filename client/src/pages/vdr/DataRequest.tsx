@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -18,7 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { 
   CheckCircle2, Circle, XCircle, Plus, Edit2, Trash2, Link as LinkIcon, 
   ExternalLink, FileText, ArrowLeft, Download, Folder, AlertCircle, LayoutGrid, List,
-  Filter, CheckSquare, Square, Users, Flag, Clock
+  Filter, CheckSquare, Square, Users, Flag, Clock, Upload, X, FolderOpen
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -87,6 +87,10 @@ export default function DataRequest() {
     assigneeId: "",
     externalAssigneeId: "",
   });
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string>("");
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const dealMemberForm = useForm<z.infer<typeof addDealMemberFormSchema>>({
     resolver: zodResolver(addDealMemberFormSchema),
     defaultValues: {
@@ -113,6 +117,11 @@ export default function DataRequest() {
 
   const { data: teamMembers, refetch: refetchTeamMembers } = useQuery<TeamMembersResponse>({
     queryKey: ['/api/vdr/projects', projectId, 'team-members'],
+    enabled: !!projectId,
+  });
+
+  const { data: vdrFolders = [] } = useQuery<Array<{ id: string; name: string; parentFolderId: string | null }>>({
+    queryKey: ['/api/vdr/projects', projectId, 'folders'],
     enabled: !!projectId,
   });
 
@@ -159,6 +168,40 @@ export default function DataRequest() {
       toast({ 
         title: "Error", 
         description: error.message || "Failed to create request", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const createWithFilesMutation = useMutation({
+    mutationFn: async (formDataPayload: FormData) => {
+      const response = await fetch(`/api/vdr/projects/${projectId}/data-requests-with-files`, {
+        method: 'POST',
+        body: formDataPayload,
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create request with files');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vdr/projects', projectId, 'data-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/vdr/projects', projectId, 'documents'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/vdr/projects', projectId, 'folders'] });
+      setIsAddDialogOpen(false);
+      resetForm();
+      setSelectedFiles([]);
+      setSelectedFolderId("");
+      setIsUploadingFiles(false);
+      toast({ title: "Success", description: "Document request added with files" });
+    },
+    onError: (error: any) => {
+      setIsUploadingFiles(false);
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to create request with files", 
         variant: "destructive" 
       });
     },
@@ -217,6 +260,22 @@ export default function DataRequest() {
       assigneeId: "",
       externalAssigneeId: "",
     });
+    setSelectedFiles([]);
+    setSelectedFolderId("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setSelectedFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = () => {
@@ -227,6 +286,31 @@ export default function DataRequest() {
 
     if (editingItem) {
       updateMutation.mutate({ id: editingItem.id, ...formData });
+    } else if (selectedFiles.length > 0) {
+      if (!selectedFolderId) {
+        toast({ title: "Error", description: "Please select a folder for the uploaded files", variant: "destructive" });
+        return;
+      }
+      
+      setIsUploadingFiles(true);
+      const formDataPayload = new FormData();
+      formDataPayload.append('category', formData.category);
+      formDataPayload.append('documentName', formData.documentName);
+      formDataPayload.append('description', formData.description);
+      formDataPayload.append('dueDate', formData.dueDate);
+      formDataPayload.append('priority', formData.priority);
+      formDataPayload.append('folderId', selectedFolderId);
+      if (formData.assigneeId) {
+        formDataPayload.append('assigneeId', formData.assigneeId);
+      }
+      if (formData.externalAssigneeId) {
+        formDataPayload.append('externalAssigneeId', formData.externalAssigneeId);
+      }
+      selectedFiles.forEach(file => {
+        formDataPayload.append('files', file);
+      });
+      
+      createWithFilesMutation.mutate(formDataPayload);
     } else {
       createMutation.mutate(formData);
     }
@@ -531,11 +615,98 @@ export default function DataRequest() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {!editingItem && (
+                    <div className="border-t pt-4 mt-4">
+                      <Label className="text-base font-medium">Attach Files (Optional)</Label>
+                      <p className="text-sm text-gray-500 mb-3">Upload documents directly to the VDR when creating this request</p>
+                      
+                      {selectedFiles.length > 0 && (
+                        <div className="mb-3">
+                          <Label htmlFor="destinationFolder">Destination Folder *</Label>
+                          <Select value={selectedFolderId} onValueChange={setSelectedFolderId}>
+                            <SelectTrigger data-testid="select-destination-folder">
+                              <SelectValue placeholder="Select folder for uploaded files" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {vdrFolders.length === 0 ? (
+                                <SelectItem value="no-folders" disabled>No folders available</SelectItem>
+                              ) : (
+                                vdrFolders.map(folder => (
+                                  <SelectItem key={folder.id} value={folder.id}>
+                                    <div className="flex items-center gap-2">
+                                      <FolderOpen className="w-4 h-4 text-gray-500" />
+                                      {folder.name}
+                                    </div>
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      <div 
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-500 cursor-pointer transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                        data-testid="file-drop-zone"
+                      >
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileSelect}
+                          multiple
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg"
+                          data-testid="input-file-upload"
+                        />
+                        <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                        <p className="text-sm text-gray-600">Click to browse or drag and drop files</p>
+                        <p className="text-xs text-gray-400 mt-1">PDF, Word, Excel, CSV, Images (max 10MB each)</p>
+                      </div>
+
+                      {selectedFiles.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          <Label className="text-sm">Selected Files ({selectedFiles.length})</Label>
+                          {selectedFiles.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                              <div className="flex items-center gap-2 truncate">
+                                <FileText className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                <span className="text-sm truncate">{file.name}</span>
+                                <span className="text-xs text-gray-400">({(file.size / 1024).toFixed(1)} KB)</span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeFile(index)}
+                                className="h-6 w-6 p-0"
+                                data-testid={`button-remove-file-${index}`}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} data-testid="button-cancel">Cancel</Button>
-                  <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit">
-                    {editingItem ? 'Update' : 'Add'} Request
+                  <Button 
+                    onClick={handleSubmit} 
+                    disabled={createMutation.isPending || updateMutation.isPending || createWithFilesMutation.isPending || isUploadingFiles} 
+                    data-testid="button-submit"
+                  >
+                    {isUploadingFiles ? (
+                      <>
+                        <Upload className="w-4 h-4 mr-2 animate-pulse" />
+                        Uploading...
+                      </>
+                    ) : (
+                      editingItem ? 'Update' : 'Add'
+                    )} {!isUploadingFiles && 'Request'}
                   </Button>
                 </DialogFooter>
               </DialogContent>
