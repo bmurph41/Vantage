@@ -114,6 +114,7 @@ const vdrNav = [
 // Modeling Navigation
 const modelingNav = [
   { name: "Projects", href: "/modeling/projects", icon: TrendingUp },
+  { name: "Fund Management", href: "/modeling/funds", icon: Briefcase },
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
   { name: "Exit Strategies", href: "/modeling/exit-strategies", icon: Target },
 ];
