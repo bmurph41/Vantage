@@ -139,9 +139,12 @@ type PendingItem = {
   status: string;
 };
 
+type PackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro';
+
 type BootstrapData = {
   persona: any;
   features: any[];
+  activePacks: PackType[];
   pendingCounts: {
     properties: number;
     contacts: number;
@@ -181,9 +184,15 @@ export default function UnifiedSidebar() {
 
   // Extract data from bootstrap response
   const userPersona = bootstrapData?.persona;
+  const activePacks = bootstrapData?.activePacks || [];
   const pendingPropertiesCount = bootstrapData?.pendingCounts?.properties || 0;
   const pendingContactsCount = bootstrapData?.pendingCounts?.contacts || 0;
   const pendingCompaniesCount = bootstrapData?.pendingCounts?.companies || 0;
+
+  // Helper function to check if user has access to a pack
+  const hasPack = (packType: PackType): boolean => {
+    return activePacks.includes(packType);
+  };
 
   // Helper function to check if user can see a section based on persona
   const canViewSection = (section: string): boolean => {
@@ -654,7 +663,7 @@ export default function UnifiedSidebar() {
         )}
         
         {/* Prospecting & Outreach Section (Premium/Broker Add-On) */}
-        {canViewSection('prospecting') && (
+        {canViewSection('prospecting') && hasPack('prospecting') && (
           <div className="mb-2">
             <SectionHeader 
               title="Prospecting" 
@@ -707,9 +716,15 @@ export default function UnifiedSidebar() {
               onToggle={() => setModelingExpanded(!modelingExpanded)}
               isActive={location.startsWith('/modeling/')}
             />
-            {modelingExpanded && modelingNav.map((item) => (
-              <NavLink key={item.name} item={item} />
-            ))}
+            {modelingExpanded && modelingNav
+              .filter((item) => {
+                if (item.href === '/modeling/funds') return hasPack('fund_management');
+                if (item.href === '/modeling/lp-portal') return hasPack('fund_management') && hasPack('lp_portal');
+                return true;
+              })
+              .map((item) => (
+                <NavLink key={item.name} item={item} />
+              ))}
           </div>
         )}
         

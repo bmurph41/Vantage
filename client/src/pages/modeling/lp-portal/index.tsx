@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { formatCurrency, formatPercent } from '@/lib/formatUtils';
+import { PackGate } from '@/contexts/PackContext';
 import {
   Briefcase,
   TrendingUp,
@@ -44,7 +45,7 @@ interface FundWithMetrics extends Fund {
   nav?: number;
 }
 
-export default function LPPortal() {
+function LPPortalContent() {
   const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
 
   const { data: funds, isLoading: fundsLoading } = useQuery<FundWithMetrics[]>({
@@ -649,5 +650,16 @@ export default function LPPortal() {
         </>
       )}
     </div>
+  );
+}
+
+export default function LPPortal() {
+  return (
+    <PackGate 
+      pack={['fund_management', 'lp_portal']}
+      upgradeMessage="LP Portal is a premium add-on that provides a dedicated investor portal with capital account statements, distribution tracking, and K-1 access. Requires Fund Management pack."
+    >
+      <LPPortalContent />
+    </PackGate>
   );
 }

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PackGate } from '@/contexts/PackContext';
 import { 
   Dialog, 
   DialogContent, 
@@ -860,7 +861,7 @@ function FundDetailView({ fund }: { fund: Fund }) {
   );
 }
 
-export default function FundManagement() {
+function FundManagementContent() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const { data: funds, isLoading, error } = useQuery<Fund[]>({
@@ -947,5 +948,16 @@ export default function FundManagement() {
 
       <CreateFundDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
     </div>
+  );
+}
+
+export default function FundManagement() {
+  return (
+    <PackGate 
+      pack="fund_management" 
+      upgradeMessage="Fund Management is a premium add-on that helps you track PE fund lifecycle, capital allocation, and investor returns."
+    >
+      <FundManagementContent />
+    </PackGate>
   );
 }

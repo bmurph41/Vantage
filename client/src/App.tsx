@@ -60,6 +60,7 @@ const ImportHistory = lazy(() => import("@/pages/import-history"));
 const SortableListDemo = lazy(() => import("@/pages/demo/SortableListDemo"));
 const MilestoneDemo = lazy(() => import("@/pages/milestone-demo"));
 const NotFound = lazy(() => import("@/pages/not-found"));
+const PacksSettings = lazy(() => import("@/pages/packs-settings"));
 const CrmTasks = lazy(() => import("@/pages/crm-tasks"));
 const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
 const CalendarSettings = lazy(() => import("@/pages/calendar-settings"));
@@ -249,6 +250,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <UserSettingsPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/settings/packs">
+        {() => (
+          <UnifiedLayout>
+            <PacksSettings />
           </UnifiedLayout>
         )}
       </Route>

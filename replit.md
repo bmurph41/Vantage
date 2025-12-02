@@ -38,6 +38,7 @@ Preferred communication style: Simple, everyday language.
 - **Session Management**: Express sessions with PostgreSQL session store.
 - **Security**: Zod schema validation, SQL injection prevention, RBAC middleware, audit trails.
 - **VDR Permission System**: Hierarchical, 5-level granular permissions with 60-second cache invalidation.
+- **Pack System**: Modular add-on packs for premium features with frontend (`PackGate` component) and backend (`requirePack` middleware) access control.
 
 ### Key Features
 - **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation. Includes relationship management and a premium prospecting/outreach add-on.
@@ -54,7 +55,9 @@ Preferred communication style: Simple, everyday language.
     - **Capital Stack Builder**: Multi-tranche debt and equity structure modeling with detailed financial calculations and fund inheritance.
     - **Pro Forma Engine**: Real-time projections from actuals and assumptions.
     - **Portfolio Roll-ups**: Aggregate views and performance analysis across projects.
-- **Fund Management Module**: Tracks PE fund lifecycle, capital allocation, fund-level returns, and investor capital accounts with a dedicated LP Portal.
+- **Fund Management Module** (Add-on Pack): Tracks PE fund lifecycle, capital allocation, fund-level returns, and investor capital accounts. Requires `fund_management` pack activation.
+- **LP Portal Module** (Add-on Pack): Dedicated investor portal for LPs with capital account statements, K-1 distribution, and fund performance views. Requires both `fund_management` and `lp_portal` packs.
+- **Prospecting Module** (Add-on Pack): Premium prospecting and outreach tools for deal sourcing. Requires `prospecting` pack activation.
 - **Marketing Module**: Tracks campaigns, expenses, and lead attribution.
 - **Fuel Sales & Ship Store Modules**: POS/inventory systems with analytics and portfolio management.
 - **Virtual Data Room (VDR) Module**: Secure document management with hierarchical folders, granular permissions, external user management, diligence request workflows, and audit logging.

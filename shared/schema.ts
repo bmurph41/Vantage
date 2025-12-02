@@ -129,6 +129,37 @@ export const organizations = pgTable("organizations", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Pack Types - Add-on feature packs that can be purchased
+export const packTypeEnum = pgEnum("pack_type", [
+  "fund_management",  // Fund Management module
+  "lp_portal",        // LP Portal for investor access
+  "prospecting",      // Premium prospecting & outreach tools
+  "analytics_pro",    // Advanced analytics and reporting
+]);
+
+export const packStatusEnum = pgEnum("pack_status", ["active", "trial", "expired", "cancelled"]);
+
+// Organization Packs - Tracks purchased add-on packs per organization
+export const organizationPacks = pgTable("organization_packs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  packType: packTypeEnum("pack_type").notNull(),
+  status: packStatusEnum("status").notNull().default("active"),
+  // Billing info
+  purchasedAt: timestamp("purchased_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at"), // Null = no expiration
+  trialEndsAt: timestamp("trial_ends_at"), // For trial packs
+  // Metadata
+  purchasedBy: varchar("purchased_by"), // User who purchased
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgPackIdx: index("org_packs_org_idx").on(table.orgId),
+  packTypeIdx: index("org_packs_type_idx").on(table.packType),
+  orgPackUnique: index("org_packs_unique_idx").on(table.orgId, table.packType),
+}));
+
 // SSO Configurations - Per-organization SSO provider settings
 export const ssoConfigurations = pgTable("sso_configurations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1576,6 +1607,13 @@ export const insertOrganizationSchema = createInsertSchema(organizations).omit({
   createdAt: true,
 });
 
+export const insertOrganizationPackSchema = createInsertSchema(organizationPacks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateOrganizationPackSchema = insertOrganizationPackSchema.partial();
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -1795,6 +1833,10 @@ export const insertProjectIntegrationSchema = createInsertSchema(projectIntegrat
 // Types
 export type Organization = typeof organizations.$inferSelect;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+
+export type OrganizationPack = typeof organizationPacks.$inferSelect;
+export type InsertOrganizationPack = z.infer<typeof insertOrganizationPackSchema>;
+export type UpdateOrganizationPack = z.infer<typeof updateOrganizationPackSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;

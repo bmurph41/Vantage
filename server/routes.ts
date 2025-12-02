@@ -32,6 +32,8 @@ import { ownedAssetsService } from "./services/owned-assets-service";
 import { debtScenarioService } from "./debt-scenario-service";
 import { docIntelService } from "./services/doc-intel-service";
 import { jobQueueService } from "./services/job-queue-service";
+import { packService, type PackType } from "./services/pack-service";
+import { requirePack, requireFundManagement, requireLpPortal, requireProspecting, loadActivePacks } from "./middleware/pack-guard";
 import { cacheService } from "./services/cache-service";
 import { monitoringService } from "./services/monitoring-service";
 import { dealPricingService } from "./services/deal-pricing-service";
@@ -310,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.use("/api/dd", authenticateUser);
   app.use("/api/crm", authenticateUser);
-  app.use("/api/prospecting", authenticateUser);
+  app.use("/api/prospecting", authenticateUser, requireProspecting());
   // Apply authentication to CRM route aliases
   app.use("/api/leads", authenticateUser);
   app.use("/api/deals", authenticateUser);
@@ -337,6 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rc-pending-properties", authenticateUser);
   app.use("/api/debt-scenarios", authenticateUser);
   app.use("/api/docktalk", authenticateUser);
+  app.use("/api/funds", authenticateUser, requireFundManagement());
   app.use("/api/vdr", authenticateUser, vdrRouter);
   app.use("/api/ship-store", authenticateUser, shipStoreRouter);
   app.use("/api/integration", authenticateUser, integrationRouter);
@@ -369,6 +372,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Organization Packs endpoints
+  app.get("/api/organization/packs", authenticateUser, async (req: any, res) => {
+    try {
+      const packsWithStatus = await packService.getAllPacksWithStatus(req.user.orgId);
+      res.json(packsWithStatus);
+    } catch (error) {
+      console.error("Failed to fetch organization packs:", error);
+      res.status(500).json({ error: "Failed to fetch organization packs" });
+    }
+  });
+
+  app.get("/api/organization/packs/active", authenticateUser, async (req: any, res) => {
+    try {
+      const activePacks = await packService.getActivePacks(req.user.orgId);
+      res.json(activePacks);
+    } catch (error) {
+      console.error("Failed to fetch active packs:", error);
+      res.status(500).json({ error: "Failed to fetch active packs" });
+    }
+  });
+
+  app.get("/api/organization/packs/:packType", authenticateUser, async (req: any, res) => {
+    try {
+      const { packType } = req.params;
+      const hasAccess = await packService.hasPackAccess(req.user.orgId, packType as PackType);
+      const packInfo = await packService.getPackInfo(packType as PackType);
+      res.json({ hasAccess, ...packInfo });
+    } catch (error) {
+      console.error("Failed to check pack access:", error);
+      res.status(500).json({ error: "Failed to check pack access" });
+    }
+  });
+
+  app.post("/api/organization/packs/:packType/activate", authenticateUser, requireRole("owner"), async (req: any, res) => {
+    try {
+      const { packType } = req.params;
+      const { isTrial, trialDays, expiresAt, notes } = req.body;
+      
+      const pack = await packService.activatePack(
+        req.user.orgId,
+        packType as PackType,
+        req.user.id,
+        { isTrial, trialDays, expiresAt: expiresAt ? new Date(expiresAt) : undefined, notes }
+      );
+      res.json(pack);
+    } catch (error: any) {
+      console.error("Failed to activate pack:", error);
+      res.status(400).json({ error: error.message || "Failed to activate pack" });
+    }
+  });
+
+  app.post("/api/organization/packs/:packType/deactivate", authenticateUser, requireRole("owner"), async (req: any, res) => {
+    try {
+      const { packType } = req.params;
+      const pack = await packService.deactivatePack(req.user.orgId, packType as PackType);
+      res.json(pack || { message: "Pack deactivated" });
+    } catch (error: any) {
+      console.error("Failed to deactivate pack:", error);
+      res.status(400).json({ error: error.message || "Failed to deactivate pack" });
+    }
+  });
+
   // Bootstrap endpoint - consolidates sidebar data into a single request
   app.get("/api/bootstrap", authenticateUser, async (req: any, res) => {
     try {
@@ -377,17 +442,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Fetch all data in parallel for maximum speed
       // Note: getPending*ForOrg methods already filter by status='pending'
-      const [persona, features, pendingProperties, pendingContacts, pendingCompanies] = await Promise.all([
+      const [persona, features, pendingProperties, pendingContacts, pendingCompanies, activePacks] = await Promise.all([
         personaService.getUserPersona(userId, orgId).catch(() => null),
         storage.getOrganizationFeatures(orgId).catch(() => []),
         storage.getPendingPropertiesForOrg(orgId).catch(() => []),
         storage.getPendingContactsForOrg(orgId).catch(() => []),
-        storage.getPendingCompaniesForOrg(orgId).catch(() => [])
+        storage.getPendingCompaniesForOrg(orgId).catch(() => []),
+        packService.getActivePacks(orgId).catch(() => [])
       ]);
 
       res.json({
         persona,
         features,
+        activePacks,
         pendingCounts: {
           properties: pendingProperties.length,
           contacts: pendingContacts.length,
