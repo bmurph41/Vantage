@@ -4641,6 +4641,7 @@ export const salesComps = pgTable('sales_comps', {
   company: text('company'),
   owner: text('owner'),
   listPrice: integer('list_price'),
+  estimatedPurchasePrice: integer('estimated_purchase_price'), // Broker-provided estimate when actual price unavailable
   acres: integer('acres'),
   occupancy: integer('occupancy'),
   yearBuilt: integer('year_built'),

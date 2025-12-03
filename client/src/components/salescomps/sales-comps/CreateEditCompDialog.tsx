@@ -56,6 +56,7 @@ const compFormSchema = z.object({
   company: z.string().optional(),
   owner: z.string().optional(),
   listPrice: z.union([z.string(), z.number()]).optional(),
+  estimatedPurchasePrice: z.union([z.string(), z.number()]).optional(),
   // Transaction parties
   sellerCompany: z.string().optional(),
   sellerPrincipal: z.string().optional(),
@@ -182,6 +183,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       company: comp?.company || "",
       owner: comp?.owner || "",
       listPrice: comp?.listPrice ? Number(comp.listPrice) : "",
+      estimatedPurchasePrice: comp?.estimatedPurchasePrice ? Number(comp.estimatedPurchasePrice) : "",
       acres: comp?.acres ? Number(comp.acres) : "",
       occupancy: comp?.occupancy ? Number(comp.occupancy) : "",
       yearBuilt: comp?.yearBuilt || "",
@@ -474,6 +476,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       dryRacks: data.dryRacks === "" ? undefined : Number(data.dryRacks),
       daysOnMarket: data.daysOnMarket === "" ? undefined : Number(data.daysOnMarket),
       listPrice: data.listPrice === "" ? undefined : Number(data.listPrice),
+      estimatedPurchasePrice: data.estimatedPurchasePrice === "" ? undefined : Number(data.estimatedPurchasePrice),
       acres: data.acres === "" ? undefined : Number(data.acres),
       occupancy: data.occupancy === "" ? undefined : Number(data.occupancy),
       yearBuilt: data.yearBuilt === "" ? undefined : Number(data.yearBuilt),
@@ -1149,6 +1152,29 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                             </FormItem>
                           )}
                         />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={form.control}
+                          name="estimatedPurchasePrice"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Estimated Purchase Price</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  type="text"
+                                  placeholder="12000000"
+                                  data-testid="input-estimated-purchase-price"
+                                />
+                              </FormControl>
+                              <p className="text-xs text-muted-foreground mt-1">Broker estimate when actual price unavailable</p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div /> {/* Empty space for grid alignment */}
                       </div>
                       
                       <div className="grid grid-cols-2 gap-3">
