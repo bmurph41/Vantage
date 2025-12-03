@@ -49,6 +49,7 @@ const marinaDataSchema = z.object({
   salePrice: z.union([z.string(), z.number()]).optional(),
   isPriceDisclosed: z.boolean().default(true),
   listPrice: z.union([z.string(), z.number()]).optional(),
+  estimatedPurchasePrice: z.union([z.string(), z.number()]).optional(),
   noi: z.union([z.string(), z.number()]).optional(),
   isNoiDisclosed: z.boolean().default(true),
   capRate: z.union([z.string(), z.number()]).optional(),
@@ -113,6 +114,7 @@ const emptyMarina: MarinaData = {
   salePrice: "",
   isPriceDisclosed: true,
   listPrice: "",
+  estimatedPurchasePrice: "",
   noi: "",
   isNoiDisclosed: true,
   capRate: "",
@@ -342,6 +344,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
             salePrice: marinaData.salePrice ? Number(marinaData.salePrice) : undefined,
             isPriceDisclosed: marinaData.isPriceDisclosed,
             listPrice: marinaData.listPrice ? Number(marinaData.listPrice) : undefined,
+            estimatedPurchasePrice: marinaData.estimatedPurchasePrice ? Number(marinaData.estimatedPurchasePrice) : undefined,
             noi: marinaData.noi ? Number(marinaData.noi) : undefined,
             isNoiDisclosed: marinaData.isNoiDisclosed,
             capRate: marinaData.capRate ? Number(marinaData.capRate) : undefined,
@@ -842,6 +845,29 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                                 </FormItem>
                               )}
                             />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <FormField
+                              control={marinaForm.control}
+                              name="estimatedPurchasePrice"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Estimated Purchase Price</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      {...field} 
+                                      type="text"
+                                      placeholder="12000000"
+                                      data-testid="input-estimated-purchase-price"
+                                    />
+                                  </FormControl>
+                                  <p className="text-xs text-muted-foreground mt-1">Broker estimate when actual price unavailable</p>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div /> {/* Empty space for grid alignment */}
                           </div>
                           
                           <div className="grid grid-cols-2 gap-3">
