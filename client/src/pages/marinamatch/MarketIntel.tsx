@@ -20,7 +20,7 @@ import {
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
   Wrench, ArrowUpDown, Building, Info, Globe, Loader2,
-  Settings, ChevronDown, ChevronUp, Plus, Trash2, Check, X
+  Settings, ChevronDown, ChevronUp, Plus, Trash2, Check, X, Upload
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -884,14 +884,28 @@ export function MarketIntelTab() {
                 </>
               ) : listings?.length === 0 && !searchTerm && stateFilter === "all" && sourceFilter === "all" ? (
                 <>
-                  <Loader2 className="h-12 w-12 mx-auto text-primary mb-4 animate-spin" />
-                  <p className="text-lg font-medium">Loading Listings...</p>
-                  <p className="text-muted-foreground">
-                    Fetching marina listings from commercial real estate platforms
+                  <Anchor className="h-12 w-12 mx-auto text-primary/50 mb-4" />
+                  <p className="text-lg font-medium">No Listings Yet</p>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    Add marina listings to start tracking opportunities. You can import listings via CSV upload or sync from configured sources.
                   </p>
-                  <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>Listings will appear automatically</span>
+                  <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <Button 
+                      variant="default"
+                      onClick={() => setActiveTab("data")}
+                      data-testid="button-go-to-sources"
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Configure Sources
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => setActiveTab("data")}
+                      data-testid="button-import-csv"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import CSV
+                    </Button>
                   </div>
                 </>
               ) : (

@@ -442,19 +442,8 @@ async function seedDefaultSources(orgId: string): Promise<number> {
 }
 
 async function ensureSourcesExist(orgId: string): Promise<void> {
-  try {
-    const existingSources = await db
-      .select({ id: marinaScrapeources.id })
-      .from(marinaScrapeources)
-      .where(eq(marinaScrapeources.orgId, orgId))
-      .limit(1);
-
-    if (existingSources.length === 0) {
-      await seedDefaultSources(orgId);
-    }
-  } catch (error) {
-    console.error("[MarinaMatch Intel] Error ensuring sources exist:", error);
-  }
+  // No auto-seeding - users should configure their own sources
+  // This is intentionally a no-op now
 }
 
 async function runAutoScrape(): Promise<void> {
