@@ -33,6 +33,7 @@ const dealManagementNav = [
 
 // Prospecting & Outreach Navigation (Premium/Broker Add-On)
 const prospectingNav = [
+  { name: "MarinaMatch", href: "/marinamatch", icon: Anchor },
   { name: "Prospecting", href: "/prospecting", icon: Target },
   { name: "Market Targets", href: "/prospecting/markets", icon: LayoutList },
   { name: "Campaigns & Templates", href: "/prospecting/campaigns", icon: Send },
@@ -236,8 +237,8 @@ export default function UnifiedSidebar() {
     const isPendingPage = location.includes('/pending-');
     // Deal Management: deal-workspace, activity, tasks, marketing-automation, analytics, forecast
     const isDealManagementPage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/marketing-automation', '/crm/analytics', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
-    // Prospecting: prospecting pages only (leads are now in Deal Workspace)
-    const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting';
+    // Prospecting: prospecting pages and MarinaMatch (leads are now in Deal Workspace)
+    const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting' || location.startsWith('/marinamatch');
     const isDdPage = location === '/' || location === '/progress-report';
     const isVdrPage = location.startsWith('/vdr');
     const isModelingPage = location.startsWith('/modeling/');
