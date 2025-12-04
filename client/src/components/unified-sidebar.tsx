@@ -34,7 +34,7 @@ const dealManagementNav = [
 // MarinaMatch Navigation (Premium Add-On)
 const marinamatchNav = [
   { name: "Overview", href: "/marinamatch", icon: LayoutDashboard },
-  { name: "Market Intel", href: "/marinamatch?tab=market-intel", icon: Search },
+  { name: "Available Listings", href: "/marinamatch?tab=listings", icon: Search },
   { name: "Investment Criteria", href: "/marinamatch?tab=criteria", icon: Target },
   { name: "Goals", href: "/marinamatch?tab=goals", icon: TrendingUp },
 ];

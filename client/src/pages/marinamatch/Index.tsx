@@ -91,12 +91,12 @@ export default function MarinaMatchIndex() {
               Broker Network
             </TabsTrigger>
             <TabsTrigger 
-              value="market-intel" 
+              value="listings" 
               className="data-[state=active]:bg-background"
-              data-testid="tab-market-intel"
+              data-testid="tab-listings"
             >
               <Radar className="h-4 w-4 mr-2" />
-              Market Intel
+              Available Listings
             </TabsTrigger>
             <TabsTrigger 
               value="criteria" 
@@ -312,7 +312,7 @@ export default function MarinaMatchIndex() {
             <BrokersTab />
           </TabsContent>
 
-          <TabsContent value="market-intel">
+          <TabsContent value="listings">
             <MarketIntelTab />
           </TabsContent>
 
