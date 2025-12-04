@@ -4,11 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Target, Users, TrendingUp, Rss, FileText, BarChart3 } from "lucide-react";
+import { Building2, Target, Users, TrendingUp, Rss, FileText, BarChart3, Radar, Goal, Settings2 } from "lucide-react";
 import { DealSourcesTab } from "./DealSources";
 import { MandatesTab } from "./Mandates";
 import { DealTrackerTab } from "./DealTracker";
 import { BrokersTab } from "./Brokers";
+import { MarketIntelTab } from "./MarketIntel";
+import { InvestmentCriteriaTab } from "./InvestmentCriteria";
+import { GoalsDashboard } from "./GoalsDashboard";
 
 export default function MarinaMatchIndex() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -86,6 +89,30 @@ export default function MarinaMatchIndex() {
             >
               <Users className="h-4 w-4 mr-2" />
               Broker Network
+            </TabsTrigger>
+            <TabsTrigger 
+              value="market-intel" 
+              className="data-[state=active]:bg-background"
+              data-testid="tab-market-intel"
+            >
+              <Radar className="h-4 w-4 mr-2" />
+              Market Intel
+            </TabsTrigger>
+            <TabsTrigger 
+              value="criteria" 
+              className="data-[state=active]:bg-background"
+              data-testid="tab-criteria"
+            >
+              <Settings2 className="h-4 w-4 mr-2" />
+              Investment Criteria
+            </TabsTrigger>
+            <TabsTrigger 
+              value="goals" 
+              className="data-[state=active]:bg-background"
+              data-testid="tab-goals"
+            >
+              <Goal className="h-4 w-4 mr-2" />
+              Goals
             </TabsTrigger>
           </TabsList>
 
@@ -283,6 +310,18 @@ export default function MarinaMatchIndex() {
 
           <TabsContent value="brokers">
             <BrokersTab />
+          </TabsContent>
+
+          <TabsContent value="market-intel">
+            <MarketIntelTab />
+          </TabsContent>
+
+          <TabsContent value="criteria">
+            <InvestmentCriteriaTab />
+          </TabsContent>
+
+          <TabsContent value="goals">
+            <GoalsDashboard />
           </TabsContent>
         </Tabs>
       </div>

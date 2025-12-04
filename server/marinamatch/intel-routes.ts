@@ -832,4 +832,62 @@ router.get("/analytics/overview", requireProspecting, async (req: Request, res: 
   }
 });
 
+// ============================================
+// SCRAPING
+// ============================================
+
+router.get("/scrape-runs", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const runs = await db
+      .select()
+      .from(marinaScrapeRuns)
+      .where(eq(marinaScrapeRuns.orgId, orgId))
+      .orderBy(desc(marinaScrapeRuns.startedAt))
+      .limit(20);
+
+    res.json(runs);
+  } catch (error) {
+    console.error("Error fetching scrape runs:", error);
+    res.status(500).json({ error: "Failed to fetch scrape runs" });
+  }
+});
+
+router.post("/scrape/trigger", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { platforms = ["crexi", "bizbuysell"] } = req.body;
+    
+    const { runScrapeJob } = await import("./services/cre-scraper");
+    const result = await runScrapeJob(orgId, platforms);
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error: any) {
+    console.error("Error triggering scrape:", error);
+    res.status(500).json({ error: error.message || "Failed to trigger scrape" });
+  }
+});
+
+router.get("/scrape/stats", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { getScrapingStats } = await import("./services/cre-scraper");
+    const stats = await getScrapingStats(orgId);
+
+    res.json(stats);
+  } catch (error: any) {
+    console.error("Error fetching scrape stats:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch scrape stats" });
+  }
+});
+
 export default router;

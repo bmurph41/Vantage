@@ -58,6 +58,13 @@ Preferred communication style: Simple, everyday language.
 - **Fund Management Module** (Add-on Pack): Tracks PE fund lifecycle, capital allocation, fund-level returns, and investor capital accounts. Requires `fund_management` pack activation.
 - **LP Portal Module** (Add-on Pack): Dedicated investor portal for LPs with capital account statements, K-1 distribution, and fund performance views. Requires both `fund_management` and `lp_portal` packs.
 - **Prospecting Module** (Add-on Pack): Premium prospecting and outreach tools for deal sourcing. Requires `prospecting` pack activation.
+- **MarinaMatch Intel Module** (Add-on Pack): AI-powered marina listing aggregation and matching system. Features include:
+    - **Market Intel**: Aggregates marina listings from CRE platforms (LoopNet, Crexi, BizBuySell) with deduplication and attribution.
+    - **Investment Criteria Profiles**: Configurable weighted scoring across 7 categories (Location, Financial, Operational, Size, Capital, Involvement, CapEx).
+    - **Goals Dashboard**: Acquisition target tracking for marinas, revenue, EBITDA, capital deployed with progress visualization.
+    - **Automated Matching**: AI-powered scoring engine that ranks listings against user-defined investment criteria.
+    - **Legal Compliance**: robots.txt checking, rate limiting, user agent attribution, source attribution for scraped data.
+    - Requires `prospecting` pack activation.
 - **Marketing Module**: Tracks campaigns, expenses, and lead attribution.
 - **Fuel Sales & Ship Store Modules**: POS/inventory systems with analytics and portfolio management.
 - **Virtual Data Room (VDR) Module**: Secure document management with hierarchical folders, granular permissions, external user management, diligence request workflows, and audit logging.
