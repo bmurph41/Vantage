@@ -11,6 +11,7 @@ import {
   sourcedDeals,
   dealAttributions,
   brokerActivityLog,
+  brokerPortalSubmissions,
   insertDealSourceSchema,
   updateDealSourceSchema,
   insertInvestmentMandateSchema,
@@ -24,6 +25,7 @@ import {
   insertDealAttributionSchema,
   updateDealAttributionSchema,
   insertBrokerActivityLogSchema,
+  insertBrokerPortalSubmissionSchema,
   type DealSource,
   type InvestmentMandate,
   type MandateCriteria,
@@ -31,6 +33,7 @@ import {
   type SourcedDeal,
   type DealAttribution,
   type BrokerActivityLog,
+  type BrokerPortalSubmission,
 } from "@shared/schema";
 import { requireProspecting } from "../middleware/pack-guard";
 
@@ -828,6 +831,361 @@ router.post("/broker-relationships/:id/activity", requireProspecting, async (req
   } catch (error: any) {
     console.error("Error logging broker activity:", error);
     res.status(400).json({ error: error.message || "Failed to log broker activity" });
+  }
+});
+
+// ============================================
+// BROKER DEAL SUBMISSIONS
+// ============================================
+
+// Submit a deal from a broker (internal user submitting on behalf of broker)
+router.post("/broker-relationships/:id/submit-deal", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = (req as any).session?.user?.id;
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const brokerId = req.params.id;
+
+    // Verify broker exists and belongs to org
+    const [broker] = await db
+      .select()
+      .from(brokerRelationships)
+      .where(and(eq(brokerRelationships.id, brokerId), eq(brokerRelationships.orgId, orgId)));
+
+    if (!broker) return res.status(404).json({ error: "Broker not found" });
+
+    // Generate dedupe hash
+    const dedupeHash = generateDedupeHash(req.body);
+    
+    // Check for duplicates
+    const [existingDeal] = await db
+      .select()
+      .from(sourcedDeals)
+      .where(and(eq(sourcedDeals.orgId, orgId), eq(sourcedDeals.dedupeHash, dedupeHash)))
+      .limit(1);
+
+    // Create the sourced deal
+    const validated = insertSourcedDealSchema.parse({
+      ...req.body,
+      orgId,
+      brokerId,
+      dedupeHash,
+      isManual: true,
+      isDuplicate: !!existingDeal,
+      duplicateOfId: existingDeal?.id,
+      status: "new",
+    });
+
+    const [deal] = await db.insert(sourcedDeals).values(validated).returning();
+
+    // Log broker activity
+    await db.insert(brokerActivityLog).values({
+      orgId,
+      brokerId,
+      activityType: "deal_submitted",
+      subject: `Deal submitted: ${deal.propertyName}`,
+      description: `Marina deal "${deal.propertyName}" in ${deal.city || ""}, ${deal.state || ""} was submitted`,
+      sourcedDealId: deal.id,
+      performedBy: userId,
+    });
+
+    // Update broker stats
+    await updateBrokerStats(brokerId, orgId);
+
+    res.status(201).json(deal);
+  } catch (error: any) {
+    console.error("Error submitting broker deal:", error);
+    res.status(400).json({ error: error.message || "Failed to submit deal" });
+  }
+});
+
+// Generate or rotate broker share token
+router.post("/broker-relationships/:id/generate-token", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const brokerId = req.params.id;
+
+    // Verify broker exists and belongs to org
+    const [broker] = await db
+      .select()
+      .from(brokerRelationships)
+      .where(and(eq(brokerRelationships.id, brokerId), eq(brokerRelationships.orgId, orgId)));
+
+    if (!broker) return res.status(404).json({ error: "Broker not found" });
+
+    // Generate new token
+    const shareToken = crypto.randomBytes(32).toString("hex");
+
+    const [updated] = await db
+      .update(brokerRelationships)
+      .set({ 
+        shareToken,
+        portalEnabled: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(brokerRelationships.id, brokerId))
+      .returning();
+
+    res.json({ 
+      shareToken: updated.shareToken,
+      portalEnabled: updated.portalEnabled,
+      portalUrl: `/broker-portal/${updated.shareToken}`,
+    });
+  } catch (error: any) {
+    console.error("Error generating broker token:", error);
+    res.status(400).json({ error: error.message || "Failed to generate token" });
+  }
+});
+
+// Disable broker portal access
+router.post("/broker-relationships/:id/disable-portal", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const brokerId = req.params.id;
+
+    const [updated] = await db
+      .update(brokerRelationships)
+      .set({ 
+        portalEnabled: false,
+        shareToken: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(brokerRelationships.id, brokerId), eq(brokerRelationships.orgId, orgId)))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Broker not found" });
+    res.json({ success: true, portalEnabled: false });
+  } catch (error: any) {
+    console.error("Error disabling broker portal:", error);
+    res.status(400).json({ error: error.message || "Failed to disable portal" });
+  }
+});
+
+// Get broker portal submissions (pending review)
+router.get("/broker-portal-submissions", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { status } = req.query;
+
+    const submissions = await db
+      .select()
+      .from(brokerPortalSubmissions)
+      .where(eq(brokerPortalSubmissions.orgId, orgId))
+      .orderBy(desc(brokerPortalSubmissions.createdAt));
+
+    let filtered = submissions;
+    if (status) {
+      filtered = filtered.filter(s => s.status === status);
+    }
+
+    res.json(filtered);
+  } catch (error) {
+    console.error("Error fetching portal submissions:", error);
+    res.status(500).json({ error: "Failed to fetch submissions" });
+  }
+});
+
+// Approve or reject a broker portal submission
+router.post("/broker-portal-submissions/:id/review", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = (req as any).session?.user?.id;
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { action, notes } = req.body; // action: "approve" | "reject"
+    
+    if (!["approve", "reject"].includes(action)) {
+      return res.status(400).json({ error: "Invalid action. Must be 'approve' or 'reject'" });
+    }
+
+    const [submission] = await db
+      .select()
+      .from(brokerPortalSubmissions)
+      .where(and(
+        eq(brokerPortalSubmissions.id, req.params.id),
+        eq(brokerPortalSubmissions.orgId, orgId)
+      ));
+
+    if (!submission) return res.status(404).json({ error: "Submission not found" });
+
+    if (action === "approve") {
+      // Create sourced deal from submission
+      const dedupeHash = generateDedupeHash({
+        propertyName: submission.propertyName,
+        propertyAddress: submission.propertyAddress || undefined,
+        city: submission.city || undefined,
+        state: submission.state || undefined,
+      });
+
+      const [deal] = await db.insert(sourcedDeals).values({
+        orgId,
+        brokerId: submission.brokerId,
+        propertyName: submission.propertyName,
+        propertyAddress: submission.propertyAddress,
+        city: submission.city,
+        state: submission.state,
+        askingPrice: submission.askingPrice,
+        totalSlips: submission.totalSlips,
+        grossRevenue: submission.grossRevenue,
+        description: submission.description,
+        dedupeHash,
+        isManual: true,
+        portalSubmissionId: submission.id,
+        status: "new",
+      }).returning();
+
+      // Update submission status
+      await db
+        .update(brokerPortalSubmissions)
+        .set({
+          status: "approved",
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+          reviewNotes: notes,
+          promotedToSourcedDealId: deal.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(brokerPortalSubmissions.id, submission.id));
+
+      // Log broker activity
+      await db.insert(brokerActivityLog).values({
+        orgId,
+        brokerId: submission.brokerId,
+        activityType: "deal_submitted",
+        subject: `Portal submission approved: ${submission.propertyName}`,
+        sourcedDealId: deal.id,
+        performedBy: userId,
+      });
+
+      // Update broker stats
+      await updateBrokerStats(submission.brokerId, orgId);
+
+      res.json({ success: true, deal });
+    } else {
+      // Reject submission
+      await db
+        .update(brokerPortalSubmissions)
+        .set({
+          status: "rejected",
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+          reviewNotes: notes,
+          updatedAt: new Date(),
+        })
+        .where(eq(brokerPortalSubmissions.id, submission.id));
+
+      res.json({ success: true, status: "rejected" });
+    }
+  } catch (error: any) {
+    console.error("Error reviewing submission:", error);
+    res.status(400).json({ error: error.message || "Failed to review submission" });
+  }
+});
+
+// ============================================
+// PUBLIC BROKER PORTAL (No Auth Required)
+// ============================================
+
+// Validate broker token and get broker info
+router.get("/public/broker-portal/:token", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+
+    const [broker] = await db
+      .select({
+        id: brokerRelationships.id,
+        companyName: brokerRelationships.companyName,
+        primaryContactName: brokerRelationships.primaryContactName,
+        portalEnabled: brokerRelationships.portalEnabled,
+        orgId: brokerRelationships.orgId,
+      })
+      .from(brokerRelationships)
+      .where(eq(brokerRelationships.shareToken, token));
+
+    if (!broker || !broker.portalEnabled) {
+      return res.status(404).json({ error: "Invalid or expired portal link" });
+    }
+
+    // Update last accessed timestamp
+    await db
+      .update(brokerRelationships)
+      .set({ portalLastAccessedAt: new Date() })
+      .where(eq(brokerRelationships.shareToken, token));
+
+    res.json({
+      brokerName: broker.companyName,
+      contactName: broker.primaryContactName,
+    });
+  } catch (error) {
+    console.error("Error validating broker portal:", error);
+    res.status(500).json({ error: "Failed to validate portal" });
+  }
+});
+
+// Submit deal via broker portal (public, no auth)
+router.post("/public/broker-portal/:token/submit", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+
+    const [broker] = await db
+      .select()
+      .from(brokerRelationships)
+      .where(eq(brokerRelationships.shareToken, token));
+
+    if (!broker || !broker.portalEnabled) {
+      return res.status(404).json({ error: "Invalid or expired portal link" });
+    }
+
+    // Generate submission token for tracking
+    const submissionToken = crypto.randomBytes(16).toString("hex");
+
+    // Create portal submission (pending review)
+    const [submission] = await db.insert(brokerPortalSubmissions).values({
+      orgId: broker.orgId,
+      brokerId: broker.id,
+      submissionToken,
+      status: "pending",
+      propertyName: req.body.propertyName,
+      propertyAddress: req.body.propertyAddress,
+      city: req.body.city,
+      state: req.body.state,
+      askingPrice: req.body.askingPrice,
+      totalSlips: req.body.totalSlips,
+      grossRevenue: req.body.grossRevenue,
+      description: req.body.description,
+      contactName: req.body.contactName,
+      contactEmail: req.body.contactEmail,
+      contactPhone: req.body.contactPhone,
+      additionalNotes: req.body.additionalNotes,
+      rawPayload: req.body,
+      submitterIp: req.ip,
+      submitterUserAgent: req.get("user-agent"),
+    }).returning();
+
+    // Update broker last contact
+    await db
+      .update(brokerRelationships)
+      .set({ 
+        lastContactDate: new Date(),
+        portalLastAccessedAt: new Date(),
+      })
+      .where(eq(brokerRelationships.id, broker.id));
+
+    res.status(201).json({
+      success: true,
+      message: "Deal submitted successfully! The team will review your submission.",
+      submissionToken,
+    });
+  } catch (error: any) {
+    console.error("Error submitting portal deal:", error);
+    res.status(400).json({ error: error.message || "Failed to submit deal" });
   }
 });
 

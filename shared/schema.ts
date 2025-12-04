@@ -12991,12 +12991,17 @@ export const brokerRelationships = pgTable("broker_relationships", {
   isActive: boolean("is_active").notNull().default(true),
   // Link to CRM contact if exists (stored as integer, FK added at DB level)
   crmContactId: integer("crm_contact_id"),
+  // Broker Portal - shareable link for external deal submissions
+  shareToken: varchar("share_token", { length: 64 }).unique(),
+  portalEnabled: boolean("portal_enabled").notNull().default(false),
+  portalLastAccessedAt: timestamp("portal_last_accessed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   orgIdx: index("broker_relationships_org_idx").on(table.orgId),
   tierIdx: index("broker_relationships_tier_idx").on(table.tier),
   activeIdx: index("broker_relationships_active_idx").on(table.isActive),
+  shareTokenIdx: index("broker_relationships_share_token_idx").on(table.shareToken),
 }));
 
 // Sourced Deals - Incoming deals from feeds before conversion to CRM
@@ -13062,6 +13067,8 @@ export const sourcedDeals = pgTable("sourced_deals", {
   disqualificationReason: text("disqualification_reason"),
   // Metadata
   rawData: jsonb("raw_data"), // Original data from source
+  isManual: boolean("is_manual").default(false), // True if submitted via broker/manual entry
+  portalSubmissionId: varchar("portal_submission_id"), // Links to broker portal submission if applicable
   importedAt: timestamp("imported_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -13127,6 +13134,47 @@ export const brokerActivityLog = pgTable("broker_activity_log", {
   orgIdx: index("broker_activity_log_org_idx").on(table.orgId),
   brokerIdx: index("broker_activity_log_broker_idx").on(table.brokerId),
   dateIdx: index("broker_activity_log_date_idx").on(table.activityDate),
+}));
+
+// Broker Portal Submissions - Audit trail for external broker submissions
+export const brokerPortalSubmissionStatusEnum = pgEnum("broker_portal_submission_status", ["pending", "approved", "rejected", "duplicate"]);
+export const brokerPortalSubmissions = pgTable("broker_portal_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  brokerId: varchar("broker_id").notNull().references(() => brokerRelationships.id),
+  submissionToken: varchar("submission_token", { length: 64 }).notNull().unique(),
+  status: brokerPortalSubmissionStatusEnum("status").notNull().default("pending"),
+  // Submitted property data (before promotion to sourcedDeals)
+  propertyName: text("property_name").notNull(),
+  propertyAddress: text("property_address"),
+  city: text("city"),
+  state: text("state"),
+  askingPrice: decimal("asking_price", { precision: 18, scale: 2 }),
+  totalSlips: integer("total_slips"),
+  grossRevenue: decimal("gross_revenue", { precision: 18, scale: 2 }),
+  description: text("description"),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  additionalNotes: text("additional_notes"),
+  // Raw submission payload for audit
+  rawPayload: jsonb("raw_payload"),
+  // Review tracking
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  // Links to promoted deal if approved
+  promotedToSourcedDealId: varchar("promoted_to_sourced_deal_id").references(() => sourcedDeals.id),
+  // Metadata
+  submitterIp: text("submitter_ip"),
+  submitterUserAgent: text("submitter_user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("broker_portal_submissions_org_idx").on(table.orgId),
+  brokerIdx: index("broker_portal_submissions_broker_idx").on(table.brokerId),
+  statusIdx: index("broker_portal_submissions_status_idx").on(table.status),
+  tokenIdx: index("broker_portal_submissions_token_idx").on(table.submissionToken),
 }));
 
 // Insert schemas and types for MarinaMatch
@@ -13215,6 +13263,16 @@ export const insertBrokerActivityLogSchema = createInsertSchema(brokerActivityLo
 });
 export type BrokerActivityLog = typeof brokerActivityLog.$inferSelect;
 export type InsertBrokerActivityLog = z.infer<typeof insertBrokerActivityLogSchema>;
+
+export const insertBrokerPortalSubmissionSchema = createInsertSchema(brokerPortalSubmissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateBrokerPortalSubmissionSchema = insertBrokerPortalSubmissionSchema.partial();
+export type BrokerPortalSubmission = typeof brokerPortalSubmissions.$inferSelect;
+export type InsertBrokerPortalSubmission = z.infer<typeof insertBrokerPortalSubmissionSchema>;
+export type UpdateBrokerPortalSubmission = z.infer<typeof updateBrokerPortalSubmissionSchema>;
 
 // ============================================================================
 // MarinaMatch Intel - Scraped Listings & Investment Criteria
