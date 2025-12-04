@@ -324,6 +324,22 @@ export function MarketIntelTab() {
           <CollapsibleContent>
             <CardContent className="pt-0">
               <div className="space-y-4">
+                <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800" data-testid="data-source-info">
+                  <Info className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-sm">
+                    <span className="font-medium text-foreground">Data Configuration:</span>
+                    <ul className="mt-2 space-y-1 text-muted-foreground text-xs list-disc list-inside">
+                      <li><strong>Demo Mode:</strong> Sample listings are provided for testing and demonstration</li>
+                      <li><strong>Manual Import:</strong> Upload marina listings via CSV for immediate population</li>
+                      <li><strong>API Integration:</strong> Contact LoopNet, CoStar, or Crexi for commercial data feeds</li>
+                      <li><strong>Broker RSS:</strong> Add broker website RSS feeds as custom sources below</li>
+                    </ul>
+                    <span className="block mt-2 text-xs text-muted-foreground">
+                      Platform sources below are monitored automatically. Toggle sources on/off to control which platforms are checked.
+                    </span>
+                  </AlertDescription>
+                </Alert>
+                
                 <p className="text-sm text-muted-foreground">
                   Configure which commercial real estate platforms to monitor for marina listings. 
                   Active sources are automatically checked on a regular schedule.
