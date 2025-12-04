@@ -31,10 +31,6 @@ const dealManagementNav = [
   { name: "Forecast", href: "/crm/forecast", icon: TrendingUp },
 ];
 
-// MarinaMatch Navigation (Single Entry Point - tabs handle internal navigation)
-const marinamatchNav = [
-  { name: "Deal Sourcing", href: "/marinamatch", icon: Target },
-];
 
 // Prospecting & Outreach Navigation (Premium/Broker Add-On)
 const prospectingNav = [
@@ -168,7 +164,6 @@ export default function UnifiedSidebar() {
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [dealManagementExpanded, setDealManagementExpanded] = useState(false);
   const [prospectingExpanded, setProspectingExpanded] = useState(false);
-  const [marinamatchExpanded, setMarinamatchExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [ddExpanded, setDdExpanded] = useState(false);
   const [vdrExpanded, setVdrExpanded] = useState(false);
@@ -261,7 +256,7 @@ export default function UnifiedSidebar() {
     setMarketingExpanded(isMarketingPage);
     setCrmExpanded(isCrmPage);
     setDealManagementExpanded(isDealManagementPage);
-    setMarinamatchExpanded(isMarinamatchPage);
+    // MarinaMatch is now a direct link, no expanded state needed
     setProspectingExpanded(isProspectingPage);
     setCrmToolsExpanded(isCrmToolsPage);
     setPendingExpanded(isPendingPage);
@@ -671,17 +666,22 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* MarinaMatch Section - Available to all users */}
+        {/* MarinaMatch - Direct Link (no dropdown) */}
         <div className="mb-2">
-          <SectionHeader 
-            title="MarinaMatch" 
-            expanded={marinamatchExpanded} 
-            onToggle={() => setMarinamatchExpanded(!marinamatchExpanded)}
-            isActive={location.startsWith('/marinamatch')}
-          />
-          {marinamatchExpanded && marinamatchNav.map((item) => (
-            <NavLink key={item.name} item={item} />
-          ))}
+          <Link href="/marinamatch">
+            <div 
+              className={cn(
+                "flex items-center px-4 py-2.5 text-sm font-medium transition-colors rounded-md mx-2",
+                location.startsWith('/marinamatch')
+                  ? "bg-primary/10 text-primary"
+                  : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+              )}
+              data-testid="nav-marinamatch"
+            >
+              <Target className="w-4 h-4 mr-3 flex-shrink-0" />
+              <span className="truncate">MarinaMatch</span>
+            </div>
+          </Link>
         </div>
         
         {/* Prospecting & Outreach Section (Premium/Broker Add-On) */}
