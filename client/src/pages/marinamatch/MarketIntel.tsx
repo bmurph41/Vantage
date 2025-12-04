@@ -1387,11 +1387,11 @@ export function MarketIntelTab() {
                   <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
                     <Button 
                       variant="outline"
-                      onClick={() => syncMutation.mutate()}
-                      disabled={syncMutation.isPending || syncStatus?.isScraping}
+                      onClick={() => triggerScrapeMutation.mutate()}
+                      disabled={triggerScrapeMutation.isPending || syncStatus?.isScraping}
                       data-testid="button-trigger-sync"
                     >
-                      <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending || syncStatus?.isScraping ? 'animate-spin' : ''}`} />
+                      <RefreshCw className={`h-4 w-4 mr-2 ${triggerScrapeMutation.isPending || syncStatus?.isScraping ? 'animate-spin' : ''}`} />
                       {syncStatus?.isScraping ? 'Checking Sources...' : 'Check Sources'}
                     </Button>
                     <Button 
