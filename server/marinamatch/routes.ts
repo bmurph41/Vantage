@@ -36,9 +36,9 @@ import { requireProspecting } from "../middleware/pack-guard";
 
 const router = Router();
 
-// Helper to extract orgId from session
+// Helper to extract orgId from session or user object
 function getOrgId(req: Request): string | null {
-  return (req as any).session?.user?.orgId || null;
+  return (req as any).user?.orgId || (req as any).session?.user?.orgId || null;
 }
 
 // Helper to generate dedupe hash for deal

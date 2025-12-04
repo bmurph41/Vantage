@@ -41,11 +41,11 @@ import { PLATFORM_CAPABILITIES, getPlatformCapabilities, getRecommendedMethod } 
 const router = Router();
 
 function getOrgId(req: Request): string | null {
-  return (req as any).session?.user?.orgId || null;
+  return (req as any).user?.orgId || (req as any).session?.user?.orgId || null;
 }
 
 function getUserId(req: Request): string | null {
-  return (req as any).session?.user?.id || null;
+  return (req as any).user?.id || (req as any).session?.user?.id || null;
 }
 
 function generateListingDedupeHash(listing: Partial<MarinaListing>): string {
