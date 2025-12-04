@@ -358,41 +358,70 @@ async function seedInitialListings(orgId: string): Promise<number> {
 }
 
 const DEFAULT_SOURCES = [
+  // ACCESSIBLE SOURCES - These actually work without API partnerships
+  {
+    platform: "govdeals",
+    name: "GovDeals Government Surplus",
+    baseUrl: "https://www.govdeals.com",
+    searchUrl: "https://www.govdeals.com/boats-marine-vessels-supplies",
+    config: { category: "marina", type: "government_auction" },
+    rateLimitRpm: 30,
+    isActive: true,
+  },
+  {
+    platform: "publicsurplus",
+    name: "PublicSurplus Marine",
+    baseUrl: "https://www.publicsurplus.com",
+    searchUrl: "https://www.publicsurplus.com/sms/browse/cataucs?catid=20",
+    config: { category: "marine", type: "government_auction" },
+    rateLimitRpm: 30,
+    isActive: true,
+  },
+  {
+    platform: "marina_rss",
+    name: "Marina Industry Feeds",
+    baseUrl: "https://www.tradeonlytoday.com",
+    searchUrl: "https://www.tradeonlytoday.com/feed",
+    config: { type: "rss_feed", keywords: ["marina", "sale", "acquisition"] },
+    rateLimitRpm: 60,
+    isActive: true,
+  },
+  // BLOCKED SOURCES - Require API partnerships (kept for future integration)
   {
     platform: "LoopNet",
     name: "LoopNet Marina Properties",
     baseUrl: "https://www.loopnet.com",
     searchUrl: "https://www.loopnet.com/search/commercial-real-estate/marina/for-sale/",
-    config: { propertyType: "marina", sortBy: "newest" },
+    config: { propertyType: "marina", sortBy: "newest", note: "Requires API partnership" },
     rateLimitRpm: 20,
-    isActive: true,
+    isActive: false, // Disabled until API access is obtained
   },
   {
     platform: "Crexi",
     name: "Crexi Marina Listings",
     baseUrl: "https://www.crexi.com",
     searchUrl: "https://www.crexi.com/search?propertyType=marina",
-    config: { propertyType: "marina", sortBy: "date" },
+    config: { propertyType: "marina", sortBy: "date", note: "Requires API partnership" },
     rateLimitRpm: 30,
-    isActive: true,
+    isActive: false, // Disabled until API access is obtained
   },
   {
     platform: "BizBuySell",
     name: "BizBuySell Marinas",
     baseUrl: "https://www.bizbuysell.com",
     searchUrl: "https://www.bizbuysell.com/buy/all-businesses/marina-businesses-for-sale/",
-    config: { businessType: "marina" },
+    config: { businessType: "marina", note: "Requires API partnership" },
     rateLimitRpm: 20,
-    isActive: true,
+    isActive: false, // Disabled until API access is obtained
   },
   {
     platform: "CoStar",
     name: "CoStar Marina Listings",
     baseUrl: "https://www.costar.com",
     searchUrl: "https://www.costar.com/search?type=marina",
-    config: { requiresApiAccess: true, note: "Requires CoStar subscription for API access" },
+    config: { requiresApiAccess: true, note: "Requires CoStar subscription" },
     rateLimitRpm: 10,
-    isActive: true,
+    isActive: false, // Disabled until API access is obtained
   },
 ];
 
@@ -465,8 +494,10 @@ async function runAutoScrape(): Promise<void> {
         await ensureSourcesExist(org.id);
 
         // Run actual scraper for the org
+        // Include new accessible sources (govdeals, publicsurplus, marina_rss) that actually work
+        // plus traditional CRE platforms (though they require API partnerships)
         const { runScrapeJob } = await import("./cre-scraper");
-        await runScrapeJob(org.id, ["crexi", "loopnet", "bizbuysell", "costar"]);
+        await runScrapeJob(org.id, ["govdeals", "publicsurplus", "marina_rss", "crexi", "loopnet", "bizbuysell"]);
         
       } catch (error) {
         console.error(`[MarinaMatch Intel] Error scraping for org ${org.id}:`, error);

@@ -13223,7 +13223,7 @@ export type InsertBrokerActivityLog = z.infer<typeof insertBrokerActivityLogSche
 export const marinaListings = pgTable("marina_listings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   orgId: varchar("org_id").notNull(),
-  sourcePlatform: varchar("source_platform", { length: 50 }).notNull(),
+  sourcePlatform: varchar("source_platform", { length: 100 }).notNull(),
   sourceUrl: text("source_url").notNull(),
   sourceListingId: varchar("source_listing_id"),
   scrapeRunId: varchar("scrape_run_id"),
@@ -13456,7 +13456,7 @@ export const marinaMatchGoalProgress = pgTable("marina_match_goal_progress", {
 export const marinaScrapeources = pgTable("marina_scrape_sources", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   orgId: varchar("org_id").notNull(),
-  platform: varchar("platform", { length: 50 }).notNull(),
+  platform: varchar("platform", { length: 100 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   baseUrl: text("base_url"),
   searchUrl: text("search_url"),
@@ -13513,7 +13513,7 @@ export const marinaScrapeRuns = pgTable("marina_scrape_runs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   orgId: varchar("org_id").notNull(),
   sourceId: varchar("source_id").references(() => marinaScrapeources.id, { onDelete: "set null" }),
-  platform: varchar("platform", { length: 50 }).notNull(),
+  platform: varchar("platform", { length: 255 }).notNull(),
   status: varchar("status", { length: 30 }).notNull(),
   listingsFound: integer("listings_found").default(0),
   listingsNew: integer("listings_new").default(0),

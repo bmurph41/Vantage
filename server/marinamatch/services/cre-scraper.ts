@@ -754,6 +754,29 @@ export async function scrapeCoStarMetadata(): Promise<ListingData[]> {
   return scrapeCoStar();
 }
 
+// New accessible source scrapers
+
+async function scrapeGovDeals(): Promise<ListingData[]> {
+  const { GovDealsAdapter } = await import("./source-adapters");
+  const adapter = new GovDealsAdapter();
+  const result = await adapter.fetchListings();
+  return result.listings;
+}
+
+async function scrapePublicSurplus(): Promise<ListingData[]> {
+  const { PublicSurplusAdapter } = await import("./source-adapters");
+  const adapter = new PublicSurplusAdapter();
+  const result = await adapter.fetchListings();
+  return result.listings;
+}
+
+async function scrapeMarinaRSS(): Promise<ListingData[]> {
+  const { MarinaIndustryRSSAdapter } = await import("./source-adapters");
+  const adapter = new MarinaIndustryRSSAdapter();
+  const result = await adapter.fetchListings();
+  return result.listings;
+}
+
 export async function runScrapeJob(
   orgId: string,
   platforms: string[] = ["crexi", "bizbuysell"]
@@ -833,6 +856,15 @@ export async function runScrapeJob(
             break;
           case "costar":
             platformListings = await scrapeCoStar(sourceSearchUrl);
+            break;
+          case "govdeals":
+            platformListings = await scrapeGovDeals();
+            break;
+          case "publicsurplus":
+            platformListings = await scrapePublicSurplus();
+            break;
+          case "marina_rss":
+            platformListings = await scrapeMarinaRSS();
             break;
           default:
             console.log(`[${platform}] Unknown platform`);
