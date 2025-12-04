@@ -51,11 +51,201 @@ function ConsolidatedInvestmentCriteria() {
   );
 }
 
+function FunnelStep({ 
+  label, 
+  count, 
+  total, 
+  color 
+}: { 
+  label: string; 
+  count: number; 
+  total: number; 
+  color: string; 
+}) {
+  const percentage = total > 0 ? (count / total) * 100 : 0;
+  
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium">{count}</span>
+      </div>
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <div 
+          className={`h-full ${color} rounded-full transition-all`}
+          style={{ width: `${Math.max(percentage, 2)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PipelineSnapshot() {
+  const { data: analytics, isLoading: analyticsLoading } = useQuery<{
+    totalDeals: number;
+    statusBreakdown: Record<string, number>;
+    activeSources: number;
+    totalSources: number;
+    activeMandates: number;
+    highScoreDeals: number;
+    conversionRate: string | number;
+    topBrokers: any[];
+  }>({
+    queryKey: ["/api/marinamatch/analytics/overview"],
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="border-l-4 border-l-blue-500">
+          <CardHeader className="pb-2 p-3">
+            <CardDescription className="text-xs">Total Deals</CardDescription>
+            <CardTitle className="text-2xl" data-testid="stat-total-deals">
+              {analyticsLoading ? (
+                <Skeleton className="h-7 w-12" />
+              ) : (
+                analytics?.totalDeals || 0
+              )}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-l-4 border-l-green-500">
+          <CardHeader className="pb-2 p-3">
+            <CardDescription className="text-xs">Active Sources</CardDescription>
+            <CardTitle className="text-2xl" data-testid="stat-active-sources">
+              {analyticsLoading ? (
+                <Skeleton className="h-7 w-12" />
+              ) : (
+                `${analytics?.activeSources || 0}/${analytics?.totalSources || 0}`
+              )}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-l-4 border-l-purple-500">
+          <CardHeader className="pb-2 p-3">
+            <CardDescription className="text-xs">Mandates</CardDescription>
+            <CardTitle className="text-2xl" data-testid="stat-mandates">
+              {analyticsLoading ? (
+                <Skeleton className="h-7 w-12" />
+              ) : (
+                analytics?.activeMandates || 0
+              )}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-l-4 border-l-orange-500">
+          <CardHeader className="pb-2 p-3">
+            <CardDescription className="text-xs">High-Score</CardDescription>
+            <CardTitle className="text-2xl" data-testid="stat-high-score">
+              {analyticsLoading ? (
+                <Skeleton className="h-7 w-12" />
+              ) : (
+                analytics?.highScoreDeals || 0
+              )}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-2 p-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Conversion Funnel
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            {analyticsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-4/5" />
+                <Skeleton className="h-6 w-3/5" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <FunnelStep 
+                  label="New" 
+                  count={analytics?.statusBreakdown?.new || 0}
+                  total={analytics?.totalDeals || 1}
+                  color="bg-blue-500"
+                />
+                <FunnelStep 
+                  label="Review" 
+                  count={analytics?.statusBreakdown?.under_review || 0}
+                  total={analytics?.totalDeals || 1}
+                  color="bg-yellow-500"
+                />
+                <FunnelStep 
+                  label="Qualified" 
+                  count={analytics?.statusBreakdown?.qualified || 0}
+                  total={analytics?.totalDeals || 1}
+                  color="bg-green-500"
+                />
+                <FunnelStep 
+                  label="Converted" 
+                  count={analytics?.statusBreakdown?.converted || 0}
+                  total={analytics?.totalDeals || 1}
+                  color="bg-primary"
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2 p-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Top Brokers
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            {analyticsLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Skeleton className="h-6 w-6 rounded-full" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                ))}
+              </div>
+            ) : analytics?.topBrokers?.length ? (
+              <div className="space-y-2">
+                {analytics.topBrokers.slice(0, 3).map((broker, idx) => (
+                  <div key={broker.id} className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
+                      {idx + 1}
+                    </div>
+                    <span className="text-sm truncate flex-1">{broker.contactName}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {broker.totalDealsConverted}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm text-center py-2">
+                No broker data yet
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function DealManagement() {
   const [subTab, setSubTab] = useState("queue");
   
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <PipelineSnapshot />
+      
       <Tabs value={subTab} onValueChange={setSubTab}>
         <TabsList className="bg-muted/30 p-1">
           <TabsTrigger value="queue" className="data-[state=active]:bg-background" data-testid="subtab-queue">
@@ -94,7 +284,7 @@ export default function MarinaMatchIndex() {
   const getTabFromUrl = () => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
-    const validTabs = ["listings", "criteria", "deals", "overview"];
+    const validTabs = ["listings", "criteria", "deals"];
     return tab && validTabs.includes(tab) ? tab : "listings";
   };
   
@@ -112,19 +302,6 @@ export default function MarinaMatchIndex() {
       setLocation(`/marinamatch?tab=${newTab}`);
     }
   };
-  
-  const { data: analytics, isLoading: analyticsLoading } = useQuery<{
-    totalDeals: number;
-    statusBreakdown: Record<string, number>;
-    activeSources: number;
-    totalSources: number;
-    activeMandates: number;
-    highScoreDeals: number;
-    conversionRate: string | number;
-    topBrokers: any[];
-  }>({
-    queryKey: ["/api/marinamatch/analytics/overview"],
-  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -171,195 +348,7 @@ export default function MarinaMatchIndex() {
               <Briefcase className="h-4 w-4 mr-2" />
               Deal Management
             </TabsTrigger>
-            <TabsTrigger 
-              value="overview" 
-              className="data-[state=active]:bg-background"
-              data-testid="tab-overview"
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Overview
-            </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="border-l-4 border-l-blue-500">
-                <CardHeader className="pb-2">
-                  <CardDescription>Total Sourced Deals</CardDescription>
-                  <CardTitle className="text-3xl" data-testid="stat-total-deals">
-                    {analyticsLoading ? (
-                      <Skeleton className="h-9 w-16" />
-                    ) : (
-                      analytics?.totalDeals || 0
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex gap-2 flex-wrap">
-                    {analytics?.statusBreakdown && Object.entries(analytics.statusBreakdown).map(([status, count]) => (
-                      <Badge key={status} variant="secondary" className="text-xs">
-                        {status}: {count}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-l-4 border-l-green-500">
-                <CardHeader className="pb-2">
-                  <CardDescription>Active Sources</CardDescription>
-                  <CardTitle className="text-3xl" data-testid="stat-active-sources">
-                    {analyticsLoading ? (
-                      <Skeleton className="h-9 w-16" />
-                    ) : (
-                      `${analytics?.activeSources || 0} / ${analytics?.totalSources || 0}`
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">
-                    Broker feeds, marketplaces, and proprietary sources
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-l-4 border-l-purple-500">
-                <CardHeader className="pb-2">
-                  <CardDescription>Investment Mandates</CardDescription>
-                  <CardTitle className="text-3xl" data-testid="stat-mandates">
-                    {analyticsLoading ? (
-                      <Skeleton className="h-9 w-16" />
-                    ) : (
-                      analytics?.activeMandates || 0
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">
-                    Active investment criteria profiles
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-l-4 border-l-orange-500">
-                <CardHeader className="pb-2">
-                  <CardDescription>High-Score Matches</CardDescription>
-                  <CardTitle className="text-3xl" data-testid="stat-high-score">
-                    {analyticsLoading ? (
-                      <Skeleton className="h-9 w-16" />
-                    ) : (
-                      analytics?.highScoreDeals || 0
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">
-                    Deals scoring 70%+ against mandates
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5" />
-                    Conversion Funnel
-                  </CardTitle>
-                  <CardDescription>
-                    Deal progression from sourcing to CRM conversion
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {analyticsLoading ? (
-                    <div className="space-y-3">
-                      <Skeleton className="h-8 w-full" />
-                      <Skeleton className="h-8 w-4/5" />
-                      <Skeleton className="h-8 w-3/5" />
-                      <Skeleton className="h-8 w-2/5" />
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <FunnelStep 
-                        label="New Deals" 
-                        count={analytics?.statusBreakdown?.new || 0}
-                        total={analytics?.totalDeals || 1}
-                        color="bg-blue-500"
-                      />
-                      <FunnelStep 
-                        label="Under Review" 
-                        count={analytics?.statusBreakdown?.under_review || 0}
-                        total={analytics?.totalDeals || 1}
-                        color="bg-yellow-500"
-                      />
-                      <FunnelStep 
-                        label="Qualified" 
-                        count={analytics?.statusBreakdown?.qualified || 0}
-                        total={analytics?.totalDeals || 1}
-                        color="bg-green-500"
-                      />
-                      <FunnelStep 
-                        label="Converted to CRM" 
-                        count={analytics?.statusBreakdown?.converted || 0}
-                        total={analytics?.totalDeals || 1}
-                        color="bg-primary"
-                      />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Top Performing Brokers
-                  </CardTitle>
-                  <CardDescription>
-                    Brokers ranked by deal conversion
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {analyticsLoading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <Skeleton className="h-10 w-10 rounded-full" />
-                          <div className="flex-1">
-                            <Skeleton className="h-4 w-32 mb-1" />
-                            <Skeleton className="h-3 w-20" />
-                          </div>
-                          <Skeleton className="h-6 w-12" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : analytics?.topBrokers?.length ? (
-                    <div className="space-y-3">
-                      {analytics.topBrokers.map((broker, idx) => (
-                        <div key={broker.id} className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center font-medium">
-                            {idx + 1}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium">{broker.contactName}</p>
-                            <p className="text-sm text-muted-foreground">{broker.company}</p>
-                          </div>
-                          <Badge variant="secondary">
-                            {broker.totalDealsConverted} deals
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground text-center py-6">
-                      No broker data available yet
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
 
           <TabsContent value="listings">
             <MarketIntelTab />
@@ -373,35 +362,6 @@ export default function MarinaMatchIndex() {
             <DealManagement />
           </TabsContent>
         </Tabs>
-      </div>
-    </div>
-  );
-}
-
-function FunnelStep({ 
-  label, 
-  count, 
-  total, 
-  color 
-}: { 
-  label: string; 
-  count: number; 
-  total: number; 
-  color: string; 
-}) {
-  const percentage = total > 0 ? (count / total) * 100 : 0;
-  
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{count}</span>
-      </div>
-      <div className="h-2 bg-muted rounded-full overflow-hidden">
-        <div 
-          className={`h-full ${color} rounded-full transition-all`}
-          style={{ width: `${Math.max(percentage, 2)}%` }}
-        />
       </div>
     </div>
   );
