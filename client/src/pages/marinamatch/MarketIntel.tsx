@@ -12,10 +12,11 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
-  Wrench, ArrowUpDown, Building
+  Wrench, ArrowUpDown, Building, Info, Globe
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -139,8 +140,47 @@ export function MarketIntelTab() {
     return "bg-red-500";
   };
 
+  const getSourceBadgeStyle = (source: string) => {
+    switch (source.toLowerCase()) {
+      case 'loopnet':
+        return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200';
+      case 'crexi':
+        return 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200';
+      case 'bizbuysell':
+        return 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200';
+      case 'costar':
+        return 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-800 dark:text-gray-200';
+    }
+  };
+
+  const getLastSyncTime = () => {
+    if (!listings || listings.length === 0) return null;
+    const mostRecent = listings.reduce((latest, listing) => {
+      const listingDate = new Date(listing.createdAt);
+      return listingDate > new Date(latest.createdAt) ? listing : latest;
+    }, listings[0]);
+    return mostRecent.createdAt;
+  };
+
+  const lastSync = getLastSyncTime();
+
   return (
     <div className="space-y-6">
+      <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800" data-testid="aggregator-disclaimer">
+        <Info className="h-4 w-4 text-blue-600" />
+        <AlertDescription className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">Aggregated Listings:</span> These marina listings are sourced from third-party commercial real estate platforms including LoopNet, Crexi, BizBuySell, and broker websites. MarinaMatch does not own, endorse, or guarantee the accuracy of these listings. For accurate, up-to-date information, please contact the listing broker directly or visit the original source.
+          {lastSync && (
+            <span className="block mt-1 text-xs">
+              <Clock className="h-3 w-3 inline mr-1" />
+              Last synchronized: {formatDistanceToNow(new Date(lastSync), { addSuffix: true })}
+            </span>
+          )}
+        </AlertDescription>
+      </Alert>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -374,13 +414,30 @@ export function MarketIntelTab() {
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {listing.sourcePlatform}
+                      <div className="text-right flex flex-col items-end gap-2">
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs font-medium border ${getSourceBadgeStyle(listing.sourcePlatform)}`}
+                          data-testid={`badge-source-${listing.sourcePlatform}`}
+                        >
+                          <Globe className="h-3 w-3 mr-1" />
+                          via {listing.sourcePlatform}
                         </Badge>
-                        <Button variant="ghost" size="sm" className="mt-2" asChild>
-                          <a href={listing.sourceUrl} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-4 w-4" />
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-xs h-7"
+                          asChild
+                          data-testid={`button-view-original-${listing.id}`}
+                        >
+                          <a 
+                            href={listing.sourceUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            View Original
                           </a>
                         </Button>
                       </div>
@@ -394,26 +451,39 @@ export function MarketIntelTab() {
       </Card>
 
       <Dialog open={!!selectedListing} onOpenChange={() => setSelectedListing(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedListing && (
             <>
               <DialogHeader>
-                <DialogTitle>{selectedListing.title}</DialogTitle>
+                <div className="flex items-start justify-between">
+                  <DialogTitle className="text-xl">{selectedListing.title}</DialogTitle>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs font-medium border ml-2 ${getSourceBadgeStyle(selectedListing.sourcePlatform)}`}
+                  >
+                    <Globe className="h-3 w-3 mr-1" />
+                    via {selectedListing.sourcePlatform}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Aggregated listing from {selectedListing.sourcePlatform}
+                </p>
               </DialogHeader>
               
               <div className="space-y-4">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-wrap">
                   {selectedListing.bestMatchScore && (
                     <div className={`px-3 py-1 rounded text-white ${getScoreColor(selectedListing.bestMatchScore)}`}>
                       {selectedListing.bestMatchScore}% Match Score
                     </div>
                   )}
-                  <Badge variant="outline" className="capitalize">
-                    {selectedListing.sourcePlatform}
-                  </Badge>
                   <Badge variant={selectedListing.status === "active" ? "default" : "secondary"}>
                     {selectedListing.status}
                   </Badge>
+                  <span className="text-xs text-muted-foreground flex items-center">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Added {formatDistanceToNow(new Date(selectedListing.createdAt), { addSuffix: true })}
+                  </span>
                 </div>
 
                 <Separator />
@@ -488,16 +558,31 @@ export function MarketIntelTab() {
 
                 <Separator />
 
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    {selectedListing.attributionText}
-                  </p>
-                  <Button asChild>
-                    <a href={selectedListing.sourceUrl} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      View Original Listing
-                    </a>
-                  </Button>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground">
+                        {selectedListing.attributionText || `Source: ${selectedListing.sourcePlatform}`}
+                      </p>
+                    </div>
+                    <Button 
+                      className="shrink-0" 
+                      asChild
+                      data-testid="button-view-original-modal"
+                    >
+                      <a href={selectedListing.sourceUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        View Original Listing
+                      </a>
+                    </Button>
+                  </div>
+                  
+                  <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
+                    <Info className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Disclaimer:</span> This listing information is aggregated from {selectedListing.sourcePlatform} for informational purposes only. MarinaMatch does not own this listing and makes no representations about its accuracy, completeness, or availability. Contact the listing broker for verified information before making any investment decisions.
+                    </AlertDescription>
+                  </Alert>
                 </div>
               </div>
             </>
