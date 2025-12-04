@@ -48,7 +48,28 @@ export function broadcastNewArticle(article: Partial<Article>) {
       clientCount++;
     }
   });
+}
 
-  if (clientCount > 0) {
+export function broadcastFetchStatus(status: { 
+  type: 'fetch_started' | 'fetch_completed' | 'fetch_error'; 
+  newArticles?: number;
+  error?: string;
+  timestamp: number;
+  nextFetch?: string;
+}) {
+  if (!wss) {
+    return;
   }
+  
+  const message = JSON.stringify({
+    type: "fetch_status",
+    payload: status,
+    timestamp: Date.now(),
+  });
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
 }

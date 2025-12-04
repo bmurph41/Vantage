@@ -3,34 +3,71 @@ import { fetchRssFeeds, initializeDefaultRssSources } from "./services/rss-fetch
 import { IStorage } from "./storage";
 import { processImmediateAlerts, processDailyAlerts, processWeeklyAlerts } from "./services/alert-service";
 import { generateAllCategorySummaries } from "./services/category-summary-service";
+import { broadcastFetchStatus } from "./websocket";
 
 let isInitialized = false;
 let dockTalkStorage: IStorage;
+let autoFetchEnabled = true;
+let lastFetchTime: Date | null = null;
+let isFetching = false;
+
+export function getAutoFetchStatus() {
+  return {
+    enabled: autoFetchEnabled,
+    lastFetch: lastFetchTime,
+    isFetching: isFetching,
+    nextFetch: autoFetchEnabled && lastFetchTime 
+      ? new Date(lastFetchTime.getTime() + 5 * 60 * 1000) 
+      : null
+  };
+}
+
+export function setAutoFetchEnabled(enabled: boolean) {
+  autoFetchEnabled = enabled;
+  console.log(`DockTalk auto-fetch ${enabled ? 'enabled' : 'disabled'}`);
+  return getAutoFetchStatus();
+}
 
 export function startDockTalkCronJobs(storage: IStorage): void {
   dockTalkStorage = storage;
   if (isInitialized) return;
   
-  // Skip cron jobs in development mode to prevent API rate limiting and improve stability
   const isDevelopment = process.env.NODE_ENV === 'development';
-  if (isDevelopment) {
-    console.log('DockTalk cron jobs disabled in development mode (use manual fetch if needed)');
-    isInitialized = true;
-    return;
-  }
   
   // Initialize default RSS sources asynchronously (non-blocking)
   setImmediate(() => {
     initializeDefaultRssSources().catch(console.error);
   });
   
-  // Schedule RSS fetching every 15 minutes for real-time updates
-  const cronSchedule = process.env.CRON_SCHEDULE || "*/15 * * * *";
+  // Schedule RSS fetching - every 5 minutes in dev, every 15 in production
+  const cronSchedule = isDevelopment 
+    ? (process.env.DEV_CRON_SCHEDULE || "*/5 * * * *")
+    : (process.env.CRON_SCHEDULE || "*/15 * * * *");
+  
+  console.log(`DockTalk cron jobs enabled (schedule: ${cronSchedule})`);
+  console.log(`Auto-fetch is ${autoFetchEnabled ? 'ON' : 'OFF'} - toggle via API`);
   
   cron.schedule(cronSchedule, async () => {
+    // Skip if auto-fetch is disabled
+    if (!autoFetchEnabled) {
+      return;
+    }
+    
     try {
+      isFetching = true;
+      broadcastFetchStatus({ type: 'fetch_started', timestamp: Date.now() });
+      
       const newArticles = await fetchRssFeeds();
+      lastFetchTime = new Date();
+      
       await updateSystemStats(newArticles);
+      
+      broadcastFetchStatus({ 
+        type: 'fetch_completed', 
+        newArticles, 
+        timestamp: Date.now(),
+        nextFetch: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+      });
       
       // Process immediate alerts after successful RSS fetch (when new articles exist)
       if (newArticles > 0) {
@@ -38,6 +75,9 @@ export function startDockTalkCronJobs(storage: IStorage): void {
       }
     } catch (error) {
       console.error("❌ CRON error:", error);
+      broadcastFetchStatus({ type: 'fetch_error', error: String(error), timestamp: Date.now() });
+    } finally {
+      isFetching = false;
     }
   });
 
@@ -101,12 +141,30 @@ export function startDockTalkCronJobs(storage: IStorage): void {
 
 export async function triggerManualFetch(): Promise<number> {
   try {
+    isFetching = true;
+    broadcastFetchStatus({ type: 'fetch_started', timestamp: Date.now() });
+    
     const newArticles = await fetchRssFeeds();
+    lastFetchTime = new Date();
+    
     await updateSystemStats(newArticles);
+    
+    broadcastFetchStatus({ 
+      type: 'fetch_completed', 
+      newArticles, 
+      timestamp: Date.now(),
+      nextFetch: autoFetchEnabled 
+        ? new Date(Date.now() + 5 * 60 * 1000).toISOString() 
+        : undefined
+    });
+    
     return newArticles;
   } catch (error) {
     console.error("❌ Manual fetch error:", error);
+    broadcastFetchStatus({ type: 'fetch_error', error: String(error), timestamp: Date.now() });
     throw error;
+  } finally {
+    isFetching = false;
   }
 }
 

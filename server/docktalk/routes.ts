@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { IStorage } from "./storage";
 import { z } from "zod";
-import { startCronJobs, triggerManualFetch } from "./cron-jobs";
+import { startCronJobs, triggerManualFetch, getAutoFetchStatus, setAutoFetchEnabled } from "./cron-jobs";
 import bcrypt from "bcrypt";
 import { initializeWebSocket } from "./websocket";
 import type { User } from "@shared/docktalk-schema";
@@ -646,9 +646,35 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
   app.post("/api/docktalk/fetch", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const count = await triggerManualFetch();
-      res.json({ message: `Successfully fetched ${count} new articles` });
+      res.json({ message: `Successfully fetched ${count} new articles`, newArticles: count });
     } catch (error) {
       console.error("Error during manual fetch:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Auto-fetch status endpoint
+  app.get("/api/docktalk/auto-fetch/status", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const status = getAutoFetchStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Error getting auto-fetch status:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Toggle auto-fetch
+  app.post("/api/docktalk/auto-fetch/toggle", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const { enabled } = req.body;
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: "enabled must be a boolean" });
+      }
+      const status = setAutoFetchEnabled(enabled);
+      res.json(status);
+    } catch (error) {
+      console.error("Error toggling auto-fetch:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
