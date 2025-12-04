@@ -31,9 +31,16 @@ const dealManagementNav = [
   { name: "Forecast", href: "/crm/forecast", icon: TrendingUp },
 ];
 
+// MarinaMatch Navigation (Premium Add-On)
+const marinamatchNav = [
+  { name: "Overview", href: "/marinamatch", icon: LayoutDashboard },
+  { name: "Market Intel", href: "/marinamatch?tab=market-intel", icon: Search },
+  { name: "Investment Criteria", href: "/marinamatch?tab=criteria", icon: Target },
+  { name: "Goals", href: "/marinamatch?tab=goals", icon: TrendingUp },
+];
+
 // Prospecting & Outreach Navigation (Premium/Broker Add-On)
 const prospectingNav = [
-  { name: "MarinaMatch", href: "/marinamatch", icon: Anchor },
   { name: "Prospecting", href: "/prospecting", icon: Target },
   { name: "Market Targets", href: "/prospecting/markets", icon: LayoutList },
   { name: "Campaigns & Templates", href: "/prospecting/campaigns", icon: Send },
@@ -164,6 +171,7 @@ export default function UnifiedSidebar() {
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [dealManagementExpanded, setDealManagementExpanded] = useState(false);
   const [prospectingExpanded, setProspectingExpanded] = useState(false);
+  const [marinamatchExpanded, setMarinamatchExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [ddExpanded, setDdExpanded] = useState(false);
   const [vdrExpanded, setVdrExpanded] = useState(false);
@@ -237,8 +245,10 @@ export default function UnifiedSidebar() {
     const isPendingPage = location.includes('/pending-');
     // Deal Management: deal-workspace, activity, tasks, marketing-automation, analytics, forecast
     const isDealManagementPage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/marketing-automation', '/crm/analytics', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
-    // Prospecting: prospecting pages and MarinaMatch (leads are now in Deal Workspace)
-    const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting' || location.startsWith('/marinamatch');
+    // MarinaMatch has its own section
+    const isMarinamatchPage = location.startsWith('/marinamatch');
+    // Prospecting: prospecting pages (leads are now in Deal Workspace)
+    const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting';
     const isDdPage = location === '/' || location === '/progress-report';
     const isVdrPage = location.startsWith('/vdr');
     const isModelingPage = location.startsWith('/modeling/');
@@ -254,6 +264,7 @@ export default function UnifiedSidebar() {
     setMarketingExpanded(isMarketingPage);
     setCrmExpanded(isCrmPage);
     setDealManagementExpanded(isDealManagementPage);
+    setMarinamatchExpanded(isMarinamatchPage);
     setProspectingExpanded(isProspectingPage);
     setCrmToolsExpanded(isCrmToolsPage);
     setPendingExpanded(isPendingPage);
@@ -663,6 +674,21 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
+        {/* MarinaMatch Section (Premium Add-On) */}
+        {canViewSection('prospecting') && hasPack('prospecting') && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="MarinaMatch" 
+              expanded={marinamatchExpanded} 
+              onToggle={() => setMarinamatchExpanded(!marinamatchExpanded)}
+              isActive={location.startsWith('/marinamatch')}
+            />
+            {marinamatchExpanded && marinamatchNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
+          </div>
+        )}
+        
         {/* Prospecting & Outreach Section (Premium/Broker Add-On) */}
         {canViewSection('prospecting') && hasPack('prospecting') && (
           <div className="mb-2">
@@ -670,7 +696,7 @@ export default function UnifiedSidebar() {
               title="Prospecting" 
               expanded={prospectingExpanded} 
               onToggle={() => setProspectingExpanded(!prospectingExpanded)}
-              isActive={location.startsWith('/prospecting/') || location === '/crm/leads'}
+              isActive={location.startsWith('/prospecting/')}
             />
             {prospectingExpanded && prospectingNav.map((item) => (
               <NavLink key={item.name} item={item} />
