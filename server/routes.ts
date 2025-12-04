@@ -20,6 +20,7 @@ import { setTenantContext, clearTenantContext } from "./middleware/tenant-contex
 import vdrRouter from "./vdr-routes";
 import shipStoreRouter from "./ship-store-router";
 import integrationRouter from "./integration-routes";
+import marinamatchRouter from "./marinamatch/routes";
 import authRoutes from "./routes/auth-routes";
 import { enterpriseAuthService } from "./services/enterprise-auth-service";
 import { userSessions } from "@shared/schema";
@@ -344,6 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/vdr", authenticateUser, vdrRouter);
   app.use("/api/ship-store", authenticateUser, shipStoreRouter);
   app.use("/api/integration", authenticateUser, integrationRouter);
+  app.use("/api/marinamatch", authenticateUser, marinamatchRouter);
 
   // Dockit Marina Operations Module - mounted at /dockit/api
   try {
