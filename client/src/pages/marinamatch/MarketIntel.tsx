@@ -101,18 +101,12 @@ export function MarketIntelTab() {
     queryKey: ["/api/marinamatch/intel/analytics/overview"],
   });
 
+  const listingsUrl = minScoreFilter && minScoreFilter !== "0" 
+    ? `/api/marinamatch/intel/listings?minScore=${minScoreFilter}`
+    : "/api/marinamatch/intel/listings";
+    
   const { data: listings, isLoading: listingsLoading, refetch: refetchListings } = useQuery<MarinaListing[]>({
-    queryKey: ["/api/marinamatch/intel/listings", minScoreFilter],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (minScoreFilter && minScoreFilter !== "0") {
-        params.set("minScore", minScoreFilter);
-      }
-      const url = `/api/marinamatch/intel/listings${params.toString() ? `?${params.toString()}` : ""}`;
-      const response = await fetch(url, { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch listings");
-      return response.json();
-    },
+    queryKey: [listingsUrl],
     refetchInterval: (data) => {
       if (!data?.state?.data?.length) return 3000;
       return false;
