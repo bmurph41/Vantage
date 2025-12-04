@@ -8,6 +8,7 @@ import { registerDockTalkRoutes } from "./docktalk/routes";
 import { startDockTalkCronJobs } from "./docktalk/cron-jobs";
 import { DatabaseStorage as DockTalkStorage } from "./docktalk/storage";
 import { initializeWebSocket } from "./docktalk/websocket";
+import { startMarinaMatchIntelCronJobs } from "./marinamatch/services/intel-cron";
 
 import { configureSecurityMiddleware } from "./middleware/security";
 import { requestIdMiddleware, requestLoggingMiddleware } from "./middleware/logging";
@@ -73,6 +74,13 @@ app.use(requestLoggingMiddleware);
         log('DockTalk background jobs started');
       } catch (error) {
         log(`Failed to start DockTalk background jobs: ${error}`);
+      }
+
+      try {
+        startMarinaMatchIntelCronJobs();
+        log('MarinaMatch Intel background jobs started');
+      } catch (error) {
+        log(`Failed to start MarinaMatch Intel background jobs: ${error}`);
       }
 
       // Skip DockTalk WebSocket in development to avoid conflict with Vite HMR WebSocket

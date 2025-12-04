@@ -34,6 +34,7 @@ import {
   type MarinaMatchGoal,
   type MarinaScrapeSource,
 } from "@shared/schema";
+import { getScrapeStatus, ensureListingsExist, getLastScrapeRun } from "./services/intel-cron";
 const router = Router();
 
 function getOrgId(req: Request): string | null {
@@ -59,10 +60,37 @@ function generateListingDedupeHash(listing: Partial<MarinaListing>): string {
 // MARINA LISTINGS (Scraped Data)
 // ============================================
 
+router.get("/sync-status", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const scrapeStatus = getScrapeStatus();
+    const lastRun = await getLastScrapeRun(orgId);
+    
+    const listingsCount = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(marinaListings)
+      .where(eq(marinaListings.orgId, orgId));
+
+    res.json({
+      ...scrapeStatus,
+      lastRun,
+      listingsCount: Number(listingsCount[0]?.count || 0),
+    });
+  } catch (error) {
+    console.error("Error fetching sync status:", error);
+    res.status(500).json({ error: "Failed to fetch sync status" });
+  }
+});
+
 router.get("/listings", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    // Auto-seed initial listings if none exist
+    await ensureListingsExist(orgId);
 
     const { status, state, source, minScore, sortBy, limit = "50", offset = "0" } = req.query;
 

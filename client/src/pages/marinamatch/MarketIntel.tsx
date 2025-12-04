@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,12 +11,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
-  Wrench, ArrowUpDown, Building, Info, Globe
+  Wrench, ArrowUpDown, Building, Info, Globe, Loader2
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -77,54 +76,34 @@ export function MarketIntelTab() {
 
   const { data: listings, isLoading: listingsLoading, refetch: refetchListings } = useQuery<MarinaListing[]>({
     queryKey: ["/api/marinamatch/intel/listings", { minScore: minScoreFilter }],
+    refetchInterval: (data) => {
+      if (!data?.state?.data?.length) return 3000;
+      return false;
+    },
   });
 
   const { data: scrapeStats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/marinamatch/intel/scrape/stats"],
   });
 
-  const triggerScrapeMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/marinamatch/intel/scrape/trigger", { platforms: ["crexi", "bizbuysell"] });
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      toast({
-        title: "Scrape Complete",
-        description: `Found ${data.totalFound || 0} listings. ${data.newListings || 0} new, ${data.updatedListings || 0} updated.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape/stats"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Scrape Failed",
-        description: error.message || "Failed to trigger scrape job",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const seedDemoMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/marinamatch/intel/seed-demo-data");
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      toast({
-        title: "Sample Listings Loaded",
-        description: data.message || `Loaded ${data.listingsCount} sample marina listings.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to Load Sample Data",
-        description: error.message || "Could not load sample listings",
-        variant: "destructive",
-      });
+  const { data: syncStatus } = useQuery<{
+    enabled: boolean;
+    lastScrape: string | null;
+    isScraping: boolean;
+    nextScrape: string | null;
+    listingsCount: number;
+    lastRun?: {
+      status: string;
+      completedAt: string;
+      listingsFound?: number;
+      listingsNew?: number;
+    };
+  }>({
+    queryKey: ["/api/marinamatch/intel/sync-status"],
+    refetchInterval: (data) => {
+      if (data?.state?.data?.isScraping) return 3000;
+      if (!data?.state?.data?.listingsCount) return 5000;
+      return 60000;
     },
   });
 
@@ -176,6 +155,9 @@ export function MarketIntelTab() {
   };
 
   const getLastSyncTime = () => {
+    if (syncStatus?.lastRun?.completedAt) {
+      return syncStatus.lastRun.completedAt;
+    }
     if (!listings || listings.length === 0) return null;
     const mostRecent = listings.reduce((latest, listing) => {
       const listingDate = new Date(listing.createdAt);
@@ -185,19 +167,32 @@ export function MarketIntelTab() {
   };
 
   const lastSync = getLastSyncTime();
+  const isSyncing = syncStatus?.isScraping || false;
 
   return (
     <div className="space-y-6">
       <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800" data-testid="aggregator-disclaimer">
         <Info className="h-4 w-4 text-blue-600" />
         <AlertDescription className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Aggregated Listings:</span> These marina listings are sourced from third-party commercial real estate platforms including LoopNet, Crexi, BizBuySell, and broker websites. MarinaMatch does not own, endorse, or guarantee the accuracy of these listings. For accurate, up-to-date information, please contact the listing broker directly or visit the original source.
-          {lastSync && (
-            <span className="block mt-1 text-xs">
-              <Clock className="h-3 w-3 inline mr-1" />
-              Last synchronized: {formatDistanceToNow(new Date(lastSync), { addSuffix: true })}
-            </span>
-          )}
+          <span className="font-medium text-foreground">Aggregated Listings:</span> These marina listings are sourced from third-party commercial real estate platforms including LoopNet, Crexi, CoStar, BizBuySell, and broker websites. MarinaMatch does not own, endorse, or guarantee the accuracy of these listings. For accurate, up-to-date information, please contact the listing broker directly or visit the original source.
+          <span className="block mt-1 text-xs">
+            {isSyncing ? (
+              <>
+                <RefreshCw className="h-3 w-3 inline mr-1 animate-spin" />
+                Syncing new listings...
+              </>
+            ) : lastSync ? (
+              <>
+                <Clock className="h-3 w-3 inline mr-1" />
+                Last synchronized: {formatDistanceToNow(new Date(lastSync), { addSuffix: true })}
+              </>
+            ) : (
+              <>
+                <Clock className="h-3 w-3 inline mr-1" />
+                Auto-sync enabled
+              </>
+            )}
+          </span>
         </AlertDescription>
       </Alert>
 
@@ -344,33 +339,53 @@ export function MarketIntelTab() {
             </div>
           ) : filteredListings.length === 0 ? (
             <div className="text-center py-12">
-              <Anchor className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-lg font-medium">No listings found</p>
-              <p className="text-muted-foreground">
-                Try adjusting your filters or load sample data to explore the platform
-              </p>
-              <div className="flex gap-3 justify-center mt-4">
-                <Button 
-                  variant="outline"
-                  onClick={() => seedDemoMutation.mutate()}
-                  disabled={seedDemoMutation.isPending}
-                  data-testid="button-seed-demo-data"
-                >
-                  {seedDemoMutation.isPending ? (
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Building className="h-4 w-4 mr-2" />
-                  )}
-                  Load Sample Listings
-                </Button>
-                <Button 
-                  onClick={() => triggerScrapeMutation.mutate()}
-                  disabled={triggerScrapeMutation.isPending}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Fetch Live Listings
-                </Button>
-              </div>
+              {syncStatus?.isScraping ? (
+                <>
+                  <Loader2 className="h-12 w-12 mx-auto text-primary mb-4 animate-spin" />
+                  <p className="text-lg font-medium">Syncing Listings...</p>
+                  <p className="text-muted-foreground">
+                    Aggregating marina listings from LoopNet, Crexi, CoStar, and broker networks
+                  </p>
+                  <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>This may take a moment...</span>
+                  </div>
+                </>
+              ) : listings?.length === 0 && !searchTerm && stateFilter === "all" && sourceFilter === "all" ? (
+                <>
+                  <Loader2 className="h-12 w-12 mx-auto text-primary mb-4 animate-spin" />
+                  <p className="text-lg font-medium">Loading Listings...</p>
+                  <p className="text-muted-foreground">
+                    Fetching marina listings from commercial real estate platforms
+                  </p>
+                  <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>Listings will appear automatically</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Anchor className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium">No listings match your filters</p>
+                  <p className="text-muted-foreground">
+                    Try adjusting your search or filter criteria
+                  </p>
+                  <Button 
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setStateFilter("all");
+                      setSourceFilter("all");
+                      setMinScoreFilter("0");
+                    }}
+                    data-testid="button-clear-filters"
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    Clear All Filters
+                  </Button>
+                </>
+              )}
             </div>
           ) : (
             <ScrollArea className="h-[600px]">
