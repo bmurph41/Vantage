@@ -382,14 +382,6 @@ export const PLATFORM_CAPABILITIES: Record<string, PlatformCapability> = {
     accessNotes: "Custom sources depend on the specific site's policies. Check robots.txt before automated access.",
     scrapingStatus: "allowed",
   },
-  csv_import: {
-    platform: "csv_import",
-    displayName: "CSV Import",
-    capabilities: ["manual"],
-    blockedMethods: [],
-    accessNotes: "Manual data import via CSV file upload. Most reliable method for any data source.",
-    scrapingStatus: "allowed",
-  },
 };
 
 // Get capabilities for a platform

@@ -13465,6 +13465,7 @@ export const marinaScrapeources = pgTable("marina_scrape_sources", {
   respectRobotsTxt: boolean("respect_robots_txt").default(true),
   userAgent: varchar("user_agent", { length: 255 }).default("MarinaMatchBot/1.0"),
   isActive: boolean("is_active").default(true),
+  isManaged: boolean("is_managed").default(false), // True for system-created default sources
   
   // Ingestion method configuration
   ingestionMethod: varchar("ingestion_method", { length: 30 }).default("scraping"), // api, feed, scraping, manual, rss

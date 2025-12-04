@@ -357,93 +357,93 @@ async function seedInitialListings(orgId: string): Promise<number> {
   }
 }
 
-async function seedDefaultSources(orgId: string): Promise<number> {
-  const crypto = await import("crypto");
-  
-  const defaultSources = [
-    {
-      id: `source-${crypto.randomUUID()}`,
-      orgId,
-      platform: "Crexi",
-      name: "Crexi Marina Listings",
-      baseUrl: "https://www.crexi.com",
-      searchUrl: "https://www.crexi.com/search?propertyType=marina",
-      config: { propertyType: "marina", sortBy: "date" },
-      rateLimitRpm: 30,
-      respectRobotsTxt: true,
-      userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
-      isActive: true,
-    },
-    {
-      id: `source-${crypto.randomUUID()}`,
-      orgId,
-      platform: "LoopNet",
-      name: "LoopNet Marina Properties",
-      baseUrl: "https://www.loopnet.com",
-      searchUrl: "https://www.loopnet.com/search/commercial-real-estate/marina/for-sale/",
-      config: { propertyType: "marina", sortBy: "newest" },
-      rateLimitRpm: 20,
-      respectRobotsTxt: true,
-      userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
-      isActive: true,
-    },
-    {
-      id: `source-${crypto.randomUUID()}`,
-      orgId,
-      platform: "BizBuySell",
-      name: "BizBuySell Marinas",
-      baseUrl: "https://www.bizbuysell.com",
-      searchUrl: "https://www.bizbuysell.com/buy/all-businesses/marina-businesses-for-sale/",
-      config: { businessType: "marina" },
-      rateLimitRpm: 20,
-      respectRobotsTxt: true,
-      userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
-      isActive: true,
-    },
-    {
-      id: `source-${crypto.randomUUID()}`,
-      orgId,
-      platform: "CoStar",
-      name: "CoStar Marina Listings",
-      baseUrl: "https://www.costar.com",
-      searchUrl: "https://www.costar.com/search?type=marina",
-      config: { requiresApiAccess: true },
-      rateLimitRpm: 10,
-      respectRobotsTxt: true,
-      userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
-      isActive: false, // Disabled by default - requires subscription
-    },
-    {
-      id: `source-${crypto.randomUUID()}`,
-      orgId,
-      platform: "MerlemMarine",
-      name: "Merle Marine Brokerage",
-      baseUrl: "https://www.merlemarine.com",
-      searchUrl: "https://www.merlemarine.com/marinas-for-sale",
-      config: { brokerType: "specialized" },
-      rateLimitRpm: 15,
-      respectRobotsTxt: true,
-      userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
-      isActive: true,
-    },
-  ];
+const DEFAULT_SOURCES = [
+  {
+    platform: "LoopNet",
+    name: "LoopNet Marina Properties",
+    baseUrl: "https://www.loopnet.com",
+    searchUrl: "https://www.loopnet.com/search/commercial-real-estate/marina/for-sale/",
+    config: { propertyType: "marina", sortBy: "newest" },
+    rateLimitRpm: 20,
+    isActive: true,
+  },
+  {
+    platform: "Crexi",
+    name: "Crexi Marina Listings",
+    baseUrl: "https://www.crexi.com",
+    searchUrl: "https://www.crexi.com/search?propertyType=marina",
+    config: { propertyType: "marina", sortBy: "date" },
+    rateLimitRpm: 30,
+    isActive: true,
+  },
+  {
+    platform: "BizBuySell",
+    name: "BizBuySell Marinas",
+    baseUrl: "https://www.bizbuysell.com",
+    searchUrl: "https://www.bizbuysell.com/buy/all-businesses/marina-businesses-for-sale/",
+    config: { businessType: "marina" },
+    rateLimitRpm: 20,
+    isActive: true,
+  },
+  {
+    platform: "CoStar",
+    name: "CoStar Marina Listings",
+    baseUrl: "https://www.costar.com",
+    searchUrl: "https://www.costar.com/search?type=marina",
+    config: { requiresApiAccess: true, note: "Requires CoStar subscription for API access" },
+    rateLimitRpm: 10,
+    isActive: true,
+  },
+];
 
-  try {
-    await db.insert(marinaScrapeources).values(defaultSources as any);
-    console.log(`[MarinaMatch Intel] Seeded ${defaultSources.length} default sources for org ${orgId}`);
-    return defaultSources.length;
-  } catch (error: any) {
-    if (error.code === '23505') {
-      console.log(`[MarinaMatch Intel] Some sources already exist for org ${orgId}`);
-      return 0;
+async function ensureDefaultSources(orgId: string): Promise<number> {
+  const crypto = await import("crypto");
+  let created = 0;
+
+  for (const source of DEFAULT_SOURCES) {
+    try {
+      const existing = await db
+        .select({ id: marinaScrapeources.id })
+        .from(marinaScrapeources)
+        .where(
+          and(
+            eq(marinaScrapeources.orgId, orgId),
+            eq(marinaScrapeources.platform, source.platform)
+          )
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        await db.insert(marinaScrapeources).values({
+          id: `source-${crypto.randomUUID()}`,
+          orgId,
+          platform: source.platform,
+          name: source.name,
+          baseUrl: source.baseUrl,
+          searchUrl: source.searchUrl,
+          config: source.config,
+          rateLimitRpm: source.rateLimitRpm,
+          respectRobotsTxt: true,
+          userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
+          isActive: source.isActive,
+          isManaged: true,
+        } as any);
+        created++;
+        console.log(`[MarinaMatch Intel] Created default source: ${source.platform} for org ${orgId}`);
+      }
+    } catch (error) {
+      console.error(`[MarinaMatch Intel] Error creating default source ${source.platform}:`, error);
     }
-    throw error;
   }
+
+  if (created > 0) {
+    console.log(`[MarinaMatch Intel] Created ${created} default sources for org ${orgId}`);
+  }
+  return created;
 }
 
 async function ensureSourcesExist(orgId: string): Promise<void> {
-  // No auto-seeding - users should configure their own sources
-  // This is intentionally a no-op now
+  await ensureDefaultSources(orgId);
 }
 
 async function runAutoScrape(): Promise<void> {

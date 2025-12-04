@@ -20,7 +20,7 @@ import {
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
   Wrench, ArrowUpDown, Building, Info, Globe, Loader2,
-  Settings, ChevronDown, ChevronUp, Plus, Trash2, Check, X, Upload
+  Settings, ChevronDown, ChevronUp, Plus, Trash2, Check, X, Radar
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -394,18 +394,18 @@ export function MarketIntelTab() {
           <CollapsibleContent>
             <CardContent className="pt-0">
               <div className="space-y-4">
-                <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800" data-testid="data-source-info">
-                  <Info className="h-4 w-4 text-amber-600" />
+                <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800" data-testid="data-source-info">
+                  <Radar className="h-4 w-4 text-blue-600" />
                   <AlertDescription className="text-sm">
-                    <span className="font-medium text-foreground">Data Configuration:</span>
+                    <span className="font-medium text-foreground">Automated Listing Aggregation</span>
                     <ul className="mt-2 space-y-1 text-muted-foreground text-xs list-disc list-inside">
-                      <li><strong>Demo Mode:</strong> Sample listings are provided for testing and demonstration</li>
-                      <li><strong>Manual Import:</strong> Upload marina listings via CSV for immediate population</li>
-                      <li><strong>API Integration:</strong> Contact LoopNet, CoStar, or Crexi for commercial data feeds</li>
-                      <li><strong>Broker RSS:</strong> Add broker website RSS feeds as custom sources below</li>
+                      <li><strong>Default Sources:</strong> LoopNet, Crexi, BizBuySell, and CoStar are automatically configured for every account</li>
+                      <li><strong>Live Monitoring:</strong> Sources are polled regularly to detect new marina listings</li>
+                      <li><strong>AI Matching:</strong> Listings are scored against your investment criteria profiles</li>
+                      <li><strong>Deduplication:</strong> Identical listings across platforms are merged automatically</li>
                     </ul>
                     <span className="block mt-2 text-xs text-muted-foreground">
-                      Platform sources below are monitored automatically. Toggle sources on/off to control which platforms are checked.
+                      Toggle sources on/off to control which platforms are monitored. Add custom broker sources below.
                     </span>
                   </AlertDescription>
                 </Alert>
@@ -884,27 +884,29 @@ export function MarketIntelTab() {
                 </>
               ) : listings?.length === 0 && !searchTerm && stateFilter === "all" && sourceFilter === "all" ? (
                 <>
-                  <Anchor className="h-12 w-12 mx-auto text-primary/50 mb-4" />
-                  <p className="text-lg font-medium">No Listings Yet</p>
+                  <Radar className="h-12 w-12 mx-auto text-primary/50 mb-4" />
+                  <p className="text-lg font-medium">Scanning for Marina Listings</p>
                   <p className="text-muted-foreground max-w-md mx-auto">
-                    Add marina listings to start tracking opportunities. You can import listings via CSV upload or sync from configured sources.
+                    The system is monitoring LoopNet, Crexi, BizBuySell, and CoStar for marina listings. 
+                    New listings will appear here automatically as they are discovered.
                   </p>
                   <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
                     <Button 
                       variant="default"
-                      onClick={() => setActiveTab("data")}
-                      data-testid="button-go-to-sources"
+                      onClick={() => syncMutation.mutate()}
+                      disabled={syncMutation.isPending || syncStatus?.isScraping}
+                      data-testid="button-trigger-sync"
                     >
-                      <Settings className="h-4 w-4 mr-2" />
-                      Configure Sources
+                      <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending || syncStatus?.isScraping ? 'animate-spin' : ''}`} />
+                      {syncStatus?.isScraping ? 'Syncing...' : 'Sync Now'}
                     </Button>
                     <Button 
                       variant="outline"
-                      onClick={() => setActiveTab("data")}
-                      data-testid="button-import-csv"
+                      onClick={() => setSettingsOpen(true)}
+                      data-testid="button-manage-sources"
                     >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Import CSV
+                      <Settings className="h-4 w-4 mr-2" />
+                      Manage Sources
                     </Button>
                   </div>
                 </>
