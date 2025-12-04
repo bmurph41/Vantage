@@ -20,7 +20,7 @@ import {
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
   Wrench, ArrowUpDown, Building, Info, Globe, Loader2,
-  Settings, ChevronDown, ChevronUp, Plus, Trash2, Check, X, Radar, Pencil
+  Settings, ChevronDown, ChevronUp, Plus, Trash2, Check, X, Radar, Pencil, Mail, AlertTriangle
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -1232,7 +1232,7 @@ export function MarketIntelTab() {
             <div>
               <CardTitle>Marina Listings</CardTitle>
               <CardDescription>
-                AI-matched marina listings from commercial real estate platforms
+                AI-matched marina listings from broker submissions and verified sources
               </CardDescription>
             </div>
           </div>
@@ -1515,23 +1515,52 @@ export function MarketIntelTab() {
                           <Globe className="h-3 w-3 mr-1" />
                           via {listing.sourcePlatform}
                         </Badge>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-xs h-7"
-                          asChild
-                          data-testid={`button-view-original-${listing.id}`}
-                        >
-                          <a 
-                            href={listing.sourceUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
+                        {listing.sourceUrl?.startsWith("mailto:") ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs h-7"
+                            asChild
+                            data-testid={`button-contact-broker-${listing.id}`}
                           >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            View Original
-                          </a>
-                        </Button>
+                            <a 
+                              href={listing.sourceUrl} 
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Mail className="h-3 w-3 mr-1" />
+                              Contact Broker
+                            </a>
+                          </Button>
+                        ) : listing.sourceUrl?.startsWith("#") || !listing.sourceUrl ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs h-7"
+                            disabled
+                            data-testid={`button-direct-listing-${listing.id}`}
+                          >
+                            <Anchor className="h-3 w-3 mr-1" />
+                            Direct Listing
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs h-7"
+                            asChild
+                            data-testid={`button-view-original-${listing.id}`}
+                          >
+                            <a 
+                              href={listing.sourceUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              View Original
+                            </a>
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1657,16 +1686,38 @@ export function MarketIntelTab() {
                         {selectedListing.attributionText || `Source: ${selectedListing.sourcePlatform}`}
                       </p>
                     </div>
-                    <Button 
-                      className="shrink-0" 
-                      asChild
-                      data-testid="button-view-original-modal"
-                    >
-                      <a href={selectedListing.sourceUrl} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        View Original Listing
-                      </a>
-                    </Button>
+                    {selectedListing.sourceUrl?.startsWith("mailto:") ? (
+                      <Button 
+                        className="shrink-0" 
+                        asChild
+                        data-testid="button-contact-broker-modal"
+                      >
+                        <a href={selectedListing.sourceUrl}>
+                          <Mail className="h-4 w-4 mr-2" />
+                          Contact Broker
+                        </a>
+                      </Button>
+                    ) : selectedListing.sourceUrl?.startsWith("#") || !selectedListing.sourceUrl ? (
+                      <Button 
+                        className="shrink-0" 
+                        disabled
+                        data-testid="button-direct-listing-modal"
+                      >
+                        <Anchor className="h-4 w-4 mr-2" />
+                        Direct Listing
+                      </Button>
+                    ) : (
+                      <Button 
+                        className="shrink-0" 
+                        asChild
+                        data-testid="button-view-original-modal"
+                      >
+                        <a href={selectedListing.sourceUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View Original Listing
+                        </a>
+                      </Button>
+                    )}
                   </div>
                   
                   <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
