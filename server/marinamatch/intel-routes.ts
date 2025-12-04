@@ -184,6 +184,16 @@ router.post("/listings", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
+    if (req.body.sourceUrl) {
+      const urlValidation = validateListingUrl(req.body.sourceUrl, req.body.sourcePlatform);
+      if (!urlValidation.isValid) {
+        return res.status(400).json({ 
+          error: "Invalid source URL",
+          details: urlValidation.reason
+        });
+      }
+    }
+
     const dedupeHash = generateListingDedupeHash(req.body);
     
     const [existingListing] = await db
@@ -222,6 +232,16 @@ router.patch("/listings/:id", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    if (req.body.sourceUrl) {
+      const urlValidation = validateListingUrl(req.body.sourceUrl, req.body.sourcePlatform);
+      if (!urlValidation.isValid) {
+        return res.status(400).json({ 
+          error: "Invalid source URL",
+          details: urlValidation.reason
+        });
+      }
+    }
 
     const validated = updateMarinaListingSchema.parse(req.body);
     const [updated] = await db
