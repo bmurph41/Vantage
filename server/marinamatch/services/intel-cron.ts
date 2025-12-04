@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { db } from "../../db";
 import { eq, and, desc } from "drizzle-orm";
-import { marinaListings, marinaScrapeRuns, organizations } from "@shared/schema";
+import { marinaListings, marinaScrapeRuns, marinaScrapeources, organizations } from "@shared/schema";
 
 let isInitialized = false;
 let autoScrapeEnabled = true;
@@ -357,6 +357,106 @@ async function seedInitialListings(orgId: string): Promise<number> {
   }
 }
 
+async function seedDefaultSources(orgId: string): Promise<number> {
+  const crypto = await import("crypto");
+  
+  const defaultSources = [
+    {
+      id: `source-${crypto.randomUUID()}`,
+      orgId,
+      platform: "Crexi",
+      name: "Crexi Marina Listings",
+      baseUrl: "https://www.crexi.com",
+      searchUrl: "https://www.crexi.com/search?propertyType=marina",
+      config: { propertyType: "marina", sortBy: "date" },
+      rateLimitRpm: 30,
+      respectRobotsTxt: true,
+      userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
+      isActive: true,
+    },
+    {
+      id: `source-${crypto.randomUUID()}`,
+      orgId,
+      platform: "LoopNet",
+      name: "LoopNet Marina Properties",
+      baseUrl: "https://www.loopnet.com",
+      searchUrl: "https://www.loopnet.com/search/commercial-real-estate/marina/for-sale/",
+      config: { propertyType: "marina", sortBy: "newest" },
+      rateLimitRpm: 20,
+      respectRobotsTxt: true,
+      userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
+      isActive: true,
+    },
+    {
+      id: `source-${crypto.randomUUID()}`,
+      orgId,
+      platform: "BizBuySell",
+      name: "BizBuySell Marinas",
+      baseUrl: "https://www.bizbuysell.com",
+      searchUrl: "https://www.bizbuysell.com/buy/all-businesses/marina-businesses-for-sale/",
+      config: { businessType: "marina" },
+      rateLimitRpm: 20,
+      respectRobotsTxt: true,
+      userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
+      isActive: true,
+    },
+    {
+      id: `source-${crypto.randomUUID()}`,
+      orgId,
+      platform: "CoStar",
+      name: "CoStar Marina Listings",
+      baseUrl: "https://www.costar.com",
+      searchUrl: "https://www.costar.com/search?type=marina",
+      config: { requiresApiAccess: true },
+      rateLimitRpm: 10,
+      respectRobotsTxt: true,
+      userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
+      isActive: false, // Disabled by default - requires subscription
+    },
+    {
+      id: `source-${crypto.randomUUID()}`,
+      orgId,
+      platform: "MerlemMarine",
+      name: "Merle Marine Brokerage",
+      baseUrl: "https://www.merlemarine.com",
+      searchUrl: "https://www.merlemarine.com/marinas-for-sale",
+      config: { brokerType: "specialized" },
+      rateLimitRpm: 15,
+      respectRobotsTxt: true,
+      userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
+      isActive: true,
+    },
+  ];
+
+  try {
+    await db.insert(marinaScrapeources).values(defaultSources as any);
+    console.log(`[MarinaMatch Intel] Seeded ${defaultSources.length} default sources for org ${orgId}`);
+    return defaultSources.length;
+  } catch (error: any) {
+    if (error.code === '23505') {
+      console.log(`[MarinaMatch Intel] Some sources already exist for org ${orgId}`);
+      return 0;
+    }
+    throw error;
+  }
+}
+
+async function ensureSourcesExist(orgId: string): Promise<void> {
+  try {
+    const existingSources = await db
+      .select({ id: marinaScrapeources.id })
+      .from(marinaScrapeources)
+      .where(eq(marinaScrapeources.orgId, orgId))
+      .limit(1);
+
+    if (existingSources.length === 0) {
+      await seedDefaultSources(orgId);
+    }
+  } catch (error) {
+    console.error("[MarinaMatch Intel] Error ensuring sources exist:", error);
+  }
+}
+
 async function runAutoScrape(): Promise<void> {
   if (isScraping) {
     console.log("[MarinaMatch Intel] Scrape already in progress, skipping...");
@@ -379,6 +479,9 @@ async function runAutoScrape(): Promise<void> {
           .where(eq(marinaListings.orgId, org.id))
           .limit(1);
 
+        // Ensure sources exist for the org
+        await ensureSourcesExist(org.id);
+        
         if (existingListings.length === 0) {
           await seedInitialListings(org.id);
         }

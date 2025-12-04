@@ -1,21 +1,26 @@
 import { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
-  Wrench, ArrowUpDown, Building, Info, Globe, Loader2
+  Wrench, ArrowUpDown, Building, Info, Globe, Loader2,
+  Settings, ChevronDown, Plus, Trash2, Check, X
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -61,6 +66,26 @@ interface IntelAnalytics {
   listingsByState: Record<string, number>;
 }
 
+interface ScrapeSource {
+  id: string;
+  orgId: string;
+  platform: string;
+  name: string;
+  baseUrl?: string;
+  searchUrl?: string;
+  config?: Record<string, unknown>;
+  rateLimitRpm: number;
+  respectRobotsTxt: boolean;
+  userAgent?: string;
+  isActive: boolean;
+  lastScrapeAt?: string;
+  lastScrapeStatus?: string;
+  lastScrapeCount?: number;
+  totalListingsFound: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export function MarketIntelTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -69,6 +94,8 @@ export function MarketIntelTab() {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [minScoreFilter, setMinScoreFilter] = useState<string>("0");
   const [selectedListing, setSelectedListing] = useState<MarinaListing | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [newSourceForm, setNewSourceForm] = useState({ platform: "", name: "", searchUrl: "" });
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery<IntelAnalytics>({
     queryKey: ["/api/marinamatch/intel/analytics/overview"],
@@ -104,6 +131,76 @@ export function MarketIntelTab() {
       if (data?.state?.data?.isScraping) return 3000;
       if (!data?.state?.data?.listingsCount) return 5000;
       return 60000;
+    },
+  });
+
+  const { data: scrapeSources, isLoading: sourcesLoading } = useQuery<ScrapeSource[]>({
+    queryKey: ["/api/marinamatch/intel/scrape-sources"],
+  });
+
+  const toggleSourceMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      return apiRequest(`/api/marinamatch/intel/scrape-sources/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isActive }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
+      toast({ title: "Source updated", description: "Listing source status changed successfully." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update source. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const addSourceMutation = useMutation({
+    mutationFn: async (data: { platform: string; name: string; searchUrl: string }) => {
+      return apiRequest("/api/marinamatch/intel/scrape-sources", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
+      setNewSourceForm({ platform: "", name: "", searchUrl: "" });
+      toast({ title: "Source added", description: "New listing source added successfully." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add source. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const deleteSourceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/marinamatch/intel/scrape-sources/${id}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
+      toast({ title: "Source deleted", description: "Listing source removed successfully." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete source. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const triggerScrapeMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/marinamatch/intel/scrape/trigger", {
+        method: "POST",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/sync-status"] });
+      toast({ title: "Sync started", description: "Fetching new listings from configured sources..." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to trigger sync. Please try again.", variant: "destructive" });
     },
   });
 
@@ -195,6 +292,146 @@ export function MarketIntelTab() {
           </span>
         </AlertDescription>
       </Alert>
+
+      <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <Card className="border-dashed">
+          <CardHeader className="py-3">
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-base">Listing Sources</CardTitle>
+                  <Badge variant="outline" className="ml-2">
+                    {scrapeSources?.filter(s => s.isActive).length || 0} active
+                  </Badge>
+                </div>
+                <Button variant="ghost" size="sm" data-testid="button-toggle-sources-settings">
+                  <ChevronDown className={`h-4 w-4 transition-transform ${settingsOpen ? 'rotate-180' : ''}`} />
+                </Button>
+              </div>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Configure which commercial real estate platforms to monitor for marina listings. 
+                  Active sources are automatically checked on a regular schedule.
+                </p>
+                
+                {sourcesLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {scrapeSources?.map(source => (
+                      <div 
+                        key={source.id} 
+                        className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                        data-testid={`source-row-${source.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={source.isActive}
+                            onCheckedChange={(checked) => 
+                              toggleSourceMutation.mutate({ id: source.id, isActive: checked })
+                            }
+                            disabled={toggleSourceMutation.isPending}
+                            data-testid={`switch-source-${source.id}`}
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{source.name}</span>
+                              <Badge 
+                                variant="outline" 
+                                className={getSourceBadgeStyle(source.platform)}
+                              >
+                                {source.platform}
+                              </Badge>
+                            </div>
+                            {source.searchUrl && (
+                              <p className="text-xs text-muted-foreground truncate max-w-md">
+                                {source.searchUrl}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {source.lastScrapeAt && (
+                            <span className="text-xs text-muted-foreground">
+                              Last sync: {formatDistanceToNow(new Date(source.lastScrapeAt), { addSuffix: true })}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {source.totalListingsFound} listings
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => deleteSourceMutation.mutate(source.id)}
+                            disabled={deleteSourceMutation.isPending}
+                            data-testid={`button-delete-source-${source.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium">Add Custom Source</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <Input
+                      placeholder="Platform name (e.g., Custom Broker)"
+                      value={newSourceForm.platform}
+                      onChange={(e) => setNewSourceForm(prev => ({ ...prev, platform: e.target.value }))}
+                      data-testid="input-new-source-platform"
+                    />
+                    <Input
+                      placeholder="Display name"
+                      value={newSourceForm.name}
+                      onChange={(e) => setNewSourceForm(prev => ({ ...prev, name: e.target.value }))}
+                      data-testid="input-new-source-name"
+                    />
+                    <Input
+                      placeholder="Search URL"
+                      value={newSourceForm.searchUrl}
+                      onChange={(e) => setNewSourceForm(prev => ({ ...prev, searchUrl: e.target.value }))}
+                      data-testid="input-new-source-url"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addSourceMutation.mutate(newSourceForm)}
+                    disabled={
+                      addSourceMutation.isPending || 
+                      !newSourceForm.platform || 
+                      !newSourceForm.name || 
+                      !newSourceForm.searchUrl
+                    }
+                    data-testid="button-add-source"
+                  >
+                    {addSourceMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4 mr-2" />
+                    )}
+                    Add Source
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
