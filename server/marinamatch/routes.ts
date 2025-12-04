@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { db } from "../db";
 import { eq, and, desc, asc, sql, gte, lte, like, or, isNull } from "drizzle-orm";
 import crypto from "crypto";
+import intelRouter from "./intel-routes";
 import {
   dealSources,
   investmentMandates,
@@ -1317,5 +1318,7 @@ async function updateBrokerStats(brokerId: string, orgId: string): Promise<void>
     })
     .where(eq(brokerRelationships.id, brokerId));
 }
+
+router.use("/intel", intelRouter);
 
 export default router;

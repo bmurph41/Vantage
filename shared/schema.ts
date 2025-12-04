@@ -13217,6 +13217,383 @@ export type BrokerActivityLog = typeof brokerActivityLog.$inferSelect;
 export type InsertBrokerActivityLog = z.infer<typeof insertBrokerActivityLogSchema>;
 
 // ============================================================================
+// MarinaMatch Intel - Scraped Listings & Investment Criteria
+// ============================================================================
+
+export const marinaListings = pgTable("marina_listings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  orgId: varchar("org_id").notNull(),
+  sourcePlatform: varchar("source_platform", { length: 50 }).notNull(),
+  sourceUrl: text("source_url").notNull(),
+  sourceListingId: varchar("source_listing_id"),
+  scrapeRunId: varchar("scrape_run_id"),
+  dedupeHash: varchar("dedupe_hash", { length: 64 }).notNull(),
+  title: text("title").notNull(),
+  propertyName: text("property_name"),
+  propertyAddress: text("property_address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 50 }),
+  zipCode: varchar("zip_code", { length: 20 }),
+  region: varchar("region", { length: 100 }),
+  latitude: numeric("latitude", { precision: 10, scale: 7 }),
+  longitude: numeric("longitude", { precision: 10, scale: 7 }),
+  marinaType: varchar("marina_type", { length: 50 }),
+  propertyType: varchar("property_type", { length: 50 }),
+  dealType: varchar("deal_type", { length: 50 }),
+  totalSlips: integer("total_slips"),
+  wetSlips: integer("wet_slips"),
+  dryStorageSpaces: integer("dry_storage_spaces"),
+  acreage: numeric("acreage", { precision: 10, scale: 2 }),
+  waterFrontage: numeric("water_frontage", { precision: 10, scale: 2 }),
+  hasFuel: boolean("has_fuel").default(false),
+  hasShipStore: boolean("has_ship_store").default(false),
+  hasRestaurant: boolean("has_restaurant").default(false),
+  hasRepairShop: boolean("has_repair_shop").default(false),
+  hasDryStorage: boolean("has_dry_storage").default(false),
+  hasBoatRamp: boolean("has_boat_ramp").default(false),
+  amenities: jsonb("amenities"),
+  askingPrice: numeric("asking_price", { precision: 15, scale: 2 }),
+  pricePerSlip: numeric("price_per_slip", { precision: 12, scale: 2 }),
+  grossRevenue: numeric("gross_revenue", { precision: 15, scale: 2 }),
+  noi: numeric("noi", { precision: 15, scale: 2 }),
+  ebitda: numeric("ebitda", { precision: 15, scale: 2 }),
+  capRate: numeric("cap_rate", { precision: 5, scale: 2 }),
+  occupancyRate: numeric("occupancy_rate", { precision: 5, scale: 2 }),
+  status: varchar("status", { length: 30 }).default("active"),
+  isFeatured: boolean("is_featured").default(false),
+  isReviewed: boolean("is_reviewed").default(false),
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  bestCriteriaId: varchar("best_criteria_id"),
+  bestMatchScore: integer("best_match_score"),
+  matchScores: jsonb("match_scores"),
+  brokerName: text("broker_name"),
+  brokerCompany: text("broker_company"),
+  brokerPhone: varchar("broker_phone", { length: 50 }),
+  brokerEmail: varchar("broker_email", { length: 255 }),
+  attributionText: text("attribution_text"),
+  originalDescription: text("original_description"),
+  images: jsonb("images"),
+  listingDate: timestamp("listing_date"),
+  lastScrapedAt: timestamp("last_scraped_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  orgIdx: index("marina_listings_org_idx").on(table.orgId),
+  sourceIdx: index("marina_listings_source_idx").on(table.sourcePlatform),
+  statusIdx: index("marina_listings_status_idx").on(table.status),
+  stateIdx: index("marina_listings_state_idx").on(table.state),
+}));
+
+export const investmentCriteriaProfiles = pgTable("investment_criteria_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  orgId: varchar("org_id").notNull(),
+  name: varchar("name", { length: 255 }).notNull().default("Default Investment Criteria"),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  isDefault: boolean("is_default").default(false),
+  minMatchScoreAlert: integer("min_match_score_alert").default(70),
+  locationWeight: integer("location_weight").default(20),
+  financialWeight: integer("financial_weight").default(25),
+  operationalWeight: integer("operational_weight").default(15),
+  sizeWeight: integer("size_weight").default(15),
+  capitalWeight: integer("capital_weight").default(10),
+  involvementWeight: integer("involvement_weight").default(5),
+  capexWeight: integer("capex_weight").default(10),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  orgIdx: index("criteria_profiles_org_idx").on(table.orgId),
+}));
+
+export const investmentCriteriaLocation = pgTable("investment_criteria_location", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  targetStates: text("target_states").array(),
+  targetRegions: text("target_regions").array(),
+  targetMetros: text("target_metros").array(),
+  excludedStates: text("excluded_states").array(),
+  maxDistanceFromCoast: integer("max_distance_from_coast"),
+  preferIcwAccess: boolean("prefer_icw_access").default(false),
+  preferOceanAccess: boolean("prefer_ocean_access").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const investmentCriteriaFinancial = pgTable("investment_criteria_financial", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  minAskingPrice: numeric("min_asking_price", { precision: 15, scale: 2 }),
+  maxAskingPrice: numeric("max_asking_price", { precision: 15, scale: 2 }),
+  minGrossRevenue: numeric("min_gross_revenue", { precision: 15, scale: 2 }),
+  maxGrossRevenue: numeric("max_gross_revenue", { precision: 15, scale: 2 }),
+  minNoi: numeric("min_noi", { precision: 15, scale: 2 }),
+  maxNoi: numeric("max_noi", { precision: 15, scale: 2 }),
+  minEbitda: numeric("min_ebitda", { precision: 15, scale: 2 }),
+  maxEbitda: numeric("max_ebitda", { precision: 15, scale: 2 }),
+  minCapRate: numeric("min_cap_rate", { precision: 5, scale: 2 }),
+  maxCapRate: numeric("max_cap_rate", { precision: 5, scale: 2 }),
+  minPricePerSlip: numeric("min_price_per_slip", { precision: 12, scale: 2 }),
+  maxPricePerSlip: numeric("max_price_per_slip", { precision: 12, scale: 2 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const investmentCriteriaOperational = pgTable("investment_criteria_operational", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  targetMarinaTypes: text("target_marina_types").array(),
+  targetPropertyTypes: text("target_property_types").array(),
+  minOccupancyRate: numeric("min_occupancy_rate", { precision: 5, scale: 2 }),
+  requireFuelDock: boolean("require_fuel_dock").default(false),
+  requireShipStore: boolean("require_ship_store").default(false),
+  requireRepairShop: boolean("require_repair_shop").default(false),
+  requireRestaurant: boolean("require_restaurant").default(false),
+  requireDryStorage: boolean("require_dry_storage").default(false),
+  requireBoatRamp: boolean("require_boat_ramp").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const investmentCriteriaSize = pgTable("investment_criteria_size", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  minTotalSlips: integer("min_total_slips"),
+  maxTotalSlips: integer("max_total_slips"),
+  minWetSlips: integer("min_wet_slips"),
+  maxWetSlips: integer("max_wet_slips"),
+  minDryStorage: integer("min_dry_storage"),
+  maxDryStorage: integer("max_dry_storage"),
+  minAcreage: numeric("min_acreage", { precision: 10, scale: 2 }),
+  maxAcreage: numeric("max_acreage", { precision: 10, scale: 2 }),
+  minWaterFrontage: numeric("min_water_frontage", { precision: 10, scale: 2 }),
+  maxWaterFrontage: numeric("max_water_frontage", { precision: 10, scale: 2 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const investmentCriteriaCapital = pgTable("investment_criteria_capital", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  totalCapitalAvailable: numeric("total_capital_available", { precision: 15, scale: 2 }),
+  maxEquityPerDeal: numeric("max_equity_per_deal", { precision: 15, scale: 2 }),
+  targetLtvRatio: numeric("target_ltv_ratio", { precision: 5, scale: 2 }),
+  preferredDebtType: varchar("preferred_debt_type", { length: 50 }),
+  minCashOnCashReturn: numeric("min_cash_on_cash_return", { precision: 5, scale: 2 }),
+  minIrrTarget: numeric("min_irr_target", { precision: 5, scale: 2 }),
+  targetHoldPeriod: integer("target_hold_period"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const investmentCriteriaInvolvement = pgTable("investment_criteria_involvement", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  involvementLevel: varchar("involvement_level", { length: 30 }),
+  requireManagementInPlace: boolean("require_management_in_place").default(false),
+  willingToRelocate: boolean("willing_to_relocate").default(false),
+  maxTravelDistance: integer("max_travel_distance"),
+  hoursPerWeekAvailable: integer("hours_per_week_available"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const investmentCriteriaCapex = pgTable("investment_criteria_capex", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  deferredMaintenanceTolerance: varchar("deferred_maintenance_tolerance", { length: 30 }),
+  maxCapexBudget: numeric("max_capex_budget", { precision: 15, scale: 2 }),
+  capexAsPercentOfPurchase: numeric("capex_as_percent_of_purchase", { precision: 5, scale: 2 }),
+  preferTurnkey: boolean("prefer_turnkey").default(true),
+  willingToRenovate: boolean("willing_to_renovate").default(false),
+  environmentalIssuesOk: boolean("environmental_issues_ok").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const marinaMatchGoals = pgTable("marina_match_goals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  orgId: varchar("org_id").notNull(),
+  goalType: varchar("goal_type", { length: 50 }).notNull(),
+  goalName: varchar("goal_name", { length: 255 }).notNull(),
+  targetValue: numeric("target_value", { precision: 15, scale: 2 }).notNull(),
+  currentValue: numeric("current_value", { precision: 15, scale: 2 }).default("0"),
+  timePeriod: varchar("time_period", { length: 30 }),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  priority: integer("priority").default(0),
+  isPrimary: boolean("is_primary").default(false),
+  displayFormat: varchar("display_format", { length: 30 }).default("number"),
+  color: varchar("color", { length: 20 }),
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  orgIdx: index("goals_org_idx").on(table.orgId),
+}));
+
+export const marinaMatchGoalProgress = pgTable("marina_match_goal_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  goalId: varchar("goal_id").notNull().references(() => marinaMatchGoals.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  recordedValue: numeric("recorded_value", { precision: 15, scale: 2 }).notNull(),
+  recordedAt: timestamp("recorded_at").notNull().defaultNow(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const marinaScrapeources = pgTable("marina_scrape_sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  orgId: varchar("org_id").notNull(),
+  platform: varchar("platform", { length: 50 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  baseUrl: text("base_url"),
+  searchUrl: text("search_url"),
+  config: jsonb("config"),
+  rateLimitRpm: integer("rate_limit_rpm").default(30),
+  respectRobotsTxt: boolean("respect_robots_txt").default(true),
+  userAgent: varchar("user_agent", { length: 255 }).default("MarinaMatchBot/1.0"),
+  isActive: boolean("is_active").default(true),
+  lastScrapeAt: timestamp("last_scrape_at"),
+  lastScrapeStatus: varchar("last_scrape_status", { length: 30 }),
+  lastScrapeCount: integer("last_scrape_count"),
+  totalListingsFound: integer("total_listings_found").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  orgIdx: index("scrape_sources_org_idx").on(table.orgId),
+}));
+
+export const marinaScrapeRuns = pgTable("marina_scrape_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  orgId: varchar("org_id").notNull(),
+  sourceId: varchar("source_id").references(() => marinaScrapeources.id, { onDelete: "set null" }),
+  platform: varchar("platform", { length: 50 }).notNull(),
+  status: varchar("status", { length: 30 }).notNull(),
+  listingsFound: integer("listings_found").default(0),
+  listingsNew: integer("listings_new").default(0),
+  listingsUpdated: integer("listings_updated").default(0),
+  listingsRemoved: integer("listings_removed").default(0),
+  errorsCount: integer("errors_count").default(0),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  durationMs: integer("duration_ms"),
+  errorMessage: text("error_message"),
+  details: jsonb("details"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("scrape_runs_org_idx").on(table.orgId),
+}));
+
+export const marinaListingMatches = pgTable("marina_listing_matches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  listingId: varchar("listing_id").notNull().references(() => marinaListings.id, { onDelete: "cascade" }),
+  criteriaProfileId: varchar("criteria_profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  overallScore: integer("overall_score").notNull(),
+  locationScore: integer("location_score"),
+  financialScore: integer("financial_score"),
+  operationalScore: integer("operational_score"),
+  sizeScore: integer("size_score"),
+  capitalScore: integer("capital_score"),
+  involvementScore: integer("involvement_score"),
+  capexScore: integer("capex_score"),
+  scoreBreakdown: jsonb("score_breakdown"),
+  passesHardRequirements: boolean("passes_hard_requirements").default(true),
+  disqualificationReasons: jsonb("disqualification_reasons"),
+  calculatedAt: timestamp("calculated_at").notNull().defaultNow(),
+}, (table) => ({
+  listingIdx: index("listing_matches_listing_idx").on(table.listingId),
+  profileIdx: index("listing_matches_profile_idx").on(table.criteriaProfileId),
+}));
+
+export const marinaMatchAlerts = pgTable("marina_match_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  orgId: varchar("org_id").notNull(),
+  userId: varchar("user_id"),
+  name: varchar("name", { length: 255 }).notNull(),
+  criteriaProfileId: varchar("criteria_profile_id").references(() => investmentCriteriaProfiles.id, { onDelete: "set null" }),
+  minMatchScore: integer("min_match_score").default(70),
+  sendImmediately: boolean("send_immediately").default(true),
+  digestFrequency: varchar("digest_frequency", { length: 20 }),
+  notifyEmail: boolean("notify_email").default(true),
+  notifyInApp: boolean("notify_in_app").default(true),
+  emailAddresses: text("email_addresses").array(),
+  isActive: boolean("is_active").default(true),
+  lastSentAt: timestamp("last_sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  orgIdx: index("alerts_org_idx").on(table.orgId),
+}));
+
+export const marinaMatchAlertHistory = pgTable("marina_match_alert_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  alertId: varchar("alert_id").notNull().references(() => marinaMatchAlerts.id, { onDelete: "cascade" }),
+  listingId: varchar("listing_id").references(() => marinaListings.id, { onDelete: "set null" }),
+  orgId: varchar("org_id").notNull(),
+  matchScore: integer("match_score").notNull(),
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+  channel: varchar("channel", { length: 20 }),
+  status: varchar("status", { length: 20 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Insert schemas and types for MarinaMatch Intel
+export const insertMarinaListingSchema = createInsertSchema(marinaListings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastScrapedAt: true,
+});
+export const updateMarinaListingSchema = insertMarinaListingSchema.partial();
+export type MarinaListing = typeof marinaListings.$inferSelect;
+export type InsertMarinaListing = z.infer<typeof insertMarinaListingSchema>;
+
+export const insertInvestmentCriteriaProfileSchema = createInsertSchema(investmentCriteriaProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateInvestmentCriteriaProfileSchema = insertInvestmentCriteriaProfileSchema.partial();
+export type InvestmentCriteriaProfile = typeof investmentCriteriaProfiles.$inferSelect;
+
+export const insertMarinaMatchGoalSchema = createInsertSchema(marinaMatchGoals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateMarinaMatchGoalSchema = insertMarinaMatchGoalSchema.partial();
+export type MarinaMatchGoal = typeof marinaMatchGoals.$inferSelect;
+
+export const insertMarinaScrapeSourceSchema = createInsertSchema(marinaScrapeources).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateMarinaScrapeSourceSchema = insertMarinaScrapeSourceSchema.partial();
+export type MarinaScrapeSource = typeof marinaScrapeources.$inferSelect;
+
+export const insertMarinaMatchAlertSchema = createInsertSchema(marinaMatchAlerts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateMarinaMatchAlertSchema = insertMarinaMatchAlertSchema.partial();
+export type MarinaMatchAlert = typeof marinaMatchAlerts.$inferSelect;
+
+// ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular
