@@ -196,7 +196,9 @@ export function MarketIntelTab() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [stateFilter, setStateFilter] = useState<string>("all");
+  const [cityFilter, setCityFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [minScoreFilter, setMinScoreFilter] = useState<string>("0");
   const [selectedListing, setSelectedListing] = useState<MarinaListing | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -461,14 +463,25 @@ export function MarketIntelTab() {
     if (stateFilter !== "all" && listing.state !== stateFilter) {
       return false;
     }
+    if (cityFilter !== "all" && listing.city !== cityFilter) {
+      return false;
+    }
     if (sourceFilter !== "all" && listing.sourcePlatform !== sourceFilter) {
+      return false;
+    }
+    if (statusFilter !== "all" && listing.status !== statusFilter) {
       return false;
     }
     return true;
   }) || [];
 
   const uniqueStates = [...new Set(listings?.map(l => l.state).filter(Boolean))].sort();
+  const uniqueCities = [...new Set(
+    listings?.filter(l => stateFilter === "all" || l.state === stateFilter)
+      .map(l => l.city).filter(Boolean)
+  )].sort();
   const uniqueSources = [...new Set(listings?.map(l => l.sourcePlatform))].sort();
+  const uniqueStatuses = [...new Set(listings?.map(l => l.status))].sort();
 
   const formatPrice = (price: string | undefined) => {
     if (!price) return "—";
@@ -1229,8 +1242,11 @@ export function MarketIntelTab() {
               />
             </div>
             
-            <Select value={stateFilter} onValueChange={setStateFilter}>
-              <SelectTrigger className="w-[140px]" data-testid="select-state-filter">
+            <Select value={stateFilter} onValueChange={(value) => {
+              setStateFilter(value);
+              setCityFilter("all");
+            }}>
+              <SelectTrigger className="w-[120px]" data-testid="select-state-filter">
                 <MapPin className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="State" />
               </SelectTrigger>
@@ -1242,9 +1258,22 @@ export function MarketIntelTab() {
               </SelectContent>
             </Select>
 
+            <Select value={cityFilter} onValueChange={setCityFilter}>
+              <SelectTrigger className="w-[140px]" data-testid="select-city-filter">
+                <Building className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="City" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Cities</SelectItem>
+                {uniqueCities.map(city => (
+                  <SelectItem key={city} value={city!}>{city}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={sourceFilter} onValueChange={setSourceFilter}>
-              <SelectTrigger className="w-[140px]" data-testid="select-source-filter">
-                <Filter className="h-4 w-4 mr-2" />
+              <SelectTrigger className="w-[130px]" data-testid="select-source-filter">
+                <Globe className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Source" />
               </SelectTrigger>
               <SelectContent>
@@ -1255,8 +1284,21 @@ export function MarketIntelTab() {
               </SelectContent>
             </Select>
 
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[120px]" data-testid="select-status-filter">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                {uniqueStatuses.map(status => (
+                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={minScoreFilter} onValueChange={setMinScoreFilter}>
-              <SelectTrigger className="w-[140px]" data-testid="select-score-filter">
+              <SelectTrigger className="w-[130px]" data-testid="select-score-filter">
                 <Star className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Min Score" />
               </SelectTrigger>
@@ -1271,7 +1313,7 @@ export function MarketIntelTab() {
             </Select>
 
             <Button 
-              variant="outline"
+              variant="default"
               onClick={() => setBrokerSubmitOpen(true)}
               data-testid="button-submit-listing"
             >
@@ -1368,7 +1410,9 @@ export function MarketIntelTab() {
                     onClick={() => {
                       setSearchTerm("");
                       setStateFilter("all");
+                      setCityFilter("all");
                       setSourceFilter("all");
+                      setStatusFilter("all");
                       setMinScoreFilter("0");
                     }}
                     data-testid="button-clear-filters"
