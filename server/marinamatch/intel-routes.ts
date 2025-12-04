@@ -252,6 +252,171 @@ router.delete("/listings/:id", async (req: Request, res: Response) => {
 });
 
 // ============================================
+// BROKER DIRECT POSTING
+// ============================================
+
+router.post("/broker-submit", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const {
+      title,
+      propertyName,
+      propertyAddress,
+      city,
+      state,
+      zipCode,
+      marinaType,
+      dealType,
+      askingPrice,
+      totalSlips,
+      wetSlips,
+      dryStorageSpaces,
+      acreage,
+      waterFrontage,
+      hasFuel,
+      hasShipStore,
+      hasRestaurant,
+      hasRepairShop,
+      hasDryStorage,
+      hasBoatRamp,
+      grossRevenue,
+      noi,
+      capRate,
+      occupancyRate,
+      brokerName,
+      brokerCompany,
+      brokerPhone,
+      brokerEmail,
+      originalDescription,
+      contactUrl,
+      images,
+    } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ error: "Listing title is required" });
+    }
+
+    const sourceUrl = contactUrl || (brokerEmail ? `mailto:${brokerEmail}` : "#direct-listing");
+    
+    const toNumericString = (val: any): string | null => {
+      if (val === null || val === undefined || val === "") return null;
+      const num = typeof val === "string" ? parseFloat(val.replace(/[^0-9.-]/g, "")) : val;
+      return isNaN(num) ? null : String(num);
+    };
+    
+    const listingData = {
+      orgId,
+      sourcePlatform: "direct",
+      sourceUrl,
+      sourceListingId: `DIRECT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title,
+      propertyName: propertyName || title,
+      propertyAddress: propertyAddress || null,
+      city: city || null,
+      state: state || null,
+      zipCode: zipCode || null,
+      marinaType: marinaType || "marina",
+      propertyType: "marina",
+      dealType: dealType || "acquisition",
+      askingPrice: toNumericString(askingPrice),
+      totalSlips: totalSlips || null,
+      wetSlips: wetSlips || null,
+      dryStorageSpaces: dryStorageSpaces || null,
+      acreage: toNumericString(acreage),
+      waterFrontage: toNumericString(waterFrontage),
+      hasFuel: hasFuel || false,
+      hasShipStore: hasShipStore || false,
+      hasRestaurant: hasRestaurant || false,
+      hasRepairShop: hasRepairShop || false,
+      hasDryStorage: hasDryStorage || false,
+      hasBoatRamp: hasBoatRamp || false,
+      grossRevenue: toNumericString(grossRevenue),
+      noi: toNumericString(noi),
+      capRate: toNumericString(capRate),
+      occupancyRate: toNumericString(occupancyRate),
+      brokerName: brokerName || null,
+      brokerCompany: brokerCompany || null,
+      brokerPhone: brokerPhone || null,
+      brokerEmail: brokerEmail || null,
+      originalDescription: originalDescription || null,
+      images: images || null,
+      attributionText: brokerCompany 
+        ? `Direct Listing from ${brokerCompany}` 
+        : brokerName 
+          ? `Direct Listing from ${brokerName}`
+          : "Direct Broker Listing",
+      status: "active",
+      isReviewed: false,
+      listingDate: new Date(),
+      lastScrapedAt: new Date(),
+    };
+
+    const dedupeHash = generateListingDedupeHash(listingData);
+
+    const [existingListing] = await db
+      .select()
+      .from(marinaListings)
+      .where(and(eq(marinaListings.orgId, orgId), eq(marinaListings.dedupeHash, dedupeHash)))
+      .limit(1);
+
+    if (existingListing) {
+      const [updated] = await db
+        .update(marinaListings)
+        .set({ ...listingData, updatedAt: new Date() })
+        .where(eq(marinaListings.id, existingListing.id))
+        .returning();
+      return res.json({ 
+        ...updated, 
+        wasUpdated: true,
+        message: "Listing updated successfully" 
+      });
+    }
+
+    const validated = insertMarinaListingSchema.parse({ ...listingData, dedupeHash });
+    const [listing] = await db.insert(marinaListings).values(validated).returning();
+
+    await scoreListingAgainstCriteria(listing.id, orgId);
+
+    const [scoredListing] = await db
+      .select()
+      .from(marinaListings)
+      .where(eq(marinaListings.id, listing.id));
+
+    res.status(201).json({
+      ...scoredListing,
+      message: "Listing posted successfully"
+    });
+  } catch (error: any) {
+    console.error("Error creating broker listing:", error);
+    res.status(400).json({ error: error.message || "Failed to create broker listing" });
+  }
+});
+
+router.get("/broker-listings", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const listings = await db
+      .select()
+      .from(marinaListings)
+      .where(and(
+        eq(marinaListings.orgId, orgId),
+        eq(marinaListings.sourcePlatform, "direct")
+      ))
+      .orderBy(desc(marinaListings.createdAt));
+
+    res.json(listings);
+  } catch (error) {
+    console.error("Error fetching broker listings:", error);
+    res.status(500).json({ error: "Failed to fetch broker listings" });
+  }
+});
+
+// ============================================
 // INVESTMENT CRITERIA PROFILES
 // ============================================
 

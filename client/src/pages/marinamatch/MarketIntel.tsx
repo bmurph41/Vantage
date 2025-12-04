@@ -115,6 +115,72 @@ interface NewSourceForm {
   pollingIntervalMinutes: string;
 }
 
+interface BrokerSubmitForm {
+  title: string;
+  propertyName: string;
+  propertyAddress: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  marinaType: string;
+  dealType: string;
+  askingPrice: string;
+  totalSlips: string;
+  wetSlips: string;
+  dryStorageSpaces: string;
+  acreage: string;
+  waterFrontage: string;
+  hasFuel: boolean;
+  hasShipStore: boolean;
+  hasRestaurant: boolean;
+  hasRepairShop: boolean;
+  hasDryStorage: boolean;
+  hasBoatRamp: boolean;
+  grossRevenue: string;
+  noi: string;
+  capRate: string;
+  occupancyRate: string;
+  brokerName: string;
+  brokerCompany: string;
+  brokerPhone: string;
+  brokerEmail: string;
+  originalDescription: string;
+  contactUrl: string;
+}
+
+const INITIAL_BROKER_FORM: BrokerSubmitForm = {
+  title: "",
+  propertyName: "",
+  propertyAddress: "",
+  city: "",
+  state: "",
+  zipCode: "",
+  marinaType: "marina",
+  dealType: "acquisition",
+  askingPrice: "",
+  totalSlips: "",
+  wetSlips: "",
+  dryStorageSpaces: "",
+  acreage: "",
+  waterFrontage: "",
+  hasFuel: false,
+  hasShipStore: false,
+  hasRestaurant: false,
+  hasRepairShop: false,
+  hasDryStorage: false,
+  hasBoatRamp: false,
+  grossRevenue: "",
+  noi: "",
+  capRate: "",
+  occupancyRate: "",
+  brokerName: "",
+  brokerCompany: "",
+  brokerPhone: "",
+  brokerEmail: "",
+  originalDescription: "",
+  contactUrl: "",
+};
+
 const DEFAULT_MARINA_KEYWORDS = ["marina", "boatyard", "yacht club", "boat slip", "dock", "waterfront marina"];
 const DEFAULT_EXCLUDE_KEYWORDS = ["rv storage", "self-storage", "warehouse", "mini storage"];
 const US_STATES = [
@@ -166,6 +232,8 @@ export function MarketIntelTab() {
     maxSlips: "",
     pollingIntervalMinutes: "60",
   });
+  const [brokerSubmitOpen, setBrokerSubmitOpen] = useState(false);
+  const [brokerForm, setBrokerForm] = useState<BrokerSubmitForm>(INITIAL_BROKER_FORM);
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery<IntelAnalytics>({
     queryKey: ["/api/marinamatch/intel/analytics/overview"],
@@ -353,6 +421,36 @@ export function MarketIntelTab() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to trigger sync. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const brokerSubmitMutation = useMutation({
+    mutationFn: async (data: BrokerSubmitForm) => {
+      const payload = {
+        ...data,
+        askingPrice: data.askingPrice ? parseFloat(data.askingPrice.replace(/[^0-9.]/g, "")) : null,
+        totalSlips: data.totalSlips ? parseInt(data.totalSlips) : null,
+        wetSlips: data.wetSlips ? parseInt(data.wetSlips) : null,
+        dryStorageSpaces: data.dryStorageSpaces ? parseInt(data.dryStorageSpaces) : null,
+        acreage: data.acreage ? parseFloat(data.acreage) : null,
+        waterFrontage: data.waterFrontage ? parseFloat(data.waterFrontage) : null,
+        grossRevenue: data.grossRevenue ? parseFloat(data.grossRevenue.replace(/[^0-9.]/g, "")) : null,
+        noi: data.noi ? parseFloat(data.noi.replace(/[^0-9.]/g, "")) : null,
+        capRate: data.capRate ? parseFloat(data.capRate) : null,
+        occupancyRate: data.occupancyRate ? parseFloat(data.occupancyRate) : null,
+      };
+      return apiRequest("POST", "/api/marinamatch/intel/broker-submit", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
+      setBrokerSubmitOpen(false);
+      setBrokerForm(INITIAL_BROKER_FORM);
+      toast({ title: "Listing posted", description: "Your marina listing has been submitted successfully." });
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.message || "Failed to submit listing. Please try again.";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     },
   });
 
@@ -1171,6 +1269,15 @@ export function MarketIntelTab() {
                 <SelectItem value="90">90+ Score</SelectItem>
               </SelectContent>
             </Select>
+
+            <Button 
+              variant="outline"
+              onClick={() => setBrokerSubmitOpen(true)}
+              data-testid="button-submit-listing"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Submit Listing
+            </Button>
           </div>
         </CardHeader>
         
@@ -1496,6 +1603,403 @@ export function MarketIntelTab() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Broker Direct Submit Dialog */}
+      <Dialog open={brokerSubmitOpen} onOpenChange={setBrokerSubmitOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Submit Marina Listing</DialogTitle>
+            <DialogDescription>
+              Brokers can directly submit marina listings to MarinaMatch. Your listing will be matched against buyer criteria and displayed with proper attribution.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2 md:col-span-2">
+                <Label>Listing Title *</Label>
+                <Input
+                  value={brokerForm.title}
+                  onChange={(e) => setBrokerForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g., Premier Gulf Coast Marina - 150 Slips"
+                  data-testid="input-broker-title"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Marina Name</Label>
+                <Input
+                  value={brokerForm.propertyName}
+                  onChange={(e) => setBrokerForm(prev => ({ ...prev, propertyName: e.target.value }))}
+                  placeholder="Official marina name"
+                  data-testid="input-broker-property-name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Property Address</Label>
+                <Input
+                  value={brokerForm.propertyAddress}
+                  onChange={(e) => setBrokerForm(prev => ({ ...prev, propertyAddress: e.target.value }))}
+                  placeholder="Street address"
+                  data-testid="input-broker-address"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>City</Label>
+                <Input
+                  value={brokerForm.city}
+                  onChange={(e) => setBrokerForm(prev => ({ ...prev, city: e.target.value }))}
+                  placeholder="City"
+                  data-testid="input-broker-city"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>State</Label>
+                <Select
+                  value={brokerForm.state}
+                  onValueChange={(value) => setBrokerForm(prev => ({ ...prev, state: value }))}
+                >
+                  <SelectTrigger data-testid="select-broker-state">
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {US_STATES.map(state => (
+                      <SelectItem key={state} value={state}>{state}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>ZIP Code</Label>
+                <Input
+                  value={brokerForm.zipCode}
+                  onChange={(e) => setBrokerForm(prev => ({ ...prev, zipCode: e.target.value }))}
+                  placeholder="ZIP Code"
+                  data-testid="input-broker-zip"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Asking Price</Label>
+                <Input
+                  value={brokerForm.askingPrice}
+                  onChange={(e) => setBrokerForm(prev => ({ ...prev, askingPrice: e.target.value }))}
+                  placeholder="$0"
+                  data-testid="input-broker-price"
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="font-medium mb-3">Property Details</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>Total Slips</Label>
+                  <Input
+                    type="number"
+                    value={brokerForm.totalSlips}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, totalSlips: e.target.value }))}
+                    placeholder="0"
+                    data-testid="input-broker-total-slips"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Wet Slips</Label>
+                  <Input
+                    type="number"
+                    value={brokerForm.wetSlips}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, wetSlips: e.target.value }))}
+                    placeholder="0"
+                    data-testid="input-broker-wet-slips"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Dry Storage</Label>
+                  <Input
+                    type="number"
+                    value={brokerForm.dryStorageSpaces}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, dryStorageSpaces: e.target.value }))}
+                    placeholder="0"
+                    data-testid="input-broker-dry-storage"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Acreage</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={brokerForm.acreage}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, acreage: e.target.value }))}
+                    placeholder="0"
+                    data-testid="input-broker-acreage"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Water Frontage (ft)</Label>
+                  <Input
+                    type="number"
+                    value={brokerForm.waterFrontage}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, waterFrontage: e.target.value }))}
+                    placeholder="0"
+                    data-testid="input-broker-frontage"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Marina Type</Label>
+                  <Select
+                    value={brokerForm.marinaType}
+                    onValueChange={(value) => setBrokerForm(prev => ({ ...prev, marinaType: value }))}
+                  >
+                    <SelectTrigger data-testid="select-broker-marina-type">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="marina">Marina</SelectItem>
+                      <SelectItem value="boatyard">Boatyard</SelectItem>
+                      <SelectItem value="yacht_club">Yacht Club</SelectItem>
+                      <SelectItem value="dry_stack">Dry Stack</SelectItem>
+                      <SelectItem value="full_service">Full Service</SelectItem>
+                      <SelectItem value="mixed">Mixed Use</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Deal Type</Label>
+                  <Select
+                    value={brokerForm.dealType}
+                    onValueChange={(value) => setBrokerForm(prev => ({ ...prev, dealType: value }))}
+                  >
+                    <SelectTrigger data-testid="select-broker-deal-type">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="acquisition">Acquisition</SelectItem>
+                      <SelectItem value="ground_lease">Ground Lease</SelectItem>
+                      <SelectItem value="sale_leaseback">Sale Leaseback</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-3">Amenities</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={brokerForm.hasFuel}
+                    onCheckedChange={(checked) => setBrokerForm(prev => ({ ...prev, hasFuel: checked }))}
+                    data-testid="switch-broker-fuel"
+                  />
+                  <Label className="flex items-center gap-1">
+                    <Fuel className="h-4 w-4" /> Fuel Dock
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={brokerForm.hasShipStore}
+                    onCheckedChange={(checked) => setBrokerForm(prev => ({ ...prev, hasShipStore: checked }))}
+                    data-testid="switch-broker-ship-store"
+                  />
+                  <Label className="flex items-center gap-1">
+                    <Store className="h-4 w-4" /> Ship Store
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={brokerForm.hasRepairShop}
+                    onCheckedChange={(checked) => setBrokerForm(prev => ({ ...prev, hasRepairShop: checked }))}
+                    data-testid="switch-broker-repair"
+                  />
+                  <Label className="flex items-center gap-1">
+                    <Wrench className="h-4 w-4" /> Repair Shop
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={brokerForm.hasRestaurant}
+                    onCheckedChange={(checked) => setBrokerForm(prev => ({ ...prev, hasRestaurant: checked }))}
+                    data-testid="switch-broker-restaurant"
+                  />
+                  <Label>Restaurant</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={brokerForm.hasDryStorage}
+                    onCheckedChange={(checked) => setBrokerForm(prev => ({ ...prev, hasDryStorage: checked }))}
+                    data-testid="switch-broker-dry-storage"
+                  />
+                  <Label>Dry Storage</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={brokerForm.hasBoatRamp}
+                    onCheckedChange={(checked) => setBrokerForm(prev => ({ ...prev, hasBoatRamp: checked }))}
+                    data-testid="switch-broker-ramp"
+                  />
+                  <Label>Boat Ramp</Label>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="font-medium mb-3">Financial Information</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>Gross Revenue</Label>
+                  <Input
+                    value={brokerForm.grossRevenue}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, grossRevenue: e.target.value }))}
+                    placeholder="$0"
+                    data-testid="input-broker-revenue"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>NOI</Label>
+                  <Input
+                    value={brokerForm.noi}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, noi: e.target.value }))}
+                    placeholder="$0"
+                    data-testid="input-broker-noi"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cap Rate (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={brokerForm.capRate}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, capRate: e.target.value }))}
+                    placeholder="0.0"
+                    data-testid="input-broker-cap-rate"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Occupancy (%)</Label>
+                  <Input
+                    type="number"
+                    value={brokerForm.occupancyRate}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, occupancyRate: e.target.value }))}
+                    placeholder="0"
+                    data-testid="input-broker-occupancy"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="font-medium mb-3">Broker Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Broker Name</Label>
+                  <Input
+                    value={brokerForm.brokerName}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, brokerName: e.target.value }))}
+                    placeholder="Your name"
+                    data-testid="input-broker-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Brokerage Company</Label>
+                  <Input
+                    value={brokerForm.brokerCompany}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, brokerCompany: e.target.value }))}
+                    placeholder="Company name"
+                    data-testid="input-broker-company"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone</Label>
+                  <Input
+                    value={brokerForm.brokerPhone}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, brokerPhone: e.target.value }))}
+                    placeholder="(555) 555-5555"
+                    data-testid="input-broker-phone"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={brokerForm.brokerEmail}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, brokerEmail: e.target.value }))}
+                    placeholder="broker@company.com"
+                    data-testid="input-broker-email"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Contact URL (optional)</Label>
+                  <Input
+                    value={brokerForm.contactUrl}
+                    onChange={(e) => setBrokerForm(prev => ({ ...prev, contactUrl: e.target.value }))}
+                    placeholder="https://your-listing-page.com"
+                    data-testid="input-broker-contact-url"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Property Description</Label>
+              <textarea
+                className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
+                value={brokerForm.originalDescription}
+                onChange={(e) => setBrokerForm(prev => ({ ...prev, originalDescription: e.target.value }))}
+                placeholder="Describe the marina property, its features, and investment highlights..."
+                data-testid="textarea-broker-description"
+              />
+            </div>
+
+            <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-xs">
+                Your listing will be displayed with proper attribution to your brokerage. Buyers will contact you directly through the provided contact information.
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setBrokerSubmitOpen(false);
+                  setBrokerForm(INITIAL_BROKER_FORM);
+                }}
+                data-testid="button-cancel-broker-submit"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => brokerSubmitMutation.mutate(brokerForm)}
+                disabled={brokerSubmitMutation.isPending || !brokerForm.title}
+                data-testid="button-submit-broker-listing"
+              >
+                {brokerSubmitMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-2" />
+                )}
+                Submit Listing
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
