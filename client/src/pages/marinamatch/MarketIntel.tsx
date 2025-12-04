@@ -592,8 +592,25 @@ export function MarketIntelTab() {
                     </div>
 
                     <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">States to Monitor</Label>
-                      <div className="flex flex-wrap gap-1 p-2 border rounded-md min-h-[40px]">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">States to Monitor</Label>
+                        <Button
+                          type="button"
+                          variant={newSourceForm.geographyStates.length === US_STATES.length ? "default" : "outline"}
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={() => {
+                            setNewSourceForm(prev => ({
+                              ...prev,
+                              geographyStates: prev.geographyStates.length === US_STATES.length ? [] : [...US_STATES]
+                            }));
+                          }}
+                          data-testid="button-toggle-all-states"
+                        >
+                          {newSourceForm.geographyStates.length === US_STATES.length ? "Deselect All" : "Select All"}
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-1 p-2 border rounded-md min-h-[40px] max-h-[120px] overflow-y-auto">
                         {US_STATES.map(state => (
                           <Badge
                             key={state}
@@ -615,7 +632,9 @@ export function MarketIntelTab() {
                       </div>
                       {newSourceForm.geographyStates.length > 0 && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          Selected: {newSourceForm.geographyStates.join(", ")}
+                          {newSourceForm.geographyStates.length === US_STATES.length 
+                            ? "All states selected" 
+                            : `Selected (${newSourceForm.geographyStates.length}): ${newSourceForm.geographyStates.slice(0, 10).join(", ")}${newSourceForm.geographyStates.length > 10 ? "..." : ""}`}
                           <Button 
                             variant="link" 
                             size="sm" 
@@ -633,7 +652,7 @@ export function MarketIntelTab() {
                         <Label className="text-xs text-muted-foreground">Min Price ($)</Label>
                         <Input
                           type="number"
-                          placeholder="0"
+                          placeholder="No limit"
                           value={newSourceForm.minPrice}
                           onChange={(e) => setNewSourceForm(prev => ({ ...prev, minPrice: e.target.value }))}
                           data-testid="input-min-price"
@@ -653,7 +672,7 @@ export function MarketIntelTab() {
                         <Label className="text-xs text-muted-foreground">Min Slips</Label>
                         <Input
                           type="number"
-                          placeholder="0"
+                          placeholder="No limit"
                           value={newSourceForm.minSlips}
                           onChange={(e) => setNewSourceForm(prev => ({ ...prev, minSlips: e.target.value }))}
                           data-testid="input-min-slips"
