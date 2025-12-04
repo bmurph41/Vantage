@@ -24,6 +24,7 @@ const CATEGORIES = {
   MODELING: { label: 'Modeling', href: '/modeling/projects', icon: TrendingUp },
   DOCKTALK: { label: 'DockTalk', href: '/docktalk', icon: MessageSquare },
   ANALYSIS: { label: 'Analysis', href: '/analysis/sales-comps', icon: BarChart3 },
+  MARINAMATCH: { label: 'MarinaMatch', href: '/marinamatch', icon: Target },
 };
 
 const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
@@ -593,6 +594,15 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
     { label: 'AI Training' },
   ],
   
+  '/marinamatch': [
+    CATEGORIES.MARINAMATCH,
+    { label: 'Overview' },
+  ],
+  '/marinamatch/intel': [
+    CATEGORIES.MARINAMATCH,
+    { label: 'Market Intel' },
+  ],
+  
   '/user/settings': [
     { label: 'User Settings' },
   ],
@@ -761,9 +771,32 @@ function DynamicBreadcrumbItem({ item, isLast }: { item: BreadcrumbItem; isLast:
   );
 }
 
+const MARINAMATCH_TAB_LABELS: Record<string, string> = {
+  'overview': 'Overview',
+  'sources': 'Deal Sources',
+  'mandates': 'Investment Mandates',
+  'deals': 'Deal Queue',
+  'brokers': 'Broker Network',
+  'listings': 'Market Intel',
+  'criteria': 'Investment Criteria',
+  'goals': 'Goals',
+};
+
 export function Breadcrumb() {
   const [location] = useLocation();
-  const breadcrumbs = getBreadcrumbsForPath(location);
+  
+  let breadcrumbs = getBreadcrumbsForPath(location);
+  
+  if (location === '/marinamatch' || location.startsWith('/marinamatch?')) {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab') || 'overview';
+    const tabLabel = MARINAMATCH_TAB_LABELS[tab] || 'Overview';
+    breadcrumbs = [
+      DASHBOARD_ITEM,
+      CATEGORIES.MARINAMATCH,
+      { label: tabLabel },
+    ];
+  }
 
   if (location === '/dashboard' || location === '/' || breadcrumbs.length === 0) {
     return null;
