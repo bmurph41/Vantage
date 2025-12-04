@@ -34,8 +34,6 @@ import {
   type MarinaMatchGoal,
   type MarinaScrapeSource,
 } from "@shared/schema";
-import { requireProspecting } from "../middleware/pack-guard";
-
 const router = Router();
 
 function getOrgId(req: Request): string | null {
@@ -61,7 +59,7 @@ function generateListingDedupeHash(listing: Partial<MarinaListing>): string {
 // MARINA LISTINGS (Scraped Data)
 // ============================================
 
-router.get("/listings", requireProspecting, async (req: Request, res: Response) => {
+router.get("/listings", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -96,7 +94,7 @@ router.get("/listings", requireProspecting, async (req: Request, res: Response) 
   }
 });
 
-router.get("/listings/:id", requireProspecting, async (req: Request, res: Response) => {
+router.get("/listings/:id", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -121,7 +119,7 @@ router.get("/listings/:id", requireProspecting, async (req: Request, res: Respon
   }
 });
 
-router.post("/listings", requireProspecting, async (req: Request, res: Response) => {
+router.post("/listings", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -160,7 +158,7 @@ router.post("/listings", requireProspecting, async (req: Request, res: Response)
   }
 });
 
-router.patch("/listings/:id", requireProspecting, async (req: Request, res: Response) => {
+router.patch("/listings/:id", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -180,7 +178,7 @@ router.patch("/listings/:id", requireProspecting, async (req: Request, res: Resp
   }
 });
 
-router.delete("/listings/:id", requireProspecting, async (req: Request, res: Response) => {
+router.delete("/listings/:id", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -202,7 +200,7 @@ router.delete("/listings/:id", requireProspecting, async (req: Request, res: Res
 // INVESTMENT CRITERIA PROFILES
 // ============================================
 
-router.get("/criteria-profiles", requireProspecting, async (req: Request, res: Response) => {
+router.get("/criteria-profiles", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -220,7 +218,7 @@ router.get("/criteria-profiles", requireProspecting, async (req: Request, res: R
   }
 });
 
-router.get("/criteria-profiles/:id", requireProspecting, async (req: Request, res: Response) => {
+router.get("/criteria-profiles/:id", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -250,7 +248,7 @@ router.get("/criteria-profiles/:id", requireProspecting, async (req: Request, re
   }
 });
 
-router.post("/criteria-profiles", requireProspecting, async (req: Request, res: Response) => {
+router.post("/criteria-profiles", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     const userId = getUserId(req);
@@ -292,7 +290,7 @@ router.post("/criteria-profiles", requireProspecting, async (req: Request, res: 
   }
 });
 
-router.patch("/criteria-profiles/:id", requireProspecting, async (req: Request, res: Response) => {
+router.patch("/criteria-profiles/:id", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -348,7 +346,7 @@ router.patch("/criteria-profiles/:id", requireProspecting, async (req: Request, 
   }
 });
 
-router.delete("/criteria-profiles/:id", requireProspecting, async (req: Request, res: Response) => {
+router.delete("/criteria-profiles/:id", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -370,7 +368,7 @@ router.delete("/criteria-profiles/:id", requireProspecting, async (req: Request,
 // GOALS
 // ============================================
 
-router.get("/goals", requireProspecting, async (req: Request, res: Response) => {
+router.get("/goals", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -388,7 +386,7 @@ router.get("/goals", requireProspecting, async (req: Request, res: Response) => 
   }
 });
 
-router.post("/goals", requireProspecting, async (req: Request, res: Response) => {
+router.post("/goals", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     const userId = getUserId(req);
@@ -403,7 +401,7 @@ router.post("/goals", requireProspecting, async (req: Request, res: Response) =>
   }
 });
 
-router.patch("/goals/:id", requireProspecting, async (req: Request, res: Response) => {
+router.patch("/goals/:id", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -423,7 +421,7 @@ router.patch("/goals/:id", requireProspecting, async (req: Request, res: Respons
   }
 });
 
-router.delete("/goals/:id", requireProspecting, async (req: Request, res: Response) => {
+router.delete("/goals/:id", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -441,7 +439,7 @@ router.delete("/goals/:id", requireProspecting, async (req: Request, res: Respon
   }
 });
 
-router.post("/goals/:id/progress", requireProspecting, async (req: Request, res: Response) => {
+router.post("/goals/:id/progress", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -471,7 +469,7 @@ router.post("/goals/:id/progress", requireProspecting, async (req: Request, res:
 // SCRAPE SOURCES
 // ============================================
 
-router.get("/scrape-sources", requireProspecting, async (req: Request, res: Response) => {
+router.get("/scrape-sources", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -489,7 +487,7 @@ router.get("/scrape-sources", requireProspecting, async (req: Request, res: Resp
   }
 });
 
-router.post("/scrape-sources", requireProspecting, async (req: Request, res: Response) => {
+router.post("/scrape-sources", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -503,7 +501,7 @@ router.post("/scrape-sources", requireProspecting, async (req: Request, res: Res
   }
 });
 
-router.patch("/scrape-sources/:id", requireProspecting, async (req: Request, res: Response) => {
+router.patch("/scrape-sources/:id", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -523,7 +521,7 @@ router.patch("/scrape-sources/:id", requireProspecting, async (req: Request, res
   }
 });
 
-router.delete("/scrape-sources/:id", requireProspecting, async (req: Request, res: Response) => {
+router.delete("/scrape-sources/:id", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -741,7 +739,7 @@ async function calculateMatchScore(listing: MarinaListing, profile: InvestmentCr
   };
 }
 
-router.post("/listings/:id/rescore", requireProspecting, async (req: Request, res: Response) => {
+router.post("/listings/:id/rescore", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -760,7 +758,7 @@ router.post("/listings/:id/rescore", requireProspecting, async (req: Request, re
   }
 });
 
-router.post("/bulk-rescore", requireProspecting, async (req: Request, res: Response) => {
+router.post("/bulk-rescore", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -787,7 +785,7 @@ router.post("/bulk-rescore", requireProspecting, async (req: Request, res: Respo
 // ANALYTICS
 // ============================================
 
-router.get("/analytics/overview", requireProspecting, async (req: Request, res: Response) => {
+router.get("/analytics/overview", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -836,7 +834,7 @@ router.get("/analytics/overview", requireProspecting, async (req: Request, res: 
 // SCRAPING
 // ============================================
 
-router.get("/scrape-runs", requireProspecting, async (req: Request, res: Response) => {
+router.get("/scrape-runs", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -855,7 +853,7 @@ router.get("/scrape-runs", requireProspecting, async (req: Request, res: Respons
   }
 });
 
-router.post("/scrape/trigger", requireProspecting, async (req: Request, res: Response) => {
+router.post("/scrape/trigger", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -875,7 +873,7 @@ router.post("/scrape/trigger", requireProspecting, async (req: Request, res: Res
   }
 });
 
-router.get("/scrape/stats", requireProspecting, async (req: Request, res: Response) => {
+router.get("/scrape/stats", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
@@ -887,6 +885,230 @@ router.get("/scrape/stats", requireProspecting, async (req: Request, res: Respon
   } catch (error: any) {
     console.error("Error fetching scrape stats:", error);
     res.status(500).json({ error: error.message || "Failed to fetch scrape stats" });
+  }
+});
+
+router.post("/seed-demo-data", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const sampleListings = [
+      {
+        id: `listing-${crypto.randomUUID()}`,
+        orgId,
+        title: "Gulf Breeze Marina - Full Service",
+        propertyName: "Gulf Breeze Marina",
+        propertyAddress: "4200 Marina Way",
+        city: "Pensacola",
+        state: "FL",
+        zipCode: "32507",
+        askingPrice: "8500000",
+        totalSlips: 185,
+        wetSlips: 150,
+        dryStorage: 35,
+        grossRevenue: "2100000",
+        noi: "890000",
+        capRate: "10.47",
+        occupancyRate: "94",
+        acreage: "12.5",
+        waterDepth: "8",
+        sourcePlatform: "Crexi",
+        sourceUrl: "https://www.crexi.com/properties/example-1",
+        status: "active",
+        hasFuel: true,
+        hasShipStore: true,
+        hasRepairShop: true,
+        hasDryStorage: true,
+        bestMatchScore: 87,
+        attributionText: "Listing sourced from Crexi. All data provided for informational purposes only.",
+        brokerName: "John Marine Brokers",
+        brokerCompany: "Coastal CRE Group",
+        brokerPhone: "(850) 555-0123",
+        brokerEmail: "john@coastalcre.com",
+        originalDescription: "Premier full-service marina located in the heart of Pensacola's waterfront district. Features 185 slips with deep-water access, on-site fuel dock, fully stocked ship store, and certified repair facility. Strong cash flow with excellent upside potential through slip rate optimization.",
+        listingDate: "2024-01-15",
+        dedupeHash: crypto.createHash("md5").update("crexi|gulf breeze marina|4200 marina way|pensacola|fl").digest("hex"),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: `listing-${crypto.randomUUID()}`,
+        orgId,
+        title: "Sunset Cove Marina",
+        propertyName: "Sunset Cove Marina",
+        propertyAddress: "789 Harbor Drive",
+        city: "Naples",
+        state: "FL",
+        zipCode: "34102",
+        askingPrice: "12750000",
+        totalSlips: 245,
+        wetSlips: 200,
+        dryStorage: 45,
+        grossRevenue: "3200000",
+        noi: "1450000",
+        capRate: "11.37",
+        occupancyRate: "97",
+        acreage: "18.2",
+        waterDepth: "10",
+        sourcePlatform: "LoopNet",
+        sourceUrl: "https://www.loopnet.com/listing/example-2",
+        status: "active",
+        hasFuel: true,
+        hasShipStore: true,
+        hasRepairShop: false,
+        hasDryStorage: true,
+        bestMatchScore: 92,
+        attributionText: "Listing sourced from LoopNet. All data provided for informational purposes only.",
+        brokerName: "Sarah Waters",
+        brokerCompany: "Premier Marine Realty",
+        brokerPhone: "(239) 555-0456",
+        brokerEmail: "swaters@premiermarinerealty.com",
+        originalDescription: "Exceptional marina opportunity in Naples' prestigious waterfront location. Featuring 245 total slips with premium amenities, this property offers strong NOI with room for revenue enhancement through rate increases and additional services.",
+        listingDate: "2024-02-01",
+        dedupeHash: crypto.createHash("md5").update("loopnet|sunset cove marina|789 harbor drive|naples|fl").digest("hex"),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: `listing-${crypto.randomUUID()}`,
+        orgId,
+        title: "Bay Harbor Marine Center",
+        propertyName: "Bay Harbor Marine Center",
+        propertyAddress: "1500 Waterfront Blvd",
+        city: "Sarasota",
+        state: "FL",
+        zipCode: "34236",
+        askingPrice: "6200000",
+        totalSlips: 120,
+        wetSlips: 100,
+        dryStorage: 20,
+        grossRevenue: "1450000",
+        noi: "580000",
+        capRate: "9.35",
+        occupancyRate: "91",
+        acreage: "8.3",
+        waterDepth: "7",
+        sourcePlatform: "BizBuySell",
+        sourceUrl: "https://www.bizbuysell.com/listing/example-3",
+        status: "active",
+        hasFuel: true,
+        hasShipStore: false,
+        hasRepairShop: true,
+        hasDryStorage: true,
+        bestMatchScore: 74,
+        attributionText: "Listing sourced from BizBuySell. All data provided for informational purposes only.",
+        brokerName: "Michael Anchor",
+        brokerCompany: "Gulf Coast Business Brokers",
+        brokerPhone: "(941) 555-0789",
+        brokerEmail: "manchor@gcbb.com",
+        originalDescription: "Well-maintained marina with established customer base in growing Sarasota market. Full-service repair shop and fuel dock provide strong ancillary revenue streams. Ideal for owner-operator or addition to existing portfolio.",
+        listingDate: "2024-01-28",
+        dedupeHash: crypto.createHash("md5").update("bizbuysell|bay harbor marine center|1500 waterfront blvd|sarasota|fl").digest("hex"),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: `listing-${crypto.randomUUID()}`,
+        orgId,
+        title: "Charleston Harbor Marina",
+        propertyName: "Charleston Harbor Marina",
+        propertyAddress: "2100 Coastal Way",
+        city: "Charleston",
+        state: "SC",
+        zipCode: "29401",
+        askingPrice: "9800000",
+        totalSlips: 175,
+        wetSlips: 160,
+        dryStorage: 15,
+        grossRevenue: "2400000",
+        noi: "1020000",
+        capRate: "10.41",
+        occupancyRate: "96",
+        acreage: "14.1",
+        waterDepth: "9",
+        sourcePlatform: "Crexi",
+        sourceUrl: "https://www.crexi.com/properties/example-4",
+        status: "active",
+        hasFuel: true,
+        hasShipStore: true,
+        hasRepairShop: true,
+        hasDryStorage: false,
+        bestMatchScore: 81,
+        attributionText: "Listing sourced from Crexi. All data provided for informational purposes only.",
+        brokerName: "Robert Maritime",
+        brokerCompany: "Lowcountry CRE",
+        brokerPhone: "(843) 555-0321",
+        brokerEmail: "rmaritime@lowcountrycre.com",
+        originalDescription: "Historic Charleston marina with deep-water access and stunning harbor views. Prime location attracts high-net-worth boaters and transient traffic. Recent infrastructure upgrades including new floating docks and electrical systems.",
+        listingDate: "2024-02-10",
+        dedupeHash: crypto.createHash("md5").update("crexi|charleston harbor marina|2100 coastal way|charleston|sc").digest("hex"),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: `listing-${crypto.randomUUID()}`,
+        orgId,
+        title: "Lake Travis Marina & Resort",
+        propertyName: "Lake Travis Marina & Resort",
+        propertyAddress: "500 Lakefront Road",
+        city: "Austin",
+        state: "TX",
+        zipCode: "78734",
+        askingPrice: "15500000",
+        totalSlips: 320,
+        wetSlips: 280,
+        dryStorage: 40,
+        grossRevenue: "4100000",
+        noi: "1845000",
+        capRate: "11.9",
+        occupancyRate: "99",
+        acreage: "22.5",
+        waterDepth: "12",
+        sourcePlatform: "LoopNet",
+        sourceUrl: "https://www.loopnet.com/listing/example-5",
+        status: "active",
+        hasFuel: true,
+        hasShipStore: true,
+        hasRepairShop: true,
+        hasDryStorage: true,
+        bestMatchScore: 95,
+        attributionText: "Listing sourced from LoopNet. All data provided for informational purposes only.",
+        brokerName: "Texas Marina Specialists",
+        brokerCompany: "Hill Country Brokers",
+        brokerPhone: "(512) 555-0654",
+        brokerEmail: "sales@texasmarinasales.com",
+        originalDescription: "Trophy marina asset on Lake Travis with exceptional demand metrics. Nearly 100% occupancy with extensive waitlist. Multiple revenue streams including boat rentals, restaurant lease, and event space. Rare opportunity in undersupplied Austin market.",
+        listingDate: "2024-02-05",
+        dedupeHash: crypto.createHash("md5").update("loopnet|lake travis marina & resort|500 lakefront road|austin|tx").digest("hex"),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    const existingListings = await db
+      .select({ id: marinaListings.id })
+      .from(marinaListings)
+      .where(eq(marinaListings.orgId, orgId))
+      .limit(1);
+
+    if (existingListings.length > 0) {
+      return res.json({ 
+        message: "Demo data already exists", 
+        listingsCount: existingListings.length 
+      });
+    }
+
+    await db.insert(marinaListings).values(sampleListings);
+
+    res.json({
+      success: true,
+      message: "Demo marina listings seeded successfully",
+      listingsCount: sampleListings.length,
+    });
+  } catch (error: any) {
+    console.error("Error seeding demo data:", error);
+    res.status(500).json({ error: error.message || "Failed to seed demo data" });
   }
 });
 

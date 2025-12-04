@@ -108,6 +108,29 @@ export function MarketIntelTab() {
     },
   });
 
+  const seedDemoMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/marinamatch/intel/seed-demo-data", {
+        method: "POST",
+      });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Sample Listings Loaded",
+        description: data.message || `Loaded ${data.listingsCount} sample marina listings.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Load Sample Data",
+        description: error.message || "Could not load sample listings",
+        variant: "destructive",
+      });
+    },
+  });
+
   const filteredListings = listings?.filter(listing => {
     if (searchTerm && !listing.title.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
@@ -327,16 +350,30 @@ export function MarketIntelTab() {
               <Anchor className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-lg font-medium">No listings found</p>
               <p className="text-muted-foreground">
-                Try adjusting your filters or refresh to pull new listings
+                Try adjusting your filters or load sample data to explore the platform
               </p>
-              <Button 
-                className="mt-4" 
-                onClick={() => triggerScrapeMutation.mutate()}
-                disabled={triggerScrapeMutation.isPending}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Fetch Listings Now
-              </Button>
+              <div className="flex gap-3 justify-center mt-4">
+                <Button 
+                  variant="outline"
+                  onClick={() => seedDemoMutation.mutate()}
+                  disabled={seedDemoMutation.isPending}
+                  data-testid="button-seed-demo-data"
+                >
+                  {seedDemoMutation.isPending ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Building className="h-4 w-4 mr-2" />
+                  )}
+                  Load Sample Listings
+                </Button>
+                <Button 
+                  onClick={() => triggerScrapeMutation.mutate()}
+                  disabled={triggerScrapeMutation.isPending}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Fetch Live Listings
+                </Button>
+              </div>
             </div>
           ) : (
             <ScrollArea className="h-[600px]">

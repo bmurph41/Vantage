@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,29 @@ import { InvestmentCriteriaTab } from "./InvestmentCriteria";
 import { GoalsDashboard } from "./GoalsDashboard";
 
 export default function MarinaMatchIndex() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [location, setLocation] = useLocation();
+  
+  const getTabFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    const validTabs = ["overview", "sources", "mandates", "deals", "brokers", "listings", "criteria", "goals"];
+    return tab && validTabs.includes(tab) ? tab : "overview";
+  };
+  
+  const [activeTab, setActiveTab] = useState(getTabFromUrl);
+  
+  useEffect(() => {
+    setActiveTab(getTabFromUrl());
+  }, [location]);
+  
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    if (newTab === "overview") {
+      setLocation("/marinamatch");
+    } else {
+      setLocation(`/marinamatch?tab=${newTab}`);
+    }
+  };
   
   const { data: analytics, isLoading: analyticsLoading } = useQuery<{
     totalDeals: number;
@@ -48,7 +71,7 @@ export default function MarinaMatchIndex() {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="bg-muted/50 p-1 h-auto flex-wrap justify-start gap-1">
             <TabsTrigger 
               value="overview" 
