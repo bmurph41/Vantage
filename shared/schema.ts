@@ -12866,6 +12866,329 @@ export type FundWaterfallCalculation = typeof fundWaterfallCalculations.$inferSe
 export type InsertFundWaterfallCalculation = z.infer<typeof insertFundWaterfallCalculationSchema>;
 
 // ============================================================================
+// MarinaMatch - Deal Sourcing & Prospecting Module
+// ============================================================================
+
+// Enums for MarinaMatch
+export const dealSourceTypeEnum = pgEnum("deal_source_type", ["broker", "marketplace", "direct", "referral", "owned_network", "web_scrape", "cold_outreach"]);
+export const feedStatusEnum = pgEnum("feed_status", ["active", "paused", "error", "pending_setup"]);
+export const mandateStatusEnum = pgEnum("mandate_status", ["active", "paused", "archived"]);
+export const sourcedDealStatusEnum = pgEnum("sourced_deal_status", ["new", "reviewing", "qualified", "disqualified", "converted", "duplicate"]);
+export const brokerTierEnum = pgEnum("broker_tier", ["platinum", "gold", "silver", "bronze", "new"]);
+export const marinaTypeEnum = pgEnum("marina_type", ["wet_slips", "dry_storage", "full_service", "yacht_club", "boatyard", "mixed_use", "commercial"]);
+
+// Deal Sources - External feed configurations (brokers, marketplaces, etc.)
+export const dealSources = pgTable("deal_sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  sourceType: dealSourceTypeEnum("source_type").notNull(),
+  // Feed configuration
+  feedUrl: text("feed_url"), // RSS/API endpoint
+  apiKey: text("api_key"), // Encrypted API key if needed
+  feedFormat: text("feed_format").default("rss"), // rss, json, xml
+  // Broker/source info
+  brokerCompany: text("broker_company"),
+  brokerContact: text("broker_contact"),
+  brokerEmail: text("broker_email"),
+  brokerPhone: text("broker_phone"),
+  // Status & sync
+  status: feedStatusEnum("status").notNull().default("pending_setup"),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSyncStatus: text("last_sync_status"),
+  syncErrorCount: integer("sync_error_count").default(0),
+  // Settings
+  autoImport: boolean("auto_import").notNull().default(false),
+  dedupeEnabled: boolean("dedupe_enabled").notNull().default(true),
+  minDealSize: decimal("min_deal_size", { precision: 18, scale: 2 }),
+  maxDealSize: decimal("max_deal_size", { precision: 18, scale: 2 }),
+  targetRegions: text("target_regions").array(),
+  // Metrics
+  totalDealsImported: integer("total_deals_imported").default(0),
+  totalDealsConverted: integer("total_deals_converted").default(0),
+  // Metadata
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("deal_sources_org_idx").on(table.orgId),
+  statusIdx: index("deal_sources_status_idx").on(table.status),
+}));
+
+// Investment Mandates - Define investment thesis/criteria
+export const investmentMandates = pgTable("investment_mandates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: mandateStatusEnum("status").notNull().default("active"),
+  // Deal size criteria
+  minDealSize: decimal("min_deal_size", { precision: 18, scale: 2 }),
+  maxDealSize: decimal("max_deal_size", { precision: 18, scale: 2 }),
+  // Geographic criteria
+  targetStates: text("target_states").array(),
+  targetRegions: text("target_regions").array(), // e.g., "Gulf Coast", "Great Lakes"
+  coastalPreference: text("coastal_preference"), // "ocean", "lake", "river", "any"
+  // Marina type criteria
+  targetMarinaTypes: text("target_marina_types").array(),
+  // Operational criteria
+  minSlipCount: integer("min_slip_count"),
+  maxSlipCount: integer("max_slip_count"),
+  minOccupancy: decimal("min_occupancy", { precision: 5, scale: 2 }),
+  minRevenue: decimal("min_revenue", { precision: 18, scale: 2 }),
+  minNoi: decimal("min_noi", { precision: 18, scale: 2 }),
+  // Cap rate / valuation criteria
+  minCapRate: decimal("min_cap_rate", { precision: 5, scale: 2 }),
+  maxCapRate: decimal("max_cap_rate", { precision: 5, scale: 2 }),
+  // Required amenities/features
+  requiredAmenities: text("required_amenities").array(),
+  excludedAttributes: text("excluded_attributes").array(), // Things to avoid
+  // Priority & scoring weights
+  priority: integer("priority").default(1), // 1 = highest
+  sizeWeight: integer("size_weight").default(20), // % weight for scoring
+  locationWeight: integer("location_weight").default(25),
+  typeWeight: integer("type_weight").default(15),
+  operationsWeight: integer("operations_weight").default(25),
+  valuationWeight: integer("valuation_weight").default(15),
+  // Fund association (optional)
+  fundId: varchar("fund_id").references(() => funds.id),
+  // Metadata
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("investment_mandates_org_idx").on(table.orgId),
+  statusIdx: index("investment_mandates_status_idx").on(table.status),
+  fundIdx: index("investment_mandates_fund_idx").on(table.fundId),
+}));
+
+// Broker Relationships - Track broker contacts and performance
+export const brokerRelationships = pgTable("broker_relationships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  // Broker info
+  companyName: text("company_name").notNull(),
+  primaryContactName: text("primary_contact_name"),
+  primaryContactEmail: text("primary_contact_email"),
+  primaryContactPhone: text("primary_contact_phone"),
+  website: text("website"),
+  // Classification
+  tier: brokerTierEnum("tier").notNull().default("new"),
+  specializations: text("specializations").array(), // e.g., "marinas", "yacht clubs", "commercial"
+  regions: text("regions").array(), // Geographic coverage
+  // Relationship details
+  relationshipStartDate: date("relationship_start_date"),
+  lastContactDate: date("last_contact_date"),
+  preferredContactMethod: text("preferred_contact_method").default("email"),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }), // Standard rate
+  // Performance metrics
+  totalDealsSubmitted: integer("total_deals_submitted").default(0),
+  totalDealsConverted: integer("total_deals_converted").default(0),
+  totalDealValue: decimal("total_deal_value", { precision: 18, scale: 2 }).default("0"),
+  avgDealQuality: decimal("avg_deal_quality", { precision: 5, scale: 2 }), // 0-100 score
+  // Notes & tracking
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  // Link to CRM contact if exists (stored as integer, FK added at DB level)
+  crmContactId: integer("crm_contact_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("broker_relationships_org_idx").on(table.orgId),
+  tierIdx: index("broker_relationships_tier_idx").on(table.tier),
+  activeIdx: index("broker_relationships_active_idx").on(table.isActive),
+}));
+
+// Sourced Deals - Incoming deals from feeds before conversion to CRM
+export const sourcedDeals = pgTable("sourced_deals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  // Source tracking
+  dealSourceId: varchar("deal_source_id").references(() => dealSources.id),
+  brokerId: varchar("broker_id").references(() => brokerRelationships.id),
+  externalId: text("external_id"), // ID from source system
+  sourceUrl: text("source_url"), // Original listing URL
+  // Status
+  status: sourcedDealStatusEnum("status").notNull().default("new"),
+  // Basic deal info
+  propertyName: text("property_name").notNull(),
+  propertyAddress: text("property_address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  latitude: decimal("latitude", { precision: 10, scale: 6 }),
+  longitude: decimal("longitude", { precision: 10, scale: 6 }),
+  // Marina details
+  marinaType: marinaTypeEnum("marina_type"),
+  totalSlips: integer("total_slips"),
+  wetSlips: integer("wet_slips"),
+  dryStorage: integer("dry_storage"),
+  // Financial info
+  askingPrice: decimal("asking_price", { precision: 18, scale: 2 }),
+  grossRevenue: decimal("gross_revenue", { precision: 18, scale: 2 }),
+  noi: decimal("noi", { precision: 18, scale: 2 }),
+  capRate: decimal("cap_rate", { precision: 5, scale: 2 }),
+  pricePerSlip: decimal("price_per_slip", { precision: 18, scale: 2 }),
+  // Amenities & features
+  amenities: text("amenities").array(),
+  description: text("description"),
+  // Mandate matching
+  mandateScores: jsonb("mandate_scores").$type<{
+    mandateId: string;
+    mandateName: string;
+    score: number;
+    breakdown: {
+      size: number;
+      location: number;
+      type: number;
+      operations: number;
+      valuation: number;
+    };
+  }[]>(),
+  bestMandateScore: decimal("best_mandate_score", { precision: 5, scale: 2 }),
+  bestMandateId: varchar("best_mandate_id"),
+  // Deduplication
+  dedupeHash: text("dedupe_hash"), // Hash for detecting duplicates
+  isDuplicate: boolean("is_duplicate").default(false),
+  duplicateOfId: varchar("duplicate_of_id"),
+  // Conversion tracking (stored as integer for legacy compatibility)
+  convertedToDealId: integer("converted_to_deal_id"),
+  convertedAt: timestamp("converted_at"),
+  convertedBy: varchar("converted_by").references(() => users.id),
+  // Review tracking
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  disqualificationReason: text("disqualification_reason"),
+  // Metadata
+  rawData: jsonb("raw_data"), // Original data from source
+  importedAt: timestamp("imported_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("sourced_deals_org_idx").on(table.orgId),
+  sourceIdx: index("sourced_deals_source_idx").on(table.dealSourceId),
+  statusIdx: index("sourced_deals_status_idx").on(table.status),
+  brokerIdx: index("sourced_deals_broker_idx").on(table.brokerId),
+  mandateScoreIdx: index("sourced_deals_mandate_score_idx").on(table.bestMandateScore),
+  dedupeIdx: index("sourced_deals_dedupe_idx").on(table.dedupeHash),
+  stateIdx: index("sourced_deals_state_idx").on(table.state),
+}));
+
+// Deal Attribution - Track how CRM deals were sourced
+export const dealAttributions = pgTable("deal_attributions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: integer("deal_id").notNull(),
+  // Attribution details
+  sourceType: dealSourceTypeEnum("source_type").notNull(),
+  dealSourceId: varchar("deal_source_id").references(() => dealSources.id),
+  brokerId: varchar("broker_id").references(() => brokerRelationships.id),
+  sourcedDealId: varchar("sourced_deal_id").references(() => sourcedDeals.id),
+  // For referrals
+  referredBy: text("referred_by"),
+  referralContact: text("referral_contact"),
+  // For direct/cold outreach
+  outreachCampaignId: varchar("outreach_campaign_id"),
+  initialContactDate: date("initial_contact_date"),
+  // Commission tracking
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }),
+  commissionAmount: decimal("commission_amount", { precision: 18, scale: 2 }),
+  commissionPaid: boolean("commission_paid").default(false),
+  commissionPaidDate: date("commission_paid_date"),
+  // Notes
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("deal_attributions_org_idx").on(table.orgId),
+  dealIdx: index("deal_attributions_deal_idx").on(table.dealId),
+  sourceTypeIdx: index("deal_attributions_source_type_idx").on(table.sourceType),
+  brokerIdx: index("deal_attributions_broker_idx").on(table.brokerId),
+}));
+
+// Broker Activity Log - Track interactions with brokers
+export const brokerActivityLog = pgTable("broker_activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  brokerId: varchar("broker_id").notNull().references(() => brokerRelationships.id),
+  // Activity details
+  activityType: text("activity_type").notNull(), // "call", "email", "meeting", "deal_submitted", etc.
+  activityDate: timestamp("activity_date").notNull().defaultNow(),
+  subject: text("subject"),
+  description: text("description"),
+  // Associated deal if any
+  sourcedDealId: varchar("sourced_deal_id").references(() => sourcedDeals.id),
+  dealId: integer("deal_id").references(() => crmDeals.id),
+  // User tracking
+  performedBy: varchar("performed_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("broker_activity_log_org_idx").on(table.orgId),
+  brokerIdx: index("broker_activity_log_broker_idx").on(table.brokerId),
+  dateIdx: index("broker_activity_log_date_idx").on(table.activityDate),
+}));
+
+// Insert schemas and types for MarinaMatch
+export const insertDealSourceSchema = createInsertSchema(dealSources).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateDealSourceSchema = insertDealSourceSchema.partial();
+export type DealSource = typeof dealSources.$inferSelect;
+export type InsertDealSource = z.infer<typeof insertDealSourceSchema>;
+export type UpdateDealSource = z.infer<typeof updateDealSourceSchema>;
+
+export const insertInvestmentMandateSchema = createInsertSchema(investmentMandates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateInvestmentMandateSchema = insertInvestmentMandateSchema.partial();
+export type InvestmentMandate = typeof investmentMandates.$inferSelect;
+export type InsertInvestmentMandate = z.infer<typeof insertInvestmentMandateSchema>;
+export type UpdateInvestmentMandate = z.infer<typeof updateInvestmentMandateSchema>;
+
+export const insertBrokerRelationshipSchema = createInsertSchema(brokerRelationships).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateBrokerRelationshipSchema = insertBrokerRelationshipSchema.partial();
+export type BrokerRelationship = typeof brokerRelationships.$inferSelect;
+export type InsertBrokerRelationship = z.infer<typeof insertBrokerRelationshipSchema>;
+export type UpdateBrokerRelationship = z.infer<typeof updateBrokerRelationshipSchema>;
+
+export const insertSourcedDealSchema = createInsertSchema(sourcedDeals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  importedAt: true,
+});
+export const updateSourcedDealSchema = insertSourcedDealSchema.partial();
+export type SourcedDeal = typeof sourcedDeals.$inferSelect;
+export type InsertSourcedDeal = z.infer<typeof insertSourcedDealSchema>;
+export type UpdateSourcedDeal = z.infer<typeof updateSourcedDealSchema>;
+
+export const insertDealAttributionSchema = createInsertSchema(dealAttributions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateDealAttributionSchema = insertDealAttributionSchema.partial();
+export type DealAttribution = typeof dealAttributions.$inferSelect;
+export type InsertDealAttribution = z.infer<typeof insertDealAttributionSchema>;
+export type UpdateDealAttribution = z.infer<typeof updateDealAttributionSchema>;
+
+export const insertBrokerActivityLogSchema = createInsertSchema(brokerActivityLog).omit({
+  id: true,
+  createdAt: true,
+});
+export type BrokerActivityLog = typeof brokerActivityLog.$inferSelect;
+export type InsertBrokerActivityLog = z.infer<typeof insertBrokerActivityLogSchema>;
+
+// ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular
