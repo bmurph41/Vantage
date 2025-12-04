@@ -20,7 +20,7 @@ import {
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
   Wrench, ArrowUpDown, Building, Info, Globe, Loader2,
-  Settings, ChevronDown, ChevronUp, Plus, Trash2, Check, X, Radar
+  Settings, ChevronDown, ChevronUp, Plus, Trash2, Check, X, Radar, Pencil
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -135,6 +135,22 @@ export function MarketIntelTab() {
   const [selectedListing, setSelectedListing] = useState<MarinaListing | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addSourceExpanded, setAddSourceExpanded] = useState(false);
+  const [editingSource, setEditingSource] = useState<ScrapeSource | null>(null);
+  const [editSourceForm, setEditSourceForm] = useState<NewSourceForm>({
+    platform: "",
+    name: "",
+    searchUrl: "",
+    ingestionMethod: "scraping",
+    propertyType: "marina",
+    keywordsInclude: DEFAULT_MARINA_KEYWORDS.join(", "),
+    keywordsExclude: DEFAULT_EXCLUDE_KEYWORDS.join(", "),
+    geographyStates: [],
+    minPrice: "",
+    maxPrice: "",
+    minSlips: "",
+    maxSlips: "",
+    pollingIntervalMinutes: "60",
+  });
   const [newSourceForm, setNewSourceForm] = useState<NewSourceForm>({
     platform: "",
     name: "",
@@ -269,6 +285,62 @@ export function MarketIntelTab() {
       toast({ title: "Error", description: "Failed to delete source. Please try again.", variant: "destructive" });
     },
   });
+
+  const editSourceMutation = useMutation({
+    mutationFn: async ({ id, data, originalSource }: { id: string; data: NewSourceForm; originalSource: ScrapeSource }) => {
+      const payload = {
+        platform: data.platform,
+        name: data.name,
+        searchUrl: data.searchUrl,
+        ingestionMethod: data.ingestionMethod,
+        propertyType: data.propertyType,
+        keywordsInclude: data.keywordsInclude.split(",").map(k => k.trim()).filter(Boolean),
+        keywordsExclude: data.keywordsExclude.split(",").map(k => k.trim()).filter(Boolean),
+        geographyStates: data.geographyStates.length > 0 ? data.geographyStates : null,
+        minPrice: data.minPrice ? data.minPrice : null,
+        maxPrice: data.maxPrice ? data.maxPrice : null,
+        minSlips: data.minSlips ? parseInt(data.minSlips) : null,
+        maxSlips: data.maxSlips ? parseInt(data.maxSlips) : null,
+        pollingIntervalMinutes: data.pollingIntervalMinutes ? parseInt(data.pollingIntervalMinutes) : 60,
+        rateLimitRpm: originalSource.rateLimitRpm,
+        respectRobotsTxt: originalSource.respectRobotsTxt,
+        userAgent: originalSource.userAgent,
+        config: originalSource.config,
+        capabilities: originalSource.capabilities,
+        capabilityNotes: originalSource.capabilityNotes,
+      };
+      return apiRequest("PATCH", `/api/marinamatch/intel/scrape-sources/${id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
+      setEditingSource(null);
+      toast({ title: "Source updated", description: "Listing source configuration saved successfully." });
+    },
+    onError: (error: any) => {
+      console.error("Edit source error:", error);
+      const errorMessage = error?.message || "Failed to update source. Please try again.";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
+    },
+  });
+
+  const openEditDialog = (source: ScrapeSource) => {
+    setEditSourceForm({
+      platform: source.platform,
+      name: source.name,
+      searchUrl: source.searchUrl || "",
+      ingestionMethod: source.ingestionMethod || "scraping",
+      propertyType: source.propertyType || "marina",
+      keywordsInclude: source.keywordsInclude?.join(", ") || DEFAULT_MARINA_KEYWORDS.join(", "),
+      keywordsExclude: source.keywordsExclude?.join(", ") || DEFAULT_EXCLUDE_KEYWORDS.join(", "),
+      geographyStates: source.geographyStates || [],
+      minPrice: source.minPrice || "",
+      maxPrice: source.maxPrice || "",
+      minSlips: source.minSlips?.toString() || "",
+      maxSlips: source.maxSlips?.toString() || "",
+      pollingIntervalMinutes: source.pollingIntervalMinutes?.toString() || "60",
+    });
+    setEditingSource(source);
+  };
 
   const triggerScrapeMutation = useMutation({
     mutationFn: async () => {
@@ -463,6 +535,15 @@ export function MarketIntelTab() {
                           <span className="text-xs text-muted-foreground">
                             {source.totalListingsFound} listings
                           </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openEditDialog(source)}
+                            data-testid={`button-edit-source-${source.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -726,6 +807,238 @@ export function MarketIntelTab() {
           </CollapsibleContent>
         </Card>
       </Collapsible>
+
+      {/* Edit Source Dialog */}
+      <Dialog open={!!editingSource} onOpenChange={(open) => !open && setEditingSource(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Source Configuration</DialogTitle>
+            <DialogDescription>
+              Modify the settings for this listing source. Changes will apply on the next sync.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Platform</Label>
+                <Input
+                  value={editSourceForm.platform}
+                  onChange={(e) => setEditSourceForm(prev => ({ ...prev, platform: e.target.value }))}
+                  data-testid="input-edit-source-platform"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Display Name</Label>
+                <Input
+                  value={editSourceForm.name}
+                  onChange={(e) => setEditSourceForm(prev => ({ ...prev, name: e.target.value }))}
+                  data-testid="input-edit-source-name"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Search URL</Label>
+              <Input
+                value={editSourceForm.searchUrl}
+                onChange={(e) => setEditSourceForm(prev => ({ ...prev, searchUrl: e.target.value }))}
+                placeholder="https://example.com/search"
+                data-testid="input-edit-source-url"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Ingestion Method</Label>
+                <Select
+                  value={editSourceForm.ingestionMethod}
+                  onValueChange={(value) => setEditSourceForm(prev => ({ ...prev, ingestionMethod: value }))}
+                >
+                  <SelectTrigger data-testid="select-edit-ingestion-method">
+                    <SelectValue placeholder="Select method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="scraping">Web Scraping</SelectItem>
+                    <SelectItem value="api">API Access</SelectItem>
+                    <SelectItem value="rss">RSS Feed</SelectItem>
+                    <SelectItem value="manual">Manual Import</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Property Type</Label>
+                <Select
+                  value={editSourceForm.propertyType}
+                  onValueChange={(value) => setEditSourceForm(prev => ({ ...prev, propertyType: value }))}
+                >
+                  <SelectTrigger data-testid="select-edit-property-type">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="marina">Marina</SelectItem>
+                    <SelectItem value="boatyard">Boatyard</SelectItem>
+                    <SelectItem value="yacht_club">Yacht Club</SelectItem>
+                    <SelectItem value="waterfront">Waterfront Property</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Keywords to Include (comma-separated)</Label>
+              <Input
+                value={editSourceForm.keywordsInclude}
+                onChange={(e) => setEditSourceForm(prev => ({ ...prev, keywordsInclude: e.target.value }))}
+                placeholder="marina, boatyard, yacht club..."
+                data-testid="input-edit-keywords-include"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Keywords to Exclude (comma-separated)</Label>
+              <Input
+                value={editSourceForm.keywordsExclude}
+                onChange={(e) => setEditSourceForm(prev => ({ ...prev, keywordsExclude: e.target.value }))}
+                placeholder="rv storage, warehouse..."
+                data-testid="input-edit-keywords-exclude"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>States to Monitor</Label>
+                <Button
+                  type="button"
+                  variant={editSourceForm.geographyStates.length === US_STATES.length ? "default" : "outline"}
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => {
+                    setEditSourceForm(prev => ({
+                      ...prev,
+                      geographyStates: prev.geographyStates.length === US_STATES.length ? [] : [...US_STATES]
+                    }));
+                  }}
+                  data-testid="button-edit-toggle-all-states"
+                >
+                  {editSourceForm.geographyStates.length === US_STATES.length ? "Deselect All" : "Select All"}
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-1 p-2 border rounded-md min-h-[40px] max-h-[120px] overflow-y-auto">
+                {US_STATES.map(state => (
+                  <Badge
+                    key={state}
+                    variant={editSourceForm.geographyStates.includes(state) ? "default" : "outline"}
+                    className="cursor-pointer text-xs"
+                    onClick={() => {
+                      setEditSourceForm(prev => ({
+                        ...prev,
+                        geographyStates: prev.geographyStates.includes(state)
+                          ? prev.geographyStates.filter(s => s !== state)
+                          : [...prev.geographyStates, state]
+                      }));
+                    }}
+                    data-testid={`badge-edit-state-${state}`}
+                  >
+                    {state}
+                  </Badge>
+                ))}
+              </div>
+              {editSourceForm.geographyStates.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {editSourceForm.geographyStates.length === US_STATES.length 
+                    ? "All states selected" 
+                    : `Selected (${editSourceForm.geographyStates.length}): ${editSourceForm.geographyStates.slice(0, 10).join(", ")}${editSourceForm.geographyStates.length > 10 ? "..." : ""}`}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label>Min Price ($)</Label>
+                <Input
+                  type="number"
+                  placeholder="No limit"
+                  value={editSourceForm.minPrice}
+                  onChange={(e) => setEditSourceForm(prev => ({ ...prev, minPrice: e.target.value }))}
+                  data-testid="input-edit-min-price"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Max Price ($)</Label>
+                <Input
+                  type="number"
+                  placeholder="No limit"
+                  value={editSourceForm.maxPrice}
+                  onChange={(e) => setEditSourceForm(prev => ({ ...prev, maxPrice: e.target.value }))}
+                  data-testid="input-edit-max-price"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Min Slips</Label>
+                <Input
+                  type="number"
+                  placeholder="No limit"
+                  value={editSourceForm.minSlips}
+                  onChange={(e) => setEditSourceForm(prev => ({ ...prev, minSlips: e.target.value }))}
+                  data-testid="input-edit-min-slips"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Max Slips</Label>
+                <Input
+                  type="number"
+                  placeholder="No limit"
+                  value={editSourceForm.maxSlips}
+                  onChange={(e) => setEditSourceForm(prev => ({ ...prev, maxSlips: e.target.value }))}
+                  data-testid="input-edit-max-slips"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Polling Interval</Label>
+              <Select
+                value={editSourceForm.pollingIntervalMinutes}
+                onValueChange={(value) => setEditSourceForm(prev => ({ ...prev, pollingIntervalMinutes: value }))}
+              >
+                <SelectTrigger className="w-48" data-testid="select-edit-polling-interval">
+                  <SelectValue placeholder="Select interval" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="15">Every 15 minutes</SelectItem>
+                  <SelectItem value="30">Every 30 minutes</SelectItem>
+                  <SelectItem value="60">Hourly</SelectItem>
+                  <SelectItem value="360">Every 6 hours</SelectItem>
+                  <SelectItem value="1440">Daily</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setEditingSource(null)}
+                data-testid="button-cancel-edit-source"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => editingSource && editSourceMutation.mutate({ id: editingSource.id, data: editSourceForm, originalSource: editingSource })}
+                disabled={editSourceMutation.isPending || !editSourceForm.platform || !editSourceForm.name}
+                data-testid="button-save-source"
+              >
+                {editSourceMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4 mr-2" />
+                )}
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
