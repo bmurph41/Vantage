@@ -674,20 +674,18 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* MarinaMatch Section (Premium Add-On) */}
-        {canViewSection('prospecting') && hasPack('prospecting') && (
-          <div className="mb-2">
-            <SectionHeader 
-              title="MarinaMatch" 
-              expanded={marinamatchExpanded} 
-              onToggle={() => setMarinamatchExpanded(!marinamatchExpanded)}
-              isActive={location.startsWith('/marinamatch')}
-            />
-            {marinamatchExpanded && marinamatchNav.map((item) => (
-              <NavLink key={item.name} item={item} />
-            ))}
-          </div>
-        )}
+        {/* MarinaMatch Section - Available to all users */}
+        <div className="mb-2">
+          <SectionHeader 
+            title="MarinaMatch" 
+            expanded={marinamatchExpanded} 
+            onToggle={() => setMarinamatchExpanded(!marinamatchExpanded)}
+            isActive={location.startsWith('/marinamatch')}
+          />
+          {marinamatchExpanded && marinamatchNav.map((item) => (
+            <NavLink key={item.name} item={item} />
+          ))}
+        </div>
         
         {/* Prospecting & Outreach Section (Premium/Broker Add-On) */}
         {canViewSection('prospecting') && hasPack('prospecting') && (
