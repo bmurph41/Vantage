@@ -1726,6 +1726,35 @@ export function MarketIntelTab() {
                       <span className="font-medium text-foreground">Disclaimer:</span> This listing information is aggregated from {selectedListing.sourcePlatform} for informational purposes only. MarinaMatch does not own this listing and makes no representations about its accuracy, completeness, or availability. Contact the listing broker for verified information before making any investment decisions.
                     </AlertDescription>
                   </Alert>
+                  
+                  {selectedListing.sourceUrl && !selectedListing.sourceUrl.startsWith("#") && !selectedListing.sourceUrl.startsWith("mailto:") && (
+                    <div className="flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          const subject = encodeURIComponent(`Broken Link Report: ${selectedListing.title}`);
+                          const body = encodeURIComponent(
+                            `Listing Title: ${selectedListing.title}\n` +
+                            `Listing ID: ${selectedListing.id}\n` +
+                            `Source: ${selectedListing.sourcePlatform}\n` +
+                            `URL: ${selectedListing.sourceUrl}\n\n` +
+                            `Issue: [Please describe the issue with this link]\n`
+                          );
+                          window.location.href = `mailto:support@marinamatch.com?subject=${subject}&body=${body}`;
+                          toast({
+                            title: "Report sent",
+                            description: "Thank you for reporting this issue. We'll review the listing.",
+                          });
+                        }}
+                        data-testid="button-report-broken-link"
+                      >
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Report Broken Link
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </>
