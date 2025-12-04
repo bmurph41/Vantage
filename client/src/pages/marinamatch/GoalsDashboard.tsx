@@ -65,10 +65,7 @@ export function GoalsDashboard() {
 
   const createGoalMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("/api/marinamatch/intel/goals", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/marinamatch/intel/goals", data);
     },
     onSuccess: () => {
       toast({ title: "Goal created successfully" });
@@ -82,10 +79,7 @@ export function GoalsDashboard() {
 
   const updateGoalMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      return apiRequest(`/api/marinamatch/intel/goals/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("PATCH", `/api/marinamatch/intel/goals/${id}`, data);
     },
     onSuccess: () => {
       toast({ title: "Goal updated successfully" });
@@ -99,9 +93,7 @@ export function GoalsDashboard() {
 
   const deleteGoalMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/marinamatch/intel/goals/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/marinamatch/intel/goals/${id}`);
     },
     onSuccess: () => {
       toast({ title: "Goal deleted" });
@@ -114,10 +106,7 @@ export function GoalsDashboard() {
 
   const updateProgressMutation = useMutation({
     mutationFn: async ({ goalId, value, notes }: { goalId: string; value: number; notes?: string }) => {
-      return apiRequest(`/api/marinamatch/intel/goals/${goalId}/progress`, {
-        method: "POST",
-        body: JSON.stringify({ recordedValue: value, notes }),
-      });
+      return apiRequest("POST", `/api/marinamatch/intel/goals/${goalId}/progress`, { recordedValue: value, notes });
     },
     onSuccess: () => {
       toast({ title: "Progress updated" });

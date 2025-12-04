@@ -13477,7 +13477,7 @@ export const marinaScrapeources = pgTable("marina_scrape_sources", {
   // Geography filters
   geographyStates: text("geography_states").array(), // Array of state abbreviations to filter
   geographyRegion: varchar("geography_region", { length: 100 }), // Optional region name
-  geographyRadius: integer("geography_radius"), // Radius in miles from center point
+  geographyRadius: numeric("geography_radius", { precision: 10, scale: 2 }), // Radius in miles from center point
   
   // Price and size filters
   minPrice: numeric("min_price", { precision: 15, scale: 2 }),

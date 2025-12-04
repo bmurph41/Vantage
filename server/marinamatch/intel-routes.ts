@@ -551,6 +551,8 @@ router.post("/scrape-sources", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
+    console.log("[MarinaMatch Intel] Creating scrape source with body:", JSON.stringify(req.body, null, 2));
+
     const {
       platform,
       name,
@@ -576,6 +578,12 @@ router.post("/scrape-sources", async (req: Request, res: Response) => {
       capabilities,
       capabilityNotes,
     } = req.body;
+
+    // Validate required fields
+    if (!platform || !name) {
+      console.log("[MarinaMatch Intel] Missing required fields: platform or name");
+      return res.status(400).json({ error: "Platform and name are required" });
+    }
 
     const [source] = await db.insert(marinaScrapeources).values({
       orgId,
@@ -606,7 +614,8 @@ router.post("/scrape-sources", async (req: Request, res: Response) => {
     
     res.status(201).json(source);
   } catch (error: any) {
-    console.error("Error creating scrape source:", error);
+    console.error("[MarinaMatch Intel] Error creating scrape source:", error);
+    console.error("[MarinaMatch Intel] Error details:", error.message, error.stack);
     res.status(400).json({ error: error.message || "Failed to create scrape source" });
   }
 });

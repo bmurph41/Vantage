@@ -198,10 +198,7 @@ export function MarketIntelTab() {
 
   const toggleSourceMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      return apiRequest(`/api/marinamatch/intel/scrape-sources/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ isActive }),
-      });
+      return apiRequest("PATCH", `/api/marinamatch/intel/scrape-sources/${id}`, { isActive });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
@@ -230,10 +227,7 @@ export function MarketIntelTab() {
         maxSlips: data.maxSlips ? parseInt(data.maxSlips) : null,
         pollingIntervalMinutes: data.pollingIntervalMinutes ? parseInt(data.pollingIntervalMinutes) : 60,
       };
-      return apiRequest("/api/marinamatch/intel/scrape-sources", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      return apiRequest("POST", "/api/marinamatch/intel/scrape-sources", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
@@ -255,16 +249,16 @@ export function MarketIntelTab() {
       setAddSourceExpanded(false);
       toast({ title: "Source added", description: "New listing source added successfully." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to add source. Please try again.", variant: "destructive" });
+    onError: (error: any) => {
+      console.error("Add source error:", error);
+      const errorMessage = error?.message || "Failed to add source. Please try again.";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     },
   });
 
   const deleteSourceMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/marinamatch/intel/scrape-sources/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/marinamatch/intel/scrape-sources/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
@@ -278,9 +272,7 @@ export function MarketIntelTab() {
 
   const triggerScrapeMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/marinamatch/intel/scrape/trigger", {
-        method: "POST",
-      });
+      return apiRequest("POST", "/api/marinamatch/intel/scrape/trigger");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
