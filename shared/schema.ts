@@ -13465,6 +13465,39 @@ export const marinaScrapeources = pgTable("marina_scrape_sources", {
   respectRobotsTxt: boolean("respect_robots_txt").default(true),
   userAgent: varchar("user_agent", { length: 255 }).default("MarinaMatchBot/1.0"),
   isActive: boolean("is_active").default(true),
+  
+  // Ingestion method configuration
+  ingestionMethod: varchar("ingestion_method", { length: 30 }).default("scraping"), // api, feed, scraping, manual, rss
+  
+  // Search/filter configuration for marina listings
+  propertyType: varchar("property_type", { length: 50 }).default("marina"),
+  keywordsInclude: text("keywords_include").array().default(sql`ARRAY['marina', 'boatyard', 'yacht club', 'boat slip', 'dock', 'waterfront marina']`),
+  keywordsExclude: text("keywords_exclude").array().default(sql`ARRAY['rv storage', 'self-storage', 'warehouse', 'mini storage']`),
+  
+  // Geography filters
+  geographyStates: text("geography_states").array(), // Array of state abbreviations to filter
+  geographyRegion: varchar("geography_region", { length: 100 }), // Optional region name
+  geographyRadius: integer("geography_radius"), // Radius in miles from center point
+  
+  // Price and size filters
+  minPrice: numeric("min_price", { precision: 15, scale: 2 }),
+  maxPrice: numeric("max_price", { precision: 15, scale: 2 }),
+  minSlips: integer("min_slips"),
+  maxSlips: integer("max_slips"),
+  
+  // Polling configuration
+  pollingIntervalMinutes: integer("polling_interval_minutes").default(60),
+  
+  // Delta tracking for detecting new/updated listings
+  lastSeenListingId: varchar("last_seen_listing_id", { length: 255 }),
+  lastSeenContentHash: varchar("last_seen_content_hash", { length: 64 }),
+  lastDeltaCheckAt: timestamp("last_delta_check_at"),
+  
+  // Source capabilities (what methods this source supports)
+  capabilities: text("capabilities").array().default(sql`ARRAY['scraping']`), // api, scraping, rss, webhook, manual
+  capabilityNotes: text("capability_notes"), // Notes about API access requirements, etc.
+  
+  // Scrape tracking
   lastScrapeAt: timestamp("last_scrape_at"),
   lastScrapeStatus: varchar("last_scrape_status", { length: 30 }),
   lastScrapeCount: integer("last_scrape_count"),

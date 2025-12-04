@@ -195,6 +195,227 @@ function detectAmenities(text: string): Partial<ListingData> {
   };
 }
 
+// Source Configuration interface for filtering
+export interface SourceConfig {
+  keywordsInclude?: string[];
+  keywordsExclude?: string[];
+  geographyStates?: string[];
+  minPrice?: string | number;
+  maxPrice?: string | number;
+  minSlips?: number;
+  maxSlips?: number;
+  propertyType?: string;
+}
+
+// Marina-focused keyword adapter - applies source filters to listings
+export function applyMarinaKeywordFilter(
+  listing: ListingData,
+  config: SourceConfig
+): { include: boolean; reason?: string } {
+  const searchableText = [
+    listing.title || "",
+    listing.propertyName || "",
+    listing.originalDescription || "",
+    listing.propertyType || "",
+    listing.marinaType || "",
+  ].join(" ").toLowerCase();
+  
+  // Check include keywords - at least one must match
+  if (config.keywordsInclude && config.keywordsInclude.length > 0) {
+    const hasIncludeMatch = config.keywordsInclude.some(keyword => 
+      searchableText.includes(keyword.toLowerCase().trim())
+    );
+    if (!hasIncludeMatch) {
+      return { include: false, reason: `No match for include keywords: ${config.keywordsInclude.join(", ")}` };
+    }
+  }
+  
+  // Check exclude keywords - none should match
+  if (config.keywordsExclude && config.keywordsExclude.length > 0) {
+    const hasExcludeMatch = config.keywordsExclude.find(keyword => 
+      searchableText.includes(keyword.toLowerCase().trim())
+    );
+    if (hasExcludeMatch) {
+      return { include: false, reason: `Matched exclude keyword: ${hasExcludeMatch}` };
+    }
+  }
+  
+  // Check geography filter
+  if (config.geographyStates && config.geographyStates.length > 0) {
+    const listingState = listing.state?.toUpperCase();
+    if (!listingState || !config.geographyStates.includes(listingState)) {
+      return { include: false, reason: `State ${listingState || "unknown"} not in filter: ${config.geographyStates.join(", ")}` };
+    }
+  }
+  
+  // Check price range
+  const listingPrice = listing.askingPrice;
+  if (listingPrice !== undefined) {
+    const minPrice = typeof config.minPrice === "string" ? parseFloat(config.minPrice) : config.minPrice;
+    const maxPrice = typeof config.maxPrice === "string" ? parseFloat(config.maxPrice) : config.maxPrice;
+    
+    if (minPrice && listingPrice < minPrice) {
+      return { include: false, reason: `Price $${listingPrice} below minimum $${minPrice}` };
+    }
+    if (maxPrice && listingPrice > maxPrice) {
+      return { include: false, reason: `Price $${listingPrice} above maximum $${maxPrice}` };
+    }
+  }
+  
+  // Check slip count range
+  const slipCount = listing.totalSlips;
+  if (slipCount !== undefined) {
+    if (config.minSlips && slipCount < config.minSlips) {
+      return { include: false, reason: `Slip count ${slipCount} below minimum ${config.minSlips}` };
+    }
+    if (config.maxSlips && slipCount > config.maxSlips) {
+      return { include: false, reason: `Slip count ${slipCount} above maximum ${config.maxSlips}` };
+    }
+  }
+  
+  return { include: true };
+}
+
+// Apply filters to an array of listings
+export function filterListingsWithConfig(
+  listings: ListingData[],
+  config: SourceConfig
+): { filtered: ListingData[]; rejected: Array<{ listing: ListingData; reason: string }> } {
+  const filtered: ListingData[] = [];
+  const rejected: Array<{ listing: ListingData; reason: string }> = [];
+  
+  for (const listing of listings) {
+    const result = applyMarinaKeywordFilter(listing, config);
+    if (result.include) {
+      filtered.push(listing);
+    } else {
+      rejected.push({ listing, reason: result.reason || "Unknown" });
+    }
+  }
+  
+  return { filtered, rejected };
+}
+
+// Generate content hash for delta tracking
+export function generateContentHash(listing: ListingData): string {
+  const content = [
+    listing.title,
+    listing.askingPrice?.toString(),
+    listing.totalSlips?.toString(),
+    listing.grossRevenue?.toString(),
+    listing.capRate?.toString(),
+    listing.occupancyRate?.toString(),
+    listing.originalDescription?.substring(0, 200),
+  ].filter(Boolean).join("|");
+  
+  return crypto.createHash("md5").update(content).digest("hex");
+}
+
+// Platform capability metadata - defines what methods work for each platform
+export interface PlatformCapability {
+  platform: string;
+  displayName: string;
+  capabilities: string[];
+  blockedMethods: string[];
+  accessNotes: string;
+  apiInfo?: {
+    available: boolean;
+    contactUrl?: string;
+    pricingInfo?: string;
+  };
+  scrapingStatus: "blocked" | "limited" | "allowed";
+}
+
+export const PLATFORM_CAPABILITIES: Record<string, PlatformCapability> = {
+  loopnet: {
+    platform: "loopnet",
+    displayName: "LoopNet",
+    capabilities: ["manual", "api"],
+    blockedMethods: ["scraping"],
+    accessNotes: "LoopNet blocks automated scraping. Data access requires CoStar Group API subscription.",
+    apiInfo: {
+      available: true,
+      contactUrl: "https://www.costargroup.com/products/loopnet",
+      pricingInfo: "Enterprise subscription required",
+    },
+    scrapingStatus: "blocked",
+  },
+  crexi: {
+    platform: "crexi",
+    displayName: "Crexi",
+    capabilities: ["manual", "api"],
+    blockedMethods: ["scraping"],
+    accessNotes: "Crexi returns 403 errors for automated requests. Official API access may be available for partners.",
+    apiInfo: {
+      available: true,
+      contactUrl: "https://www.crexi.com/contact",
+      pricingInfo: "Contact for enterprise access",
+    },
+    scrapingStatus: "blocked",
+  },
+  bizbuysell: {
+    platform: "bizbuysell",
+    displayName: "BizBuySell",
+    capabilities: ["manual"],
+    blockedMethods: ["scraping", "api"],
+    accessNotes: "BizBuySell uses aggressive rate limiting and CAPTCHA. Manual data entry or broker partnerships recommended.",
+    scrapingStatus: "blocked",
+  },
+  costar: {
+    platform: "costar",
+    displayName: "CoStar",
+    capabilities: ["api"],
+    blockedMethods: ["scraping"],
+    accessNotes: "CoStar requires paid API subscription. Premium data service for commercial real estate.",
+    apiInfo: {
+      available: true,
+      contactUrl: "https://www.costargroup.com/products",
+      pricingInfo: "Enterprise subscription required",
+    },
+    scrapingStatus: "blocked",
+  },
+  custom: {
+    platform: "custom",
+    displayName: "Custom Source",
+    capabilities: ["manual", "scraping", "rss", "api"],
+    blockedMethods: [],
+    accessNotes: "Custom sources depend on the specific site's policies. Check robots.txt before automated access.",
+    scrapingStatus: "allowed",
+  },
+  csv_import: {
+    platform: "csv_import",
+    displayName: "CSV Import",
+    capabilities: ["manual"],
+    blockedMethods: [],
+    accessNotes: "Manual data import via CSV file upload. Most reliable method for any data source.",
+    scrapingStatus: "allowed",
+  },
+};
+
+// Get capabilities for a platform
+export function getPlatformCapabilities(platform: string): PlatformCapability {
+  const normalizedPlatform = platform.toLowerCase().replace(/\s+/g, "_");
+  return PLATFORM_CAPABILITIES[normalizedPlatform] || PLATFORM_CAPABILITIES.custom;
+}
+
+// Check if a method is supported for a platform
+export function isMethodSupported(platform: string, method: string): boolean {
+  const capabilities = getPlatformCapabilities(platform);
+  return capabilities.capabilities.includes(method.toLowerCase());
+}
+
+// Get recommended ingestion method for a platform
+export function getRecommendedMethod(platform: string): string {
+  const capabilities = getPlatformCapabilities(platform);
+  if (capabilities.capabilities.includes("api") && capabilities.apiInfo?.available) {
+    return "api";
+  }
+  if (capabilities.capabilities.includes("rss")) {
+    return "rss";
+  }
+  return "manual";
+}
+
 export async function scrapeCrexi(searchQuery: string = "marina", maxPages: number = 3): Promise<ListingData[]> {
   const platform = "crexi";
   const baseUrl = "https://www.crexi.com";

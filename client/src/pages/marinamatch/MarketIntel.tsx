@@ -20,7 +20,7 @@ import {
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
   Wrench, ArrowUpDown, Building, Info, Globe, Loader2,
-  Settings, ChevronDown, Plus, Trash2, Check, X
+  Settings, ChevronDown, ChevronUp, Plus, Trash2, Check, X
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -78,6 +78,19 @@ interface ScrapeSource {
   respectRobotsTxt: boolean;
   userAgent?: string;
   isActive: boolean;
+  ingestionMethod?: string;
+  propertyType?: string;
+  keywordsInclude?: string[];
+  keywordsExclude?: string[];
+  geographyStates?: string[];
+  geographyRegion?: string;
+  minPrice?: string;
+  maxPrice?: string;
+  minSlips?: number;
+  maxSlips?: number;
+  pollingIntervalMinutes?: number;
+  capabilities?: string[];
+  capabilityNotes?: string;
   lastScrapeAt?: string;
   lastScrapeStatus?: string;
   lastScrapeCount?: number;
@@ -85,6 +98,32 @@ interface ScrapeSource {
   createdAt: string;
   updatedAt?: string;
 }
+
+interface NewSourceForm {
+  platform: string;
+  name: string;
+  searchUrl: string;
+  ingestionMethod: string;
+  propertyType: string;
+  keywordsInclude: string;
+  keywordsExclude: string;
+  geographyStates: string[];
+  minPrice: string;
+  maxPrice: string;
+  minSlips: string;
+  maxSlips: string;
+  pollingIntervalMinutes: string;
+}
+
+const DEFAULT_MARINA_KEYWORDS = ["marina", "boatyard", "yacht club", "boat slip", "dock", "waterfront marina"];
+const DEFAULT_EXCLUDE_KEYWORDS = ["rv storage", "self-storage", "warehouse", "mini storage"];
+const US_STATES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", 
+  "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", 
+  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", 
+  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", 
+  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+];
 
 export function MarketIntelTab() {
   const { toast } = useToast();
@@ -95,7 +134,22 @@ export function MarketIntelTab() {
   const [minScoreFilter, setMinScoreFilter] = useState<string>("0");
   const [selectedListing, setSelectedListing] = useState<MarinaListing | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [newSourceForm, setNewSourceForm] = useState({ platform: "", name: "", searchUrl: "" });
+  const [addSourceExpanded, setAddSourceExpanded] = useState(false);
+  const [newSourceForm, setNewSourceForm] = useState<NewSourceForm>({
+    platform: "",
+    name: "",
+    searchUrl: "",
+    ingestionMethod: "scraping",
+    propertyType: "marina",
+    keywordsInclude: DEFAULT_MARINA_KEYWORDS.join(", "),
+    keywordsExclude: DEFAULT_EXCLUDE_KEYWORDS.join(", "),
+    geographyStates: [],
+    minPrice: "",
+    maxPrice: "",
+    minSlips: "",
+    maxSlips: "",
+    pollingIntervalMinutes: "60",
+  });
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery<IntelAnalytics>({
     queryKey: ["/api/marinamatch/intel/analytics/overview"],
@@ -160,15 +214,45 @@ export function MarketIntelTab() {
   });
 
   const addSourceMutation = useMutation({
-    mutationFn: async (data: { platform: string; name: string; searchUrl: string }) => {
+    mutationFn: async (data: NewSourceForm) => {
+      const payload = {
+        platform: data.platform,
+        name: data.name,
+        searchUrl: data.searchUrl,
+        ingestionMethod: data.ingestionMethod,
+        propertyType: data.propertyType,
+        keywordsInclude: data.keywordsInclude.split(",").map(k => k.trim()).filter(Boolean),
+        keywordsExclude: data.keywordsExclude.split(",").map(k => k.trim()).filter(Boolean),
+        geographyStates: data.geographyStates.length > 0 ? data.geographyStates : null,
+        minPrice: data.minPrice ? data.minPrice : null,
+        maxPrice: data.maxPrice ? data.maxPrice : null,
+        minSlips: data.minSlips ? parseInt(data.minSlips) : null,
+        maxSlips: data.maxSlips ? parseInt(data.maxSlips) : null,
+        pollingIntervalMinutes: data.pollingIntervalMinutes ? parseInt(data.pollingIntervalMinutes) : 60,
+      };
       return apiRequest("/api/marinamatch/intel/scrape-sources", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
-      setNewSourceForm({ platform: "", name: "", searchUrl: "" });
+      setNewSourceForm({
+        platform: "",
+        name: "",
+        searchUrl: "",
+        ingestionMethod: "scraping",
+        propertyType: "marina",
+        keywordsInclude: DEFAULT_MARINA_KEYWORDS.join(", "),
+        keywordsExclude: DEFAULT_EXCLUDE_KEYWORDS.join(", "),
+        geographyStates: [],
+        minPrice: "",
+        maxPrice: "",
+        minSlips: "",
+        maxSlips: "",
+        pollingIntervalMinutes: "60",
+      });
+      setAddSourceExpanded(false);
       toast({ title: "Source added", description: "New listing source added successfully." });
     },
     onError: () => {
@@ -405,48 +489,227 @@ export function MarketIntelTab() {
 
                 <Separator />
 
-                <div className="space-y-3">
-                  <h4 className="text-sm font-medium">Add Custom Source</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <Input
-                      placeholder="Platform name (e.g., Custom Broker)"
-                      value={newSourceForm.platform}
-                      onChange={(e) => setNewSourceForm(prev => ({ ...prev, platform: e.target.value }))}
-                      data-testid="input-new-source-platform"
-                    />
-                    <Input
-                      placeholder="Display name"
-                      value={newSourceForm.name}
-                      onChange={(e) => setNewSourceForm(prev => ({ ...prev, name: e.target.value }))}
-                      data-testid="input-new-source-name"
-                    />
-                    <Input
-                      placeholder="Search URL"
-                      value={newSourceForm.searchUrl}
-                      onChange={(e) => setNewSourceForm(prev => ({ ...prev, searchUrl: e.target.value }))}
-                      data-testid="input-new-source-url"
-                    />
+                <Collapsible open={addSourceExpanded} onOpenChange={setAddSourceExpanded}>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium">Add Custom Source</h4>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" data-testid="button-toggle-add-source">
+                        {addSourceExpanded ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </CollapsibleTrigger>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addSourceMutation.mutate(newSourceForm)}
-                    disabled={
-                      addSourceMutation.isPending || 
-                      !newSourceForm.platform || 
-                      !newSourceForm.name || 
-                      !newSourceForm.searchUrl
-                    }
-                    data-testid="button-add-source"
-                  >
-                    {addSourceMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Plus className="h-4 w-4 mr-2" />
-                    )}
-                    Add Source
-                  </Button>
-                </div>
+                  
+                  <CollapsibleContent className="space-y-4 mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Platform</Label>
+                        <Input
+                          placeholder="e.g., LoopNet, Custom Broker"
+                          value={newSourceForm.platform}
+                          onChange={(e) => setNewSourceForm(prev => ({ ...prev, platform: e.target.value }))}
+                          data-testid="input-new-source-platform"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Display Name</Label>
+                        <Input
+                          placeholder="My Marina Source"
+                          value={newSourceForm.name}
+                          onChange={(e) => setNewSourceForm(prev => ({ ...prev, name: e.target.value }))}
+                          data-testid="input-new-source-name"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Search URL</Label>
+                        <Input
+                          placeholder="https://example.com/search"
+                          value={newSourceForm.searchUrl}
+                          onChange={(e) => setNewSourceForm(prev => ({ ...prev, searchUrl: e.target.value }))}
+                          data-testid="input-new-source-url"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Ingestion Method</Label>
+                        <Select
+                          value={newSourceForm.ingestionMethod}
+                          onValueChange={(value) => setNewSourceForm(prev => ({ ...prev, ingestionMethod: value }))}
+                        >
+                          <SelectTrigger data-testid="select-ingestion-method">
+                            <SelectValue placeholder="Select method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="scraping">Web Scraping</SelectItem>
+                            <SelectItem value="api">API Access</SelectItem>
+                            <SelectItem value="rss">RSS Feed</SelectItem>
+                            <SelectItem value="manual">Manual Import</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Property Type</Label>
+                        <Select
+                          value={newSourceForm.propertyType}
+                          onValueChange={(value) => setNewSourceForm(prev => ({ ...prev, propertyType: value }))}
+                        >
+                          <SelectTrigger data-testid="select-property-type">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="marina">Marina</SelectItem>
+                            <SelectItem value="boatyard">Boatyard</SelectItem>
+                            <SelectItem value="yacht_club">Yacht Club</SelectItem>
+                            <SelectItem value="waterfront">Waterfront Property</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Keywords to Include (comma-separated)</Label>
+                      <Input
+                        placeholder="marina, boatyard, yacht club..."
+                        value={newSourceForm.keywordsInclude}
+                        onChange={(e) => setNewSourceForm(prev => ({ ...prev, keywordsInclude: e.target.value }))}
+                        data-testid="input-keywords-include"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Keywords to Exclude (comma-separated)</Label>
+                      <Input
+                        placeholder="rv storage, warehouse..."
+                        value={newSourceForm.keywordsExclude}
+                        onChange={(e) => setNewSourceForm(prev => ({ ...prev, keywordsExclude: e.target.value }))}
+                        data-testid="input-keywords-exclude"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">States to Monitor</Label>
+                      <div className="flex flex-wrap gap-1 p-2 border rounded-md min-h-[40px]">
+                        {US_STATES.map(state => (
+                          <Badge
+                            key={state}
+                            variant={newSourceForm.geographyStates.includes(state) ? "default" : "outline"}
+                            className="cursor-pointer text-xs"
+                            onClick={() => {
+                              setNewSourceForm(prev => ({
+                                ...prev,
+                                geographyStates: prev.geographyStates.includes(state)
+                                  ? prev.geographyStates.filter(s => s !== state)
+                                  : [...prev.geographyStates, state]
+                              }));
+                            }}
+                            data-testid={`badge-state-${state}`}
+                          >
+                            {state}
+                          </Badge>
+                        ))}
+                      </div>
+                      {newSourceForm.geographyStates.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Selected: {newSourceForm.geographyStates.join(", ")}
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="h-auto p-0 ml-2 text-xs"
+                            onClick={() => setNewSourceForm(prev => ({ ...prev, geographyStates: [] }))}
+                          >
+                            Clear
+                          </Button>
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Min Price ($)</Label>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={newSourceForm.minPrice}
+                          onChange={(e) => setNewSourceForm(prev => ({ ...prev, minPrice: e.target.value }))}
+                          data-testid="input-min-price"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Max Price ($)</Label>
+                        <Input
+                          type="number"
+                          placeholder="No limit"
+                          value={newSourceForm.maxPrice}
+                          onChange={(e) => setNewSourceForm(prev => ({ ...prev, maxPrice: e.target.value }))}
+                          data-testid="input-max-price"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Min Slips</Label>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={newSourceForm.minSlips}
+                          onChange={(e) => setNewSourceForm(prev => ({ ...prev, minSlips: e.target.value }))}
+                          data-testid="input-min-slips"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Max Slips</Label>
+                        <Input
+                          type="number"
+                          placeholder="No limit"
+                          value={newSourceForm.maxSlips}
+                          onChange={(e) => setNewSourceForm(prev => ({ ...prev, maxSlips: e.target.value }))}
+                          data-testid="input-max-slips"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Polling Interval (minutes)</Label>
+                      <Select
+                        value={newSourceForm.pollingIntervalMinutes}
+                        onValueChange={(value) => setNewSourceForm(prev => ({ ...prev, pollingIntervalMinutes: value }))}
+                      >
+                        <SelectTrigger className="w-48" data-testid="select-polling-interval">
+                          <SelectValue placeholder="Select interval" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="15">Every 15 minutes</SelectItem>
+                          <SelectItem value="30">Every 30 minutes</SelectItem>
+                          <SelectItem value="60">Hourly</SelectItem>
+                          <SelectItem value="360">Every 6 hours</SelectItem>
+                          <SelectItem value="1440">Daily</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <Button
+                      variant="default"
+                      onClick={() => addSourceMutation.mutate(newSourceForm)}
+                      disabled={
+                        addSourceMutation.isPending || 
+                        !newSourceForm.platform || 
+                        !newSourceForm.name || 
+                        !newSourceForm.searchUrl
+                      }
+                      data-testid="button-add-source"
+                    >
+                      {addSourceMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-2" />
+                      )}
+                      Add Source
+                    </Button>
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
             </CardContent>
           </CollapsibleContent>

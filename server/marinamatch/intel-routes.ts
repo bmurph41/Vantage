@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { db } from "../db";
 import { eq, and, desc, asc, sql, gte, lte, like, or, isNull, inArray } from "drizzle-orm";
 import crypto from "crypto";
+import multer from "multer";
+import Papa from "papaparse";
 import {
   marinaListings,
   investmentCriteriaProfiles,
@@ -35,6 +37,7 @@ import {
   type MarinaScrapeSource,
 } from "@shared/schema";
 import { getScrapeStatus, ensureListingsExist, getLastScrapeRun } from "./services/intel-cron";
+import { PLATFORM_CAPABILITIES, getPlatformCapabilities, getRecommendedMethod } from "./services/cre-scraper";
 const router = Router();
 
 function getOrgId(req: Request): string | null {
@@ -55,6 +58,34 @@ function generateListingDedupeHash(listing: Partial<MarinaListing>): string {
   const input = `${source}|${normalizedName}|${normalizedAddress}|${city}|${state}`;
   return crypto.createHash("md5").update(input).digest("hex");
 }
+
+// ============================================
+// PLATFORM CAPABILITIES
+// ============================================
+
+router.get("/platform-capabilities", async (req: Request, res: Response) => {
+  try {
+    const { platform } = req.query;
+    
+    if (platform) {
+      const capabilities = getPlatformCapabilities(platform as string);
+      const recommendedMethod = getRecommendedMethod(platform as string);
+      res.json({ ...capabilities, recommendedMethod });
+    } else {
+      res.json({
+        platforms: Object.values(PLATFORM_CAPABILITIES),
+        summary: {
+          totalPlatforms: Object.keys(PLATFORM_CAPABILITIES).length,
+          platformsWithAPI: Object.values(PLATFORM_CAPABILITIES).filter(p => p.apiInfo?.available).length,
+          blockedPlatforms: Object.values(PLATFORM_CAPABILITIES).filter(p => p.scrapingStatus === "blocked").length,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching platform capabilities:", error);
+    res.status(500).json({ error: "Failed to fetch platform capabilities" });
+  }
+});
 
 // ============================================
 // MARINA LISTINGS (Scraped Data)
@@ -520,8 +551,59 @@ router.post("/scrape-sources", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
-    const validated = insertMarinaScrapeSourceSchema.parse({ ...req.body, orgId });
-    const [source] = await db.insert(marinaScrapeources).values(validated).returning();
+    const {
+      platform,
+      name,
+      baseUrl,
+      searchUrl,
+      config,
+      rateLimitRpm,
+      respectRobotsTxt,
+      userAgent,
+      isActive,
+      ingestionMethod,
+      propertyType,
+      keywordsInclude,
+      keywordsExclude,
+      geographyStates,
+      geographyRegion,
+      geographyRadius,
+      minPrice,
+      maxPrice,
+      minSlips,
+      maxSlips,
+      pollingIntervalMinutes,
+      capabilities,
+      capabilityNotes,
+    } = req.body;
+
+    const [source] = await db.insert(marinaScrapeources).values({
+      orgId,
+      platform,
+      name,
+      baseUrl,
+      searchUrl,
+      config,
+      rateLimitRpm: rateLimitRpm || 30,
+      respectRobotsTxt: respectRobotsTxt ?? true,
+      userAgent: userAgent || "MarinaMatchBot/1.0",
+      isActive: isActive ?? true,
+      ingestionMethod: ingestionMethod || "scraping",
+      propertyType: propertyType || "marina",
+      keywordsInclude: keywordsInclude || ["marina", "boatyard", "yacht club", "boat slip", "dock", "waterfront marina"],
+      keywordsExclude: keywordsExclude || ["rv storage", "self-storage", "warehouse", "mini storage"],
+      geographyStates: geographyStates || null,
+      geographyRegion: geographyRegion || null,
+      geographyRadius: geographyRadius || null,
+      minPrice: minPrice || null,
+      maxPrice: maxPrice || null,
+      minSlips: minSlips || null,
+      maxSlips: maxSlips || null,
+      pollingIntervalMinutes: pollingIntervalMinutes || 60,
+      capabilities: capabilities || ["scraping"],
+      capabilityNotes: capabilityNotes || null,
+    }).returning();
+    
     res.status(201).json(source);
   } catch (error: any) {
     console.error("Error creating scrape source:", error);
@@ -534,10 +616,27 @@ router.patch("/scrape-sources/:id", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
-    const validated = updateMarinaScrapeSourceSchema.parse(req.body);
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    
+    const allowedFields = [
+      "platform", "name", "baseUrl", "searchUrl", "config",
+      "rateLimitRpm", "respectRobotsTxt", "userAgent", "isActive",
+      "ingestionMethod", "propertyType", "keywordsInclude", "keywordsExclude",
+      "geographyStates", "geographyRegion", "geographyRadius",
+      "minPrice", "maxPrice", "minSlips", "maxSlips",
+      "pollingIntervalMinutes", "capabilities", "capabilityNotes",
+      "lastSeenListingId", "lastSeenContentHash", "lastDeltaCheckAt",
+    ];
+    
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+
     const [updated] = await db
       .update(marinaScrapeources)
-      .set({ ...validated, updatedAt: new Date() })
+      .set(updateData)
       .where(and(eq(marinaScrapeources.id, req.params.id), eq(marinaScrapeources.orgId, orgId)))
       .returning();
 
@@ -1138,6 +1237,269 @@ router.post("/seed-demo-data", async (req: Request, res: Response) => {
     console.error("Error seeding demo data:", error);
     res.status(500).json({ error: error.message || "Failed to seed demo data" });
   }
+});
+
+// ============================================
+// CSV IMPORT FOR MANUAL LISTING UPLOADS
+// ============================================
+
+// Multer configuration for CSV uploads
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "text/csv" || file.originalname.endsWith(".csv")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only CSV files are allowed"));
+    }
+  },
+});
+
+// CSV column mapping for marina listings
+interface CSVListingRow {
+  title?: string;
+  name?: string;
+  property_name?: string;
+  address?: string;
+  property_address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  zipCode?: string;
+  zip_code?: string;
+  asking_price?: string;
+  askingPrice?: string;
+  price?: string;
+  total_slips?: string;
+  totalSlips?: string;
+  slips?: string;
+  wet_slips?: string;
+  wetSlips?: string;
+  dry_storage?: string;
+  dryStorage?: string;
+  gross_revenue?: string;
+  grossRevenue?: string;
+  revenue?: string;
+  noi?: string;
+  cap_rate?: string;
+  capRate?: string;
+  occupancy_rate?: string;
+  occupancyRate?: string;
+  occupancy?: string;
+  acreage?: string;
+  water_frontage?: string;
+  waterFrontage?: string;
+  water_depth?: string;
+  waterDepth?: string;
+  has_fuel?: string;
+  hasFuel?: string;
+  fuel?: string;
+  has_ship_store?: string;
+  hasShipStore?: string;
+  ship_store?: string;
+  has_repair_shop?: string;
+  hasRepairShop?: string;
+  repair?: string;
+  has_dry_storage?: string;
+  hasDryStorage?: string;
+  broker_name?: string;
+  brokerName?: string;
+  broker_company?: string;
+  brokerCompany?: string;
+  broker_phone?: string;
+  brokerPhone?: string;
+  broker_email?: string;
+  brokerEmail?: string;
+  source_url?: string;
+  sourceUrl?: string;
+  url?: string;
+  description?: string;
+  notes?: string;
+  listing_date?: string;
+  listingDate?: string;
+}
+
+function parseBoolean(value: string | undefined): boolean | undefined {
+  if (!value) return undefined;
+  const lower = value.toLowerCase().trim();
+  if (["true", "yes", "1", "y"].includes(lower)) return true;
+  if (["false", "no", "0", "n"].includes(lower)) return false;
+  return undefined;
+}
+
+function parseNumber(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const cleaned = value.replace(/[$,]/g, "").trim();
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? undefined : num;
+}
+
+function parseInteger(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const cleaned = value.replace(/[$,]/g, "").trim();
+  const num = parseInt(cleaned, 10);
+  return isNaN(num) ? undefined : num;
+}
+
+function mapCSVRowToListing(row: CSVListingRow, orgId: string, sourceId?: string): Partial<typeof marinaListings.$inferInsert> {
+  const title = row.title || row.name || row.property_name || "Unnamed Listing";
+  const propertyName = row.property_name || row.name || title;
+  const propertyAddress = row.address || row.property_address || "";
+  const city = row.city || "";
+  const state = row.state || "";
+  const sourcePlatform = "CSV Import";
+  
+  const dedupeHash = crypto.createHash("md5").update(
+    `${sourcePlatform.toLowerCase()}|${propertyName.toLowerCase()}|${propertyAddress.toLowerCase()}|${city.toLowerCase()}|${state.toLowerCase()}`
+  ).digest("hex");
+  
+  return {
+    id: `listing-${crypto.randomUUID()}`,
+    orgId,
+    title,
+    propertyName,
+    propertyAddress,
+    city,
+    state,
+    zipCode: row.zip || row.zipCode || row.zip_code,
+    askingPrice: parseNumber(row.asking_price || row.askingPrice || row.price)?.toString(),
+    totalSlips: parseInteger(row.total_slips || row.totalSlips || row.slips),
+    wetSlips: parseInteger(row.wet_slips || row.wetSlips),
+    dryStorageSpaces: parseInteger(row.dry_storage || row.dryStorage),
+    grossRevenue: parseNumber(row.gross_revenue || row.grossRevenue || row.revenue)?.toString(),
+    noi: parseNumber(row.noi)?.toString(),
+    capRate: parseNumber(row.cap_rate || row.capRate)?.toString(),
+    occupancyRate: parseNumber(row.occupancy_rate || row.occupancyRate || row.occupancy)?.toString(),
+    acreage: parseNumber(row.acreage)?.toString(),
+    waterFrontage: parseNumber(row.water_frontage || row.waterFrontage)?.toString(),
+    waterDepth: parseNumber(row.water_depth || row.waterDepth)?.toString(),
+    hasFuel: parseBoolean(row.has_fuel || row.hasFuel || row.fuel),
+    hasShipStore: parseBoolean(row.has_ship_store || row.hasShipStore || row.ship_store),
+    hasRepairShop: parseBoolean(row.has_repair_shop || row.hasRepairShop || row.repair),
+    hasDryStorage: parseBoolean(row.has_dry_storage || row.hasDryStorage),
+    brokerName: row.broker_name || row.brokerName,
+    brokerCompany: row.broker_company || row.brokerCompany,
+    brokerPhone: row.broker_phone || row.brokerPhone,
+    brokerEmail: row.broker_email || row.brokerEmail,
+    sourceUrl: row.source_url || row.sourceUrl || row.url || "",
+    sourcePlatform,
+    originalDescription: row.description || row.notes,
+    listingDate: row.listing_date || row.listingDate ? new Date(row.listing_date || row.listingDate!) : undefined,
+    attributionText: `Manually imported from CSV on ${new Date().toISOString().split("T")[0]}`,
+    status: "active",
+    dedupeHash,
+    scrapeSourceId: sourceId,
+  };
+}
+
+// CSV import endpoint
+router.post("/import/csv", csvUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+    
+    if (!req.file) {
+      return res.status(400).json({ error: "No CSV file uploaded" });
+    }
+    
+    const csvContent = req.file.buffer.toString("utf-8");
+    const sourceId = req.body.sourceId; // Optional: link to a source
+    
+    const parseResult = Papa.parse<CSVListingRow>(csvContent, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => header.toLowerCase().trim().replace(/\s+/g, "_"),
+    });
+    
+    if (parseResult.errors.length > 0) {
+      return res.status(400).json({ 
+        error: "CSV parsing errors",
+        details: parseResult.errors.slice(0, 5),
+      });
+    }
+    
+    const results = {
+      total: parseResult.data.length,
+      imported: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [] as string[],
+    };
+    
+    for (const row of parseResult.data) {
+      try {
+        const listingData = mapCSVRowToListing(row, orgId, sourceId);
+        
+        // Check for duplicate by dedupe hash
+        const [existing] = await db
+          .select()
+          .from(marinaListings)
+          .where(and(
+            eq(marinaListings.orgId, orgId),
+            eq(marinaListings.dedupeHash, listingData.dedupeHash!)
+          ))
+          .limit(1);
+        
+        if (existing) {
+          // Update existing listing
+          await db
+            .update(marinaListings)
+            .set({
+              ...listingData,
+              id: undefined, // Don't update ID
+              orgId: undefined, // Don't update orgId
+              dedupeHash: undefined, // Don't update dedupe hash
+              updatedAt: new Date(),
+            })
+            .where(eq(marinaListings.id, existing.id));
+          results.updated++;
+        } else {
+          // Insert new listing
+          await db.insert(marinaListings).values(listingData as any);
+          results.imported++;
+        }
+      } catch (error: any) {
+        results.skipped++;
+        results.errors.push(`Row ${results.imported + results.updated + results.skipped}: ${error.message}`);
+      }
+    }
+    
+    // Update source stats if sourceId provided
+    if (sourceId) {
+      await db
+        .update(marinaScrapeources)
+        .set({
+          totalListingsFound: sql`${marinaScrapeources.totalListingsFound} + ${results.imported}`,
+          lastScrapeAt: new Date(),
+          lastScrapeStatus: "completed",
+          lastScrapeCount: results.imported + results.updated,
+          updatedAt: new Date(),
+        })
+        .where(eq(marinaScrapeources.id, sourceId));
+    }
+    
+    res.json({
+      success: true,
+      message: `CSV import completed: ${results.imported} new, ${results.updated} updated, ${results.skipped} skipped`,
+      results,
+    });
+  } catch (error: any) {
+    console.error("Error importing CSV:", error);
+    res.status(500).json({ error: error.message || "Failed to import CSV" });
+  }
+});
+
+// Get CSV template
+router.get("/import/template", async (req: Request, res: Response) => {
+  const template = [
+    "title,property_name,address,city,state,zip,asking_price,total_slips,wet_slips,dry_storage,gross_revenue,noi,cap_rate,occupancy,acreage,has_fuel,has_ship_store,has_repair_shop,broker_name,broker_company,broker_phone,broker_email,source_url,description",
+    "Marina Del Sol,Marina Del Sol,123 Harbor Dr,Miami,FL,33101,5500000,150,120,30,1200000,550000,10.0,95,5.5,yes,yes,no,John Smith,ABC Realty,555-0123,john@abc.com,https://example.com,Beautiful marina property",
+  ].join("\n");
+  
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", "attachment; filename=marina_listings_template.csv");
+  res.send(template);
 });
 
 export default router;
