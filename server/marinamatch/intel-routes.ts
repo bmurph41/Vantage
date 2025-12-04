@@ -417,6 +417,176 @@ router.get("/broker-listings", async (req: Request, res: Response) => {
 });
 
 // ============================================
+// ADMIN BULK IMPORT (Curated Data)
+// ============================================
+
+interface BulkListingImport {
+  title: string;
+  propertyName?: string;
+  propertyAddress?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  marinaType?: string;
+  dealType?: string;
+  askingPrice?: number | string;
+  totalSlips?: number;
+  wetSlips?: number;
+  dryStorageSpaces?: number;
+  acreage?: number | string;
+  waterFrontage?: number | string;
+  hasFuel?: boolean;
+  hasShipStore?: boolean;
+  hasRestaurant?: boolean;
+  hasRepairShop?: boolean;
+  hasDryStorage?: boolean;
+  hasBoatRamp?: boolean;
+  grossRevenue?: number | string;
+  noi?: number | string;
+  capRate?: number | string;
+  occupancyRate?: number | string;
+  brokerName?: string;
+  brokerCompany?: string;
+  brokerPhone?: string;
+  brokerEmail?: string;
+  originalDescription?: string;
+  sourceUrl?: string;
+  sourceListingId?: string;
+  sourcePlatform?: string;
+  listingDate?: string;
+  images?: string[];
+}
+
+router.post("/admin/bulk-import", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { listings, source = "manual_import", attributionPrefix = "Manual Import" } = req.body as {
+      listings: BulkListingImport[];
+      source?: string;
+      attributionPrefix?: string;
+    };
+
+    if (!listings || !Array.isArray(listings)) {
+      return res.status(400).json({ error: "listings array is required" });
+    }
+
+    if (listings.length === 0) {
+      return res.status(400).json({ error: "listings array cannot be empty" });
+    }
+
+    if (listings.length > 100) {
+      return res.status(400).json({ error: "Maximum 100 listings per import" });
+    }
+
+    const toNumericString = (val: any): string | null => {
+      if (val === null || val === undefined || val === "") return null;
+      const num = typeof val === "string" ? parseFloat(val.replace(/[^0-9.-]/g, "")) : val;
+      return isNaN(num) ? null : String(num);
+    };
+
+    const results: { imported: number; updated: number; failed: number; errors: string[] } = {
+      imported: 0,
+      updated: 0,
+      failed: 0,
+      errors: [],
+    };
+
+    for (const item of listings) {
+      try {
+        if (!item.title) {
+          results.failed++;
+          results.errors.push(`Missing title for listing`);
+          continue;
+        }
+
+        const sourcePlatform = item.sourcePlatform || source;
+        const sourceUrl = item.sourceUrl || `#${sourcePlatform}-${Date.now()}`;
+        const sourceListingId = item.sourceListingId || `${sourcePlatform.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        const listingData = {
+          orgId,
+          sourcePlatform,
+          sourceUrl,
+          sourceListingId,
+          title: item.title,
+          propertyName: item.propertyName || item.title,
+          propertyAddress: item.propertyAddress || null,
+          city: item.city || null,
+          state: item.state || null,
+          zipCode: item.zipCode || null,
+          marinaType: item.marinaType || "marina",
+          propertyType: "marina",
+          dealType: item.dealType || "acquisition",
+          askingPrice: toNumericString(item.askingPrice),
+          totalSlips: item.totalSlips || null,
+          wetSlips: item.wetSlips || null,
+          dryStorageSpaces: item.dryStorageSpaces || null,
+          acreage: toNumericString(item.acreage),
+          waterFrontage: toNumericString(item.waterFrontage),
+          hasFuel: item.hasFuel || false,
+          hasShipStore: item.hasShipStore || false,
+          hasRestaurant: item.hasRestaurant || false,
+          hasRepairShop: item.hasRepairShop || false,
+          hasDryStorage: item.hasDryStorage || false,
+          hasBoatRamp: item.hasBoatRamp || false,
+          grossRevenue: toNumericString(item.grossRevenue),
+          noi: toNumericString(item.noi),
+          capRate: toNumericString(item.capRate),
+          occupancyRate: toNumericString(item.occupancyRate),
+          brokerName: item.brokerName || null,
+          brokerCompany: item.brokerCompany || null,
+          brokerPhone: item.brokerPhone || null,
+          brokerEmail: item.brokerEmail || null,
+          originalDescription: item.originalDescription || null,
+          images: item.images || null,
+          attributionText: `${attributionPrefix} - ${item.brokerCompany || item.brokerName || sourcePlatform}`,
+          status: "active",
+          isReviewed: false,
+          listingDate: item.listingDate ? new Date(item.listingDate) : new Date(),
+          lastScrapedAt: new Date(),
+        };
+
+        const dedupeHash = generateListingDedupeHash(listingData);
+
+        const [existing] = await db
+          .select()
+          .from(marinaListings)
+          .where(and(eq(marinaListings.orgId, orgId), eq(marinaListings.dedupeHash, dedupeHash)))
+          .limit(1);
+
+        if (existing) {
+          await db
+            .update(marinaListings)
+            .set({ ...listingData, updatedAt: new Date() })
+            .where(eq(marinaListings.id, existing.id));
+          results.updated++;
+        } else {
+          const validated = insertMarinaListingSchema.parse({ ...listingData, dedupeHash });
+          const [newListing] = await db.insert(marinaListings).values(validated).returning();
+          await scoreListingAgainstCriteria(newListing.id, orgId);
+          results.imported++;
+        }
+      } catch (itemError: any) {
+        results.failed++;
+        results.errors.push(`Error importing "${item.title}": ${itemError.message}`);
+      }
+    }
+
+    res.json({
+      success: true,
+      results,
+      message: `Imported ${results.imported} new listings, updated ${results.updated}, ${results.failed} failed`,
+    });
+  } catch (error: any) {
+    console.error("Error in bulk import:", error);
+    res.status(400).json({ error: error.message || "Failed to import listings" });
+  }
+});
+
+// ============================================
 // INVESTMENT CRITERIA PROFILES
 // ============================================
 
