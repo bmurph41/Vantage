@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Target, Users, TrendingUp, Rss, FileText, BarChart3, Radar, Goal, Settings2 } from "lucide-react";
+import { Building2, Target, Users, TrendingUp, Rss, FileText, BarChart3, Radar, Goal, Settings2, Briefcase } from "lucide-react";
 import { DealSourcesTab } from "./DealSources";
 import { MandatesTab } from "./Mandates";
 import { DealTrackerTab } from "./DealTracker";
@@ -14,14 +14,88 @@ import { MarketIntelTab } from "./MarketIntel";
 import { InvestmentCriteriaTab } from "./InvestmentCriteria";
 import { GoalsDashboard } from "./GoalsDashboard";
 
+function ConsolidatedInvestmentCriteria() {
+  const [subTab, setSubTab] = useState("mandates");
+  
+  return (
+    <div className="space-y-4">
+      <Tabs value={subTab} onValueChange={setSubTab}>
+        <TabsList className="bg-muted/30 p-1">
+          <TabsTrigger value="mandates" className="data-[state=active]:bg-background" data-testid="subtab-mandates">
+            <Target className="h-4 w-4 mr-2" />
+            Investment Mandates
+          </TabsTrigger>
+          <TabsTrigger value="scoring" className="data-[state=active]:bg-background" data-testid="subtab-scoring">
+            <Settings2 className="h-4 w-4 mr-2" />
+            Scoring Criteria
+          </TabsTrigger>
+          <TabsTrigger value="goals" className="data-[state=active]:bg-background" data-testid="subtab-goals">
+            <Goal className="h-4 w-4 mr-2" />
+            Goals
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="mandates" className="mt-4">
+          <MandatesTab />
+        </TabsContent>
+        
+        <TabsContent value="scoring" className="mt-4">
+          <InvestmentCriteriaTab />
+        </TabsContent>
+        
+        <TabsContent value="goals" className="mt-4">
+          <GoalsDashboard />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function DealManagement() {
+  const [subTab, setSubTab] = useState("queue");
+  
+  return (
+    <div className="space-y-4">
+      <Tabs value={subTab} onValueChange={setSubTab}>
+        <TabsList className="bg-muted/30 p-1">
+          <TabsTrigger value="queue" className="data-[state=active]:bg-background" data-testid="subtab-queue">
+            <FileText className="h-4 w-4 mr-2" />
+            Deal Queue
+          </TabsTrigger>
+          <TabsTrigger value="sources" className="data-[state=active]:bg-background" data-testid="subtab-sources">
+            <Rss className="h-4 w-4 mr-2" />
+            Deal Sources
+          </TabsTrigger>
+          <TabsTrigger value="brokers" className="data-[state=active]:bg-background" data-testid="subtab-brokers">
+            <Users className="h-4 w-4 mr-2" />
+            Broker Network
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="queue" className="mt-4">
+          <DealTrackerTab />
+        </TabsContent>
+        
+        <TabsContent value="sources" className="mt-4">
+          <DealSourcesTab />
+        </TabsContent>
+        
+        <TabsContent value="brokers" className="mt-4">
+          <BrokersTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
 export default function MarinaMatchIndex() {
   const [location, setLocation] = useLocation();
   
   const getTabFromUrl = () => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
-    const validTabs = ["overview", "sources", "mandates", "deals", "brokers", "listings", "criteria", "goals"];
-    return tab && validTabs.includes(tab) ? tab : "overview";
+    const validTabs = ["listings", "criteria", "deals", "overview"];
+    return tab && validTabs.includes(tab) ? tab : "listings";
   };
   
   const [activeTab, setActiveTab] = useState(getTabFromUrl);
@@ -32,7 +106,7 @@ export default function MarinaMatchIndex() {
   
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
-    if (newTab === "overview") {
+    if (newTab === "listings") {
       setLocation("/marinamatch");
     } else {
       setLocation(`/marinamatch?tab=${newTab}`);
@@ -62,10 +136,10 @@ export default function MarinaMatchIndex() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground" data-testid="page-title-marinamatch">
-                MarinaMatch Deal Sourcing
+                MarinaMatch Intel
               </h1>
               <p className="text-muted-foreground">
-                Institutional-grade deal flow management with automated scoring
+                AI-powered marina acquisition platform
               </p>
             </div>
           </div>
@@ -73,46 +147,6 @@ export default function MarinaMatchIndex() {
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="bg-muted/50 p-1 h-auto flex-wrap justify-start gap-1">
-            <TabsTrigger 
-              value="overview" 
-              className="data-[state=active]:bg-background"
-              data-testid="tab-overview"
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger 
-              value="sources" 
-              className="data-[state=active]:bg-background"
-              data-testid="tab-sources"
-            >
-              <Rss className="h-4 w-4 mr-2" />
-              Deal Sources
-            </TabsTrigger>
-            <TabsTrigger 
-              value="mandates" 
-              className="data-[state=active]:bg-background"
-              data-testid="tab-mandates"
-            >
-              <Target className="h-4 w-4 mr-2" />
-              Investment Mandates
-            </TabsTrigger>
-            <TabsTrigger 
-              value="deals" 
-              className="data-[state=active]:bg-background"
-              data-testid="tab-deals"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Deal Queue
-            </TabsTrigger>
-            <TabsTrigger 
-              value="brokers" 
-              className="data-[state=active]:bg-background"
-              data-testid="tab-brokers"
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Broker Network
-            </TabsTrigger>
             <TabsTrigger 
               value="listings" 
               className="data-[state=active]:bg-background"
@@ -126,16 +160,24 @@ export default function MarinaMatchIndex() {
               className="data-[state=active]:bg-background"
               data-testid="tab-criteria"
             >
-              <Settings2 className="h-4 w-4 mr-2" />
+              <Target className="h-4 w-4 mr-2" />
               Investment Criteria
             </TabsTrigger>
             <TabsTrigger 
-              value="goals" 
+              value="deals" 
               className="data-[state=active]:bg-background"
-              data-testid="tab-goals"
+              data-testid="tab-deals"
             >
-              <Goal className="h-4 w-4 mr-2" />
-              Goals
+              <Briefcase className="h-4 w-4 mr-2" />
+              Deal Management
+            </TabsTrigger>
+            <TabsTrigger 
+              value="overview" 
+              className="data-[state=active]:bg-background"
+              data-testid="tab-overview"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Overview
             </TabsTrigger>
           </TabsList>
 
@@ -319,32 +361,16 @@ export default function MarinaMatchIndex() {
             </div>
           </TabsContent>
 
-          <TabsContent value="sources">
-            <DealSourcesTab />
-          </TabsContent>
-
-          <TabsContent value="mandates">
-            <MandatesTab />
-          </TabsContent>
-
-          <TabsContent value="deals">
-            <DealTrackerTab />
-          </TabsContent>
-
-          <TabsContent value="brokers">
-            <BrokersTab />
-          </TabsContent>
-
           <TabsContent value="listings">
             <MarketIntelTab />
           </TabsContent>
 
           <TabsContent value="criteria">
-            <InvestmentCriteriaTab />
+            <ConsolidatedInvestmentCriteria />
           </TabsContent>
 
-          <TabsContent value="goals">
-            <GoalsDashboard />
+          <TabsContent value="deals">
+            <DealManagement />
           </TabsContent>
         </Tabs>
       </div>
