@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Users, Edit, Trash2, RefreshCw, Phone, Mail, Building2, DollarSign, MessageSquare, Activity } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Plus, Users, Edit, Trash2, RefreshCw, Phone, Mail, Building2, DollarSign, MessageSquare, Activity, Ship, Link2, Copy, Check, ExternalLink, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -21,6 +22,8 @@ type BrokerRelationship = {
   orgId: string;
   contactName: string;
   company?: string;
+  companyName?: string;
+  primaryContactName?: string;
   email?: string;
   phone?: string;
   tier: "platinum" | "gold" | "silver" | "bronze";
@@ -34,6 +37,9 @@ type BrokerRelationship = {
   avgDealQuality?: string;
   notes?: string;
   isActive: boolean;
+  shareToken?: string | null;
+  portalEnabled?: boolean;
+  portalLastAccessedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -58,6 +64,8 @@ export function BrokersTab() {
   const [editingBroker, setEditingBroker] = useState<BrokerRelationship | null>(null);
   const [selectedBroker, setSelectedBroker] = useState<BrokerRelationship | null>(null);
   const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [submitDealDialogOpen, setSubmitDealDialogOpen] = useState(false);
+  const [sharePortalDialogOpen, setSharePortalDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: brokers, isLoading } = useQuery<BrokerRelationship[]>({
@@ -119,6 +127,72 @@ export function BrokersTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships", selectedBroker?.id, "activity"] });
       setActivityDialogOpen(false);
       toast({ title: "Success", description: "Activity logged" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const submitDealMutation = useMutation({
+    mutationFn: async ({ brokerId, data }: { brokerId: string; data: any }) => {
+      return apiRequest("POST", `/api/marinamatch/broker-relationships/${brokerId}/submit-deal`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/sourced-deals"] });
+      setSubmitDealDialogOpen(false);
+      toast({ 
+        title: "Deal Submitted", 
+        description: "The marina deal has been added to your pipeline" 
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const generateTokenMutation = useMutation({
+    mutationFn: async (brokerId: string) => {
+      const response = await apiRequest("POST", `/api/marinamatch/broker-relationships/${brokerId}/generate-token`);
+      return response;
+    },
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships"] });
+      if (selectedBroker) {
+        setSelectedBroker(prev => prev ? { 
+          ...prev, 
+          shareToken: (data as any).shareToken, 
+          portalEnabled: true 
+        } : null);
+      }
+      toast({ 
+        title: "Portal Link Generated", 
+        description: "Broker can now submit deals via their portal link" 
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const disablePortalMutation = useMutation({
+    mutationFn: async (brokerId: string) => {
+      return apiRequest("POST", `/api/marinamatch/broker-relationships/${brokerId}/disable-portal`);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships"] });
+      if (selectedBroker) {
+        setSelectedBroker(prev => prev ? { 
+          ...prev, 
+          shareToken: null, 
+          portalEnabled: false 
+        } : null);
+      }
+      setSharePortalDialogOpen(false);
+      toast({ 
+        title: "Portal Disabled", 
+        description: "The broker portal link has been deactivated" 
+      });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -358,6 +432,45 @@ export function BrokersTab() {
                 </div>
               </div>
 
+              <Separator />
+              
+              <div className="flex flex-wrap gap-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={() => setSubmitDealDialogOpen(true)}
+                        data-testid="btn-submit-deal"
+                      >
+                        <Ship className="h-4 w-4 mr-2" />
+                        Submit Deal
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Submit a marina deal from this broker</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        onClick={() => setSharePortalDialogOpen(true)}
+                        data-testid="btn-share-portal"
+                      >
+                        <Link2 className="h-4 w-4 mr-2" />
+                        {selectedBroker.portalEnabled ? "Manage Portal" : "Share Portal"}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Generate a shareable link for broker to submit deals</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+
               <DialogFooter className="gap-2">
                 <Button
                   variant="outline"
@@ -423,6 +536,55 @@ export function BrokersTab() {
             }}
             isLoading={logActivityMutation.isPending}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Submit Deal Dialog */}
+      <Dialog open={submitDealDialogOpen} onOpenChange={setSubmitDealDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              <div className="flex items-center gap-2">
+                <Ship className="h-5 w-5" />
+                Submit Deal from {selectedBroker?.contactName || selectedBroker?.primaryContactName}
+              </div>
+            </DialogTitle>
+            <DialogDescription>
+              Add a marina deal submitted by this broker to your pipeline
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBroker && (
+            <SubmitDealForm
+              onSubmit={(data) => submitDealMutation.mutate({ brokerId: selectedBroker.id, data })}
+              isLoading={submitDealMutation.isPending}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Portal Dialog */}
+      <Dialog open={sharePortalDialogOpen} onOpenChange={setSharePortalDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              <div className="flex items-center gap-2">
+                <Link2 className="h-5 w-5" />
+                Broker Portal
+              </div>
+            </DialogTitle>
+            <DialogDescription>
+              Share a portal link with {selectedBroker?.contactName || selectedBroker?.primaryContactName} to let them submit deals directly
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBroker && (
+            <SharePortalContent
+              broker={selectedBroker}
+              onGenerateToken={() => generateTokenMutation.mutate(selectedBroker.id)}
+              onDisablePortal={() => disablePortalMutation.mutate(selectedBroker.id)}
+              isGenerating={generateTokenMutation.isPending}
+              isDisabling={disablePortalMutation.isPending}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -651,5 +813,308 @@ function ActivityForm({
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+const US_STATES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+  "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+];
+
+function SubmitDealForm({
+  onSubmit,
+  isLoading,
+}: {
+  onSubmit: (data: any) => void;
+  isLoading: boolean;
+}) {
+  const [formData, setFormData] = useState({
+    propertyName: "",
+    propertyAddress: "",
+    city: "",
+    state: "",
+    askingPrice: "",
+    totalSlips: "",
+    grossRevenue: "",
+    description: "",
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      ...formData,
+      askingPrice: formData.askingPrice || undefined,
+      totalSlips: formData.totalSlips ? parseInt(formData.totalSlips) : undefined,
+      grossRevenue: formData.grossRevenue || undefined,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="propertyName">Property Name *</Label>
+        <Input
+          id="propertyName"
+          value={formData.propertyName}
+          onChange={(e) => setFormData({ ...formData, propertyName: e.target.value })}
+          placeholder="Sunset Marina"
+          required
+          data-testid="input-deal-property-name"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="propertyAddress">Address</Label>
+        <Input
+          id="propertyAddress"
+          value={formData.propertyAddress}
+          onChange={(e) => setFormData({ ...formData, propertyAddress: e.target.value })}
+          placeholder="123 Harbor Drive"
+          data-testid="input-deal-address"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="city">City</Label>
+          <Input
+            id="city"
+            value={formData.city}
+            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            placeholder="Miami"
+            data-testid="input-deal-city"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="state">State</Label>
+          <Select
+            value={formData.state}
+            onValueChange={(value) => setFormData({ ...formData, state: value })}
+          >
+            <SelectTrigger data-testid="select-deal-state">
+              <SelectValue placeholder="Select state" />
+            </SelectTrigger>
+            <SelectContent>
+              {US_STATES.map((state) => (
+                <SelectItem key={state} value={state}>{state}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="askingPrice">Asking Price ($)</Label>
+          <Input
+            id="askingPrice"
+            value={formData.askingPrice}
+            onChange={(e) => setFormData({ ...formData, askingPrice: e.target.value })}
+            placeholder="2,500,000"
+            data-testid="input-deal-price"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="totalSlips">Total Slips</Label>
+          <Input
+            id="totalSlips"
+            type="number"
+            value={formData.totalSlips}
+            onChange={(e) => setFormData({ ...formData, totalSlips: e.target.value })}
+            placeholder="150"
+            data-testid="input-deal-slips"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="grossRevenue">Annual Gross Revenue ($)</Label>
+        <Input
+          id="grossRevenue"
+          value={formData.grossRevenue}
+          onChange={(e) => setFormData({ ...formData, grossRevenue: e.target.value })}
+          placeholder="500,000"
+          data-testid="input-deal-revenue"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="description">Notes / Description</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          placeholder="Additional details about the marina..."
+          rows={3}
+          data-testid="textarea-deal-description"
+        />
+      </div>
+
+      <DialogFooter>
+        <Button type="submit" disabled={isLoading} data-testid="btn-submit-deal-confirm">
+          {isLoading ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              Submitting...
+            </>
+          ) : (
+            <>
+              <Send className="h-4 w-4 mr-2" />
+              Submit Deal
+            </>
+          )}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+function SharePortalContent({
+  broker,
+  onGenerateToken,
+  onDisablePortal,
+  isGenerating,
+  isDisabling,
+}: {
+  broker: BrokerRelationship;
+  onGenerateToken: () => void;
+  onDisablePortal: () => void;
+  isGenerating: boolean;
+  isDisabling: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
+
+  const portalUrl = broker.shareToken 
+    ? `${window.location.origin}/broker-portal/${broker.shareToken}`
+    : null;
+
+  const copyToClipboard = async () => {
+    if (portalUrl) {
+      try {
+        await navigator.clipboard.writeText(portalUrl);
+        setCopied(true);
+        toast({ title: "Copied!", description: "Portal link copied to clipboard" });
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        toast({ title: "Error", description: "Failed to copy link", variant: "destructive" });
+      }
+    }
+  };
+
+  if (!broker.portalEnabled || !broker.shareToken) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-muted/50 rounded-lg p-4 text-center">
+          <Link2 className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+          <h3 className="font-medium mb-2">Enable Broker Portal</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Generate a unique link that allows {broker.contactName || broker.primaryContactName} to submit marina deals directly to your pipeline.
+          </p>
+          <Button onClick={onGenerateToken} disabled={isGenerating} data-testid="btn-generate-portal-link">
+            {isGenerating ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Link2 className="h-4 w-4 mr-2" />
+                Generate Portal Link
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Check className="h-4 w-4 text-green-600" />
+          <span className="font-medium text-green-700 dark:text-green-400">Portal Active</span>
+        </div>
+        <p className="text-sm text-muted-foreground mb-3">
+          {broker.contactName || broker.primaryContactName} can submit deals using this link
+        </p>
+        
+        <div className="flex gap-2">
+          <Input 
+            value={portalUrl || ""} 
+            readOnly 
+            className="text-xs font-mono"
+            data-testid="input-portal-url"
+          />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={copyToClipboard}
+                  data-testid="btn-copy-portal-link"
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Copy link</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
+        {broker.portalLastAccessedAt && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Last accessed: {format(new Date(broker.portalLastAccessedAt), "MMM d, yyyy 'at' h:mm a")}
+          </p>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="flex gap-2">
+        <Button 
+          variant="outline" 
+          onClick={onGenerateToken} 
+          disabled={isGenerating}
+          className="flex-1"
+          data-testid="btn-rotate-portal-link"
+        >
+          {isGenerating ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              Rotating...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Rotate Link
+            </>
+          )}
+        </Button>
+        <Button 
+          variant="destructive" 
+          onClick={onDisablePortal} 
+          disabled={isDisabling}
+          className="flex-1"
+          data-testid="btn-disable-portal"
+        >
+          {isDisabling ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              Disabling...
+            </>
+          ) : (
+            "Disable Portal"
+          )}
+        </Button>
+      </div>
+    </div>
   );
 }

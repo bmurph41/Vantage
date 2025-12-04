@@ -135,6 +135,7 @@ const MarketTargets = lazy(() => import("@/pages/prospecting/Markets"));
 const ProspectingCampaigns = lazy(() => import("@/pages/prospecting/Campaigns"));
 const ProspectingAnalytics = lazy(() => import("@/pages/prospecting/Analytics"));
 const MarinaMatchIndex = lazy(() => import("@/pages/marinamatch/Index"));
+const BrokerPortal = lazy(() => import("@/pages/BrokerPortal"));
 const ActivityLog = lazy(() => import("@/pages/activity"));
 
 // Exit Strategy Suite pages
@@ -1149,6 +1150,15 @@ function Router() {
       {/* Demo Routes */}
       <Route path="/demo/sortable" component={SortableListDemo} />
       <Route path="/demo/milestone" component={MilestoneDemo} />
+      
+      {/* Public Broker Portal (no auth required) */}
+      <Route path="/broker-portal/:token">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <BrokerPortal />
+          </Suspense>
+        )}
+      </Route>
       
       {/* 404 */}
       <Route component={NotFound} />

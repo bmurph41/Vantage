@@ -351,7 +351,7 @@ export default function MarinaMatchIndex() {
           </TabsList>
 
           <TabsContent value="listings">
-            <MarketIntelTab />
+            <MarketIntelTab onNavigateToBrokers={() => handleTabChange("deals")} />
           </TabsContent>
 
           <TabsContent value="criteria">

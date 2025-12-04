@@ -966,7 +966,7 @@ router.post("/broker-relationships/:id/disable-portal", requireProspecting, asyn
   }
 });
 
-// Get broker portal submissions (pending review)
+// Get broker portal submissions (pending review) - REQUIRES AUTH
 router.get("/broker-portal-submissions", requireProspecting, async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
