@@ -588,14 +588,40 @@ export async function runScrapeJob(
   totalFound: number;
   newListings: number;
   updatedListings: number;
+  filteredOut: number;
   errors: string[];
 }> {
   const results = {
     totalFound: 0,
     newListings: 0,
     updatedListings: 0,
+    filteredOut: 0,
     errors: [] as string[],
   };
+  
+  // Fetch active source configurations for the org
+  const activeSources = await db
+    .select()
+    .from(marinaScrapeources)
+    .where(and(eq(marinaScrapeources.orgId, orgId), eq(marinaScrapeources.isActive, true)));
+  
+  // Build a map of platform to source config for filtering
+  const platformConfigs: Record<string, SourceConfig> = {};
+  const platformSources: Record<string, any> = {};
+  
+  for (const source of activeSources) {
+    const platformKey = source.platform.toLowerCase();
+    platformConfigs[platformKey] = {
+      keywordsInclude: source.keywordsInclude || DEFAULT_MARINA_KEYWORDS,
+      keywordsExclude: source.keywordsExclude || DEFAULT_EXCLUDE_KEYWORDS,
+      geographyStates: source.geographyStates || undefined,
+      minPrice: source.minPrice ? parseFloat(source.minPrice) : undefined,
+      maxPrice: source.maxPrice ? parseFloat(source.maxPrice) : undefined,
+      minSlips: source.minSlips || undefined,
+      maxSlips: source.maxSlips || undefined,
+    };
+    platformSources[platformKey] = source;
+  }
   
   const [scrapeRun] = await db.insert(marinaScrapeRuns).values({
     orgId,
@@ -605,10 +631,20 @@ export async function runScrapeJob(
   }).returning();
   
   try {
-    const allListings: Array<{ data: ListingData; platform: string }> = [];
+    const allListings: Array<{ data: ListingData; platform: string; sourceId?: string }> = [];
     
     for (const platform of platforms) {
       try {
+        const platformKey = platform.toLowerCase();
+        const sourceConfig = platformConfigs[platformKey];
+        const source = platformSources[platformKey];
+        
+        // Skip if source is configured but not active
+        if (source && !source.isActive) {
+          console.log(`[${platform}] Source is disabled, skipping`);
+          continue;
+        }
+        
         let platformListings: ListingData[] = [];
         
         switch (platform) {
@@ -628,7 +664,48 @@ export async function runScrapeJob(
             console.log(`[${platform}] Unknown platform`);
         }
         
-        platformListings.forEach(l => allListings.push({ data: l, platform }));
+        // Apply source configuration filters if available
+        if (sourceConfig && platformListings.length > 0) {
+          console.log(`[${platform}] Applying source filters...`);
+          const beforeCount = platformListings.length;
+          
+          const filteredListings = platformListings.filter(listing => {
+            const filterResult = applyMarinaKeywordFilter(listing, sourceConfig);
+            return filterResult.include;
+          });
+          
+          const filteredOutCount = beforeCount - filteredListings.length;
+          results.filteredOut += filteredOutCount;
+          
+          if (filteredOutCount > 0) {
+            console.log(`[${platform}] Filtered out ${filteredOutCount} listings that don't match criteria`);
+          }
+          
+          platformListings = filteredListings;
+        }
+        
+        platformListings.forEach(l => allListings.push({ 
+          data: l, 
+          platform,
+          sourceId: source?.id 
+        }));
+        
+        // Update delta tracking on source if configured
+        if (source && platformListings.length > 0) {
+          const lastListing = platformListings[platformListings.length - 1];
+          const contentHash = generateContentHash(lastListing);
+          
+          await db
+            .update(marinaScrapeources)
+            .set({
+              lastSeenListingId: lastListing.sourceListingId || null,
+              lastSeenContentHash: contentHash,
+              lastDeltaCheckAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(marinaScrapeources.id, source.id));
+        }
+        
       } catch (error: any) {
         results.errors.push(`${platform}: ${error.message}`);
       }
@@ -725,7 +802,11 @@ export async function runScrapeJob(
         errorsCount: results.errors.length,
         completedAt: new Date(),
         durationMs: Date.now() - scrapeRun.startedAt!.getTime(),
-        details: { errors: results.errors },
+        details: { 
+          errors: results.errors,
+          filteredOut: results.filteredOut,
+          sourcesUsed: Object.keys(platformConfigs).length,
+        },
       })
       .where(eq(marinaScrapeRuns.id, scrapeRun.id));
     
