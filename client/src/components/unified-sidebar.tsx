@@ -31,12 +31,9 @@ const dealManagementNav = [
   { name: "Forecast", href: "/crm/forecast", icon: TrendingUp },
 ];
 
-// MarinaMatch Navigation (Premium Add-On)
+// MarinaMatch Navigation (Single Entry Point - tabs handle internal navigation)
 const marinamatchNav = [
-  { name: "Overview", href: "/marinamatch", icon: LayoutDashboard },
-  { name: "Available Listings", href: "/marinamatch?tab=listings", icon: Search },
-  { name: "Investment Criteria", href: "/marinamatch?tab=criteria", icon: Target },
-  { name: "Goals", href: "/marinamatch?tab=goals", icon: TrendingUp },
+  { name: "Deal Sourcing", href: "/marinamatch", icon: Target },
 ];
 
 // Prospecting & Outreach Navigation (Premium/Broker Add-On)
