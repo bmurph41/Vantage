@@ -2,7 +2,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MultiSelectDropdown, toMultiSelectOptions } from "@/components/ui/multi-select-dropdown";
-import { ArticleFilters, SourceDistribution } from "../types/article";
+import { ArticleFilters } from "../types/article";
+import { fetchRssSources, type RssSource } from "../lib/api";
 import { formatDistanceToNow } from "date-fns";
 import { Filter, Building2, Save, Globe } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -34,9 +35,10 @@ export default function FilterBar({
     queryKey: ['/api/docktalk/analytics/categories'],
   });
 
-  // Fetch available sources from backend (active RSS sources)
-  const { data: sourceDistribution = [] } = useQuery<SourceDistribution[]>({
-    queryKey: ['/api/docktalk/analytics/sources'],
+  // Fetch all configured RSS sources from backend
+  const { data: rssSources = [] } = useQuery<RssSource[]>({
+    queryKey: ['/api/docktalk/rss-sources'],
+    queryFn: fetchRssSources,
   });
 
   // Check auth status
@@ -93,7 +95,7 @@ export default function FilterBar({
   const selectedSources = filters.sources || [];
   const selectedRegions = filters.regions || [];
   const availableCategories = categoryDistribution.map(c => c.category).sort();
-  const availableSources = sourceDistribution.map(s => s.source).sort();
+  const availableSources = rssSources.map(s => s.name).sort();
   const availableRegions = ["US/Domestic", "International"];
 
   return (
