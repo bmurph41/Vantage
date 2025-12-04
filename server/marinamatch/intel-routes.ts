@@ -120,9 +120,7 @@ router.get("/listings", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
-    // Auto-seed initial listings if none exist
-    await ensureListingsExist(orgId);
-
+    // No auto-seeding - only show real data from configured sources
     const { status, state, source, minScore, sortBy, limit = "50", offset = "0" } = req.query;
 
     let listings = await db

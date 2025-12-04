@@ -472,19 +472,8 @@ async function runAutoScrape(): Promise<void> {
     
     for (const org of orgs) {
       try {
-        // Check if org has any listings - if not, seed initial data
-        const existingListings = await db
-          .select({ id: marinaListings.id })
-          .from(marinaListings)
-          .where(eq(marinaListings.orgId, org.id))
-          .limit(1);
-
-        // Ensure sources exist for the org
+        // Ensure sources exist for the org (but no mock data seeding)
         await ensureSourcesExist(org.id);
-        
-        if (existingListings.length === 0) {
-          await seedInitialListings(org.id);
-        }
 
         // Run actual scraper for the org
         const { runScrapeJob } = await import("./cre-scraper");
@@ -506,20 +495,16 @@ async function runAutoScrape(): Promise<void> {
 
 export async function ensureListingsExist(orgId: string): Promise<boolean> {
   try {
+    // No auto-seeding of demo data - only return true if real listings exist
     const existingListings = await db
       .select({ id: marinaListings.id })
       .from(marinaListings)
       .where(eq(marinaListings.orgId, orgId))
       .limit(1);
 
-    if (existingListings.length === 0) {
-      const seeded = await seedInitialListings(orgId);
-      return seeded > 0;
-    }
-    
-    return true;
+    return existingListings.length > 0;
   } catch (error) {
-    console.error("[MarinaMatch Intel] Error ensuring listings exist:", error);
+    console.error("[MarinaMatch Intel] Error checking listings:", error);
     return false;
   }
 }
