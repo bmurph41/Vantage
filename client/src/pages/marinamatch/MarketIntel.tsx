@@ -1304,29 +1304,54 @@ export function MarketIntelTab() {
                 </>
               ) : listings?.length === 0 && !searchTerm && stateFilter === "all" && sourceFilter === "all" ? (
                 <>
-                  <Radar className="h-12 w-12 mx-auto text-primary/50 mb-4" />
-                  <p className="text-lg font-medium">Scanning for Marina Listings</p>
-                  <p className="text-muted-foreground max-w-md mx-auto">
-                    The system is monitoring LoopNet, Crexi, BizBuySell, and CoStar for marina listings. 
-                    New listings will appear here automatically as they are discovered.
+                  <Anchor className="h-16 w-16 mx-auto text-primary/30 mb-6" />
+                  <p className="text-xl font-semibold mb-2">No Marina Listings Yet</p>
+                  <p className="text-muted-foreground max-w-lg mx-auto mb-2">
+                    Your listing feed is empty. Major commercial real estate platforms (LoopNet, Crexi, CoStar) 
+                    require API partnerships for automated access.
                   </p>
-                  <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <p className="text-sm text-muted-foreground max-w-lg mx-auto">
+                    Get started by submitting listings directly from brokers, or contact the MarinaMatch team 
+                    about API partnerships with listing platforms.
+                  </p>
+                  
+                  <div className="mt-8 p-6 bg-primary/5 rounded-lg border-2 border-dashed border-primary/30 max-w-md mx-auto">
+                    <h4 className="font-semibold text-lg mb-2 flex items-center justify-center gap-2">
+                      <Plus className="h-5 w-5 text-primary" />
+                      Submit a Listing
+                    </h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Brokers can submit marina listings directly to MarinaMatch for immediate visibility to investors.
+                    </p>
                     <Button 
                       variant="default"
+                      size="lg"
+                      onClick={() => setBrokerSubmitOpen(true)}
+                      className="w-full"
+                      data-testid="button-submit-listing-cta"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Submit Broker Listing
+                    </Button>
+                  </div>
+                  
+                  <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <Button 
+                      variant="outline"
                       onClick={() => syncMutation.mutate()}
                       disabled={syncMutation.isPending || syncStatus?.isScraping}
                       data-testid="button-trigger-sync"
                     >
                       <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending || syncStatus?.isScraping ? 'animate-spin' : ''}`} />
-                      {syncStatus?.isScraping ? 'Syncing...' : 'Sync Now'}
+                      {syncStatus?.isScraping ? 'Checking Sources...' : 'Check Sources'}
                     </Button>
                     <Button 
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => setSettingsOpen(true)}
                       data-testid="button-manage-sources"
                     >
                       <Settings className="h-4 w-4 mr-2" />
-                      Manage Sources
+                      Configure Sources
                     </Button>
                   </div>
                 </>
