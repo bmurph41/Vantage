@@ -85,15 +85,13 @@ export function MarketIntelTab() {
 
   const triggerScrapeMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/marinamatch/intel/scrape/trigger", {
-        method: "POST",
-        body: JSON.stringify({ platforms: ["crexi", "bizbuysell"] }),
-      });
+      const response = await apiRequest("POST", "/api/marinamatch/intel/scrape/trigger", { platforms: ["crexi", "bizbuysell"] });
+      return response.json();
     },
     onSuccess: (data: any) => {
       toast({
         title: "Scrape Complete",
-        description: `Found ${data.totalFound} listings. ${data.newListings} new, ${data.updatedListings} updated.`,
+        description: `Found ${data.totalFound || 0} listings. ${data.newListings || 0} new, ${data.updatedListings || 0} updated.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
@@ -110,9 +108,8 @@ export function MarketIntelTab() {
 
   const seedDemoMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/marinamatch/intel/seed-demo-data", {
-        method: "POST",
-      });
+      const response = await apiRequest("POST", "/api/marinamatch/intel/seed-demo-data");
+      return response.json();
     },
     onSuccess: (data: any) => {
       toast({
