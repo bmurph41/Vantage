@@ -11,6 +11,7 @@ import {
   marinaListingMatches,
   type MarinaListing,
 } from "@shared/schema";
+import { extractListingsWithAI, validateExtractedListing, type ExtractedListing } from "./ai-extractor";
 
 interface ListingData {
   title: string;
@@ -311,6 +312,50 @@ export function generateContentHash(listing: ListingData): string {
   return crypto.createHash("md5").update(content).digest("hex");
 }
 
+// Convert AI-extracted listing to our standard ListingData format
+function convertExtractedToListingData(extracted: ExtractedListing): ListingData {
+  return {
+    title: extracted.title || extracted.propertyName || "Untitled Marina",
+    propertyName: extracted.propertyName,
+    propertyAddress: extracted.propertyAddress,
+    city: extracted.city,
+    state: extracted.state,
+    zipCode: extracted.zipCode,
+    askingPrice: extracted.askingPrice,
+    totalSlips: extracted.totalSlips,
+    wetSlips: extracted.wetSlips,
+    dryStorageSpaces: extracted.dryStorageSpaces,
+    acreage: extracted.acreage,
+    waterFrontage: extracted.waterFrontage,
+    hasFuel: extracted.hasFuel,
+    hasShipStore: extracted.hasShipStore,
+    hasRestaurant: extracted.hasRestaurant,
+    hasRepairShop: extracted.hasRepairShop,
+    hasDryStorage: extracted.hasDryStorage,
+    hasBoatRamp: extracted.hasBoatRamp,
+    capRate: extracted.capRate,
+    grossRevenue: extracted.grossRevenue,
+    noi: extracted.noi,
+    occupancyRate: extracted.occupancyRate,
+    marinaType: extracted.marinaType,
+    propertyType: extracted.propertyType || "marina",
+    dealType: extracted.dealType || "acquisition",
+    brokerName: extracted.brokerName,
+    brokerCompany: extracted.brokerCompany,
+    brokerPhone: extracted.brokerPhone,
+    brokerEmail: extracted.brokerEmail,
+    sourceUrl: extracted.sourceUrl,
+    sourceListingId: extracted.sourceListingId,
+    originalDescription: extracted.originalDescription,
+    images: extracted.images,
+    listingDate: extracted.listingDate ? new Date(extracted.listingDate) : undefined,
+    attributionText: extracted.attributionText,
+  };
+}
+
+// Minimum confidence threshold for accepting AI-extracted listings
+const AI_CONFIDENCE_THRESHOLD = 50;
+
 // Platform capability metadata - defines what methods work for each platform
 export interface PlatformCapability {
   platform: string;
@@ -408,10 +453,41 @@ export function getRecommendedMethod(platform: string): string {
   return "manual";
 }
 
-export async function scrapeCrexi(searchQuery: string = "marina", maxPages: number = 3): Promise<ListingData[]> {
+export async function scrapeCrexi(searchQuery: string = "marina", maxPages: number = 3, searchUrl?: string): Promise<ListingData[]> {
   const platform = "crexi";
   const baseUrl = "https://www.crexi.com";
   const listings: ListingData[] = [];
+  
+  const targetUrl = searchUrl || `${baseUrl}/search?propertyType=marina`;
+  
+  console.log(`[${platform}] Attempting AI-powered extraction from: ${targetUrl}`);
+  
+  try {
+    const aiResult = await extractListingsWithAI(targetUrl, "Crexi");
+    
+    if (aiResult.success && aiResult.listings.length > 0) {
+      const validListings: ListingData[] = [];
+      
+      for (const extracted of aiResult.listings) {
+        const validation = validateExtractedListing(extracted);
+        
+        if (extracted.confidence >= AI_CONFIDENCE_THRESHOLD && validation.valid) {
+          validListings.push(convertExtractedToListingData(extracted));
+        } else {
+          console.log(`[${platform}] Skipping low-quality listing: ${extracted.title} (confidence: ${extracted.confidence}, issues: ${validation.issues.join(", ")})`);
+        }
+      }
+      
+      if (validListings.length > 0) {
+        console.log(`[${platform}] AI extracted ${validListings.length} valid marina listings`);
+        return validListings;
+      }
+    }
+    
+    console.log(`[${platform}] AI extraction returned no valid listings, trying DOM parsing...`);
+  } catch (aiError: any) {
+    console.log(`[${platform}] AI extraction failed: ${aiError.message}`);
+  }
   
   const robotsCheck = await checkRobotsTxt(baseUrl, "/search");
   if (!robotsCheck.allowed) {
@@ -432,10 +508,10 @@ export async function scrapeCrexi(searchQuery: string = "marina", maxPages: numb
     for (let page = 1; page <= maxPages; page++) {
       await enforceRateLimit(platform, 20);
       
-      const searchUrl = `${baseUrl}/search?propertyType=marina&page=${page}`;
-      console.log(`[${platform}] Fetching page ${page}: ${searchUrl}`);
+      const pageUrl = `${baseUrl}/search?propertyType=marina&page=${page}`;
+      console.log(`[${platform}] Fetching page ${page}: ${pageUrl}`);
       
-      const response = await client.get(searchUrl);
+      const response = await client.get(pageUrl);
       const $ = cheerio.load(response.data);
       
       $(".property-card, .listing-card, [data-listing-id]").each((_, element) => {
@@ -462,9 +538,9 @@ export async function scrapeCrexi(searchQuery: string = "marina", maxPages: numb
             marinaType: detectMarinaType(title + " " + $el.text()),
             propertyType: "marina",
             dealType: "acquisition",
-            sourceUrl: linkHref ? `${baseUrl}${linkHref}` : searchUrl,
+            sourceUrl: linkHref ? `${baseUrl}${linkHref}` : pageUrl,
             sourceListingId: listingId,
-            attributionText: `Source: Crexi Commercial Real Estate`,
+            attributionText: `Source: Crexi Commercial Real Estate - View original listing`,
             ...amenities,
           });
         } catch (err) {
@@ -475,22 +551,55 @@ export async function scrapeCrexi(searchQuery: string = "marina", maxPages: numb
       if ($(".property-card, .listing-card").length === 0) break;
     }
     
-    console.log(`[${platform}] Found ${listings.length} marina listings`);
+    if (listings.length > 0) {
+      console.log(`[${platform}] DOM parsing found ${listings.length} marina listings`);
+      return listings;
+    }
   } catch (error: any) {
-    console.error(`[${platform}] Scraping error:`, error.message);
-    console.log(`[${platform}] Falling back to demo data for development`);
-    const demoListings = generateDemoListings("crexi");
-    console.log(`[${platform}] Generated ${demoListings.length} demo marina listings`);
-    return demoListings;
+    console.error(`[${platform}] DOM scraping error:`, error.message);
   }
   
-  return listings;
+  console.log(`[${platform}] All extraction methods failed, falling back to demo data`);
+  const demoListings = generateDemoListings("crexi");
+  console.log(`[${platform}] Generated ${demoListings.length} demo marina listings`);
+  return demoListings;
 }
 
-export async function scrapeBizBuySell(maxPages: number = 3): Promise<ListingData[]> {
+export async function scrapeBizBuySell(maxPages: number = 3, searchUrl?: string): Promise<ListingData[]> {
   const platform = "bizbuysell";
   const baseUrl = "https://www.bizbuysell.com";
   const listings: ListingData[] = [];
+  
+  const targetUrl = searchUrl || `${baseUrl}/buy/all-businesses/marina-businesses-for-sale/`;
+  
+  console.log(`[${platform}] Attempting AI-powered extraction from: ${targetUrl}`);
+  
+  try {
+    const aiResult = await extractListingsWithAI(targetUrl, "BizBuySell");
+    
+    if (aiResult.success && aiResult.listings.length > 0) {
+      const validListings: ListingData[] = [];
+      
+      for (const extracted of aiResult.listings) {
+        const validation = validateExtractedListing(extracted);
+        
+        if (extracted.confidence >= AI_CONFIDENCE_THRESHOLD && validation.valid) {
+          validListings.push(convertExtractedToListingData(extracted));
+        } else {
+          console.log(`[${platform}] Skipping low-quality listing: ${extracted.title} (confidence: ${extracted.confidence}, issues: ${validation.issues.join(", ")})`);
+        }
+      }
+      
+      if (validListings.length > 0) {
+        console.log(`[${platform}] AI extracted ${validListings.length} valid marina listings`);
+        return validListings;
+      }
+    }
+    
+    console.log(`[${platform}] AI extraction returned no valid listings, trying DOM parsing...`);
+  } catch (aiError: any) {
+    console.log(`[${platform}] AI extraction failed: ${aiError.message}`);
+  }
   
   const robotsCheck = await checkRobotsTxt(baseUrl, "/");
   if (!robotsCheck.allowed) {
@@ -511,10 +620,10 @@ export async function scrapeBizBuySell(maxPages: number = 3): Promise<ListingDat
     for (let page = 1; page <= maxPages; page++) {
       await enforceRateLimit(platform, 15);
       
-      const searchUrl = `${baseUrl}/buy/all-businesses/marina-businesses-for-sale/?page=${page}`;
-      console.log(`[${platform}] Fetching page ${page}: ${searchUrl}`);
+      const pageUrl = `${baseUrl}/buy/all-businesses/marina-businesses-for-sale/?page=${page}`;
+      console.log(`[${platform}] Fetching page ${page}: ${pageUrl}`);
       
-      const response = await client.get(searchUrl);
+      const response = await client.get(pageUrl);
       const $ = cheerio.load(response.data);
       
       $(".listing, .business-listing, .search-result").each((_, element) => {
@@ -544,7 +653,7 @@ export async function scrapeBizBuySell(maxPages: number = 3): Promise<ListingDat
             dealType: "acquisition",
             sourceUrl: linkHref?.startsWith("http") ? linkHref : `${baseUrl}${linkHref}`,
             originalDescription: description,
-            attributionText: `Source: BizBuySell Business for Sale Listings`,
+            attributionText: `Source: BizBuySell - View original listing`,
             ...amenities,
           });
         } catch (err) {
@@ -555,16 +664,18 @@ export async function scrapeBizBuySell(maxPages: number = 3): Promise<ListingDat
       if ($(".listing, .business-listing").length === 0) break;
     }
     
-    console.log(`[${platform}] Found ${listings.length} marina listings`);
+    if (listings.length > 0) {
+      console.log(`[${platform}] DOM parsing found ${listings.length} marina listings`);
+      return listings;
+    }
   } catch (error: any) {
-    console.error(`[${platform}] Scraping error:`, error.message);
-    console.log(`[${platform}] Falling back to demo data for development`);
-    const demoListings = generateDemoListings("bizbuysell");
-    console.log(`[${platform}] Generated ${demoListings.length} demo marina listings`);
-    return demoListings;
+    console.error(`[${platform}] DOM scraping error:`, error.message);
   }
   
-  return listings;
+  console.log(`[${platform}] All extraction methods failed, falling back to demo data`);
+  const demoListings = generateDemoListings("bizbuysell");
+  console.log(`[${platform}] Generated ${demoListings.length} demo marina listings`);
+  return demoListings;
 }
 
 // Demo marina listing data for development - simulates real platform data
@@ -961,22 +1072,88 @@ function generateDemoListings(platform: string): ListingData[] {
   }));
 }
 
-export async function scrapeLoopNetMetadata(): Promise<ListingData[]> {
-  console.log("[loopnet] LoopNet requires API access for scraping. Generating demo listings for development.");
-  console.log("[loopnet] Note: In production, integrate with LoopNet Data Services API for live data.");
+export async function scrapeLoopNet(searchUrl?: string): Promise<ListingData[]> {
+  const platform = "loopnet";
+  const baseUrl = "https://www.loopnet.com";
+  const targetUrl = searchUrl || `${baseUrl}/search/commercial-real-estate/marina/`;
   
+  console.log(`[${platform}] Attempting AI-powered extraction from: ${targetUrl}`);
+  
+  try {
+    const aiResult = await extractListingsWithAI(targetUrl, "LoopNet");
+    
+    if (aiResult.success && aiResult.listings.length > 0) {
+      const validListings: ListingData[] = [];
+      
+      for (const extracted of aiResult.listings) {
+        const validation = validateExtractedListing(extracted);
+        
+        if (extracted.confidence >= AI_CONFIDENCE_THRESHOLD && validation.valid) {
+          validListings.push(convertExtractedToListingData(extracted));
+        } else {
+          console.log(`[${platform}] Skipping: ${extracted.title} (confidence: ${extracted.confidence})`);
+        }
+      }
+      
+      if (validListings.length > 0) {
+        console.log(`[${platform}] AI extracted ${validListings.length} valid marina listings`);
+        return validListings;
+      }
+    }
+  } catch (aiError: any) {
+    console.log(`[${platform}] AI extraction failed: ${aiError.message}`);
+  }
+  
+  console.log(`[${platform}] Falling back to demo data (API access required for live data)`);
   const demoListings = generateDemoListings("loopnet");
-  console.log(`[loopnet] Generated ${demoListings.length} demo marina listings`);
+  console.log(`[${platform}] Generated ${demoListings.length} demo marina listings`);
   return demoListings;
 }
 
-export async function scrapeCoStarMetadata(): Promise<ListingData[]> {
-  console.log("[costar] CoStar requires API access and subscription. Generating demo listings for development.");
-  console.log("[costar] Note: In production, contact CoStar Group for API access.");
+export async function scrapeCoStar(searchUrl?: string): Promise<ListingData[]> {
+  const platform = "costar";
+  const baseUrl = "https://www.costar.com";
+  const targetUrl = searchUrl || `${baseUrl}/`;
   
+  console.log(`[${platform}] Attempting AI-powered extraction from: ${targetUrl}`);
+  
+  try {
+    const aiResult = await extractListingsWithAI(targetUrl, "CoStar");
+    
+    if (aiResult.success && aiResult.listings.length > 0) {
+      const validListings: ListingData[] = [];
+      
+      for (const extracted of aiResult.listings) {
+        const validation = validateExtractedListing(extracted);
+        
+        if (extracted.confidence >= AI_CONFIDENCE_THRESHOLD && validation.valid) {
+          validListings.push(convertExtractedToListingData(extracted));
+        } else {
+          console.log(`[${platform}] Skipping: ${extracted.title} (confidence: ${extracted.confidence})`);
+        }
+      }
+      
+      if (validListings.length > 0) {
+        console.log(`[${platform}] AI extracted ${validListings.length} valid marina listings`);
+        return validListings;
+      }
+    }
+  } catch (aiError: any) {
+    console.log(`[${platform}] AI extraction failed: ${aiError.message}`);
+  }
+  
+  console.log(`[${platform}] Falling back to demo data (subscription required for live data)`);
   const demoListings = generateDemoListings("costar");
-  console.log(`[costar] Generated ${demoListings.length} demo marina listings`);
+  console.log(`[${platform}] Generated ${demoListings.length} demo marina listings`);
   return demoListings;
+}
+
+export async function scrapeLoopNetMetadata(): Promise<ListingData[]> {
+  return scrapeLoopNet();
+}
+
+export async function scrapeCoStarMetadata(): Promise<ListingData[]> {
+  return scrapeCoStar();
 }
 
 export async function runScrapeJob(
@@ -1044,19 +1221,20 @@ export async function runScrapeJob(
         }
         
         let platformListings: ListingData[] = [];
+        const sourceSearchUrl = source?.searchUrl || undefined;
         
         switch (platform) {
           case "crexi":
-            platformListings = await scrapeCrexi();
+            platformListings = await scrapeCrexi("marina", 3, sourceSearchUrl);
             break;
           case "bizbuysell":
-            platformListings = await scrapeBizBuySell();
+            platformListings = await scrapeBizBuySell(3, sourceSearchUrl);
             break;
           case "loopnet":
-            platformListings = await scrapeLoopNetMetadata();
+            platformListings = await scrapeLoopNet(sourceSearchUrl);
             break;
           case "costar":
-            platformListings = await scrapeCoStarMetadata();
+            platformListings = await scrapeCoStar(sourceSearchUrl);
             break;
           default:
             console.log(`[${platform}] Unknown platform`);
