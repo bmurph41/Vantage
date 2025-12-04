@@ -111,6 +111,42 @@ export async function triggerManualFetch(): Promise<{ success: boolean; newArtic
   return response.json();
 }
 
+export interface AutoFetchStatus {
+  enabled: boolean;
+  lastFetch: string | null;
+  isFetching: boolean;
+  nextFetch: string | null;
+}
+
+export async function fetchAutoFetchStatus(): Promise<AutoFetchStatus> {
+  const response = await fetch(`${API_BASE}/auto-fetch/status`, {
+    credentials: "include"
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch auto-fetch status: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
+export async function toggleAutoFetch(enabled: boolean): Promise<AutoFetchStatus> {
+  const response = await fetch(`${API_BASE}/auto-fetch/toggle`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify({ enabled }),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to toggle auto-fetch: ${response.statusText}`);
+  }
+  
+  return response.json();
+}
+
 export async function addRssSource(name: string, url: string): Promise<void> {
   const response = await fetch(`${API_BASE}/rss-sources`, {
     method: "POST",

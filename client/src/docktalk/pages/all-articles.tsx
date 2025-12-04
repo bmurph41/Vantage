@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchArticles, fetchSystemStats, triggerManualFetch } from "../lib/api";
+import { fetchArticles, fetchSystemStats, triggerManualFetch, fetchAutoFetchStatus, toggleAutoFetch, type AutoFetchStatus } from "../lib/api";
 import { ArticleFilters } from "../types/article";
 import FilterBar from "../components/filter-bar";
 import ArticleCard from "../components/article-card";
@@ -8,9 +8,12 @@ import HeroArticle from "../components/hero-article";
 import TrendingSidebar from "../components/trending-sidebar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { connectWebSocket, type WebSocketMessage, type WebSocketController } from "../lib/websocket";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { connectWebSocket, type WebSocketMessage, type WebSocketController, type FetchStatusPayload, type NewArticlePayload } from "../lib/websocket";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, RefreshCw, Loader2 } from "lucide-react";
+import { Bell, RefreshCw, Loader2, Radio, Zap, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function AllArticles() {
@@ -22,6 +25,8 @@ export default function AllArticles() {
   const [allArticles, setAllArticles] = useState<any[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreArticles, setHasMoreArticles] = useState(true);
+  const [isLiveFetching, setIsLiveFetching] = useState(false);
+  const [nextFetchTime, setNextFetchTime] = useState<Date | null>(null);
   
   const [filters, setFilters] = useState<ArticleFilters>({
     limit: 50,
@@ -119,6 +124,7 @@ export default function AllArticles() {
   useEffect(() => {
     wsControllerRef.current = connectWebSocket((message: WebSocketMessage) => {
       if (message.type === "new_article") {
+        const payload = message.payload as NewArticlePayload;
         setNewArticlesCount(prev => prev + 1);
         
         toast({
@@ -127,9 +133,9 @@ export default function AllArticles() {
             <div className="flex items-start gap-2">
               <Bell className="h-4 w-4 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <p className="font-medium">{message.payload.title}</p>
+                <p className="font-medium">{payload.title}</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {message.payload.source} • {message.payload.category}
+                  {payload.source} • {payload.category}
                 </p>
               </div>
             </div>
@@ -147,6 +153,21 @@ export default function AllArticles() {
             </Button>
           ),
         });
+      } else if (message.type === "fetch_status") {
+        const payload = message.payload as FetchStatusPayload;
+        if (payload.type === 'fetch_started') {
+          setIsLiveFetching(true);
+        } else if (payload.type === 'fetch_completed') {
+          setIsLiveFetching(false);
+          if (payload.nextFetch) {
+            setNextFetchTime(new Date(payload.nextFetch));
+          }
+          if (payload.newArticles && payload.newArticles > 0) {
+            queryClient.invalidateQueries({ queryKey: ['/api/docktalk/analytics/stats'] });
+          }
+        } else if (payload.type === 'fetch_error') {
+          setIsLiveFetching(false);
+        }
       }
     });
 
@@ -156,7 +177,7 @@ export default function AllArticles() {
         wsControllerRef.current = null;
       }
     };
-  }, [toast, refetchArticles]);
+  }, [toast, refetchArticles, queryClient]);
 
   const { 
     data: systemStats,
@@ -165,6 +186,37 @@ export default function AllArticles() {
     queryKey: ['/api/docktalk/analytics/stats'],
     queryFn: fetchSystemStats,
     refetchInterval: 60 * 1000,
+  });
+
+  // Auto-fetch status query
+  const { 
+    data: autoFetchStatus,
+    refetch: refetchAutoFetchStatus
+  } = useQuery({
+    queryKey: ['/api/docktalk/auto-fetch/status'],
+    queryFn: fetchAutoFetchStatus,
+    refetchInterval: 30 * 1000,
+  });
+
+  // Auto-fetch toggle mutation
+  const toggleAutoFetchMutation = useMutation({
+    mutationFn: toggleAutoFetch,
+    onSuccess: (data) => {
+      refetchAutoFetchStatus();
+      toast({
+        title: data.enabled ? "Live Updates Enabled" : "Live Updates Paused",
+        description: data.enabled 
+          ? "Articles will automatically update every 5 minutes" 
+          : "Automatic updates are now paused",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to Toggle Live Updates",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    },
   });
 
   // Manual fetch mutation
@@ -229,25 +281,74 @@ export default function AllArticles() {
     <div className="h-full bg-gray-50 dark:bg-gray-950">
       <div className="h-full overflow-auto p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
-            {/* Action Bar with Fetch Button */}
+            {/* Action Bar with Fetch Button and Live Status */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-4">
+                {/* Live Status Indicator */}
+                <TooltipProvider>
+                  <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                    {isLiveFetching || autoFetchStatus?.isFetching ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                        <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Fetching...</span>
+                      </div>
+                    ) : autoFetchStatus?.enabled ? (
+                      <div className="flex items-center gap-2">
+                        <Radio className="h-4 w-4 text-green-500 animate-pulse" />
+                        <span className="text-sm font-medium text-green-600 dark:text-green-400">Live</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Radio className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm font-medium text-gray-500">Paused</span>
+                      </div>
+                    )}
+                    
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={autoFetchStatus?.enabled ?? true}
+                            onCheckedChange={(checked) => toggleAutoFetchMutation.mutate(checked)}
+                            disabled={toggleAutoFetchMutation.isPending}
+                            data-testid="switch-auto-fetch"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{autoFetchStatus?.enabled ? 'Disable' : 'Enable'} automatic updates</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
+
                 <Button
                   onClick={() => manualFetchMutation.mutate()}
-                  disabled={manualFetchMutation.isPending}
+                  disabled={manualFetchMutation.isPending || isLiveFetching}
                   variant="outline"
                   size="sm"
                   data-testid="button-fetch-now"
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${manualFetchMutation.isPending ? 'animate-spin' : ''}`} />
-                  {manualFetchMutation.isPending ? 'Updating...' : 'Update News'}
+                  {manualFetchMutation.isPending ? 'Updating...' : 'Update Now'}
                 </Button>
                 
-                {systemStats?.lastUpdate && (
-                  <span className="text-sm text-gray-500 dark:text-gray-400" data-testid="text-last-update">
-                    Last updated {formatDistanceToNow(new Date(systemStats.lastUpdate), { addSuffix: true })}
-                  </span>
-                )}
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  {systemStats?.lastUpdate && (
+                    <span data-testid="text-last-update">
+                      Updated {formatDistanceToNow(new Date(systemStats.lastUpdate), { addSuffix: true })}
+                    </span>
+                  )}
+                  {autoFetchStatus?.enabled && nextFetchTime && (
+                    <>
+                      <span className="text-gray-300 dark:text-gray-600">•</span>
+                      <span className="flex items-center gap-1" data-testid="text-next-update">
+                        <Clock className="h-3 w-3" />
+                        Next in {formatDistanceToNow(nextFetchTime)}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
 
               {newArticlesCount > 0 && (
@@ -258,9 +359,10 @@ export default function AllArticles() {
                   }}
                   variant="default"
                   size="sm"
+                  className="animate-pulse"
                   data-testid="button-load-new-articles"
                 >
-                  <Bell className="h-4 w-4 mr-2" />
+                  <Zap className="h-4 w-4 mr-2" />
                   {newArticlesCount} New Article{newArticlesCount !== 1 ? 's' : ''}
                 </Button>
               )}

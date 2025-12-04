@@ -84,8 +84,16 @@ export interface NewArticlePayload {
   relevanceScore?: number;
 }
 
+export interface FetchStatusPayload {
+  type: 'fetch_started' | 'fetch_completed' | 'fetch_error';
+  newArticles?: number;
+  error?: string;
+  timestamp: number;
+  nextFetch?: string;
+}
+
 export interface WebSocketMessage {
-  type: string;
-  payload: NewArticlePayload;
+  type: 'new_article' | 'fetch_status';
+  payload: NewArticlePayload | FetchStatusPayload;
   timestamp: number;
 }
