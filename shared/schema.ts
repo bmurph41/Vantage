@@ -13150,6 +13150,34 @@ export type InvestmentMandate = typeof investmentMandates.$inferSelect;
 export type InsertInvestmentMandate = z.infer<typeof insertInvestmentMandateSchema>;
 export type UpdateInvestmentMandate = z.infer<typeof updateInvestmentMandateSchema>;
 
+export const mandateCriteria = pgTable("mandate_criteria", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  mandateId: varchar("mandate_id").notNull().references(() => investmentMandates.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  criteriaType: varchar("criteria_type", { length: 50 }).notNull(),
+  criteriaKey: varchar("criteria_key", { length: 100 }).notNull(),
+  operator: varchar("operator", { length: 20 }).notNull().default("equals"),
+  criteriaValue: text("criteria_value").notNull(),
+  weight: integer("weight").default(10),
+  isRequired: boolean("is_required").default(false),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  mandateIdx: index("mandate_criteria_mandate_idx").on(table.mandateId),
+  orgIdx: index("mandate_criteria_org_idx").on(table.orgId),
+}));
+
+export const insertMandateCriteriaSchema = createInsertSchema(mandateCriteria).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateMandateCriteriaSchema = insertMandateCriteriaSchema.partial();
+export type MandateCriteria = typeof mandateCriteria.$inferSelect;
+export type InsertMandateCriteria = z.infer<typeof insertMandateCriteriaSchema>;
+export type UpdateMandateCriteria = z.infer<typeof updateMandateCriteriaSchema>;
+
 export const insertBrokerRelationshipSchema = createInsertSchema(brokerRelationships).omit({
   id: true,
   createdAt: true,

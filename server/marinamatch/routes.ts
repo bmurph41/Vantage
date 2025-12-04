@@ -5,6 +5,7 @@ import crypto from "crypto";
 import {
   dealSources,
   investmentMandates,
+  mandateCriteria,
   brokerRelationships,
   sourcedDeals,
   dealAttributions,
@@ -13,6 +14,8 @@ import {
   updateDealSourceSchema,
   insertInvestmentMandateSchema,
   updateInvestmentMandateSchema,
+  insertMandateCriteriaSchema,
+  updateMandateCriteriaSchema,
   insertBrokerRelationshipSchema,
   updateBrokerRelationshipSchema,
   insertSourcedDealSchema,
@@ -22,6 +25,7 @@ import {
   insertBrokerActivityLogSchema,
   type DealSource,
   type InvestmentMandate,
+  type MandateCriteria,
   type BrokerRelationship,
   type SourcedDeal,
   type DealAttribution,
@@ -229,6 +233,442 @@ router.delete("/investment-mandates/:id", requireProspecting, async (req: Reques
   } catch (error) {
     console.error("Error deleting investment mandate:", error);
     res.status(500).json({ error: "Failed to delete investment mandate" });
+  }
+});
+
+// ============================================
+// MANDATE CRITERIA
+// ============================================
+
+router.get("/mandate-criteria", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { mandateId } = req.query;
+    
+    let whereClause = eq(mandateCriteria.orgId, orgId);
+    if (mandateId) {
+      whereClause = and(whereClause, eq(mandateCriteria.mandateId, mandateId as string))!;
+    }
+
+    const criteria = await db
+      .select()
+      .from(mandateCriteria)
+      .where(whereClause)
+      .orderBy(asc(mandateCriteria.sortOrder));
+
+    res.json(criteria);
+  } catch (error) {
+    console.error("Error fetching mandate criteria:", error);
+    res.status(500).json({ error: "Failed to fetch mandate criteria" });
+  }
+});
+
+router.get("/mandate-criteria/:id", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const [criterion] = await db
+      .select()
+      .from(mandateCriteria)
+      .where(and(eq(mandateCriteria.id, req.params.id), eq(mandateCriteria.orgId, orgId)));
+
+    if (!criterion) return res.status(404).json({ error: "Mandate criterion not found" });
+    res.json(criterion);
+  } catch (error) {
+    console.error("Error fetching mandate criterion:", error);
+    res.status(500).json({ error: "Failed to fetch mandate criterion" });
+  }
+});
+
+router.post("/mandate-criteria", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const validated = insertMandateCriteriaSchema.parse({ ...req.body, orgId });
+    const [criterion] = await db.insert(mandateCriteria).values(validated).returning();
+    res.status(201).json(criterion);
+  } catch (error: any) {
+    console.error("Error creating mandate criterion:", error);
+    res.status(400).json({ error: error.message || "Failed to create mandate criterion" });
+  }
+});
+
+router.patch("/mandate-criteria/:id", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const validated = updateMandateCriteriaSchema.parse(req.body);
+    const [updated] = await db
+      .update(mandateCriteria)
+      .set({ ...validated, updatedAt: new Date() })
+      .where(and(eq(mandateCriteria.id, req.params.id), eq(mandateCriteria.orgId, orgId)))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Mandate criterion not found" });
+    res.json(updated);
+  } catch (error: any) {
+    console.error("Error updating mandate criterion:", error);
+    res.status(400).json({ error: error.message || "Failed to update mandate criterion" });
+  }
+});
+
+router.delete("/mandate-criteria/:id", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const [deleted] = await db
+      .delete(mandateCriteria)
+      .where(and(eq(mandateCriteria.id, req.params.id), eq(mandateCriteria.orgId, orgId)))
+      .returning();
+
+    if (!deleted) return res.status(404).json({ error: "Mandate criterion not found" });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting mandate criterion:", error);
+    res.status(500).json({ error: "Failed to delete mandate criterion" });
+  }
+});
+
+// Bulk update criteria for a mandate
+router.post("/investment-mandates/:id/criteria", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const mandateId = req.params.id;
+    const { criteria } = req.body;
+
+    if (!Array.isArray(criteria)) {
+      return res.status(400).json({ error: "Criteria must be an array" });
+    }
+
+    // Delete existing criteria for this mandate
+    await db
+      .delete(mandateCriteria)
+      .where(and(eq(mandateCriteria.mandateId, mandateId), eq(mandateCriteria.orgId, orgId)));
+
+    // Insert new criteria
+    if (criteria.length > 0) {
+      const toInsert = criteria.map((c: any, idx: number) => ({
+        mandateId,
+        orgId,
+        criteriaType: c.criteriaType,
+        criteriaKey: c.criteriaKey,
+        operator: c.operator || "equals",
+        criteriaValue: String(c.criteriaValue),
+        weight: c.weight || 10,
+        isRequired: c.isRequired || false,
+        sortOrder: idx,
+      }));
+
+      await db.insert(mandateCriteria).values(toInsert);
+    }
+
+    const updatedCriteria = await db
+      .select()
+      .from(mandateCriteria)
+      .where(and(eq(mandateCriteria.mandateId, mandateId), eq(mandateCriteria.orgId, orgId)))
+      .orderBy(asc(mandateCriteria.sortOrder));
+
+    res.json(updatedCriteria);
+  } catch (error: any) {
+    console.error("Error updating mandate criteria:", error);
+    res.status(400).json({ error: error.message || "Failed to update mandate criteria" });
+  }
+});
+
+// ============================================
+// DEAL SCORING ENGINE
+// ============================================
+
+interface CriterionEvaluation {
+  criteriaKey: string;
+  criteriaType: string;
+  operator: string;
+  expected: string;
+  actual: any;
+  weight: number;
+  isRequired: boolean;
+  passed: boolean;
+  score: number;
+}
+
+interface MandateScore {
+  mandateId: string;
+  mandateName: string;
+  totalScore: number;
+  maxPossibleScore: number;
+  percentScore: number;
+  passedRequired: boolean;
+  evaluations: CriterionEvaluation[];
+}
+
+function evaluateCriterion(criterion: MandateCriteria, deal: Partial<SourcedDeal>): CriterionEvaluation {
+  const { criteriaKey, criteriaType, operator, criteriaValue, weight, isRequired } = criterion;
+  
+  // Map criteria key to deal field
+  let actualValue: any;
+  switch (criteriaKey) {
+    case "slips_min":
+    case "slips_max":
+    case "slips":
+      actualValue = deal.slipCount;
+      break;
+    case "asking_price_min":
+    case "asking_price_max":
+    case "asking_price":
+      actualValue = deal.askingPrice ? parseFloat(deal.askingPrice) : null;
+      break;
+    case "state":
+      actualValue = deal.state?.toLowerCase();
+      break;
+    case "region":
+      actualValue = deal.region?.toLowerCase();
+      break;
+    case "property_type":
+    case "marina_type":
+      actualValue = deal.marinaType?.toLowerCase();
+      break;
+    case "deal_type":
+      actualValue = deal.dealType?.toLowerCase();
+      break;
+    case "has_fuel":
+      actualValue = deal.hasFuel;
+      break;
+    case "has_ship_store":
+      actualValue = deal.hasShipStore;
+      break;
+    case "has_dry_storage":
+      actualValue = deal.hasDryStorage;
+      break;
+    default:
+      actualValue = (deal as any)[criteriaKey];
+  }
+
+  const expectedValue = criteriaValue.toLowerCase();
+  let passed = false;
+
+  // Evaluate based on operator
+  switch (operator) {
+    case "equals":
+      passed = String(actualValue).toLowerCase() === expectedValue;
+      break;
+    case "not_equals":
+      passed = String(actualValue).toLowerCase() !== expectedValue;
+      break;
+    case "contains":
+      passed = String(actualValue).toLowerCase().includes(expectedValue);
+      break;
+    case "greater_than":
+      passed = actualValue !== null && Number(actualValue) > Number(criteriaValue);
+      break;
+    case "less_than":
+      passed = actualValue !== null && Number(actualValue) < Number(criteriaValue);
+      break;
+    case "greater_equal":
+      passed = actualValue !== null && Number(actualValue) >= Number(criteriaValue);
+      break;
+    case "less_equal":
+      passed = actualValue !== null && Number(actualValue) <= Number(criteriaValue);
+      break;
+    case "in_list":
+      const listValues = criteriaValue.split(",").map(v => v.trim().toLowerCase());
+      passed = listValues.includes(String(actualValue).toLowerCase());
+      break;
+    case "is_true":
+      passed = actualValue === true;
+      break;
+    case "is_false":
+      passed = actualValue === false;
+      break;
+    default:
+      passed = String(actualValue).toLowerCase() === expectedValue;
+  }
+
+  return {
+    criteriaKey,
+    criteriaType: criteriaType || "general",
+    operator: operator || "equals",
+    expected: criteriaValue,
+    actual: actualValue,
+    weight: weight || 10,
+    isRequired: isRequired || false,
+    passed,
+    score: passed ? (weight || 10) : 0,
+  };
+}
+
+async function scoreDealAgainstMandates(deal: Partial<SourcedDeal>, orgId: string): Promise<MandateScore[]> {
+  // Fetch all active mandates for the org
+  const mandates = await db
+    .select()
+    .from(investmentMandates)
+    .where(and(eq(investmentMandates.orgId, orgId), eq(investmentMandates.isActive, true)));
+
+  const scores: MandateScore[] = [];
+
+  for (const mandate of mandates) {
+    // Fetch criteria for this mandate
+    const criteria = await db
+      .select()
+      .from(mandateCriteria)
+      .where(eq(mandateCriteria.mandateId, mandate.id))
+      .orderBy(asc(mandateCriteria.sortOrder));
+
+    if (criteria.length === 0) {
+      // No criteria defined, give neutral score
+      scores.push({
+        mandateId: mandate.id,
+        mandateName: mandate.name,
+        totalScore: 50,
+        maxPossibleScore: 100,
+        percentScore: 50,
+        passedRequired: true,
+        evaluations: [],
+      });
+      continue;
+    }
+
+    const evaluations = criteria.map(c => evaluateCriterion(c, deal));
+    const totalScore = evaluations.reduce((sum, e) => sum + e.score, 0);
+    const maxPossibleScore = evaluations.reduce((sum, e) => sum + e.weight, 0);
+    const passedRequired = evaluations.filter(e => e.isRequired).every(e => e.passed);
+
+    scores.push({
+      mandateId: mandate.id,
+      mandateName: mandate.name,
+      totalScore,
+      maxPossibleScore,
+      percentScore: maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0,
+      passedRequired,
+      evaluations,
+    });
+  }
+
+  // Sort by score descending
+  scores.sort((a, b) => b.percentScore - a.percentScore);
+
+  return scores;
+}
+
+// Score a deal against all mandates
+router.post("/score-deal", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { deal } = req.body;
+    if (!deal) return res.status(400).json({ error: "Deal data required" });
+
+    const scores = await scoreDealAgainstMandates(deal, orgId);
+    
+    const bestScore = scores[0];
+    const result = {
+      scores,
+      bestMandateId: bestScore?.mandateId || null,
+      bestMandateName: bestScore?.mandateName || null,
+      bestMandateScore: bestScore?.percentScore || 0,
+      passesAnyRequirements: scores.some(s => s.passedRequired && s.percentScore >= 50),
+    };
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error scoring deal:", error);
+    res.status(500).json({ error: "Failed to score deal" });
+  }
+});
+
+// Score an existing sourced deal and update it
+router.post("/sourced-deals/:id/score", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    // Fetch the deal
+    const [deal] = await db
+      .select()
+      .from(sourcedDeals)
+      .where(and(eq(sourcedDeals.id, req.params.id), eq(sourcedDeals.orgId, orgId)));
+
+    if (!deal) return res.status(404).json({ error: "Deal not found" });
+
+    const scores = await scoreDealAgainstMandates(deal, orgId);
+    const bestScore = scores[0];
+
+    // Update deal with scoring results
+    const [updated] = await db
+      .update(sourcedDeals)
+      .set({
+        bestMandateId: bestScore?.mandateId || null,
+        bestMandateScore: bestScore?.percentScore || null,
+        mandateScores: scores.map(s => ({
+          mandateId: s.mandateId,
+          mandateName: s.mandateName,
+          score: s.percentScore,
+          passedRequired: s.passedRequired,
+        })),
+        updatedAt: new Date(),
+      })
+      .where(eq(sourcedDeals.id, req.params.id))
+      .returning();
+
+    res.json({
+      deal: updated,
+      scores,
+      bestMandateId: bestScore?.mandateId || null,
+      bestMandateName: bestScore?.mandateName || null,
+      bestMandateScore: bestScore?.percentScore || 0,
+    });
+  } catch (error) {
+    console.error("Error scoring sourced deal:", error);
+    res.status(500).json({ error: "Failed to score deal" });
+  }
+});
+
+// Bulk score all deals for the org
+router.post("/bulk-score-deals", requireProspecting, async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const deals = await db
+      .select()
+      .from(sourcedDeals)
+      .where(eq(sourcedDeals.orgId, orgId));
+
+    let scored = 0;
+    for (const deal of deals) {
+      const scores = await scoreDealAgainstMandates(deal, orgId);
+      const bestScore = scores[0];
+
+      await db
+        .update(sourcedDeals)
+        .set({
+          bestMandateId: bestScore?.mandateId || null,
+          bestMandateScore: bestScore?.percentScore || null,
+          mandateScores: scores.map(s => ({
+            mandateId: s.mandateId,
+            mandateName: s.mandateName,
+            score: s.percentScore,
+            passedRequired: s.passedRequired,
+          })),
+          updatedAt: new Date(),
+        })
+        .where(eq(sourcedDeals.id, deal.id));
+      
+      scored++;
+    }
+
+    res.json({ success: true, dealsScored: scored });
+  } catch (error) {
+    console.error("Error bulk scoring deals:", error);
+    res.status(500).json({ error: "Failed to bulk score deals" });
   }
 });
 
@@ -481,13 +921,25 @@ router.post("/sourced-deals", requireProspecting, async (req: Request, res: Resp
     const [deal] = await db.insert(sourcedDeals).values(validated).returning();
     
     // Score against mandates
-    await scoreDealAgainstMandates(deal.id, orgId);
+    const scores = await scoreDealAgainstMandates(deal, orgId);
+    const bestScore = scores[0];
     
-    // Refetch with scores
+    // Update deal with scores
     const [updatedDeal] = await db
-      .select()
-      .from(sourcedDeals)
-      .where(eq(sourcedDeals.id, deal.id));
+      .update(sourcedDeals)
+      .set({
+        bestMandateId: bestScore?.mandateId || null,
+        bestMandateScore: bestScore?.percentScore?.toString() || null,
+        mandateScores: scores.map(s => ({
+          mandateId: s.mandateId,
+          mandateName: s.mandateName,
+          score: s.percentScore,
+          passedRequired: s.passedRequired,
+        })),
+        updatedAt: new Date(),
+      })
+      .where(eq(sourcedDeals.id, deal.id))
+      .returning();
 
     res.status(201).json(updatedDeal);
   } catch (error: any) {
@@ -603,7 +1055,24 @@ router.post("/sourced-deals/rescore", requireProspecting, async (req: Request, r
 
     let scored = 0;
     for (const deal of deals) {
-      await scoreDealAgainstMandates(deal.id, orgId);
+      const scores = await scoreDealAgainstMandates(deal, orgId);
+      const bestScore = scores[0];
+      
+      await db
+        .update(sourcedDeals)
+        .set({
+          bestMandateId: bestScore?.mandateId || null,
+          bestMandateScore: bestScore?.percentScore?.toString() || null,
+          mandateScores: scores.map(s => ({
+            mandateId: s.mandateId,
+            mandateName: s.mandateName,
+            score: s.percentScore,
+            passedRequired: s.passedRequired,
+          })),
+          updatedAt: new Date(),
+        })
+        .where(eq(sourcedDeals.id, deal.id));
+      
       scored++;
     }
 
@@ -813,135 +1282,6 @@ router.get("/analytics/source-performance", requireProspecting, async (req: Requ
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
-
-async function scoreDealAgainstMandates(dealId: string, orgId: string): Promise<void> {
-  const [deal] = await db
-    .select()
-    .from(sourcedDeals)
-    .where(eq(sourcedDeals.id, dealId));
-
-  if (!deal) return;
-
-  const mandates = await db
-    .select()
-    .from(investmentMandates)
-    .where(and(eq(investmentMandates.orgId, orgId), eq(investmentMandates.isActive, true)));
-
-  const scores: Record<string, number> = {};
-  let bestScore = 0;
-  let bestMandateId: string | null = null;
-
-  for (const mandate of mandates) {
-    const score = calculateMandateScore(deal, mandate);
-    scores[mandate.id] = score;
-    
-    if (score > bestScore) {
-      bestScore = score;
-      bestMandateId = mandate.id;
-    }
-  }
-
-  await db
-    .update(sourcedDeals)
-    .set({
-      mandateScores: scores,
-      bestMandateScore: bestScore.toFixed(2),
-      bestMandateId,
-      updatedAt: new Date(),
-    })
-    .where(eq(sourcedDeals.id, dealId));
-}
-
-function calculateMandateScore(deal: SourcedDeal, mandate: InvestmentMandate): number {
-  let score = 0;
-  let totalWeight = 0;
-
-  // Price range check (weight: 25)
-  if (mandate.minPrice || mandate.maxPrice) {
-    totalWeight += 25;
-    if (deal.askingPrice) {
-      const price = parseFloat(deal.askingPrice);
-      const minPrice = mandate.minPrice ? parseFloat(mandate.minPrice) : 0;
-      const maxPrice = mandate.maxPrice ? parseFloat(mandate.maxPrice) : Infinity;
-      
-      if (price >= minPrice && price <= maxPrice) {
-        score += 25;
-      } else if (price < minPrice) {
-        // Partial credit if close
-        const diff = (minPrice - price) / minPrice;
-        if (diff < 0.2) score += 25 * (1 - diff);
-      } else if (price > maxPrice) {
-        const diff = (price - maxPrice) / maxPrice;
-        if (diff < 0.2) score += 25 * (1 - diff);
-      }
-    }
-  }
-
-  // Slip count check (weight: 20)
-  if (mandate.minSlips || mandate.maxSlips) {
-    totalWeight += 20;
-    if (deal.totalSlips) {
-      const minSlips = mandate.minSlips || 0;
-      const maxSlips = mandate.maxSlips || Infinity;
-      
-      if (deal.totalSlips >= minSlips && deal.totalSlips <= maxSlips) {
-        score += 20;
-      } else {
-        // Partial credit
-        const midpoint = (minSlips + (maxSlips === Infinity ? minSlips * 2 : maxSlips)) / 2;
-        const diff = Math.abs(deal.totalSlips - midpoint) / midpoint;
-        if (diff < 0.3) score += 20 * (1 - diff);
-      }
-    }
-  }
-
-  // Geographic check (weight: 20)
-  if (mandate.targetStates && mandate.targetStates.length > 0) {
-    totalWeight += 20;
-    if (deal.state && mandate.targetStates.includes(deal.state.toUpperCase())) {
-      score += 20;
-    }
-  }
-
-  // Marina type check (weight: 15)
-  if (mandate.marinaTypes && mandate.marinaTypes.length > 0) {
-    totalWeight += 15;
-    if (deal.marinaType && mandate.marinaTypes.includes(deal.marinaType)) {
-      score += 15;
-    }
-  }
-
-  // Cap rate check (weight: 10)
-  if (mandate.minCapRate || mandate.maxCapRate) {
-    totalWeight += 10;
-    if (deal.capRate) {
-      const capRate = parseFloat(deal.capRate);
-      const minCap = mandate.minCapRate ? parseFloat(mandate.minCapRate) : 0;
-      const maxCap = mandate.maxCapRate ? parseFloat(mandate.maxCapRate) : 100;
-      
-      if (capRate >= minCap && capRate <= maxCap) {
-        score += 10;
-      }
-    }
-  }
-
-  // Revenue check (weight: 10)
-  if (mandate.minRevenue || mandate.maxRevenue) {
-    totalWeight += 10;
-    if (deal.grossRevenue) {
-      const revenue = parseFloat(deal.grossRevenue);
-      const minRev = mandate.minRevenue ? parseFloat(mandate.minRevenue) : 0;
-      const maxRev = mandate.maxRevenue ? parseFloat(mandate.maxRevenue) : Infinity;
-      
-      if (revenue >= minRev && revenue <= maxRev) {
-        score += 10;
-      }
-    }
-  }
-
-  // Normalize to 0-100 scale
-  return totalWeight > 0 ? (score / totalWeight) * 100 : 0;
-}
 
 async function updateBrokerStats(brokerId: string, orgId: string): Promise<void> {
   // Get all attributions for this broker
