@@ -241,12 +241,26 @@ export function MarketIntelTab() {
     queryKey: ["/api/marinamatch/intel/analytics/overview"],
   });
 
-  const listingsUrl = minScoreFilter && minScoreFilter !== "0" 
-    ? `/api/marinamatch/intel/listings?minScore=${minScoreFilter}`
-    : "/api/marinamatch/intel/listings";
+  const buildListingsUrl = () => {
+    const params = new URLSearchParams();
+    if (stateFilter && stateFilter !== "all") params.set("state", stateFilter);
+    if (cityFilter && cityFilter !== "all") params.set("city", cityFilter);
+    if (sourceFilter && sourceFilter !== "all") params.set("source", sourceFilter);
+    if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
+    if (minScoreFilter && minScoreFilter !== "0") params.set("minScore", minScoreFilter);
+    const queryString = params.toString();
+    return queryString ? `/api/marinamatch/intel/listings?${queryString}` : "/api/marinamatch/intel/listings";
+  };
+  
+  const listingsUrl = buildListingsUrl();
     
   const { data: listings, isLoading: listingsLoading, refetch: refetchListings } = useQuery<MarinaListing[]>({
-    queryKey: [listingsUrl],
+    queryKey: ["/api/marinamatch/intel/listings", stateFilter, cityFilter, sourceFilter, statusFilter, minScoreFilter],
+    queryFn: async () => {
+      const response = await fetch(listingsUrl);
+      if (!response.ok) throw new Error("Failed to fetch listings");
+      return response.json();
+    },
     refetchInterval: (data) => {
       if (!data?.state?.data?.length) return 3000;
       return false;
@@ -460,28 +474,21 @@ export function MarketIntelTab() {
     if (searchTerm && !listing.title.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
-    if (stateFilter !== "all" && listing.state !== stateFilter) {
-      return false;
-    }
-    if (cityFilter !== "all" && listing.city !== cityFilter) {
-      return false;
-    }
-    if (sourceFilter !== "all" && listing.sourcePlatform !== sourceFilter) {
-      return false;
-    }
-    if (statusFilter !== "all" && listing.status !== statusFilter) {
-      return false;
-    }
     return true;
   }) || [];
 
-  const uniqueStates = [...new Set(listings?.map(l => l.state).filter(Boolean))].sort();
+  const { data: allListings } = useQuery<MarinaListing[]>({
+    queryKey: ["/api/marinamatch/intel/listings"],
+    staleTime: 60000,
+  });
+
+  const uniqueStates = [...new Set(allListings?.map(l => l.state).filter(Boolean))].sort();
   const uniqueCities = [...new Set(
-    listings?.filter(l => stateFilter === "all" || l.state === stateFilter)
+    allListings?.filter(l => stateFilter === "all" || l.state === stateFilter)
       .map(l => l.city).filter(Boolean)
   )].sort();
-  const uniqueSources = [...new Set(listings?.map(l => l.sourcePlatform))].sort();
-  const uniqueStatuses = [...new Set(listings?.map(l => l.status))].sort();
+  const uniqueSources = [...new Set(allListings?.map(l => l.sourcePlatform))].sort();
+  const uniqueStatuses = [...new Set(allListings?.map(l => l.status))].sort();
 
   const formatPrice = (price: string | undefined) => {
     if (!price) return "—";

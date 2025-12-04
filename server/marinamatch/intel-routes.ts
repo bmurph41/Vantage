@@ -118,29 +118,33 @@ router.get("/listings", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
-    // No auto-seeding - only show real data from configured sources
-    const { status, state, source, minScore, sortBy, limit = "50", offset = "0" } = req.query;
+    const { status, state, city, source, minScore, sortBy, limit = "100", offset = "0" } = req.query;
 
-    let listings = await db
+    const conditions: any[] = [eq(marinaListings.orgId, orgId)];
+
+    if (status && status !== "all") {
+      conditions.push(eq(marinaListings.status, status as string));
+    }
+    if (state && state !== "all") {
+      conditions.push(sql`UPPER(${marinaListings.state}) = UPPER(${state as string})`);
+    }
+    if (city && city !== "all") {
+      conditions.push(sql`LOWER(${marinaListings.city}) = LOWER(${city as string})`);
+    }
+    if (source && source !== "all") {
+      conditions.push(eq(marinaListings.sourcePlatform, source as string));
+    }
+    if (minScore && parseInt(minScore as string) > 0) {
+      conditions.push(gte(marinaListings.bestMatchScore, parseInt(minScore as string)));
+    }
+
+    const listings = await db
       .select()
       .from(marinaListings)
-      .where(eq(marinaListings.orgId, orgId))
+      .where(and(...conditions))
       .orderBy(desc(marinaListings.bestMatchScore), desc(marinaListings.createdAt))
       .limit(parseInt(limit as string))
       .offset(parseInt(offset as string));
-
-    if (status) {
-      listings = listings.filter(l => l.status === status);
-    }
-    if (state) {
-      listings = listings.filter(l => l.state?.toLowerCase() === (state as string).toLowerCase());
-    }
-    if (source) {
-      listings = listings.filter(l => l.sourcePlatform === source);
-    }
-    if (minScore) {
-      listings = listings.filter(l => (l.bestMatchScore || 0) >= parseInt(minScore as string));
-    }
 
     res.json(listings);
   } catch (error) {
