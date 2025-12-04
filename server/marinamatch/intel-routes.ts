@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { db } from "../db";
 import { eq, and, desc, asc, sql, gte, lte, like, or, isNull, inArray } from "drizzle-orm";
 import crypto from "crypto";
+import { validateListingUrl, validateUrlAccessibility, getPlatformFromUrl } from "./utils/url-validation";
 import {
   marinaListings,
   investmentCriteriaProfiles,
@@ -303,6 +304,16 @@ router.post("/broker-submit", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Listing title is required" });
     }
 
+    if (contactUrl) {
+      const urlValidation = validateListingUrl(contactUrl, "direct");
+      if (!urlValidation.valid) {
+        return res.status(400).json({ 
+          error: `Invalid contact URL: ${urlValidation.reason}`,
+          suggestedFix: urlValidation.suggestedFix 
+        });
+      }
+    }
+
     const sourceUrl = contactUrl || (brokerEmail ? `mailto:${brokerEmail}` : "#direct-listing");
     
     const toNumericString = (val: any): string | null => {
@@ -507,7 +518,23 @@ router.post("/admin/bulk-import", async (req: Request, res: Response) => {
         }
 
         const sourcePlatform = item.sourcePlatform || source;
-        const sourceUrl = item.sourceUrl || `#${sourcePlatform}-${Date.now()}`;
+        
+        if (!item.sourceUrl && sourcePlatform !== "direct" && sourcePlatform !== "manual_import") {
+          results.failed++;
+          results.errors.push(`Missing sourceUrl for listing "${item.title}" - external platform listings require valid URLs`);
+          continue;
+        }
+        
+        const sourceUrl = item.sourceUrl || `#direct-${Date.now()}`;
+        
+        if (item.sourceUrl && sourcePlatform !== "direct") {
+          const urlValidation = validateListingUrl(item.sourceUrl, sourcePlatform);
+          if (!urlValidation.valid) {
+            results.failed++;
+            results.errors.push(`Invalid sourceUrl for "${item.title}": ${urlValidation.reason}${urlValidation.suggestedFix ? ` (${urlValidation.suggestedFix})` : ""}`);
+            continue;
+          }
+        }
         const sourceListingId = item.sourceListingId || `${sourcePlatform.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
         const listingData = {
