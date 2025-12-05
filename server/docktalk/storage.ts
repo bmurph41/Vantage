@@ -1684,17 +1684,98 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
 
+    const criteria = watchlist.criteria as {
+      entities?: string[];
+      categories?: string[];
+      locations?: string[];
+      structuredLocations?: { type: string; value: string }[];
+    } | null;
+
+    // Build conditions array for OR matching
+    const matchConditions: any[] = [];
+
+    // 1. Match by entity IDs (linked entities)
     const entityIds = await db
       .select({ entityId: watchlistEntities.entityId })
       .from(watchlistEntities)
       .where(eq(watchlistEntities.watchlistId, watchlistId));
 
-    if (entityIds.length === 0) {
+    // 2. Match by criteria-based text entities
+    if (criteria?.entities && criteria.entities.length > 0) {
+      for (const entity of criteria.entities) {
+        matchConditions.push(ilike(articles.searchText, `%${entity}%`));
+        matchConditions.push(ilike(articles.title, `%${entity}%`));
+      }
+    }
+
+    // 3. Match by categories
+    if (criteria?.categories && criteria.categories.length > 0) {
+      for (const category of criteria.categories) {
+        matchConditions.push(ilike(articles.category, `%${category}%`));
+        matchConditions.push(sql`${articles.categories} @> ARRAY[${category}]::text[]`);
+      }
+    }
+
+    // 4. Match by simple locations (legacy)
+    if (criteria?.locations && criteria.locations.length > 0) {
+      for (const location of criteria.locations) {
+        matchConditions.push(ilike(articles.searchText, `%${location}%`));
+        matchConditions.push(ilike(articles.title, `%${location}%`));
+        matchConditions.push(sql`${articles.geography} @> ARRAY[${location}]::text[]`);
+      }
+    }
+
+    // 5. Match by structured locations (new feature)
+    if (criteria?.structuredLocations && criteria.structuredLocations.length > 0) {
+      for (const loc of criteria.structuredLocations) {
+        const searchValue = loc.value.toLowerCase();
+        // Search in geography array, title, content, and searchText
+        matchConditions.push(ilike(articles.searchText, `%${searchValue}%`));
+        matchConditions.push(ilike(articles.title, `%${searchValue}%`));
+        matchConditions.push(sql`EXISTS (SELECT 1 FROM unnest(${articles.geography}) AS g WHERE LOWER(g) LIKE ${'%' + searchValue + '%'})`);
+        
+        // For state codes, also search for full state names
+        if (loc.type === 'state' && loc.value.length === 2) {
+          const stateNames: Record<string, string> = {
+            'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California',
+            'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+            'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa',
+            'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
+            'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri',
+            'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+            'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+            'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
+            'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont',
+            'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming'
+          };
+          const fullStateName = stateNames[loc.value.toUpperCase()];
+          if (fullStateName) {
+            matchConditions.push(ilike(articles.searchText, `%${fullStateName}%`));
+            matchConditions.push(ilike(articles.title, `%${fullStateName}%`));
+          }
+        }
+      }
+    }
+
+    // If we have entity IDs from the join table, include those
+    if (entityIds.length > 0) {
+      const entityArticles = await db
+        .selectDistinct({ articleId: articleEntities.articleId })
+        .from(articleEntities)
+        .where(inArray(articleEntities.entityId, entityIds.map(e => e.entityId)));
+      
+      if (entityArticles.length > 0) {
+        matchConditions.push(inArray(articles.id, entityArticles.map(a => a.articleId)));
+      }
+    }
+
+    // If no conditions, return empty array
+    if (matchConditions.length === 0) {
       return [];
     }
 
     const results = await db
-      .selectDistinct({
+      .select({
         id: articles.id,
         title: articles.title,
         url: articles.url,
@@ -1722,12 +1803,11 @@ export class DatabaseStorage implements IStorage {
         createdAt: articles.createdAt,
         updatedAt: articles.updatedAt,
       })
-      .from(articleEntities)
-      .innerJoin(articles, eq(articleEntities.articleId, articles.id))
+      .from(articles)
       .where(
         and(
-          inArray(articleEntities.entityId, entityIds.map(e => e.entityId)),
-          eq(articles.isRemoved, false)
+          eq(articles.isRemoved, false),
+          or(...matchConditions)
         )
       )
       .orderBy(desc(articles.publishedAt))

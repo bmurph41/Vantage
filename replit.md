@@ -73,7 +73,10 @@ Preferred communication style: Simple, everyday language.
 - **Marketing Module**: Tracks campaigns, expenses, and lead attribution.
 - **Fuel Sales & Ship Store Modules**: POS/inventory systems with analytics and portfolio management.
 - **Virtual Data Room (VDR) Module**: Secure document management with hierarchical folders, granular permissions, external user management, diligence request workflows, and audit logging.
-- **DockTalk 2.0 Module**: Marina industry intelligence platform with AI-powered RSS aggregation, M&A deal tracking, sentiment analysis.
+- **DockTalk 2.0 Module**: Marina industry intelligence platform with AI-powered RSS aggregation, M&A deal tracking, sentiment analysis. Features include:
+    - **Watchlists**: Track entities, categories, and locations with customizable alert frequencies.
+    - **Structured Location Watching**: Filter articles by location type (city, zip code, county, state, region) with smart state code/name matching.
+    - **Article Matching**: Real-time matching against watchlist criteria using geography arrays, title, and content search.
 - **Launch Operations Module (Dockit)**: Manages marina launch and haul scheduling, transient slips, employee assignments, with CRM and Rent Roll integration.
 - **Market Demographics Module**: Regional market analysis using FRED and Census Bureau APIs for state-level economic indicators and location-based demographics with configurable trade areas and caching.
 

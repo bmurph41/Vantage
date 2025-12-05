@@ -20,11 +20,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Eye, Plus, Trash2, Bell, BellOff, ChevronDown, ChevronRight, FileText } from "lucide-react";
+import { Eye, Plus, Trash2, Bell, BellOff, ChevronDown, ChevronRight, FileText, MapPin, X } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
+
+type LocationType = 'city' | 'zip' | 'county' | 'state' | 'region';
+
+interface StructuredLocation {
+  type: LocationType;
+  value: string;
+}
 
 interface Watchlist {
   id: string;
@@ -34,6 +42,7 @@ interface Watchlist {
     entities?: string[];
     categories?: string[];
     locations?: string[];
+    structuredLocations?: StructuredLocation[];
   } | null;
   alertFrequency: 'none' | 'immediate' | 'daily' | 'weekly';
   isActive: boolean;
@@ -50,6 +59,14 @@ interface Article {
   categories: string[];
 }
 
+const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
+  city: 'City',
+  zip: 'Zip Code',
+  county: 'County',
+  state: 'State',
+  region: 'Region',
+};
+
 export default function WatchlistsPage() {
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -58,6 +75,9 @@ export default function WatchlistsPage() {
   const [entities, setEntities] = useState("");
   const [categories, setCategories] = useState("");
   const [locations, setLocations] = useState("");
+  const [structuredLocations, setStructuredLocations] = useState<StructuredLocation[]>([]);
+  const [newLocationType, setNewLocationType] = useState<LocationType>("state");
+  const [newLocationValue, setNewLocationValue] = useState("");
   const [emailAlerts, setEmailAlerts] = useState(false);
   const [alertFrequency, setAlertFrequency] = useState("daily");
   const [expandedWatchlist, setExpandedWatchlist] = useState<string | null>(null);
@@ -192,8 +212,40 @@ export default function WatchlistsPage() {
     setEntities("");
     setCategories("");
     setLocations("");
+    setStructuredLocations([]);
+    setNewLocationType("state");
+    setNewLocationValue("");
     setEmailAlerts(false);
     setAlertFrequency("daily");
+  };
+
+  const addStructuredLocation = () => {
+    if (!newLocationValue.trim()) return;
+    
+    const newLoc: StructuredLocation = {
+      type: newLocationType,
+      value: newLocationValue.trim(),
+    };
+    
+    // Check for duplicates
+    const exists = structuredLocations.some(
+      loc => loc.type === newLoc.type && loc.value.toLowerCase() === newLoc.value.toLowerCase()
+    );
+    
+    if (!exists) {
+      setStructuredLocations([...structuredLocations, newLoc]);
+      setNewLocationValue("");
+    } else {
+      toast({
+        title: "Duplicate Location",
+        description: "This location is already added",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const removeStructuredLocation = (index: number) => {
+    setStructuredLocations(structuredLocations.filter((_, i) => i !== index));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -225,7 +277,12 @@ export default function WatchlistsPage() {
       .filter(Boolean);
 
     // Build criteria object with arrays for non-empty inputs
-    const criteriaObj: { entities?: string[]; categories?: string[]; locations?: string[] } = {};
+    const criteriaObj: { 
+      entities?: string[]; 
+      categories?: string[]; 
+      locations?: string[];
+      structuredLocations?: StructuredLocation[];
+    } = {};
     
     if (entitiesArray.length > 0) {
       criteriaObj.entities = entitiesArray;
@@ -235,6 +292,9 @@ export default function WatchlistsPage() {
     }
     if (locationsArray.length > 0) {
       criteriaObj.locations = locationsArray;
+    }
+    if (structuredLocations.length > 0) {
+      criteriaObj.structuredLocations = structuredLocations;
     }
 
     // Only include criteria if at least one field has data
@@ -346,7 +406,82 @@ export default function WatchlistsPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="locations">Locations</Label>
+                    <Label>Structured Location Watch</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Add specific locations by type for precise geographic filtering
+                    </p>
+                    
+                    <div className="flex gap-2">
+                      <Select value={newLocationType} onValueChange={(v) => setNewLocationType(v as LocationType)}>
+                        <SelectTrigger className="w-[140px]" data-testid="select-location-type">
+                          <SelectValue placeholder="Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="state">State</SelectItem>
+                          <SelectItem value="city">City</SelectItem>
+                          <SelectItem value="county">County</SelectItem>
+                          <SelectItem value="zip">Zip Code</SelectItem>
+                          <SelectItem value="region">Region</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        placeholder={
+                          newLocationType === 'state' ? 'e.g., FL or Florida' :
+                          newLocationType === 'city' ? 'e.g., Miami' :
+                          newLocationType === 'county' ? 'e.g., Miami-Dade County' :
+                          newLocationType === 'zip' ? 'e.g., 33139' :
+                          'e.g., Southeast'
+                        }
+                        value={newLocationValue}
+                        onChange={(e) => setNewLocationValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addStructuredLocation();
+                          }
+                        }}
+                        className="flex-1"
+                        data-testid="input-structured-location"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addStructuredLocation}
+                        data-testid="button-add-location"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    {structuredLocations.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {structuredLocations.map((loc, index) => (
+                          <Badge
+                            key={index}
+                            variant="secondary"
+                            className="flex items-center gap-1 pr-1"
+                          >
+                            <MapPin className="h-3 w-3 mr-1" />
+                            <span className="text-xs text-muted-foreground">{LOCATION_TYPE_LABELS[loc.type]}:</span>
+                            {loc.value}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-4 w-4 p-0 ml-1 hover:bg-destructive hover:text-destructive-foreground"
+                              onClick={() => removeStructuredLocation(index)}
+                              data-testid={`button-remove-location-${index}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="locations">Additional Locations (Legacy)</Label>
                     <Input
                       id="locations"
                       data-testid="input-locations"
@@ -354,7 +489,7 @@ export default function WatchlistsPage() {
                       value={locations}
                       onChange={(e) => setLocations(e.target.value)}
                     />
-                    <p className="text-xs text-muted-foreground">Geographic regions to monitor (comma-separated)</p>
+                    <p className="text-xs text-muted-foreground">Free-form geographic regions (comma-separated)</p>
                   </div>
                 </div>
 
@@ -503,7 +638,7 @@ export default function WatchlistsPage() {
 
                 <CardContent className="space-y-3">
                   {/* Display saved criteria */}
-                  {watchlist.criteria && (watchlist.criteria.entities || watchlist.criteria.categories || watchlist.criteria.locations) && (
+                  {watchlist.criteria && (watchlist.criteria.entities || watchlist.criteria.categories || watchlist.criteria.locations || watchlist.criteria.structuredLocations) && (
                     <div className="space-y-2">
                       <h4 className="text-sm font-medium text-muted-foreground">Tracking Criteria:</h4>
                       <div className="space-y-1 text-sm">
@@ -519,9 +654,20 @@ export default function WatchlistsPage() {
                             <span className="text-foreground">{watchlist.criteria.categories.join(', ')}</span>
                           </div>
                         )}
+                        {watchlist.criteria.structuredLocations && watchlist.criteria.structuredLocations.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            <span className="text-muted-foreground font-medium">Locations:</span>
+                            {watchlist.criteria.structuredLocations.map((loc, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                <MapPin className="h-3 w-3 mr-1" />
+                                {LOCATION_TYPE_LABELS[loc.type as LocationType]}: {loc.value}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                         {watchlist.criteria.locations && watchlist.criteria.locations.length > 0 && (
                           <div className="flex gap-2">
-                            <span className="text-muted-foreground font-medium">Locations:</span>
+                            <span className="text-muted-foreground font-medium">Other Locations:</span>
                             <span className="text-foreground">{watchlist.criteria.locations.join(', ')}</span>
                           </div>
                         )}

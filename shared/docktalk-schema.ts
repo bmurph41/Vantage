@@ -186,13 +186,26 @@ export const articleEntities = pgTable("docktalk_article_entities", {
   uniqueArticleEntity: index("idx_docktalk_article_entities_unique").on(table.articleId, table.entityId),
 }));
 
+// Structured location type for watchlist criteria
+export type WatchlistLocation = {
+  type: 'city' | 'zip' | 'county' | 'state' | 'region';
+  value: string;
+};
+
+export type WatchlistCriteria = {
+  entities?: string[];
+  categories?: string[];
+  locations?: string[]; // Legacy simple locations for backward compatibility
+  structuredLocations?: WatchlistLocation[]; // New structured locations
+};
+
 export const watchlists = pgTable("docktalk_watchlists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   orgId: varchar("org_id").notNull(), // Organization scope for multi-tenancy
   name: text("name").notNull(),
   description: text("description"),
-  criteria: jsonb("criteria").$type<{ entities?: string[]; categories?: string[]; locations?: string[] }>(),
+  criteria: jsonb("criteria").$type<WatchlistCriteria>(),
   alertFrequency: alertFrequencyEnum("alert_frequency").notNull().default("none"),
   lastAlertSent: timestamp("last_alert_sent"),
   isActive: boolean("is_active").default(true),
