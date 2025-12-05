@@ -31,13 +31,17 @@ export class CompService {
         
         if (matchedProperty) {
           propertyId = matchedProperty.id;
+          console.log(`[CompService] Auto-matched "${compData.marina}" to existing property ${matchedProperty.id}`);
         } else {
           // Don't auto-create property - this will be done after creating the comp
           // so we have a compId to reference in pending_properties
           pendingPropertyId = 'pending';
+          console.log(`[CompService] No existing property match for "${compData.marina}" - will create pending property`);
         }
       } catch (error) {
-        console.error('Error matching property during comp creation:', error);
+        console.error(`[CompService] FAILED to match property for "${compData.marina}":`, error);
+        // Still mark as pending so we don't lose the data
+        pendingPropertyId = 'pending';
       }
     }
 
@@ -105,8 +109,9 @@ export class CompService {
         });
         
         const compType = compData.isChild ? 'portfolio child comp' : 'individual comp';
+        console.log(`[CompService] Created pending property for "${compData.marina}" (${compType}), pending ID: ${pendingProperty.id}`);
       } catch (error) {
-        console.error('Error creating pending property:', error);
+        console.error(`[CompService] FAILED to create pending property for "${compData.marina}":`, error);
       }
     } else if (isPortfolioParent) {
     }
@@ -132,7 +137,7 @@ export class CompService {
         // Check for similar companies to suggest duplicates
         const similarCompanies = await this.storage.findSimilarCompanies(compData.orgId, name);
         
-        await this.storage.createPendingCompany({
+        const pendingCompany = await this.storage.createPendingCompany({
           orgId: compData.orgId,
           name,
           status: 'pending',
@@ -140,8 +145,9 @@ export class CompService {
           sourceMetadata: { salesCompId: comp.id, role },
           createdBy: userId,
         });
+        console.log(`[CompService] Created pending company "${name}" (${role}) for comp "${compData.marina}"`);
       } catch (error) {
-        console.error(`Error creating pending company for ${role}:`, error);
+        console.error(`[CompService] FAILED to create pending company for ${role} "${name}":`, error);
       }
     }
     
