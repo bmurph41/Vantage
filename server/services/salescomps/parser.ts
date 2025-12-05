@@ -368,9 +368,31 @@ export class ParserService {
   }
 
   private estimateRowCount(file: Express.Multer.File): number {
-    const text = file.buffer.toString('utf-8');
-    const lines = text.split('\n').length;
-    return Math.max(0, lines - 1); // Subtract header row
+    const isExcel = file.mimetype.includes('sheet') || file.originalname.endsWith('.xlsx') || file.originalname.endsWith('.xls');
+    
+    if (isExcel) {
+      // For Excel files, we need to actually parse the file to get accurate row count
+      // since Excel files are binary and can't be counted by newlines
+      try {
+        const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        
+        // Get the range of the sheet to determine row count
+        const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+        const totalRows = range.e.r; // End row (0-indexed), excludes header
+        
+        return Math.max(0, totalRows);
+      } catch (e) {
+        // Fallback if parsing fails
+        return 0;
+      }
+    } else {
+      // For CSV files, count newlines (faster than full parsing)
+      const text = file.buffer.toString('utf-8');
+      const lines = text.split('\n').filter(line => line.trim().length > 0).length;
+      return Math.max(0, lines - 1); // Subtract header row
+    }
   }
 
   private generateMapping(headers: string[]): Record<string, string> {
