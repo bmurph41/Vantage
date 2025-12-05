@@ -81,7 +81,7 @@ import {
 } from "@shared/schema";
 import { organizationFeatures, type OrganizationFeature } from "@shared/docktalk-schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count, ilike } from "drizzle-orm";
 import { VdrStorage } from "./vdr-storage";
 import { VdrPermissionService } from "./vdr-permission-service";
 
@@ -4611,22 +4611,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findPropertyByLocation(orgId: string, marina: string, city?: string, state?: string): Promise<Property | undefined> {
+    // Validate input - marina name is required
+    if (!marina || marina.trim().length === 0) {
+      return undefined;
+    }
+    
     const conditions = [eq(crmProperties.orgId, orgId)];
     
     // Normalize marina name for comparison (case-insensitive, trim whitespace)
     const normalizedMarina = marina.trim().toLowerCase();
-    conditions.push(sql`LOWER(TRIM(${crmProperties.title})) = ${normalizedMarina}`);
+    conditions.push(ilike(crmProperties.title, normalizedMarina));
     
     // If city is provided, match it (case-insensitive)
-    if (city) {
-      const normalizedCity = city.trim().toLowerCase();
-      conditions.push(sql`LOWER(TRIM(${crmProperties.address})) LIKE ${'%' + normalizedCity + '%'}`);
+    if (city && city.trim().length > 0) {
+      const cityPattern = `%${city.trim()}%`;
+      conditions.push(ilike(crmProperties.address, cityPattern));
     }
     
     // If state is provided, match it (case-insensitive)
-    if (state) {
-      const normalizedState = state.trim().toLowerCase();
-      conditions.push(sql`LOWER(TRIM(${crmProperties.address})) LIKE ${'%' + normalizedState + '%'}`);
+    if (state && state.trim().length > 0) {
+      const statePattern = `%${state.trim()}%`;
+      conditions.push(ilike(crmProperties.address, statePattern));
     }
     
     const [property] = await db.select()
@@ -4638,39 +4643,51 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findSimilarProperties(orgId: string, marina: string, city?: string, state?: string): Promise<Property[]> {
+    // Validate input
+    if (!marina || marina.trim().length === 0) {
+      return [];
+    }
+    
     const normalizedMarina = marina.trim().toLowerCase();
     
     // Build comprehensive similarity query
     // 1. Exact match on title
     // 2. Title contains any significant word from marina name (3+ chars)
-    // 3. Marina name contains title
     const marinaWords = normalizedMarina.split(/\s+/).filter(w => w.length >= 3);
     
+    // Build title conditions using ilike for safety
     const titleConditions = [
-      sql`LOWER(TRIM(${crmProperties.title})) = ${normalizedMarina}`, // Exact match
-      ...marinaWords.map(word => 
-        sql`LOWER(${crmProperties.title}) LIKE ${'%' + word + '%'}`  // Contains word
-      ),
-      sql`LOWER(${normalizedMarina}) LIKE '%' || LOWER(${crmProperties.title}) || '%'` // Name contains title
+      ilike(crmProperties.title, normalizedMarina), // Exact match (case-insensitive)
+      ilike(crmProperties.title, `%${normalizedMarina}%`), // Title contains marina name
     ];
     
-    const similarityCondition = or(...titleConditions);
+    // Add word-based matching only if we have significant words
+    marinaWords.forEach(word => {
+      titleConditions.push(ilike(crmProperties.title, `%${word}%`));
+    });
     
-    // Base conditions - FIXED: Use orgId instead of ownerId
+    // Ensure we have at least one valid condition
+    const similarityCondition = titleConditions.length > 0 ? or(...titleConditions) : ilike(crmProperties.title, `%${normalizedMarina}%`);
+    
+    // Base conditions
     const conditions = [
       eq(crmProperties.orgId, orgId),
-      similarityCondition
     ];
     
-    // Add location filters if provided
-    if (city) {
-      const normalizedCity = city.trim().toLowerCase();
-      conditions.push(sql`LOWER(${crmProperties.address}) LIKE ${'%' + normalizedCity + '%'}`);
+    // Only add similarity condition if valid
+    if (similarityCondition) {
+      conditions.push(similarityCondition);
     }
     
-    if (state) {
-      const normalizedState = state.trim().toLowerCase();
-      conditions.push(sql`LOWER(${crmProperties.address}) LIKE ${'%' + normalizedState + '%'}`);
+    // Add location filters if provided
+    if (city && city.trim().length > 0) {
+      const cityPattern = `%${city.trim()}%`;
+      conditions.push(ilike(crmProperties.address, cityPattern));
+    }
+    
+    if (state && state.trim().length > 0) {
+      const statePattern = `%${state.trim()}%`;
+      conditions.push(ilike(crmProperties.address, statePattern));
     }
     
     const properties = await db.select()
@@ -4686,14 +4703,19 @@ export class DatabaseStorage implements IStorage {
   // ============================================================================
 
   async findCompanyByName(orgId: string, companyName: string): Promise<CRMCompany | undefined> {
+    // Validate input
+    if (!companyName || companyName.trim().length === 0) {
+      return undefined;
+    }
+    
     // Normalize company name for comparison (case-insensitive, trim whitespace)
-    const normalizedName = companyName.trim().toLowerCase();
+    const normalizedName = companyName.trim();
     
     const [company] = await db.select()
       .from(crmCompanies)
       .where(and(
         eq(crmCompanies.orgId, orgId),
-        sql`LOWER(TRIM(${crmCompanies.name})) = ${normalizedName}`
+        ilike(crmCompanies.name, normalizedName)
       ))
       .limit(1);
     
@@ -4701,19 +4723,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findSimilarCompanies(orgId: string, companyName: string): Promise<CRMCompany[]> {
+    // Validate input
+    if (!companyName || companyName.trim().length === 0) {
+      return [];
+    }
+    
     const normalizedName = companyName.trim().toLowerCase();
     
     // Build similarity query
     const nameWords = normalizedName.split(/\s+/).filter(w => w.length >= 3);
     
+    // Build name conditions using ilike for safety
     const nameConditions = [
-      sql`LOWER(TRIM(${crmCompanies.name})) = ${normalizedName}`, // Exact match
-      ...nameWords.map(word => 
-        sql`LOWER(${crmCompanies.name}) LIKE ${'%' + word + '%'}`  // Contains word
-      ),
+      ilike(crmCompanies.name, normalizedName), // Exact match (case-insensitive)
+      ilike(crmCompanies.name, `%${normalizedName}%`), // Name contains search term
     ];
     
-    const similarityCondition = or(...nameConditions);
+    // Add word-based matching
+    nameWords.forEach(word => {
+      nameConditions.push(ilike(crmCompanies.name, `%${word}%`));
+    });
+    
+    const similarityCondition = nameConditions.length > 0 ? or(...nameConditions) : ilike(crmCompanies.name, `%${normalizedName}%`);
     
     const companies = await db.select()
       .from(crmCompanies)
@@ -4731,14 +4762,41 @@ export class DatabaseStorage implements IStorage {
   // ============================================================================
 
   async findContactByName(orgId: string, contactName: string): Promise<CRMContact | undefined> {
-    // Normalize contact name for comparison (case-insensitive, trim whitespace)
-    const normalizedName = contactName.trim().toLowerCase();
+    // Validate input
+    if (!contactName || contactName.trim().length === 0) {
+      return undefined;
+    }
     
+    // Normalize contact name for comparison
+    const normalizedName = contactName.trim();
+    const nameParts = normalizedName.split(/\s+/);
+    
+    // Try to match by first name and last name if both provided
+    if (nameParts.length >= 2) {
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ');
+      
+      const [contact] = await db.select()
+        .from(crmContacts)
+        .where(and(
+          eq(crmContacts.orgId, orgId),
+          ilike(crmContacts.firstName, firstName),
+          ilike(crmContacts.lastName, lastName)
+        ))
+        .limit(1);
+      
+      if (contact) return contact;
+    }
+    
+    // Fallback: search by either first or last name
     const [contact] = await db.select()
       .from(crmContacts)
       .where(and(
         eq(crmContacts.orgId, orgId),
-        sql`LOWER(TRIM(${crmContacts.firstName} || ' ' || ${crmContacts.lastName})) = ${normalizedName}`
+        or(
+          ilike(crmContacts.firstName, normalizedName),
+          ilike(crmContacts.lastName, normalizedName)
+        )
       ))
       .limit(1);
     
@@ -4746,17 +4804,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findSimilarContacts(orgId: string, contactName: string): Promise<CRMContact[]> {
+    // Validate input
+    if (!contactName || contactName.trim().length === 0) {
+      return [];
+    }
+    
     const normalizedName = contactName.trim().toLowerCase();
     
     // Build similarity query
     const nameWords = normalizedName.split(/\s+/).filter(w => w.length >= 2);
     
-    const nameConditions = [
-      sql`LOWER(TRIM(${crmContacts.firstName} || ' ' || ${crmContacts.lastName})) = ${normalizedName}`, // Exact full name match
-      ...nameWords.map(word => 
-        sql`(LOWER(${crmContacts.firstName}) LIKE ${'%' + word + '%'} OR LOWER(${crmContacts.lastName}) LIKE ${'%' + word + '%'})`
-      ),
-    ];
+    // Build name conditions using ilike for safety
+    const nameConditions: any[] = [];
+    
+    // Match full name parts
+    nameWords.forEach(word => {
+      nameConditions.push(ilike(crmContacts.firstName, `%${word}%`));
+      nameConditions.push(ilike(crmContacts.lastName, `%${word}%`));
+    });
+    
+    // If no valid words, search by the full name
+    if (nameConditions.length === 0) {
+      nameConditions.push(ilike(crmContacts.firstName, `%${normalizedName}%`));
+      nameConditions.push(ilike(crmContacts.lastName, `%${normalizedName}%`));
+    }
     
     const similarityCondition = or(...nameConditions);
     
