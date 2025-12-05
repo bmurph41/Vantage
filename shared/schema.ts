@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index, customType, decimal, numeric, real } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index, customType, decimal, numeric, real, time } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -108,6 +108,28 @@ export const outreachCampaignStatusEnum = pgEnum("outreach_campaign_status", ["d
 export const outreachCampaignTypeEnum = pgEnum("outreach_campaign_type", ["email", "call", "mixed"]);
 export const marketTargetStatusEnum = pgEnum("market_target_status", ["research", "active", "saturated", "paused"]);
 export const marketTargetPriorityEnum = pgEnum("market_target_priority", ["low", "medium", "high", "critical"]);
+
+// Service Department enums
+export const workOrderStatusEnum = pgEnum("work_order_status", ["pending", "scheduled", "in_progress", "on_hold", "completed", "cancelled"]);
+export const workOrderPriorityEnum = pgEnum("work_order_priority", ["low", "normal", "high", "urgent"]);
+export const serviceJobTypeEnum = pgEnum("service_job_type", ["maintenance", "repair", "winterization", "spring_commissioning", "bottom_paint", "engine_service", "electrical", "fiberglass", "upholstery", "detailing", "inspection", "other"]);
+export const partsCategoryEnum = pgEnum("parts_category", ["engine", "electrical", "plumbing", "hull", "rigging", "safety", "navigation", "cleaning", "general", "other"]);
+
+// Boat Rentals enums
+export const rentalStatusEnum = pgEnum("rental_status", ["available", "reserved", "rented", "maintenance", "retired"]);
+export const rentalBookingStatusEnum = pgEnum("rental_booking_status", ["pending", "confirmed", "checked_out", "returned", "cancelled", "no_show"]);
+export const rentalPricingTypeEnum = pgEnum("rental_pricing_type", ["hourly", "half_day", "full_day", "weekly", "monthly"]);
+
+// Boat Club enums
+export const clubMembershipStatusEnum = pgEnum("club_membership_status", ["active", "suspended", "expired", "cancelled", "pending"]);
+export const clubMembershipTierEnum = pgEnum("club_membership_tier", ["bronze", "silver", "gold", "platinum", "unlimited"]);
+export const clubBookingStatusEnum = pgEnum("club_booking_status", ["pending", "confirmed", "checked_out", "returned", "cancelled", "no_show"]);
+
+// Boat Sales enums
+export const boatConditionEnum = pgEnum("boat_condition", ["new", "excellent", "good", "fair", "project"]);
+export const boatSaleStatusEnum = pgEnum("boat_sale_status", ["available", "pending", "sold", "consignment", "trade_in", "archived"]);
+export const tradeInStatusEnum = pgEnum("trade_in_status", ["pending_evaluation", "evaluated", "accepted", "rejected", "completed"]);
+export const financingStatusEnum = pgEnum("financing_status", ["not_started", "pre_approved", "application_submitted", "approved", "declined", "funded"]);
 
 // SSO Provider enums
 export const ssoProviderEnum = pgEnum("sso_provider", ["okta", "azure_ad", "onelogin", "google_workspace", "custom_saml"]);
@@ -6957,6 +6979,510 @@ export const fuelImportLogs = pgTable('fuel_import_logs', {
 }));
 
 // ================================================================================
+// SERVICE DEPARTMENT - Work Orders, Parts, Technicians, Labor
+// ================================================================================
+
+// Service Technicians - Staff who perform service work
+export const serviceTechnicians = pgTable('service_technicians', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').references(() => users.id),
+  firstName: text('first_name').notNull(),
+  lastName: text('last_name').notNull(),
+  email: text('email'),
+  phone: text('phone'),
+  hourlyRate: decimal('hourly_rate', { precision: 10, scale: 2 }),
+  specialties: text('specialties').array(),
+  certifications: jsonb('certifications').default(sql`'[]'`),
+  isActive: boolean('is_active').default(true).notNull(),
+  hireDate: date('hire_date'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('service_technicians_org_idx').on(table.orgId),
+  activeIdx: index('service_technicians_active_idx').on(table.isActive),
+  userIdx: index('service_technicians_user_idx').on(table.userId),
+}));
+
+// Service Parts - Parts inventory for service department
+export const serviceParts = pgTable('service_parts', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  partNumber: text('part_number').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  category: partsCategoryEnum('category').notNull().default('general'),
+  manufacturer: text('manufacturer'),
+  unitCost: decimal('unit_cost', { precision: 10, scale: 2 }).notNull(),
+  retailPrice: decimal('retail_price', { precision: 10, scale: 2 }).notNull(),
+  quantityOnHand: integer('quantity_on_hand').default(0).notNull(),
+  reorderPoint: integer('reorder_point').default(5).notNull(),
+  reorderQuantity: integer('reorder_quantity').default(10).notNull(),
+  location: text('location'),
+  isActive: boolean('is_active').default(true).notNull(),
+  glAccount: text('gl_account'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('service_parts_org_idx').on(table.orgId),
+  partNumberIdx: index('service_parts_part_number_idx').on(table.partNumber),
+  categoryIdx: index('service_parts_category_idx').on(table.category),
+  activeIdx: index('service_parts_active_idx').on(table.isActive),
+  uniquePartNumber: unique('service_parts_org_part_number').on(table.orgId, table.partNumber),
+}));
+
+// Service Work Orders - Main work order tracking
+export const serviceWorkOrders = pgTable('service_work_orders', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  workOrderNumber: text('work_order_number').notNull(),
+  customerId: varchar('customer_id').references(() => marinaCustomers.id),
+  contactId: varchar('contact_id').references(() => crmContacts.id),
+  boatId: varchar('boat_id').references(() => boatRegistry.id),
+  boatName: text('boat_name'),
+  boatMake: text('boat_make'),
+  boatModel: text('boat_model'),
+  boatYear: integer('boat_year'),
+  jobType: serviceJobTypeEnum('job_type').notNull().default('maintenance'),
+  status: workOrderStatusEnum('status').notNull().default('pending'),
+  priority: workOrderPriorityEnum('priority').notNull().default('normal'),
+  description: text('description').notNull(),
+  estimatedHours: decimal('estimated_hours', { precision: 6, scale: 2 }),
+  actualHours: decimal('actual_hours', { precision: 6, scale: 2 }),
+  estimatedCost: decimal('estimated_cost', { precision: 10, scale: 2 }),
+  laborTotal: decimal('labor_total', { precision: 10, scale: 2 }).default('0'),
+  partsTotal: decimal('parts_total', { precision: 10, scale: 2 }).default('0'),
+  taxAmount: decimal('tax_amount', { precision: 10, scale: 2 }).default('0'),
+  totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).default('0'),
+  scheduledDate: date('scheduled_date'),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  assignedTechnicianId: varchar('assigned_technician_id').references(() => serviceTechnicians.id),
+  internalNotes: text('internal_notes'),
+  customerNotes: text('customer_notes'),
+  glAccount: text('gl_account'),
+  invoiceId: varchar('invoice_id'),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('service_work_orders_org_idx').on(table.orgId),
+  workOrderNumberIdx: index('service_work_orders_number_idx').on(table.workOrderNumber),
+  statusIdx: index('service_work_orders_status_idx').on(table.status),
+  customerIdx: index('service_work_orders_customer_idx').on(table.customerId),
+  technicianIdx: index('service_work_orders_technician_idx').on(table.assignedTechnicianId),
+  scheduledDateIdx: index('service_work_orders_scheduled_date_idx').on(table.scheduledDate),
+  uniqueWorkOrderNumber: unique('service_work_orders_org_number').on(table.orgId, table.workOrderNumber),
+}));
+
+// Service Labor Entries - Time tracking for work orders
+export const serviceLaborEntries = pgTable('service_labor_entries', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  workOrderId: varchar('work_order_id').notNull().references(() => serviceWorkOrders.id, { onDelete: 'cascade' }),
+  technicianId: varchar('technician_id').notNull().references(() => serviceTechnicians.id),
+  description: text('description'),
+  hours: decimal('hours', { precision: 6, scale: 2 }).notNull(),
+  hourlyRate: decimal('hourly_rate', { precision: 10, scale: 2 }).notNull(),
+  totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
+  workDate: date('work_date').notNull(),
+  startTime: time('start_time'),
+  endTime: time('end_time'),
+  isBillable: boolean('is_billable').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('service_labor_entries_org_idx').on(table.orgId),
+  workOrderIdx: index('service_labor_entries_work_order_idx').on(table.workOrderId),
+  technicianIdx: index('service_labor_entries_technician_idx').on(table.technicianId),
+  workDateIdx: index('service_labor_entries_work_date_idx').on(table.workDate),
+}));
+
+// Service Parts Used - Parts used on work orders
+export const servicePartsUsed = pgTable('service_parts_used', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  workOrderId: varchar('work_order_id').notNull().references(() => serviceWorkOrders.id, { onDelete: 'cascade' }),
+  partId: varchar('part_id').notNull().references(() => serviceParts.id),
+  quantity: integer('quantity').notNull().default(1),
+  unitCost: decimal('unit_cost', { precision: 10, scale: 2 }).notNull(),
+  unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(),
+  totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('service_parts_used_org_idx').on(table.orgId),
+  workOrderIdx: index('service_parts_used_work_order_idx').on(table.workOrderId),
+  partIdx: index('service_parts_used_part_idx').on(table.partId),
+}));
+
+// ================================================================================
+// BOAT RENTALS - Fleet, Reservations, Pricing
+// ================================================================================
+
+// Boat Rental Fleet - Rental boat inventory
+export const boatRentalFleet = pgTable('boat_rental_fleet', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  make: text('make'),
+  model: text('model'),
+  year: integer('year'),
+  length: decimal('length', { precision: 5, scale: 2 }),
+  capacity: integer('capacity'),
+  engineType: text('engine_type'),
+  engineHorsepower: integer('engine_horsepower'),
+  fuelType: text('fuel_type'),
+  registrationNumber: text('registration_number'),
+  status: rentalStatusEnum('status').notNull().default('available'),
+  hourlyRate: decimal('hourly_rate', { precision: 10, scale: 2 }),
+  halfDayRate: decimal('half_day_rate', { precision: 10, scale: 2 }),
+  fullDayRate: decimal('full_day_rate', { precision: 10, scale: 2 }),
+  weeklyRate: decimal('weekly_rate', { precision: 10, scale: 2 }),
+  securityDeposit: decimal('security_deposit', { precision: 10, scale: 2 }),
+  insuranceValue: decimal('insurance_value', { precision: 12, scale: 2 }),
+  purchaseDate: date('purchase_date'),
+  purchasePrice: decimal('purchase_price', { precision: 12, scale: 2 }),
+  currentValue: decimal('current_value', { precision: 12, scale: 2 }),
+  maintenanceNotes: text('maintenance_notes'),
+  features: text('features').array(),
+  images: jsonb('images').default(sql`'[]'`),
+  glAccount: text('gl_account'),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('boat_rental_fleet_org_idx').on(table.orgId),
+  statusIdx: index('boat_rental_fleet_status_idx').on(table.status),
+  activeIdx: index('boat_rental_fleet_active_idx').on(table.isActive),
+}));
+
+// Boat Rentals - Rental transactions/reservations
+export const boatRentals = pgTable('boat_rentals', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  rentalNumber: text('rental_number').notNull(),
+  boatId: varchar('boat_id').notNull().references(() => boatRentalFleet.id),
+  customerId: varchar('customer_id').references(() => marinaCustomers.id),
+  contactId: varchar('contact_id').references(() => crmContacts.id),
+  customerName: text('customer_name').notNull(),
+  customerEmail: text('customer_email'),
+  customerPhone: text('customer_phone'),
+  status: rentalBookingStatusEnum('status').notNull().default('pending'),
+  pricingType: rentalPricingTypeEnum('pricing_type').notNull().default('full_day'),
+  startDateTime: timestamp('start_date_time', { withTimezone: true }).notNull(),
+  endDateTime: timestamp('end_date_time', { withTimezone: true }).notNull(),
+  actualReturnTime: timestamp('actual_return_time', { withTimezone: true }),
+  baseRate: decimal('base_rate', { precision: 10, scale: 2 }).notNull(),
+  hoursRented: decimal('hours_rented', { precision: 6, scale: 2 }),
+  fuelCharge: decimal('fuel_charge', { precision: 10, scale: 2 }).default('0'),
+  damageCharge: decimal('damage_charge', { precision: 10, scale: 2 }).default('0'),
+  lateCharge: decimal('late_charge', { precision: 10, scale: 2 }).default('0'),
+  discountAmount: decimal('discount_amount', { precision: 10, scale: 2 }).default('0'),
+  taxAmount: decimal('tax_amount', { precision: 10, scale: 2 }).default('0'),
+  totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
+  depositPaid: decimal('deposit_paid', { precision: 10, scale: 2 }).default('0'),
+  depositReturned: decimal('deposit_returned', { precision: 10, scale: 2 }).default('0'),
+  paymentMethod: paymentMethodEnum('payment_method'),
+  checkoutNotes: text('checkout_notes'),
+  returnNotes: text('return_notes'),
+  damageReport: text('damage_report'),
+  fuelLevelOut: integer('fuel_level_out'),
+  fuelLevelIn: integer('fuel_level_in'),
+  mileageOut: decimal('mileage_out', { precision: 10, scale: 1 }),
+  mileageIn: decimal('mileage_in', { precision: 10, scale: 1 }),
+  checkedOutBy: varchar('checked_out_by').references(() => users.id),
+  checkedInBy: varchar('checked_in_by').references(() => users.id),
+  glAccount: text('gl_account'),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('boat_rentals_org_idx').on(table.orgId),
+  rentalNumberIdx: index('boat_rentals_number_idx').on(table.rentalNumber),
+  boatIdx: index('boat_rentals_boat_idx').on(table.boatId),
+  customerIdx: index('boat_rentals_customer_idx').on(table.customerId),
+  statusIdx: index('boat_rentals_status_idx').on(table.status),
+  startDateIdx: index('boat_rentals_start_date_idx').on(table.startDateTime),
+  uniqueRentalNumber: unique('boat_rentals_org_number').on(table.orgId, table.rentalNumber),
+}));
+
+// ================================================================================
+// BOAT CLUB - Memberships, Fleet, Bookings
+// ================================================================================
+
+// Boat Club Fleet - Boats available to club members
+export const boatClubFleet = pgTable('boat_club_fleet', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  make: text('make'),
+  model: text('model'),
+  year: integer('year'),
+  length: decimal('length', { precision: 5, scale: 2 }),
+  capacity: integer('capacity'),
+  engineType: text('engine_type'),
+  engineHorsepower: integer('engine_horsepower'),
+  fuelType: text('fuel_type'),
+  registrationNumber: text('registration_number'),
+  status: rentalStatusEnum('status').notNull().default('available'),
+  minimumMembershipTier: clubMembershipTierEnum('minimum_membership_tier').default('bronze'),
+  hoursPerMonth: integer('hours_per_month'),
+  advanceBookingDays: integer('advance_booking_days').default(14),
+  purchaseDate: date('purchase_date'),
+  purchasePrice: decimal('purchase_price', { precision: 12, scale: 2 }),
+  currentValue: decimal('current_value', { precision: 12, scale: 2 }),
+  maintenanceNotes: text('maintenance_notes'),
+  features: text('features').array(),
+  images: jsonb('images').default(sql`'[]'`),
+  glAccount: text('gl_account'),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('boat_club_fleet_org_idx').on(table.orgId),
+  statusIdx: index('boat_club_fleet_status_idx').on(table.status),
+  tierIdx: index('boat_club_fleet_tier_idx').on(table.minimumMembershipTier),
+  activeIdx: index('boat_club_fleet_active_idx').on(table.isActive),
+}));
+
+// Boat Club Memberships - Member management
+export const boatClubMemberships = pgTable('boat_club_memberships', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  memberNumber: text('member_number').notNull(),
+  customerId: varchar('customer_id').references(() => marinaCustomers.id),
+  contactId: varchar('contact_id').references(() => crmContacts.id),
+  firstName: text('first_name').notNull(),
+  lastName: text('last_name').notNull(),
+  email: text('email').notNull(),
+  phone: text('phone'),
+  tier: clubMembershipTierEnum('tier').notNull().default('bronze'),
+  status: clubMembershipStatusEnum('status').notNull().default('pending'),
+  monthlyFee: decimal('monthly_fee', { precision: 10, scale: 2 }).notNull(),
+  setupFee: decimal('setup_fee', { precision: 10, scale: 2 }).default('0'),
+  hoursIncluded: integer('hours_included'),
+  hoursUsedThisMonth: decimal('hours_used_this_month', { precision: 6, scale: 2 }).default('0'),
+  additionalHourRate: decimal('additional_hour_rate', { precision: 10, scale: 2 }),
+  joinDate: date('join_date').notNull(),
+  renewalDate: date('renewal_date'),
+  expirationDate: date('expiration_date'),
+  autoRenew: boolean('auto_renew').default(true),
+  emergencyContactName: text('emergency_contact_name'),
+  emergencyContactPhone: text('emergency_contact_phone'),
+  boatingLicense: text('boating_license'),
+  licenseExpiration: date('license_expiration'),
+  notes: text('notes'),
+  glAccount: text('gl_account'),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('boat_club_memberships_org_idx').on(table.orgId),
+  memberNumberIdx: index('boat_club_memberships_number_idx').on(table.memberNumber),
+  statusIdx: index('boat_club_memberships_status_idx').on(table.status),
+  tierIdx: index('boat_club_memberships_tier_idx').on(table.tier),
+  customerIdx: index('boat_club_memberships_customer_idx').on(table.customerId),
+  uniqueMemberNumber: unique('boat_club_memberships_org_number').on(table.orgId, table.memberNumber),
+}));
+
+// Boat Club Bookings - Reservation system
+export const boatClubBookings = pgTable('boat_club_bookings', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  bookingNumber: text('booking_number').notNull(),
+  membershipId: varchar('membership_id').notNull().references(() => boatClubMemberships.id),
+  boatId: varchar('boat_id').notNull().references(() => boatClubFleet.id),
+  status: clubBookingStatusEnum('status').notNull().default('pending'),
+  startDateTime: timestamp('start_date_time', { withTimezone: true }).notNull(),
+  endDateTime: timestamp('end_date_time', { withTimezone: true }).notNull(),
+  actualReturnTime: timestamp('actual_return_time', { withTimezone: true }),
+  hoursBooked: decimal('hours_booked', { precision: 6, scale: 2 }).notNull(),
+  hoursUsed: decimal('hours_used', { precision: 6, scale: 2 }),
+  isIncludedHours: boolean('is_included_hours').default(true),
+  additionalHoursCharge: decimal('additional_hours_charge', { precision: 10, scale: 2 }).default('0'),
+  fuelCharge: decimal('fuel_charge', { precision: 10, scale: 2 }).default('0'),
+  cleaningCharge: decimal('cleaning_charge', { precision: 10, scale: 2 }).default('0'),
+  damageCharge: decimal('damage_charge', { precision: 10, scale: 2 }).default('0'),
+  totalCharges: decimal('total_charges', { precision: 10, scale: 2 }).default('0'),
+  checkoutNotes: text('checkout_notes'),
+  returnNotes: text('return_notes'),
+  damageReport: text('damage_report'),
+  fuelLevelOut: integer('fuel_level_out'),
+  fuelLevelIn: integer('fuel_level_in'),
+  checkedOutBy: varchar('checked_out_by').references(() => users.id),
+  checkedInBy: varchar('checked_in_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('boat_club_bookings_org_idx').on(table.orgId),
+  bookingNumberIdx: index('boat_club_bookings_number_idx').on(table.bookingNumber),
+  membershipIdx: index('boat_club_bookings_membership_idx').on(table.membershipId),
+  boatIdx: index('boat_club_bookings_boat_idx').on(table.boatId),
+  statusIdx: index('boat_club_bookings_status_idx').on(table.status),
+  startDateIdx: index('boat_club_bookings_start_date_idx').on(table.startDateTime),
+  uniqueBookingNumber: unique('boat_club_bookings_org_number').on(table.orgId, table.bookingNumber),
+}));
+
+// ================================================================================
+// BOAT SALES - Inventory, Sales, Trade-ins
+// ================================================================================
+
+// Boat Sales Inventory - New and used boats for sale
+export const boatSalesInventory = pgTable('boat_sales_inventory', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  stockNumber: text('stock_number').notNull(),
+  make: text('make').notNull(),
+  model: text('model').notNull(),
+  year: integer('year').notNull(),
+  condition: boatConditionEnum('condition').notNull().default('new'),
+  status: boatSaleStatusEnum('status').notNull().default('available'),
+  length: decimal('length', { precision: 5, scale: 2 }),
+  beam: decimal('beam', { precision: 5, scale: 2 }),
+  draft: decimal('draft', { precision: 5, scale: 2 }),
+  weight: integer('weight'),
+  capacity: integer('capacity'),
+  hullMaterial: text('hull_material'),
+  engineMake: text('engine_make'),
+  engineModel: text('engine_model'),
+  engineHorsepower: integer('engine_horsepower'),
+  engineHours: integer('engine_hours'),
+  fuelType: text('fuel_type'),
+  fuelCapacity: integer('fuel_capacity'),
+  registrationNumber: text('registration_number'),
+  hullId: text('hull_id'),
+  listPrice: decimal('list_price', { precision: 12, scale: 2 }).notNull(),
+  minPrice: decimal('min_price', { precision: 12, scale: 2 }),
+  cost: decimal('cost', { precision: 12, scale: 2 }),
+  floorPlanAmount: decimal('floor_plan_amount', { precision: 12, scale: 2 }),
+  floorPlanRate: decimal('floor_plan_rate', { precision: 5, scale: 3 }),
+  floorPlanStartDate: date('floor_plan_start_date'),
+  location: text('location'),
+  slipNumber: text('slip_number'),
+  consignorId: varchar('consignor_id').references(() => crmContacts.id),
+  consignmentFeePercent: decimal('consignment_fee_percent', { precision: 5, scale: 2 }),
+  features: text('features').array(),
+  options: jsonb('options').default(sql`'[]'`),
+  description: text('description'),
+  internalNotes: text('internal_notes'),
+  images: jsonb('images').default(sql`'[]'`),
+  videos: jsonb('videos').default(sql`'[]'`),
+  documents: jsonb('documents').default(sql`'[]'`),
+  dateAcquired: date('date_acquired'),
+  daysOnLot: integer('days_on_lot').default(0),
+  webListing: boolean('web_listing').default(true),
+  featuredListing: boolean('featured_listing').default(false),
+  glAccount: text('gl_account'),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('boat_sales_inventory_org_idx').on(table.orgId),
+  stockNumberIdx: index('boat_sales_inventory_stock_idx').on(table.stockNumber),
+  statusIdx: index('boat_sales_inventory_status_idx').on(table.status),
+  conditionIdx: index('boat_sales_inventory_condition_idx').on(table.condition),
+  makeModelIdx: index('boat_sales_inventory_make_model_idx').on(table.make, table.model),
+  uniqueStockNumber: unique('boat_sales_inventory_org_stock').on(table.orgId, table.stockNumber),
+}));
+
+// Boat Sales Transactions - Sales records
+export const boatSalesTransactions = pgTable('boat_sales_transactions', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  transactionNumber: text('transaction_number').notNull(),
+  inventoryId: varchar('inventory_id').notNull().references(() => boatSalesInventory.id),
+  customerId: varchar('customer_id').references(() => marinaCustomers.id),
+  contactId: varchar('contact_id').references(() => crmContacts.id),
+  dealId: varchar('deal_id').references(() => crmDeals.id),
+  buyerName: text('buyer_name').notNull(),
+  buyerEmail: text('buyer_email'),
+  buyerPhone: text('buyer_phone'),
+  buyerAddress: jsonb('buyer_address').default(sql`'{}'`),
+  saleDate: date('sale_date').notNull(),
+  salePrice: decimal('sale_price', { precision: 12, scale: 2 }).notNull(),
+  tradeInId: varchar('trade_in_id'),
+  tradeInAllowance: decimal('trade_in_allowance', { precision: 12, scale: 2 }).default('0'),
+  downPayment: decimal('down_payment', { precision: 12, scale: 2 }).default('0'),
+  financedAmount: decimal('financed_amount', { precision: 12, scale: 2 }).default('0'),
+  docFee: decimal('doc_fee', { precision: 10, scale: 2 }).default('0'),
+  registrationFee: decimal('registration_fee', { precision: 10, scale: 2 }).default('0'),
+  extendedWarranty: decimal('extended_warranty', { precision: 10, scale: 2 }).default('0'),
+  otherFees: decimal('other_fees', { precision: 10, scale: 2 }).default('0'),
+  taxAmount: decimal('tax_amount', { precision: 10, scale: 2 }).default('0'),
+  totalAmount: decimal('total_amount', { precision: 12, scale: 2 }).notNull(),
+  grossProfit: decimal('gross_profit', { precision: 12, scale: 2 }),
+  commissionPercent: decimal('commission_percent', { precision: 5, scale: 2 }),
+  commissionAmount: decimal('commission_amount', { precision: 10, scale: 2 }),
+  salespersonId: varchar('salesperson_id').references(() => users.id),
+  financingStatus: financingStatusEnum('financing_status').default('not_started'),
+  lenderName: text('lender_name'),
+  loanTermMonths: integer('loan_term_months'),
+  interestRate: decimal('interest_rate', { precision: 5, scale: 3 }),
+  monthlyPayment: decimal('monthly_payment', { precision: 10, scale: 2 }),
+  deliveryDate: date('delivery_date'),
+  deliveryNotes: text('delivery_notes'),
+  isDelivered: boolean('is_delivered').default(false),
+  notes: text('notes'),
+  glAccount: text('gl_account'),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('boat_sales_transactions_org_idx').on(table.orgId),
+  transactionNumberIdx: index('boat_sales_transactions_number_idx').on(table.transactionNumber),
+  inventoryIdx: index('boat_sales_transactions_inventory_idx').on(table.inventoryId),
+  customerIdx: index('boat_sales_transactions_customer_idx').on(table.customerId),
+  saleDateIdx: index('boat_sales_transactions_sale_date_idx').on(table.saleDate),
+  salespersonIdx: index('boat_sales_transactions_salesperson_idx').on(table.salespersonId),
+  uniqueTransactionNumber: unique('boat_sales_transactions_org_number').on(table.orgId, table.transactionNumber),
+}));
+
+// Boat Sales Trade-ins - Trade-in evaluations
+export const boatSalesTradeIns = pgTable('boat_sales_trade_ins', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  tradeInNumber: text('trade_in_number').notNull(),
+  customerId: varchar('customer_id').references(() => marinaCustomers.id),
+  contactId: varchar('contact_id').references(() => crmContacts.id),
+  customerName: text('customer_name').notNull(),
+  status: tradeInStatusEnum('status').notNull().default('pending_evaluation'),
+  make: text('make').notNull(),
+  model: text('model').notNull(),
+  year: integer('year').notNull(),
+  length: decimal('length', { precision: 5, scale: 2 }),
+  condition: boatConditionEnum('condition').notNull().default('good'),
+  engineMake: text('engine_make'),
+  engineModel: text('engine_model'),
+  engineHours: integer('engine_hours'),
+  registrationNumber: text('registration_number'),
+  hullId: text('hull_id'),
+  estimatedRetailValue: decimal('estimated_retail_value', { precision: 12, scale: 2 }),
+  estimatedWholesaleValue: decimal('estimated_wholesale_value', { precision: 12, scale: 2 }),
+  offeredAllowance: decimal('offered_allowance', { precision: 12, scale: 2 }),
+  acceptedAllowance: decimal('accepted_allowance', { precision: 12, scale: 2 }),
+  payoffAmount: decimal('payoff_amount', { precision: 12, scale: 2 }),
+  lienHolder: text('lien_holder'),
+  evaluationNotes: text('evaluation_notes'),
+  conditionNotes: text('condition_notes'),
+  images: jsonb('images').default(sql`'[]'`),
+  evaluatedBy: varchar('evaluated_by').references(() => users.id),
+  evaluatedDate: date('evaluated_date'),
+  linkedTransactionId: varchar('linked_transaction_id').references(() => boatSalesTransactions.id),
+  convertedToInventoryId: varchar('converted_to_inventory_id').references(() => boatSalesInventory.id),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('boat_sales_trade_ins_org_idx').on(table.orgId),
+  tradeInNumberIdx: index('boat_sales_trade_ins_number_idx').on(table.tradeInNumber),
+  statusIdx: index('boat_sales_trade_ins_status_idx').on(table.status),
+  customerIdx: index('boat_sales_trade_ins_customer_idx').on(table.customerId),
+  uniqueTradeInNumber: unique('boat_sales_trade_ins_org_number').on(table.orgId, table.tradeInNumber),
+}));
+
+// ================================================================================
 // CUSTOMER ANALYTICS - Marina Customer & Tenant Management
 // ================================================================================
 
@@ -7997,6 +8523,217 @@ export const insertFuelImportLogSchema = createInsertSchema(fuelImportLogs).omit
 
 export const updateFuelImportLogSchema = insertFuelImportLogSchema.partial();
 
+// Service Department Schemas
+export const insertServiceTechnicianSchema = createInsertSchema(serviceTechnicians).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  hourlyRate: z.string().or(z.number()).optional(),
+});
+
+export const updateServiceTechnicianSchema = insertServiceTechnicianSchema.partial();
+
+export const insertServicePartSchema = createInsertSchema(serviceParts).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  unitCost: z.string().or(z.number()),
+  retailPrice: z.string().or(z.number()),
+});
+
+export const updateServicePartSchema = insertServicePartSchema.partial();
+
+export const insertServiceWorkOrderSchema = createInsertSchema(serviceWorkOrders).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  estimatedHours: z.string().or(z.number()).optional(),
+  actualHours: z.string().or(z.number()).optional(),
+  estimatedCost: z.string().or(z.number()).optional(),
+  laborTotal: z.string().or(z.number()).optional(),
+  partsTotal: z.string().or(z.number()).optional(),
+  taxAmount: z.string().or(z.number()).optional(),
+  totalAmount: z.string().or(z.number()).optional(),
+});
+
+export const updateServiceWorkOrderSchema = insertServiceWorkOrderSchema.partial();
+
+export const insertServiceLaborEntrySchema = createInsertSchema(serviceLaborEntries).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  hours: z.string().or(z.number()),
+  hourlyRate: z.string().or(z.number()),
+  totalAmount: z.string().or(z.number()),
+});
+
+export const updateServiceLaborEntrySchema = insertServiceLaborEntrySchema.partial();
+
+export const insertServicePartsUsedSchema = createInsertSchema(servicePartsUsed).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+}).extend({
+  unitCost: z.string().or(z.number()),
+  unitPrice: z.string().or(z.number()),
+  totalAmount: z.string().or(z.number()),
+});
+
+// Boat Rentals Schemas
+export const insertBoatRentalFleetSchema = createInsertSchema(boatRentalFleet).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  length: z.string().or(z.number()).optional(),
+  hourlyRate: z.string().or(z.number()).optional(),
+  halfDayRate: z.string().or(z.number()).optional(),
+  fullDayRate: z.string().or(z.number()).optional(),
+  weeklyRate: z.string().or(z.number()).optional(),
+  securityDeposit: z.string().or(z.number()).optional(),
+  insuranceValue: z.string().or(z.number()).optional(),
+  purchasePrice: z.string().or(z.number()).optional(),
+  currentValue: z.string().or(z.number()).optional(),
+});
+
+export const updateBoatRentalFleetSchema = insertBoatRentalFleetSchema.partial();
+
+export const insertBoatRentalSchema = createInsertSchema(boatRentals).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  baseRate: z.string().or(z.number()),
+  hoursRented: z.string().or(z.number()).optional(),
+  fuelCharge: z.string().or(z.number()).optional(),
+  damageCharge: z.string().or(z.number()).optional(),
+  lateCharge: z.string().or(z.number()).optional(),
+  discountAmount: z.string().or(z.number()).optional(),
+  taxAmount: z.string().or(z.number()).optional(),
+  totalAmount: z.string().or(z.number()),
+  depositPaid: z.string().or(z.number()).optional(),
+  depositReturned: z.string().or(z.number()).optional(),
+  mileageOut: z.string().or(z.number()).optional(),
+  mileageIn: z.string().or(z.number()).optional(),
+});
+
+export const updateBoatRentalSchema = insertBoatRentalSchema.partial();
+
+// Boat Club Schemas
+export const insertBoatClubFleetSchema = createInsertSchema(boatClubFleet).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  length: z.string().or(z.number()).optional(),
+  purchasePrice: z.string().or(z.number()).optional(),
+  currentValue: z.string().or(z.number()).optional(),
+});
+
+export const updateBoatClubFleetSchema = insertBoatClubFleetSchema.partial();
+
+export const insertBoatClubMembershipSchema = createInsertSchema(boatClubMemberships).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  monthlyFee: z.string().or(z.number()),
+  setupFee: z.string().or(z.number()).optional(),
+  hoursUsedThisMonth: z.string().or(z.number()).optional(),
+  additionalHourRate: z.string().or(z.number()).optional(),
+});
+
+export const updateBoatClubMembershipSchema = insertBoatClubMembershipSchema.partial();
+
+export const insertBoatClubBookingSchema = createInsertSchema(boatClubBookings).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  hoursBooked: z.string().or(z.number()),
+  hoursUsed: z.string().or(z.number()).optional(),
+  additionalHoursCharge: z.string().or(z.number()).optional(),
+  fuelCharge: z.string().or(z.number()).optional(),
+  cleaningCharge: z.string().or(z.number()).optional(),
+  damageCharge: z.string().or(z.number()).optional(),
+  totalCharges: z.string().or(z.number()).optional(),
+});
+
+export const updateBoatClubBookingSchema = insertBoatClubBookingSchema.partial();
+
+// Boat Sales Schemas
+export const insertBoatSalesInventorySchema = createInsertSchema(boatSalesInventory).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  length: z.string().or(z.number()).optional(),
+  beam: z.string().or(z.number()).optional(),
+  draft: z.string().or(z.number()).optional(),
+  listPrice: z.string().or(z.number()),
+  minPrice: z.string().or(z.number()).optional(),
+  cost: z.string().or(z.number()).optional(),
+  floorPlanAmount: z.string().or(z.number()).optional(),
+  floorPlanRate: z.string().or(z.number()).optional(),
+});
+
+export const updateBoatSalesInventorySchema = insertBoatSalesInventorySchema.partial();
+
+export const insertBoatSalesTransactionSchema = createInsertSchema(boatSalesTransactions).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  salePrice: z.string().or(z.number()),
+  tradeInAllowance: z.string().or(z.number()).optional(),
+  downPayment: z.string().or(z.number()).optional(),
+  financedAmount: z.string().or(z.number()).optional(),
+  docFee: z.string().or(z.number()).optional(),
+  registrationFee: z.string().or(z.number()).optional(),
+  extendedWarranty: z.string().or(z.number()).optional(),
+  otherFees: z.string().or(z.number()).optional(),
+  taxAmount: z.string().or(z.number()).optional(),
+  totalAmount: z.string().or(z.number()),
+  grossProfit: z.string().or(z.number()).optional(),
+  commissionPercent: z.string().or(z.number()).optional(),
+  commissionAmount: z.string().or(z.number()).optional(),
+  interestRate: z.string().or(z.number()).optional(),
+  monthlyPayment: z.string().or(z.number()).optional(),
+});
+
+export const updateBoatSalesTransactionSchema = insertBoatSalesTransactionSchema.partial();
+
+export const insertBoatSalesTradeInSchema = createInsertSchema(boatSalesTradeIns).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  length: z.string().or(z.number()).optional(),
+  estimatedRetailValue: z.string().or(z.number()).optional(),
+  estimatedWholesaleValue: z.string().or(z.number()).optional(),
+  offeredAllowance: z.string().or(z.number()).optional(),
+  acceptedAllowance: z.string().or(z.number()).optional(),
+  payoffAmount: z.string().or(z.number()).optional(),
+});
+
+export const updateBoatSalesTradeInSchema = insertBoatSalesTradeInSchema.partial();
+
 // Customer Analytics
 export const insertMarinaCustomerSchema = createInsertSchema(marinaCustomers).omit({
   id: true,
@@ -8138,6 +8875,61 @@ export type UpdateFuelIntegration = z.infer<typeof updateFuelIntegrationSchema>;
 export type FuelImportLog = typeof fuelImportLogs.$inferSelect;
 export type InsertFuelImportLog = z.infer<typeof insertFuelImportLogSchema>;
 export type UpdateFuelImportLog = z.infer<typeof updateFuelImportLogSchema>;
+
+// Types for Service Department
+export type ServiceTechnician = typeof serviceTechnicians.$inferSelect;
+export type InsertServiceTechnician = z.infer<typeof insertServiceTechnicianSchema>;
+export type UpdateServiceTechnician = z.infer<typeof updateServiceTechnicianSchema>;
+
+export type ServicePart = typeof serviceParts.$inferSelect;
+export type InsertServicePart = z.infer<typeof insertServicePartSchema>;
+export type UpdateServicePart = z.infer<typeof updateServicePartSchema>;
+
+export type ServiceWorkOrder = typeof serviceWorkOrders.$inferSelect;
+export type InsertServiceWorkOrder = z.infer<typeof insertServiceWorkOrderSchema>;
+export type UpdateServiceWorkOrder = z.infer<typeof updateServiceWorkOrderSchema>;
+
+export type ServiceLaborEntry = typeof serviceLaborEntries.$inferSelect;
+export type InsertServiceLaborEntry = z.infer<typeof insertServiceLaborEntrySchema>;
+export type UpdateServiceLaborEntry = z.infer<typeof updateServiceLaborEntrySchema>;
+
+export type ServicePartsUsed = typeof servicePartsUsed.$inferSelect;
+export type InsertServicePartsUsed = z.infer<typeof insertServicePartsUsedSchema>;
+
+// Types for Boat Rentals
+export type BoatRentalFleet = typeof boatRentalFleet.$inferSelect;
+export type InsertBoatRentalFleet = z.infer<typeof insertBoatRentalFleetSchema>;
+export type UpdateBoatRentalFleet = z.infer<typeof updateBoatRentalFleetSchema>;
+
+export type BoatRental = typeof boatRentals.$inferSelect;
+export type InsertBoatRental = z.infer<typeof insertBoatRentalSchema>;
+export type UpdateBoatRental = z.infer<typeof updateBoatRentalSchema>;
+
+// Types for Boat Club
+export type BoatClubFleet = typeof boatClubFleet.$inferSelect;
+export type InsertBoatClubFleet = z.infer<typeof insertBoatClubFleetSchema>;
+export type UpdateBoatClubFleet = z.infer<typeof updateBoatClubFleetSchema>;
+
+export type BoatClubMembership = typeof boatClubMemberships.$inferSelect;
+export type InsertBoatClubMembership = z.infer<typeof insertBoatClubMembershipSchema>;
+export type UpdateBoatClubMembership = z.infer<typeof updateBoatClubMembershipSchema>;
+
+export type BoatClubBooking = typeof boatClubBookings.$inferSelect;
+export type InsertBoatClubBooking = z.infer<typeof insertBoatClubBookingSchema>;
+export type UpdateBoatClubBooking = z.infer<typeof updateBoatClubBookingSchema>;
+
+// Types for Boat Sales
+export type BoatSalesInventory = typeof boatSalesInventory.$inferSelect;
+export type InsertBoatSalesInventory = z.infer<typeof insertBoatSalesInventorySchema>;
+export type UpdateBoatSalesInventory = z.infer<typeof updateBoatSalesInventorySchema>;
+
+export type BoatSalesTransaction = typeof boatSalesTransactions.$inferSelect;
+export type InsertBoatSalesTransaction = z.infer<typeof insertBoatSalesTransactionSchema>;
+export type UpdateBoatSalesTransaction = z.infer<typeof updateBoatSalesTransactionSchema>;
+
+export type BoatSalesTradeIn = typeof boatSalesTradeIns.$inferSelect;
+export type InsertBoatSalesTradeIn = z.infer<typeof insertBoatSalesTradeInSchema>;
+export type UpdateBoatSalesTradeIn = z.infer<typeof updateBoatSalesTradeInSchema>;
 
 // Types for Customer Analytics
 export type MarinaCustomer = typeof marinaCustomers.$inferSelect;
