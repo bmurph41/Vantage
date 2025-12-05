@@ -61,6 +61,7 @@ export interface ExtractedListing {
   state?: string;
   zipCode?: string;
   askingPrice?: number;
+  pricePerSlip?: number;
   totalSlips?: number;
   wetSlips?: number;
   dryStorageSpaces?: number;
@@ -72,13 +73,19 @@ export interface ExtractedListing {
   hasRepairShop?: boolean;
   hasDryStorage?: boolean;
   hasBoatRamp?: boolean;
+  hasLaundry?: boolean;
+  hasPool?: boolean;
+  hasTransientSlips?: boolean;
   capRate?: number;
   grossRevenue?: number;
   noi?: number;
+  ebitda?: number;
   occupancyRate?: number;
   marinaType?: string;
   propertyType?: string;
   dealType?: string;
+  services?: string[];
+  tenantSummary?: string;
   brokerName?: string;
   brokerCompany?: string;
   brokerPhone?: string;
@@ -86,6 +93,7 @@ export interface ExtractedListing {
   sourceUrl: string;
   sourceListingId?: string;
   originalDescription?: string;
+  heroImageUrl?: string;
   images?: string[];
   listingDate?: string;
   attributionText: string;
@@ -99,52 +107,118 @@ interface ExtractionResult {
   tokensUsed?: number;
 }
 
-const MARINA_EXTRACTION_PROMPT = `You are a commercial real estate data extraction expert specializing in marina properties. 
-Analyze the provided HTML content from a commercial real estate listing page and extract all marina-related property listings.
+const MARINA_EXTRACTION_PROMPT = `You are an expert marina property data extraction specialist. Your job is to analyze broker listing pages and extract MAXIMUM detail about marina properties for sale.
 
-For each marina listing found, extract the following information (leave null if not found):
-- title: The listing title or property name
-- propertyName: Official marina name
+CRITICAL: Extract as much detail as possible. Return a JSON object with a "listings" array.
+
+For EACH marina listing found, extract:
+
+## PROPERTY IDENTIFICATION
+- title: Clean listing title (e.g., "Sunset Marina - 85 Slips on ICW")
+- propertyName: Official marina name (cleaned, professional)
 - propertyAddress: Street address
 - city: City name
-- state: State abbreviation (2 letters, e.g., FL, CA, TX)
+- state: 2-letter state code (FL, CA, TX, etc.)
 - zipCode: ZIP code
-- askingPrice: Asking price in dollars (number only, no formatting)
-- totalSlips: Total number of boat slips
-- wetSlips: Number of wet slips (in-water)
-- dryStorageSpaces: Number of dry storage spaces
+- sourceListingId: Any listing reference number
+
+## HERO IMAGE (CRITICAL)
+- heroImageUrl: The MAIN property photo URL. Look for:
+  * [IMAGE: url] markers in the content
+  * The first/largest property image
+  * Featured or primary listing photo
+  * MUST be a full URL (https://...)
+  * Prefer exterior marina shots over logos/icons
+
+## MARINA CAPACITY (VERY IMPORTANT)
+- totalSlips: Total slips (wet + dry) - CALCULATE if needed
+- wetSlips: Number of wet (in-water) slips
+- dryStorageSpaces: Number of dry storage/rack spaces
 - acreage: Property size in acres
 - waterFrontage: Water frontage in feet
-- hasFuel: Whether marina has fuel dock (boolean)
-- hasShipStore: Whether marina has ship store (boolean)
-- hasRestaurant: Whether marina has restaurant (boolean)
-- hasRepairShop: Whether marina has repair/service shop (boolean)
-- hasDryStorage: Whether marina has dry storage (boolean)
-- hasBoatRamp: Whether marina has boat ramp (boolean)
-- capRate: Capitalization rate as percentage (e.g., 7.5 for 7.5%)
-- grossRevenue: Annual gross revenue in dollars
-- noi: Net Operating Income in dollars
-- occupancyRate: Occupancy percentage (e.g., 95 for 95%)
-- marinaType: Type (marina, yacht_club, boatyard, dry_stack, full_service, mixed)
-- dealType: Deal type (acquisition, ground_lease, etc.)
-- brokerName: Listing broker name
-- brokerCompany: Brokerage company name
-- brokerPhone: Broker phone number
-- brokerEmail: Broker email
-- originalDescription: Full property description text
-- sourceListingId: Any listing ID or reference number visible on page
-- confidence: Your confidence in the extraction accuracy (0-100)
 
-IMPORTANT RULES:
-1. Only extract marina-related properties (marinas, yacht clubs, boatyards, boat storage facilities)
-2. Skip any non-marina properties (warehouses, RV storage, apartments, etc.)
-3. Convert all prices to numbers without currency symbols or commas
-4. Use 2-letter state abbreviations
-5. Set boolean values based on amenities mentioned in descriptions
-6. If a field is ambiguous, leave it null
-7. Set confidence score based on how clearly the data was presented
+## FINANCIALS (Extract all available)
+- askingPrice: Asking price (NUMBER ONLY, no $ or commas)
+- pricePerSlip: Calculate if askingPrice and totalSlips known
+- grossRevenue: Annual gross revenue (number)
+- noi: Net Operating Income (number)
+- ebitda: EBITDA if mentioned (number)
+- capRate: Cap rate as decimal (7.5 for 7.5%)
+- occupancyRate: Occupancy as percentage (95 for 95%)
 
-Return a JSON array of extracted listings. Even if only one listing is found, return it in an array.`;
+## AMENITIES (Boolean flags - check description carefully)
+- hasFuel: Gas/diesel dock present
+- hasShipStore: Ship store, chandlery, marine supplies
+- hasRestaurant: Restaurant, bar, grill on site
+- hasRepairShop: Repair shop, service center, maintenance
+- hasDryStorage: Dry stack, rack storage, indoor storage
+- hasBoatRamp: Boat ramp, launch facility
+- hasLaundry: Laundry facilities
+- hasPool: Pool or clubhouse amenities
+- hasTransientSlips: Transient/guest slip availability
+
+## SERVICES OFFERED (Array of strings)
+- services: ["fuel sales", "boat repair", "boat sales", "haul-out", "bottom paint", "engine service", "fiberglass repair", "upholstery", "detailing", "winter storage", "transient dockage", "pump-out", "electric hookups", "water hookups", "wifi", "cable tv", "security", "laundry", "showers", "restrooms"]
+  Extract ALL services mentioned in description.
+
+## TENANT/OCCUPANCY INFO
+- tenantSummary: Summary of tenant mix (e.g., "85% occupied, mix of sailboats and powerboats, average tenant tenure 3+ years")
+
+## MARINA TYPE
+- marinaType: One of: "marina", "yacht_club", "boatyard", "dry_stack", "full_service", "mixed_use", "resort_marina"
+- dealType: "acquisition", "ground_lease", "sale_leaseback", "partnership", "business_only"
+
+## BROKER INFO
+- brokerName: Full name
+- brokerCompany: Company name
+- brokerPhone: Phone number
+- brokerEmail: Email address
+
+## DESCRIPTION
+- originalDescription: Full property description (first 2000 chars)
+
+## CONFIDENCE
+- confidence: 0-100 score based on data completeness and clarity
+
+RULES:
+1. ONLY extract marina/boatyard/yacht club properties - skip warehouses, RV parks, apartments
+2. Convert ALL prices to numbers (no $, commas, or text)
+3. Calculate pricePerSlip = askingPrice / totalSlips when both available
+4. Look for images marked as [IMAGE: url] and extract the best property photo as heroImageUrl
+5. Parse amenities from description text carefully - look for keywords
+6. Extract ALL services mentioned, even if in passing
+7. For occupancy, look for "X% occupied", "X slips rented", waitlist mentions
+8. Provide high confidence (80+) only when data is clearly stated, not inferred
+
+EXAMPLE OUTPUT:
+{
+  "listings": [
+    {
+      "title": "Sunset Marina - 85 Slip Full-Service Marina",
+      "propertyName": "Sunset Marina",
+      "city": "Fort Lauderdale",
+      "state": "FL",
+      "heroImageUrl": "https://broker-site.com/images/sunset-marina-main.jpg",
+      "totalSlips": 85,
+      "wetSlips": 65,
+      "dryStorageSpaces": 20,
+      "askingPrice": 8500000,
+      "pricePerSlip": 100000,
+      "grossRevenue": 1200000,
+      "capRate": 7.5,
+      "occupancyRate": 95,
+      "hasFuel": true,
+      "hasShipStore": true,
+      "hasRepairShop": true,
+      "services": ["fuel sales", "boat repair", "haul-out", "transient dockage", "pump-out"],
+      "tenantSummary": "95% occupied with waitlist, average tenant 5+ years",
+      "marinaType": "full_service",
+      "brokerName": "John Smith",
+      "brokerCompany": "Marina Brokers Inc",
+      "confidence": 85
+    }
+  ]
+}`;
 
 async function fetchPageContent(url: string, userAgent: string): Promise<string> {
   const urlCheck = isAllowedUrl(url);
