@@ -7506,6 +7506,211 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to delete property" });
     }
   });
+
+  // Property Intelligence: Get sales history by matching property name/address
+  app.get("/api/properties/:id/sales-history", async (req: any, res) => {
+    try {
+      const property = await storage.getCrmProperty(req.params.id);
+      if (!property) {
+        return res.status(404).json({ error: "Property not found" });
+      }
+
+      const orgId = req.user.orgId;
+      const { salesComps } = await import('@shared/schema');
+      const { ilike, or, and, eq, isNull, desc, sql } = await import('drizzle-orm');
+      
+      // Build search terms from property title and address
+      const searchTerms: string[] = [];
+      if (property.title) searchTerms.push(property.title);
+      if (property.address) {
+        // Extract key parts from address for matching
+        const addressParts = property.address.split(',').map(p => p.trim());
+        searchTerms.push(...addressParts.filter(p => p.length > 2));
+      }
+
+      if (searchTerms.length === 0) {
+        return res.json({ matches: [], property });
+      }
+
+      // Find sales comps matching by marina name, city, or address
+      const conditions = searchTerms.map(term => 
+        or(
+          ilike(salesComps.marina, `%${term}%`),
+          ilike(salesComps.city, `%${term}%`),
+          ilike(salesComps.address, `%${term}%`)
+        )
+      );
+
+      const results = await db
+        .select()
+        .from(salesComps)
+        .where(and(
+          eq(salesComps.orgId, orgId),
+          isNull(salesComps.deletedAt),
+          or(...conditions)
+        ))
+        .orderBy(desc(salesComps.saleYear), desc(salesComps.createdAt))
+        .limit(20);
+
+      // Calculate match confidence for each result
+      const matchesWithConfidence = results.map(comp => {
+        let confidence = 0;
+        const compName = (comp.marina || '').toLowerCase();
+        const propName = (property.title || '').toLowerCase();
+        
+        // Exact name match = highest confidence
+        if (compName === propName) confidence = 100;
+        // Name contains match
+        else if (compName.includes(propName) || propName.includes(compName)) confidence = 80;
+        // City match
+        else if (comp.city && property.address?.toLowerCase().includes(comp.city.toLowerCase())) confidence = 60;
+        // State match
+        else if (comp.state && property.address?.toLowerCase().includes(comp.state.toLowerCase())) confidence = 40;
+        else confidence = 30;
+
+        return { ...comp, matchConfidence: confidence, marinaName: comp.marina };
+      });
+
+      // Sort by confidence, then by sale year
+      matchesWithConfidence.sort((a, b) => {
+        if (b.matchConfidence !== a.matchConfidence) return b.matchConfidence - a.matchConfidence;
+        return (b.saleYear || 0) - (a.saleYear || 0);
+      });
+
+      res.json({ matches: matchesWithConfidence, property });
+    } catch (error) {
+      console.error("Failed to get property sales history:", error);
+      res.status(500).json({ error: "Failed to retrieve sales history" });
+    }
+  });
+
+  // Property Intelligence: Get rate comp data by matching property name/address
+  app.get("/api/properties/:id/rate-history", async (req: any, res) => {
+    try {
+      const property = await storage.getCrmProperty(req.params.id);
+      if (!property) {
+        return res.status(404).json({ error: "Property not found" });
+      }
+
+      const orgId = req.user.orgId;
+      const { rateComps } = await import('@shared/schema');
+      const { ilike, or, and, eq, isNull, desc } = await import('drizzle-orm');
+      
+      // Build search terms from property title and address
+      const searchTerms: string[] = [];
+      if (property.title) searchTerms.push(property.title);
+      if (property.address) {
+        const addressParts = property.address.split(',').map(p => p.trim());
+        searchTerms.push(...addressParts.filter(p => p.length > 2));
+      }
+
+      if (searchTerms.length === 0) {
+        return res.json({ matches: [], property });
+      }
+
+      // Find rate comps matching by marina name, city, or address
+      const conditions = searchTerms.map(term => 
+        or(
+          ilike(rateComps.marina, `%${term}%`),
+          ilike(rateComps.city, `%${term}%`),
+          ilike(rateComps.address, `%${term}%`)
+        )
+      );
+
+      const results = await db
+        .select()
+        .from(rateComps)
+        .where(and(
+          eq(rateComps.orgId, orgId),
+          isNull(rateComps.deletedAt),
+          or(...conditions)
+        ))
+        .orderBy(desc(rateComps.saleYear), desc(rateComps.createdAt))
+        .limit(20);
+
+      // Calculate match confidence for each result
+      const matchesWithConfidence = results.map(comp => {
+        let confidence = 0;
+        const compName = (comp.marina || '').toLowerCase();
+        const propName = (property.title || '').toLowerCase();
+        
+        if (compName === propName) confidence = 100;
+        else if (compName.includes(propName) || propName.includes(compName)) confidence = 80;
+        else if (comp.city && property.address?.toLowerCase().includes(comp.city.toLowerCase())) confidence = 60;
+        else if (comp.state && property.address?.toLowerCase().includes(comp.state.toLowerCase())) confidence = 40;
+        else confidence = 30;
+
+        return { ...comp, matchConfidence: confidence, marinaName: comp.marina };
+      });
+
+      matchesWithConfidence.sort((a, b) => {
+        if (b.matchConfidence !== a.matchConfidence) return b.matchConfidence - a.matchConfidence;
+        return (b.saleYear || 0) - (a.saleYear || 0);
+      });
+
+      res.json({ matches: matchesWithConfidence, property });
+    } catch (error) {
+      console.error("Failed to get property rate history:", error);
+      res.status(500).json({ error: "Failed to retrieve rate history" });
+    }
+  });
+
+  // Property Intelligence: Get portfolio membership
+  app.get("/api/properties/:id/portfolio-status", async (req: any, res) => {
+    try {
+      const property = await storage.getCrmProperty(req.params.id);
+      if (!property) {
+        return res.status(404).json({ error: "Property not found" });
+      }
+
+      const orgId = req.user.orgId;
+      const { ownedAssets, scPortfolios, scPortfolioComps, salesComps } = await import('@shared/schema');
+      const { eq, and, ilike } = await import('drizzle-orm');
+
+      // Check if property is an owned asset
+      const ownedAsset = await db
+        .select()
+        .from(ownedAssets)
+        .where(and(
+          eq(ownedAssets.orgId, orgId),
+          eq(ownedAssets.propertyId, req.params.id)
+        ))
+        .limit(1);
+
+      // Find if this property appears in any Sales Comp portfolios
+      const propertyName = property.title?.toLowerCase() || '';
+      const portfolioComps = propertyName ? await db
+        .select({
+          portfolioId: scPortfolioComps.portfolioId,
+          portfolioName: scPortfolios.name,
+          compId: scPortfolioComps.compId,
+          marina: salesComps.marina
+        })
+        .from(scPortfolioComps)
+        .innerJoin(scPortfolios, eq(scPortfolioComps.portfolioId, scPortfolios.id))
+        .innerJoin(salesComps, eq(scPortfolioComps.compId, salesComps.id))
+        .where(and(
+          eq(scPortfolios.orgId, orgId),
+          ilike(salesComps.marina, `%${propertyName}%`)
+        ))
+        .limit(10) : [];
+
+      res.json({
+        property,
+        isOwnedAsset: ownedAsset.length > 0,
+        ownedAssetDetails: ownedAsset[0] || null,
+        portfolioMemberships: portfolioComps.map(pc => ({
+          portfolioId: pc.portfolioId,
+          portfolioName: pc.portfolioName,
+          compId: pc.compId,
+          marinaName: pc.marina
+        }))
+      });
+    } catch (error) {
+      console.error("Failed to get property portfolio status:", error);
+      res.status(500).json({ error: "Failed to retrieve portfolio status" });
+    }
+  });
   
   // Bulk operations for properties
   app.post("/api/properties/bulk/delete", async (req: any, res) => {

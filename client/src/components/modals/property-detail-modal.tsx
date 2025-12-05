@@ -12,16 +12,45 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   User, Building, MapPin, DollarSign, 
-  Edit, X, Clock, Check, Loader2, Anchor, Home, Link2
+  Edit, X, Clock, Check, Loader2, Anchor, Home, Link2,
+  TrendingUp, Calendar, Briefcase, FolderOpen, BarChart3, History
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { AddressInput } from "@/components/address-input";
-import type { Property, Contact, Company, Deal, Activity as ActivityType, Note } from "@shared/schema";
+import type { Property, Contact, Company, Deal, Activity as ActivityType, Note, SalesComp, RateComp } from "@shared/schema";
 import PropertyIntegrationPanel from "@/components/crm/PropertyIntegrationPanel";
+
+type SalesHistoryMatch = SalesComp & { matchConfidence: number };
+type RateHistoryMatch = RateComp & { matchConfidence: number };
+
+interface PortfolioStatus {
+  property: Property;
+  isOwnedAsset: boolean;
+  ownedAssetDetails: any | null;
+  portfolioMemberships: Array<{
+    portfolioId: string;
+    portfolioName: string;
+    compId: string;
+    marinaName: string;
+  }>;
+}
+
+const formatCurrency = (amount: number | string | null | undefined) => {
+  if (!amount) return "$0";
+  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(num);
+};
 
 interface PropertyDetailModalProps {
   isOpen: boolean;
@@ -119,6 +148,24 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
   // Fetch notes
   const { data: notes = [] } = useQuery<Note[]>({
     queryKey: ['/api/notes', 'property', property?.id],
+    enabled: isOpen && !!property?.id,
+  });
+
+  // Fetch sales history matches
+  const { data: salesHistoryData, isLoading: salesHistoryLoading } = useQuery<{ matches: SalesHistoryMatch[]; property: Property }>({
+    queryKey: ['/api/properties', property?.id, 'sales-history'],
+    enabled: isOpen && !!property?.id,
+  });
+
+  // Fetch rate history matches
+  const { data: rateHistoryData, isLoading: rateHistoryLoading } = useQuery<{ matches: RateHistoryMatch[]; property: Property }>({
+    queryKey: ['/api/properties', property?.id, 'rate-history'],
+    enabled: isOpen && !!property?.id,
+  });
+
+  // Fetch portfolio status
+  const { data: portfolioStatus, isLoading: portfolioLoading } = useQuery<PortfolioStatus>({
+    queryKey: ['/api/properties', property?.id, 'portfolio-status'],
     enabled: isOpen && !!property?.id,
   });
 
@@ -278,6 +325,24 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
                       {formatPrice(form.watch('listingPrice'))}
                     </Badge>
                   )}
+                  {portfolioStatus?.isOwnedAsset && (
+                    <Badge className="bg-purple-100 text-purple-800 border-purple-200" data-testid="badge-owned-asset">
+                      <Briefcase className="w-3 h-3 mr-1" />
+                      Owned Asset
+                    </Badge>
+                  )}
+                  {portfolioStatus && portfolioStatus.portfolioMemberships.length > 0 && (
+                    <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200" data-testid="badge-portfolio-count">
+                      <FolderOpen className="w-3 h-3 mr-1" />
+                      In {portfolioStatus.portfolioMemberships.length} Portfolio{portfolioStatus.portfolioMemberships.length > 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                  {salesHistoryData && salesHistoryData.matches.length > 0 && (
+                    <Badge className="bg-blue-100 text-blue-800 border-blue-200" data-testid="badge-sales-history">
+                      <History className="w-3 h-3 mr-1" />
+                      {salesHistoryData.matches.length} Sale{salesHistoryData.matches.length > 1 ? 's' : ''}
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -331,8 +396,12 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-7 flex-shrink-0">
+          <TabsList className="grid w-full grid-cols-8 flex-shrink-0">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="intelligence" data-testid="tab-intelligence">
+              <BarChart3 className="w-3 h-3 mr-1" />
+              Intel
+            </TabsTrigger>
             <TabsTrigger value="contacts" data-testid="tab-contacts">Contacts ({linkedContacts.length})</TabsTrigger>
             <TabsTrigger value="companies" data-testid="tab-companies">Companies ({linkedCompanies.length})</TabsTrigger>
             <TabsTrigger value="deals" data-testid="tab-deals">Deals ({propertyDeals.length})</TabsTrigger>
@@ -340,8 +409,8 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
               <Link2 className="w-3 h-3 mr-1" />
               Comps
             </TabsTrigger>
-            <TabsTrigger value="activity" data-testid="tab-activity">Activity ({activities.length})</TabsTrigger>
-            <TabsTrigger value="notes" data-testid="tab-notes">Notes ({notes.length})</TabsTrigger>
+            <TabsTrigger value="activity" data-testid="tab-activity">Activity</TabsTrigger>
+            <TabsTrigger value="notes" data-testid="tab-notes">Notes</TabsTrigger>
           </TabsList>
 
           <div className="flex-1 overflow-y-auto mt-4">
@@ -508,6 +577,237 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
                   </Card>
                 );
               })()}
+            </TabsContent>
+
+            {/* Intelligence Tab - Sales & Rate History */}
+            <TabsContent value="intelligence" className="mt-0 space-y-4">
+              {/* Portfolio Status Section */}
+              {portfolioLoading ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-lg" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-48" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : portfolioStatus?.isOwnedAsset || (portfolioStatus?.portfolioMemberships && portfolioStatus.portfolioMemberships.length > 0) ? (
+                <Card className="border-purple-200 bg-purple-50/30">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2 text-purple-900">
+                      <FolderOpen className="w-5 h-5" />
+                      Portfolio Status
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {portfolioStatus?.isOwnedAsset && (
+                        <div className="flex items-center gap-3 p-3 bg-purple-100 rounded-lg">
+                          <Briefcase className="w-5 h-5 text-purple-700" />
+                          <div>
+                            <div className="font-medium text-purple-900">Owned Asset</div>
+                            <div className="text-sm text-purple-700">This property is in your owned asset portfolio</div>
+                          </div>
+                        </div>
+                      )}
+                      {portfolioStatus?.portfolioMemberships && portfolioStatus.portfolioMemberships.map((pm) => (
+                        <div key={pm.portfolioId} className="flex items-center gap-3 p-3 bg-indigo-100 rounded-lg">
+                          <FolderOpen className="w-5 h-5 text-indigo-700" />
+                          <div>
+                            <div className="font-medium text-indigo-900">{pm.portfolioName}</div>
+                            <div className="text-sm text-indigo-700">Matched via: {pm.marinaName}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {/* Sales History Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-blue-600" />
+                    Sales History
+                    {salesHistoryData?.matches && salesHistoryData.matches.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {salesHistoryData.matches.length} match{salesHistoryData.matches.length > 1 ? 'es' : ''}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {salesHistoryLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-center gap-3 p-3 border rounded-lg">
+                          <Skeleton className="h-10 w-10 rounded" />
+                          <div className="space-y-2 flex-1">
+                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-3 w-32" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : !salesHistoryData?.matches || salesHistoryData.matches.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <DollarSign className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                      <p>No sales history found matching this property</p>
+                      <p className="text-sm mt-1">Sales comps will appear here when matched by name or address</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="max-h-[300px]">
+                      <div className="space-y-3 pr-4">
+                        {salesHistoryData.matches.map((comp) => (
+                          <div 
+                            key={comp.id} 
+                            className="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                            data-testid={`sales-history-${comp.id}`}
+                          >
+                            <div className={`p-2 rounded-lg ${
+                              comp.matchConfidence >= 80 ? 'bg-green-100' : 
+                              comp.matchConfidence >= 60 ? 'bg-yellow-100' : 'bg-gray-100'
+                            }`}>
+                              <DollarSign className={`w-5 h-5 ${
+                                comp.matchConfidence >= 80 ? 'text-green-700' : 
+                                comp.matchConfidence >= 60 ? 'text-yellow-700' : 'text-gray-700'
+                              }`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold truncate">{comp.marinaName || 'Unnamed'}</span>
+                                <Badge variant="outline" className={`text-xs ${
+                                  comp.matchConfidence >= 80 ? 'border-green-500 text-green-700' : 
+                                  comp.matchConfidence >= 60 ? 'border-yellow-500 text-yellow-700' : 'border-gray-400'
+                                }`}>
+                                  {comp.matchConfidence}% match
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
+                                {comp.saleYear && (
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    {comp.saleYear}
+                                  </span>
+                                )}
+                                {comp.salePrice && (
+                                  <span className="flex items-center gap-1 text-green-700 font-medium">
+                                    <DollarSign className="w-3 h-3" />
+                                    {formatCurrency(comp.salePrice)}
+                                  </span>
+                                )}
+                                {(comp.wetSlips || comp.dryRacks) && (
+                                  <span className="flex items-center gap-1">
+                                    <Anchor className="w-3 h-3" />
+                                    {comp.wetSlips ? `${comp.wetSlips} wet` : ''}{comp.wetSlips && comp.dryRacks ? ' / ' : ''}{comp.dryRacks ? `${comp.dryRacks} dry` : ''}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {comp.city}{comp.state ? `, ${comp.state}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Rate History Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-green-600" />
+                    Rate Analytics
+                    {rateHistoryData?.matches && rateHistoryData.matches.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {rateHistoryData.matches.length} match{rateHistoryData.matches.length > 1 ? 'es' : ''}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {rateHistoryLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="flex items-center gap-3 p-3 border rounded-lg">
+                          <Skeleton className="h-10 w-10 rounded" />
+                          <div className="space-y-2 flex-1">
+                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-3 w-32" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : !rateHistoryData?.matches || rateHistoryData.matches.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <TrendingUp className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                      <p>No rate data found matching this property</p>
+                      <p className="text-sm mt-1">Rate comps will appear here when matched by name or address</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="max-h-[300px]">
+                      <div className="space-y-3 pr-4">
+                        {rateHistoryData.matches.map((comp) => (
+                          <div 
+                            key={comp.id} 
+                            className="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                            data-testid={`rate-history-${comp.id}`}
+                          >
+                            <div className={`p-2 rounded-lg ${
+                              comp.matchConfidence >= 80 ? 'bg-green-100' : 
+                              comp.matchConfidence >= 60 ? 'bg-yellow-100' : 'bg-gray-100'
+                            }`}>
+                              <TrendingUp className={`w-5 h-5 ${
+                                comp.matchConfidence >= 80 ? 'text-green-700' : 
+                                comp.matchConfidence >= 60 ? 'text-yellow-700' : 'text-gray-700'
+                              }`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold truncate">{comp.marinaName || 'Unnamed'}</span>
+                                <Badge variant="outline" className={`text-xs ${
+                                  comp.matchConfidence >= 80 ? 'border-green-500 text-green-700' : 
+                                  comp.matchConfidence >= 60 ? 'border-yellow-500 text-yellow-700' : 'border-gray-400'
+                                }`}>
+                                  {comp.matchConfidence}% match
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
+                                {comp.occupancy && (
+                                  <span className="flex items-center gap-1">
+                                    Occupancy: {comp.occupancy}%
+                                  </span>
+                                )}
+                                {comp.salePrice && (
+                                  <span className="flex items-center gap-1 text-green-700 font-medium">
+                                    {formatCurrency(comp.salePrice)}
+                                  </span>
+                                )}
+                                {(comp.wetSlips || comp.dryRacks) && (
+                                  <span className="flex items-center gap-1">
+                                    <Anchor className="w-3 h-3" />
+                                    {comp.wetSlips ? `${comp.wetSlips} wet` : ''}{comp.wetSlips && comp.dryRacks ? ' / ' : ''}{comp.dryRacks ? `${comp.dryRacks} dry` : ''}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {comp.city}{comp.state ? `, ${comp.state}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="contacts" className="mt-0 space-y-4">
