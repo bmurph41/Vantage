@@ -19,6 +19,10 @@ import { AuditService } from "./services/audit-service";
 import { setTenantContext, clearTenantContext } from "./middleware/tenant-context";
 import vdrRouter from "./vdr-routes";
 import shipStoreRouter from "./ship-store-router";
+import serviceRouter from "./service-router";
+import boatRentalsRouter from "./boat-rentals-router";
+import boatClubRouter from "./boat-club-router";
+import boatSalesRouter from "./boat-sales-router";
 import integrationRouter from "./integration-routes";
 import marinamatchRouter from "./marinamatch/routes";
 import authRoutes from "./routes/auth-routes";
@@ -344,6 +348,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/funds", authenticateUser, requireFundManagement());
   app.use("/api/vdr", authenticateUser, vdrRouter);
   app.use("/api/ship-store", authenticateUser, shipStoreRouter);
+  app.use("/api/service", authenticateUser, serviceRouter);
+  app.use("/api/boat-rentals", authenticateUser, boatRentalsRouter);
+  app.use("/api/boat-club", authenticateUser, boatClubRouter);
+  app.use("/api/boat-sales", authenticateUser, boatSalesRouter);
   app.use("/api/integration", authenticateUser, integrationRouter);
   app.use("/api/marinamatch", authenticateUser, marinamatchRouter);
 

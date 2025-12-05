@@ -89,6 +89,19 @@ const ShipStoreTransactions = lazy(() => import("@/pages/operations/ship-store/T
 const ShipStoreCheckout = lazy(() => import("@/pages/operations/ship-store/Checkout"));
 const ShipStoreAnalytics = lazy(() => import("@/pages/operations/ship-store/Analytics"));
 const ShipStoreReports = lazy(() => import("@/pages/operations/ship-store/Reports"));
+
+// Service Department
+const ServiceDashboard = lazy(() => import("@/pages/operations/service/Dashboard"));
+
+// Boat Rentals
+const BoatRentalsDashboard = lazy(() => import("@/pages/operations/boat-rentals/Dashboard"));
+
+// Boat Club
+const BoatClubDashboard = lazy(() => import("@/pages/operations/boat-club/Dashboard"));
+
+// Boat Sales
+const BoatSalesDashboard = lazy(() => import("@/pages/operations/boat-sales/Dashboard"));
+
 const MarketingDashboard = lazy(() => import("@/pages/operations/marketing/Dashboard"));
 const MarketingCampaigns = lazy(() => import("@/pages/operations/marketing/Campaigns"));
 const MarketingExpenses = lazy(() => import("@/pages/operations/marketing/Expenses"));
@@ -504,6 +517,66 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <ShipStoreAnalytics />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* Operations Routes with Unified Layout - Service Department */}
+      <Route path="/operations/service">
+        {() => {
+          setLocation("/operations/service/dashboard");
+          return null;
+        }}
+      </Route>
+      <Route path="/operations/service/dashboard">
+        {() => (
+          <UnifiedLayout>
+            <ServiceDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* Operations Routes with Unified Layout - Boat Rentals */}
+      <Route path="/operations/boat-rentals">
+        {() => {
+          setLocation("/operations/boat-rentals/dashboard");
+          return null;
+        }}
+      </Route>
+      <Route path="/operations/boat-rentals/dashboard">
+        {() => (
+          <UnifiedLayout>
+            <BoatRentalsDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* Operations Routes with Unified Layout - Boat Club */}
+      <Route path="/operations/boat-club">
+        {() => {
+          setLocation("/operations/boat-club/dashboard");
+          return null;
+        }}
+      </Route>
+      <Route path="/operations/boat-club/dashboard">
+        {() => (
+          <UnifiedLayout>
+            <BoatClubDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* Operations Routes with Unified Layout - Boat Sales */}
+      <Route path="/operations/boat-sales">
+        {() => {
+          setLocation("/operations/boat-sales/dashboard");
+          return null;
+        }}
+      </Route>
+      <Route path="/operations/boat-sales/dashboard">
+        {() => (
+          <UnifiedLayout>
+            <BoatSalesDashboard />
           </UnifiedLayout>
         )}
       </Route>

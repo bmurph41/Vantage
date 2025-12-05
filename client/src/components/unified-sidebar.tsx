@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SmartSearch } from "@/components/crm/smart-search";
@@ -75,6 +75,26 @@ const shipStoreNav = [
   { name: "Transactions", href: "/operations/ship-store/transactions", icon: Receipt },
   { name: "Analytics", href: "/operations/ship-store/analytics", icon: BarChart3 },
   { name: "Reports", href: "/operations/ship-store/reports", icon: FileText },
+];
+
+// Operations Navigation - Service Department Subcategories
+const serviceNav = [
+  { name: "Dashboard", href: "/operations/service/dashboard", icon: LayoutDashboard },
+];
+
+// Operations Navigation - Boat Rentals Subcategories
+const boatRentalsNav = [
+  { name: "Dashboard", href: "/operations/boat-rentals/dashboard", icon: LayoutDashboard },
+];
+
+// Operations Navigation - Boat Club Subcategories
+const boatClubNav = [
+  { name: "Dashboard", href: "/operations/boat-club/dashboard", icon: LayoutDashboard },
+];
+
+// Operations Navigation - Boat Sales Subcategories
+const boatSalesNav = [
+  { name: "Dashboard", href: "/operations/boat-sales/dashboard", icon: LayoutDashboard },
 ];
 
 // Operations Navigation - Dockit (Launch Operations) Subcategories
@@ -159,6 +179,10 @@ export default function UnifiedSidebar() {
   const [dockitExpanded, setDockitExpanded] = useState(false);
   const [fuelSalesExpanded, setFuelSalesExpanded] = useState(false);
   const [shipStoreExpanded, setShipStoreExpanded] = useState(false);
+  const [serviceExpanded, setServiceExpanded] = useState(false);
+  const [boatRentalsExpanded, setBoatRentalsExpanded] = useState(false);
+  const [boatClubExpanded, setBoatClubExpanded] = useState(false);
+  const [boatSalesExpanded, setBoatSalesExpanded] = useState(false);
   const [rentRollExpanded, setRentRollExpanded] = useState(false);
   const [marketingExpanded, setMarketingExpanded] = useState(false);
   const [crmExpanded, setCrmExpanded] = useState(false);
@@ -229,6 +253,10 @@ export default function UnifiedSidebar() {
     const isDockitPage = location.startsWith('/operations/dockit');
     const isFuelSalesPage = location.startsWith('/operations/fuel/');
     const isShipStorePage = location.startsWith('/operations/ship-store/');
+    const isServicePage = location.startsWith('/operations/service/');
+    const isBoatRentalsPage = location.startsWith('/operations/boat-rentals/');
+    const isBoatClubPage = location.startsWith('/operations/boat-club/');
+    const isBoatSalesPage = location.startsWith('/operations/boat-sales/');
     const isRentRollPage = location.startsWith('/operations/rent-roll/') || location === '/operations/customer-analytics';
     const isMarketingPage = location.startsWith('/operations/marketing/');
     // CRM: contacts, companies, properties (core entity management)
@@ -252,6 +280,10 @@ export default function UnifiedSidebar() {
     setDockitExpanded(isDockitPage);
     setFuelSalesExpanded(isFuelSalesPage);
     setShipStoreExpanded(isShipStorePage);
+    setServiceExpanded(isServicePage);
+    setBoatRentalsExpanded(isBoatRentalsPage);
+    setBoatClubExpanded(isBoatClubPage);
+    setBoatSalesExpanded(isBoatSalesPage);
     setRentRollExpanded(isRentRollPage);
     setMarketingExpanded(isMarketingPage);
     setCrmExpanded(isCrmPage);
@@ -554,6 +586,98 @@ export default function UnifiedSidebar() {
               {shipStoreExpanded && (
                 <div className="ml-4">
                   {shipStoreNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setServiceExpanded(!serviceExpanded)}
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                  location.startsWith('/operations/service/')
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                )}
+                data-testid="toggle-service"
+              >
+                <div className="flex items-center space-x-3">
+                  <Wrench className="w-5 h-5" />
+                  <span>Service Dept</span>
+                </div>
+                {serviceExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              {serviceExpanded && (
+                <div className="ml-4">
+                  {serviceNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setBoatRentalsExpanded(!boatRentalsExpanded)}
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                  location.startsWith('/operations/boat-rentals/')
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                )}
+                data-testid="toggle-boat-rentals"
+              >
+                <div className="flex items-center space-x-3">
+                  <Ship className="w-5 h-5" />
+                  <span>Boat Rentals</span>
+                </div>
+                {boatRentalsExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              {boatRentalsExpanded && (
+                <div className="ml-4">
+                  {boatRentalsNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setBoatClubExpanded(!boatClubExpanded)}
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                  location.startsWith('/operations/boat-club/')
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                )}
+                data-testid="toggle-boat-club"
+              >
+                <div className="flex items-center space-x-3">
+                  <Users className="w-5 h-5" />
+                  <span>Boat Club</span>
+                </div>
+                {boatClubExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              {boatClubExpanded && (
+                <div className="ml-4">
+                  {boatClubNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setBoatSalesExpanded(!boatSalesExpanded)}
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                  location.startsWith('/operations/boat-sales/')
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                )}
+                data-testid="toggle-boat-sales"
+              >
+                <div className="flex items-center space-x-3">
+                  <ShoppingCart className="w-5 h-5" />
+                  <span>Boat Sales</span>
+                </div>
+                {boatSalesExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              {boatSalesExpanded && (
+                <div className="ml-4">
+                  {boatSalesNav.map((item) => (
                     <NavLink key={item.name} item={item} />
                   ))}
                 </div>
