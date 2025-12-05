@@ -36,27 +36,64 @@ export function useCreateTask() {
   });
 }
 
+interface UpdateTaskContext {
+  previousTasks?: Task[];
+  projectId?: string;
+}
+
 export function useUpdateTask() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Task> }) =>
+    mutationFn: ({ id, updates, projectId }: { id: string; updates: Partial<Task>; projectId?: string }) =>
       ddClient.updateTask(id, updates),
+    onMutate: async ({ id, updates, projectId }) => {
+      if (!projectId) return { previousTasks: undefined, projectId: undefined };
+      
+      await queryClient.cancelQueries({ queryKey: ['/api/dd/projects', projectId, 'tasks'] });
+      
+      const previousTasks = queryClient.getQueryData<Task[]>(['/api/dd/projects', projectId, 'tasks']);
+      
+      queryClient.setQueryData<Task[]>(
+        ['/api/dd/projects', projectId, 'tasks'],
+        (old) => old?.map((task) => 
+          task.id === id ? { ...task, ...updates } : task
+        ) ?? []
+      );
+      
+      return { previousTasks, projectId };
+    },
+    onError: (error: any, { projectId }, context: UpdateTaskContext | undefined) => {
+      if (context?.previousTasks && context?.projectId) {
+        queryClient.setQueryData(
+          ['/api/dd/projects', context.projectId, 'tasks'],
+          context.previousTasks
+        );
+      }
+      
+      let errorMessage = "Failed to update task";
+      if (error?.details && Array.isArray(error.details)) {
+        const fieldErrors = error.details.map((d: any) => `${d.field}: ${d.message}`).join(', ');
+        errorMessage = `Validation error: ${fieldErrors}`;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', data.projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', data.projectId] });
-      toast({
-        title: "Success",
-        description: "Task updated successfully",
-      });
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update task",
-        variant: "destructive",
-      });
+    onSettled: (data, error, variables, context: UpdateTaskContext | undefined) => {
+      if (context?.projectId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', context.projectId, 'tasks'] });
+      }
     },
   });
 }

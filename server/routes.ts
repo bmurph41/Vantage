@@ -1172,7 +1172,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taskPayload.deadlineDays = null;
       }
 
-      const updates = insertTaskSchema.partial().parse(taskPayload);
+      // Validate the task payload with better error handling
+      let updates;
+      try {
+        updates = insertDDTaskSchema.partial().parse(taskPayload);
+      } catch (validationError: any) {
+        console.error('Task validation error:', validationError);
+        const errors = validationError.errors?.map((e: any) => ({
+          field: e.path?.join('.') || 'unknown',
+          message: e.message
+        })) || [];
+        return res.status(400).json({
+          error: 'Validation failed',
+          message: 'Some fields have invalid values',
+          details: errors
+        });
+      }
 
       // Check for circular dependencies if dependencies are being updated
       if (updates.dependencies !== undefined) {
