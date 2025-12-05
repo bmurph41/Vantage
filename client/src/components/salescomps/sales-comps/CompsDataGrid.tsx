@@ -492,22 +492,27 @@ export default function CompsDataGrid({
     { key: 'dryRacks', label: 'Dry Racks', width: 140, sortable: true, order: 8 },
     { key: 'occupancy', label: 'Occupancy', width: 140, sortable: true, order: 9 },
     { key: 'market', label: 'Market', width: 160, sortable: true, order: 10 },
+    // Transaction parties columns
+    { key: 'seller', label: 'Seller Company', width: 180, sortable: true, order: 11 },
+    { key: 'sellerPrincipal', label: 'Seller Principal', width: 160, sortable: true, order: 12 },
+    { key: 'buyer', label: 'Buyer Company', width: 180, sortable: true, order: 13 },
+    { key: 'buyerPrincipal', label: 'Buyer Principal', width: 160, sortable: true, order: 14 },
     // Profit Center columns
-    { key: 'profitCenterStorage', label: 'Storage', width: 120, sortable: false, order: 11 },
-    { key: 'profitCenterEvents', label: 'Events', width: 120, sortable: false, order: 12 },
-    { key: 'profitCenterService', label: 'Service', width: 120, sortable: false, order: 13 },
-    { key: 'profitCenterThirdPartyLeases', label: 'Third-Party Leases', width: 200, sortable: false, order: 14 },
-    { key: 'profitCenterBoatRentals', label: 'Boat Rentals', width: 160, sortable: false, order: 15 },
-    { key: 'profitCenterBoatBrokerage', label: 'Boat Brokerage', width: 180, sortable: false, order: 16 },
-    { key: 'profitCenterRvPark', label: 'RV Park', width: 120, sortable: false, order: 17 },
-    { key: 'profitCenterFuel', label: 'Fuel', width: 110, sortable: false, order: 18 },
-    { key: 'profitCenterShipStore', label: 'Ship Store', width: 140, sortable: false, order: 19 },
-    { key: 'profitCenterParts', label: 'Parts', width: 110, sortable: false, order: 20 },
-    { key: 'profitCenterBoatClub', label: 'Boat Club', width: 140, sortable: false, order: 21 },
-    { key: 'profitCenterBoatSales', label: 'Boat Sales', width: 140, sortable: false, order: 22 },
-    { key: 'profitCenterFnb', label: 'F&B', width: 110, sortable: false, order: 23 },
-    { key: 'profitCenterHospitality', label: 'Hospitality/Accommodations', width: 250, sortable: false, order: 24 },
-    { key: 'actions', label: 'Actions', width: 150, sortable: false, order: 25 },
+    { key: 'profitCenterStorage', label: 'Storage', width: 120, sortable: false, order: 15 },
+    { key: 'profitCenterEvents', label: 'Events', width: 120, sortable: false, order: 16 },
+    { key: 'profitCenterService', label: 'Service', width: 120, sortable: false, order: 17 },
+    { key: 'profitCenterThirdPartyLeases', label: 'Third-Party Leases', width: 200, sortable: false, order: 18 },
+    { key: 'profitCenterBoatRentals', label: 'Boat Rentals', width: 160, sortable: false, order: 19 },
+    { key: 'profitCenterBoatBrokerage', label: 'Boat Brokerage', width: 180, sortable: false, order: 20 },
+    { key: 'profitCenterRvPark', label: 'RV Park', width: 120, sortable: false, order: 21 },
+    { key: 'profitCenterFuel', label: 'Fuel', width: 110, sortable: false, order: 22 },
+    { key: 'profitCenterShipStore', label: 'Ship Store', width: 140, sortable: false, order: 23 },
+    { key: 'profitCenterParts', label: 'Parts', width: 110, sortable: false, order: 24 },
+    { key: 'profitCenterBoatClub', label: 'Boat Club', width: 140, sortable: false, order: 25 },
+    { key: 'profitCenterBoatSales', label: 'Boat Sales', width: 140, sortable: false, order: 26 },
+    { key: 'profitCenterFnb', label: 'F&B', width: 110, sortable: false, order: 27 },
+    { key: 'profitCenterHospitality', label: 'Hospitality/Accommodations', width: 250, sortable: false, order: 28 },
+    { key: 'actions', label: 'Actions', width: 150, sortable: false, order: 29 },
   ];
 
   // Load column configuration from localStorage on mount
@@ -942,6 +947,36 @@ export default function CompsDataGrid({
           </div>
         );
       }
+      
+      // Transaction party columns
+      // seller field = Seller Company name
+      case 'seller':
+        return (
+          <span className="truncate max-w-[160px]" title={comp.seller?.toString() || ''}>
+            {comp.seller || '—'}
+          </span>
+        );
+      // owner field = Seller Principal (individual representative)
+      case 'sellerPrincipal':
+        return (
+          <span className="truncate max-w-[140px]" title={comp.owner?.toString() || ''}>
+            {comp.owner || '—'}
+          </span>
+        );
+      // company field = Buyer Company name
+      case 'buyer':
+        return (
+          <span className="truncate max-w-[160px]" title={comp.company?.toString() || ''}>
+            {comp.company || '—'}
+          </span>
+        );
+      // buyer field = Buyer Principal (individual representative)
+      case 'buyerPrincipal':
+        return (
+          <span className="truncate max-w-[140px]" title={comp.buyer?.toString() || ''}>
+            {comp.buyer || '—'}
+          </span>
+        );
       
       case 'state': {
         if (comp.isPortfolio) {
