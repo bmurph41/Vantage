@@ -36,6 +36,7 @@ export function TaskDocumentStatus({
   const handleStatusUpdate = async (status: string, overrideReason?: string) => {
     await updateTask.mutateAsync({
       id: task.id,
+      projectId: task.projectId,
       updates: { 
         status: status as any,
         completedAt: status === "completed" ? new Date() : null

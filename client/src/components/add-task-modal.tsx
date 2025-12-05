@@ -896,6 +896,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
       updateTask.mutate(
         {
           id: editingTask.id,
+          projectId,
           updates: transformedData,
         },
         {
@@ -906,10 +907,17 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
             });
             handleClose();
           },
-          onError: (error) => {
+          onError: (error: any) => {
+            let errorMessage = "Failed to update task. Please try again.";
+            if (error?.details && Array.isArray(error.details)) {
+              const fieldErrors = error.details.map((d: any) => `${d.field}: ${d.message}`).join(', ');
+              errorMessage = `Validation error: ${fieldErrors}`;
+            } else if (error?.message) {
+              errorMessage = error.message;
+            }
             toast({
               title: "Error",
-              description: "Failed to update task. Please try again.",
+              description: errorMessage,
               variant: "destructive",
             });
             console.error("Task update error:", error);

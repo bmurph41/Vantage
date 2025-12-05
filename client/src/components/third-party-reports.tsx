@@ -327,6 +327,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const handleStatusChange = (taskId: string, newStatus: string) => {
     updateTask.mutate({
       id: taskId,
+      projectId,
       updates: { 
         status: newStatus as any
       }
@@ -336,6 +337,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const handleOnSiteInspectionChange = (taskId: string, checked: boolean) => {
     updateTask.mutate({
       id: taskId,
+      projectId,
       updates: { 
         requiresOnSiteInspection: checked
       }
@@ -345,6 +347,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const handleTimelineToggle = (taskId: string, checked: boolean) => {
     updateTask.mutate({
       id: taskId,
+      projectId,
       updates: { 
         showOnTimeline: checked
       }
@@ -352,10 +355,10 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   };
 
   const handleArchiveTask = (taskId: string) => {
-    // Move task to bottom by setting sortOrder to a high value
     const maxSortOrder = Math.max(...tasks.map(t => t.sortOrder || 0));
     updateTask.mutate({
       id: taskId,
+      projectId,
       updates: { 
         sortOrder: maxSortOrder + 1000
       }
@@ -365,6 +368,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const handlePaymentStatusChange = (taskId: string, newPaymentStatus: string) => {
     updateTask.mutate({
       id: taskId,
+      projectId,
       updates: { 
         paymentStatus: newPaymentStatus as any
       }
@@ -374,6 +378,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
   const handleDateFieldChange = (taskId: string, fieldName: string, newValue: string) => {
     updateTask.mutate({
       id: taskId,
+      projectId,
       updates: { 
         [fieldName]: newValue || null
       }
@@ -491,6 +496,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     const updatePromises = companyTasks.map(task => 
       updateTask.mutateAsync({
         id: task.id,
+        projectId: task.projectId,
         updates: {
           repName: newContactInfo.repName || null,
           repEmail: newContactInfo.repEmail || null,
@@ -531,6 +537,7 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     const cost = editingCostValue.trim() === '' ? null : editingCostValue;
     updateTask.mutate({
       id: taskId,
+      projectId,
       updates: { cost: cost }
     });
     setEditingCostTaskId(null);
