@@ -1017,6 +1017,9 @@ router.patch("/scrape-sources/:id", async (req: Request, res: Response) => {
       "minPrice", "maxPrice", "minSlips", "maxSlips",
       "pollingIntervalMinutes", "capabilities", "capabilityNotes",
       "lastSeenListingId", "lastSeenContentHash", "lastDeltaCheckAt",
+      "crawlMode", "seedUrls", "maxPagesPerRun", "maxCrawlDepth",
+      "tokenBudgetPerRun", "paginationSelector", "paginationUrlPattern",
+      "listingLinkSelector",
     ];
     
     for (const field of allowedFields) {

@@ -99,6 +99,12 @@ interface ScrapeSource {
   minSlips?: number;
   maxSlips?: number;
   pollingIntervalMinutes?: number;
+  crawlMode?: string;
+  seedUrls?: string[];
+  maxPagesPerRun?: number;
+  tokenBudgetPerRun?: string;
+  paginationSelector?: string;
+  listingLinkSelector?: string;
   capabilities?: string[];
   capabilityNotes?: string;
   lastScrapeAt?: string;
@@ -123,6 +129,12 @@ interface NewSourceForm {
   minSlips: string;
   maxSlips: string;
   pollingIntervalMinutes: string;
+  crawlMode: string;
+  seedUrls: string;
+  maxPagesPerRun: string;
+  tokenBudgetPerRun: string;
+  paginationSelector: string;
+  listingLinkSelector: string;
 }
 
 interface BrokerSubmitForm {
@@ -232,6 +244,12 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
     minSlips: "",
     maxSlips: "",
     pollingIntervalMinutes: "60",
+    crawlMode: "single",
+    seedUrls: "",
+    maxPagesPerRun: "10",
+    tokenBudgetPerRun: "0.50",
+    paginationSelector: "",
+    listingLinkSelector: "",
   });
   const [newSourceForm, setNewSourceForm] = useState<NewSourceForm>({
     platform: "",
@@ -247,6 +265,12 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
     minSlips: "",
     maxSlips: "",
     pollingIntervalMinutes: "60",
+    crawlMode: "single",
+    seedUrls: "",
+    maxPagesPerRun: "10",
+    tokenBudgetPerRun: "0.50",
+    paginationSelector: "",
+    listingLinkSelector: "",
   });
   const [brokerSubmitOpen, setBrokerSubmitOpen] = useState(false);
   const [brokerForm, setBrokerForm] = useState<BrokerSubmitForm>(INITIAL_BROKER_FORM);
@@ -436,6 +460,12 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
       minSlips: source.minSlips?.toString() || "",
       maxSlips: source.maxSlips?.toString() || "",
       pollingIntervalMinutes: source.pollingIntervalMinutes?.toString() || "60",
+      crawlMode: source.crawlMode || "single",
+      seedUrls: source.seedUrls?.join("\n") || "",
+      maxPagesPerRun: source.maxPagesPerRun?.toString() || "10",
+      tokenBudgetPerRun: source.tokenBudgetPerRun?.toString() || "0.50",
+      paginationSelector: source.paginationSelector || "",
+      listingLinkSelector: source.listingLinkSelector || "",
     });
     setEditingSource(source);
   };
@@ -1145,6 +1175,105 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                   <SelectItem value="1440">Daily</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <Separator className="my-4" />
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <h4 className="font-medium">Multi-Page Crawling</h4>
+                <Badge variant="outline" className="text-xs">Advanced</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Configure how to discover and extract listings across multiple pages on this site.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Crawl Mode</Label>
+                  <Select
+                    value={editSourceForm.crawlMode}
+                    onValueChange={(value) => setEditSourceForm(prev => ({ ...prev, crawlMode: value }))}
+                  >
+                    <SelectTrigger data-testid="select-edit-crawl-mode">
+                      <SelectValue placeholder="Select mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="single">Single Page</SelectItem>
+                      <SelectItem value="multi_seed">Multiple URLs</SelectItem>
+                      <SelectItem value="pagination">Follow Pagination</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {editSourceForm.crawlMode === "single" && "Extract listings from the main URL only"}
+                    {editSourceForm.crawlMode === "multi_seed" && "Extract from multiple specific URLs"}
+                    {editSourceForm.crawlMode === "pagination" && "Follow Next/page links to discover more listings"}
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Cost Budget (per scan)</Label>
+                  <Select
+                    value={editSourceForm.tokenBudgetPerRun}
+                    onValueChange={(value) => setEditSourceForm(prev => ({ ...prev, tokenBudgetPerRun: value }))}
+                  >
+                    <SelectTrigger data-testid="select-edit-token-budget">
+                      <SelectValue placeholder="Select budget" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0.25">$0.25 (~5 pages)</SelectItem>
+                      <SelectItem value="0.50">$0.50 (~10 pages)</SelectItem>
+                      <SelectItem value="1.00">$1.00 (~20 pages)</SelectItem>
+                      <SelectItem value="2.50">$2.50 (~50 pages)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {(editSourceForm.crawlMode === "multi_seed" || editSourceForm.crawlMode === "pagination") && (
+                <div className="space-y-2">
+                  <Label>Additional URLs (one per line)</Label>
+                  <textarea
+                    className="w-full h-24 px-3 py-2 text-sm border rounded-md resize-none bg-background"
+                    placeholder="https://broker-site.com/listings/florida&#10;https://broker-site.com/listings/texas&#10;https://broker-site.com/listings/california"
+                    value={editSourceForm.seedUrls}
+                    onChange={(e) => setEditSourceForm(prev => ({ ...prev, seedUrls: e.target.value }))}
+                    data-testid="textarea-edit-seed-urls"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Add specific listing pages to scrape. Each URL will be processed by the AI extractor.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Max Pages per Scan</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={editSourceForm.maxPagesPerRun}
+                    onChange={(e) => setEditSourceForm(prev => ({ ...prev, maxPagesPerRun: e.target.value }))}
+                    data-testid="input-edit-max-pages"
+                  />
+                </div>
+                
+                {editSourceForm.crawlMode === "pagination" && (
+                  <div className="space-y-2">
+                    <Label>Pagination Selector (CSS)</Label>
+                    <Input
+                      placeholder="a.next-page, .pagination a[rel='next']"
+                      value={editSourceForm.paginationSelector}
+                      onChange={(e) => setEditSourceForm(prev => ({ ...prev, paginationSelector: e.target.value }))}
+                      data-testid="input-edit-pagination-selector"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      CSS selector for the "Next" button/link
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
