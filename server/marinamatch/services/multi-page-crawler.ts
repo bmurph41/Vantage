@@ -41,6 +41,15 @@ const COST_PER_1K_OUTPUT_TOKENS = 0.01;
 const AVG_TOKENS_PER_PAGE = 4000;
 const ESTIMATED_COST_PER_PAGE = (AVG_TOKENS_PER_PAGE / 1000) * COST_PER_1K_INPUT_TOKENS + 0.5 * COST_PER_1K_OUTPUT_TOKENS;
 
+interface RobotsTxtRules {
+  disallowedPaths: string[];
+  allowedPaths: string[];
+  crawlDelay?: number;
+}
+
+const robotsTxtCache: Map<string, { rules: RobotsTxtRules; fetchedAt: number }> = new Map();
+const ROBOTS_TXT_CACHE_TTL = 3600000;
+
 export class MultiPageCrawler {
   private config: CrawlConfig;
   private visitedUrls: Set<string> = new Set();
@@ -49,10 +58,98 @@ export class MultiPageCrawler {
   private errors: string[] = [];
   private sourceName: string;
   private baseHost: string = "";
+  private robotsRules: RobotsTxtRules | null = null;
 
   constructor(config: CrawlConfig, sourceName: string) {
     this.config = config;
     this.sourceName = sourceName;
+  }
+
+  private async fetchRobotsTxt(baseUrl: string): Promise<RobotsTxtRules> {
+    try {
+      const url = new URL(baseUrl);
+      const robotsUrl = `${url.protocol}//${url.host}/robots.txt`;
+      const cacheKey = url.host;
+
+      const cached = robotsTxtCache.get(cacheKey);
+      if (cached && Date.now() - cached.fetchedAt < ROBOTS_TXT_CACHE_TTL) {
+        console.log(`[${this.sourceName}] Using cached robots.txt for ${url.host}`);
+        return cached.rules;
+      }
+
+      console.log(`[${this.sourceName}] Fetching robots.txt from ${robotsUrl}`);
+      const response = await axios.get(robotsUrl, {
+        timeout: 5000,
+        headers: { "User-Agent": this.config.userAgent },
+        validateStatus: (status) => status < 500,
+      });
+
+      const rules: RobotsTxtRules = { disallowedPaths: [], allowedPaths: [] };
+
+      if (response.status !== 200) {
+        console.log(`[${this.sourceName}] No robots.txt found (${response.status}), allowing all`);
+        robotsTxtCache.set(cacheKey, { rules, fetchedAt: Date.now() });
+        return rules;
+      }
+
+      const lines = response.data.toString().split("\n");
+      let inUserAgentBlock = false;
+      const userAgent = this.config.userAgent.split("/")[0].toLowerCase();
+
+      for (const line of lines) {
+        const trimmed = line.trim().toLowerCase();
+        if (trimmed.startsWith("user-agent:")) {
+          const agent = trimmed.replace("user-agent:", "").trim();
+          inUserAgentBlock = agent === "*" || agent.includes(userAgent);
+        } else if (inUserAgentBlock) {
+          if (trimmed.startsWith("disallow:")) {
+            const path = line.trim().replace(/disallow:/i, "").trim();
+            if (path) rules.disallowedPaths.push(path);
+          } else if (trimmed.startsWith("allow:")) {
+            const path = line.trim().replace(/allow:/i, "").trim();
+            if (path) rules.allowedPaths.push(path);
+          } else if (trimmed.startsWith("crawl-delay:")) {
+            const delay = parseInt(trimmed.replace("crawl-delay:", "").trim());
+            if (!isNaN(delay)) rules.crawlDelay = delay;
+          }
+        }
+      }
+
+      console.log(`[${this.sourceName}] Parsed robots.txt: ${rules.disallowedPaths.length} disallowed, ${rules.allowedPaths.length} allowed`);
+      robotsTxtCache.set(cacheKey, { rules, fetchedAt: Date.now() });
+      return rules;
+    } catch (error: any) {
+      console.log(`[${this.sourceName}] Error fetching robots.txt: ${error.message}, allowing all`);
+      return { disallowedPaths: [], allowedPaths: [] };
+    }
+  }
+
+  private isUrlAllowedByRobots(url: string): boolean {
+    if (!this.config.respectRobotsTxt || !this.robotsRules) {
+      return true;
+    }
+
+    try {
+      const parsedUrl = new URL(url);
+      const path = parsedUrl.pathname + parsedUrl.search;
+
+      for (const allowedPath of this.robotsRules.allowedPaths) {
+        if (path.startsWith(allowedPath)) {
+          return true;
+        }
+      }
+
+      for (const disallowedPath of this.robotsRules.disallowedPaths) {
+        if (disallowedPath === "/" || path.startsWith(disallowedPath)) {
+          console.log(`[${this.sourceName}] Skipping ${url} - disallowed by robots.txt`);
+          return false;
+        }
+      }
+
+      return true;
+    } catch {
+      return true;
+    }
   }
 
   async crawl(): Promise<CrawlResult> {
@@ -88,6 +185,10 @@ export class MultiPageCrawler {
       return result;
     }
 
+    if (this.config.respectRobotsTxt) {
+      this.robotsRules = await this.fetchRobotsTxt(seedUrls[0]);
+    }
+
     for (const seedUrl of seedUrls) {
       this.urlQueue.push({ url: seedUrl, depth: 0 });
     }
@@ -112,6 +213,11 @@ export class MultiPageCrawler {
       }
 
       if (depth > this.config.maxCrawlDepth) {
+        result.pagesSkipped++;
+        continue;
+      }
+
+      if (!this.isUrlAllowedByRobots(url)) {
         result.pagesSkipped++;
         continue;
       }
@@ -278,8 +384,12 @@ export class MultiPageCrawler {
 export async function discoverListingUrls(
   searchUrl: string,
   sourceName: string,
-  config: Partial<CrawlConfig>
+  config: Partial<CrawlConfig> & { tokenBudgetPerRun?: number | string }
 ): Promise<{ urls: string[]; pagesCrawled: number; cost: number }> {
+  const parsedBudget = typeof config.tokenBudgetPerRun === "string" 
+    ? parseFloat(config.tokenBudgetPerRun) 
+    : (config.tokenBudgetPerRun || 0.50);
+
   const fullConfig: CrawlConfig = {
     seedUrls: [searchUrl],
     crawlMode: config.crawlMode || "single",
@@ -288,7 +398,7 @@ export async function discoverListingUrls(
     listingLinkSelector: config.listingLinkSelector,
     maxPagesPerRun: config.maxPagesPerRun || 5,
     maxCrawlDepth: config.maxCrawlDepth || 1,
-    tokenBudgetPerRun: config.tokenBudgetPerRun || 0.50,
+    tokenBudgetPerRun: isNaN(parsedBudget) ? 0.50 : parsedBudget,
     respectRobotsTxt: config.respectRobotsTxt ?? true,
     userAgent: config.userAgent || "MarinaMatchBot/1.0 (+https://marinamatch.com)",
     rateLimitRpm: config.rateLimitRpm || 30,
@@ -304,7 +414,7 @@ export async function discoverListingUrls(
   };
 }
 
-export function estimateCrawlCost(config: CrawlConfig): { estimatedPages: number; estimatedCost: number; warning?: string } {
+export function estimateCrawlCost(config: CrawlConfig & { tokenBudgetPerRun?: number | string }): { estimatedPages: number; estimatedCost: number; warning?: string } {
   const seedCount = config.seedUrls?.length || 1;
   let estimatedPages = seedCount;
 
@@ -316,9 +426,13 @@ export function estimateCrawlCost(config: CrawlConfig): { estimatedPages: number
 
   const estimatedCost = estimatedPages * ESTIMATED_COST_PER_PAGE;
   
+  const budget = typeof config.tokenBudgetPerRun === "string" 
+    ? parseFloat(config.tokenBudgetPerRun) 
+    : (config.tokenBudgetPerRun || 0.50);
+  
   let warning: string | undefined;
-  if (estimatedCost > config.tokenBudgetPerRun) {
-    warning = `Estimated cost ($${estimatedCost.toFixed(2)}) exceeds budget ($${config.tokenBudgetPerRun.toFixed(2)})`;
+  if (!isNaN(budget) && estimatedCost > budget) {
+    warning = `Estimated cost ($${estimatedCost.toFixed(2)}) exceeds budget ($${budget.toFixed(2)})`;
   }
 
   return { estimatedPages, estimatedCost, warning };

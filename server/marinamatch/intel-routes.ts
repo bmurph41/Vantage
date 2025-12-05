@@ -907,6 +907,41 @@ router.post("/goals/:id/progress", async (req: Request, res: Response) => {
 });
 
 // ============================================
+// SCRAPE SOURCES HELPERS
+// ============================================
+
+function normalizeToArray(value: any): string[] | null {
+  if (!value) return null;
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return trimmed.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+  }
+  return null;
+}
+
+function normalizeCrawlFields(data: Record<string, any>): Record<string, any> {
+  const result = { ...data };
+  
+  if (result.seedUrls !== undefined) {
+    result.seedUrls = normalizeToArray(result.seedUrls);
+  }
+  if (result.maxPagesPerRun !== undefined) {
+    result.maxPagesPerRun = parseInt(result.maxPagesPerRun) || 10;
+  }
+  if (result.maxCrawlDepth !== undefined) {
+    result.maxCrawlDepth = parseInt(result.maxCrawlDepth) || 2;
+  }
+  if (result.tokenBudgetPerRun !== undefined) {
+    const parsed = parseFloat(result.tokenBudgetPerRun);
+    result.tokenBudgetPerRun = (isNaN(parsed) ? 1.00 : parsed).toFixed(4);
+  }
+  
+  return result;
+}
+
+// ============================================
 // SCRAPE SOURCES
 // ============================================
 
@@ -959,6 +994,14 @@ router.post("/scrape-sources", async (req: Request, res: Response) => {
       pollingIntervalMinutes,
       capabilities,
       capabilityNotes,
+      crawlMode,
+      seedUrls,
+      maxPagesPerRun,
+      maxCrawlDepth,
+      tokenBudgetPerRun,
+      paginationSelector,
+      paginationUrlPattern,
+      listingLinkSelector,
     } = req.body;
 
     // Validate required fields
@@ -992,6 +1035,14 @@ router.post("/scrape-sources", async (req: Request, res: Response) => {
       pollingIntervalMinutes: pollingIntervalMinutes || 60,
       capabilities: capabilities || ["scraping"],
       capabilityNotes: capabilityNotes || null,
+      crawlMode: crawlMode || "single",
+      seedUrls: normalizeToArray(seedUrls),
+      maxPagesPerRun: parseInt(maxPagesPerRun) || 10,
+      maxCrawlDepth: parseInt(maxCrawlDepth) || 2,
+      tokenBudgetPerRun: (parseFloat(tokenBudgetPerRun) || 1.00).toFixed(4),
+      paginationSelector: paginationSelector || null,
+      paginationUrlPattern: paginationUrlPattern || null,
+      listingLinkSelector: listingLinkSelector || null,
     }).returning();
     
     res.status(201).json(source);
@@ -1028,9 +1079,11 @@ router.patch("/scrape-sources/:id", async (req: Request, res: Response) => {
       }
     }
 
+    const normalizedData = normalizeCrawlFields(updateData);
+
     const [updated] = await db
       .update(marinaScrapeources)
-      .set(updateData)
+      .set(normalizedData)
       .where(and(eq(marinaScrapeources.id, req.params.id), eq(marinaScrapeources.orgId, orgId)))
       .returning();
 
