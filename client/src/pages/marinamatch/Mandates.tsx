@@ -75,7 +75,7 @@ export function MandatesTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/investment-mandates"] });
       setCreateDialogOpen(false);
-      toast({ title: "Success", description: "Investment mandate created successfully" });
+      toast({ title: "Success", description: "Investment criteria created successfully" });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -89,7 +89,7 @@ export function MandatesTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/investment-mandates"] });
       setEditingMandate(null);
-      toast({ title: "Success", description: "Investment mandate updated successfully" });
+      toast({ title: "Success", description: "Investment criteria updated successfully" });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -102,7 +102,7 @@ export function MandatesTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/investment-mandates"] });
-      toast({ title: "Success", description: "Investment mandate deleted" });
+      toast({ title: "Success", description: "Investment criteria deleted" });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -129,14 +129,14 @@ export function MandatesTab() {
         </div>
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="btn-add-mandate">
+            <Button data-testid="btn-add-criteria">
               <Plus className="h-4 w-4 mr-2" />
-              Add Mandate
+              Add Criteria
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Create Investment Mandate</DialogTitle>
+              <DialogTitle>Create Investment Criteria</DialogTitle>
               <DialogDescription>
                 Define investment criteria to automatically score and filter incoming deals
               </DialogDescription>
@@ -280,7 +280,7 @@ export function MandatesTab() {
             </p>
             <Button onClick={() => setCreateDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Create Your First Mandate
+              Create Your First Criteria
             </Button>
           </CardContent>
         </Card>
@@ -289,9 +289,9 @@ export function MandatesTab() {
       <Dialog open={!!editingMandate} onOpenChange={(open) => !open && setEditingMandate(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Investment Mandate</DialogTitle>
+            <DialogTitle>Edit Investment Criteria</DialogTitle>
             <DialogDescription>
-              Update the criteria for this investment mandate
+              Update the criteria for this investment profile
             </DialogDescription>
           </DialogHeader>
           {editingMandate && (
@@ -568,14 +568,14 @@ function MandateForm({
       </div>
 
       <DialogFooter>
-        <Button type="submit" disabled={isLoading} data-testid="btn-save-mandate">
+        <Button type="submit" disabled={isLoading} data-testid="btn-save-criteria">
           {isLoading ? (
             <>
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
               Saving...
             </>
           ) : (
-            "Save Mandate"
+            "Save Criteria"
           )}
         </Button>
       </DialogFooter>
