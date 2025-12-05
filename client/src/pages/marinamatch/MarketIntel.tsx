@@ -32,17 +32,27 @@ interface MarinaListing {
   city?: string;
   state?: string;
   askingPrice?: string;
+  pricePerSlip?: string;
   totalSlips?: number;
+  wetSlips?: number;
+  dryStorageSpaces?: number;
   grossRevenue?: string;
+  noi?: string;
   capRate?: string;
   occupancyRate?: string;
   sourcePlatform: string;
   sourceUrl: string;
   bestMatchScore?: number;
+  extractionConfidence?: number;
   hasFuel?: boolean;
   hasShipStore?: boolean;
+  hasRestaurant?: boolean;
   hasRepairShop?: boolean;
   hasDryStorage?: boolean;
+  hasBoatRamp?: boolean;
+  services?: string[];
+  tenantSummary?: string;
+  heroImageUrl?: string;
   status: string;
   listingDate?: string;
   createdAt: string;
@@ -1460,131 +1470,185 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                 {filteredListings.map((listing) => (
                   <div
                     key={listing.id}
-                    className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                    className="border rounded-lg overflow-hidden hover:bg-muted/50 cursor-pointer transition-colors"
                     onClick={() => setSelectedListing(listing)}
                     data-testid={`listing-card-${listing.id}`}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold">{listing.title}</h3>
-                          {listing.bestMatchScore && (
-                            <div className={`px-2 py-0.5 rounded text-xs text-white ${getScoreColor(listing.bestMatchScore)}`}>
-                              {listing.bestMatchScore}% match
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                          {listing.city && listing.state && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {listing.city}, {listing.state}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatDistanceToNow(new Date(listing.createdAt), { addSuffix: true })}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-wrap gap-3 text-sm">
-                          {listing.askingPrice && (
-                            <span className="flex items-center gap-1 font-medium">
-                              <DollarSign className="h-4 w-4 text-green-600" />
-                              {formatPrice(listing.askingPrice)}
-                            </span>
-                          )}
-                          {listing.totalSlips && (
-                            <span className="flex items-center gap-1">
-                              <Anchor className="h-4 w-4" />
-                              {listing.totalSlips} slips
-                            </span>
-                          )}
-                          {listing.capRate && (
-                            <span className="text-muted-foreground">
-                              {parseFloat(listing.capRate).toFixed(1)}% cap
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex gap-2 mt-2">
-                          {listing.hasFuel && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Fuel className="h-3 w-3 mr-1" />
-                              Fuel
-                            </Badge>
-                          )}
-                          {listing.hasShipStore && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Store className="h-3 w-3 mr-1" />
-                              Store
-                            </Badge>
-                          )}
-                          {listing.hasRepairShop && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Wrench className="h-3 w-3 mr-1" />
-                              Repair
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="text-right flex flex-col items-end gap-2">
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs font-medium border ${getSourceBadgeStyle(listing.sourcePlatform)}`}
-                          data-testid={`badge-source-${listing.sourcePlatform}`}
-                        >
-                          <Globe className="h-3 w-3 mr-1" />
-                          via {listing.sourcePlatform}
-                        </Badge>
-                        {listing.sourceUrl?.startsWith("mailto:") ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="text-xs h-7"
-                            asChild
-                            data-testid={`button-contact-broker-${listing.id}`}
-                          >
-                            <a 
-                              href={listing.sourceUrl} 
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Mail className="h-3 w-3 mr-1" />
-                              Contact Broker
-                            </a>
-                          </Button>
-                        ) : listing.sourceUrl?.startsWith("#") || !listing.sourceUrl ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="text-xs h-7"
-                            disabled
-                            data-testid={`button-direct-listing-${listing.id}`}
-                          >
-                            <Anchor className="h-3 w-3 mr-1" />
-                            Direct Listing
-                          </Button>
+                    <div className="flex">
+                      {/* Hero Image Section */}
+                      <div className="w-40 h-32 flex-shrink-0 bg-muted relative">
+                        {listing.heroImageUrl ? (
+                          <img 
+                            src={listing.heroImageUrl} 
+                            alt={listing.propertyName || listing.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
+                              const placeholder = document.createElement('div');
+                              placeholder.innerHTML = '<svg class="h-12 w-12 text-muted-foreground/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
+                              e.currentTarget.parentElement?.appendChild(placeholder.firstChild!);
+                            }}
+                          />
                         ) : (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="text-xs h-7"
-                            asChild
-                            data-testid={`button-view-original-${listing.id}`}
-                          >
-                            <a 
-                              href={listing.sourceUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <ExternalLink className="h-3 w-3 mr-1" />
-                              View Original
-                            </a>
-                          </Button>
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Anchor className="h-12 w-12 text-muted-foreground/30" />
+                          </div>
                         )}
+                        {/* Match Score Overlay */}
+                        {listing.bestMatchScore !== undefined && listing.bestMatchScore > 0 && (
+                          <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold text-white shadow-lg ${getScoreColor(listing.bestMatchScore)}`}>
+                            {listing.bestMatchScore}%
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Content Section */}
+                      <div className="flex-1 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold text-base">{listing.propertyName || listing.title}</h3>
+                              <Badge variant="outline" className={`text-xs ${getSourceBadgeStyle(listing.sourcePlatform)}`}>
+                                {listing.sourcePlatform}
+                              </Badge>
+                            </div>
+                            
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                              {listing.city && listing.state && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {listing.city}, {listing.state}
+                                </span>
+                              )}
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {formatDistanceToNow(new Date(listing.createdAt), { addSuffix: true })}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap gap-3 text-sm mb-2">
+                              {listing.askingPrice && (
+                                <span className="flex items-center gap-1 font-semibold text-green-600">
+                                  <DollarSign className="h-4 w-4" />
+                                  {formatPrice(listing.askingPrice)}
+                                </span>
+                              )}
+                              {listing.totalSlips && (
+                                <span className="flex items-center gap-1">
+                                  <Anchor className="h-4 w-4 text-blue-500" />
+                                  {listing.totalSlips} slips
+                                  {listing.wetSlips && listing.dryStorageSpaces && (
+                                    <span className="text-xs text-muted-foreground">
+                                      ({listing.wetSlips} wet, {listing.dryStorageSpaces} dry)
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                              {listing.pricePerSlip && (
+                                <span className="text-muted-foreground">
+                                  ${parseFloat(listing.pricePerSlip).toLocaleString()}/slip
+                                </span>
+                              )}
+                              {listing.capRate && (
+                                <span className="text-muted-foreground font-medium">
+                                  {parseFloat(listing.capRate).toFixed(1)}% cap
+                                </span>
+                              )}
+                              {listing.occupancyRate && (
+                                <span className="text-muted-foreground">
+                                  {parseFloat(listing.occupancyRate).toFixed(0)}% occupied
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5">
+                              {listing.hasFuel && (
+                                <Badge variant="secondary" className="text-xs py-0">
+                                  <Fuel className="h-3 w-3 mr-1" />
+                                  Fuel
+                                </Badge>
+                              )}
+                              {listing.hasShipStore && (
+                                <Badge variant="secondary" className="text-xs py-0">
+                                  <Store className="h-3 w-3 mr-1" />
+                                  Store
+                                </Badge>
+                              )}
+                              {listing.hasRestaurant && (
+                                <Badge variant="secondary" className="text-xs py-0">
+                                  Restaurant
+                                </Badge>
+                              )}
+                              {listing.hasRepairShop && (
+                                <Badge variant="secondary" className="text-xs py-0">
+                                  <Wrench className="h-3 w-3 mr-1" />
+                                  Repair
+                                </Badge>
+                              )}
+                              {listing.hasDryStorage && (
+                                <Badge variant="secondary" className="text-xs py-0">
+                                  Dry Storage
+                                </Badge>
+                              )}
+                              {listing.hasBoatRamp && (
+                                <Badge variant="secondary" className="text-xs py-0">
+                                  Boat Ramp
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right side - View button */}
+                          <div className="text-right flex flex-col items-end gap-2">
+                            {listing.sourceUrl?.startsWith("mailto:") ? (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-xs h-7"
+                                asChild
+                                data-testid={`button-contact-broker-${listing.id}`}
+                              >
+                                <a 
+                                  href={listing.sourceUrl} 
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Mail className="h-3 w-3 mr-1" />
+                                  Contact Broker
+                                </a>
+                              </Button>
+                            ) : listing.sourceUrl?.startsWith("#") || !listing.sourceUrl ? (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-xs h-7"
+                                disabled
+                                data-testid={`button-direct-listing-${listing.id}`}
+                              >
+                                <Anchor className="h-3 w-3 mr-1" />
+                                Direct Listing
+                              </Button>
+                            ) : (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-xs h-7"
+                                asChild
+                                data-testid={`button-view-original-${listing.id}`}
+                              >
+                                <a 
+                                  href={listing.sourceUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  View Original
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -21,6 +21,7 @@ interface ListingData {
   state?: string;
   zipCode?: string;
   askingPrice?: number;
+  pricePerSlip?: number;
   totalSlips?: number;
   wetSlips?: number;
   dryStorageSpaces?: number;
@@ -35,10 +36,13 @@ interface ListingData {
   capRate?: number;
   grossRevenue?: number;
   noi?: number;
+  ebitda?: number;
   occupancyRate?: number;
   marinaType?: string;
   propertyType?: string;
   dealType?: string;
+  services?: string[];
+  tenantSummary?: string;
   brokerName?: string;
   brokerCompany?: string;
   brokerPhone?: string;
@@ -46,9 +50,11 @@ interface ListingData {
   sourceUrl: string;
   sourceListingId?: string;
   originalDescription?: string;
+  heroImageUrl?: string;
   images?: string[];
   listingDate?: Date;
   attributionText: string;
+  confidence?: number;
 }
 
 interface RateLimiter {
@@ -314,6 +320,12 @@ export function generateContentHash(listing: ListingData): string {
 
 // Convert AI-extracted listing to our standard ListingData format
 function convertExtractedToListingData(extracted: ExtractedListing): ListingData {
+  const totalSlips = extracted.totalSlips || 
+    ((extracted.wetSlips || 0) + (extracted.dryStorageSpaces || 0)) || undefined;
+  
+  const pricePerSlip = extracted.pricePerSlip || 
+    (extracted.askingPrice && totalSlips ? Math.round(extracted.askingPrice / totalSlips) : undefined);
+  
   return {
     title: extracted.title || extracted.propertyName || "Untitled Marina",
     propertyName: extracted.propertyName,
@@ -322,7 +334,8 @@ function convertExtractedToListingData(extracted: ExtractedListing): ListingData
     state: extracted.state,
     zipCode: extracted.zipCode,
     askingPrice: extracted.askingPrice,
-    totalSlips: extracted.totalSlips,
+    pricePerSlip,
+    totalSlips,
     wetSlips: extracted.wetSlips,
     dryStorageSpaces: extracted.dryStorageSpaces,
     acreage: extracted.acreage,
@@ -336,10 +349,13 @@ function convertExtractedToListingData(extracted: ExtractedListing): ListingData
     capRate: extracted.capRate,
     grossRevenue: extracted.grossRevenue,
     noi: extracted.noi,
+    ebitda: extracted.ebitda,
     occupancyRate: extracted.occupancyRate,
     marinaType: extracted.marinaType,
     propertyType: extracted.propertyType || "marina",
     dealType: extracted.dealType || "acquisition",
+    services: extracted.services,
+    tenantSummary: extracted.tenantSummary,
     brokerName: extracted.brokerName,
     brokerCompany: extracted.brokerCompany,
     brokerPhone: extracted.brokerPhone,
@@ -347,9 +363,11 @@ function convertExtractedToListingData(extracted: ExtractedListing): ListingData
     sourceUrl: extracted.sourceUrl,
     sourceListingId: extracted.sourceListingId,
     originalDescription: extracted.originalDescription,
+    heroImageUrl: extracted.heroImageUrl,
     images: extracted.images,
     listingDate: extracted.listingDate ? new Date(extracted.listingDate) : undefined,
     attributionText: extracted.attributionText,
+    confidence: extracted.confidence,
   };
 }
 
@@ -1016,8 +1034,10 @@ export async function runScrapeJob(
             hasDryStorage: data.hasDryStorage,
             hasBoatRamp: data.hasBoatRamp,
             askingPrice: data.askingPrice?.toString(),
+            pricePerSlip: data.pricePerSlip?.toString(),
             grossRevenue: data.grossRevenue?.toString(),
             noi: data.noi?.toString(),
+            ebitda: data.ebitda?.toString(),
             capRate: data.capRate?.toString(),
             occupancyRate: data.occupancyRate?.toString(),
             brokerName: data.brokerName,
@@ -1026,7 +1046,11 @@ export async function runScrapeJob(
             brokerEmail: data.brokerEmail,
             attributionText: data.attributionText,
             originalDescription: data.originalDescription,
+            heroImageUrl: data.heroImageUrl,
             images: data.images,
+            services: data.services,
+            tenantSummary: data.tenantSummary,
+            extractionConfidence: data.confidence,
             listingDate: data.listingDate,
             status: "active",
           }).returning();
