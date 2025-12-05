@@ -493,11 +493,22 @@ async function runAutoScrape(): Promise<void> {
         // Ensure sources exist for the org (but no mock data seeding)
         await ensureSourcesExist(org.id);
 
+        // Get all active sources for this org, including user-added custom sources
+        const activeSources = await db
+          .select({ platform: marinaScrapeources.platform })
+          .from(marinaScrapeources)
+          .where(and(eq(marinaScrapeources.orgId, org.id), eq(marinaScrapeources.isActive, true)));
+        
+        // Build list of platforms to scrape - include both default platforms and user-added ones
+        const defaultPlatforms = ["govdeals", "publicsurplus", "marina_rss", "crexi", "loopnet", "bizbuysell"];
+        const userPlatforms = activeSources.map(s => s.platform).filter(p => !defaultPlatforms.includes(p.toLowerCase()));
+        const allPlatforms = [...defaultPlatforms, ...userPlatforms];
+        
+        console.log(`[MarinaMatch Intel] Scraping ${allPlatforms.length} sources for org ${org.id}: ${allPlatforms.join(", ")}`);
+
         // Run actual scraper for the org
-        // Include new accessible sources (govdeals, publicsurplus, marina_rss) that actually work
-        // plus traditional CRE platforms (though they require API partnerships)
         const { runScrapeJob } = await import("./cre-scraper");
-        await runScrapeJob(org.id, ["govdeals", "publicsurplus", "marina_rss", "crexi", "loopnet", "bizbuysell"]);
+        await runScrapeJob(org.id, allPlatforms);
         
       } catch (error) {
         console.error(`[MarinaMatch Intel] Error scraping for org ${org.id}:`, error);

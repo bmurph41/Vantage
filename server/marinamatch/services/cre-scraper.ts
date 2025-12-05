@@ -777,6 +777,42 @@ async function scrapeMarinaRSS(): Promise<ListingData[]> {
   return result.listings;
 }
 
+// Custom broker source scraper - uses AI extraction for user-added sources
+export async function scrapeCustomSource(searchUrl: string, sourceName: string): Promise<ListingData[]> {
+  const platform = sourceName.toLowerCase().replace(/\s+/g, '_');
+  
+  console.log(`[${sourceName}] Attempting AI-powered extraction from: ${searchUrl}`);
+  
+  try {
+    const aiResult = await extractListingsWithAI(searchUrl, sourceName);
+    
+    if (aiResult.success && aiResult.listings.length > 0) {
+      const validListings: ListingData[] = [];
+      
+      for (const extracted of aiResult.listings) {
+        const validation = validateExtractedListing(extracted);
+        
+        if (extracted.confidence >= AI_CONFIDENCE_THRESHOLD && validation.valid) {
+          validListings.push(convertExtractedToListingData(extracted));
+        } else {
+          console.log(`[${sourceName}] Skipping low-quality listing: ${extracted.title} (confidence: ${extracted.confidence}, issues: ${validation.issues.join(", ")})`);
+        }
+      }
+      
+      if (validListings.length > 0) {
+        console.log(`[${sourceName}] AI extracted ${validListings.length} valid marina listings`);
+        return validListings;
+      }
+    }
+    
+    console.log(`[${sourceName}] AI extraction returned no valid listings`);
+    return [];
+  } catch (error: any) {
+    console.error(`[${sourceName}] Scraping error:`, error.message);
+    return [];
+  }
+}
+
 export async function runScrapeJob(
   orgId: string,
   platforms: string[] = ["crexi", "bizbuysell"]
@@ -867,7 +903,13 @@ export async function runScrapeJob(
             platformListings = await scrapeMarinaRSS();
             break;
           default:
-            console.log(`[${platform}] Unknown platform`);
+            // Handle custom/user-added broker sources using AI extraction
+            if (source && sourceSearchUrl) {
+              console.log(`[${platform}] Processing custom source: ${source.name}`);
+              platformListings = await scrapeCustomSource(sourceSearchUrl, source.name || platform);
+            } else {
+              console.log(`[${platform}] Unknown platform or missing search URL`);
+            }
         }
         
         // Apply source configuration filters if available
