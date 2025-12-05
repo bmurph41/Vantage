@@ -64,11 +64,6 @@ const STANDARD_FIELDS = [
   { value: 'agentFirstName', label: 'Agent First Name' },
   { value: 'agentLastName', label: 'Agent Last Name' },
   
-  // Legacy/Other
-  { value: 'seller', label: 'Seller (legacy)' },
-  { value: 'company', label: 'Company (legacy)' },
-  { value: 'owner', label: 'Owner (legacy)' },
-  
   // Additional Info
   { value: 'notes', label: 'Notes/Comments' },
   { value: 'articleUrls', label: 'Article URL' },

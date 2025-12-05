@@ -8888,8 +8888,21 @@ Current context: Project ${req.params.projectId}`;
 
       const compData = salesCompCreateSchema.parse(req.body);
 
-      const comp = await compService.createComp({
+      // Map user-friendly field names to database column names
+      const mappedData = {
         ...compData,
+        // Map sellerCompany -> seller (Seller Company in the form)
+        seller: compData.sellerCompany || compData.seller,
+        // Map sellerPrincipal -> owner (Seller Principal in the form)
+        owner: compData.sellerPrincipal || compData.owner,
+        // Map buyerCompany -> company (Buyer Company in the form)
+        company: compData.buyerCompany || compData.company,
+        // Map buyerPrincipal -> buyer (Buyer Principal in the form)
+        buyer: compData.buyerPrincipal || compData.buyer,
+      };
+
+      const comp = await compService.createComp({
+        ...mappedData,
         orgId,
         createdBy: userId,
       }, userId);
@@ -8944,9 +8957,22 @@ Current context: Project ${req.params.projectId}`;
 
       const updates = salesCompUpdateSchema.parse(req.body);
 
+      // Map user-friendly field names to database column names
+      const mappedUpdates = {
+        ...updates,
+        // Map sellerCompany -> seller (Seller Company in the form)
+        seller: updates.sellerCompany || updates.seller,
+        // Map sellerPrincipal -> owner (Seller Principal in the form)
+        owner: updates.sellerPrincipal || updates.owner,
+        // Map buyerCompany -> company (Buyer Company in the form)
+        company: updates.buyerCompany || updates.company,
+        // Map buyerPrincipal -> buyer (Buyer Principal in the form)
+        buyer: updates.buyerPrincipal || updates.buyer,
+      };
+
       const comp = await compService.updateComp(
         req.params.id,
-        { ...updates, updatedBy: userId },
+        { ...mappedUpdates, updatedBy: userId },
         orgId,
         userId
       );
@@ -24531,10 +24557,20 @@ Current context: Project ${req.params.projectId}`;
             organizationId: orgId,
           };
 
+          // Field name mapping: convert user-friendly names to database column names
+          const fieldNameMap: Record<string, string> = {
+            sellerCompany: 'seller',
+            sellerPrincipal: 'owner',
+            buyerCompany: 'company',
+            buyerPrincipal: 'buyer',
+          };
+
           for (const mapping of mappings) {
             const value = row[mapping.sourceColumn];
             if (value !== undefined && value !== '') {
-              transformedData[mapping.targetField] = transformValue(value, mapping.targetField);
+              // Convert field name if mapping exists, otherwise use as-is
+              const dbFieldName = fieldNameMap[mapping.targetField] || mapping.targetField;
+              transformedData[dbFieldName] = transformValue(value, mapping.targetField);
             }
           }
 
