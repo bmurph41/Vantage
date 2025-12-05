@@ -4696,6 +4696,51 @@ export const salesComps = pgTable('sales_comps', {
   buyerCompanyId: varchar('buyer_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
   buyerContactId: varchar('buyer_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
 
+  // === INSTITUTIONAL DATA GOVERNANCE ===
+  
+  // Source Attribution - Track where data came from
+  dataSource: text('data_source'), // 'broker', 'costar', 'loopnet', 'direct_research', 'public_records', 'internal'
+  sourceConfidence: integer('source_confidence'), // 1-100 confidence rating
+  sourceUrl: text('source_url'), // Original source URL if applicable
+  sourceContactId: varchar('source_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }), // Who provided the data
+  sourceNotes: text('source_notes'), // Additional context about the source
+  
+  // Data Quality & Verification
+  lastVerifiedAt: timestamp('last_verified_at'), // When data was last verified
+  lastVerifiedBy: varchar('last_verified_by').references(() => users.id, { onDelete: 'set null' }), // User who verified
+  dataQualityScore: integer('data_quality_score'), // 0-100 computed quality score
+  dataCompleteness: integer('data_completeness'), // 0-100 completeness percentage
+  verificationStatus: text('verification_status').default('unverified'), // 'unverified', 'pending', 'verified', 'stale'
+  verificationNotes: text('verification_notes'), // Notes from verification process
+  
+  // Enhanced Geocoding Metadata
+  geocodedAt: timestamp('geocoded_at'), // When geocoding was performed
+  geocodeAccuracy: text('geocode_accuracy'), // 'rooftop', 'range_interpolated', 'geometric_center', 'approximate'
+  formattedAddress: text('formatted_address'), // Standardized address from geocoding
+  placeId: text('place_id'), // Google Place ID for future reference
+  county: text('county'), // Extracted county from geocoding
+  country: text('country').default('US'), // Country code
+  timezone: text('timezone'), // Property timezone for analytics
+  
+  // Import & Audit Tracking
+  importBatchId: varchar('import_batch_id'), // Which import batch this came from
+  importSource: text('import_source'), // 'csv_import', 'manual_entry', 'api', 'broker_submission'
+  importedAt: timestamp('imported_at'), // When originally imported
+  changeHistory: jsonb('change_history').$type<Array<{
+    field: string;
+    oldValue: unknown;
+    newValue: unknown;
+    changedAt: string;
+    changedBy: string;
+    changeReason?: string;
+  }>>().default([]),
+  
+  // Statistical Metadata (computed during import/update)
+  pricePerSlip: integer('price_per_slip'), // Computed: salePrice / (wetSlips + dryRacks)
+  pricePerAcre: integer('price_per_acre'), // Computed: salePrice / acres
+  noiPerSlip: integer('noi_per_slip'), // Computed: noi / (wetSlips + dryRacks)
+  totalUnits: integer('total_units'), // Computed: wetSlips + dryRacks
+
   // Expandable data
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
 }, (table) => ({
@@ -4707,6 +4752,13 @@ export const salesComps = pgTable('sales_comps', {
   orgMarinaIdx: index('sales_comps_org_marina_idx').on(table.orgId, table.marina),
   orgRegionIdx: index('sales_comps_org_region_idx').on(table.orgId, table.region),
   orgOwnerPortfolioIdx: index('sales_comps_org_owner_portfolio_idx').on(table.orgId, table.ownerCompanyId, table.isPortfolio),
+  orgQualityScoreIdx: index('sales_comps_org_quality_score_idx').on(table.orgId, table.dataQualityScore),
+  orgVerificationIdx: index('sales_comps_org_verification_idx').on(table.orgId, table.verificationStatus),
+  orgDataSourceIdx: index('sales_comps_org_data_source_idx').on(table.orgId, table.dataSource),
+  orgImportBatchIdx: index('sales_comps_org_import_batch_idx').on(table.orgId, table.importBatchId),
+  orgBuyerIdx: index('sales_comps_org_buyer_idx').on(table.orgId, table.buyerCompanyId),
+  orgSellerIdx: index('sales_comps_org_seller_idx').on(table.orgId, table.sellerCompanyId),
+  orgCountyIdx: index('sales_comps_org_county_idx').on(table.orgId, table.county),
 }));
 
 // Custom storage types table - per-organization customizable storage types
@@ -4799,8 +4851,161 @@ export const compImports = pgTable('comp_imports', {
     warningCount: number;
     errors: Array<{ row: number; message: string; }>;
   }>(),
+  // Enhanced import tracking fields
+  batchId: varchar('batch_id'), // Links to import batch for multi-file reconciliation
+  dataSource: text('data_source'), // 'broker', 'costar', etc.
+  sourceContact: text('source_contact'), // Who provided this file
+  validationResults: jsonb('validation_results').$type<{
+    passed: number;
+    warnings: number;
+    errors: number;
+    outliers: Array<{ row: number; field: string; value: any; reason: string; }>;
+  }>(),
 }, (table) => ({
   orgIdx: index('comp_imports_org_idx').on(table.orgId),
+  batchIdx: index('comp_imports_batch_idx').on(table.batchId),
+}));
+
+// Import batches - for multi-source reconciliation
+export const scImportBatches = pgTable('sc_import_batches', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+  
+  name: text('name'), // User-friendly batch name
+  description: text('description'),
+  status: text('status').notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  
+  // Batch statistics
+  totalFiles: integer('total_files').default(0),
+  totalRecords: integer('total_records').default(0),
+  insertedCount: integer('inserted_count').default(0),
+  updatedCount: integer('updated_count').default(0),
+  skippedCount: integer('skipped_count').default(0),
+  errorCount: integer('error_count').default(0),
+  
+  // Reconciliation tracking
+  duplicatesFound: integer('duplicates_found').default(0),
+  duplicatesResolved: integer('duplicates_resolved').default(0),
+  conflictsFound: integer('conflicts_found').default(0),
+  conflictsResolved: integer('conflicts_resolved').default(0),
+  
+  // Sources in this batch
+  sources: text('sources').array().default(sql`'{}'`), // Array of data sources
+}, (table) => ({
+  orgIdx: index('sc_import_batches_org_idx').on(table.orgId),
+  orgStatusIdx: index('sc_import_batches_org_status_idx').on(table.orgId, table.status),
+  orgCreatedIdx: index('sc_import_batches_org_created_idx').on(table.orgId, table.createdAt),
+}));
+
+// Validation rules - configurable thresholds for import validation
+export const scValidationRules = pgTable('sc_validation_rules', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  isActive: boolean('is_active').default(true),
+  
+  // Rule configuration
+  field: text('field').notNull(), // Which field this applies to
+  ruleType: text('rule_type').notNull(), // 'range', 'required', 'format', 'custom'
+  severity: text('severity').default('warning'), // 'warning', 'error'
+  
+  // Rule parameters (depends on ruleType)
+  minValue: decimal('min_value', { precision: 15, scale: 4 }),
+  maxValue: decimal('max_value', { precision: 15, scale: 4 }),
+  pattern: text('pattern'), // Regex pattern for format validation
+  customLogic: text('custom_logic'), // Custom validation expression
+  
+  // Suggested action when violated
+  suggestedAction: text('suggested_action'), // 'flag', 'exclude', 'auto_fix'
+  autoFixValue: text('auto_fix_value'), // Value to use for auto-fix
+}, (table) => ({
+  orgIdx: index('sc_validation_rules_org_idx').on(table.orgId),
+  orgFieldIdx: index('sc_validation_rules_org_field_idx').on(table.orgId, table.field),
+  orgActiveIdx: index('sc_validation_rules_org_active_idx').on(table.orgId, table.isActive),
+}));
+
+// Comp history - preserves historical values when records are updated
+export const scCompHistory = pgTable('sc_comp_history', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  compId: varchar('comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
+  
+  changedBy: varchar('changed_by').notNull().references(() => users.id),
+  changedAt: timestamp('changed_at').defaultNow().notNull(),
+  
+  changeType: text('change_type').notNull(), // 'create', 'update', 'merge', 'bulk_update'
+  changeSource: text('change_source'), // 'manual', 'import', 'api', 'system'
+  importBatchId: varchar('import_batch_id'), // If from an import
+  
+  // Snapshot of changed fields
+  previousValues: jsonb('previous_values').$type<Record<string, unknown>>().default({}),
+  newValues: jsonb('new_values').$type<Record<string, unknown>>().default({}),
+  
+  // Change metadata
+  changeReason: text('change_reason'), // User-provided reason
+  affectedFields: text('affected_fields').array().default(sql`'{}'`),
+}, (table) => ({
+  orgIdx: index('sc_comp_history_org_idx').on(table.orgId),
+  compIdx: index('sc_comp_history_comp_idx').on(table.compId),
+  orgCompDateIdx: index('sc_comp_history_org_comp_date_idx').on(table.orgId, table.compId, table.changedAt),
+  changeTypeIdx: index('sc_comp_history_change_type_idx').on(table.orgId, table.changeType),
+}));
+
+// Comp adjustments - for appraisal-style comp adjustments
+export const scCompAdjustments = pgTable('sc_comp_adjustments', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  
+  // Links
+  compId: varchar('comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
+  targetPropertyId: varchar('target_property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
+  projectId: varchar('project_id'), // Optional link to a modeling project
+  
+  // Adjustment calculations
+  timeAdjustment: decimal('time_adjustment', { precision: 10, scale: 4 }), // % adjustment for time since sale
+  locationAdjustment: decimal('location_adjustment', { precision: 10, scale: 4 }), // % adjustment for location differences
+  sizeAdjustment: decimal('size_adjustment', { precision: 10, scale: 4 }), // % adjustment for size differences
+  conditionAdjustment: decimal('condition_adjustment', { precision: 10, scale: 4 }), // % adjustment for condition
+  amenitiesAdjustment: decimal('amenities_adjustment', { precision: 10, scale: 4 }), // % adjustment for amenity differences
+  marketAdjustment: decimal('market_adjustment', { precision: 10, scale: 4 }), // % adjustment for market conditions
+  customAdjustment: decimal('custom_adjustment', { precision: 10, scale: 4 }), // Any other adjustments
+  
+  // Totals
+  grossAdjustment: decimal('gross_adjustment', { precision: 10, scale: 4 }), // Sum of absolute adjustments
+  netAdjustment: decimal('net_adjustment', { precision: 10, scale: 4 }), // Sum of signed adjustments
+  adjustedPrice: integer('adjusted_price'), // Final adjusted price
+  adjustedCapRate: decimal('adjusted_cap_rate', { precision: 6, scale: 4 }),
+  
+  // Adjustment notes
+  notes: text('notes'),
+  adjustmentDetails: jsonb('adjustment_details').$type<{
+    timeNotes?: string;
+    locationNotes?: string;
+    sizeNotes?: string;
+    conditionNotes?: string;
+    amenitiesNotes?: string;
+    marketNotes?: string;
+    customNotes?: string;
+  }>().default({}),
+  
+  // Weight for this comp in analysis
+  compWeight: decimal('comp_weight', { precision: 5, scale: 4 }).default('1'), // 0-1 weight for weighted analysis
+}, (table) => ({
+  orgIdx: index('sc_comp_adjustments_org_idx').on(table.orgId),
+  compIdx: index('sc_comp_adjustments_comp_idx').on(table.compId),
+  targetIdx: index('sc_comp_adjustments_target_idx').on(table.targetPropertyId),
+  projectIdx: index('sc_comp_adjustments_project_idx').on(table.projectId),
 }));
 
 // SC Projects table for organizing sales comps (renamed from "projects" to avoid conflict with DD projects)
@@ -5388,6 +5593,49 @@ export const insertCompImportSchema = createInsertSchema(compImports).omit({
   createdAt: true,
 });
 
+// Import batch schemas
+export const insertScImportBatchSchema = createInsertSchema(scImportBatches).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export const updateScImportBatchSchema = insertScImportBatchSchema.partial().omit({
+  orgId: true,
+  createdBy: true,
+});
+
+// Validation rules schemas
+export const insertScValidationRuleSchema = createInsertSchema(scValidationRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateScValidationRuleSchema = insertScValidationRuleSchema.partial().omit({
+  orgId: true,
+  createdBy: true,
+});
+
+// Comp history schemas
+export const insertScCompHistorySchema = createInsertSchema(scCompHistory).omit({
+  id: true,
+  changedAt: true,
+});
+
+// Comp adjustments schemas
+export const insertScCompAdjustmentSchema = createInsertSchema(scCompAdjustments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateScCompAdjustmentSchema = insertScCompAdjustmentSchema.partial().omit({
+  orgId: true,
+  createdBy: true,
+  compId: true,
+});
+
 export const insertScProjectSchema = createInsertSchema(scProjects).omit({
   id: true,
   createdAt: true,
@@ -5506,6 +5754,22 @@ export type UpdateSalesComp = z.infer<typeof updateSalesCompSchema>;
 export type CompColumn = typeof compColumns.$inferSelect;
 export type InsertCompColumn = z.infer<typeof insertCompColumnSchema>;
 export type UpdateCompColumn = z.infer<typeof updateCompColumnSchema>;
+
+// Institutional data governance types
+export type ScImportBatch = typeof scImportBatches.$inferSelect;
+export type InsertScImportBatch = z.infer<typeof insertScImportBatchSchema>;
+export type UpdateScImportBatch = z.infer<typeof updateScImportBatchSchema>;
+
+export type ScValidationRule = typeof scValidationRules.$inferSelect;
+export type InsertScValidationRule = z.infer<typeof insertScValidationRuleSchema>;
+export type UpdateScValidationRule = z.infer<typeof updateScValidationRuleSchema>;
+
+export type ScCompHistory = typeof scCompHistory.$inferSelect;
+export type InsertScCompHistory = z.infer<typeof insertScCompHistorySchema>;
+
+export type ScCompAdjustment = typeof scCompAdjustments.$inferSelect;
+export type InsertScCompAdjustment = z.infer<typeof insertScCompAdjustmentSchema>;
+export type UpdateScCompAdjustment = z.infer<typeof updateScCompAdjustmentSchema>;
 export type CompImport = typeof compImports.$inferSelect;
 export type InsertCompImport = z.infer<typeof insertCompImportSchema>;
 export type ScAuditLog = typeof scAuditLog.$inferSelect;

@@ -44,7 +44,12 @@ Preferred communication style: Simple, everyday language.
 - **CRM Module**: Manages deals, leads, contacts, companies, pipelines, activities, email sequences, and marketing automation. Includes relationship management and a premium prospecting/outreach add-on.
 - **Due Diligence Module**: Project management with task tracking and template management, integrated with CRM for deal conversion.
 - **Rent Roll Module**: Manages marina unit occupancy and rental income, with real-time Customer Analytics (LTV, retention, churn, tenure, churn risk).
-- **SalesComps Module**: Marina sales comparables with CSV import/export, Google Maps, and portfolio functionality.
+- **SalesComps Module**: Marina sales comparables with CSV import/export, Google Maps, and portfolio functionality. Includes institutional-grade data services:
+    - **Geocoding Service**: Google Maps integration for address standardization, batch geocoding, place IDs, county/country attribution.
+    - **Data Quality Scoring**: 0-100 scoring across completeness, recency, source reliability, and verification status with recommendations.
+    - **Validation Rules Engine**: Configurable validation rules per organization, outlier detection (IQR/Z-score), pre-import data validation.
+    - **Comp History Tracking**: Full audit trail, field-level history, version rollback, import batch grouping.
+    - **Comp Adjustment Grid**: Appraisal-style adjustments (time, location, size, condition, amenities, market, custom), weighted comparison grids for property valuation.
 - **Modeling Projects Module**: Tracks marina valuation, integrated with CRM, DD, and sales comps. Features include:
     - **Dynamic Year Selector**: Project-specific financial period selection.
     - **Operations Data Sync**: Institutional-grade pipeline for operational data.
@@ -105,3 +110,4 @@ Preferred communication style: Simple, everyday language.
 - **FRED API**: Federal Reserve Economic Data.
 - **Census Bureau API**: Demographic data.
 - **QuickBooks API**: Financial data synchronization.
+- **Google Maps Services**: Geocoding and address standardization for Sales Comps.

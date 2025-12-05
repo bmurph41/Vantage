@@ -9450,6 +9450,466 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ================================================================================
+  // INSTITUTIONAL DATA SERVICES - Geocoding, Quality Scoring, Validation, History
+  // ================================================================================
+
+  // Geocoding Service Routes
+  app.post('/api/sales-comps/geocode', async (req: any, res) => {
+    try {
+      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const { address, city, state, zip, country } = req.body;
+
+      if (!geocodingService.isConfigured()) {
+        return res.status(503).json({ message: "Geocoding service not configured" });
+      }
+
+      const result = await geocodingService.geocodeAddress({ address, city, state, zip, country });
+      if (!result) {
+        return res.status(404).json({ message: "Could not geocode address" });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      res.status(500).json({ message: "Failed to geocode address" });
+    }
+  });
+
+  app.post('/api/sales-comps/:id/geocode', async (req: any, res) => {
+    try {
+      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const compId = req.params.id;
+
+      const comp = await storage.getCompById(compId, orgId);
+      if (!comp) {
+        return res.status(404).json({ message: "Comp not found" });
+      }
+
+      if (!geocodingService.isConfigured()) {
+        return res.status(503).json({ message: "Geocoding service not configured" });
+      }
+
+      const result = await geocodingService.geocodeAddress({
+        address: comp.address || undefined,
+        city: comp.city || undefined,
+        state: comp.state || undefined,
+        zip: comp.zip || undefined,
+      });
+
+      if (!result) {
+        return res.status(404).json({ message: "Could not geocode comp address" });
+      }
+
+      // Update comp with geocoded data
+      const updated = await storage.updateComp(compId, {
+        lat: result.lat.toString(),
+        lng: result.lng.toString(),
+        formattedAddress: result.formattedAddress,
+        placeId: result.placeId,
+        county: result.county,
+        country: result.country,
+        geocodeAccuracy: result.geocodeAccuracy,
+        geocodedAt: new Date(),
+        updatedBy: userId,
+      }, orgId);
+
+      res.json({ geocodeResult: result, updatedComp: updated });
+    } catch (error) {
+      console.error("Comp geocoding error:", error);
+      res.status(500).json({ message: "Failed to geocode comp" });
+    }
+  });
+
+  app.post('/api/sales-comps/batch-geocode', async (req: any, res) => {
+    try {
+      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { compIds } = req.body;
+
+      if (!geocodingService.isConfigured()) {
+        return res.status(503).json({ message: "Geocoding service not configured" });
+      }
+
+      if (!Array.isArray(compIds) || compIds.length === 0) {
+        return res.status(400).json({ message: "compIds array required" });
+      }
+
+      const results: { compId: string; success: boolean; error?: string }[] = [];
+
+      for (const compId of compIds.slice(0, 50)) { // Limit to 50 at a time
+        try {
+          const comp = await storage.getCompById(compId, orgId);
+          if (!comp) {
+            results.push({ compId, success: false, error: "Not found" });
+            continue;
+          }
+
+          const result = await geocodingService.geocodeAddress({
+            address: comp.address || undefined,
+            city: comp.city || undefined,
+            state: comp.state || undefined,
+            zip: comp.zip || undefined,
+          });
+
+          if (result) {
+            await storage.updateComp(compId, {
+              lat: result.lat.toString(),
+              lng: result.lng.toString(),
+              formattedAddress: result.formattedAddress,
+              placeId: result.placeId,
+              county: result.county,
+              country: result.country,
+              geocodeAccuracy: result.geocodeAccuracy,
+              geocodedAt: new Date(),
+              updatedBy: userId,
+            }, orgId);
+            results.push({ compId, success: true });
+          } else {
+            results.push({ compId, success: false, error: "Could not geocode" });
+          }
+        } catch (err) {
+          results.push({ compId, success: false, error: "Processing error" });
+        }
+      }
+
+      const summary = {
+        total: results.length,
+        successful: results.filter(r => r.success).length,
+        failed: results.filter(r => !r.success).length,
+        results,
+      };
+
+      res.json(summary);
+    } catch (error) {
+      console.error("Batch geocoding error:", error);
+      res.status(500).json({ message: "Failed to batch geocode" });
+    }
+  });
+
+  // Data Quality Service Routes
+  app.get('/api/sales-comps/:id/quality-score', async (req: any, res) => {
+    try {
+      const { dataQualityService } = await import('./services/salescomps/dataQualityService');
+      const orgId = req.user.orgId;
+      const compId = req.params.id;
+
+      const comp = await storage.getCompById(compId, orgId);
+      if (!comp) {
+        return res.status(404).json({ message: "Comp not found" });
+      }
+
+      const qualityReport = dataQualityService.calculateQualityScore(comp);
+      res.json(qualityReport);
+    } catch (error) {
+      console.error("Quality score error:", error);
+      res.status(500).json({ message: "Failed to calculate quality score" });
+    }
+  });
+
+  app.post('/api/sales-comps/batch-quality-score', async (req: any, res) => {
+    try {
+      const { dataQualityService } = await import('./services/salescomps/dataQualityService');
+      const orgId = req.user.orgId;
+      const { compIds } = req.body;
+
+      let comps;
+      if (compIds && Array.isArray(compIds)) {
+        const allComps = await storage.getComps({ orgId, pageSize: 10000 });
+        comps = allComps.comps.filter(c => compIds.includes(c.id));
+      } else {
+        const result = await storage.getComps({ orgId, pageSize: 1000 });
+        comps = result.comps;
+      }
+
+      const batchQuality = dataQualityService.calculateBatchQuality(comps);
+      res.json(batchQuality);
+    } catch (error) {
+      console.error("Batch quality score error:", error);
+      res.status(500).json({ message: "Failed to calculate batch quality" });
+    }
+  });
+
+  app.patch('/api/sales-comps/:id/update-quality-score', async (req: any, res) => {
+    try {
+      const { dataQualityService } = await import('./services/salescomps/dataQualityService');
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const compId = req.params.id;
+
+      const comp = await storage.getCompById(compId, orgId);
+      if (!comp) {
+        return res.status(404).json({ message: "Comp not found" });
+      }
+
+      const qualityReport = dataQualityService.calculateQualityScore(comp);
+      
+      const updated = await storage.updateComp(compId, {
+        dataQualityScore: qualityReport.overallScore,
+        dataCompleteness: qualityReport.completenessScore,
+        sourceConfidence: qualityReport.sourceReliabilityScore,
+        updatedBy: userId,
+      }, orgId);
+
+      res.json({ qualityReport, updatedComp: updated });
+    } catch (error) {
+      console.error("Update quality score error:", error);
+      res.status(500).json({ message: "Failed to update quality score" });
+    }
+  });
+
+  // Validation Service Routes
+  app.get('/api/sales-comps/validation-rules', async (req: any, res) => {
+    try {
+      const { validationService } = await import('./services/salescomps/validationService');
+      const orgId = req.user.orgId;
+
+      const orgRules = await validationService.getOrganizationRules(orgId);
+      const defaultRules = validationService.getDefaultRules();
+
+      res.json({
+        organizationRules: orgRules,
+        defaultRules,
+      });
+    } catch (error) {
+      console.error("Validation rules error:", error);
+      res.status(500).json({ message: "Failed to fetch validation rules" });
+    }
+  });
+
+  app.post('/api/sales-comps/validate', async (req: any, res) => {
+    try {
+      const { validationService } = await import('./services/salescomps/validationService');
+      const orgId = req.user.orgId;
+      const { rows } = req.body;
+
+      if (!Array.isArray(rows)) {
+        return res.status(400).json({ message: "rows array required" });
+      }
+
+      const { results, summary } = await validationService.validateBatch(rows, orgId);
+      res.json({ results, summary });
+    } catch (error) {
+      console.error("Validation error:", error);
+      res.status(500).json({ message: "Failed to validate data" });
+    }
+  });
+
+  app.post('/api/sales-comps/detect-outliers', async (req: any, res) => {
+    try {
+      const { validationService } = await import('./services/salescomps/validationService');
+      const { rows, field, method } = req.body;
+
+      if (!Array.isArray(rows) || !field) {
+        return res.status(400).json({ message: "rows array and field required" });
+      }
+
+      const outlierIndices = validationService.detectOutliers(rows, field, method || 'iqr');
+      res.json({ field, method: method || 'iqr', outlierIndices });
+    } catch (error) {
+      console.error("Outlier detection error:", error);
+      res.status(500).json({ message: "Failed to detect outliers" });
+    }
+  });
+
+  // Comp History Service Routes
+  app.get('/api/sales-comps/:id/history', async (req: any, res) => {
+    try {
+      const { compHistoryService } = await import('./services/salescomps/compHistoryService');
+      const orgId = req.user.orgId;
+      const compId = req.params.id;
+      const limit = parseInt(req.query.limit as string) || 50;
+
+      const history = await compHistoryService.getCompHistory(orgId, compId, limit);
+      res.json(history);
+    } catch (error) {
+      console.error("Comp history error:", error);
+      res.status(500).json({ message: "Failed to fetch comp history" });
+    }
+  });
+
+  app.get('/api/sales-comps/:id/history/field/:field', async (req: any, res) => {
+    try {
+      const { compHistoryService } = await import('./services/salescomps/compHistoryService');
+      const orgId = req.user.orgId;
+      const compId = req.params.id;
+      const field = req.params.field;
+
+      const fieldHistory = await compHistoryService.getFieldHistory(orgId, compId, field);
+      res.json(fieldHistory);
+    } catch (error) {
+      console.error("Field history error:", error);
+      res.status(500).json({ message: "Failed to fetch field history" });
+    }
+  });
+
+  app.post('/api/sales-comps/:id/history/rollback/:historyId', async (req: any, res) => {
+    try {
+      const { compHistoryService } = await import('./services/salescomps/compHistoryService');
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const compId = req.params.id;
+      const historyId = req.params.historyId;
+
+      const success = await compHistoryService.rollbackToVersion(orgId, compId, historyId, userId);
+      res.json({ success });
+    } catch (error) {
+      console.error("History rollback error:", error);
+      res.status(500).json({ message: "Failed to rollback to version" });
+    }
+  });
+
+  app.get('/api/sales-comps/history/recent', async (req: any, res) => {
+    try {
+      const { compHistoryService } = await import('./services/salescomps/compHistoryService');
+      const orgId = req.user.orgId;
+      const limit = parseInt(req.query.limit as string) || 100;
+
+      const recentChanges = await compHistoryService.getRecentOrgChanges(orgId, limit);
+      res.json(recentChanges);
+    } catch (error) {
+      console.error("Recent changes error:", error);
+      res.status(500).json({ message: "Failed to fetch recent changes" });
+    }
+  });
+
+  // Comp Adjustment Service Routes
+  app.post('/api/sales-comps/:id/adjustment', async (req: any, res) => {
+    try {
+      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const compId = req.params.id;
+      const { targetPropertyId, projectId, ...adjustments } = req.body;
+
+      const adjustmentId = await compAdjustmentService.saveAdjustment(
+        orgId,
+        userId,
+        compId,
+        adjustments,
+        targetPropertyId,
+        projectId
+      );
+
+      res.json({ adjustmentId });
+    } catch (error) {
+      console.error("Adjustment save error:", error);
+      res.status(500).json({ message: "Failed to save adjustment" });
+    }
+  });
+
+  app.get('/api/sales-comps/:id/adjustment', async (req: any, res) => {
+    try {
+      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const orgId = req.user.orgId;
+      const compId = req.params.id;
+      const targetPropertyId = req.query.targetPropertyId as string | undefined;
+
+      const adjustment = await compAdjustmentService.getAdjustment(orgId, compId, targetPropertyId);
+      if (!adjustment) {
+        return res.status(404).json({ message: "Adjustment not found" });
+      }
+
+      res.json(adjustment);
+    } catch (error) {
+      console.error("Adjustment fetch error:", error);
+      res.status(500).json({ message: "Failed to fetch adjustment" });
+    }
+  });
+
+  app.post('/api/sales-comps/:id/calculate-adjustment', async (req: any, res) => {
+    try {
+      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const orgId = req.user.orgId;
+      const compId = req.params.id;
+      const adjustments = req.body;
+
+      const comp = await storage.getCompById(compId, orgId);
+      if (!comp) {
+        return res.status(404).json({ message: "Comp not found" });
+      }
+
+      const result = compAdjustmentService.calculateAdjustment(comp, adjustments, new Date());
+      res.json(result);
+    } catch (error) {
+      console.error("Calculate adjustment error:", error);
+      res.status(500).json({ message: "Failed to calculate adjustment" });
+    }
+  });
+
+  app.post('/api/sales-comps/comparison-grid', async (req: any, res) => {
+    try {
+      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { targetPropertyId, compIds } = req.body;
+
+      if (!targetPropertyId || !Array.isArray(compIds)) {
+        return res.status(400).json({ message: "targetPropertyId and compIds array required" });
+      }
+
+      const grid = await compAdjustmentService.buildComparisonGrid(
+        orgId,
+        targetPropertyId,
+        compIds,
+        userId
+      );
+
+      res.json(grid);
+    } catch (error) {
+      console.error("Comparison grid error:", error);
+      res.status(500).json({ message: "Failed to build comparison grid" });
+    }
+  });
+
+  app.get('/api/sales-comps/project/:projectId/adjustments', async (req: any, res) => {
+    try {
+      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const orgId = req.user.orgId;
+      const projectId = req.params.projectId;
+
+      const adjustments = await compAdjustmentService.getProjectAdjustments(orgId, projectId);
+      res.json(adjustments);
+    } catch (error) {
+      console.error("Project adjustments error:", error);
+      res.status(500).json({ message: "Failed to fetch project adjustments" });
+    }
+  });
+
+  app.delete('/api/sales-comps/adjustment/:adjustmentId', async (req: any, res) => {
+    try {
+      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const orgId = req.user.orgId;
+      const adjustmentId = req.params.adjustmentId;
+
+      const success = await compAdjustmentService.deleteAdjustment(orgId, adjustmentId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete adjustment error:", error);
+      res.status(500).json({ message: "Failed to delete adjustment" });
+    }
+  });
+
+  // Geocoding status check
+  app.get('/api/sales-comps/geocoding/status', async (req: any, res) => {
+    try {
+      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      res.json({
+        configured: geocodingService.isConfigured(),
+        requestCount: geocodingService.getRequestCount(),
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get geocoding status" });
+    }
+  });
+
+  // ================================================================================
+  // END INSTITUTIONAL DATA SERVICES
+  // ================================================================================
+
   // Saved Searches routes
   app.get('/api/saved-searches', async (req: any, res) => {
     try {
