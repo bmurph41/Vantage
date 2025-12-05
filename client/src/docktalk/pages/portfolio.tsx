@@ -332,8 +332,8 @@ export default function PortfolioCompaniesPage() {
       setShowMatchDialog(false);
       resetForm();
       toast({
-        title: "Portfolio Company Added",
-        description: "Company has been added to your portfolio tracking list.",
+        title: "Company Added to Watchlist",
+        description: "Company has been added to your watchlist.",
       });
       return newCompany;
     },
@@ -674,7 +674,7 @@ export default function PortfolioCompaniesPage() {
   };
 
   const handleDelete = (company: PortfolioCompany) => {
-    if (window.confirm(`Are you sure you want to remove ${company.companyName} from your portfolio tracking?`)) {
+    if (window.confirm(`Are you sure you want to remove ${company.companyName} from your watchlist?`)) {
       deleteMutation.mutate(company.id);
     }
   };
@@ -703,10 +703,10 @@ export default function PortfolioCompaniesPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <Building2 className="h-8 w-8 text-primary" />
-            Portfolio Companies
+            Watchlist
           </h1>
           <p className="text-muted-foreground mt-2">
-            Track marina companies in your investment portfolio and receive alerts when they appear in news
+            Track marina companies and receive alerts when they appear in news
           </p>
         </div>
 
@@ -719,9 +719,9 @@ export default function PortfolioCompaniesPage() {
           </DialogTrigger>
           <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Add Portfolio Company</DialogTitle>
+              <DialogTitle>Add Company to Watchlist</DialogTitle>
               <DialogDescription>
-                Add a marina company to your portfolio tracking list. We'll check if it matches any existing CRM companies.
+                Add a marina company to your watchlist. We'll check if it matches any existing CRM companies.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
@@ -1540,9 +1540,9 @@ export default function PortfolioCompaniesPage() {
             <div className="flex justify-center mb-4">
               <Building2 className="h-16 w-16 text-muted-foreground/50" />
             </div>
-            <CardTitle className="text-2xl">No Portfolio Companies Yet</CardTitle>
+            <CardTitle className="text-2xl">Your Watchlist is Empty</CardTitle>
             <p className="text-muted-foreground text-base mt-2">
-              Start tracking marina companies in your investment portfolio to receive automated alerts when they appear in industry news.
+              Start tracking marina companies to receive automated alerts when they appear in industry news.
             </p>
             <div className="mt-6">
               <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-first-company">
