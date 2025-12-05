@@ -892,12 +892,13 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     };
 
     if (isEditMode && editingTask) {
-      // Update existing task
+      // Update existing task with conflict detection
       updateTask.mutate(
         {
           id: editingTask.id,
           projectId,
           updates: transformedData,
+          expectedUpdatedAt: editingTask.updatedAt,
         },
         {
           onSuccess: () => {

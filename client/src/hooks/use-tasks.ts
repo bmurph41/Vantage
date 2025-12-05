@@ -41,13 +41,24 @@ interface UpdateTaskContext {
   projectId?: string;
 }
 
+interface UpdateTaskParams {
+  id: string;
+  updates: Partial<Task>;
+  projectId?: string;
+  expectedUpdatedAt?: string | Date | null;
+}
+
 export function useUpdateTask() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: ({ id, updates, projectId }: { id: string; updates: Partial<Task>; projectId?: string }) =>
-      ddClient.updateTask(id, updates),
+    mutationFn: ({ id, updates, expectedUpdatedAt }: UpdateTaskParams) => {
+      const payload = expectedUpdatedAt 
+        ? { ...updates, expectedUpdatedAt: typeof expectedUpdatedAt === 'string' ? expectedUpdatedAt : expectedUpdatedAt?.toISOString() }
+        : updates;
+      return ddClient.updateTask(id, payload);
+    },
     onMutate: async ({ id, updates, projectId }) => {
       if (!projectId) return { previousTasks: undefined, projectId: undefined };
       
@@ -73,7 +84,15 @@ export function useUpdateTask() {
       }
       
       let errorMessage = "Failed to update task";
-      if (error?.details && Array.isArray(error.details)) {
+      let isConflict = false;
+      
+      if (error?.error === 'Conflict detected') {
+        isConflict = true;
+        errorMessage = error.message || "This task was modified. Please refresh the page.";
+        if (context?.projectId) {
+          queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', context.projectId, 'tasks'] });
+        }
+      } else if (error?.details && Array.isArray(error.details)) {
         const fieldErrors = error.details.map((d: any) => `${d.field}: ${d.message}`).join(', ');
         errorMessage = `Validation error: ${fieldErrors}`;
       } else if (error?.message) {
@@ -81,7 +100,7 @@ export function useUpdateTask() {
       }
       
       toast({
-        title: "Error",
+        title: isConflict ? "Conflict Detected" : "Error",
         description: errorMessage,
         variant: "destructive",
       });

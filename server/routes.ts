@@ -1129,8 +1129,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await authorizeProjectAccess(task.projectId, req.user.orgId);
       
-      // Extract isInternalTask field before validation
-      const { isInternalTask, ...taskPayload } = req.body;
+      // Extract special fields before validation
+      const { isInternalTask, expectedUpdatedAt, ...taskPayload } = req.body;
+      
+      // Conflict detection: check if task was modified since client loaded it
+      if (expectedUpdatedAt) {
+        const clientTimestamp = new Date(expectedUpdatedAt).getTime();
+        const serverTimestamp = task.updatedAt ? new Date(task.updatedAt).getTime() : 0;
+        
+        // Allow 1 second tolerance for timestamp comparison
+        if (Math.abs(clientTimestamp - serverTimestamp) > 1000) {
+          return res.status(409).json({
+            error: 'Conflict detected',
+            message: 'This task was modified by someone else. Please refresh and try again.',
+            serverUpdatedAt: task.updatedAt,
+            clientUpdatedAt: expectedUpdatedAt
+          });
+        }
+      }
       
       // If it's an internal task, clear company-related fields
       if (isInternalTask) {
