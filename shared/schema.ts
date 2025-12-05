@@ -14631,6 +14631,16 @@ export const marinaScrapeources = pgTable("marina_scrape_sources", {
   lastScrapeStatus: varchar("last_scrape_status", { length: 30 }),
   lastScrapeCount: integer("last_scrape_count"),
   totalListingsFound: integer("total_listings_found").default(0),
+  
+  // Source health tracking
+  successCount: integer("success_count").default(0),
+  failureCount: integer("failure_count").default(0),
+  consecutiveFailures: integer("consecutive_failures").default(0),
+  lastFailureReason: text("last_failure_reason"),
+  healthStatus: varchar("health_status", { length: 20 }).default("unknown"), // unknown, healthy, warning, failing, disabled
+  lastFetchMethod: varchar("last_fetch_method", { length: 20 }), // static, headless
+  requiresJsRendering: boolean("requires_js_rendering").default(false), // Auto-learned preference
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

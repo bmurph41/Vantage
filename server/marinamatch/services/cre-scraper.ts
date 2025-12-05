@@ -798,13 +798,17 @@ async function scrapeMarinaRSS(): Promise<ListingData[]> {
 }
 
 // Custom broker source scraper - uses AI extraction for user-added sources
-export async function scrapeCustomSource(searchUrl: string, sourceName: string): Promise<ListingData[]> {
-  const platform = sourceName.toLowerCase().replace(/\s+/g, '_');
+export async function scrapeCustomSource(
+  searchUrl: string, 
+  sourceName: string,
+  options?: { requiresJsRendering?: boolean }
+): Promise<ListingData[]> {
+  const forceHeadless = options?.requiresJsRendering || false;
   
-  console.log(`[${sourceName}] Attempting AI-powered extraction from: ${searchUrl}`);
+  console.log(`[${sourceName}] Attempting AI-powered extraction from: ${searchUrl}${forceHeadless ? ' (headless mode)' : ''}`);
   
   try {
-    const aiResult = await extractListingsWithAI(searchUrl, sourceName);
+    const aiResult = await extractListingsWithAI(searchUrl, sourceName, { forceHeadless });
     
     if (aiResult.success && aiResult.listings.length > 0) {
       const validListings: ListingData[] = [];
@@ -1070,7 +1074,46 @@ export async function runScrapeJob(
             // Handle custom/user-added broker sources using AI extraction
             if (source && sourceSearchUrl) {
               console.log(`[${platform}] Processing custom source: ${source.name}`);
-              platformListings = await scrapeCustomSource(sourceSearchUrl, source.name || platform);
+              platformListings = await scrapeCustomSource(sourceSearchUrl, source.name || platform, {
+                requiresJsRendering: source.requiresJsRendering || false,
+              });
+              
+              // Track source health - update consecutive failures if no listings found
+              if (platformListings.length === 0) {
+                const newConsecutiveFailures = (source.consecutiveFailures || 0) + 1;
+                const shouldEnableJs = newConsecutiveFailures >= 2 && !source.requiresJsRendering;
+                
+                await db
+                  .update(marinaScrapeources)
+                  .set({
+                    consecutiveFailures: newConsecutiveFailures,
+                    failureCount: (source.failureCount || 0) + 1,
+                    lastFailureReason: "No listings extracted from page content",
+                    healthStatus: newConsecutiveFailures >= 3 ? "failing" : "warning",
+                    requiresJsRendering: shouldEnableJs ? true : source.requiresJsRendering,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(marinaScrapeources.id, source.id));
+                
+                if (shouldEnableJs) {
+                  console.log(`[${platform}] Auto-enabling headless mode after ${newConsecutiveFailures} failures`);
+                }
+              } else {
+                // Success - reset failure tracking
+                await db
+                  .update(marinaScrapeources)
+                  .set({
+                    consecutiveFailures: 0,
+                    successCount: (source.successCount || 0) + 1,
+                    healthStatus: "healthy",
+                    lastFailureReason: null,
+                    lastScrapeCount: platformListings.length,
+                    lastScrapeAt: new Date(),
+                    lastScrapeStatus: "success",
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(marinaScrapeources.id, source.id));
+              }
             } else {
               console.log(`[${platform}] Unknown platform or missing search URL`);
             }

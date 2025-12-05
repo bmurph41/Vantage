@@ -1,29 +1,8 @@
 import OpenAI from "openai";
-import axios from "axios";
 import * as cheerio from "cheerio";
+import { smartFetch, SmartFetchResult } from "./headless-fetcher";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-const ALLOWED_HOSTS = [
-  "crexi.com",
-  "www.crexi.com",
-  "loopnet.com",
-  "www.loopnet.com",
-  "bizbuysell.com",
-  "www.bizbuysell.com",
-  "costar.com",
-  "www.costar.com",
-  "landwatch.com",
-  "www.landwatch.com",
-  "landsofamerica.com",
-  "www.landsofamerica.com",
-  "commercialcafe.com",
-  "www.commercialcafe.com",
-  "cityfeet.com",
-  "www.cityfeet.com",
-];
-
-const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
 
 function isAllowedUrl(url: string): { allowed: boolean; reason?: string } {
   try {
@@ -37,14 +16,6 @@ function isAllowedUrl(url: string): { allowed: boolean; reason?: string } {
         parsed.hostname.startsWith("10.") || parsed.hostname.startsWith("192.168.") ||
         parsed.hostname.startsWith("172.") || parsed.hostname === "0.0.0.0") {
       return { allowed: false, reason: "Private/localhost URLs not allowed" };
-    }
-    
-    const hostMatch = ALLOWED_HOSTS.some(host => 
-      parsed.hostname === host || parsed.hostname.endsWith(`.${host}`)
-    );
-    
-    if (!hostMatch) {
-      console.log(`[AI Extractor] Host ${parsed.hostname} not in allowlist, allowing with caution`);
     }
     
     return { allowed: true };
@@ -220,30 +191,41 @@ EXAMPLE OUTPUT:
   ]
 }`;
 
-async function fetchPageContent(url: string, userAgent: string): Promise<string> {
+interface FetchResult {
+  html: string;
+  fetchMethod: "static" | "headless";
+  renderTimeMs: number;
+}
+
+interface FetchOptions {
+  forceHeadless?: boolean;
+}
+
+async function fetchPageContent(url: string, options: FetchOptions = {}): Promise<FetchResult> {
   const urlCheck = isAllowedUrl(url);
   if (!urlCheck.allowed) {
     throw new Error(`URL not allowed: ${urlCheck.reason}`);
   }
   
-  try {
-    const response = await axios.get(url, {
-      headers: {
-        "User-Agent": userAgent,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate",
-        "Connection": "keep-alive",
-      },
-      timeout: 20000,
-      maxRedirects: 3,
-      maxContentLength: MAX_RESPONSE_SIZE,
-      maxBodyLength: MAX_RESPONSE_SIZE,
-    });
-    return response.data;
-  } catch (error: any) {
-    throw new Error(`Failed to fetch page: ${error.message}`);
+  const result = await smartFetch(url, {
+    waitForTimeout: 2000,
+    scrollToBottom: true,
+    blockImages: false,
+    blockFonts: true,
+    forceHeadless: options.forceHeadless,
+  });
+  
+  if (!result.success) {
+    throw new Error(`Failed to fetch page: ${result.error}`);
   }
+  
+  console.log(`[AI Extractor] Fetched via ${result.fetchMethod} in ${result.renderTimeMs}ms`);
+  
+  return {
+    html: result.html,
+    fetchMethod: result.fetchMethod,
+    renderTimeMs: result.renderTimeMs,
+  };
 }
 
 function cleanHtmlForAI(html: string): string {
@@ -276,17 +258,23 @@ function cleanHtmlForAI(html: string): string {
   return text;
 }
 
+export interface ExtractionOptions {
+  userAgent?: string;
+  forceHeadless?: boolean;
+}
+
 export async function extractListingsWithAI(
   url: string,
   platformName: string,
-  userAgent: string = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 MarinaMatch/1.0"
+  options: ExtractionOptions = {}
 ): Promise<ExtractionResult> {
   try {
-    console.log(`[AI Extractor] Fetching page: ${url}`);
-    const html = await fetchPageContent(url, userAgent);
+    const forceHeadless = options.forceHeadless || false;
+    console.log(`[AI Extractor] Fetching page: ${url}${forceHeadless ? ' (forced headless)' : ''}`);
+    const fetchResult = await fetchPageContent(url, { forceHeadless });
     
     console.log(`[AI Extractor] Cleaning HTML for analysis...`);
-    const cleanedContent = cleanHtmlForAI(html);
+    const cleanedContent = cleanHtmlForAI(fetchResult.html);
     
     if (cleanedContent.length < 100) {
       return {
@@ -357,21 +345,21 @@ export async function extractListingsWithAI(
 export async function extractSingleListing(
   url: string,
   platformName: string,
-  userAgent?: string
+  options?: ExtractionOptions
 ): Promise<ExtractionResult> {
-  return extractListingsWithAI(url, platformName, userAgent);
+  return extractListingsWithAI(url, platformName, options);
 }
 
 export async function extractListingsFromSearchPage(
   searchUrl: string,
   platformName: string,
   maxDetailPages: number = 5,
-  userAgent?: string
+  options?: ExtractionOptions
 ): Promise<ExtractionResult> {
   try {
     console.log(`[AI Extractor] Fetching search page: ${searchUrl}`);
-    const html = await fetchPageContent(searchUrl, userAgent || "Mozilla/5.0 MarinaMatch/1.0");
-    const $ = cheerio.load(html);
+    const fetchResult = await fetchPageContent(searchUrl, { forceHeadless: options?.forceHeadless });
+    const $ = cheerio.load(fetchResult.html);
     
     const listingLinks: string[] = [];
     const baseUrl = new URL(searchUrl).origin;
@@ -395,7 +383,7 @@ export async function extractListingsFromSearchPage(
       try {
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        const result = await extractSingleListing(link, platformName, userAgent);
+        const result = await extractSingleListing(link, platformName, options);
         if (result.success && result.listings.length > 0) {
           allListings.push(...result.listings);
         }
@@ -404,7 +392,7 @@ export async function extractListingsFromSearchPage(
       }
     }
     
-    const searchResult = await extractListingsWithAI(searchUrl, platformName, userAgent);
+    const searchResult = await extractListingsWithAI(searchUrl, platformName, options);
     if (searchResult.success && searchResult.listings.length > 0) {
       for (const listing of searchResult.listings) {
         const isDupe = allListings.some(
