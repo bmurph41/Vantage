@@ -874,11 +874,11 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Market Intel Section */}
+        {/* Analysis Section */}
         {canViewSection('analysis') && (
           <div className="mb-2">
             <SectionHeader 
-              title="Market Intel" 
+              title="Analysis" 
               expanded={analysisExpanded} 
               onToggle={() => setAnalysisExpanded(!analysisExpanded)}
               isActive={location.startsWith('/analysis/') || location.startsWith('/docktalk')}
