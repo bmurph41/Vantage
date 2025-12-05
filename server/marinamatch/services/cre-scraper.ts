@@ -10,8 +10,10 @@ import {
   investmentCriteriaProfiles,
   marinaListingMatches,
   type MarinaListing,
+  type MarinaScrapeSource,
 } from "@shared/schema";
 import { extractListingsWithAI, validateExtractedListing, type ExtractedListing } from "./ai-extractor";
+import { MultiPageCrawler, discoverListingUrls, estimateCrawlCost, type CrawlConfig } from "./multi-page-crawler";
 
 interface ListingData {
   title: string;
@@ -829,6 +831,150 @@ export async function scrapeCustomSource(searchUrl: string, sourceName: string):
     console.error(`[${sourceName}] Scraping error:`, error.message);
     return [];
   }
+}
+
+export interface MultiPageScrapeResult {
+  listings: ListingData[];
+  pagesCrawled: number;
+  pagesSkipped: number;
+  linksDiscovered: number;
+  tokensSpent: number;
+  errors: string[];
+  budgetExceeded: boolean;
+}
+
+export async function scrapeSourceWithMultiPage(
+  source: MarinaScrapeSource
+): Promise<MultiPageScrapeResult> {
+  const result: MultiPageScrapeResult = {
+    listings: [],
+    pagesCrawled: 0,
+    pagesSkipped: 0,
+    linksDiscovered: 0,
+    tokensSpent: 0,
+    errors: [],
+    budgetExceeded: false,
+  };
+
+  const sourceName = source.name;
+  const crawlMode = (source.crawlMode as CrawlConfig["crawlMode"]) || "single";
+  
+  console.log(`[${sourceName}] Starting multi-page scrape with mode: ${crawlMode}`);
+
+  const allUrls: string[] = [];
+  
+  if (source.seedUrls && source.seedUrls.length > 0) {
+    allUrls.push(...source.seedUrls);
+    console.log(`[${sourceName}] Using ${source.seedUrls.length} seed URLs`);
+  }
+  
+  if (source.searchUrl && !allUrls.includes(source.searchUrl)) {
+    allUrls.push(source.searchUrl);
+  }
+
+  if (allUrls.length === 0) {
+    console.log(`[${sourceName}] No URLs configured for scraping`);
+    return result;
+  }
+
+  if (crawlMode === "single" || crawlMode === "multi_seed") {
+    for (const url of allUrls) {
+      if (result.tokensSpent >= parseFloat(source.tokenBudgetPerRun?.toString() || "0.50")) {
+        console.log(`[${sourceName}] Token budget exceeded, stopping`);
+        result.budgetExceeded = true;
+        break;
+      }
+
+      if (result.pagesCrawled >= (source.maxPagesPerRun || 10)) {
+        console.log(`[${sourceName}] Max pages limit reached`);
+        break;
+      }
+
+      try {
+        const pageListings = await scrapeCustomSource(url, sourceName);
+        result.listings.push(...pageListings);
+        result.pagesCrawled++;
+        result.tokensSpent += 0.03;
+      } catch (error: any) {
+        result.errors.push(`Error scraping ${url}: ${error.message}`);
+      }
+    }
+  } else if (crawlMode === "pagination") {
+    const crawlConfig: CrawlConfig = {
+      seedUrls: allUrls,
+      crawlMode: "pagination",
+      paginationSelector: source.paginationSelector || undefined,
+      paginationUrlPattern: source.paginationUrlPattern || undefined,
+      listingLinkSelector: source.listingLinkSelector || undefined,
+      maxPagesPerRun: source.maxPagesPerRun || 10,
+      maxCrawlDepth: source.maxCrawlDepth || 1,
+      tokenBudgetPerRun: parseFloat(source.tokenBudgetPerRun?.toString() || "0.50"),
+      respectRobotsTxt: source.respectRobotsTxt ?? true,
+      userAgent: source.userAgent || "MarinaMatchBot/1.0",
+      rateLimitRpm: source.rateLimitRpm || 30,
+    };
+
+    const crawler = new MultiPageCrawler(crawlConfig, sourceName);
+    const crawlResult = await crawler.crawl();
+    
+    result.pagesCrawled = crawlResult.pagesCrawled;
+    result.pagesSkipped = crawlResult.pagesSkipped;
+    result.linksDiscovered = crawlResult.linksDiscovered;
+    result.budgetExceeded = crawlResult.budgetExceeded;
+    result.errors.push(...crawlResult.errors);
+
+    const urlsToScrape = crawlResult.listingUrls.length > 0 
+      ? crawlResult.listingUrls 
+      : crawlResult.pagesVisited;
+
+    console.log(`[${sourceName}] Crawl found ${urlsToScrape.length} URLs to extract listings from`);
+
+    for (const url of urlsToScrape) {
+      if (result.tokensSpent >= parseFloat(source.tokenBudgetPerRun?.toString() || "0.50")) {
+        result.budgetExceeded = true;
+        break;
+      }
+
+      try {
+        const pageListings = await scrapeCustomSource(url, sourceName);
+        result.listings.push(...pageListings);
+        result.tokensSpent += 0.03;
+      } catch (error: any) {
+        result.errors.push(`Error extracting from ${url}: ${error.message}`);
+      }
+    }
+  }
+
+  const uniqueListings = deduplicateListings(result.listings);
+  result.listings = uniqueListings;
+
+  console.log(`[${sourceName}] Multi-page scrape complete: ${result.listings.length} unique listings from ${result.pagesCrawled} pages`);
+
+  return result;
+}
+
+function deduplicateListings(listings: ListingData[]): ListingData[] {
+  const seen = new Map<string, ListingData>();
+  
+  for (const listing of listings) {
+    const key = generateDedupeKey(listing);
+    if (!seen.has(key)) {
+      seen.set(key, listing);
+    }
+  }
+  
+  return Array.from(seen.values());
+}
+
+function generateDedupeKey(listing: ListingData): string {
+  const parts = [
+    listing.propertyName?.toLowerCase() || listing.title?.toLowerCase() || "",
+    listing.city?.toLowerCase() || "",
+    listing.state?.toLowerCase() || "",
+    listing.askingPrice?.toString() || "",
+  ].join("|");
+  
+  return crypto.createHash("md5").update(parts).digest("hex");
 }
 
 export async function runScrapeJob(

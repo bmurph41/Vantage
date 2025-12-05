@@ -14607,6 +14607,16 @@ export const marinaScrapeources = pgTable("marina_scrape_sources", {
   // Polling configuration
   pollingIntervalMinutes: integer("polling_interval_minutes").default(60),
   
+  // Multi-page crawl configuration
+  seedUrls: text("seed_urls").array(), // Multiple starting URLs for crawling
+  crawlMode: varchar("crawl_mode", { length: 30 }).default("single"), // single, pagination, multi_seed, sitemap
+  paginationSelector: varchar("pagination_selector", { length: 255 }), // CSS selector for "Next" button/link
+  paginationUrlPattern: varchar("pagination_url_pattern", { length: 500 }), // URL pattern with {page} placeholder
+  listingLinkSelector: varchar("listing_link_selector", { length: 255 }), // CSS selector to find listing detail links
+  maxPagesPerRun: integer("max_pages_per_run").default(10), // Limit pages crawled per run
+  maxCrawlDepth: integer("max_crawl_depth").default(1), // How many link levels to follow
+  tokenBudgetPerRun: numeric("token_budget_per_run", { precision: 10, scale: 4 }).default("0.50"), // Max $ to spend on AI per run
+  
   // Delta tracking for detecting new/updated listings
   lastSeenListingId: varchar("last_seen_listing_id", { length: 255 }),
   lastSeenContentHash: varchar("last_seen_content_hash", { length: 64 }),
@@ -14638,6 +14648,13 @@ export const marinaScrapeRuns = pgTable("marina_scrape_runs", {
   listingsUpdated: integer("listings_updated").default(0),
   listingsRemoved: integer("listings_removed").default(0),
   errorsCount: integer("errors_count").default(0),
+  
+  // Multi-page crawl tracking
+  pagesCrawled: integer("pages_crawled").default(0),
+  pagesSkipped: integer("pages_skipped").default(0),
+  linksDiscovered: integer("links_discovered").default(0),
+  tokensCost: numeric("tokens_cost", { precision: 10, scale: 4 }).default("0"), // Estimated $ spent on AI
+  
   startedAt: timestamp("started_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
   durationMs: integer("duration_ms"),
