@@ -7627,6 +7627,70 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Contact-Company Links
+  app.get("/api/contacts/:id/companies", async (req: any, res) => {
+    try {
+      const links = await storage.getContactCompanies(req.params.id);
+      res.json(links);
+    } catch (error) {
+      console.error("Failed to get contact companies:", error);
+      res.status(500).json({ error: "Failed to retrieve contact companies" });
+    }
+  });
+
+  // Contact-Property Links
+  app.get("/api/contacts/:id/properties", async (req: any, res) => {
+    try {
+      const links = await storage.getContactProperties(req.params.id);
+      res.json(links);
+    } catch (error) {
+      console.error("Failed to get contact properties:", error);
+      res.status(500).json({ error: "Failed to retrieve contact properties" });
+    }
+  });
+
+  app.delete("/api/contacts/:contactId/properties/:linkId", async (req: any, res) => {
+    try {
+      await storage.unlinkContactFromProperty(req.params.linkId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to unlink contact from property:", error);
+      res.status(500).json({ error: "Failed to unlink contact from property" });
+    }
+  });
+
+  // Company-Contact Links
+  app.get("/api/companies/:id/contacts", async (req: any, res) => {
+    try {
+      const links = await storage.getCompanyContacts(req.params.id);
+      res.json(links);
+    } catch (error) {
+      console.error("Failed to get company contacts:", error);
+      res.status(500).json({ error: "Failed to retrieve company contacts" });
+    }
+  });
+
+  // Company-Property Links
+  app.get("/api/companies/:id/properties", async (req: any, res) => {
+    try {
+      const links = await storage.getCompanyProperties(req.params.id);
+      res.json(links);
+    } catch (error) {
+      console.error("Failed to get company properties:", error);
+      res.status(500).json({ error: "Failed to retrieve company properties" });
+    }
+  });
+
+  app.delete("/api/companies/:companyId/properties/:linkId", async (req: any, res) => {
+    try {
+      await storage.unlinkCompanyFromProperty(req.params.linkId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to unlink company from property:", error);
+      res.status(500).json({ error: "Failed to unlink company from property" });
+    }
+  });
+
   // Property Intelligence: Get sales history by matching property name/address
   app.get("/api/properties/:id/sales-history", async (req: any, res) => {
     try {

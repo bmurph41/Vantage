@@ -138,13 +138,13 @@ export default function ContactDetailModal({ isOpen, onClose, contact }: Contact
 
   // Fetch linked companies
   const { data: linkedCompanies = [] } = useQuery<ContactCompanyWithCompany[]>({
-    queryKey: ['/api/contacts', contact?.id, 'companies'],
+    queryKey: [`/api/contacts/${contact?.id}/companies`],
     enabled: isOpen && !!contact?.id,
   });
 
   // Fetch linked properties
   const { data: linkedProperties = [] } = useQuery<ContactPropertyWithProperty[]>({
-    queryKey: ['/api/contacts', contact?.id, 'properties'],
+    queryKey: [`/api/contacts/${contact?.id}/properties`],
     enabled: isOpen && !!contact?.id,
   });
 

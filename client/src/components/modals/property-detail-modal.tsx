@@ -129,13 +129,13 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
 
   // Fetch linked contacts
   const { data: linkedContacts = [] } = useQuery<ContactPropertyWithContact[]>({
-    queryKey: ['/api/properties', property?.id, 'contacts'],
+    queryKey: [`/api/properties/${property?.id}/contacts`],
     enabled: isOpen && !!property?.id,
   });
 
   // Fetch linked companies
   const { data: linkedCompanies = [] } = useQuery<CompanyPropertyWithCompany[]>({
-    queryKey: ['/api/properties', property?.id, 'companies'],
+    queryKey: [`/api/properties/${property?.id}/companies`],
     enabled: isOpen && !!property?.id,
   });
 
@@ -211,6 +211,34 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
         setSaveStatus('idle');
         isAutosaveRef.current = false;
       }
+    },
+  });
+
+  // Unlink contact mutation
+  const unlinkContactMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      return await apiRequest('DELETE', `/api/properties/${property?.id}/contacts/${linkId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property?.id}/contacts`] });
+      toast({ title: "Contact unlinked" });
+    },
+    onError: () => {
+      toast({ title: "Failed to unlink contact", variant: "destructive" });
+    },
+  });
+
+  // Unlink company mutation
+  const unlinkCompanyMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      return await apiRequest('DELETE', `/api/properties/${property?.id}/companies/${linkId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property?.id}/companies`] });
+      toast({ title: "Company unlinked" });
+    },
+    onError: () => {
+      toast({ title: "Failed to unlink company", variant: "destructive" });
     },
   });
 
@@ -867,6 +895,16 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
                               <Badge variant="outline" className="text-xs mt-1">{link.relationship}</Badge>
                             )}
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => unlinkContactMutation.mutate(link.id)}
+                            disabled={unlinkContactMutation.isPending}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            data-testid={`button-unlink-contact-${link.id}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -899,6 +937,16 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
                               <Badge variant="outline" className="text-xs mt-1">{link.relationship}</Badge>
                             )}
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => unlinkCompanyMutation.mutate(link.id)}
+                            disabled={unlinkCompanyMutation.isPending}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            data-testid={`button-unlink-company-${link.id}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
                       ))}
                     </div>

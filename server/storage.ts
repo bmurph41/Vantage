@@ -387,6 +387,16 @@ export interface IStorage {
   unlinkPropertyFromContact(linkId: string): Promise<void>;
   unlinkPropertyFromCompany(linkId: string): Promise<void>;
 
+  // CRM - Contact Links
+  getContactCompanies(contactId: string): Promise<Array<{ id: string; contactId: string; companyId: string; role?: string | null; isPrimary: boolean; company?: any }>>;
+  getContactProperties(contactId: string): Promise<Array<{ id: string; contactId: string; propertyId: string; relationship?: string | null; property?: any }>>;
+  unlinkContactFromProperty(linkId: string): Promise<void>;
+
+  // CRM - Company Links
+  getCompanyContacts(companyId: string): Promise<Array<{ id: string; contactId: string; companyId: string; role?: string | null; isPrimary: boolean; contact?: any }>>;
+  getCompanyProperties(companyId: string): Promise<Array<{ id: string; companyId: string; propertyId: string; relationship?: string | null; property?: any }>>;
+  unlinkCompanyFromProperty(linkId: string): Promise<void>;
+
   // CRM - Pending Contacts
   getPendingContact(id: string): Promise<PendingContact | undefined>;
   getPendingContactsForOrg(orgId: string): Promise<PendingContact[]>;
@@ -3177,6 +3187,74 @@ export class DatabaseStorage implements IStorage {
   }
 
   async unlinkPropertyFromCompany(linkId: string): Promise<void> {
+    await db.delete(crmCompanyProperties).where(eq(crmCompanyProperties.id, linkId));
+  }
+
+  // CRM - Contact Links
+  async getContactCompanies(contactId: string): Promise<Array<{ id: string; contactId: string; companyId: string; role?: string | null; isPrimary: boolean; company?: any }>> {
+    const links = await db.select({
+      id: crmContactCompanies.id,
+      contactId: crmContactCompanies.contactId,
+      companyId: crmContactCompanies.companyId,
+      role: crmContactCompanies.role,
+      isPrimary: crmContactCompanies.isPrimary,
+      company: crmCompanies
+    })
+    .from(crmContactCompanies)
+    .leftJoin(crmCompanies, eq(crmContactCompanies.companyId, crmCompanies.id))
+    .where(eq(crmContactCompanies.contactId, contactId));
+    return links;
+  }
+
+  async getContactProperties(contactId: string): Promise<Array<{ id: string; contactId: string; propertyId: string; relationship?: string | null; property?: any }>> {
+    const links = await db.select({
+      id: crmContactProperties.id,
+      contactId: crmContactProperties.contactId,
+      propertyId: crmContactProperties.propertyId,
+      relationship: crmContactProperties.relationship,
+      property: crmProperties
+    })
+    .from(crmContactProperties)
+    .leftJoin(crmProperties, eq(crmContactProperties.propertyId, crmProperties.id))
+    .where(eq(crmContactProperties.contactId, contactId));
+    return links;
+  }
+
+  async unlinkContactFromProperty(linkId: string): Promise<void> {
+    await db.delete(crmContactProperties).where(eq(crmContactProperties.id, linkId));
+  }
+
+  // CRM - Company Links
+  async getCompanyContacts(companyId: string): Promise<Array<{ id: string; contactId: string; companyId: string; role?: string | null; isPrimary: boolean; contact?: any }>> {
+    const links = await db.select({
+      id: crmContactCompanies.id,
+      contactId: crmContactCompanies.contactId,
+      companyId: crmContactCompanies.companyId,
+      role: crmContactCompanies.role,
+      isPrimary: crmContactCompanies.isPrimary,
+      contact: crmContacts
+    })
+    .from(crmContactCompanies)
+    .leftJoin(crmContacts, eq(crmContactCompanies.contactId, crmContacts.id))
+    .where(eq(crmContactCompanies.companyId, companyId));
+    return links;
+  }
+
+  async getCompanyProperties(companyId: string): Promise<Array<{ id: string; companyId: string; propertyId: string; relationship?: string | null; property?: any }>> {
+    const links = await db.select({
+      id: crmCompanyProperties.id,
+      companyId: crmCompanyProperties.companyId,
+      propertyId: crmCompanyProperties.propertyId,
+      relationship: crmCompanyProperties.relationship,
+      property: crmProperties
+    })
+    .from(crmCompanyProperties)
+    .leftJoin(crmProperties, eq(crmCompanyProperties.propertyId, crmProperties.id))
+    .where(eq(crmCompanyProperties.companyId, companyId));
+    return links;
+  }
+
+  async unlinkCompanyFromProperty(linkId: string): Promise<void> {
     await db.delete(crmCompanyProperties).where(eq(crmCompanyProperties.id, linkId));
   }
 
