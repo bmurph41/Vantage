@@ -45,7 +45,7 @@ Preferred communication style: Simple, everyday language.
 - **Due Diligence Module**: Project management with task tracking and template management, integrated with CRM for deal conversion.
 - **Rent Roll Module**: Manages marina unit occupancy and rental income, with real-time Customer Analytics (LTV, retention, churn, tenure, churn risk).
 - **SalesComps Module**: Marina sales comparables with CSV import/export, Google Maps, and portfolio functionality. Includes institutional-grade data services:
-    - **Geocoding Service**: Google Maps integration for address standardization, batch geocoding, place IDs, county/country attribution.
+    - **Geocoding Service**: Google Maps integration for address standardization, batch geocoding, place IDs, county/country attribution. Features database-backed caching (90-day TTL), address autocomplete via Google Places API, geocode-by-place-ID, hit rate tracking, and quota monitoring via `/api/sales-comps/geocoding/stats`.
     - **Data Quality Scoring**: 0-100 scoring across completeness, recency, source reliability, and verification status with recommendations.
     - **Validation Rules Engine**: Configurable validation rules per organization, outlier detection (IQR/Z-score), pre-import data validation.
     - **Comp History Tracking**: Full audit trail, field-level history, version rollback, import batch grouping.

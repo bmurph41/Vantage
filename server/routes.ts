@@ -9909,6 +9909,78 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Address autocomplete for real-time suggestions
+  app.get('/api/sales-comps/address-autocomplete', async (req: any, res) => {
+    try {
+      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const { input, sessionToken } = req.query;
+
+      if (!geocodingService.isConfigured()) {
+        return res.status(503).json({ message: "Geocoding service not configured" });
+      }
+
+      if (!input || typeof input !== 'string') {
+        return res.json([]);
+      }
+
+      const suggestions = await geocodingService.getAddressAutocomplete(
+        input,
+        sessionToken as string | undefined
+      );
+
+      res.json(suggestions);
+    } catch (error) {
+      console.error("Address autocomplete error:", error);
+      res.status(500).json({ message: "Failed to get address suggestions" });
+    }
+  });
+
+  // Geocode by place ID (from autocomplete selection)
+  app.post('/api/sales-comps/geocode-place', async (req: any, res) => {
+    try {
+      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const { placeId } = req.body;
+
+      if (!geocodingService.isConfigured()) {
+        return res.status(503).json({ message: "Geocoding service not configured" });
+      }
+
+      if (!placeId) {
+        return res.status(400).json({ message: "placeId required" });
+      }
+
+      const result = await geocodingService.geocodeByPlaceId(placeId);
+      if (!result) {
+        return res.status(404).json({ message: "Could not geocode place" });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Place geocoding error:", error);
+      res.status(500).json({ message: "Failed to geocode place" });
+    }
+  });
+
+  // Geocoding service stats
+  app.get('/api/sales-comps/geocoding/stats', async (req: any, res) => {
+    try {
+      const { geocodingService } = await import('./services/salescomps/geocodingService');
+
+      if (!geocodingService.isConfigured()) {
+        return res.json({
+          configured: false,
+          message: "Geocoding service not configured",
+        });
+      }
+
+      const stats = geocodingService.getStats();
+      res.json({ configured: true, ...stats });
+    } catch (error) {
+      console.error("Geocoding stats error:", error);
+      res.status(500).json({ message: "Failed to get geocoding stats" });
+    }
+  });
+
   // Data Quality Service Routes
   app.get('/api/sales-comps/:id/quality-score', async (req: any, res) => {
     try {

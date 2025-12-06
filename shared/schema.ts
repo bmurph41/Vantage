@@ -4781,6 +4781,7 @@ export const salesComps = pgTable('sales_comps', {
   orgBuyerIdx: index('sales_comps_org_buyer_idx').on(table.orgId, table.buyerCompanyId),
   orgSellerIdx: index('sales_comps_org_seller_idx').on(table.orgId, table.sellerCompanyId),
   orgCountyIdx: index('sales_comps_org_county_idx').on(table.orgId, table.county),
+  orgWaterTypeIdx: index('sales_comps_org_water_type_idx').on(table.orgId, table.waterType),
 }));
 
 // Custom storage types table - per-organization customizable storage types
@@ -4836,6 +4837,151 @@ export const scDuplicateAuditLog = pgTable('sc_duplicate_audit_log', {
   orgEntityTypeIdx: index('sc_duplicate_audit_log_org_entity_type_idx').on(table.orgId, table.entityType),
   orgCreatedIdx: index('sc_duplicate_audit_log_org_created_idx').on(table.orgId, table.createdAt),
   existingEntityIdx: index('sc_duplicate_audit_log_existing_entity_idx').on(table.existingEntityId),
+}));
+
+// Geocode cache - stores geocoding results to avoid repeat API calls
+export const geocodeCache = pgTable('geocode_cache', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  addressHash: varchar('address_hash', { length: 64 }).notNull().unique(), // SHA-256 hash of normalized address
+  originalAddress: text('original_address').notNull(),
+  formattedAddress: text('formatted_address'),
+  lat: decimal('lat', { precision: 10, scale: 7 }),
+  lng: decimal('lng', { precision: 10, scale: 7 }),
+  placeId: text('place_id'),
+  county: text('county'),
+  country: text('country'),
+  geocodeAccuracy: text('geocode_accuracy'), // 'rooftop' | 'range_interpolated' | 'geometric_center' | 'approximate'
+  timezone: text('timezone'),
+  status: text('status').notNull().default('success'), // 'success' | 'not_found' | 'error'
+  errorMessage: text('error_message'),
+  apiProvider: text('api_provider').default('google'), // For future multi-provider support
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  expiresAt: timestamp('expires_at'), // Optional cache expiry
+  hitCount: integer('hit_count').default(0), // Track usage for analytics
+  lastHitAt: timestamp('last_hit_at'),
+}, (table) => ({
+  addressHashIdx: index('geocode_cache_address_hash_idx').on(table.addressHash),
+  placeIdIdx: index('geocode_cache_place_id_idx').on(table.placeId),
+  statusIdx: index('geocode_cache_status_idx').on(table.status),
+}));
+
+// Saved filters - user-defined filter presets for sales comps and other modules
+export const scSavedFilters = pgTable('sc_saved_filters', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  filterConfig: jsonb('filter_config').$type<{
+    states?: string[];
+    waterTypes?: string[];
+    regions?: string[];
+    saleYearMin?: number;
+    saleYearMax?: number;
+    salePriceMin?: number;
+    salePriceMax?: number;
+    capRateMin?: number;
+    capRateMax?: number;
+    wetSlipsMin?: number;
+    wetSlipsMax?: number;
+    [key: string]: any;
+  }>().notNull(),
+  isDefault: boolean('is_default').default(false),
+  isShared: boolean('is_shared').default(false), // Share with org members
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgUserIdx: index('sc_saved_filters_org_user_idx').on(table.orgId, table.userId),
+  orgSharedIdx: index('sc_saved_filters_org_shared_idx').on(table.orgId, table.isShared),
+}));
+
+// Comp tags - for bulk tagging and organization
+export const scCompTags = pgTable('sc_comp_tags', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  color: varchar('color', { length: 7 }), // Hex color code
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgNameIdx: index('sc_comp_tags_org_name_idx').on(table.orgId, table.name),
+}));
+
+// Comp-tag relationships (many-to-many)
+export const scCompTagAssignments = pgTable('sc_comp_tag_assignments', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  compId: varchar('comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
+  tagId: varchar('tag_id').notNull().references(() => scCompTags.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  assignedBy: varchar('assigned_by').notNull().references(() => users.id),
+  assignedAt: timestamp('assigned_at').defaultNow().notNull(),
+}, (table) => ({
+  compTagIdx: index('sc_comp_tag_assignments_comp_tag_idx').on(table.compId, table.tagId),
+  orgTagIdx: index('sc_comp_tag_assignments_org_tag_idx').on(table.orgId, table.tagId),
+}));
+
+// Scenario groupings - group comps by deal/scenario for analysis
+export const scScenarios = pgTable('sc_scenarios', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  dealId: varchar('deal_id').references(() => crmDeals.id, { onDelete: 'set null' }), // Link to CRM deal
+  projectId: varchar('project_id').references(() => projects.id, { onDelete: 'set null' }), // Link to DD project
+  modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id, { onDelete: 'set null' }),
+  status: text('status').default('active'), // 'active' | 'archived'
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('sc_scenarios_org_idx').on(table.orgId),
+  orgDealIdx: index('sc_scenarios_org_deal_idx').on(table.orgId, table.dealId),
+  orgStatusIdx: index('sc_scenarios_org_status_idx').on(table.orgId, table.status),
+}));
+
+// Scenario-comp relationships
+export const scScenarioComps = pgTable('sc_scenario_comps', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  scenarioId: varchar('scenario_id').notNull().references(() => scScenarios.id, { onDelete: 'cascade' }),
+  compId: varchar('comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  addedBy: varchar('added_by').notNull().references(() => users.id),
+  addedAt: timestamp('added_at').defaultNow().notNull(),
+  notes: text('notes'),
+}, (table) => ({
+  scenarioCompIdx: index('sc_scenario_comps_scenario_comp_idx').on(table.scenarioId, table.compId),
+  orgScenarioIdx: index('sc_scenario_comps_org_scenario_idx').on(table.orgId, table.scenarioId),
+}));
+
+// Market benchmarks - external market data for comparison
+export const scMarketBenchmarks = pgTable('sc_market_benchmarks', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  source: text('source').notNull(), // 'marina_association' | 'custom' | 'industry_report'
+  region: text('region'), // Geographic region this applies to
+  state: text('state'),
+  waterType: text('water_type'),
+  year: integer('year').notNull(),
+  quarter: integer('quarter'), // 1-4, null for annual
+  metrics: jsonb('metrics').$type<{
+    avgPricePerSlip?: number;
+    medianPricePerSlip?: number;
+    avgCapRate?: number;
+    avgSalePrice?: number;
+    transactionVolume?: number;
+    transactionCount?: number;
+    avgOccupancy?: number;
+    [key: string]: any;
+  }>().notNull(),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgYearIdx: index('sc_market_benchmarks_org_year_idx').on(table.orgId, table.year),
+  orgRegionIdx: index('sc_market_benchmarks_org_region_idx').on(table.orgId, table.region),
+  orgSourceIdx: index('sc_market_benchmarks_org_source_idx').on(table.orgId, table.source),
 }));
 
 // Column definitions for dynamic columns
