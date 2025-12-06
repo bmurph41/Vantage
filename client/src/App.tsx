@@ -69,45 +69,16 @@ const RentRoll = lazy(() => import("@/pages/operations/RentRoll"));
 const RentRollPortfolio = lazy(() => import("@/pages/operations/rent-roll/Portfolio"));
 const RentRollProjects = lazy(() => import("@/pages/operations/rent-roll/Projects"));
 
-// Dockit (Launch Operations Module)
-const DockitDashboard = lazy(() => import("@/pages/operations/dockit/Dashboard"));
-const DockitLaunches = lazy(() => import("@/pages/operations/dockit/Launches"));
-const DockitSlips = lazy(() => import("@/pages/operations/dockit/Slips"));
-const FuelSalesDashboard = lazy(() => import("@/pages/operations/fuel/Dashboard"));
-const FuelSalesTransactions = lazy(() => import("@/pages/operations/fuel/Transactions"));
-const FuelSalesInventory = lazy(() => import("@/pages/operations/fuel/Inventory"));
-const FuelSalesAnalytics = lazy(() => import("@/pages/operations/fuel/Analytics"));
-const FuelSalesReports = lazy(() => import("@/pages/operations/fuel/Reports"));
-const FuelSalesFinancialModel = lazy(() => import("@/pages/operations/fuel/FinancialModel"));
-const FuelSalesSettings = lazy(() => import("@/pages/operations/fuel/Settings"));
-const FuelSalesImportHistory = lazy(() => import("@/pages/operations/fuel/ImportHistory"));
-const FuelSalesAuditTrail = lazy(() => import("@/pages/operations/fuel/AuditTrail"));
-const ShipStoreDashboard = lazy(() => import("@/pages/operations/ship-store/Dashboard"));
-const ShipStorePOS = lazy(() => import("@/pages/operations/ship-store/POS"));
-const ShipStoreInventory = lazy(() => import("@/pages/operations/ship-store/Inventory"));
-const ShipStoreTransactions = lazy(() => import("@/pages/operations/ship-store/Transactions"));
-const ShipStoreCheckout = lazy(() => import("@/pages/operations/ship-store/Checkout"));
-const ShipStoreAnalytics = lazy(() => import("@/pages/operations/ship-store/Analytics"));
-const ShipStoreReports = lazy(() => import("@/pages/operations/ship-store/Reports"));
-
-// Service Department
-const ServiceDashboard = lazy(() => import("@/pages/operations/service/Dashboard"));
-
-// Boat Rentals
-const BoatRentalsDashboard = lazy(() => import("@/pages/operations/boat-rentals/Dashboard"));
-
-// Boat Club
-const BoatClubDashboard = lazy(() => import("@/pages/operations/boat-club/Dashboard"));
-
-// Boat Sales
-const BoatSalesDashboard = lazy(() => import("@/pages/operations/boat-sales/Dashboard"));
-
-const MarketingDashboard = lazy(() => import("@/pages/operations/marketing/Dashboard"));
-const MarketingCampaigns = lazy(() => import("@/pages/operations/marketing/Campaigns"));
-const MarketingExpenses = lazy(() => import("@/pages/operations/marketing/Expenses"));
-const MarketingAttribution = lazy(() => import("@/pages/operations/marketing/Attribution"));
-const MarketingEmailCampaigns = lazy(() => import("@/pages/operations/marketing/EmailCampaigns"));
-const MarketingSettings = lazy(() => import("@/pages/operations/marketing/Settings"));
+// Operations - Tabbed Module Pages
+const FuelSalesTabbed = lazy(() => import("@/pages/operations/FuelSalesTabbed"));
+const ShipStoreTabbed = lazy(() => import("@/pages/operations/ShipStoreTabbed"));
+const DockitTabbed = lazy(() => import("@/pages/operations/DockitTabbed"));
+const RentRollTabbed = lazy(() => import("@/pages/operations/RentRollTabbed"));
+const MarketingTabbed = lazy(() => import("@/pages/operations/MarketingTabbed"));
+const ServiceTabbed = lazy(() => import("@/pages/operations/ServiceTabbed"));
+const BoatRentalsTabbed = lazy(() => import("@/pages/operations/BoatRentalsTabbed"));
+const BoatClubTabbed = lazy(() => import("@/pages/operations/BoatClubTabbed"));
+const BoatSalesTabbed = lazy(() => import("@/pages/operations/BoatSalesTabbed"));
 const SalesCompsIndex = lazy(() => import("@/pages/analysis/sales-comps/Index"));
 const SalesCompsAnalytics = lazy(() => import("@/pages/analysis/sales-comps/Analytics"));
 const SalesCompsProjects = lazy(() => import("@/pages/analysis/sales-comps/Projects"));
@@ -346,283 +317,257 @@ function Router() {
         )}
       </Route>
       
-      {/* Operations Routes with Unified Layout */}
-      <Route path="/operations/customer-analytics">
-        {() => (
-          <UnifiedLayout>
-            <CustomerAnalytics />
-          </UnifiedLayout>
-        )}
-      </Route>
-      {/* Dockit Marina Operations Routes */}
+      {/* Operations Routes - Tabbed Module Pages */}
       <Route path="/operations/dockit">
         {() => (
           <UnifiedLayout>
-            <DockitDashboard />
-          </UnifiedLayout>
-        )}
-      </Route>
-      <Route path="/operations/dockit/launches">
-        {() => (
-          <UnifiedLayout>
-            <DockitLaunches />
-          </UnifiedLayout>
-        )}
-      </Route>
-      <Route path="/operations/dockit/slips">
-        {() => (
-          <UnifiedLayout>
-            <DockitSlips />
+            <DockitTabbed />
           </UnifiedLayout>
         )}
       </Route>
       <Route path="/operations/rent-roll">
         {() => (
           <UnifiedLayout>
-            <RentRoll />
+            <RentRollTabbed />
           </UnifiedLayout>
         )}
       </Route>
-      <Route path="/operations/rent-roll/portfolio">
+      <Route path="/operations/fuel">
         {() => (
           <UnifiedLayout>
-            <RentRollPortfolio />
+            <FuelSalesTabbed />
           </UnifiedLayout>
         )}
       </Route>
-      <Route path="/operations/rent-roll/projects">
+      <Route path="/operations/ship-store">
         {() => (
           <UnifiedLayout>
-            <RentRollProjects />
+            <ShipStoreTabbed />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/service">
+        {() => (
+          <UnifiedLayout>
+            <ServiceTabbed />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/boat-rentals">
+        {() => (
+          <UnifiedLayout>
+            <BoatRentalsTabbed />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/boat-club">
+        {() => (
+          <UnifiedLayout>
+            <BoatClubTabbed />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/boat-sales">
+        {() => (
+          <UnifiedLayout>
+            <BoatSalesTabbed />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/marketing">
+        {() => (
+          <UnifiedLayout>
+            <MarketingTabbed />
           </UnifiedLayout>
         )}
       </Route>
       
-      {/* Operations Routes with Unified Layout - Fuel Sales */}
+      {/* Legacy Operations Routes - Redirect to new tab-based URLs */}
+      <Route path="/operations/customer-analytics">
+        {() => {
+          window.location.replace('/operations/rent-roll?tab=customer-analytics');
+          return null;
+        }}
+      </Route>
+      <Route path="/operations/dockit/launches">
+        {() => {
+          window.location.replace('/operations/dockit?tab=launches');
+          return null;
+        }}
+      </Route>
+      <Route path="/operations/dockit/slips">
+        {() => {
+          window.location.replace('/operations/dockit?tab=slips');
+          return null;
+        }}
+      </Route>
+      <Route path="/operations/rent-roll/portfolio">
+        {() => {
+          window.location.replace('/operations/rent-roll?tab=portfolio');
+          return null;
+        }}
+      </Route>
+      <Route path="/operations/rent-roll/projects">
+        {() => {
+          window.location.replace('/operations/rent-roll?tab=projects');
+          return null;
+        }}
+      </Route>
       <Route path="/operations/fuel/dashboard">
-        {() => (
-          <UnifiedLayout>
-            <FuelSalesDashboard />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/fuel?tab=dashboard');
+          return null;
+        }}
       </Route>
       <Route path="/operations/fuel/transactions">
-        {() => (
-          <UnifiedLayout>
-            <FuelSalesTransactions />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/fuel?tab=transactions');
+          return null;
+        }}
       </Route>
       <Route path="/operations/fuel/inventory">
-        {() => (
-          <UnifiedLayout>
-            <FuelSalesInventory />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/fuel?tab=inventory');
+          return null;
+        }}
       </Route>
       <Route path="/operations/fuel/analytics">
-        {() => (
-          <UnifiedLayout>
-            <FuelSalesAnalytics />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/fuel?tab=analytics');
+          return null;
+        }}
       </Route>
       <Route path="/operations/fuel/reports">
-        {() => (
-          <UnifiedLayout>
-            <FuelSalesReports />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/fuel?tab=reports');
+          return null;
+        }}
       </Route>
       <Route path="/operations/fuel/financial-model">
-        {() => (
-          <UnifiedLayout>
-            <FuelSalesFinancialModel />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/fuel?tab=financial-model');
+          return null;
+        }}
       </Route>
       <Route path="/operations/fuel/integration-settings">
-        {() => (
-          <UnifiedLayout>
-            <FuelSalesSettings />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/fuel?tab=settings');
+          return null;
+        }}
       </Route>
       <Route path="/operations/fuel/import-history">
-        {() => (
-          <UnifiedLayout>
-            <FuelSalesImportHistory />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/fuel?tab=import-history');
+          return null;
+        }}
       </Route>
       <Route path="/operations/fuel/audit-trail">
-        {() => (
-          <UnifiedLayout>
-            <FuelSalesAuditTrail />
-          </UnifiedLayout>
-        )}
-      </Route>
-
-      {/* Operations Routes with Unified Layout - Ship Store */}
-      <Route path="/operations/ship-store">
         {() => {
-          const [, setLocation] = useLocation();
-          setLocation("/operations/ship-store/dashboard");
+          window.location.replace('/operations/fuel?tab=audit-trail');
           return null;
         }}
       </Route>
       <Route path="/operations/ship-store/dashboard">
-        {() => (
-          <UnifiedLayout>
-            <ShipStoreDashboard />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/ship-store?tab=dashboard');
+          return null;
+        }}
       </Route>
       <Route path="/operations/ship-store/pos">
-        {() => (
-          <UnifiedLayout>
-            <ShipStorePOS />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/ship-store?tab=pos');
+          return null;
+        }}
       </Route>
       <Route path="/operations/ship-store/inventory">
-        {() => (
-          <UnifiedLayout>
-            <ShipStoreInventory />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/ship-store?tab=inventory');
+          return null;
+        }}
       </Route>
       <Route path="/operations/ship-store/transactions">
-        {() => (
-          <UnifiedLayout>
-            <ShipStoreTransactions />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/ship-store?tab=transactions');
+          return null;
+        }}
       </Route>
       <Route path="/operations/ship-store/checkout">
-        {() => (
-          <UnifiedLayout>
-            <ShipStoreCheckout />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/ship-store?tab=pos');
+          return null;
+        }}
       </Route>
       <Route path="/operations/ship-store/reports">
-        {() => (
-          <UnifiedLayout>
-            <ShipStoreReports />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/ship-store?tab=reports');
+          return null;
+        }}
       </Route>
       <Route path="/operations/ship-store/analytics">
-        {() => (
-          <UnifiedLayout>
-            <ShipStoreAnalytics />
-          </UnifiedLayout>
-        )}
-      </Route>
-
-      {/* Operations Routes with Unified Layout - Service Department */}
-      <Route path="/operations/service">
         {() => {
-          setLocation("/operations/service/dashboard");
+          window.location.replace('/operations/ship-store?tab=analytics');
           return null;
         }}
       </Route>
       <Route path="/operations/service/dashboard">
-        {() => (
-          <UnifiedLayout>
-            <ServiceDashboard />
-          </UnifiedLayout>
-        )}
-      </Route>
-
-      {/* Operations Routes with Unified Layout - Boat Rentals */}
-      <Route path="/operations/boat-rentals">
         {() => {
-          setLocation("/operations/boat-rentals/dashboard");
+          window.location.replace('/operations/service?tab=dashboard');
           return null;
         }}
       </Route>
       <Route path="/operations/boat-rentals/dashboard">
-        {() => (
-          <UnifiedLayout>
-            <BoatRentalsDashboard />
-          </UnifiedLayout>
-        )}
-      </Route>
-
-      {/* Operations Routes with Unified Layout - Boat Club */}
-      <Route path="/operations/boat-club">
         {() => {
-          setLocation("/operations/boat-club/dashboard");
+          window.location.replace('/operations/boat-rentals?tab=dashboard');
           return null;
         }}
       </Route>
       <Route path="/operations/boat-club/dashboard">
-        {() => (
-          <UnifiedLayout>
-            <BoatClubDashboard />
-          </UnifiedLayout>
-        )}
-      </Route>
-
-      {/* Operations Routes with Unified Layout - Boat Sales */}
-      <Route path="/operations/boat-sales">
         {() => {
-          setLocation("/operations/boat-sales/dashboard");
+          window.location.replace('/operations/boat-club?tab=dashboard');
           return null;
         }}
       </Route>
       <Route path="/operations/boat-sales/dashboard">
-        {() => (
-          <UnifiedLayout>
-            <BoatSalesDashboard />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/boat-sales?tab=dashboard');
+          return null;
+        }}
       </Route>
-
-      {/* Operations Routes with Unified Layout - Marketing */}
       <Route path="/operations/marketing/dashboard">
-        {() => (
-          <UnifiedLayout>
-            <MarketingDashboard />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/marketing?tab=dashboard');
+          return null;
+        }}
       </Route>
       <Route path="/operations/marketing/campaigns">
-        {() => (
-          <UnifiedLayout>
-            <MarketingCampaigns />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/marketing?tab=campaigns');
+          return null;
+        }}
       </Route>
       <Route path="/operations/marketing/expenses">
-        {() => (
-          <UnifiedLayout>
-            <MarketingExpenses />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/marketing?tab=expenses');
+          return null;
+        }}
       </Route>
       <Route path="/operations/marketing/attribution">
-        {() => (
-          <UnifiedLayout>
-            <MarketingAttribution />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/marketing?tab=attribution');
+          return null;
+        }}
       </Route>
       <Route path="/operations/marketing/email-campaigns">
-        {() => (
-          <UnifiedLayout>
-            <MarketingEmailCampaigns />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/marketing?tab=email-campaigns');
+          return null;
+        }}
       </Route>
       <Route path="/operations/marketing/settings">
-        {() => (
-          <UnifiedLayout>
-            <MarketingSettings />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/marketing?tab=settings');
+          return null;
+        }}
       </Route>
 
       {/* CRM Routes with Unified Layout */}

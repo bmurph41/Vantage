@@ -71,7 +71,16 @@ Preferred communication style: Simple, everyday language.
     - **Legal Compliance**: robots.txt checking, rate limiting, user agent attribution, source attribution for scraped data.
     - Requires `prospecting` pack activation.
 - **Marketing Module**: Tracks campaigns, expenses, and lead attribution.
-- **Fuel Sales & Ship Store Modules**: POS/inventory systems with analytics and portfolio management.
+- **Operations Modules**: Flattened 2-level navigation with tab-based sub-navigation using URL query params for deep linking. All Operations modules use the `TabbedModuleLayout` component for consistent UX:
+    - **Fuel Sales**: 9 tabs (Dashboard, Transactions, Inventory, Analytics, Reports, Financial Model, Import History, Audit Trail, Settings).
+    - **Ship Store**: 6 tabs (Dashboard, POS, Inventory, Transactions, Reports, Analytics).
+    - **Dockit**: 3 tabs (Dashboard, Launches, Slips).
+    - **Rent Roll**: 3 tabs (Dashboard, Portfolio, Projects) + Customer Analytics.
+    - **Marketing**: 6 tabs (Dashboard, Campaigns, Expenses, Attribution, Email Campaigns, Settings).
+    - **Service Dept**: 8 tabs (Dashboard, Work Orders, Scheduling, Customers, Parts, Estimates, Reports, Settings) - integration-ready placeholders.
+    - **Boat Rentals**: 7 tabs (Dashboard, Fleet, Reservations, Customers, Availability, Rates, Settings) - integration-ready placeholders.
+    - **Boat Club**: 8 tabs (Dashboard, Members, Fleet, Reservations, Dues, Waitlist, Reports, Settings) - integration-ready placeholders.
+    - **Boat Sales**: 9 tabs (Dashboard, Inventory, Leads, Deals, Trade-ins, Financing, Marketing, Reports, Settings) - integration-ready placeholders.
 - **Virtual Data Room (VDR) Module**: Secure document management with hierarchical folders, granular permissions, external user management, diligence request workflows, and audit logging.
 - **DockTalk 2.0 Module**: Marina industry intelligence platform with AI-powered RSS aggregation, M&A deal tracking, sentiment analysis. Features include:
     - **Watchlists**: Track entities, categories, and locations with customizable alert frequencies.

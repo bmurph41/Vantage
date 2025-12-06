@@ -54,71 +54,17 @@ const crmToolsNav = [
   { name: "Import History", href: "/import-history", icon: History },
 ];
 
-// Operations Navigation - Fuel Sales Subcategories
-const fuelSalesNav = [
-  { name: "Dashboard", href: "/operations/fuel/dashboard", icon: LayoutDashboard },
-  { name: "Transactions", href: "/operations/fuel/transactions", icon: CreditCard },
-  { name: "Inventory", href: "/operations/fuel/inventory", icon: Box },
-  { name: "Analytics", href: "/operations/fuel/analytics", icon: BarChart3 },
-  { name: "Reports", href: "/operations/fuel/reports", icon: FileText },
-  { name: "Financial Model", href: "/operations/fuel/financial-model", icon: Calculator },
-  { name: "Import History", href: "/operations/fuel/import-history", icon: History },
-  { name: "Audit Trail", href: "/operations/fuel/audit-trail", icon: Shield },
-  { name: "Settings", href: "/operations/fuel/integration-settings", icon: Settings },
-];
-
-// Operations Navigation - Ship Store Subcategories
-const shipStoreNav = [
-  { name: "Dashboard", href: "/operations/ship-store/dashboard", icon: LayoutDashboard },
-  { name: "Point of Sale", href: "/operations/ship-store/pos", icon: CreditCard },
-  { name: "Inventory", href: "/operations/ship-store/inventory", icon: Box },
-  { name: "Transactions", href: "/operations/ship-store/transactions", icon: Receipt },
-  { name: "Analytics", href: "/operations/ship-store/analytics", icon: BarChart3 },
-  { name: "Reports", href: "/operations/ship-store/reports", icon: FileText },
-];
-
-// Operations Navigation - Service Department Subcategories
-const serviceNav = [
-  { name: "Dashboard", href: "/operations/service/dashboard", icon: LayoutDashboard },
-];
-
-// Operations Navigation - Boat Rentals Subcategories
-const boatRentalsNav = [
-  { name: "Dashboard", href: "/operations/boat-rentals/dashboard", icon: LayoutDashboard },
-];
-
-// Operations Navigation - Boat Club Subcategories
-const boatClubNav = [
-  { name: "Dashboard", href: "/operations/boat-club/dashboard", icon: LayoutDashboard },
-];
-
-// Operations Navigation - Boat Sales Subcategories
-const boatSalesNav = [
-  { name: "Dashboard", href: "/operations/boat-sales/dashboard", icon: LayoutDashboard },
-];
-
-// Operations Navigation - Dockit (Launch Operations) Subcategories
-const dockitNav = [
-  { name: "Launch Control", href: "/operations/dockit", icon: LayoutDashboard },
-  { name: "Launch Queue", href: "/operations/dockit/launches", icon: Calendar },
-  { name: "Transient Slips", href: "/operations/dockit/slips", icon: Anchor },
-];
-
-// Operations Navigation - Rent Roll Subcategories
-const rentRollNav = [
-  { name: "Portfolio", href: "/operations/rent-roll/portfolio", icon: Building2 },
-  { name: "Projects", href: "/operations/rent-roll/projects", icon: FolderKanban },
-  { name: "Customer Analytics", href: "/operations/customer-analytics", icon: Users },
-];
-
-// Operations Navigation - Marketing Subcategories
-const marketingNav = [
-  { name: "Dashboard", href: "/operations/marketing/dashboard", icon: LayoutDashboard },
-  { name: "Campaigns", href: "/operations/marketing/campaigns", icon: Megaphone },
-  { name: "Expenses", href: "/operations/marketing/expenses", icon: DollarSign },
-  { name: "Attribution", href: "/operations/marketing/attribution", icon: Link2 },
-  { name: "Email Campaigns", href: "/operations/marketing/email-campaigns", icon: Mail },
-  { name: "Settings", href: "/operations/marketing/settings", icon: Settings },
+// Operations Navigation - Flattened module links (tabs handle sub-navigation)
+const operationsModulesNav = [
+  { name: "Dockit", href: "/operations/dockit", icon: Anchor },
+  { name: "Rent Roll", href: "/operations/rent-roll", icon: Building2 },
+  { name: "Fuel Sales", href: "/operations/fuel", icon: Fuel },
+  { name: "Ship Store", href: "/operations/ship-store", icon: ShoppingCart },
+  { name: "Service Dept", href: "/operations/service", icon: Wrench },
+  { name: "Boat Rentals", href: "/operations/boat-rentals", icon: Ship },
+  { name: "Boat Club", href: "/operations/boat-club", icon: Users },
+  { name: "Boat Sales", href: "/operations/boat-sales", icon: ShoppingCart },
+  { name: "Marketing", href: "/operations/marketing", icon: Megaphone },
 ];
 
 // Due Diligence Navigation
@@ -175,16 +121,7 @@ type BootstrapData = {
 
 export default function UnifiedSidebar() {
   const [location] = useLocation();
-  const [operationsExpanded, setOperationsExpanded] = useState(false);
-  const [dockitExpanded, setDockitExpanded] = useState(false);
-  const [fuelSalesExpanded, setFuelSalesExpanded] = useState(false);
-  const [shipStoreExpanded, setShipStoreExpanded] = useState(false);
-  const [serviceExpanded, setServiceExpanded] = useState(false);
-  const [boatRentalsExpanded, setBoatRentalsExpanded] = useState(false);
-  const [boatClubExpanded, setBoatClubExpanded] = useState(false);
-  const [boatSalesExpanded, setBoatSalesExpanded] = useState(false);
-  const [rentRollExpanded, setRentRollExpanded] = useState(false);
-  const [marketingExpanded, setMarketingExpanded] = useState(false);
+  const [operationsExpanded, setOperationsExpanded] = useState(true); // Default expanded for Operations
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [dealManagementExpanded, setDealManagementExpanded] = useState(false);
   const [prospectingExpanded, setProspectingExpanded] = useState(false);
@@ -250,45 +187,25 @@ export default function UnifiedSidebar() {
   useEffect(() => {
     // Determine which section the current page belongs to
     const isOperationsPage = location.startsWith('/operations/');
-    const isDockitPage = location.startsWith('/operations/dockit');
-    const isFuelSalesPage = location.startsWith('/operations/fuel/');
-    const isShipStorePage = location.startsWith('/operations/ship-store/');
-    const isServicePage = location.startsWith('/operations/service/');
-    const isBoatRentalsPage = location.startsWith('/operations/boat-rentals/');
-    const isBoatClubPage = location.startsWith('/operations/boat-club/');
-    const isBoatSalesPage = location.startsWith('/operations/boat-sales/');
-    const isRentRollPage = location.startsWith('/operations/rent-roll/') || location === '/operations/customer-analytics';
-    const isMarketingPage = location.startsWith('/operations/marketing/');
     // CRM: contacts, companies, properties (core entity management)
     const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/import-') || location === '/calendar-settings';
     const isCrmToolsPage = location === '/calendar-settings' || location.startsWith('/import-');
     const isPendingPage = location.includes('/pending-');
     // Deal Management: deal-workspace, activity, tasks, marketing-automation, analytics, forecast
     const isDealManagementPage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/marketing-automation', '/crm/analytics', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
-    // MarinaMatch has its own section
-    const isMarinamatchPage = location.startsWith('/marinamatch');
     // Prospecting: prospecting pages (leads are now in Deal Workspace)
     const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting';
     const isDdPage = location === '/' || location === '/progress-report';
     const isVdrPage = location.startsWith('/vdr');
     const isModelingPage = location.startsWith('/modeling/');
     const isAnalysisPage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
-    const isDockTalkPage = location.startsWith('/docktalk');
 
-    // Set expanded states - only expand the active section, collapse all others
-    setOperationsExpanded(isOperationsPage);
-    setDockitExpanded(isDockitPage);
-    setFuelSalesExpanded(isFuelSalesPage);
-    setShipStoreExpanded(isShipStorePage);
-    setServiceExpanded(isServicePage);
-    setBoatRentalsExpanded(isBoatRentalsPage);
-    setBoatClubExpanded(isBoatClubPage);
-    setBoatSalesExpanded(isBoatSalesPage);
-    setRentRollExpanded(isRentRollPage);
-    setMarketingExpanded(isMarketingPage);
+    // Set expanded states - Operations stays expanded by default, others expand when active
+    if (isOperationsPage) {
+      setOperationsExpanded(true);
+    }
     setCrmExpanded(isCrmPage);
     setDealManagementExpanded(isDealManagementPage);
-    // MarinaMatch is now a direct link, no expanded state needed
     setProspectingExpanded(isProspectingPage);
     setCrmToolsExpanded(isCrmToolsPage);
     setPendingExpanded(isPendingPage);
@@ -487,7 +404,7 @@ export default function UnifiedSidebar() {
           <NavLink item={{ name: "Dashboard", href: "/dashboard", icon: LayoutDashboard }} />
         </div>
         
-        {/* Operations Section */}
+        {/* Operations Section - Flattened navigation with in-page tabs */}
         {canViewSection('operations') && (
           <div className="mb-2">
             <SectionHeader 
@@ -496,217 +413,9 @@ export default function UnifiedSidebar() {
               onToggle={() => setOperationsExpanded(!operationsExpanded)}
               isActive={location.startsWith('/operations/')}
             />
-            {operationsExpanded && (
-            <div className="ml-4 mt-1 mb-2">
-              <button
-                onClick={() => setDockitExpanded(!dockitExpanded)}
-                className={cn(
-                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                  location.startsWith('/operations/dockit')
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                )}
-                data-testid="toggle-dockit"
-              >
-                <div className="flex items-center space-x-3">
-                  <Anchor className="w-5 h-5" />
-                  <span>Dockit</span>
-                </div>
-                {dockitExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-              {dockitExpanded && (
-                <div className="ml-4">
-                  {dockitNav.map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setRentRollExpanded(!rentRollExpanded)}
-                className={cn(
-                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                  (location.startsWith('/operations/rent-roll/') || location === '/operations/customer-analytics')
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                )}
-                data-testid="toggle-rent-roll"
-              >
-                <div className="flex items-center space-x-3">
-                  <LayoutList className="w-5 h-5" />
-                  <span>Rent Roll</span>
-                </div>
-                {rentRollExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-              {rentRollExpanded && (
-                <div className="ml-4">
-                  {rentRollNav.map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setFuelSalesExpanded(!fuelSalesExpanded)}
-                className={cn(
-                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                  location.startsWith('/operations/fuel/')
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                )}
-                data-testid="toggle-fuel-sales"
-              >
-                <div className="flex items-center space-x-3">
-                  <Fuel className="w-5 h-5" />
-                  <span>Fuel Sales</span>
-                </div>
-                {fuelSalesExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-              {fuelSalesExpanded && (
-                <div className="ml-4">
-                  {fuelSalesNav.map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setShipStoreExpanded(!shipStoreExpanded)}
-                className={cn(
-                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                  location.startsWith('/operations/ship-store/')
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                )}
-                data-testid="toggle-ship-store"
-              >
-                <div className="flex items-center space-x-3">
-                  <Package className="w-5 h-5" />
-                  <span>Ship Store</span>
-                </div>
-                {shipStoreExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-              {shipStoreExpanded && (
-                <div className="ml-4">
-                  {shipStoreNav.map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setServiceExpanded(!serviceExpanded)}
-                className={cn(
-                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                  location.startsWith('/operations/service/')
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                )}
-                data-testid="toggle-service"
-              >
-                <div className="flex items-center space-x-3">
-                  <Wrench className="w-5 h-5" />
-                  <span>Service Dept</span>
-                </div>
-                {serviceExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-              {serviceExpanded && (
-                <div className="ml-4">
-                  {serviceNav.map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setBoatRentalsExpanded(!boatRentalsExpanded)}
-                className={cn(
-                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                  location.startsWith('/operations/boat-rentals/')
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                )}
-                data-testid="toggle-boat-rentals"
-              >
-                <div className="flex items-center space-x-3">
-                  <Ship className="w-5 h-5" />
-                  <span>Boat Rentals</span>
-                </div>
-                {boatRentalsExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-              {boatRentalsExpanded && (
-                <div className="ml-4">
-                  {boatRentalsNav.map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setBoatClubExpanded(!boatClubExpanded)}
-                className={cn(
-                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                  location.startsWith('/operations/boat-club/')
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                )}
-                data-testid="toggle-boat-club"
-              >
-                <div className="flex items-center space-x-3">
-                  <Users className="w-5 h-5" />
-                  <span>Boat Club</span>
-                </div>
-                {boatClubExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-              {boatClubExpanded && (
-                <div className="ml-4">
-                  {boatClubNav.map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setBoatSalesExpanded(!boatSalesExpanded)}
-                className={cn(
-                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                  location.startsWith('/operations/boat-sales/')
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                )}
-                data-testid="toggle-boat-sales"
-              >
-                <div className="flex items-center space-x-3">
-                  <ShoppingCart className="w-5 h-5" />
-                  <span>Boat Sales</span>
-                </div>
-                {boatSalesExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-              {boatSalesExpanded && (
-                <div className="ml-4">
-                  {boatSalesNav.map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setMarketingExpanded(!marketingExpanded)}
-                className={cn(
-                  "flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                  location.startsWith('/operations/marketing/')
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-                )}
-                data-testid="toggle-marketing"
-              >
-                <div className="flex items-center space-x-3">
-                  <Megaphone className="w-5 h-5" />
-                  <span>Marketing</span>
-                </div>
-                {marketingExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-              {marketingExpanded && (
-                <div className="ml-4">
-                  {marketingNav.map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+            {operationsExpanded && operationsModulesNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
           </div>
         )}
         
