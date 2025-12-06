@@ -4,7 +4,7 @@ import {
   contacts, projectContacts, projectPendingContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
-  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities,
+  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmContactProperties, crmCompanyProperties, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities,
   crmImportJobs, crmImportedRecords, crmProspectingEntries, crmProspectingUserSettings, crmProspectingGoalTemplates,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
@@ -378,6 +378,14 @@ export interface IStorage {
   createCrmProperty(property: InsertProperty): Promise<Property>;
   updateCrmProperty(id: string, updates: Partial<InsertProperty>): Promise<Property>;
   deleteCrmProperty(id: string): Promise<void>;
+  
+  // CRM - Property-Contact/Company Links
+  getPropertyContacts(propertyId: string): Promise<Array<{ id: string; contactId: string; propertyId: string; relationship?: string | null; notes?: string | null; contact?: any }>>;
+  getPropertyCompanies(propertyId: string): Promise<Array<{ id: string; companyId: string; propertyId: string; relationship?: string | null; notes?: string | null; company?: any }>>;
+  linkPropertyToContact(propertyId: string, contactId: string, relationship?: string, notes?: string): Promise<{ id: string }>;
+  linkPropertyToCompany(propertyId: string, companyId: string, relationship?: string, notes?: string): Promise<{ id: string }>;
+  unlinkPropertyFromContact(linkId: string): Promise<void>;
+  unlinkPropertyFromCompany(linkId: string): Promise<void>;
 
   // CRM - Pending Contacts
   getPendingContact(id: string): Promise<PendingContact | undefined>;
@@ -3111,6 +3119,65 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCrmProperty(id: string): Promise<void> {
     await db.delete(crmProperties).where(eq(crmProperties.id, id));
+  }
+
+  // CRM - Property-Contact/Company Links
+  async getPropertyContacts(propertyId: string): Promise<Array<{ id: string; contactId: string; propertyId: string; relationship?: string | null; notes?: string | null; contact?: any }>> {
+    const links = await db.select({
+      id: crmContactProperties.id,
+      contactId: crmContactProperties.contactId,
+      propertyId: crmContactProperties.propertyId,
+      relationship: crmContactProperties.relationship,
+      notes: crmContactProperties.notes,
+      contact: crmContacts
+    })
+    .from(crmContactProperties)
+    .leftJoin(crmContacts, eq(crmContactProperties.contactId, crmContacts.id))
+    .where(eq(crmContactProperties.propertyId, propertyId));
+    return links;
+  }
+
+  async getPropertyCompanies(propertyId: string): Promise<Array<{ id: string; companyId: string; propertyId: string; relationship?: string | null; notes?: string | null; company?: any }>> {
+    const links = await db.select({
+      id: crmCompanyProperties.id,
+      companyId: crmCompanyProperties.companyId,
+      propertyId: crmCompanyProperties.propertyId,
+      relationship: crmCompanyProperties.relationship,
+      notes: crmCompanyProperties.notes,
+      company: crmCompanies
+    })
+    .from(crmCompanyProperties)
+    .leftJoin(crmCompanies, eq(crmCompanyProperties.companyId, crmCompanies.id))
+    .where(eq(crmCompanyProperties.propertyId, propertyId));
+    return links;
+  }
+
+  async linkPropertyToContact(propertyId: string, contactId: string, relationship?: string, notes?: string): Promise<{ id: string }> {
+    const [link] = await db.insert(crmContactProperties).values({
+      propertyId,
+      contactId,
+      relationship: relationship || null,
+      notes: notes || null
+    }).returning({ id: crmContactProperties.id });
+    return link;
+  }
+
+  async linkPropertyToCompany(propertyId: string, companyId: string, relationship?: string, notes?: string): Promise<{ id: string }> {
+    const [link] = await db.insert(crmCompanyProperties).values({
+      propertyId,
+      companyId,
+      relationship: relationship || null,
+      notes: notes || null
+    }).returning({ id: crmCompanyProperties.id });
+    return link;
+  }
+
+  async unlinkPropertyFromContact(linkId: string): Promise<void> {
+    await db.delete(crmContactProperties).where(eq(crmContactProperties.id, linkId));
+  }
+
+  async unlinkPropertyFromCompany(linkId: string): Promise<void> {
+    await db.delete(crmCompanyProperties).where(eq(crmCompanyProperties.id, linkId));
   }
 
   // CRM - Pending Contacts

@@ -7545,6 +7545,87 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to delete property" });
     }
   });
+  
+  // PATCH route for property updates (used by detail modal)
+  app.patch("/api/properties/:id", async (req: any, res) => {
+    try {
+      const property = await storage.updateCrmProperty(req.params.id, req.body);
+      res.json(property);
+    } catch (error) {
+      console.error("Failed to update property:", error);
+      res.status(500).json({ error: "Failed to update property" });
+    }
+  });
+
+  // Property-Contact Links
+  app.get("/api/properties/:id/contacts", async (req: any, res) => {
+    try {
+      const links = await storage.getPropertyContacts(req.params.id);
+      res.json(links);
+    } catch (error) {
+      console.error("Failed to get property contacts:", error);
+      res.status(500).json({ error: "Failed to retrieve property contacts" });
+    }
+  });
+
+  app.post("/api/properties/:id/contacts", async (req: any, res) => {
+    try {
+      const { contactId, relationship, notes } = req.body;
+      if (!contactId) {
+        return res.status(400).json({ error: "contactId is required" });
+      }
+      const link = await storage.linkPropertyToContact(req.params.id, contactId, relationship, notes);
+      res.json(link);
+    } catch (error) {
+      console.error("Failed to link property to contact:", error);
+      res.status(500).json({ error: "Failed to link property to contact" });
+    }
+  });
+
+  app.delete("/api/properties/:propertyId/contacts/:linkId", async (req: any, res) => {
+    try {
+      await storage.unlinkPropertyFromContact(req.params.linkId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to unlink property from contact:", error);
+      res.status(500).json({ error: "Failed to unlink property from contact" });
+    }
+  });
+
+  // Property-Company Links
+  app.get("/api/properties/:id/companies", async (req: any, res) => {
+    try {
+      const links = await storage.getPropertyCompanies(req.params.id);
+      res.json(links);
+    } catch (error) {
+      console.error("Failed to get property companies:", error);
+      res.status(500).json({ error: "Failed to retrieve property companies" });
+    }
+  });
+
+  app.post("/api/properties/:id/companies", async (req: any, res) => {
+    try {
+      const { companyId, relationship, notes } = req.body;
+      if (!companyId) {
+        return res.status(400).json({ error: "companyId is required" });
+      }
+      const link = await storage.linkPropertyToCompany(req.params.id, companyId, relationship, notes);
+      res.json(link);
+    } catch (error) {
+      console.error("Failed to link property to company:", error);
+      res.status(500).json({ error: "Failed to link property to company" });
+    }
+  });
+
+  app.delete("/api/properties/:propertyId/companies/:linkId", async (req: any, res) => {
+    try {
+      await storage.unlinkPropertyFromCompany(req.params.linkId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to unlink property from company:", error);
+      res.status(500).json({ error: "Failed to unlink property from company" });
+    }
+  });
 
   // Property Intelligence: Get sales history by matching property name/address
   app.get("/api/properties/:id/sales-history", async (req: any, res) => {

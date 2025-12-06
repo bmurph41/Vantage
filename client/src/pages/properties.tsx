@@ -8,11 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, AlertCircle, X, FolderPlus } from "lucide-react";
 import { FileUpload } from "@/components/file-upload";
 import PropertyDetailModal from "@/components/modals/property-detail-modal";
+import PropertyFormModal from "@/components/modals/property-form-modal";
 import PortfolioWizard from "@/components/salescomps/sales-comps/PortfolioWizard";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-// import PropertyFormModal from "@/components/modals/property-form-modal"; // TODO: Create PropertyFormModal component
 
 type Property = {
   id: string;
@@ -100,13 +100,8 @@ export default function Properties() {
 
   const handleEdit = (property: Property, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    toast({
-      title: "Feature coming soon",
-      description: "Property editing will be available in the next update.",
-    });
-    // TODO: Uncomment when PropertyFormModal is implemented
-    // setEditingProperty(property);
-    // setIsPropertyFormOpen(true);
+    setEditingProperty(property);
+    setIsPropertyFormOpen(true);
   };
 
   const handleDelete = (id: string, e?: React.MouseEvent) => {
@@ -117,13 +112,8 @@ export default function Properties() {
   };
 
   const handleAdd = () => {
-    toast({
-      title: "Feature coming soon",
-      description: "Property form will be available in the next update.",
-    });
-    // TODO: Uncomment when PropertyFormModal is implemented
-    // setEditingProperty(null);
-    // setIsPropertyFormOpen(true);
+    setEditingProperty(null);
+    setIsPropertyFormOpen(true);
   };
 
   const handleFileUpload = async (files: File[]) => {
@@ -517,7 +507,6 @@ export default function Properties() {
           </div>
         )}
         
-        {/* TODO: Add PropertyFormModal component
         <PropertyFormModal
           isOpen={isPropertyFormOpen}
           onClose={() => {
@@ -526,7 +515,6 @@ export default function Properties() {
           }}
           property={editingProperty}
         />
-        */}
 
         <PropertyDetailModal
           isOpen={isDetailModalOpen}
