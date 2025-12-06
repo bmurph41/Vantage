@@ -676,7 +676,7 @@ export class DashboardService {
 
   private async getSalesCompsData(orgId: string, dateFilter: TimeRangeFilter | null) {
     const { salesComps } = await import('@shared/schema');
-    const { sql, count, avg, desc } = await import('drizzle-orm');
+    const { sql, count, desc } = await import('drizzle-orm');
     
     // Filter out soft-deleted records
     const conditions = [eq(salesComps.orgId, orgId), isNull(salesComps.deletedAt)];
@@ -684,17 +684,23 @@ export class DashboardService {
       conditions.push(gte(salesComps.createdAt, dateFilter.startDate));
     }
     
+    // Calculate average using salePrice OR estimatedPurchasePrice, only for deals that have at least one
     const [statsResult, recentResult] = await Promise.all([
       db.select({
         totalComps: count(),
-        avgSalePrice: avg(salesComps.salePrice),
+        sumPrice: sql<number>`SUM(COALESCE(${salesComps.salePrice}, ${salesComps.estimatedPurchasePrice}))`,
+        countWithPrice: sql<number>`COUNT(CASE WHEN ${salesComps.salePrice} IS NOT NULL OR ${salesComps.estimatedPurchasePrice} IS NOT NULL THEN 1 END)`,
       }).from(salesComps).where(and(...conditions)),
       db.select().from(salesComps).where(and(...conditions)).orderBy(desc(salesComps.createdAt)).limit(5),
     ]);
 
+    const sumPrice = Number(statsResult[0]?.sumPrice) || 0;
+    const countWithPrice = Number(statsResult[0]?.countWithPrice) || 0;
+    const avgSalePrice = countWithPrice > 0 ? sumPrice / countWithPrice : 0;
+
     return {
       totalComps: Number(statsResult[0]?.totalComps) || 0,
-      avgPricePerSlip: Math.round(Number(statsResult[0]?.avgSalePrice) || 0),
+      avgPricePerSlip: Math.round(avgSalePrice),
       recentComps: recentResult,
     };
   }
@@ -2097,19 +2103,29 @@ export class DashboardService {
       }
 
       case 'avg_price': {
-        // Exclude undisclosed prices ($0, null, or isPriceDisclosed = false)
+        // Use salePrice OR estimatedPurchasePrice, only for deals that have at least one price value
         const [avgResult] = await db
-          .select({ avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.salePrice} > 0 AND (${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL) THEN ${salesComps.salePrice} ELSE NULL END)` })
+          .select({ 
+            sumPrice: drizzleSql<number>`SUM(COALESCE(NULLIF(${salesComps.salePrice}, 0), ${salesComps.estimatedPurchasePrice}))`,
+            countWithPrice: drizzleSql<number>`COUNT(CASE WHEN (${salesComps.salePrice} > 0) OR (${salesComps.estimatedPurchasePrice} > 0) THEN 1 END)`
+          })
           .from(salesComps)
           .where(whereCondition);
-        result.value = Number(avgResult?.avg) || 0;
+        const sumPrice = Number(avgResult?.sumPrice) || 0;
+        const countWithPrice = Number(avgResult?.countWithPrice) || 0;
+        result.value = countWithPrice > 0 ? sumPrice / countWithPrice : 0;
 
         if (enableComparison && comparisonType === 'yoy' && yearFilter) {
           const [prevResult] = await db
-            .select({ avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.salePrice} > 0 AND (${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL) THEN ${salesComps.salePrice} ELSE NULL END)` })
+            .select({ 
+              sumPrice: drizzleSql<number>`SUM(COALESCE(NULLIF(${salesComps.salePrice}, 0), ${salesComps.estimatedPurchasePrice}))`,
+              countWithPrice: drizzleSql<number>`COUNT(CASE WHEN (${salesComps.salePrice} > 0) OR (${salesComps.estimatedPurchasePrice} > 0) THEN 1 END)`
+            })
             .from(salesComps)
             .where(prevWhereCondition);
-          result.previousValue = Number(prevResult?.avg) || 0;
+          const prevSum = Number(prevResult?.sumPrice) || 0;
+          const prevCount = Number(prevResult?.countWithPrice) || 0;
+          result.previousValue = prevCount > 0 ? prevSum / prevCount : 0;
           result.trend = result.previousValue > 0 
             ? ((result.value - result.previousValue) / result.previousValue) * 100 
             : (result.value > 0 ? 100 : 0);
