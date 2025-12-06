@@ -28,10 +28,12 @@ import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES, US_REGIONS } from "@shared/
 import { AddressInput } from "@/components/address-input";
 import { useCustomStorageTypes, useCreateCustomStorageType } from "@/hooks/ratecomps/useCustomStorageTypes";
 import RateTiersEditor from "./RateTiersEditor";
+import PropertyAutocomplete from "@/components/property-autocomplete";
 
 const compFormSchema = z.object({
   marina: z.string().min(1, "Marina name is required"),
   marinaId: z.string().optional(), // Link to Marina Rate Database
+  propertyId: z.string().optional(), // Link to CRM Property
   city: z.string().optional(),
   state: z.string().optional(),
   address: z.string().optional(),
@@ -116,6 +118,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   const [marinaSearchResults, setMarinaSearchResults] = useState<MarinaRateDatabase[]>([]);
   const [selectedMarina, setSelectedMarina] = useState<MarinaRateDatabase | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  
+  // CRM Property linking state
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>((comp as any)?.propertyId || null);
   
   // Portfolio mode state
   const [portfolioTabs, setPortfolioTabs] = useState<Array<{id: string, marinaName: string}>>([
@@ -402,6 +407,8 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       coastalType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType,
       // Marina Database link
       marinaId: data.marinaId || undefined,
+      // CRM Property link
+      propertyId: data.propertyId || undefined,
       // Rate-focused fields
       rateCollectionDate: data.rateCollectionDate || undefined,
       rateSource: data.rateSource === "" || data.rateSource === "none-selected" ? undefined : data.rateSource,
@@ -706,10 +713,27 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 )}
                               </div>
                               <FormControl>
-                                <Input 
-                                  {...field} 
-                                  placeholder="Enter marina name or search Marina DB..."
-                                  data-testid="input-marina"
+                                <PropertyAutocomplete
+                                  value={field.value}
+                                  selectedPropertyId={selectedPropertyId}
+                                  onValueChange={field.onChange}
+                                  onPropertySelect={(property) => {
+                                    if (property) {
+                                      setSelectedPropertyId(property.id);
+                                      form.setValue('propertyId', property.id);
+                                    } else {
+                                      setSelectedPropertyId(null);
+                                      form.setValue('propertyId', undefined);
+                                    }
+                                  }}
+                                  onPropertyDataPopulate={(property) => {
+                                    if (property.city) form.setValue('city', property.city);
+                                    if (property.state) form.setValue('state', property.state);
+                                    if (property.address) form.setValue('address', property.address);
+                                    if (property.wetSlips) form.setValue('wetSlips', property.wetSlips);
+                                    if (property.drySlips) form.setValue('dryRacks', property.drySlips);
+                                  }}
+                                  placeholder="Enter marina name..."
                                 />
                               </FormControl>
                               <FormMessage />

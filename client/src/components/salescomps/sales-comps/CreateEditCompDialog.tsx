@@ -23,9 +23,11 @@ import type { SalesComp, InsertSalesComp, UpdateSalesComp } from "@shared/schema
 import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES, US_REGIONS } from "@shared/salescomps-constants";
 import { AddressInput } from "@/components/address-input";
 import { useCustomStorageTypes, useCreateCustomStorageType } from "@/hooks/salescomps/useCustomStorageTypes";
+import PropertyAutocomplete from "@/components/property-autocomplete";
 
 const compFormSchema = z.object({
   marina: z.string().min(1, "Marina name is required"),
+  propertyId: z.string().optional(),
   salePrice: z.union([z.string(), z.number()]).optional(),
   isPriceDisclosed: z.boolean().default(true),
   capRate: z.union([z.string(), z.number()]).optional(),
@@ -133,6 +135,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   // Check if the existing comp has a legacy storage type value
   const hasLegacyStorageType = comp?.ioBoth && !STORAGE_TYPES.includes(comp.ioBoth as any);
   const [showLegacyStorageWarning, setShowLegacyStorageWarning] = useState(hasLegacyStorageType);
+  
+  // Property linking state
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>((comp as any)?.propertyId || null);
 
   // Fetch existing portfolio comps
   const { data: portfoliosData } = useQuery({
@@ -517,6 +522,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       buyerCompany: data.buyerCompany || undefined,
       buyerPrincipal: data.buyerPrincipal || undefined,
       notes: data.notes || undefined,
+      propertyId: data.propertyId || undefined,
       waterType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType,
       coastalType: data.waterType === "" || data.waterType === "none-selected" ? undefined : data.waterType, // Sync with waterType for backward compatibility
       isPriceDisclosed: data.isPriceDisclosed,
@@ -753,10 +759,27 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                             <FormItem>
                               <FormLabel>Marina Name *</FormLabel>
                               <FormControl>
-                                <Input 
-                                  {...field} 
+                                <PropertyAutocomplete
+                                  value={field.value}
+                                  selectedPropertyId={selectedPropertyId}
+                                  onValueChange={field.onChange}
+                                  onPropertySelect={(property) => {
+                                    if (property) {
+                                      setSelectedPropertyId(property.id);
+                                      form.setValue('propertyId', property.id);
+                                    } else {
+                                      setSelectedPropertyId(null);
+                                      form.setValue('propertyId', undefined);
+                                    }
+                                  }}
+                                  onPropertyDataPopulate={(property) => {
+                                    if (property.city) form.setValue('city', property.city);
+                                    if (property.state) form.setValue('state', property.state);
+                                    if (property.address) form.setValue('address', property.address);
+                                    if (property.wetSlips) form.setValue('wetSlips', property.wetSlips);
+                                    if (property.drySlips) form.setValue('dryRacks', property.drySlips);
+                                  }}
                                   placeholder="Enter marina name..."
-                                  data-testid="input-marina"
                                 />
                               </FormControl>
                               <FormMessage />

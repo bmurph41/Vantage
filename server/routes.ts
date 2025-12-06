@@ -7557,6 +7557,66 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Property search autocomplete for comp linking
+  app.get("/api/properties/search/autocomplete", async (req: any, res) => {
+    try {
+      const orgId = req.user?.orgId;
+      if (!orgId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { q, limit = 10 } = req.query;
+      if (!q || typeof q !== 'string' || q.length < 2) {
+        return res.json([]);
+      }
+      
+      const { or, and, eq, sql } = await import('drizzle-orm');
+      const searchTerm = `%${q.toLowerCase()}%`;
+      
+      const results = await db.select({
+        id: crmProperties.id,
+        title: crmProperties.title,
+        address: crmProperties.address,
+        type: crmProperties.type,
+        status: crmProperties.status,
+        coordinates: crmProperties.coordinates,
+        specifications: crmProperties.specifications,
+      })
+      .from(crmProperties)
+      .where(
+        and(
+          eq(crmProperties.orgId, orgId),
+          or(
+            sql`LOWER(${crmProperties.title}) LIKE ${searchTerm}`,
+            sql`LOWER(${crmProperties.address}) LIKE ${searchTerm}`
+          )
+        )
+      )
+      .limit(parseInt(limit as string) || 10);
+      
+      // Parse specifications to extract city/state if available
+      const formattedResults = results.map(p => {
+        const specs = p.specifications as any || {};
+        return {
+          id: p.id,
+          title: p.title,
+          address: p.address,
+          city: specs.city || '',
+          state: specs.state || '',
+          type: p.type,
+          status: p.status,
+          wetSlips: specs.wetSlips || specs.wet_slips,
+          drySlips: specs.drySlips || specs.dry_slips,
+        };
+      });
+      
+      res.json(formattedResults);
+    } catch (error) {
+      console.error("Failed to search properties:", error);
+      res.status(500).json({ error: "Failed to search properties" });
+    }
+  });
+
   // Property-Contact Links
   app.get("/api/properties/:id/contacts", async (req: any, res) => {
     try {
@@ -9378,6 +9438,19 @@ Current context: Project ${req.params.projectId}`;
           }
         } catch (contactError) {
           console.error('Error auto-creating pending contact:', contactError);
+        }
+      }
+
+      // Auto-create pending property profile if propertyId is not provided
+      if (!compData.propertyId) {
+        try {
+          await storage.createPendingPropertyProfile({
+            compId: comp.id,
+            orgId,
+            status: 'pending',
+          });
+        } catch (pendingError) {
+          console.error('Error auto-creating pending property profile:', pendingError);
         }
       }
 
@@ -21456,6 +21529,19 @@ Current context: Project ${req.params.projectId}`;
         orgId,
         createdBy: userId,
       }, userId);
+
+      // Auto-create pending property profile if propertyId is not provided
+      if (!compData.propertyId) {
+        try {
+          await storage.createRcPendingPropertyProfile({
+            compId: comp.id,
+            orgId,
+            status: 'pending',
+          });
+        } catch (pendingError) {
+          console.error('Error auto-creating pending property profile for rate comp:', pendingError);
+        }
+      }
 
       res.status(201).json(comp);
     } catch (error) {
