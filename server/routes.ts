@@ -10473,6 +10473,120 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Duplicate detection endpoints using rule-based matching service
+  app.post('/api/pending/:entityType/:id/detect-duplicates', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { entityType, id } = req.params;
+      
+      if (!['property', 'contact', 'company'].includes(entityType)) {
+        return res.status(400).json({ message: "Invalid entity type" });
+      }
+      
+      const { duplicateMatchingService } = await import('./services/duplicateMatchingService');
+      const matches = await duplicateMatchingService.runDuplicateDetection(
+        orgId, 
+        entityType as 'property' | 'contact' | 'company', 
+        id
+      );
+      
+      res.json({ 
+        pendingId: id,
+        entityType,
+        matchCount: matches.length,
+        matches: matches.slice(0, 10)
+      });
+    } catch (error) {
+      console.error("Error detecting duplicates:", error);
+      res.status(500).json({ message: "Failed to detect duplicates" });
+    }
+  });
+
+  app.get('/api/pending/:entityType/:id/matches', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { entityType, id } = req.params;
+      
+      if (!['property', 'contact', 'company'].includes(entityType)) {
+        return res.status(400).json({ message: "Invalid entity type" });
+      }
+      
+      const { duplicateMatchingService } = await import('./services/duplicateMatchingService');
+      const matches = await duplicateMatchingService.getMatchesForPending(
+        orgId, 
+        entityType as 'property' | 'contact' | 'company', 
+        id
+      );
+      
+      res.json(matches);
+    } catch (error) {
+      console.error("Error fetching matches:", error);
+      res.status(500).json({ message: "Failed to fetch matches" });
+    }
+  });
+
+  app.post('/api/pending/:entityType/:id/resolve', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { entityType, id } = req.params;
+      const { resolution, targetEntityId } = req.body;
+      
+      if (!['property', 'contact', 'company'].includes(entityType)) {
+        return res.status(400).json({ message: "Invalid entity type" });
+      }
+      
+      if (!['merge', 'reject', 'create_new'].includes(resolution)) {
+        return res.status(400).json({ message: "Invalid resolution type. Use 'merge', 'reject', or 'create_new'" });
+      }
+      
+      if (resolution === 'merge' && !targetEntityId) {
+        return res.status(400).json({ message: "Target entity ID required for merge" });
+      }
+      
+      const { duplicateMatchingService } = await import('./services/duplicateMatchingService');
+      
+      if (resolution === 'merge') {
+        const result = await storage.mergePendingWithExisting(
+          entityType as 'property' | 'contact' | 'company',
+          id, 
+          targetEntityId, 
+          orgId, 
+          userId
+        );
+        await duplicateMatchingService.resolveDuplicate(
+          orgId, entityType as any, id, 'merge', userId, targetEntityId
+        );
+        res.json({ success: true, merged: true, result });
+      } else if (resolution === 'reject') {
+        const success = await storage.rejectPendingEntity(
+          entityType as 'property' | 'contact' | 'company',
+          id, 
+          orgId, 
+          userId
+        );
+        await duplicateMatchingService.resolveDuplicate(
+          orgId, entityType as any, id, 'reject', userId
+        );
+        res.json({ success: true, rejected: true });
+      } else {
+        const created = await storage.acceptPendingEntity(
+          entityType as 'property' | 'contact' | 'company',
+          id, 
+          orgId, 
+          userId
+        );
+        await duplicateMatchingService.resolveDuplicate(
+          orgId, entityType as any, id, 'create_new', userId
+        );
+        res.json({ success: true, created: true, result: created });
+      }
+    } catch (error) {
+      console.error("Error resolving duplicate:", error);
+      res.status(500).json({ message: "Failed to resolve duplicate" });
+    }
+  });
+
   // Pending Contacts routes - Review queue for contacts created from comps or DD projects
   app.get('/api/pending-contacts', async (req: any, res) => {
     try {

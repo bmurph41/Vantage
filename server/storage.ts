@@ -647,6 +647,11 @@ export interface IStorage {
   updatePendingCompany(id: string, orgId: string, updates: Partial<PendingCompany>): Promise<PendingCompany | undefined>;
   mergePendingCompanyWithExisting(pendingId: string, companyId: string, orgId: string, userId: string): Promise<CrmCompany | undefined>;
 
+  // Generic pending entity resolution (delegates to type-specific methods)
+  mergePendingWithExisting(entityType: 'property' | 'contact' | 'company', pendingId: string, targetEntityId: string, orgId: string, userId: string): Promise<any>;
+  rejectPendingEntity(entityType: 'property' | 'contact' | 'company', pendingId: string, orgId: string, userId: string): Promise<boolean>;
+  acceptPendingEntity(entityType: 'property' | 'contact' | 'company', pendingId: string, orgId: string, userId: string): Promise<any>;
+
   // Auto-create pending records from sales comps with deduplication
   autoCreatePendingCompanyFromSalesComp(params: {
     salesCompId: string;
@@ -5469,6 +5474,65 @@ export class DatabaseStorage implements IStorage {
 
       return existingCompany;
     });
+  }
+
+  // ============================================================================
+  // Generic pending entity resolution (delegates to type-specific methods)
+  // ============================================================================
+  
+  async mergePendingWithExisting(
+    entityType: 'property' | 'contact' | 'company',
+    pendingId: string,
+    targetEntityId: string,
+    orgId: string,
+    userId: string
+  ): Promise<any> {
+    switch (entityType) {
+      case 'property':
+        return this.mergePendingPropertyWithExisting(pendingId, targetEntityId, orgId, userId);
+      case 'contact':
+        return this.mergePendingContactWithExisting(pendingId, targetEntityId, orgId, userId);
+      case 'company':
+        return this.mergePendingCompanyWithExisting(pendingId, targetEntityId, orgId, userId);
+      default:
+        throw new Error(`Unknown entity type: ${entityType}`);
+    }
+  }
+  
+  async rejectPendingEntity(
+    entityType: 'property' | 'contact' | 'company',
+    pendingId: string,
+    orgId: string,
+    userId: string
+  ): Promise<boolean> {
+    switch (entityType) {
+      case 'property':
+        return this.rejectPendingProperty(pendingId, orgId, userId);
+      case 'contact':
+        return this.rejectPendingContact(pendingId, orgId, userId);
+      case 'company':
+        return this.rejectPendingCompany(pendingId, orgId, userId);
+      default:
+        throw new Error(`Unknown entity type: ${entityType}`);
+    }
+  }
+  
+  async acceptPendingEntity(
+    entityType: 'property' | 'contact' | 'company',
+    pendingId: string,
+    orgId: string,
+    userId: string
+  ): Promise<any> {
+    switch (entityType) {
+      case 'property':
+        return this.acceptPendingProperty(pendingId, orgId, userId);
+      case 'contact':
+        return this.acceptPendingContact(pendingId, orgId, userId);
+      case 'company':
+        return this.acceptPendingCompany(pendingId, orgId, userId);
+      default:
+        throw new Error(`Unknown entity type: ${entityType}`);
+    }
   }
 
   // ============================================================================

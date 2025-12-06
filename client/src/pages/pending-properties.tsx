@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Check, X, AlertTriangle, MapPin, DollarSign, Calendar, Building } from "lucide-react";
+import { Check, X, AlertTriangle, MapPin, DollarSign, Calendar, Building, RefreshCw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -19,19 +19,57 @@ import { PendingPropertyDetailDialog } from "@/components/pending-property-detai
 import DuplicateResolutionModal from "@/components/modals/duplicate-resolution-modal";
 import type { PendingProperty, Property } from "@shared/schema";
 
+interface DuplicateMatch {
+  entityId: string;
+  matchEntityId?: string;
+  entityType: 'property' | 'contact' | 'company';
+  confidenceScore: number;
+  matchedFields: string[];
+  matchReasons: string[];
+  fieldScores: Record<string, number>;
+  matchReason: string;
+}
+
 export default function PendingProperties() {
   const [selectedPending, setSelectedPending] = useState<PendingProperty | null>(null);
   const [selectedExisting, setSelectedExisting] = useState<Property | null>(null);
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [duplicateMatches, setDuplicateMatches] = useState<Record<string, DuplicateMatch[]>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: pendingProperties = [], isLoading } = useQuery<PendingProperty[]>({
     queryKey: ['/api/crm/pending-properties'],
-    staleTime: 60 * 1000, // Consider data fresh for 1 minute
-    refetchInterval: 2 * 60 * 1000, // Refresh every 2 minutes
+    staleTime: 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
   });
+
+  const detectDuplicatesMutation = useMutation({
+    mutationFn: async (pendingId: string) => {
+      const response = await fetch(`/api/pending/property/${pendingId}/detect-duplicates`, { method: 'POST' });
+      if (!response.ok) throw new Error('Failed to detect duplicates');
+      return response.json();
+    },
+    onSuccess: (data, pendingId) => {
+      setDuplicateMatches(prev => ({
+        ...prev,
+        [pendingId]: data.matches || []
+      }));
+    }
+  });
+
+  useEffect(() => {
+    pendingProperties.filter(p => p.status === 'pending').forEach(pending => {
+      if (!duplicateMatches[pending.id]) {
+        detectDuplicatesMutation.mutate(pending.id);
+      }
+    });
+  }, [pendingProperties]);
+
+  const getMatchCount = (pendingId: string): number => {
+    return duplicateMatches[pendingId]?.length || 0;
+  };
 
   const { mutate: fetchDuplicate, isPending: isFetchingDuplicate } = useMutation({
     mutationFn: async (propertyId: string) => {
@@ -77,9 +115,11 @@ export default function PendingProperties() {
   const handleAccept = async (pending: PendingProperty) => {
     setSelectedPending(pending);
     
-    if (pending.suggestedDuplicates && Array.isArray(pending.suggestedDuplicates) && pending.suggestedDuplicates.length > 0) {
-      const duplicateId = pending.suggestedDuplicates[0] as string;
-      fetchDuplicate(duplicateId, {
+    const matches = duplicateMatches[pending.id] || [];
+    if (matches.length > 0) {
+      const bestMatch = matches[0];
+      const entityId = bestMatch.entityId || bestMatch.matchEntityId;
+      fetchDuplicate(entityId, {
         onSuccess: (existingProperty) => {
           setSelectedExisting(existingProperty);
           setShowDuplicatesDialog(true);
@@ -231,13 +271,18 @@ export default function PendingProperties() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        {pending.suggestedDuplicates?.length > 0 ? (
+                        {getMatchCount(pending.id) > 0 ? (
                           <Badge variant="destructive" className="gap-1">
                             <AlertTriangle className="h-3 w-3" />
-                            {pending.suggestedDuplicates.length} Found
+                            {getMatchCount(pending.id)} Match{getMatchCount(pending.id) > 1 ? 'es' : ''}
                           </Badge>
+                        ) : duplicateMatches[pending.id] === undefined ? (
+                          <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground mx-auto" />
                         ) : (
-                          <span className="text-xs text-muted-foreground">None</span>
+                          <Badge variant="outline" className="text-green-600 border-green-300">
+                            <Check className="h-3 w-3 mr-1" />
+                            Unique
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
