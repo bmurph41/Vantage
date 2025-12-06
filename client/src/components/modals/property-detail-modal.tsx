@@ -26,7 +26,13 @@ import { AddressInput } from "@/components/address-input";
 import type { Property, Contact, Company, Deal, Activity as ActivityType, Note, SalesComp, RateComp } from "@shared/schema";
 import PropertyIntegrationPanel from "@/components/crm/PropertyIntegrationPanel";
 
-type SalesHistoryMatch = SalesComp & { matchConfidence: number };
+type SalesHistoryMatch = SalesComp & { 
+  matchConfidence: number;
+  sellerCompanyName?: string | null;
+  buyerCompanyName?: string | null;
+  sellerContactName?: string | null;
+  buyerContactName?: string | null;
+};
 type RateHistoryMatch = RateComp & { matchConfidence: number };
 
 interface PortfolioStatus {
@@ -627,15 +633,15 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
                 </Card>
               ) : null}
 
-              {/* Sales History Section */}
+              {/* Sales History Section - County-Style Table */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <DollarSign className="w-5 h-5 text-blue-600" />
+                    <History className="w-5 h-5 text-blue-600" />
                     Sales History
                     {salesHistoryData?.matches && salesHistoryData.matches.length > 0 && (
                       <Badge variant="secondary" className="ml-2">
-                        {salesHistoryData.matches.length} match{salesHistoryData.matches.length > 1 ? 'es' : ''}
+                        {salesHistoryData.matches.length} transaction{salesHistoryData.matches.length > 1 ? 's' : ''}
                       </Badge>
                     )}
                   </CardTitle>
@@ -645,74 +651,96 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
                     <div className="space-y-3">
                       {[1, 2, 3].map((i) => (
                         <div key={i} className="flex items-center gap-3 p-3 border rounded-lg">
-                          <Skeleton className="h-10 w-10 rounded" />
-                          <div className="space-y-2 flex-1">
-                            <Skeleton className="h-4 w-48" />
-                            <Skeleton className="h-3 w-32" />
-                          </div>
+                          <Skeleton className="h-10 w-full rounded" />
                         </div>
                       ))}
                     </div>
                   ) : !salesHistoryData?.matches || salesHistoryData.matches.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
-                      <DollarSign className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                      <History className="w-12 h-12 mx-auto mb-2 text-gray-400" />
                       <p>No sales history found matching this property</p>
-                      <p className="text-sm mt-1">Sales comps will appear here when matched by name or address</p>
+                      <p className="text-sm mt-1">Sales transactions will appear here when matched by name or address</p>
                     </div>
                   ) : (
-                    <ScrollArea className="max-h-[300px]">
-                      <div className="space-y-3 pr-4">
-                        {salesHistoryData.matches.map((comp) => (
-                          <div 
-                            key={comp.id} 
-                            className="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-                            data-testid={`sales-history-${comp.id}`}
-                          >
-                            <div className={`p-2 rounded-lg ${
-                              comp.matchConfidence >= 80 ? 'bg-green-100' : 
-                              comp.matchConfidence >= 60 ? 'bg-yellow-100' : 'bg-gray-100'
-                            }`}>
-                              <DollarSign className={`w-5 h-5 ${
-                                comp.matchConfidence >= 80 ? 'text-green-700' : 
-                                comp.matchConfidence >= 60 ? 'text-yellow-700' : 'text-gray-700'
-                              }`} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-semibold truncate">{comp.marinaName || 'Unnamed'}</span>
-                                <Badge variant="outline" className={`text-xs ${
-                                  comp.matchConfidence >= 80 ? 'border-green-500 text-green-700' : 
-                                  comp.matchConfidence >= 60 ? 'border-yellow-500 text-yellow-700' : 'border-gray-400'
-                                }`}>
-                                  {comp.matchConfidence}% match
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
-                                {comp.saleYear && (
-                                  <span className="flex items-center gap-1">
-                                    <Calendar className="w-3 h-3" />
-                                    {comp.saleYear}
-                                  </span>
-                                )}
-                                {comp.salePrice && (
-                                  <span className="flex items-center gap-1 text-green-700 font-medium">
-                                    <DollarSign className="w-3 h-3" />
-                                    {formatCurrency(comp.salePrice)}
-                                  </span>
-                                )}
-                                {(comp.wetSlips || comp.dryRacks) && (
-                                  <span className="flex items-center gap-1">
-                                    <Anchor className="w-3 h-3" />
-                                    {comp.wetSlips ? `${comp.wetSlips} wet` : ''}{comp.wetSlips && comp.dryRacks ? ' / ' : ''}{comp.dryRacks ? `${comp.dryRacks} dry` : ''}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                {comp.city}{comp.state ? `, ${comp.state}` : ''}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                    <ScrollArea className="max-h-[400px]">
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full text-sm" data-testid="sales-history-table">
+                          <thead className="bg-gray-50 border-b">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-medium text-gray-700">Date</th>
+                              <th className="px-3 py-2 text-right font-medium text-gray-700">Sale Price</th>
+                              <th className="px-3 py-2 text-left font-medium text-gray-700">Buyer</th>
+                              <th className="px-3 py-2 text-left font-medium text-gray-700">Seller</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {salesHistoryData.matches.map((comp, index) => (
+                              <tr 
+                                key={comp.id} 
+                                className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                                data-testid={`sales-history-row-${comp.id}`}
+                              >
+                                <td className="px-3 py-3">
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="w-4 h-4 text-gray-400" />
+                                    <span className="font-medium">
+                                      {comp.saleMonth && comp.saleYear 
+                                        ? `${String(comp.saleMonth).padStart(2, '0')}/${comp.saleYear}`
+                                        : comp.saleYear || 'Unknown'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3 text-right">
+                                  {comp.salePrice ? (
+                                    <span className="font-semibold text-green-700">
+                                      {formatCurrency(comp.salePrice)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400 italic">Undisclosed</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-3">
+                                  <div className="space-y-0.5">
+                                    {comp.buyerCompanyName ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <Building className="w-3.5 h-3.5 text-blue-500" />
+                                        <span className="font-medium text-gray-900">{comp.buyerCompanyName}</span>
+                                      </div>
+                                    ) : null}
+                                    {comp.buyerContactName ? (
+                                      <div className="flex items-center gap-1.5 text-gray-600">
+                                        <User className="w-3 h-3 text-gray-400" />
+                                        <span className="text-xs">{comp.buyerContactName}</span>
+                                      </div>
+                                    ) : null}
+                                    {!comp.buyerCompanyName && !comp.buyerContactName && (
+                                      <span className="text-gray-400 italic text-xs">—</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3">
+                                  <div className="space-y-0.5">
+                                    {comp.sellerCompanyName ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <Building className="w-3.5 h-3.5 text-orange-500" />
+                                        <span className="font-medium text-gray-900">{comp.sellerCompanyName}</span>
+                                      </div>
+                                    ) : null}
+                                    {comp.sellerContactName ? (
+                                      <div className="flex items-center gap-1.5 text-gray-600">
+                                        <User className="w-3 h-3 text-gray-400" />
+                                        <span className="text-xs">{comp.sellerContactName}</span>
+                                      </div>
+                                    ) : null}
+                                    {!comp.sellerCompanyName && !comp.sellerContactName && (
+                                      <span className="text-gray-400 italic text-xs">—</span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </ScrollArea>
                   )}

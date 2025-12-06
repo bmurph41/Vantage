@@ -7555,7 +7555,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       const orgId = req.user.orgId;
-      const { salesComps } = await import('@shared/schema');
+      const { salesComps, crmCompanies, crmContacts } = await import('@shared/schema');
       const { ilike, or, and, eq, isNull, desc, sql } = await import('drizzle-orm');
       
       // Build search terms from property title and address
@@ -7591,8 +7591,57 @@ Current context: Project ${req.params.projectId}`;
         .orderBy(desc(salesComps.saleYear), desc(salesComps.createdAt))
         .limit(20);
 
+      // Collect all unique company and contact IDs for batch lookup (org-scoped)
+      const companyIds = new Set<string>();
+      const contactIds = new Set<string>();
+      
+      results.forEach(comp => {
+        if (comp.sellerCompanyId) companyIds.add(comp.sellerCompanyId);
+        if (comp.buyerCompanyId) companyIds.add(comp.buyerCompanyId);
+        if (comp.sellerContactId) contactIds.add(comp.sellerContactId);
+        if (comp.buyerContactId) contactIds.add(comp.buyerContactId);
+      });
+
+      // Batch fetch companies (org-scoped for security)
+      const companyMap = new Map<string, string>();
+      if (companyIds.size > 0) {
+        const { inArray } = await import('drizzle-orm');
+        const companies = await db.select({ id: crmCompanies.id, name: crmCompanies.name })
+          .from(crmCompanies)
+          .where(and(
+            inArray(crmCompanies.id, Array.from(companyIds)),
+            eq(crmCompanies.orgId, orgId)
+          ));
+        companies.forEach(c => companyMap.set(c.id, c.name));
+      }
+
+      // Batch fetch contacts (org-scoped for security)
+      const contactMap = new Map<string, string>();
+      if (contactIds.size > 0) {
+        const { inArray } = await import('drizzle-orm');
+        const contacts = await db.select({ id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName })
+          .from(crmContacts)
+          .where(and(
+            inArray(crmContacts.id, Array.from(contactIds)),
+            eq(crmContacts.orgId, orgId)
+          ));
+        contacts.forEach(c => {
+          const fullName = `${c.firstName || ''} ${c.lastName || ''}`.trim();
+          if (fullName) contactMap.set(c.id, fullName);
+        });
+      }
+
+      // Enrich results with company/contact names
+      const enrichedResults = results.map(comp => ({
+        ...comp,
+        sellerCompanyName: (comp.sellerCompanyId && companyMap.get(comp.sellerCompanyId)) || comp.seller || null,
+        buyerCompanyName: (comp.buyerCompanyId && companyMap.get(comp.buyerCompanyId)) || comp.buyer || comp.company || null,
+        sellerContactName: (comp.sellerContactId && contactMap.get(comp.sellerContactId)) || null,
+        buyerContactName: (comp.buyerContactId && contactMap.get(comp.buyerContactId)) || null,
+      }));
+
       // Calculate match confidence for each result
-      const matchesWithConfidence = results.map(comp => {
+      const matchesWithConfidence = enrichedResults.map(comp => {
         let confidence = 0;
         const compName = (comp.marina || '').toLowerCase();
         const propName = (property.title || '').toLowerCase();
