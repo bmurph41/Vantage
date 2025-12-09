@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,46 +61,41 @@ function CurrencyInput({ value, onChange, placeholder, ...props }: {
   placeholder?: string;
   [key: string]: any;
 }) {
-  const [displayValue, setDisplayValue] = useState(() => formatCurrency(value));
-  const [isFocused, setIsFocused] = useState(false);
+  const [localValue, setLocalValue] = useState<string>("");
+  const [isEditing, setIsEditing] = useState(false);
+  const lastSyncedValue = useRef<number | undefined>(undefined);
 
   useEffect(() => {
-    if (!isFocused) {
-      setDisplayValue(formatCurrency(value));
+    if (!isEditing && value !== lastSyncedValue.current) {
+      lastSyncedValue.current = typeof value === "number" ? value : undefined;
+      setLocalValue(formatCurrency(value));
     }
-  }, [value, isFocused]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDisplayValue(e.target.value);
-  };
-
-  const handleFocus = () => {
-    setIsFocused(true);
-    if (value !== undefined && value !== null) {
-      setDisplayValue(String(value));
-    }
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
-    const trimmed = displayValue.trim();
-    if (trimmed === "" || trimmed === "$") {
-      onChange(undefined);
-      setDisplayValue("");
-    } else {
-      const parsed = parseCurrency(displayValue);
-      onChange(parsed);
-      setDisplayValue(formatCurrency(parsed));
-    }
-  };
+  }, [value, isEditing]);
 
   return (
     <Input
       {...props}
-      value={displayValue}
-      onChange={handleChange}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onFocus={() => {
+        setIsEditing(true);
+        const numValue = typeof value === "number" ? value : parseCurrency(String(value));
+        setLocalValue(numValue !== undefined ? String(numValue) : "");
+      }}
+      onBlur={() => {
+        setIsEditing(false);
+        const trimmed = localValue.trim();
+        if (trimmed === "" || trimmed === "$") {
+          lastSyncedValue.current = undefined;
+          onChange(undefined);
+          setLocalValue("");
+        } else {
+          const parsed = parseCurrency(localValue);
+          lastSyncedValue.current = parsed;
+          onChange(parsed);
+          setLocalValue(formatCurrency(parsed));
+        }
+      }}
       placeholder={placeholder || "$0"}
     />
   );
@@ -112,46 +107,41 @@ function PercentageInput({ value, onChange, placeholder, ...props }: {
   placeholder?: string;
   [key: string]: any;
 }) {
-  const [displayValue, setDisplayValue] = useState(() => formatPercentage(value));
-  const [isFocused, setIsFocused] = useState(false);
+  const [localValue, setLocalValue] = useState<string>("");
+  const [isEditing, setIsEditing] = useState(false);
+  const lastSyncedValue = useRef<number | undefined>(undefined);
 
   useEffect(() => {
-    if (!isFocused) {
-      setDisplayValue(formatPercentage(value));
+    if (!isEditing && value !== lastSyncedValue.current) {
+      lastSyncedValue.current = typeof value === "number" ? value : undefined;
+      setLocalValue(formatPercentage(value));
     }
-  }, [value, isFocused]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDisplayValue(e.target.value);
-  };
-
-  const handleFocus = () => {
-    setIsFocused(true);
-    if (value !== undefined && value !== null) {
-      setDisplayValue(String(value));
-    }
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
-    const trimmed = displayValue.trim();
-    if (trimmed === "" || trimmed === "%") {
-      onChange(undefined);
-      setDisplayValue("");
-    } else {
-      const parsed = parsePercentage(displayValue);
-      onChange(parsed);
-      setDisplayValue(formatPercentage(parsed));
-    }
-  };
+  }, [value, isEditing]);
 
   return (
     <Input
       {...props}
-      value={displayValue}
-      onChange={handleChange}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onFocus={() => {
+        setIsEditing(true);
+        const numValue = typeof value === "number" ? value : parsePercentage(String(value));
+        setLocalValue(numValue !== undefined ? String(numValue) : "");
+      }}
+      onBlur={() => {
+        setIsEditing(false);
+        const trimmed = localValue.trim();
+        if (trimmed === "" || trimmed === "%") {
+          lastSyncedValue.current = undefined;
+          onChange(undefined);
+          setLocalValue("");
+        } else {
+          const parsed = parsePercentage(localValue);
+          lastSyncedValue.current = parsed;
+          onChange(parsed);
+          setLocalValue(formatPercentage(parsed));
+        }
+      }}
       placeholder={placeholder || "0.00%"}
     />
   );
