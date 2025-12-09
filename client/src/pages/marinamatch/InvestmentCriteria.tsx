@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,16 +62,36 @@ function CurrencyInput({ value, onChange, placeholder, ...props }: {
   [key: string]: any;
 }) {
   const [displayValue, setDisplayValue] = useState(() => formatCurrency(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setDisplayValue(formatCurrency(value));
+    }
+  }, [value, isFocused]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setDisplayValue(raw);
+    setDisplayValue(e.target.value);
+  };
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    if (value !== undefined && value !== null) {
+      setDisplayValue(String(value));
+    }
   };
 
   const handleBlur = () => {
-    const parsed = parseCurrency(displayValue);
-    onChange(parsed);
-    setDisplayValue(formatCurrency(parsed));
+    setIsFocused(false);
+    const trimmed = displayValue.trim();
+    if (trimmed === "" || trimmed === "$") {
+      onChange(undefined);
+      setDisplayValue("");
+    } else {
+      const parsed = parseCurrency(displayValue);
+      onChange(parsed);
+      setDisplayValue(formatCurrency(parsed));
+    }
   };
 
   return (
@@ -79,6 +99,7 @@ function CurrencyInput({ value, onChange, placeholder, ...props }: {
       {...props}
       value={displayValue}
       onChange={handleChange}
+      onFocus={handleFocus}
       onBlur={handleBlur}
       placeholder={placeholder || "$0"}
     />
@@ -92,16 +113,36 @@ function PercentageInput({ value, onChange, placeholder, ...props }: {
   [key: string]: any;
 }) {
   const [displayValue, setDisplayValue] = useState(() => formatPercentage(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setDisplayValue(formatPercentage(value));
+    }
+  }, [value, isFocused]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setDisplayValue(raw);
+    setDisplayValue(e.target.value);
+  };
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    if (value !== undefined && value !== null) {
+      setDisplayValue(String(value));
+    }
   };
 
   const handleBlur = () => {
-    const parsed = parsePercentage(displayValue);
-    onChange(parsed);
-    setDisplayValue(formatPercentage(parsed));
+    setIsFocused(false);
+    const trimmed = displayValue.trim();
+    if (trimmed === "" || trimmed === "%") {
+      onChange(undefined);
+      setDisplayValue("");
+    } else {
+      const parsed = parsePercentage(displayValue);
+      onChange(parsed);
+      setDisplayValue(formatPercentage(parsed));
+    }
   };
 
   return (
@@ -109,6 +150,7 @@ function PercentageInput({ value, onChange, placeholder, ...props }: {
       {...props}
       value={displayValue}
       onChange={handleChange}
+      onFocus={handleFocus}
       onBlur={handleBlur}
       placeholder={placeholder || "0.00%"}
     />
@@ -574,23 +616,30 @@ function CreateProfileForm({
   });
 
   const handleSubmit = (formData: any) => {
-    const cleanedCriteria = {
-      financial: Object.fromEntries(
-        Object.entries(criteria.financial).filter(([_, v]) => v !== undefined && v !== null)
-      ),
-      size: Object.fromEntries(
-        Object.entries(criteria.size).filter(([_, v]) => v !== undefined && v !== null)
-      ),
-      capital: Object.fromEntries(
-        Object.entries(criteria.capital).filter(([_, v]) => v !== undefined && v !== null)
-      ),
-      operational: criteria.operational,
-    };
+    const financialEntries = Object.entries(criteria.financial).filter(([_, v]) => v !== undefined && v !== null);
+    const sizeEntries = Object.entries(criteria.size).filter(([_, v]) => v !== undefined && v !== null);
+    const capitalEntries = Object.entries(criteria.capital).filter(([_, v]) => v !== undefined && v !== null);
+    
+    const cleanedCriteria: any = {};
+    
+    if (financialEntries.length > 0) {
+      cleanedCriteria.financial = Object.fromEntries(financialEntries);
+    }
+    if (sizeEntries.length > 0) {
+      cleanedCriteria.size = Object.fromEntries(sizeEntries);
+    }
+    if (capitalEntries.length > 0) {
+      cleanedCriteria.capital = Object.fromEntries(capitalEntries);
+    }
+    cleanedCriteria.operational = criteria.operational;
 
-    onSubmit({
+    const payload = {
       ...formData,
       criteria: cleanedCriteria,
-    });
+    };
+    
+    console.log("[Investment Criteria] Submitting profile with criteria:", JSON.stringify(payload, null, 2));
+    onSubmit(payload);
   };
 
   return (
