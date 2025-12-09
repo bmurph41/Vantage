@@ -20,7 +20,7 @@ import {
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
   Wrench, ArrowUpDown, Building, Info, Globe, Loader2,
-  Settings, ChevronDown, ChevronUp, Plus, Check, X, Radar, Pencil, Mail, AlertTriangle, Flag, MessageSquareWarning
+  Settings, ChevronDown, ChevronUp, Plus, Check, X, Radar, Pencil, Mail, AlertTriangle, Flag, MessageSquareWarning, Trash2
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
