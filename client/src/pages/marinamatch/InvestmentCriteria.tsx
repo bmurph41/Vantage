@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -21,6 +21,99 @@ import {
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+function formatCurrency(value: string | number | undefined): string {
+  if (value === undefined || value === "" || value === null) return "";
+  const numValue = typeof value === "string" ? parseFloat(value.replace(/[^0-9.-]/g, "")) : value;
+  if (isNaN(numValue)) return "";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(numValue);
+}
+
+function parseCurrency(value: string): number | undefined {
+  if (!value) return undefined;
+  const cleaned = value.replace(/[^0-9.-]/g, "");
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? undefined : parsed;
+}
+
+function formatPercentage(value: string | number | undefined): string {
+  if (value === undefined || value === "" || value === null) return "";
+  const numValue = typeof value === "string" ? parseFloat(value.replace(/[^0-9.-]/g, "")) : value;
+  if (isNaN(numValue)) return "";
+  return `${numValue.toFixed(2)}%`;
+}
+
+function parsePercentage(value: string): number | undefined {
+  if (!value) return undefined;
+  const cleaned = value.replace(/[^0-9.-]/g, "");
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? undefined : parsed;
+}
+
+function CurrencyInput({ value, onChange, placeholder, ...props }: {
+  value: string | number | undefined;
+  onChange: (value: number | undefined) => void;
+  placeholder?: string;
+  [key: string]: any;
+}) {
+  const [displayValue, setDisplayValue] = useState(() => formatCurrency(value));
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setDisplayValue(raw);
+  };
+
+  const handleBlur = () => {
+    const parsed = parseCurrency(displayValue);
+    onChange(parsed);
+    setDisplayValue(formatCurrency(parsed));
+  };
+
+  return (
+    <Input
+      {...props}
+      value={displayValue}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      placeholder={placeholder || "$0"}
+    />
+  );
+}
+
+function PercentageInput({ value, onChange, placeholder, ...props }: {
+  value: string | number | undefined;
+  onChange: (value: number | undefined) => void;
+  placeholder?: string;
+  [key: string]: any;
+}) {
+  const [displayValue, setDisplayValue] = useState(() => formatPercentage(value));
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setDisplayValue(raw);
+  };
+
+  const handleBlur = () => {
+    const parsed = parsePercentage(displayValue);
+    onChange(parsed);
+    setDisplayValue(formatPercentage(parsed));
+  };
+
+  return (
+    <Input
+      {...props}
+      value={displayValue}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      placeholder={placeholder || "0.00%"}
+    />
+  );
+}
 
 interface CriteriaProfile {
   id: string;
@@ -398,9 +491,12 @@ export function InvestmentCriteriaTab() {
       </div>
 
       <Dialog open={isCreating} onOpenChange={setIsCreating}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Create Investment Criteria Profile</DialogTitle>
+            <DialogDescription>
+              Define your investment criteria to automatically score and match marina listings
+            </DialogDescription>
           </DialogHeader>
           <CreateProfileForm
             onSubmit={(data) => createProfileMutation.mutate(data)}
@@ -422,6 +518,45 @@ function CreateProfileForm({
   isLoading: boolean;
   onCancel: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState("basic");
+  const [criteria, setCriteria] = useState({
+    financial: {
+      minAskingPrice: undefined as number | undefined,
+      maxAskingPrice: undefined as number | undefined,
+      minGrossRevenue: undefined as number | undefined,
+      maxGrossRevenue: undefined as number | undefined,
+      minNoi: undefined as number | undefined,
+      maxNoi: undefined as number | undefined,
+      minCapRate: undefined as number | undefined,
+      maxCapRate: undefined as number | undefined,
+      minPricePerSlip: undefined as number | undefined,
+      maxPricePerSlip: undefined as number | undefined,
+    },
+    size: {
+      minTotalSlips: undefined as number | undefined,
+      maxTotalSlips: undefined as number | undefined,
+      minWetSlips: undefined as number | undefined,
+      maxWetSlips: undefined as number | undefined,
+      minAcreage: undefined as number | undefined,
+      maxAcreage: undefined as number | undefined,
+    },
+    capital: {
+      totalCapitalAvailable: undefined as number | undefined,
+      maxEquityPerDeal: undefined as number | undefined,
+      targetLtvRatio: undefined as number | undefined,
+      minCashOnCashReturn: undefined as number | undefined,
+      minIrrTarget: undefined as number | undefined,
+      targetHoldPeriod: undefined as number | undefined,
+    },
+    operational: {
+      minOccupancyRate: undefined as number | undefined,
+      requireFuelDock: false,
+      requireShipStore: false,
+      requireRepairShop: false,
+      requireDryStorage: false,
+    },
+  });
+
   const form = useForm({
     defaultValues: {
       name: "",
@@ -438,70 +573,380 @@ function CreateProfileForm({
     },
   });
 
+  const handleSubmit = (formData: any) => {
+    const cleanedCriteria = {
+      financial: Object.fromEntries(
+        Object.entries(criteria.financial).filter(([_, v]) => v !== undefined && v !== null)
+      ),
+      size: Object.fromEntries(
+        Object.entries(criteria.size).filter(([_, v]) => v !== undefined && v !== null)
+      ),
+      capital: Object.fromEntries(
+        Object.entries(criteria.capital).filter(([_, v]) => v !== undefined && v !== null)
+      ),
+      operational: criteria.operational,
+    };
+
+    onSubmit({
+      ...formData,
+      criteria: cleanedCriteria,
+    });
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Profile Name</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., Gulf Coast Full-Service" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="basic">Basic</TabsTrigger>
+            <TabsTrigger value="financial">Financial</TabsTrigger>
+            <TabsTrigger value="size">Size</TabsTrigger>
+            <TabsTrigger value="capital">Capital</TabsTrigger>
+          </TabsList>
 
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormControl>
-                <Input placeholder="Optional description..." {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <ScrollArea className="h-[350px] mt-4">
+            <TabsContent value="basic" className="space-y-4 pr-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Profile Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Gulf Coast Full-Service" {...field} data-testid="input-profile-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-        <div className="flex items-center gap-4">
-          <FormField
-            control={form.control}
-            name="isActive"
-            render={({ field }) => (
-              <FormItem className="flex items-center gap-2">
-                <FormControl>
-                  <Switch checked={field.value} onCheckedChange={field.onChange} />
-                </FormControl>
-                <FormLabel className="!mt-0">Active</FormLabel>
-              </FormItem>
-            )}
-          />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional description..." {...field} data-testid="input-profile-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <FormField
-            control={form.control}
-            name="isDefault"
-            render={({ field }) => (
-              <FormItem className="flex items-center gap-2">
-                <FormControl>
-                  <Switch checked={field.value} onCheckedChange={field.onChange} />
-                </FormControl>
-                <FormLabel className="!mt-0">Set as Default</FormLabel>
-              </FormItem>
-            )}
-          />
-        </div>
+              <div className="flex items-center gap-4">
+                <FormField
+                  control={form.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2">
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-profile-active-new" />
+                      </FormControl>
+                      <FormLabel className="!mt-0">Active</FormLabel>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="isDefault"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2">
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-profile-default" />
+                      </FormControl>
+                      <FormLabel className="!mt-0">Set as Default</FormLabel>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="financial" className="space-y-4 pr-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Min Asking Price</Label>
+                  <CurrencyInput
+                    value={criteria.financial.minAskingPrice}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, financial: { ...prev.financial, minAskingPrice: val } }))}
+                    placeholder="$1,000,000"
+                    data-testid="input-min-asking-price"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Max Asking Price</Label>
+                  <CurrencyInput
+                    value={criteria.financial.maxAskingPrice}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, financial: { ...prev.financial, maxAskingPrice: val } }))}
+                    placeholder="$50,000,000"
+                    data-testid="input-max-asking-price"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Min Gross Revenue</Label>
+                  <CurrencyInput
+                    value={criteria.financial.minGrossRevenue}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, financial: { ...prev.financial, minGrossRevenue: val } }))}
+                    placeholder="$500,000"
+                    data-testid="input-min-gross-revenue"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Max Gross Revenue</Label>
+                  <CurrencyInput
+                    value={criteria.financial.maxGrossRevenue}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, financial: { ...prev.financial, maxGrossRevenue: val } }))}
+                    placeholder="$10,000,000"
+                    data-testid="input-max-gross-revenue"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Min NOI</Label>
+                  <CurrencyInput
+                    value={criteria.financial.minNoi}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, financial: { ...prev.financial, minNoi: val } }))}
+                    placeholder="$250,000"
+                    data-testid="input-min-noi"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Max NOI</Label>
+                  <CurrencyInput
+                    value={criteria.financial.maxNoi}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, financial: { ...prev.financial, maxNoi: val } }))}
+                    placeholder="$5,000,000"
+                    data-testid="input-max-noi"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Min Cap Rate</Label>
+                  <PercentageInput
+                    value={criteria.financial.minCapRate}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, financial: { ...prev.financial, minCapRate: val } }))}
+                    placeholder="6.00%"
+                    data-testid="input-min-cap-rate"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Max Cap Rate</Label>
+                  <PercentageInput
+                    value={criteria.financial.maxCapRate}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, financial: { ...prev.financial, maxCapRate: val } }))}
+                    placeholder="12.00%"
+                    data-testid="input-max-cap-rate"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Min Price Per Slip</Label>
+                  <CurrencyInput
+                    value={criteria.financial.minPricePerSlip}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, financial: { ...prev.financial, minPricePerSlip: val } }))}
+                    placeholder="$25,000"
+                    data-testid="input-min-price-per-slip"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Max Price Per Slip</Label>
+                  <CurrencyInput
+                    value={criteria.financial.maxPricePerSlip}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, financial: { ...prev.financial, maxPricePerSlip: val } }))}
+                    placeholder="$150,000"
+                    data-testid="input-max-price-per-slip"
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="size" className="space-y-4 pr-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Min Total Slips</Label>
+                  <Input
+                    type="number"
+                    value={criteria.size.minTotalSlips || ""}
+                    onChange={(e) => setCriteria(prev => ({ ...prev, size: { ...prev.size, minTotalSlips: e.target.value ? parseInt(e.target.value) : undefined } }))}
+                    placeholder="25"
+                    data-testid="input-min-total-slips"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Max Total Slips</Label>
+                  <Input
+                    type="number"
+                    value={criteria.size.maxTotalSlips || ""}
+                    onChange={(e) => setCriteria(prev => ({ ...prev, size: { ...prev.size, maxTotalSlips: e.target.value ? parseInt(e.target.value) : undefined } }))}
+                    placeholder="500"
+                    data-testid="input-max-total-slips"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Min Wet Slips</Label>
+                  <Input
+                    type="number"
+                    value={criteria.size.minWetSlips || ""}
+                    onChange={(e) => setCriteria(prev => ({ ...prev, size: { ...prev.size, minWetSlips: e.target.value ? parseInt(e.target.value) : undefined } }))}
+                    placeholder="20"
+                    data-testid="input-min-wet-slips"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Max Wet Slips</Label>
+                  <Input
+                    type="number"
+                    value={criteria.size.maxWetSlips || ""}
+                    onChange={(e) => setCriteria(prev => ({ ...prev, size: { ...prev.size, maxWetSlips: e.target.value ? parseInt(e.target.value) : undefined } }))}
+                    placeholder="300"
+                    data-testid="input-max-wet-slips"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Min Acreage</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={criteria.size.minAcreage || ""}
+                    onChange={(e) => setCriteria(prev => ({ ...prev, size: { ...prev.size, minAcreage: e.target.value ? parseFloat(e.target.value) : undefined } }))}
+                    placeholder="1.0"
+                    data-testid="input-min-acreage"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Max Acreage</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={criteria.size.maxAcreage || ""}
+                    onChange={(e) => setCriteria(prev => ({ ...prev, size: { ...prev.size, maxAcreage: e.target.value ? parseFloat(e.target.value) : undefined } }))}
+                    placeholder="50.0"
+                    data-testid="input-max-acreage"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Min Occupancy Rate</Label>
+                <PercentageInput
+                  value={criteria.operational.minOccupancyRate}
+                  onChange={(val) => setCriteria(prev => ({ ...prev, operational: { ...prev.operational, minOccupancyRate: val } }))}
+                  placeholder="75.00%"
+                  data-testid="input-min-occupancy-rate"
+                />
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <Label className="text-sm font-medium">Required Amenities</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: "requireFuelDock", label: "Fuel Dock" },
+                    { key: "requireShipStore", label: "Ship Store" },
+                    { key: "requireRepairShop", label: "Repair Shop" },
+                    { key: "requireDryStorage", label: "Dry Storage" },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <Switch
+                        checked={criteria.operational[key as keyof typeof criteria.operational] as boolean}
+                        onCheckedChange={(checked) => setCriteria(prev => ({ ...prev, operational: { ...prev.operational, [key]: checked } }))}
+                        data-testid={`switch-${key}`}
+                      />
+                      <Label className="text-sm">{label}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="capital" className="space-y-4 pr-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Total Capital Available</Label>
+                  <CurrencyInput
+                    value={criteria.capital.totalCapitalAvailable}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, capital: { ...prev.capital, totalCapitalAvailable: val } }))}
+                    placeholder="$10,000,000"
+                    data-testid="input-total-capital"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Max Equity Per Deal</Label>
+                  <CurrencyInput
+                    value={criteria.capital.maxEquityPerDeal}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, capital: { ...prev.capital, maxEquityPerDeal: val } }))}
+                    placeholder="$5,000,000"
+                    data-testid="input-max-equity-per-deal"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Target LTV Ratio</Label>
+                  <PercentageInput
+                    value={criteria.capital.targetLtvRatio}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, capital: { ...prev.capital, targetLtvRatio: val } }))}
+                    placeholder="65.00%"
+                    data-testid="input-target-ltv"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Target Hold Period (years)</Label>
+                  <Input
+                    type="number"
+                    value={criteria.capital.targetHoldPeriod || ""}
+                    onChange={(e) => setCriteria(prev => ({ ...prev, capital: { ...prev.capital, targetHoldPeriod: e.target.value ? parseInt(e.target.value) : undefined } }))}
+                    placeholder="5"
+                    data-testid="input-hold-period"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Min Cash-on-Cash Return</Label>
+                  <PercentageInput
+                    value={criteria.capital.minCashOnCashReturn}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, capital: { ...prev.capital, minCashOnCashReturn: val } }))}
+                    placeholder="8.00%"
+                    data-testid="input-min-coc"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Min IRR Target</Label>
+                  <PercentageInput
+                    value={criteria.capital.minIrrTarget}
+                    onChange={(val) => setCriteria(prev => ({ ...prev, capital: { ...prev.capital, minIrrTarget: val } }))}
+                    placeholder="15.00%"
+                    data-testid="input-min-irr"
+                  />
+                </div>
+              </div>
+            </TabsContent>
+          </ScrollArea>
+        </Tabs>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} data-testid="button-cancel-create">
             Cancel
           </Button>
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" disabled={isLoading} data-testid="button-submit-create">
             {isLoading && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
             Create Profile
           </Button>
