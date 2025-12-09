@@ -20,8 +20,10 @@ import {
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
   Wrench, ArrowUpDown, Building, Info, Globe, Loader2,
-  Settings, ChevronDown, ChevronUp, Plus, Trash2, Check, X, Radar, Pencil, Mail, AlertTriangle
+  Settings, ChevronDown, ChevronUp, Plus, Check, X, Radar, Pencil, Mail, AlertTriangle, Flag, MessageSquareWarning
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { format, formatDistanceToNow } from "date-fns";
 
 interface MarinaListing {
@@ -274,6 +276,10 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
   });
   const [brokerSubmitOpen, setBrokerSubmitOpen] = useState(false);
   const [brokerForm, setBrokerForm] = useState<BrokerSubmitForm>(INITIAL_BROKER_FORM);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportingListing, setReportingListing] = useState<MarinaListing | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDetails, setReportDetails] = useState("");
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery<IntelAnalytics>({
     queryKey: ["/api/marinamatch/intel/analytics/overview"],
@@ -514,20 +520,55 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
     },
   });
 
-  const deleteListingMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/marinamatch/intel/listings/${id}`);
+  interface FeedbackReason {
+    value: string;
+    label: string;
+    description: string;
+  }
+
+  const { data: feedbackReasons } = useQuery<FeedbackReason[]>({
+    queryKey: ["/api/marinamatch/intel/feedback/reasons"],
+    staleTime: 300000,
+  });
+
+  const reportListingMutation = useMutation({
+    mutationFn: async (data: { listingId: string; reason: string; details?: string }) => {
+      return apiRequest("POST", "/api/marinamatch/intel/feedback", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
-      setSelectedListing(null);
-      toast({ title: "Listing deleted", description: "The listing has been removed successfully." });
+      setReportDialogOpen(false);
+      setReportingListing(null);
+      setReportReason("");
+      setReportDetails("");
+      toast({ 
+        title: "Report submitted", 
+        description: "Thank you for your feedback. It helps improve listing quality for everyone." 
+      });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to delete listing. Please try again.", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error?.message || "Failed to submit report. Please try again.", 
+        variant: "destructive" 
+      });
     },
   });
+
+  const openReportDialog = (listing: MarinaListing) => {
+    setReportingListing(listing);
+    setReportReason("");
+    setReportDetails("");
+    setReportDialogOpen(true);
+  };
+
+  const submitReport = () => {
+    if (!reportingListing || !reportReason) return;
+    reportListingMutation.mutate({
+      listingId: reportingListing.id,
+      reason: reportReason,
+      details: reportDetails || undefined,
+    });
+  };
 
   const filteredListings = listings?.filter(listing => {
     if (searchTerm && !listing.title.toLowerCase().includes(searchTerm.toLowerCase())) {
@@ -1795,17 +1836,15 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                className="h-7 w-7 text-muted-foreground hover:text-amber-600"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  if (confirm("Are you sure you want to delete this listing?")) {
-                                    deleteListingMutation.mutate(listing.id);
-                                  }
+                                  openReportDialog(listing);
                                 }}
-                                disabled={deleteListingMutation.isPending}
-                                data-testid={`button-delete-listing-${listing.id}`}
+                                title="Report an issue with this listing"
+                                data-testid={`button-report-listing-${listing.id}`}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Flag className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
@@ -1976,53 +2015,106 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                     </AlertDescription>
                   </Alert>
                   
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-center">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                       onClick={() => {
-                        if (confirm("Are you sure you want to delete this listing? This cannot be undone.")) {
-                          deleteListingMutation.mutate(selectedListing.id);
-                        }
+                        setSelectedListing(null);
+                        openReportDialog(selectedListing);
                       }}
-                      disabled={deleteListingMutation.isPending}
-                      data-testid="button-delete-listing-dialog"
+                      data-testid="button-report-listing-dialog"
                     >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      {deleteListingMutation.isPending ? "Deleting..." : "Delete Listing"}
+                      <Flag className="h-3 w-3 mr-1" />
+                      Report an Issue
                     </Button>
-                    
-                    {selectedListing.sourceUrl && !selectedListing.sourceUrl.startsWith("#") && !selectedListing.sourceUrl.startsWith("mailto:") && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-muted-foreground hover:text-amber-600"
-                        onClick={() => {
-                          const subject = encodeURIComponent(`Broken Link Report: ${selectedListing.title}`);
-                          const body = encodeURIComponent(
-                            `Listing Title: ${selectedListing.title}\n` +
-                            `Listing ID: ${selectedListing.id}\n` +
-                            `Source: ${selectedListing.sourcePlatform}\n` +
-                            `URL: ${selectedListing.sourceUrl}\n\n` +
-                            `Issue: [Please describe the issue with this link]\n`
-                          );
-                          window.location.href = `mailto:support@marinamatch.com?subject=${subject}&body=${body}`;
-                          toast({
-                            title: "Report sent",
-                            description: "Thank you for reporting this issue. We'll review the listing.",
-                          });
-                        }}
-                        data-testid="button-report-broken-link"
-                      >
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        Report Broken Link
-                      </Button>
-                    )}
                   </div>
                 </div>
               </div>
             </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Listing Issue Dialog */}
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquareWarning className="h-5 w-5 text-amber-500" />
+              Report Listing Issue
+            </DialogTitle>
+            <DialogDescription>
+              Help improve listing quality by reporting issues. Your feedback trains our system to automatically filter problematic listings.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {reportingListing && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="font-medium text-sm">{reportingListing.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {reportingListing.city}, {reportingListing.state} • via {reportingListing.sourcePlatform}
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">What's wrong with this listing?</Label>
+                <RadioGroup value={reportReason} onValueChange={setReportReason}>
+                  {feedbackReasons?.map((reason) => (
+                    <div key={reason.value} className="flex items-start space-x-3 py-1">
+                      <RadioGroupItem value={reason.value} id={reason.value} className="mt-0.5" />
+                      <div className="flex-1">
+                        <Label htmlFor={reason.value} className="text-sm font-normal cursor-pointer">
+                          {reason.label}
+                        </Label>
+                        <p className="text-xs text-muted-foreground">{reason.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+              
+              {reportReason === "other" && (
+                <div className="space-y-2">
+                  <Label className="text-sm">Additional details</Label>
+                  <Textarea
+                    value={reportDetails}
+                    onChange={(e) => setReportDetails(e.target.value)}
+                    placeholder="Please describe the issue..."
+                    className="resize-none"
+                    rows={3}
+                    data-testid="textarea-report-details"
+                  />
+                </div>
+              )}
+              
+              <div className="flex justify-end gap-2 pt-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setReportDialogOpen(false)}
+                  data-testid="button-cancel-report"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={submitReport}
+                  disabled={!reportReason || reportListingMutation.isPending}
+                  className="bg-amber-500 hover:bg-amber-600"
+                  data-testid="button-submit-report"
+                >
+                  {reportListingMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit Report"
+                  )}
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
