@@ -694,8 +694,8 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                               Last sync: {formatDistanceToNow(new Date(source.lastScrapeAt), { addSuffix: true })}
                             </span>
                           )}
-                          <span className="text-xs text-muted-foreground">
-                            {source.totalListingsFound} listings
+                          <span className="text-xs text-muted-foreground font-medium">
+                            {analytics?.listingsBySource?.[source.platform] || 0} listings
                           </span>
                           <Button
                             variant="ghost"
