@@ -20,6 +20,9 @@ import {
   marinaListingMatches,
   marinaMatchAlerts,
   marinaMatchAlertHistory,
+  marinaListingFeedback,
+  marinaAiFilterPatterns,
+  listingFeedbackReasons,
   insertMarinaListingSchema,
   updateMarinaListingSchema,
   insertInvestmentCriteriaProfileSchema,
@@ -30,10 +33,12 @@ import {
   updateMarinaScrapeSourceSchema,
   insertMarinaMatchAlertSchema,
   updateMarinaMatchAlertSchema,
+  insertListingFeedbackSchema,
   type MarinaListing,
   type InvestmentCriteriaProfile,
   type MarinaMatchGoal,
   type MarinaScrapeSource,
+  type ListingFeedback,
 } from "@shared/schema";
 import { getScrapeStatus, ensureListingsExist, getLastScrapeRun } from "./services/intel-cron";
 import { PLATFORM_CAPABILITIES, getPlatformCapabilities, getRecommendedMethod } from "./services/cre-scraper";
@@ -1683,6 +1688,319 @@ router.post("/seed-demo-data", async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error seeding demo data:", error);
     res.status(500).json({ error: error.message || "Failed to seed demo data" });
+  }
+});
+
+// ============================================
+// LISTING FEEDBACK SYSTEM
+// Global feedback collection for AI training
+// ============================================
+
+router.get("/feedback/reasons", async (req: Request, res: Response) => {
+  try {
+    const reasons = [
+      { value: "sold_closed", label: "Sold / Closed", description: "This listing has been sold or the deal is closed" },
+      { value: "under_contract", label: "Under Contract", description: "This listing is under contract or pending sale" },
+      { value: "off_market", label: "Off Market", description: "This listing is no longer actively for sale" },
+      { value: "duplicate_listing", label: "Duplicate", description: "This appears to be a duplicate of another listing" },
+      { value: "not_a_marina", label: "Not a Marina", description: "This is not a marina property" },
+      { value: "incorrect_information", label: "Incorrect Info", description: "The listing contains incorrect information" },
+      { value: "spam_or_fake", label: "Spam / Fake", description: "This appears to be spam or a fake listing" },
+      { value: "broken_link", label: "Broken Link", description: "The original listing link no longer works" },
+      { value: "other", label: "Other", description: "Other issue not listed above" },
+    ];
+    res.json(reasons);
+  } catch (error) {
+    console.error("Error fetching feedback reasons:", error);
+    res.status(500).json({ error: "Failed to fetch feedback reasons" });
+  }
+});
+
+router.post("/feedback", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    const { listingId, reason, customReason, details } = req.body;
+
+    if (!listingId || !reason) {
+      return res.status(400).json({ error: "listingId and reason are required" });
+    }
+
+    if (!listingFeedbackReasons.includes(reason)) {
+      return res.status(400).json({ error: "Invalid feedback reason" });
+    }
+
+    const listing = await db
+      .select()
+      .from(marinaListings)
+      .where(eq(marinaListings.id, listingId))
+      .limit(1);
+
+    if (!listing.length) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    const [feedback] = await db.insert(marinaListingFeedback).values({
+      listingId,
+      userId,
+      orgId,
+      reason,
+      customReason: customReason || null,
+      details: details || null,
+      listingTitle: listing[0].title,
+      listingSource: listing[0].sourcePlatform,
+      listingUrl: listing[0].sourceUrl,
+      status: "pending",
+    }).returning();
+
+    res.json({
+      success: true,
+      message: "Thank you for your feedback. It helps improve listing quality for everyone.",
+      feedbackId: feedback.id,
+    });
+  } catch (error: any) {
+    console.error("Error submitting feedback:", error);
+    res.status(500).json({ error: error.message || "Failed to submit feedback" });
+  }
+});
+
+router.get("/feedback", async (req: Request, res: Response) => {
+  try {
+    const { status, reason, page = "1", limit = "50" } = req.query;
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const offset = (pageNum - 1) * limitNum;
+
+    let conditions = [];
+    if (status) {
+      conditions.push(eq(marinaListingFeedback.status, status as string));
+    }
+    if (reason) {
+      conditions.push(eq(marinaListingFeedback.reason, reason as string));
+    }
+
+    const feedbackList = await db
+      .select()
+      .from(marinaListingFeedback)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(marinaListingFeedback.createdAt))
+      .limit(limitNum)
+      .offset(offset);
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(marinaListingFeedback)
+      .where(conditions.length ? and(...conditions) : undefined);
+
+    const [{ pendingCount }] = await db
+      .select({ pendingCount: sql<number>`count(*)::int` })
+      .from(marinaListingFeedback)
+      .where(eq(marinaListingFeedback.status, "pending"));
+
+    res.json({
+      feedback: feedbackList,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: count,
+        pages: Math.ceil(count / limitNum),
+      },
+      stats: {
+        pending: pendingCount,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error fetching feedback:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch feedback" });
+  }
+});
+
+router.get("/feedback/stats", async (req: Request, res: Response) => {
+  try {
+    const [totals] = await db
+      .select({ 
+        total: sql<number>`count(*)::int`,
+        pending: sql<number>`count(*) filter (where status = 'pending')::int`,
+        approved: sql<number>`count(*) filter (where status = 'approved')::int`,
+        dismissed: sql<number>`count(*) filter (where status = 'dismissed')::int`,
+      })
+      .from(marinaListingFeedback);
+
+    const byReason = await db
+      .select({
+        reason: marinaListingFeedback.reason,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(marinaListingFeedback)
+      .groupBy(marinaListingFeedback.reason)
+      .orderBy(desc(sql`count(*)`));
+
+    const bySource = await db
+      .select({
+        source: marinaListingFeedback.listingSource,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(marinaListingFeedback)
+      .groupBy(marinaListingFeedback.listingSource)
+      .orderBy(desc(sql`count(*)`));
+
+    const [patterns] = await db
+      .select({ 
+        totalPatterns: sql<number>`count(*)::int`,
+        activePatterns: sql<number>`count(*) filter (where is_active = true)::int`,
+      })
+      .from(marinaAiFilterPatterns);
+
+    res.json({
+      totals,
+      byReason,
+      bySource,
+      patterns,
+    });
+  } catch (error: any) {
+    console.error("Error fetching feedback stats:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch feedback stats" });
+  }
+});
+
+router.patch("/feedback/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = getUserId(req);
+    const { status, reviewNotes, createPattern } = req.body;
+
+    if (!status || !["approved", "dismissed"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status. Must be 'approved' or 'dismissed'" });
+    }
+
+    const [feedback] = await db
+      .select()
+      .from(marinaListingFeedback)
+      .where(eq(marinaListingFeedback.id, id))
+      .limit(1);
+
+    if (!feedback) {
+      return res.status(404).json({ error: "Feedback not found" });
+    }
+
+    const [updated] = await db
+      .update(marinaListingFeedback)
+      .set({
+        status,
+        reviewedBy: userId,
+        reviewedAt: new Date(),
+        reviewNotes: reviewNotes || null,
+      })
+      .where(eq(marinaListingFeedback.id, id))
+      .returning();
+
+    if (status === "approved" && createPattern && feedback.listingTitle) {
+      const titleWords = feedback.listingTitle.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const patternKeywords = titleWords.slice(0, 5).join(" ");
+      
+      if (patternKeywords) {
+        await db.insert(marinaAiFilterPatterns).values({
+          patternType: "title_keyword",
+          pattern: patternKeywords,
+          reason: feedback.reason,
+          source: feedback.listingSource || undefined,
+          createdFromFeedbackId: feedback.id,
+          isActive: true,
+          confidence: "0.75",
+        });
+
+        await db
+          .update(marinaListingFeedback)
+          .set({ aiPatternApplied: true })
+          .where(eq(marinaListingFeedback.id, id));
+      }
+    }
+
+    if (status === "approved") {
+      await db
+        .update(marinaListings)
+        .set({ status: "removed" })
+        .where(eq(marinaListings.id, feedback.listingId));
+    }
+
+    res.json({
+      success: true,
+      feedback: updated,
+      message: status === "approved" 
+        ? "Feedback approved. Listing marked as removed." 
+        : "Feedback dismissed.",
+    });
+  } catch (error: any) {
+    console.error("Error updating feedback:", error);
+    res.status(500).json({ error: error.message || "Failed to update feedback" });
+  }
+});
+
+router.get("/ai-patterns", async (req: Request, res: Response) => {
+  try {
+    const { active, patternType, limit = "100" } = req.query;
+    
+    let conditions = [];
+    if (active === "true") {
+      conditions.push(eq(marinaAiFilterPatterns.isActive, true));
+    }
+    if (patternType) {
+      conditions.push(eq(marinaAiFilterPatterns.patternType, patternType as string));
+    }
+
+    const patterns = await db
+      .select()
+      .from(marinaAiFilterPatterns)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(marinaAiFilterPatterns.feedbackCount), desc(marinaAiFilterPatterns.createdAt))
+      .limit(parseInt(limit as string));
+
+    res.json(patterns);
+  } catch (error: any) {
+    console.error("Error fetching AI patterns:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch AI patterns" });
+  }
+});
+
+router.patch("/ai-patterns/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { isActive, pattern, confidence } = req.body;
+
+    const updates: any = { updatedAt: new Date() };
+    if (typeof isActive === "boolean") updates.isActive = isActive;
+    if (pattern) updates.pattern = pattern;
+    if (confidence) updates.confidence = confidence;
+
+    const [updated] = await db
+      .update(marinaAiFilterPatterns)
+      .set(updates)
+      .where(eq(marinaAiFilterPatterns.id, id))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "Pattern not found" });
+    }
+
+    res.json(updated);
+  } catch (error: any) {
+    console.error("Error updating AI pattern:", error);
+    res.status(500).json({ error: error.message || "Failed to update AI pattern" });
+  }
+});
+
+router.delete("/ai-patterns/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    await db
+      .delete(marinaAiFilterPatterns)
+      .where(eq(marinaAiFilterPatterns.id, id));
+
+    res.json({ success: true, message: "Pattern deleted" });
+  } catch (error: any) {
+    console.error("Error deleting AI pattern:", error);
+    res.status(500).json({ error: error.message || "Failed to delete AI pattern" });
   }
 });
 
