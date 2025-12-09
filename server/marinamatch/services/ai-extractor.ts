@@ -153,13 +153,14 @@ For EACH marina listing found, extract:
 
 RULES:
 1. ONLY extract marina/boatyard/yacht club properties - skip warehouses, RV parks, apartments
-2. Convert ALL prices to numbers (no $, commas, or text)
-3. Calculate pricePerSlip = askingPrice / totalSlips when both available
-4. Look for images marked as [IMAGE: url] and extract the best property photo as heroImageUrl
-5. Parse amenities from description text carefully - look for keywords
-6. Extract ALL services mentioned, even if in passing
-7. For occupancy, look for "X% occupied", "X slips rented", waitlist mentions
-8. Provide high confidence (80+) only when data is clearly stated, not inferred
+2. SKIP SOLD LISTINGS: Do NOT extract any listing marked as "Sold", "Closed", "Recently Sold", "Recently Closed", "Under Contract", "Pending Sale", or "Sale Pending". Only extract ACTIVE listings that are currently for sale.
+3. Convert ALL prices to numbers (no $, commas, or text)
+4. Calculate pricePerSlip = askingPrice / totalSlips when both available
+5. Look for images marked as [IMAGE: url] and extract the best property photo as heroImageUrl
+6. Parse amenities from description text carefully - look for keywords
+7. Extract ALL services mentioned, even if in passing
+8. For occupancy, look for "X% occupied", "X slips rented", waitlist mentions
+9. Provide high confidence (80+) only when data is clearly stated, not inferred
 
 EXAMPLE OUTPUT:
 {

@@ -204,6 +204,38 @@ function detectAmenities(text: string): Partial<ListingData> {
   };
 }
 
+// Default sold/closed status keywords to always exclude
+const SOLD_STATUS_KEYWORDS = [
+  "sold",
+  "closed",
+  "recently sold",
+  "recently closed",
+  "under contract",
+  "pending sale",
+  "sale pending",
+  "pending",
+  "off market",
+  "no longer available",
+];
+
+// Check if a listing appears to be sold/closed
+function isSoldListing(listing: ListingData): { isSold: boolean; matchedKeyword?: string } {
+  const searchableText = [
+    listing.title || "",
+    listing.propertyName || "",
+    listing.originalDescription || "",
+    listing.dealType || "",
+  ].join(" ").toLowerCase();
+  
+  for (const keyword of SOLD_STATUS_KEYWORDS) {
+    if (searchableText.includes(keyword.toLowerCase())) {
+      return { isSold: true, matchedKeyword: keyword };
+    }
+  }
+  
+  return { isSold: false };
+}
+
 // Source Configuration interface for filtering
 export interface SourceConfig {
   keywordsInclude?: string[];
@@ -214,6 +246,7 @@ export interface SourceConfig {
   minSlips?: number;
   maxSlips?: number;
   propertyType?: string;
+  includeSoldListings?: boolean; // Default false - only show active listings
 }
 
 // Marina-focused keyword adapter - applies source filters to listings
@@ -221,6 +254,14 @@ export function applyMarinaKeywordFilter(
   listing: ListingData,
   config: SourceConfig
 ): { include: boolean; reason?: string } {
+  // FIRST: Check for sold/closed status (default behavior excludes sold listings)
+  if (!config.includeSoldListings) {
+    const soldCheck = isSoldListing(listing);
+    if (soldCheck.isSold) {
+      return { include: false, reason: `Listing appears to be sold/closed: matched "${soldCheck.matchedKeyword}"` };
+    }
+  }
+  
   const searchableText = [
     listing.title || "",
     listing.propertyName || "",
