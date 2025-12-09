@@ -1753,13 +1753,26 @@ router.post("/feedback", async (req: Request, res: Response) => {
       status: "pending",
     }).returning();
 
+    // Log feedback submission for audit trail and AI training pipeline
+    console.log(`[MarinaMatch Intel] Feedback submitted:`, {
+      feedbackId: feedback.id,
+      listingId,
+      reason,
+      listingTitle: listing[0].title,
+      listingSource: listing[0].sourcePlatform,
+      userId,
+      orgId,
+      timestamp: new Date().toISOString(),
+      aiTrainingStatus: "pending_review",
+    });
+
     res.json({
       success: true,
       message: "Thank you for your feedback. It helps improve listing quality for everyone.",
       feedbackId: feedback.id,
     });
   } catch (error: any) {
-    console.error("Error submitting feedback:", error);
+    console.error("[MarinaMatch Intel] Error submitting feedback:", error);
     res.status(500).json({ error: error.message || "Failed to submit feedback" });
   }
 });
@@ -1899,7 +1912,7 @@ router.patch("/feedback/:id", async (req: Request, res: Response) => {
       const patternKeywords = titleWords.slice(0, 5).join(" ");
       
       if (patternKeywords) {
-        await db.insert(marinaAiFilterPatterns).values({
+        const [newPattern] = await db.insert(marinaAiFilterPatterns).values({
           patternType: "title_keyword",
           pattern: patternKeywords,
           reason: feedback.reason,
@@ -1907,7 +1920,7 @@ router.patch("/feedback/:id", async (req: Request, res: Response) => {
           createdFromFeedbackId: feedback.id,
           isActive: true,
           confidence: "0.75",
-        });
+        }).returning();
 
         await db
           .update(marinaListingFeedback)
@@ -1916,8 +1929,32 @@ router.patch("/feedback/:id", async (req: Request, res: Response) => {
 
         // Invalidate cache so new pattern takes effect immediately
         invalidateLearnedPatternsCache();
+
+        // Log AI pattern creation for training audit
+        console.log(`[MarinaMatch Intel] AI Pattern Created from Feedback:`, {
+          patternId: newPattern.id,
+          patternType: "title_keyword",
+          pattern: patternKeywords,
+          reason: feedback.reason,
+          source: feedback.listingSource,
+          feedbackId: feedback.id,
+          reviewedBy: userId,
+          timestamp: new Date().toISOString(),
+          aiTrainingStatus: "pattern_active",
+        });
       }
     }
+
+    // Log feedback review action
+    console.log(`[MarinaMatch Intel] Feedback Reviewed:`, {
+      feedbackId: id,
+      status,
+      reason: feedback.reason,
+      listingTitle: feedback.listingTitle,
+      reviewedBy: userId,
+      patternCreated: status === "approved" && createPattern,
+      timestamp: new Date().toISOString(),
+    });
 
     if (status === "approved") {
       await db
@@ -1934,7 +1971,7 @@ router.patch("/feedback/:id", async (req: Request, res: Response) => {
         : "Feedback dismissed.",
     });
   } catch (error: any) {
-    console.error("Error updating feedback:", error);
+    console.error("[MarinaMatch Intel] Error updating feedback:", error);
     res.status(500).json({ error: error.message || "Failed to update feedback" });
   }
 });

@@ -2039,83 +2039,92 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
 
       {/* Report Listing Issue Dialog */}
       <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <MessageSquareWarning className="h-5 w-5 text-amber-500" />
               Report Listing Issue
             </DialogTitle>
             <DialogDescription>
-              Help improve listing quality by reporting issues. Your feedback trains our system to automatically filter problematic listings.
+              Help improve listing quality by reporting issues. Your feedback trains our AI to automatically filter problematic listings for all users.
             </DialogDescription>
           </DialogHeader>
           
           {reportingListing && (
-            <div className="space-y-4 py-2">
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="font-medium text-sm">{reportingListing.title}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {reportingListing.city}, {reportingListing.state} • via {reportingListing.sourcePlatform}
-                </p>
-              </div>
-              
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">What's wrong with this listing?</Label>
-                <RadioGroup value={reportReason} onValueChange={setReportReason}>
-                  {feedbackReasons?.map((reason) => (
-                    <div key={reason.value} className="flex items-start space-x-3 py-1">
-                      <RadioGroupItem value={reason.value} id={reason.value} className="mt-0.5" />
-                      <div className="flex-1">
-                        <Label htmlFor={reason.value} className="text-sm font-normal cursor-pointer">
-                          {reason.label}
-                        </Label>
-                        <p className="text-xs text-muted-foreground">{reason.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </RadioGroup>
-              </div>
-              
-              {reportReason === "other" && (
-                <div className="space-y-2">
-                  <Label className="text-sm">Additional details</Label>
-                  <Textarea
-                    value={reportDetails}
-                    onChange={(e) => setReportDetails(e.target.value)}
-                    placeholder="Please describe the issue..."
-                    className="resize-none"
-                    rows={3}
-                    data-testid="textarea-report-details"
-                  />
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-4 py-2">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="font-medium text-sm">{reportingListing.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {reportingListing.city}, {reportingListing.state} • via {reportingListing.sourcePlatform}
+                  </p>
                 </div>
-              )}
-              
-              <div className="flex justify-end gap-2 pt-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setReportDialogOpen(false)}
-                  data-testid="button-cancel-report"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={submitReport}
-                  disabled={!reportReason || reportListingMutation.isPending}
-                  className="bg-amber-500 hover:bg-amber-600"
-                  data-testid="button-submit-report"
-                >
-                  {reportListingMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    "Submit Report"
-                  )}
-                </Button>
+                
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">What's wrong with this listing?</Label>
+                  <RadioGroup value={reportReason} onValueChange={setReportReason}>
+                    {feedbackReasons?.map((reason) => (
+                      <div key={reason.value} className="flex items-start space-x-3 py-1">
+                        <RadioGroupItem value={reason.value} id={reason.value} className="mt-0.5" />
+                        <div className="flex-1">
+                          <Label htmlFor={reason.value} className="text-sm font-normal cursor-pointer">
+                            {reason.label}
+                          </Label>
+                          <p className="text-xs text-muted-foreground">{reason.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+                
+                {reportReason === "other" && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Additional details</Label>
+                    <Textarea
+                      value={reportDetails}
+                      onChange={(e) => setReportDetails(e.target.value)}
+                      placeholder="Please describe the issue..."
+                      className="resize-none"
+                      rows={3}
+                      data-testid="textarea-report-details"
+                    />
+                  </div>
+                )}
+                
+                <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
+                  <Info className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-xs text-muted-foreground">
+                    Your report will be reviewed by our team. When approved, it trains our AI to automatically filter similar listings, improving quality for all users.
+                  </AlertDescription>
+                </Alert>
               </div>
-            </div>
+            </ScrollArea>
           )}
+          
+          <div className="flex justify-end gap-2 pt-4 border-t flex-shrink-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setReportDialogOpen(false)}
+              data-testid="button-cancel-report"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={submitReport}
+              disabled={!reportReason || reportListingMutation.isPending}
+              className="bg-amber-500 hover:bg-amber-600"
+              data-testid="button-submit-report"
+            >
+              {reportListingMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Report"
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
