@@ -514,6 +514,21 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
     },
   });
 
+  const deleteListingMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/marinamatch/intel/listings/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
+      setSelectedListing(null);
+      toast({ title: "Listing deleted", description: "The listing has been removed successfully." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete listing. Please try again.", variant: "destructive" });
+    },
+  });
+
   const filteredListings = listings?.filter(listing => {
     if (searchTerm && !listing.title.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
@@ -1728,54 +1743,71 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                             </div>
                           </div>
 
-                          {/* Right side - View button */}
+                          {/* Right side - View button and Delete */}
                           <div className="text-right flex flex-col items-end gap-2">
-                            {listing.sourceUrl?.startsWith("mailto:") ? (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="text-xs h-7"
-                                asChild
-                                data-testid={`button-contact-broker-${listing.id}`}
-                              >
-                                <a 
-                                  href={listing.sourceUrl} 
-                                  onClick={(e) => e.stopPropagation()}
+                            <div className="flex items-center gap-1">
+                              {listing.sourceUrl?.startsWith("mailto:") ? (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="text-xs h-7"
+                                  asChild
+                                  data-testid={`button-contact-broker-${listing.id}`}
                                 >
-                                  <Mail className="h-3 w-3 mr-1" />
-                                  Contact Broker
-                                </a>
-                              </Button>
-                            ) : listing.sourceUrl?.startsWith("#") || !listing.sourceUrl ? (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="text-xs h-7"
-                                disabled
-                                data-testid={`button-direct-listing-${listing.id}`}
-                              >
-                                <Anchor className="h-3 w-3 mr-1" />
-                                Direct Listing
-                              </Button>
-                            ) : (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="text-xs h-7"
-                                asChild
-                                data-testid={`button-view-original-${listing.id}`}
-                              >
-                                <a 
-                                  href={listing.sourceUrl} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
+                                  <a 
+                                    href={listing.sourceUrl} 
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Mail className="h-3 w-3 mr-1" />
+                                    Contact Broker
+                                  </a>
+                                </Button>
+                              ) : listing.sourceUrl?.startsWith("#") || !listing.sourceUrl ? (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="text-xs h-7"
+                                  disabled
+                                  data-testid={`button-direct-listing-${listing.id}`}
                                 >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  View Original
-                                </a>
+                                  <Anchor className="h-3 w-3 mr-1" />
+                                  Direct Listing
+                                </Button>
+                              ) : (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="text-xs h-7"
+                                  asChild
+                                  data-testid={`button-view-original-${listing.id}`}
+                                >
+                                  <a 
+                                    href={listing.sourceUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    View Original
+                                  </a>
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm("Are you sure you want to delete this listing?")) {
+                                    deleteListingMutation.mutate(listing.id);
+                                  }
+                                }}
+                                disabled={deleteListingMutation.isPending}
+                                data-testid={`button-delete-listing-${listing.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
-                            )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1944,12 +1976,28 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                     </AlertDescription>
                   </Alert>
                   
-                  {selectedListing.sourceUrl && !selectedListing.sourceUrl.startsWith("#") && !selectedListing.sourceUrl.startsWith("mailto:") && (
-                    <div className="flex justify-end">
+                  <div className="flex justify-between items-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to delete this listing? This cannot be undone.")) {
+                          deleteListingMutation.mutate(selectedListing.id);
+                        }
+                      }}
+                      disabled={deleteListingMutation.isPending}
+                      data-testid="button-delete-listing-dialog"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      {deleteListingMutation.isPending ? "Deleting..." : "Delete Listing"}
+                    </Button>
+                    
+                    {selectedListing.sourceUrl && !selectedListing.sourceUrl.startsWith("#") && !selectedListing.sourceUrl.startsWith("mailto:") && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-xs text-muted-foreground hover:text-destructive"
+                        className="text-xs text-muted-foreground hover:text-amber-600"
                         onClick={() => {
                           const subject = encodeURIComponent(`Broken Link Report: ${selectedListing.title}`);
                           const body = encodeURIComponent(
@@ -1970,8 +2018,8 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                         <AlertTriangle className="h-3 w-3 mr-1" />
                         Report Broken Link
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </>
