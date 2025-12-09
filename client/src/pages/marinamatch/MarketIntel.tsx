@@ -2080,19 +2080,17 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                   </RadioGroup>
                 </div>
                 
-                {reportReason === "other" && (
-                  <div className="space-y-2">
-                    <Label className="text-sm">Additional details</Label>
-                    <Textarea
-                      value={reportDetails}
-                      onChange={(e) => setReportDetails(e.target.value)}
-                      placeholder="Please describe the issue..."
-                      className="resize-none"
-                      rows={3}
-                      data-testid="textarea-report-details"
-                    />
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label className="text-sm">Notes (optional)</Label>
+                  <Textarea
+                    value={reportDetails}
+                    onChange={(e) => setReportDetails(e.target.value)}
+                    placeholder="e.g., wrong picture, wrong price, outdated info..."
+                    className="resize-none"
+                    rows={2}
+                    data-testid="textarea-report-details"
+                  />
+                </div>
                 
                 <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
                   <Info className="h-4 w-4 text-blue-600" />
