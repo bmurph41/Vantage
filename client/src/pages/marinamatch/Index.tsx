@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Target, Users, TrendingUp, Rss, FileText, BarChart3, Radar, Goal, Settings2, Briefcase } from "lucide-react";
+import { Building2, Target, Users, TrendingUp, Rss, FileText, BarChart3, Radar, Goal, Settings2, Briefcase, MessageSquareWarning } from "lucide-react";
 import { DealSourcesTab } from "./DealSources";
 import { MandatesTab } from "./Mandates";
 import { DealTrackerTab } from "./DealTracker";
@@ -13,6 +13,7 @@ import { BrokersTab } from "./Brokers";
 import { MarketIntelTab } from "./MarketIntel";
 import { InvestmentCriteriaTab } from "./InvestmentCriteria";
 import { GoalsDashboard } from "./GoalsDashboard";
+import { FeedbackAdminTab } from "./FeedbackAdmin";
 
 function ConsolidatedInvestmentCriteria() {
   const [subTab, setSubTab] = useState("mandates");
@@ -284,7 +285,7 @@ export default function MarinaMatchIndex() {
   const getTabFromUrl = () => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
-    const validTabs = ["listings", "criteria", "deals"];
+    const validTabs = ["listings", "criteria", "deals", "feedback"];
     return tab && validTabs.includes(tab) ? tab : "listings";
   };
   
@@ -348,6 +349,14 @@ export default function MarinaMatchIndex() {
               <Briefcase className="h-4 w-4 mr-2" />
               Deal Management
             </TabsTrigger>
+            <TabsTrigger 
+              value="feedback" 
+              className="data-[state=active]:bg-background"
+              data-testid="tab-feedback"
+            >
+              <MessageSquareWarning className="h-4 w-4 mr-2" />
+              Feedback Admin
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="listings">
@@ -360,6 +369,10 @@ export default function MarinaMatchIndex() {
 
           <TabsContent value="deals">
             <DealManagement />
+          </TabsContent>
+
+          <TabsContent value="feedback">
+            <FeedbackAdminTab />
           </TabsContent>
         </Tabs>
       </div>
