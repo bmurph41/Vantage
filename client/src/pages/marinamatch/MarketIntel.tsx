@@ -535,14 +535,17 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
     mutationFn: async (data: { listingId: string; reason: string; details?: string }) => {
       return apiRequest("POST", "/api/marinamatch/intel/feedback", data);
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       setReportDialogOpen(false);
       setReportingListing(null);
       setReportReason("");
       setReportDetails("");
+      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
       toast({ 
-        title: "Report submitted", 
-        description: "Thank you for your feedback. It helps improve listing quality for everyone." 
+        title: data?.autoApproved ? "Listing removed for all users" : "Listing removed from your feed", 
+        description: data?.autoApproved 
+          ? "Multiple users reported this listing - it has been removed for everyone."
+          : "Thank you for your feedback. This listing has been hidden from your feed." 
       });
     },
     onError: (error: any) => {
@@ -2039,7 +2042,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
 
       {/* Report Listing Issue Dialog */}
       <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
-        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <MessageSquareWarning className="h-5 w-5 text-amber-500" />
@@ -2051,7 +2054,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
           </DialogHeader>
           
           {reportingListing && (
-            <ScrollArea className="flex-1 pr-4">
+            <ScrollArea className="flex-1 min-h-0 pr-4">
               <div className="space-y-4 py-2">
                 <div className="p-3 bg-muted/50 rounded-lg">
                   <p className="font-medium text-sm">{reportingListing.title}</p>

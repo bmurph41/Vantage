@@ -14975,6 +14975,20 @@ export const marinaAiFilterPatterns = pgTable("marina_ai_filter_patterns", {
   activeIdx: index("ai_pattern_active_idx").on(table.isActive),
 }));
 
+export const userHiddenListings = pgTable("user_hidden_listings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  userId: varchar("user_id").notNull(),
+  orgId: varchar("org_id").notNull(),
+  listingId: varchar("listing_id").notNull().references(() => marinaListings.id, { onDelete: "cascade" }),
+  reason: varchar("reason", { length: 50 }),
+  hiddenAt: timestamp("hidden_at").notNull().defaultNow(),
+}, (table) => ({
+  userListingIdx: index("user_hidden_listing_idx").on(table.userId, table.listingId),
+  orgListingIdx: index("org_hidden_listing_idx").on(table.orgId, table.listingId),
+}));
+
+export type UserHiddenListing = typeof userHiddenListings.$inferSelect;
+
 export const insertListingFeedbackSchema = createInsertSchema(marinaListingFeedback).omit({
   id: true,
   createdAt: true,

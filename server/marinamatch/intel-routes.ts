@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
-import { eq, and, desc, asc, sql, gte, lte, like, or, isNull, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, gte, lte, like, or, isNull, inArray, notInArray, ne } from "drizzle-orm";
 import crypto from "crypto";
 import { validateListingUrl, validateUrlAccessibility, getPlatformFromUrl } from "./utils/url-validation";
 import {
@@ -22,6 +22,7 @@ import {
   marinaMatchAlertHistory,
   marinaListingFeedback,
   marinaAiFilterPatterns,
+  userHiddenListings,
   listingFeedbackReasons,
   insertMarinaListingSchema,
   updateMarinaListingSchema,
@@ -122,6 +123,7 @@ router.get("/sync-status", async (req: Request, res: Response) => {
 router.get("/listings", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
+    const userId = getUserId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
     const { status, state, city, source, minScore, sortBy, limit = "100", offset = "0" } = req.query;
@@ -142,6 +144,20 @@ router.get("/listings", async (req: Request, res: Response) => {
     }
     if (minScore && parseInt(minScore as string) > 0) {
       conditions.push(gte(marinaListings.bestMatchScore, parseInt(minScore as string)));
+    }
+
+    // Filter out listings hidden by the current user
+    let hiddenListingIds: string[] = [];
+    if (userId) {
+      const hiddenListings = await db
+        .select({ listingId: userHiddenListings.listingId })
+        .from(userHiddenListings)
+        .where(eq(userHiddenListings.userId, userId));
+      hiddenListingIds = hiddenListings.map(h => h.listingId);
+    }
+
+    if (hiddenListingIds.length > 0) {
+      conditions.push(sql`${marinaListings.id} NOT IN (${sql.join(hiddenListingIds.map(id => sql`${id}`), sql`, `)})`);
     }
 
     const listings = await db
@@ -1716,6 +1732,8 @@ router.get("/feedback/reasons", async (req: Request, res: Response) => {
   }
 });
 
+const AUTO_APPROVAL_THRESHOLD = 3;
+
 router.post("/feedback", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
@@ -1753,6 +1771,81 @@ router.post("/feedback", async (req: Request, res: Response) => {
       status: "pending",
     }).returning();
 
+    // Immediately hide the listing from the reporting user's feed
+    if (userId && orgId) {
+      const existingHidden = await db
+        .select()
+        .from(userHiddenListings)
+        .where(and(
+          eq(userHiddenListings.userId, userId),
+          eq(userHiddenListings.listingId, listingId)
+        ))
+        .limit(1);
+
+      if (!existingHidden.length) {
+        await db.insert(userHiddenListings).values({
+          userId,
+          orgId,
+          listingId,
+          reason,
+        });
+        console.log(`[MarinaMatch Intel] Listing hidden from user feed:`, { userId, listingId, reason });
+      }
+    }
+
+    // Check for auto-approval threshold
+    const [{ feedbackCount }] = await db
+      .select({ feedbackCount: sql<number>`count(DISTINCT user_id)::int` })
+      .from(marinaListingFeedback)
+      .where(and(
+        eq(marinaListingFeedback.listingId, listingId),
+        eq(marinaListingFeedback.status, "pending")
+      ));
+
+    let autoApproved = false;
+    if (feedbackCount >= AUTO_APPROVAL_THRESHOLD) {
+      // Auto-approve: enough users have reported the same listing
+      await db
+        .update(marinaListingFeedback)
+        .set({ status: "approved", reviewNotes: "Auto-approved: threshold reached" })
+        .where(and(
+          eq(marinaListingFeedback.listingId, listingId),
+          eq(marinaListingFeedback.status, "pending")
+        ));
+
+      // Mark the listing as removed
+      await db
+        .update(marinaListings)
+        .set({ status: "removed" })
+        .where(eq(marinaListings.id, listingId));
+
+      // Create an AI pattern for this listing to filter similar ones
+      const patternData = {
+        patternType: "listing_url",
+        pattern: listing[0].sourceUrl || "",
+        reason,
+        source: listing[0].sourcePlatform,
+        feedbackCount,
+        isActive: true,
+        confidence: "1.00",
+        createdFromFeedbackId: feedback.id,
+      };
+
+      await db.insert(marinaAiFilterPatterns).values(patternData);
+
+      // Invalidate learned patterns cache
+      invalidateLearnedPatternsCache();
+
+      autoApproved = true;
+      console.log(`[MarinaMatch Intel] Auto-approved feedback - threshold reached:`, {
+        listingId,
+        feedbackCount,
+        threshold: AUTO_APPROVAL_THRESHOLD,
+        listingRemoved: true,
+        patternCreated: true,
+      });
+    }
+
     // Log feedback submission for audit trail and AI training pipeline
     console.log(`[MarinaMatch Intel] Feedback submitted:`, {
       feedbackId: feedback.id,
@@ -1763,13 +1856,18 @@ router.post("/feedback", async (req: Request, res: Response) => {
       userId,
       orgId,
       timestamp: new Date().toISOString(),
-      aiTrainingStatus: "pending_review",
+      aiTrainingStatus: autoApproved ? "auto_approved" : "pending_review",
+      hiddenFromUserFeed: true,
     });
 
     res.json({
       success: true,
-      message: "Thank you for your feedback. It helps improve listing quality for everyone.",
+      message: autoApproved 
+        ? "Thank you! Multiple users reported this listing - it has been removed for all users."
+        : "Thank you for your feedback. This listing has been removed from your feed.",
       feedbackId: feedback.id,
+      listingHidden: true,
+      autoApproved,
     });
   } catch (error: any) {
     console.error("[MarinaMatch Intel] Error submitting feedback:", error);
