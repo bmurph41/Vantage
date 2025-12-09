@@ -9,8 +9,10 @@ import {
   marinaScrapeRuns,
   investmentCriteriaProfiles,
   marinaListingMatches,
+  marinaAiFilterPatterns,
   type MarinaListing,
   type MarinaScrapeSource,
+  type AiFilterPattern,
 } from "@shared/schema";
 import { extractListingsWithAI, validateExtractedListing, type ExtractedListing } from "./ai-extractor";
 import { MultiPageCrawler, discoverListingUrls, estimateCrawlCost, type CrawlConfig } from "./multi-page-crawler";
@@ -236,6 +238,105 @@ function isSoldListing(listing: ListingData): { isSold: boolean; matchedKeyword?
   return { isSold: false };
 }
 
+// Cache for learned AI filter patterns (refreshed every 5 minutes)
+let learnedPatternsCache: AiFilterPattern[] = [];
+let learnedPatternsCacheTime = 0;
+const PATTERN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Export function to invalidate cache when admin updates patterns
+export function invalidateLearnedPatternsCache() {
+  learnedPatternsCacheTime = 0;
+  learnedPatternsCache = [];
+  console.log("[AI Filter] Pattern cache invalidated");
+}
+
+// Load active learned patterns from database
+async function loadLearnedPatterns(): Promise<AiFilterPattern[]> {
+  const now = Date.now();
+  if (now - learnedPatternsCacheTime < PATTERN_CACHE_TTL && learnedPatternsCache.length > 0) {
+    return learnedPatternsCache;
+  }
+  
+  try {
+    const patterns = await db
+      .select()
+      .from(marinaAiFilterPatterns)
+      .where(eq(marinaAiFilterPatterns.isActive, true));
+    
+    learnedPatternsCache = patterns;
+    learnedPatternsCacheTime = now;
+    console.log(`[AI Filter] Loaded ${patterns.length} active learned patterns`);
+    return patterns;
+  } catch (error) {
+    console.error("[AI Filter] Failed to load patterns:", error);
+    return learnedPatternsCache;
+  }
+}
+
+// Check if listing matches any learned AI filter patterns
+function matchesLearnedPattern(
+  listing: ListingData, 
+  patterns: AiFilterPattern[]
+): { matched: boolean; pattern?: AiFilterPattern; reason?: string } {
+  if (!patterns.length) return { matched: false };
+  
+  const searchableText = [
+    listing.title || "",
+    listing.propertyName || "",
+    listing.originalDescription || "",
+  ].join(" ").toLowerCase();
+  
+  for (const pattern of patterns) {
+    if (pattern.patternType === "title_keyword") {
+      const patternWords = pattern.pattern.toLowerCase().split(/\s+/);
+      const matchCount = patternWords.filter(word => 
+        word.length > 3 && searchableText.includes(word)
+      ).length;
+      
+      // Require at least 60% of pattern words to match
+      const matchThreshold = Math.ceil(patternWords.length * 0.6);
+      if (matchCount >= matchThreshold) {
+        // Also check source if pattern has a specific source
+        if (pattern.source && listing.sourceUrl) {
+          const listingSource = extractPlatformFromUrl(listing.sourceUrl);
+          if (listingSource?.toLowerCase() !== pattern.source.toLowerCase()) {
+            continue; // Skip if source doesn't match
+          }
+        }
+        return { 
+          matched: true, 
+          pattern, 
+          reason: `Matched learned pattern: "${pattern.pattern}" (reason: ${pattern.reason})` 
+        };
+      }
+    } else if (pattern.patternType === "exact_phrase") {
+      if (searchableText.includes(pattern.pattern.toLowerCase())) {
+        return {
+          matched: true,
+          pattern,
+          reason: `Matched exact phrase: "${pattern.pattern}" (reason: ${pattern.reason})`
+        };
+      }
+    }
+  }
+  
+  return { matched: false };
+}
+
+// Helper to extract platform from URL
+function extractPlatformFromUrl(url: string): string | undefined {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    if (hostname.includes("loopnet")) return "LoopNet";
+    if (hostname.includes("crexi")) return "Crexi";
+    if (hostname.includes("bizbuysell")) return "BizBuySell";
+    if (hostname.includes("costar")) return "CoStar";
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // Source Configuration interface for filtering
 export interface SourceConfig {
   keywordsInclude?: string[];
@@ -320,6 +421,29 @@ export function applyMarinaKeywordFilter(
     }
     if (config.maxSlips && slipCount > config.maxSlips) {
       return { include: false, reason: `Slip count ${slipCount} above maximum ${config.maxSlips}` };
+    }
+  }
+  
+  return { include: true };
+}
+
+// Async version that also checks learned AI patterns
+export async function applyMarinaKeywordFilterWithPatterns(
+  listing: ListingData,
+  config: SourceConfig
+): Promise<{ include: boolean; reason?: string }> {
+  // First apply standard filters
+  const standardResult = applyMarinaKeywordFilter(listing, config);
+  if (!standardResult.include) {
+    return standardResult;
+  }
+  
+  // Then check learned patterns
+  const patterns = await loadLearnedPatterns();
+  if (patterns.length > 0) {
+    const patternMatch = matchesLearnedPattern(listing, patterns);
+    if (patternMatch.matched) {
+      return { include: false, reason: patternMatch.reason };
     }
   }
   
@@ -1160,21 +1284,23 @@ export async function runScrapeJob(
             }
         }
         
-        // Apply source configuration filters if available
+        // Apply source configuration filters if available (including learned AI patterns)
         if (sourceConfig && platformListings.length > 0) {
-          console.log(`[${platform}] Applying source filters...`);
+          console.log(`[${platform}] Applying source filters and learned AI patterns...`);
           const beforeCount = platformListings.length;
           
-          const filteredListings = platformListings.filter(listing => {
-            const filterResult = applyMarinaKeywordFilter(listing, sourceConfig);
-            return filterResult.include;
-          });
+          // Use async filter with learned patterns
+          const filterResults = await Promise.all(
+            platformListings.map(listing => applyMarinaKeywordFilterWithPatterns(listing, sourceConfig))
+          );
+          
+          const filteredListings = platformListings.filter((_, index) => filterResults[index].include);
           
           const filteredOutCount = beforeCount - filteredListings.length;
           results.filteredOut += filteredOutCount;
           
           if (filteredOutCount > 0) {
-            console.log(`[${platform}] Filtered out ${filteredOutCount} listings that don't match criteria`);
+            console.log(`[${platform}] Filtered out ${filteredOutCount} listings (criteria + learned patterns)`);
           }
           
           platformListings = filteredListings;

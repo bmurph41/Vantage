@@ -41,7 +41,7 @@ import {
   type ListingFeedback,
 } from "@shared/schema";
 import { getScrapeStatus, ensureListingsExist, getLastScrapeRun } from "./services/intel-cron";
-import { PLATFORM_CAPABILITIES, getPlatformCapabilities, getRecommendedMethod } from "./services/cre-scraper";
+import { PLATFORM_CAPABILITIES, getPlatformCapabilities, getRecommendedMethod, invalidateLearnedPatternsCache } from "./services/cre-scraper";
 const router = Router();
 
 function getOrgId(req: Request): string | null {
@@ -1913,6 +1913,9 @@ router.patch("/feedback/:id", async (req: Request, res: Response) => {
           .update(marinaListingFeedback)
           .set({ aiPatternApplied: true })
           .where(eq(marinaListingFeedback.id, id));
+
+        // Invalidate cache so new pattern takes effect immediately
+        invalidateLearnedPatternsCache();
       }
     }
 
@@ -1982,6 +1985,9 @@ router.patch("/ai-patterns/:id", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Pattern not found" });
     }
 
+    // Invalidate pattern cache so changes take effect immediately
+    invalidateLearnedPatternsCache();
+
     res.json(updated);
   } catch (error: any) {
     console.error("Error updating AI pattern:", error);
@@ -1996,6 +2002,9 @@ router.delete("/ai-patterns/:id", async (req: Request, res: Response) => {
     await db
       .delete(marinaAiFilterPatterns)
       .where(eq(marinaAiFilterPatterns.id, id));
+
+    // Invalidate pattern cache so changes take effect immediately
+    invalidateLearnedPatternsCache();
 
     res.json({ success: true, message: "Pattern deleted" });
   } catch (error: any) {
