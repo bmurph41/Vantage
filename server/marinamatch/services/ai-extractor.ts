@@ -93,11 +93,12 @@ For EACH marina listing found, extract:
 - zipCode: ZIP code
 - sourceListingId: Any listing reference number
 
-## HERO IMAGE (CRITICAL)
-- heroImageUrl: The MAIN property photo URL. Look for:
-  * [IMAGE: url] markers in the content
-  * The first/largest property image
-  * Featured or primary listing photo
+## HERO IMAGE (CRITICAL - DO NOT MIX UP BETWEEN LISTINGS)
+- heroImageUrl: The MAIN property photo URL for THIS SPECIFIC LISTING ONLY
+  * ONLY use [IMAGE: url] markers that appear WITHIN the same listing section
+  * When listings are separated by "--- LISTING X ---" markers, only use images from that section
+  * Do NOT assign images from one listing to another
+  * If no image is found within the listing section, leave heroImageUrl empty (null)
   * MUST be a full URL (https://...)
   * Prefer exterior marina shots over logos/icons
 
@@ -234,15 +235,69 @@ function cleanHtmlForAI(html: string): string {
   
   $("script, style, noscript, iframe, svg, nav, footer, header").remove();
   $("[style*='display:none'], [style*='display: none'], .hidden, .d-none").remove();
+  
+  // Remove icons, logos, and small UI images that aren't property photos
   $("img").each((_, el) => {
-    const src = $(el).attr("src") || $(el).attr("data-src");
-    if (src) {
-      $(el).replaceWith(`[IMAGE: ${src}]`);
+    const src = $(el).attr("src") || $(el).attr("data-src") || "";
+    const alt = ($(el).attr("alt") || "").toLowerCase();
+    const className = ($(el).attr("class") || "").toLowerCase();
+    
+    // Skip icons, logos, avatars, UI elements
+    const isUIElement = 
+      src.includes("icon") || src.includes("logo") || src.includes("avatar") ||
+      src.includes("placeholder") || src.includes("default") ||
+      src.includes("user") || src.includes("profile") ||
+      alt.includes("icon") || alt.includes("logo") ||
+      className.includes("icon") || className.includes("logo") || className.includes("avatar");
+    
+    // Skip small images (tracking pixels, badges, etc.)
+    const width = parseInt($(el).attr("width") || "0");
+    const height = parseInt($(el).attr("height") || "0");
+    const isTooSmall = (width > 0 && width < 100) || (height > 0 && height < 100);
+    
+    if (src && !isUIElement && !isTooSmall) {
+      // Make URL absolute if needed
+      const absoluteSrc = src.startsWith("http") ? src : src;
+      $(el).replaceWith(`[IMAGE: ${absoluteSrc}]`);
     } else {
       $(el).remove();
     }
   });
   
+  // Try to find listing cards/sections and process them individually
+  const listingSelectors = [
+    ".listing-card", ".property-card", ".result-card", ".search-result",
+    "[data-listing]", "[data-property]", ".listing-item", ".property-item",
+    "article.listing", "article.property", ".card"
+  ];
+  
+  let structuredListings: string[] = [];
+  for (const selector of listingSelectors) {
+    const cards = $(selector);
+    if (cards.length > 1) {
+      cards.each((i, el) => {
+        const cardText = $(el).text().replace(/\s+/g, " ").trim();
+        const cardHtml = $(el).html() || "";
+        // Extract images within this card only
+        const imageMatches = cardHtml.match(/\[IMAGE: [^\]]+\]/g) || [];
+        if (cardText.length > 50) {
+          structuredListings.push(`\n--- LISTING ${i + 1} ---\n${imageMatches.length > 0 ? imageMatches[0] + "\n" : ""}${cardText}`);
+        }
+      });
+      break;
+    }
+  }
+  
+  // If we found structured listings, use those
+  if (structuredListings.length > 0) {
+    let text = structuredListings.join("\n");
+    if (text.length > 15000) {
+      text = text.substring(0, 15000) + "... [truncated]";
+    }
+    return text;
+  }
+  
+  // Fallback: extract all text with images preserved
   let text = $("body").text();
   text = text.replace(/\s+/g, " ").trim();
   text = text.replace(/(.)\1{4,}/g, "$1$1$1");
