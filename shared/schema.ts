@@ -14919,6 +14919,78 @@ export const updateMarinaMatchAlertSchema = insertMarinaMatchAlertSchema.partial
 export type MarinaMatchAlert = typeof marinaMatchAlerts.$inferSelect;
 
 // ============================================================================
+// MarinaMatch Listing Feedback System
+// Global feedback collection for AI training and listing quality improvement
+// ============================================================================
+
+export const listingFeedbackReasons = [
+  "sold_closed",
+  "under_contract", 
+  "off_market",
+  "duplicate_listing",
+  "not_a_marina",
+  "incorrect_information",
+  "spam_or_fake",
+  "broken_link",
+  "other"
+] as const;
+
+export const marinaListingFeedback = pgTable("marina_listing_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  listingId: varchar("listing_id").notNull().references(() => marinaListings.id, { onDelete: "cascade" }),
+  userId: varchar("user_id"),
+  orgId: varchar("org_id"),
+  reason: varchar("reason", { length: 50 }).notNull(),
+  customReason: text("custom_reason"),
+  details: text("details"),
+  listingTitle: text("listing_title"),
+  listingSource: varchar("listing_source", { length: 100 }),
+  listingUrl: text("listing_url"),
+  status: varchar("status", { length: 20 }).default("pending"),
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  aiPatternApplied: boolean("ai_pattern_applied").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  listingIdx: index("feedback_listing_idx").on(table.listingId),
+  statusIdx: index("feedback_status_idx").on(table.status),
+  reasonIdx: index("feedback_reason_idx").on(table.reason),
+}));
+
+export const marinaAiFilterPatterns = pgTable("marina_ai_filter_patterns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  patternType: varchar("pattern_type", { length: 50 }).notNull(),
+  pattern: text("pattern").notNull(),
+  reason: varchar("reason", { length: 50 }).notNull(),
+  source: varchar("source", { length: 100 }),
+  feedbackCount: integer("feedback_count").default(1),
+  isActive: boolean("is_active").default(true),
+  confidence: numeric("confidence", { precision: 5, scale: 2 }).default("1.00"),
+  createdFromFeedbackId: varchar("created_from_feedback_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  typeIdx: index("ai_pattern_type_idx").on(table.patternType),
+  activeIdx: index("ai_pattern_active_idx").on(table.isActive),
+}));
+
+export const insertListingFeedbackSchema = createInsertSchema(marinaListingFeedback).omit({
+  id: true,
+  createdAt: true,
+  reviewedAt: true,
+});
+export type ListingFeedback = typeof marinaListingFeedback.$inferSelect;
+export type InsertListingFeedback = z.infer<typeof insertListingFeedbackSchema>;
+
+export const insertAiFilterPatternSchema = createInsertSchema(marinaAiFilterPatterns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AiFilterPattern = typeof marinaAiFilterPatterns.$inferSelect;
+
+// ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular
