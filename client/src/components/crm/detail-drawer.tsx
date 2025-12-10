@@ -38,6 +38,7 @@ import { formatDistanceToNow } from "date-fns";
 import type { Contact, Deal } from "@shared/schema";
 import { FileUploader } from "./file-uploader";
 import { FileList } from "./file-list";
+import UnifiedTimeline from "./unified-timeline";
 
 interface DetailDrawerProps {
   open: boolean;
@@ -610,11 +611,15 @@ export function DetailDrawer({
               </TabsContent>
 
               <TabsContent value="timeline" className="mt-4">
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Timeline coming soon</p>
-                  <p className="text-sm">View all activities, emails, calls, and notes</p>
-                </div>
+                {entityId && (
+                  <UnifiedTimeline 
+                    entityType={entityType} 
+                    entityId={entityId}
+                    showHeader={false}
+                    maxHeight="400px"
+                    compact={true}
+                  />
+                )}
               </TabsContent>
 
               <TabsContent value="files" className="mt-4 space-y-6">

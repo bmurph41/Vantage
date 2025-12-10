@@ -72,7 +72,7 @@ import {
   insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema,
   insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema,
   insertCrmTaskSchema, insertCrmFileSchema, insertCalendarSettingsSchema,
-  crmTasks, crmFiles, crmContacts, crmDeals, crmCompanies, crmPipelines, crmPipelineStages, crmActivities, crmProperties,
+  crmTasks, crmFiles, crmContacts, crmDeals, crmCompanies, crmPipelines, crmPipelineStages, crmActivities, crmProperties, crmNotes,
   type InsertCrmFile,
   insertScSavedSearchSchema,
   updateScSavedSearchSchema,
@@ -6513,6 +6513,135 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Failed to delete file:", error);
       res.status(500).json({ error: "Failed to delete file" });
+    }
+  });
+
+  // ===================================================================
+  // Unified Activity Timeline - Aggregates activities, notes, and files
+  // ===================================================================
+
+  app.get("/api/crm/timeline/:entityType/:entityId", async (req: any, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+      const userId = req.user.id;
+
+      // Validate entity type
+      const validTypes = ['contact', 'company', 'deal', 'property', 'lead'];
+      if (!validTypes.includes(entityType)) {
+        return res.status(400).json({ error: `Invalid entity type. Must be one of: ${validTypes.join(', ')}` });
+      }
+
+      // Fetch activities for this entity
+      const activities = await db.query.crmActivities.findMany({
+        where: and(
+          eq(crmActivities.entityType, entityType),
+          eq(crmActivities.entityId, entityId),
+          eq(crmActivities.userId, userId)
+        ),
+        orderBy: [desc(crmActivities.createdAt)],
+      });
+
+      // Fetch notes for this entity
+      const notes = await db.query.crmNotes.findMany({
+        where: and(
+          eq(crmNotes.entityType, entityType),
+          eq(crmNotes.entityId, entityId),
+          eq(crmNotes.ownerId, userId)
+        ),
+        orderBy: [desc(crmNotes.createdAt)],
+      });
+
+      // Fetch files for this entity
+      const files = await db.query.crmFiles.findMany({
+        where: and(
+          eq(crmFiles.entityType, entityType),
+          eq(crmFiles.entityId, entityId),
+          eq(crmFiles.ownerId, userId)
+        ),
+        orderBy: [desc(crmFiles.createdAt)],
+      });
+
+      // Normalize all items into a unified timeline format
+      type TimelineItem = {
+        id: string;
+        type: 'activity' | 'note' | 'file';
+        subType: string;
+        title: string;
+        description: string | null;
+        timestamp: Date;
+        metadata: Record<string, any>;
+      };
+
+      const timelineItems: TimelineItem[] = [];
+
+      // Add activities
+      for (const activity of activities) {
+        timelineItems.push({
+          id: activity.id,
+          type: 'activity',
+          subType: activity.type,
+          title: activity.subject || `${activity.type.charAt(0).toUpperCase() + activity.type.slice(1)}`,
+          description: activity.description,
+          timestamp: activity.createdAt,
+          metadata: {
+            direction: activity.direction,
+            duration: activity.duration,
+            outcome: activity.outcome,
+            status: activity.status,
+            scheduledAt: activity.scheduledAt,
+            completedAt: activity.completedAt,
+          },
+        });
+      }
+
+      // Add notes
+      for (const note of notes) {
+        timelineItems.push({
+          id: note.id,
+          type: 'note',
+          subType: note.isPinned ? 'pinned_note' : 'note',
+          title: 'Note',
+          description: note.content,
+          timestamp: note.createdAt,
+          metadata: {
+            isPinned: note.isPinned,
+          },
+        });
+      }
+
+      // Add files
+      for (const file of files) {
+        timelineItems.push({
+          id: file.id,
+          type: 'file',
+          subType: file.mimeType?.split('/')[0] || 'document',
+          title: file.name,
+          description: `File uploaded: ${file.fileName}`,
+          timestamp: file.createdAt,
+          metadata: {
+            fileName: file.fileName,
+            size: file.size,
+            mimeType: file.mimeType,
+            url: file.url,
+          },
+        });
+      }
+
+      // Sort by timestamp descending
+      timelineItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      res.json({
+        items: timelineItems,
+        counts: {
+          activities: activities.length,
+          notes: notes.length,
+          files: files.length,
+          total: timelineItems.length,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to get unified timeline:", error);
+      res.status(500).json({ error: "Failed to retrieve timeline" });
     }
   });
 
