@@ -8479,6 +8479,75 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to delete stage" });
     }
   });
+
+  // Seed CRE Default Pipeline Stages (Oracle RCM style)
+  app.post("/api/pipelines/seed-cre-defaults", async (req: any, res) => {
+    try {
+      const { pipelineId } = req.body;
+      if (!pipelineId) {
+        return res.status(400).json({ error: "Pipeline ID is required" });
+      }
+
+      // CRE Acquisitions Pipeline - Standard broker-style stages
+      const creStages = [
+        { name: 'Lead', color: '#94A3B8', probability: 5, stageType: 'active', slaWarningDays: 7, slaMaxDays: 14 },
+        { name: 'Intro Call', color: '#3B82F6', probability: 10, stageType: 'active', slaWarningDays: 5, slaMaxDays: 10 },
+        { name: 'NDA Sent', color: '#8B5CF6', probability: 15, stageType: 'active', slaWarningDays: 3, slaMaxDays: 7 },
+        { name: 'NDA Signed', color: '#A855F7', probability: 20, stageType: 'active', slaWarningDays: 5, slaMaxDays: 14, requiredFields: ['ndaStatus'] },
+        { name: 'OM Sent', color: '#6366F1', probability: 25, stageType: 'active', slaWarningDays: 7, slaMaxDays: 21 },
+        { name: 'Site Visit', color: '#14B8A6', probability: 35, stageType: 'active', slaWarningDays: 14, slaMaxDays: 30 },
+        { name: 'LOI Drafted', color: '#10B981', probability: 45, stageType: 'active', slaWarningDays: 7, slaMaxDays: 14 },
+        { name: 'LOI Sent', color: '#22C55E', probability: 55, stageType: 'active', slaWarningDays: 5, slaMaxDays: 10 },
+        { name: 'Best & Final', color: '#84CC16', probability: 65, stageType: 'active', slaWarningDays: 7, slaMaxDays: 14 },
+        { name: 'Under Contract', color: '#EAB308', probability: 75, stageType: 'active', slaWarningDays: 30, slaMaxDays: 60,
+          taskTemplates: [
+            { title: 'Schedule site visit', description: 'Coordinate with seller to schedule property inspection', priority: 'high', daysFromNow: 3 },
+            { title: 'Request financial documents', description: 'Request P&L, rent roll, and tax returns from seller', priority: 'high', daysFromNow: 2 },
+            { title: 'Engage title company', description: 'Order title search and commitment', priority: 'medium', daysFromNow: 5 },
+          ]
+        },
+        { name: 'Due Diligence', color: '#F97316', probability: 85, stageType: 'active', slaWarningDays: 21, slaMaxDays: 45,
+          taskTemplates: [
+            { title: 'Review financial statements', description: 'Analyze P&L trends, verify revenue and expense items', priority: 'high', daysFromNow: 7 },
+            { title: 'Complete environmental review', description: 'Review Phase I ESA, check for fuel storage compliance', priority: 'high', daysFromNow: 10 },
+            { title: 'Verify permits and licenses', description: 'Confirm marina operating permits, DNR compliance', priority: 'medium', daysFromNow: 7 },
+          ]
+        },
+        { name: 'Financing', color: '#FB923C', probability: 90, stageType: 'active', slaWarningDays: 14, slaMaxDays: 30 },
+        { name: 'Closing', color: '#16A34A', probability: 95, stageType: 'active', slaWarningDays: 7, slaMaxDays: 14,
+          taskTemplates: [
+            { title: 'Prepare closing checklist', description: 'Compile all required closing documents', priority: 'high', daysFromNow: 2 },
+            { title: 'Coordinate with lender', description: 'Ensure financing terms are finalized', priority: 'high', daysFromNow: 3 },
+          ]
+        },
+        { name: 'Closed Won', color: '#22C55E', probability: 100, stageType: 'won', slaWarningDays: null, slaMaxDays: null },
+        { name: 'Lost', color: '#EF4444', probability: 0, stageType: 'lost', slaWarningDays: null, slaMaxDays: null },
+      ];
+
+      const createdStages = [];
+      for (let i = 0; i < creStages.length; i++) {
+        const stageDef = creStages[i];
+        const stage = await storage.createCrmStage({
+          pipelineId,
+          name: stageDef.name,
+          stageOrder: (i + 1) * 10,
+          probability: stageDef.probability,
+          color: stageDef.color,
+          pipelineType: 'sales',
+        });
+        createdStages.push(stage);
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Created ${createdStages.length} CRE pipeline stages`,
+        stages: createdStages 
+      });
+    } catch (error) {
+      console.error("Failed to seed CRE stages:", error);
+      res.status(500).json({ error: "Failed to seed CRE stages" });
+    }
+  });
   
   // Activities aliases
   app.get("/api/activities", async (req: any, res) => {

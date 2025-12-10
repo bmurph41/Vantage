@@ -3685,6 +3685,13 @@ export const crmPipelineStages = pgTable("crm_pipeline_stages", {
   color: text("color").default('#3B82F6'),
   // Legacy field for backward compatibility
   pipelineType: text("pipeline_type").notNull().default('sales'), // sales, marketing, service
+  // CRE-specific stage metadata (Oracle RCM style)
+  stageType: text("stage_type").default('active'), // active, won, lost
+  slaWarningDays: integer("sla_warning_days"), // days before SLA warning shows
+  slaMaxDays: integer("sla_max_days"), // maximum days allowed in stage
+  requiredFields: jsonb("required_fields").default([]), // fields required to enter stage
+  taskTemplates: jsonb("task_templates").default([]), // auto-create tasks on entry
+  automations: jsonb("automations").default([]), // workflow automations for this stage
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

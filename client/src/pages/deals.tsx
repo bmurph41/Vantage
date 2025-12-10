@@ -13,11 +13,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { 
   Handshake, Plus, Edit, Trash2, Calendar, User, Search, 
   Filter, MoreHorizontal, List, Grid3x3, HelpCircle, Sliders,
-  DollarSign, TrendingUp, Target, Award, Bookmark, Save, X, Download, CheckCircle2
+  DollarSign, TrendingUp, Target, Award, Bookmark, Save, X, Download, CheckCircle2, Kanban
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import DealFormModal from "@/components/modals/deal-form-modal";
 import { DealDrawer } from "@/components/deal-drawer";
+import { DealKanbanBoard } from "@/components/deals/DealKanbanBoard";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, Contact, Company, PipelineStage } from "@shared/schema";
@@ -30,7 +31,7 @@ export default function Deals() {
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list" | "kanban">("kanban");
   const [selectedDealIds, setSelectedDealIds] = useState<Set<string>>(new Set());
   const [isSaveViewOpen, setIsSaveViewOpen] = useState(false);
   const [viewName, setViewName] = useState("");
@@ -520,20 +521,29 @@ export default function Deals() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className={`h-8 px-3 text-xs rounded-r-none border-r border-gray-300 ${viewMode === "list" ? "bg-gray-100" : ""}`}
-                onClick={() => setViewMode("list")}
-                data-testid="list-view-button"
+                className={`h-8 px-3 text-xs rounded-r-none border-r border-gray-300 ${viewMode === "kanban" ? "bg-gray-100" : ""}`}
+                onClick={() => setViewMode("kanban")}
+                data-testid="kanban-view-button"
               >
-                <List className="w-4 h-4" />
+                <Kanban className="w-4 h-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className={`h-8 px-3 text-xs rounded-l-none ${viewMode === "grid" ? "bg-gray-100" : ""}`}
+                className={`h-8 px-3 text-xs border-r border-gray-300 ${viewMode === "grid" ? "bg-gray-100" : ""}`}
                 onClick={() => setViewMode("grid")}
                 data-testid="grid-view-button"
               >
                 <Grid3x3 className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={`h-8 px-3 text-xs rounded-l-none ${viewMode === "list" ? "bg-gray-100" : ""}`}
+                onClick={() => setViewMode("list")}
+                data-testid="list-view-button"
+              >
+                <List className="w-4 h-4" />
               </Button>
             </div>
             
@@ -925,6 +935,14 @@ export default function Deals() {
               Clear Filters
             </Button>
           </div>
+        ) : viewMode === "kanban" ? (
+          stages && (
+            <DealKanbanBoard 
+              deals={filteredDeals} 
+              stages={stages} 
+              onDealClick={setSelectedDeal}
+            />
+          )
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredDeals.map((deal: DealWithRelations) => (
