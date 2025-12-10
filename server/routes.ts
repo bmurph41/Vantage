@@ -25,6 +25,7 @@ import boatClubRouter from "./boat-club-router";
 import boatSalesRouter from "./boat-sales-router";
 import integrationRouter from "./integration-routes";
 import marinamatchRouter from "./marinamatch/routes";
+import omRouter from "./om/routes";
 import authRoutes from "./routes/auth-routes";
 import { enterpriseAuthService } from "./services/enterprise-auth-service";
 import { userSessions } from "@shared/schema";
@@ -354,6 +355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/boat-sales", authenticateUser, boatSalesRouter);
   app.use("/api/integration", authenticateUser, integrationRouter);
   app.use("/api/marinamatch", authenticateUser, marinamatchRouter);
+  app.use("/api/om", authenticateUser, omRouter);
 
   // Dockit Marina Operations Module - mounted at /dockit/api
   try {
