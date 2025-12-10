@@ -7698,6 +7698,198 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to bulk delete deals" });
     }
   });
+
+  // Deal-Contact Relationships (CRE role assignments)
+  app.get("/api/deals/:dealId/contacts", async (req: any, res) => {
+    try {
+      const contacts = await storage.getDealContacts(req.params.dealId);
+      res.json(contacts);
+    } catch (error) {
+      console.error("Failed to get deal contacts:", error);
+      res.status(500).json({ error: "Failed to retrieve deal contacts" });
+    }
+  });
+
+  app.post("/api/deals/:dealId/contacts", async (req: any, res) => {
+    try {
+      const { contactId, role, isPrimary, notes } = req.body;
+      if (!contactId) {
+        return res.status(400).json({ error: "Contact ID is required" });
+      }
+      const result = await storage.addContactToDeal(req.params.dealId, contactId, role, isPrimary, notes);
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to add contact to deal:", error);
+      res.status(500).json({ error: "Failed to add contact to deal" });
+    }
+  });
+
+  app.put("/api/deals/:dealId/contacts/:linkId", async (req: any, res) => {
+    try {
+      const { role, isPrimary, notes } = req.body;
+      const result = await storage.updateDealContact(req.params.linkId, { role, isPrimary, notes });
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to update deal contact:", error);
+      res.status(500).json({ error: "Failed to update deal contact" });
+    }
+  });
+
+  app.delete("/api/deals/:dealId/contacts/:linkId", async (req: any, res) => {
+    try {
+      await storage.removeContactFromDeal(req.params.linkId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to remove contact from deal:", error);
+      res.status(500).json({ error: "Failed to remove contact from deal" });
+    }
+  });
+
+  // Deal-Company Relationships (CRE role assignments)
+  app.get("/api/deals/:dealId/companies", async (req: any, res) => {
+    try {
+      const companies = await storage.getDealCompanies(req.params.dealId);
+      res.json(companies);
+    } catch (error) {
+      console.error("Failed to get deal companies:", error);
+      res.status(500).json({ error: "Failed to retrieve deal companies" });
+    }
+  });
+
+  app.post("/api/deals/:dealId/companies", async (req: any, res) => {
+    try {
+      const { companyId, role, isPrimary, notes } = req.body;
+      if (!companyId) {
+        return res.status(400).json({ error: "Company ID is required" });
+      }
+      const result = await storage.addCompanyToDeal(req.params.dealId, companyId, role, isPrimary, notes);
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to add company to deal:", error);
+      res.status(500).json({ error: "Failed to add company to deal" });
+    }
+  });
+
+  app.put("/api/deals/:dealId/companies/:linkId", async (req: any, res) => {
+    try {
+      const { role, isPrimary, notes } = req.body;
+      const result = await storage.updateDealCompany(req.params.linkId, { role, isPrimary, notes });
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to update deal company:", error);
+      res.status(500).json({ error: "Failed to update deal company" });
+    }
+  });
+
+  app.delete("/api/deals/:dealId/companies/:linkId", async (req: any, res) => {
+    try {
+      await storage.removeCompanyFromDeal(req.params.linkId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to remove company from deal:", error);
+      res.status(500).json({ error: "Failed to remove company from deal" });
+    }
+  });
+
+  // Stage Task Templates - Auto-create DD tasks when deal enters a stage
+  app.post("/api/deals/:dealId/apply-stage-templates", async (req: any, res) => {
+    try {
+      const { stageId, projectId } = req.body;
+      
+      if (!stageId) {
+        return res.status(400).json({ error: "Stage ID is required" });
+      }
+      
+      const stage = await storage.getCrmStage(stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      
+      const taskTemplates = (stage as any).taskTemplates || [];
+      if (!Array.isArray(taskTemplates) || taskTemplates.length === 0) {
+        return res.json({ success: true, message: "No task templates for this stage", tasksCreated: 0 });
+      }
+      
+      const createdTasks = [];
+      for (const template of taskTemplates) {
+        if (!template.title) continue;
+        
+        const dueDate = template.daysFromNow 
+          ? new Date(Date.now() + template.daysFromNow * 24 * 60 * 60 * 1000)
+          : null;
+        
+        const task = await storage.createTask({
+          projectId: projectId || req.params.dealId,
+          name: template.title,
+          description: template.description || '',
+          status: 'not_started',
+          priority: template.priority || 'medium',
+          dueDate: dueDate,
+          assigneeId: null,
+          createdBy: req.user.id,
+        });
+        createdTasks.push(task);
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Created ${createdTasks.length} tasks from stage templates`,
+        tasksCreated: createdTasks.length,
+        tasks: createdTasks
+      });
+    } catch (error) {
+      console.error("Failed to apply stage templates:", error);
+      res.status(500).json({ error: "Failed to apply stage templates" });
+    }
+  });
+
+  // Get stage templates for a given stage
+  app.get("/api/stages/:stageId/templates", async (req: any, res) => {
+    try {
+      const stage = await storage.getCrmStage(req.params.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      
+      res.json({
+        stageId: stage.id,
+        stageName: stage.name,
+        taskTemplates: (stage as any).taskTemplates || [],
+        requiredFields: (stage as any).requiredFields || [],
+        slaWarningDays: (stage as any).slaWarningDays,
+        slaMaxDays: (stage as any).slaMaxDays,
+      });
+    } catch (error) {
+      console.error("Failed to get stage templates:", error);
+      res.status(500).json({ error: "Failed to retrieve stage templates" });
+    }
+  });
+
+  // Update stage templates
+  app.put("/api/stages/:stageId/templates", async (req: any, res) => {
+    try {
+      const { taskTemplates, requiredFields, slaWarningDays, slaMaxDays } = req.body;
+      
+      const stage = await storage.updateCrmStage(req.params.stageId, {
+        ...(taskTemplates !== undefined ? { taskTemplates } : {}),
+        ...(requiredFields !== undefined ? { requiredFields } : {}),
+        ...(slaWarningDays !== undefined ? { slaWarningDays } : {}),
+        ...(slaMaxDays !== undefined ? { slaMaxDays } : {}),
+      });
+      
+      res.json({
+        stageId: stage.id,
+        stageName: stage.name,
+        taskTemplates: (stage as any).taskTemplates || [],
+        requiredFields: (stage as any).requiredFields || [],
+        slaWarningDays: (stage as any).slaWarningDays,
+        slaMaxDays: (stage as any).slaMaxDays,
+      });
+    } catch (error) {
+      console.error("Failed to update stage templates:", error);
+      res.status(500).json({ error: "Failed to update stage templates" });
+    }
+  });
   
   // Contacts aliases  
   app.get("/api/contacts", async (req: any, res) => {

@@ -4,7 +4,7 @@ import {
   contacts, projectContacts, projectPendingContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
-  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmContactProperties, crmCompanyProperties, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities,
+  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmContactProperties, crmCompanyProperties, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities, crmDealContacts, crmDealCompanies,
   crmImportJobs, crmImportedRecords, crmProspectingEntries, crmProspectingUserSettings, crmProspectingGoalTemplates,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
@@ -346,6 +346,18 @@ export interface IStorage {
   createCrmDeal(deal: InsertCrmDeal): Promise<CrmDeal>;
   updateCrmDeal(id: string, updates: Partial<InsertCrmDeal>): Promise<CrmDeal>;
   deleteCrmDeal(id: string): Promise<void>;
+
+  // CRM - Deal-Contact Relationships (many-to-many with roles)
+  getDealContacts(dealId: string): Promise<Array<{ id: string; dealId: string; contactId: string; role: string | null; isPrimary: boolean; notes: string | null; contact?: CrmContact }>>;
+  addContactToDeal(dealId: string, contactId: string, role?: string, isPrimary?: boolean, notes?: string): Promise<{ id: string }>;
+  updateDealContact(id: string, updates: { role?: string; isPrimary?: boolean; notes?: string }): Promise<{ id: string }>;
+  removeContactFromDeal(id: string): Promise<void>;
+
+  // CRM - Deal-Company Relationships (many-to-many with roles)
+  getDealCompanies(dealId: string): Promise<Array<{ id: string; dealId: string; companyId: string; role: string | null; isPrimary: boolean; notes: string | null; company?: CrmCompany }>>;
+  addCompanyToDeal(dealId: string, companyId: string, role?: string, isPrimary?: boolean, notes?: string): Promise<{ id: string }>;
+  updateDealCompany(id: string, updates: { role?: string; isPrimary?: boolean; notes?: string }): Promise<{ id: string }>;
+  removeCompanyFromDeal(id: string): Promise<void>;
 
   // CRM - Leads
   getCrmLead(id: string): Promise<CrmLead | undefined>;
@@ -2896,6 +2908,104 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCrmDeal(id: string): Promise<void> {
     await db.delete(crmDeals).where(eq(crmDeals.id, id));
+  }
+
+  // CRM - Deal-Contact Relationships
+  async getDealContacts(dealId: string): Promise<Array<{ id: string; dealId: string; contactId: string; role: string | null; isPrimary: boolean; notes: string | null; contact?: CrmContact }>> {
+    const results = await db
+      .select({
+        id: crmDealContacts.id,
+        dealId: crmDealContacts.dealId,
+        contactId: crmDealContacts.contactId,
+        role: crmDealContacts.role,
+        isPrimary: crmDealContacts.isPrimary,
+        notes: crmDealContacts.notes,
+        contact: crmContacts,
+      })
+      .from(crmDealContacts)
+      .leftJoin(crmContacts, eq(crmDealContacts.contactId, crmContacts.id))
+      .where(eq(crmDealContacts.dealId, dealId));
+    return results.map(r => ({
+      ...r,
+      isPrimary: r.isPrimary ?? false,
+      contact: r.contact || undefined,
+    }));
+  }
+
+  async addContactToDeal(dealId: string, contactId: string, role?: string, isPrimary?: boolean, notes?: string): Promise<{ id: string }> {
+    const [created] = await db.insert(crmDealContacts).values({
+      dealId,
+      contactId,
+      role: role || null,
+      isPrimary: isPrimary ?? false,
+      notes: notes || null,
+    }).returning({ id: crmDealContacts.id });
+    return created;
+  }
+
+  async updateDealContact(id: string, updates: { role?: string; isPrimary?: boolean; notes?: string }): Promise<{ id: string }> {
+    const [updated] = await db.update(crmDealContacts)
+      .set({
+        ...(updates.role !== undefined ? { role: updates.role } : {}),
+        ...(updates.isPrimary !== undefined ? { isPrimary: updates.isPrimary } : {}),
+        ...(updates.notes !== undefined ? { notes: updates.notes } : {}),
+      })
+      .where(eq(crmDealContacts.id, id))
+      .returning({ id: crmDealContacts.id });
+    return updated;
+  }
+
+  async removeContactFromDeal(id: string): Promise<void> {
+    await db.delete(crmDealContacts).where(eq(crmDealContacts.id, id));
+  }
+
+  // CRM - Deal-Company Relationships
+  async getDealCompanies(dealId: string): Promise<Array<{ id: string; dealId: string; companyId: string; role: string | null; isPrimary: boolean; notes: string | null; company?: CrmCompany }>> {
+    const results = await db
+      .select({
+        id: crmDealCompanies.id,
+        dealId: crmDealCompanies.dealId,
+        companyId: crmDealCompanies.companyId,
+        role: crmDealCompanies.role,
+        isPrimary: crmDealCompanies.isPrimary,
+        notes: crmDealCompanies.notes,
+        company: crmCompanies,
+      })
+      .from(crmDealCompanies)
+      .leftJoin(crmCompanies, eq(crmDealCompanies.companyId, crmCompanies.id))
+      .where(eq(crmDealCompanies.dealId, dealId));
+    return results.map(r => ({
+      ...r,
+      isPrimary: r.isPrimary ?? false,
+      company: r.company || undefined,
+    }));
+  }
+
+  async addCompanyToDeal(dealId: string, companyId: string, role?: string, isPrimary?: boolean, notes?: string): Promise<{ id: string }> {
+    const [created] = await db.insert(crmDealCompanies).values({
+      dealId,
+      companyId,
+      role: role || null,
+      isPrimary: isPrimary ?? false,
+      notes: notes || null,
+    }).returning({ id: crmDealCompanies.id });
+    return created;
+  }
+
+  async updateDealCompany(id: string, updates: { role?: string; isPrimary?: boolean; notes?: string }): Promise<{ id: string }> {
+    const [updated] = await db.update(crmDealCompanies)
+      .set({
+        ...(updates.role !== undefined ? { role: updates.role } : {}),
+        ...(updates.isPrimary !== undefined ? { isPrimary: updates.isPrimary } : {}),
+        ...(updates.notes !== undefined ? { notes: updates.notes } : {}),
+      })
+      .where(eq(crmDealCompanies.id, id))
+      .returning({ id: crmDealCompanies.id });
+    return updated;
+  }
+
+  async removeCompanyFromDeal(id: string): Promise<void> {
+    await db.delete(crmDealCompanies).where(eq(crmDealCompanies.id, id));
   }
 
   // CRM - Leads
