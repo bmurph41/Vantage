@@ -7,7 +7,7 @@ import {
   insertOmBlockSchema, 
   insertOmTemplateSchema, 
   insertOmDatasetSchema,
-  deals,
+  crmDeals,
   modelingProjects
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
@@ -675,8 +675,8 @@ router.get("/data-facade/data/:sourceId", async (req, res) => {
     
     if (sourceId.startsWith('deal-')) {
       const dealId = sourceId.replace('deal-', '');
-      const deal = await db.query.deals.findFirst({
-        where: eq(deals.id, dealId),
+      const deal = await db.query.crmDeals.findFirst({
+        where: eq(crmDeals.id, dealId),
       });
       if (deal) {
         return res.json({
