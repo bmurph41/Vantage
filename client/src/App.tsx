@@ -143,6 +143,11 @@ const DocumentIntelligence = lazy(() => import("@/pages/modeling/doc-intel/Docum
 // Project Workspace
 const ProjectWorkspace = lazy(() => import("@/pages/modeling/projects/workspace"));
 
+// OM Builder
+const ProjectOms = lazy(() => import("@/modules/om-builder/pages/project-oms"));
+const OMBuilder = lazy(() => import("@/modules/om-builder/pages/om-builder"));
+const OMExport = lazy(() => import("@/modules/om-builder/pages/om-export"));
+
 // Lightweight sidebar loader for initial render
 function SidebarLoader() {
   return (
@@ -1161,6 +1166,36 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <ExitStrategiesIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      
+      {/* OM Builder Routes */}
+      <Route path="/om">
+        {() => (
+          <UnifiedLayout>
+            <ProjectOms />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/om/projects/:projectId">
+        {() => (
+          <UnifiedLayout>
+            <ProjectOms />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/om/builder/:omId">
+        {() => (
+          <UnifiedLayout>
+            <OMBuilder />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/om/export/:omId">
+        {() => (
+          <UnifiedLayout>
+            <OMExport />
           </UnifiedLayout>
         )}
       </Route>

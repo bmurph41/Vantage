@@ -60,6 +60,15 @@ Preferred communication style: Simple, everyday language.
     - **Capital Stack Builder**: Multi-tranche debt and equity structure modeling with detailed financial calculations and fund inheritance.
     - **Pro Forma Engine**: Real-time projections from actuals and assumptions.
     - **Portfolio Roll-ups**: Aggregate views and performance analysis across projects.
+- **OM Builder Module**: Professional offering memorandum creation with WYSIWYG editor. Features include:
+    - **3-Panel Layout**: Sidebar (pages/blocks/themes), Canvas (document preview), Inspector (properties)
+    - **Block Types**: Text, KPI, Chart, Table, Image with drag-and-drop reordering
+    - **Data Binding**: Connect blocks to underwriting, sales comps, rent comps, or uploaded datasets
+    - **Theme System**: Professional, Modern, and Marina Blue preset themes
+    - **Export**: PDF generation with Table of Contents, appendix options
+    - **Templates**: Reusable block, page, and full OM templates
+    - Routes: `/om` (list), `/om/builder/:omId` (editor), `/om/export/:omId` (export)
+    - Database tables: `oms`, `om_pages`, `om_blocks`, `om_templates`, `om_datasets`
 - **Fund Management Module** (Add-on Pack): Tracks PE fund lifecycle, capital allocation, fund-level returns, and investor capital accounts. Requires `fund_management` pack activation.
 - **LP Portal Module** (Add-on Pack): Dedicated investor portal for LPs with capital account statements, K-1 distribution, and fund performance views. Requires both `fund_management` and `lp_portal` packs.
 - **Prospecting Module** (Add-on Pack): Premium prospecting and outreach tools for deal sourcing. Requires `prospecting` pack activation.

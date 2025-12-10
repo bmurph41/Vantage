@@ -81,6 +81,7 @@ const vdrNav = [
 // Modeling Navigation
 const modelingNav = [
   { name: "Projects", href: "/modeling/projects", icon: TrendingUp },
+  { name: "OM Builder", href: "/om", icon: FileText },
   { name: "Fund Management", href: "/modeling/funds", icon: Briefcase },
   { name: "LP Portal", href: "/modeling/lp-portal", icon: Users },
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
@@ -197,7 +198,7 @@ export default function UnifiedSidebar() {
     const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting';
     const isDdPage = location === '/' || location === '/progress-report';
     const isVdrPage = location.startsWith('/vdr');
-    const isModelingPage = location.startsWith('/modeling/');
+    const isModelingPage = location.startsWith('/modeling/') || location.startsWith('/om');
     const isAnalysisPage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
 
     // Set expanded states - Operations stays expanded by default, others expand when active
@@ -569,7 +570,7 @@ export default function UnifiedSidebar() {
               title="Modeling" 
               expanded={modelingExpanded} 
               onToggle={() => setModelingExpanded(!modelingExpanded)}
-              isActive={location.startsWith('/modeling/')}
+              isActive={location.startsWith('/modeling/') || location.startsWith('/om')}
             />
             {modelingExpanded && modelingNav
               .filter((item) => {
