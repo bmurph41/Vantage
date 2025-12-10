@@ -39,6 +39,7 @@ import type { Contact, Deal } from "@shared/schema";
 import { FileUploader } from "./file-uploader";
 import { FileList } from "./file-list";
 import UnifiedTimeline from "./unified-timeline";
+import { RelationshipStats } from "./relationship-stats";
 
 interface DetailDrawerProps {
   open: boolean;
@@ -273,6 +274,10 @@ export function DetailDrawer({
                   <div className="text-center py-8 text-muted-foreground">Loading...</div>
                 ) : (
                   <>
+                    {entityId && (
+                      <RelationshipStats entityType={entityType} entityId={entityId} />
+                    )}
+                    
                     {/* Contact Overview */}
                     {entityType === "contact" && (
                       <div className="space-y-4">

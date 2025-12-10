@@ -5508,6 +5508,16 @@ Current context: Project ${req.params.projectId}`;
     try {
       let updateData = { ...req.body };
       
+      // Get current deal to detect stage changes
+      const currentDeal = await storage.getCrmDeal(req.params.id);
+      if (!currentDeal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      const oldStageId = currentDeal.stageId;
+      const newStageId = updateData.stageId;
+      const stageChanged = newStageId && oldStageId !== newStageId;
+      
       // Auto-close deal if stage name is "Closed"
       if (updateData.stageId) {
         const stage = await storage.getCrmStage(updateData.stageId);
@@ -5518,6 +5528,93 @@ Current context: Project ${req.params.projectId}`;
       }
       
       const deal = await storage.updateCrmDeal(req.params.id, updateData);
+      
+      // Pipeline Stage Automation - execute after successful deal update
+      if (stageChanged) {
+        try {
+          const newStage = await storage.getCrmStage(newStageId);
+          const oldStage = oldStageId ? await storage.getCrmStage(oldStageId) : null;
+          
+          // Log stage change activity
+          await storage.createCrmActivity({
+            type: 'stage_change',
+            subject: `Deal moved to ${newStage?.name || 'Unknown'}`,
+            description: `Stage changed from "${oldStage?.name || 'None'}" to "${newStage?.name || 'Unknown'}"`,
+            status: 'completed',
+            entityType: 'deal',
+            entityId: req.params.id,
+            performedBy: req.user.id,
+          });
+          
+          // Stage-based task automation rules
+          const stageName = newStage?.name?.toLowerCase() || '';
+          const automatedTasks: Array<{ title: string; description: string; priority: string; daysFromNow: number }> = [];
+          
+          // Under Contract / LOI stage - create DD prep tasks
+          if (stageName.includes('contract') || stageName.includes('loi') || stageName.includes('letter of intent')) {
+            automatedTasks.push(
+              { title: 'Schedule site visit', description: 'Coordinate with seller to schedule property inspection', priority: 'high', daysFromNow: 3 },
+              { title: 'Request financial documents', description: 'Request P&L, rent roll, and tax returns from seller', priority: 'high', daysFromNow: 2 },
+              { title: 'Engage title company', description: 'Order title search and commitment', priority: 'medium', daysFromNow: 5 },
+            );
+          }
+          
+          // Due Diligence stage - create review tasks
+          if (stageName.includes('due diligence') || stageName.includes('dd')) {
+            automatedTasks.push(
+              { title: 'Review financial statements', description: 'Analyze P&L trends, verify revenue and expense items', priority: 'high', daysFromNow: 7 },
+              { title: 'Complete environmental review', description: 'Review Phase I ESA, check for fuel storage compliance', priority: 'high', daysFromNow: 10 },
+              { title: 'Verify permits and licenses', description: 'Confirm marina operating permits, DNR compliance', priority: 'medium', daysFromNow: 7 },
+            );
+          }
+          
+          // Negotiation stage - create closing prep tasks
+          if (stageName.includes('negotiation') || stageName.includes('closing')) {
+            automatedTasks.push(
+              { title: 'Prepare closing checklist', description: 'Compile all required closing documents', priority: 'high', daysFromNow: 2 },
+              { title: 'Coordinate with lender', description: 'Ensure financing terms are finalized', priority: 'high', daysFromNow: 3 },
+            );
+          }
+          
+          // Get existing tasks for this deal to prevent duplicates
+          const existingTasks = await db.query.crmTasks.findMany({
+            where: eq(crmTasks.dealId, req.params.id),
+          });
+          const existingTaskTitles = new Set(existingTasks.map(t => t.title));
+          
+          // Create automated tasks (skip if same title already exists)
+          let tasksCreated = 0;
+          for (const taskDef of automatedTasks) {
+            if (existingTaskTitles.has(taskDef.title)) {
+              continue; // Skip duplicate
+            }
+            
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + taskDef.daysFromNow);
+            
+            await db.insert(crmTasks).values({
+              title: taskDef.title,
+              description: taskDef.description,
+              type: 'task',
+              priority: taskDef.priority,
+              status: 'pending',
+              dueDate: dueDate,
+              completed: false,
+              dealId: req.params.id,
+              assigneeId: req.user.id,
+            });
+            tasksCreated++;
+          }
+          
+          if (tasksCreated > 0) {
+            console.log(`[Pipeline Automation] Created ${tasksCreated} tasks for deal ${req.params.id} on stage change to "${newStage?.name}"`);
+          }
+        } catch (automationError) {
+          // Don't fail the deal update if automation fails
+          console.error("[Pipeline Automation] Error creating automated tasks:", automationError);
+        }
+      }
+      
       res.json(deal);
     } catch (error) {
       console.error("Failed to update deal:", error);
@@ -6642,6 +6739,118 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error("Failed to get unified timeline:", error);
       res.status(500).json({ error: "Failed to retrieve timeline" });
+    }
+  });
+
+  // CRM Relationship Stats - Quick metrics for entity detail pages
+  app.get("/api/crm/stats/:entityType/:entityId", async (req: any, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+      const userId = req.user.id;
+
+      const validTypes = ['contact', 'company', 'deal', 'property'];
+      if (!validTypes.includes(entityType)) {
+        return res.status(400).json({ error: `Invalid entity type. Must be one of: ${validTypes.join(', ')}` });
+      }
+
+      // Common stats for all entities
+      const activitiesResult = await db.query.crmActivities.findMany({
+        where: and(
+          eq(crmActivities.entityType, entityType),
+          eq(crmActivities.entityId, entityId),
+          eq(crmActivities.userId, userId)
+        ),
+        orderBy: [desc(crmActivities.createdAt)],
+        limit: 1,
+      });
+
+      const notesCount = await db.select({ count: sql`count(*)` })
+        .from(crmNotes)
+        .where(and(
+          eq(crmNotes.entityType, entityType),
+          eq(crmNotes.entityId, entityId),
+          eq(crmNotes.ownerId, userId)
+        ));
+
+      const filesCount = await db.select({ count: sql`count(*)` })
+        .from(crmFiles)
+        .where(and(
+          eq(crmFiles.entityType, entityType),
+          eq(crmFiles.entityId, entityId)
+        ));
+
+      const stats: Record<string, any> = {
+        lastActivity: activitiesResult[0]?.createdAt || null,
+        lastActivityType: activitiesResult[0]?.type || null,
+        notesCount: Number(notesCount[0]?.count || 0),
+        filesCount: Number(filesCount[0]?.count || 0),
+      };
+
+      // Entity-specific stats using aggregated queries
+      if (entityType === 'contact') {
+        // Aggregate deal stats in a single query
+        const dealStats = await db.select({
+          totalDeals: sql<number>`count(*)`,
+          openDeals: sql<number>`count(*) filter (where is_closed = false)`,
+          wonDeals: sql<number>`count(*) filter (where is_closed = true and is_won = true)`,
+          totalDealValue: sql<number>`coalesce(sum(value::numeric), 0)`,
+        }).from(crmDeals).where(and(
+          eq(crmDeals.primaryContactId, entityId),
+          eq(crmDeals.ownerId, userId)
+        ));
+        
+        stats.totalDeals = Number(dealStats[0]?.totalDeals || 0);
+        stats.openDeals = Number(dealStats[0]?.openDeals || 0);
+        stats.wonDeals = Number(dealStats[0]?.wonDeals || 0);
+        stats.totalDealValue = Number(dealStats[0]?.totalDealValue || 0);
+      }
+
+      if (entityType === 'company') {
+        // Count contacts in a single query
+        const contactsCount = await db.select({ count: sql`count(*)` })
+          .from(crmContacts)
+          .where(eq(crmContacts.companyId, entityId));
+        stats.contactsCount = Number(contactsCount[0]?.count || 0);
+
+        // Aggregate deal stats in a single query
+        const dealStats = await db.select({
+          totalDeals: sql<number>`count(*)`,
+          openDeals: sql<number>`count(*) filter (where is_closed = false)`,
+          totalDealValue: sql<number>`coalesce(sum(value::numeric), 0)`,
+        }).from(crmDeals).where(and(
+          eq(crmDeals.companyId, entityId),
+          eq(crmDeals.ownerId, userId)
+        ));
+        
+        stats.totalDeals = Number(dealStats[0]?.totalDeals || 0);
+        stats.openDeals = Number(dealStats[0]?.openDeals || 0);
+        stats.totalDealValue = Number(dealStats[0]?.totalDealValue || 0);
+      }
+
+      if (entityType === 'deal') {
+        // Aggregate task stats in a single query
+        const taskStats = await db.select({
+          totalTasks: sql<number>`count(*)`,
+          openTasks: sql<number>`count(*) filter (where completed = false)`,
+          overdueTasks: sql<number>`count(*) filter (where completed = false and due_date < now())`,
+        }).from(crmTasks).where(eq(crmTasks.dealId, entityId));
+        
+        stats.totalTasks = Number(taskStats[0]?.totalTasks || 0);
+        stats.openTasks = Number(taskStats[0]?.openTasks || 0);
+        stats.overdueTasks = Number(taskStats[0]?.overdueTasks || 0);
+
+        // Get the deal for additional metrics
+        const deal = await storage.getCrmDeal(entityId);
+        if (deal?.currentStageEnteredAt) {
+          const daysInStage = Math.floor((Date.now() - new Date(deal.currentStageEnteredAt).getTime()) / (1000 * 60 * 60 * 24));
+          stats.daysInCurrentStage = daysInStage;
+        }
+      }
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Failed to get relationship stats:", error);
+      res.status(500).json({ error: "Failed to retrieve stats" });
     }
   });
 
