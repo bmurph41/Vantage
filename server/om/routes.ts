@@ -1,14 +1,18 @@
 import { Router } from "express";
 import { omStorage } from "./storage";
+import { db } from "../db";
 import { 
   insertOmSchema, 
   insertOmPageSchema, 
   insertOmBlockSchema, 
   insertOmTemplateSchema, 
-  insertOmDatasetSchema 
+  insertOmDatasetSchema,
+  deals,
+  modelingProjects
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { generateOmContent, improveContent, suggestLayout, type GenerateRequest } from "./ai-service";
@@ -621,15 +625,24 @@ router.get("/datasets/:id/sheet/:sheetName", async (req, res) => {
 
 router.get("/data-facade/sources/:projectId", async (req, res) => {
   try {
-    const datasets = await omStorage.getDatasetsByProjectId(req.params.projectId);
+    const { projectId } = req.params;
+    const { omId } = req.query;
+    const datasets = await omStorage.getDatasetsByProjectId(projectId);
     
-    const sources = [
+    const sources: Array<{
+      id: string;
+      name: string;
+      type: string;
+      sourceType: string;
+      sheetNames?: string[];
+      metadata?: any;
+    }> = [
       ...datasets.map(d => ({
         id: d.id,
         name: d.name,
         type: d.type,
         sourceType: 'dataset',
-        sheetNames: d.sheetNames,
+        sheetNames: d.sheetNames ?? [],
         metadata: d.metadata,
       })),
       { id: "underwriting", name: "Underwriting Model", type: "internal", sourceType: 'marinamatch' },
@@ -637,6 +650,16 @@ router.get("/data-facade/sources/:projectId", async (req, res) => {
       { id: "rent-roll", name: "Rent Roll", type: "internal", sourceType: 'marinamatch' },
       { id: "market-demographics", name: "Market Demographics", type: "api", sourceType: 'external' },
     ];
+    
+    if (omId && typeof omId === 'string') {
+      const om = await omStorage.getOmById(omId);
+      if (om?.dealId) {
+        sources.push({ id: `deal-${om.dealId}`, name: "Linked CRM Deal", type: "internal", sourceType: 'crm' });
+      }
+      if (om?.modelingProjectId) {
+        sources.push({ id: `modeling-${om.modelingProjectId}`, name: "Linked Modeling Project", type: "internal", sourceType: 'modeling' });
+      }
+    }
     
     res.json(sources);
   } catch (error) {
@@ -649,6 +672,58 @@ router.get("/data-facade/data/:sourceId", async (req, res) => {
   try {
     const { sourceId } = req.params;
     const { sheet, projectId } = req.query;
+    
+    if (sourceId.startsWith('deal-')) {
+      const dealId = sourceId.replace('deal-', '');
+      const deal = await db.query.deals.findFirst({
+        where: eq(deals.id, dealId),
+      });
+      if (deal) {
+        return res.json({
+          id: deal.id,
+          name: deal.name,
+          propertyName: deal.propertyName,
+          propertyType: deal.propertyType,
+          address: deal.address,
+          city: deal.city,
+          state: deal.state,
+          asking_price: deal.purchasePrice,
+          stage: deal.stage,
+          status: deal.status,
+          probability: deal.probability,
+          noi: deal.noi,
+          capRate: deal.capRate,
+          slips: deal.slips,
+          square_footage: deal.squareFootage,
+          notes: deal.notes,
+        });
+      }
+      return res.status(404).json({ error: "Deal not found" });
+    }
+    
+    if (sourceId.startsWith('modeling-')) {
+      const modelingProjectId = sourceId.replace('modeling-', '');
+      const project = await db.query.modelingProjects.findFirst({
+        where: eq(modelingProjects.id, modelingProjectId),
+      });
+      if (project) {
+        return res.json({
+          id: project.id,
+          name: project.name,
+          propertyType: project.propertyType,
+          address: project.address,
+          city: project.city,
+          state: project.state,
+          zip: project.zip,
+          purchasePrice: project.purchasePrice,
+          status: project.status,
+          slipCount: project.slipCount,
+          totalSquareFeet: project.totalSquareFeet,
+          notes: project.notes,
+        });
+      }
+      return res.status(404).json({ error: "Modeling project not found" });
+    }
     
     const dataset = await omStorage.getDatasetById(sourceId);
     if (dataset) {
