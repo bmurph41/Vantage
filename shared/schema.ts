@@ -15025,6 +15025,8 @@ export const oms = pgTable("oms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   projectId: varchar("project_id").notNull(),
   organizationId: varchar("organization_id"),
+  dealId: varchar("deal_id").references(() => crmDeals.id, { onDelete: 'set null' }),
+  modelingProjectId: varchar("modeling_project_id").references(() => modelingProjects.id, { onDelete: 'set null' }),
   name: text("name").notNull(),
   status: omStatusEnum("status").notNull().default('draft'),
   version: integer("version").notNull().default(1),
@@ -15036,6 +15038,8 @@ export const oms = pgTable("oms", {
 }, (table) => ({
   projectIdx: index("oms_project_idx").on(table.projectId),
   orgIdx: index("oms_org_idx").on(table.organizationId),
+  dealIdx: index("oms_deal_idx").on(table.dealId),
+  modelingProjectIdx: index("oms_modeling_project_idx").on(table.modelingProjectId),
 }));
 
 export const omPages = pgTable("om_pages", {

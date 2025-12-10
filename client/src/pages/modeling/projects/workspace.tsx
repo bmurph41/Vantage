@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useLocation } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,12 +29,15 @@ import {
   History,
   Layers,
   Link2,
-  SlidersHorizontal
+  SlidersHorizontal,
+  FileText
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
 import { FavoriteButton, PinButton } from '@/components/quick-access';
 import { useTrackRecent } from '@/hooks/use-track-recent';
 import { formatCurrency } from '@/lib/formatUtils';
+import { apiRequest } from '@/lib/queryClient';
+import { toast } from '@/hooks/use-toast';
 
 import WorkspaceOverview from './workspace/overview';
 import WorkspaceInputs from './workspace/inputs';
@@ -57,11 +60,35 @@ export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState('overview');
+  const queryClient = useQueryClient();
 
   const { data: project, isLoading } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
     enabled: !!projectId,
   });
+
+  const createOmMutation = useMutation({
+    mutationFn: (data: { projectId: string; name: string; status: string; modelingProjectId: string }) =>
+      apiRequest('/api/om/oms', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: (newOm: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/om/oms'] });
+      toast({ title: "OM Created", description: "Offering Memorandum created successfully." });
+      navigate(`/om/builder/${newOm.id}`);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create OM.", variant: "destructive" });
+    }
+  });
+
+  const handleCreateOm = () => {
+    if (!project) return;
+    createOmMutation.mutate({
+      projectId: `modeling-${projectId}`,
+      name: `${project.marinaName} - Offering Memorandum`,
+      status: 'draft',
+      modelingProjectId: projectId!,
+    });
+  };
 
   useTrackRecent({
     itemType: 'modeling_project',
@@ -153,6 +180,16 @@ export default function ProjectWorkspace() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCreateOm}
+            disabled={createOmMutation.isPending}
+            data-testid="button-create-om"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            {createOmMutation.isPending ? 'Creating...' : 'Create OM'}
+          </Button>
           <PinButton
             itemType="modeling_project"
             itemId={projectId}

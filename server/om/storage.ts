@@ -22,6 +22,8 @@ export interface IOmStorage {
   getOmById(id: string): Promise<Om | undefined>;
   getOmsByProjectId(projectId: string): Promise<Om[]>;
   getOmsByOrganizationId(organizationId: string): Promise<Om[]>;
+  getOmsByDealId(dealId: string): Promise<Om[]>;
+  getOmsByModelingProjectId(modelingProjectId: string): Promise<Om[]>;
   createOm(om: InsertOm): Promise<Om>;
   updateOm(id: string, om: Partial<InsertOm>): Promise<Om | undefined>;
   deleteOm(id: string): Promise<void>;
@@ -72,6 +74,22 @@ export class OmDbStorage implements IOmStorage {
       .select()
       .from(oms)
       .where(eq(oms.organizationId, organizationId))
+      .orderBy(desc(oms.updatedAt));
+  }
+
+  async getOmsByDealId(dealId: string): Promise<Om[]> {
+    return db
+      .select()
+      .from(oms)
+      .where(eq(oms.dealId, dealId))
+      .orderBy(desc(oms.updatedAt));
+  }
+
+  async getOmsByModelingProjectId(modelingProjectId: string): Promise<Om[]> {
+    return db
+      .select()
+      .from(oms)
+      .where(eq(oms.modelingProjectId, modelingProjectId))
       .orderBy(desc(oms.updatedAt));
   }
 

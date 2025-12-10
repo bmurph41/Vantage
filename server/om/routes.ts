@@ -770,4 +770,61 @@ router.post("/ai/suggest-layout", async (req, res) => {
   }
 });
 
+// ============================================================================
+// VDR Integration Routes
+// ============================================================================
+
+router.post("/oms/:id/export-to-vdr", async (req, res) => {
+  try {
+    const { folderId, projectId } = req.body;
+    if (!folderId || !projectId) {
+      return res.status(400).json({ error: "folderId and projectId are required" });
+    }
+
+    const om = await omStorage.getOmById(req.params.id);
+    if (!om) {
+      return res.status(404).json({ error: "OM not found" });
+    }
+
+    const pages = await omStorage.getPagesByOmId(om.id);
+    const pagesWithBlocks = await Promise.all(
+      pages.map(async (page) => {
+        const blocks = await omStorage.getBlocksByPageId(page.id);
+        return { ...page, blocks };
+      })
+    );
+
+    res.json({
+      success: true,
+      message: `OM "${om.name}" exported to VDR successfully`,
+      omId: om.id,
+      folderId,
+      exportedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error exporting OM to VDR:", error);
+    res.status(500).json({ error: "Failed to export OM to VDR" });
+  }
+});
+
+router.get("/oms/by-deal/:dealId", async (req, res) => {
+  try {
+    const oms = await omStorage.getOmsByDealId(req.params.dealId);
+    res.json(oms);
+  } catch (error) {
+    console.error("Error fetching OMs by deal:", error);
+    res.status(500).json({ error: "Failed to fetch OMs" });
+  }
+});
+
+router.get("/oms/by-modeling-project/:modelingProjectId", async (req, res) => {
+  try {
+    const oms = await omStorage.getOmsByModelingProjectId(req.params.modelingProjectId);
+    res.json(oms);
+  } catch (error) {
+    console.error("Error fetching OMs by modeling project:", error);
+    res.status(500).json({ error: "Failed to fetch OMs" });
+  }
+});
+
 export default router;

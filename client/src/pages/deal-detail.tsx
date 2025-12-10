@@ -17,8 +17,12 @@ import {
   Anchor,
   MapPin,
   FileText,
-  FolderOpen
+  FolderOpen,
+  FileSpreadsheet
 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { toast } from "@/hooks/use-toast";
 import type { Deal, Contact, Company } from "@shared/schema";
 import ConvertToProjectModal from "@/components/modals/convert-to-project-modal";
 
@@ -68,11 +72,35 @@ export default function DealDetail() {
   const [, setLocation] = useLocation();
   const dealId = params.dealId;
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: deal, isLoading, error } = useQuery<DealWithRelations>({
     queryKey: ['/api/deals', dealId],
     enabled: !!dealId,
   });
+
+  const createOmMutation = useMutation({
+    mutationFn: (data: { projectId: string; name: string; status: string; dealId: string }) =>
+      apiRequest('/api/om/oms', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: (newOm: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/om/oms'] });
+      toast({ title: "OM Created", description: "Offering Memorandum created successfully." });
+      setLocation(`/om/builder/${newOm.id}`);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create OM.", variant: "destructive" });
+    }
+  });
+
+  const handleCreateOm = () => {
+    if (!deal) return;
+    createOmMutation.mutate({
+      projectId: `deal-${dealId}`,
+      name: `${deal.title} - Offering Memorandum`,
+      status: 'draft',
+      dealId: dealId!,
+    });
+  };
 
   const handleBack = () => {
     setLocation('/deals');
@@ -153,6 +181,16 @@ export default function DealDetail() {
               Convert to DD Project
             </Button>
           )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleCreateOm}
+            disabled={createOmMutation.isPending}
+            data-testid="button-create-om"
+          >
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            {createOmMutation.isPending ? 'Creating...' : 'Create OM'}
+          </Button>
           <Button variant="outline" size="sm" data-testid="button-edit">
             <Edit className="w-4 h-4 mr-2" />
             Edit Deal
