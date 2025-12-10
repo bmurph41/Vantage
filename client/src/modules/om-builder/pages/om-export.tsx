@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useRoute } from "wouter";
-import { ArrowLeft, Download, Printer, FileText, Mail, Share2 } from "lucide-react";
+import { ArrowLeft, Download, Printer, FileText, Mail, Share2, FolderLock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import type { Om } from "@shared/schema";
 
 export default function OMExport() {
@@ -47,6 +48,34 @@ export default function OMExport() {
     toast({ 
       title: "Coming Soon", 
       description: "Email sharing will be available in a future update." 
+    });
+  };
+
+  const exportToVdrMutation = useMutation({
+    mutationFn: (data: { folderId: string; projectId: string }) =>
+      apiRequest(`/api/om/oms/${omId}/export-to-vdr`, { 
+        method: 'POST', 
+        body: JSON.stringify(data) 
+      }),
+    onSuccess: () => {
+      toast({ 
+        title: "Saved to Data Room", 
+        description: "OM has been saved to the Virtual Data Room." 
+      });
+    },
+    onError: () => {
+      toast({ 
+        title: "Error", 
+        description: "Failed to save to VDR.", 
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const handleExportToVdr = () => {
+    exportToVdrMutation.mutate({
+      folderId: 'default-folder',
+      projectId: om?.projectId || 'default-project',
     });
   };
 
@@ -157,6 +186,16 @@ export default function OMExport() {
                 <Button variant="outline" className="w-full justify-start" onClick={handleEmail}>
                   <Share2 className="w-4 h-4 mr-2" />
                   Share Link
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={handleExportToVdr}
+                  disabled={exportToVdrMutation.isPending}
+                  data-testid="button-export-vdr"
+                >
+                  <FolderLock className="w-4 h-4 mr-2" />
+                  {exportToVdrMutation.isPending ? 'Saving...' : 'Save to Data Room'}
                 </Button>
               </CardContent>
             </Card>
