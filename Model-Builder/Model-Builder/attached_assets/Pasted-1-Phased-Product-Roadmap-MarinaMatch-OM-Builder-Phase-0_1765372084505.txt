@@ -1,0 +1,850 @@
+1. Phased Product Roadmap – MarinaMatch OM Builder
+Phase 0 – Foundation & Alignment
+
+Goal: Make sure the OM Builder plugs cleanly into your existing stack and data model without breaking anything.
+
+Objectives:
+
+Confirm:
+
+Where “Projects/Deals” live (table & route names).
+
+Where underwriting, sales comps, rent comps, and demographics are stored and how they’re exposed via APIs.
+
+Decide:
+
+URL structure for OM Builder routes.
+
+Where to store OM-related schema (Drizzle) and frontend modules.
+
+Key decisions:
+
+Use existing project/deal entity as the “parent” of every OM:
+
+Each OM always belongs to a single project.
+
+Create a data façade for OM consumption:
+
+/api/om-data/underwriting/:projectId
+
+/api/om-data/sales-comps/:projectId
+
+/api/om-data/rent-comps/:projectId
+
+/api/om-data/market/:projectId
+
+/api/om-data/demographics/:projectId
+
+Phase 1 – Core OM Editor (No AI, Minimal Data Binding)
+
+Goal: A fully functional OM editor wired to projects: OMs → pages → blocks, with CRUD + drag-and-drop, and the ability to export a simple-but-professional PDF.
+
+User Stories
+
+As a user, I can:
+
+Create an OM for a project.
+
+Add/remove/reorder pages within that OM.
+
+Add/remove/reorder content blocks (text, KPI, chart placeholder, table placeholder, image placeholder, map placeholder).
+
+Click into a block to edit its content and style.
+
+Save and re-open OMs later.
+
+Export as a decent PDF.
+
+Backend (Phase 1)
+
+Drizzle schema (new tables)
+
+Create new schema file, e.g. /backend/db/schema/om.ts with:
+
+oms
+
+om_pages
+
+om_blocks
+
+om_templates (basic structure, but template features will really come in Phase 2–3)
+
+We already defined fields; Phase 1 uses:
+
+oms: id, project_id, name, status, version, settings, created_by, updated_by, timestamps.
+
+om_pages: id, om_id, title, order_index, layout, timestamps.
+
+om_blocks: id, page_id, type, order_index, content, data_binding, style, ai_metadata, timestamps.
+
+om_templates: id, owner_type, owner_id, name, scope, category, template_data, created_by, timestamps.
+
+Even if templates are underused in P1, creating the table now avoids schema churn.
+
+Routes / Controllers
+
+Create OM routes (e.g., /backend/routes/omBuilder.ts) and mount under /api.
+
+Implement:
+
+GET /api/projects/:projectId/oms – list project OMs
+
+POST /api/projects/:projectId/oms – create OM
+
+GET /api/oms/:omId – fetch OM with pages + blocks tree
+
+PATCH /api/oms/:omId – update OM name/status/settings
+
+DELETE /api/oms/:omId – delete (follow your project’s soft/hard delete pattern)
+
+Pages:
+
+POST /api/oms/:omId/pages
+
+PATCH /api/om-pages/:pageId
+
+PATCH /api/oms/:omId/pages/reorder
+
+DELETE /api/om-pages/:pageId (and cascade blocks)
+
+Blocks:
+
+POST /api/om-pages/:pageId/blocks
+
+PATCH /api/om-blocks/:blockId
+
+PATCH /api/om-pages/:pageId/blocks/reorder
+
+DELETE /api/om-blocks/:blockId
+
+Data binding + AI can be placeholders for now (data_binding and ai_metadata default to null/empty).
+
+Security & Ownership
+
+Restrict OMs to:
+
+Current user’s org (use your existing project ownership logic).
+
+Protect endpoints with your auth middleware.
+
+Frontend (Phase 1)
+
+Routes:
+
+/projects/:projectId/oms – OM list for project
+
+/projects/:projectId/oms/:omId/builder – OM Builder
+
+New module structure (adapt names to your repo):
+
+/frontend/src/modules/om-builder/OmBuilderPage.tsx
+
+/frontend/src/modules/om-builder/OmSidebar.tsx
+
+/frontend/src/modules/om-builder/OmCanvas.tsx
+
+/frontend/src/modules/om-builder/OmInspector.tsx
+
+/frontend/src/modules/om-builder/BlockRenderer.tsx
+
+/frontend/src/modules/om-builder/omApi.ts
+
+/frontend/src/modules/om-builder/omTypes.ts
+
+/frontend/src/modules/om-builder/OmTemplatePicker.tsx (stub)
+
+/frontend/src/modules/om-builder/OmDataBindingPanel.tsx (stub / basic)
+
+Features (Phase 1):
+
+OmBuilderPage
+
+Fetch OM tree (OM + pages + blocks).
+
+Manage state: selectedPageId, selectedBlockId.
+
+Layout: flex with left sidebar, center canvas, right inspector.
+
+OmSidebar
+
+Pages list: reorderable (dnd-kit or existing drag lib).
+
+Add page.
+
+Basic block palette:
+
+Text
+
+KPI
+
+Chart (placeholder)
+
+Table (placeholder)
+
+Image
+
+Map (placeholder)
+
+Drag block types to the canvas (or click-to-add at bottom).
+
+OmCanvas
+
+Render current page’s blocks in vertical stack.
+
+Each block clickable to select.
+
+Drag-and-drop reordering.
+
+BlockRenderer
+
+Shows:
+
+Text: markdown rendered (or simple text).
+
+KPI: label + placeholder value.
+
+Chart/Table/Map: placeholder card with message “Configure in inspector”.
+
+Image: image if URL exists, else placeholder.
+
+OmInspector
+
+If OM selected:
+
+Name, status, basic settings.
+
+If Page selected:
+
+Title, layout (simple fields).
+
+If Block selected:
+
+Content editor:
+
+For text: textarea/multiline input.
+
+For KPI: label, format, fallback text.
+
+For image: URL input.
+
+For chart/table/map: config fields (even if not yet wired to data).
+
+Style panel: alignment, basic typography, card appearance.
+
+PDF Export (simple)
+
+Add a “Export to PDF” button on the Builder page.
+
+Use your existing HTML-to-PDF approach or integrate something like a backend PDF render route:
+
+POST /api/oms/:omId/export → returns PDF file/URL.
+
+Acceptance Criteria (Phase 1):
+
+You can:
+
+Create an OM for a project.
+
+Add multiple pages.
+
+Add multiple blocks to a page and reorder them.
+
+Change text and image content.
+
+Persist and reload everything.
+
+Generate a functional PDF (even if styling is basic).
+
+Phase 2 – Data Binding + AI Text Generation + Basic Templates
+
+Goal: Turn the static editor into a data-aware, AI-assisted OM builder.
+
+User Stories
+
+As a user, I can:
+
+Bind KPI/chart/table blocks to real project data (underwriting, comps, demographics).
+
+Click “Draft with AI” to generate text for Exec Summary, Highlights, Market Overview.
+
+Save a page or block configuration as a template for future deals.
+
+Backend (Phase 2)
+
+OM Data Facade Endpoints
+
+Implement:
+
+GET /api/om-data/underwriting/:projectId
+
+GET /api/om-data/sales-comps/:projectId
+
+GET /api/om-data/rent-comps/:projectId
+
+GET /api/om-data/market/:projectId
+
+GET /api/om-data/demographics/:projectId
+
+Each returns:
+
+{
+  metrics: Record<string, number | string>,
+  series: Array<{
+    id: string;
+    label: string;
+    data: Array<{ x: string | number | Date; y: number }>;
+  }>,
+  tables: Array<{
+    id: string;
+    label: string;
+    columns: { id: string; label: string }[];
+    rows: Record<string, any>[];
+  }>
+}
+
+
+Map your existing data into this generic shape. For example:
+
+Underwriting metrics: NOI_Year1, CapRateEntry, PurchasePrice, etc.
+
+Series: noiByYear, revenueByYear.
+
+Tables: T-12 P&L summary.
+
+AI Text Routes (wired to a provider)
+
+Create:
+
+POST /api/ai/om/generate-layout
+
+POST /api/ai/om/generate-text
+
+Use environment variables for API keys. Start simple:
+
+generate-layout:
+
+Input: project summary + modules available.
+
+Output: JSON describing suggested pages and blocks (we already defined that schema previously).
+
+generate-text:
+
+Input: projectId, prompt type (e.g., "exec_summary"), optional existingText.
+
+Output: draft text.
+
+Template Routes (build out)
+
+Implement full CRUD for om_templates (Phase 1 stub becomes real usage).
+
+Add logic in /api/oms/:omId/apply-template:
+
+For scope='page': create page + blocks from template_data.
+
+For scope='block': create new block on specified page.
+
+Frontend (Phase 2)
+
+Data Binding UI
+
+In OmDataBindingPanel:
+
+If block type is KPI/chart/table:
+
+Show sourceType dropdown: Underwriting, Sales Comps, Rent Comps, Market, Demographics, Manual.
+
+Fetch useOmData(projectId, sourceType) from /api/om-data/....
+
+Show metrics/series/tables depending on type:
+
+KPI: metrics dropdown.
+
+Chart: series dropdown, plus config (xField, yField).
+
+Table: tables dropdown.
+
+Store selection in block.dataBinding.
+
+Rendering wired to data
+
+In BlockRenderer:
+
+Wenn dataBinding exists and sourceType !== 'manual':
+
+Fetch data via useOmData.
+
+Render:
+
+KPI: value from metrics[bindingRole or selectedMetric].
+
+Chart: use your chart library to draw data.
+
+Table: render rows/columns.
+
+AI Text Buttons
+
+In OmInspector for text blocks:
+
+Add:
+
+“Draft with AI” – calls /api/ai/om/generate-text with:
+
+block context (e.g., page type “Executive Summary”)
+
+relevant metrics from /api/om-data/underwriting.
+
+“Refine” – sends existing text + revision instructions.
+
+Templates UI
+
+In OmSidebar:
+
+Add “Save Page as Template” and “Save Block as Template” actions.
+
+Implement OmTemplatePicker:
+
+Load templates with scope='page' or scope='block'.
+
+Apply template to current OM/page via the backend route.
+
+Acceptance Criteria (Phase 2):
+
+KPI/chart/table blocks can show real data from the project.
+
+AI can draft text for at least:
+
+Executive Summary
+
+Investment Highlights
+
+Market Overview
+
+You can save and reuse block/page templates between projects.
+
+Phase 3 – Advanced Layout, Branding, PDFs, and “One-Click OM”
+
+Goal: Make it feel “Buildout-grade” for marinas: polished layouts, strong exports, and near-one-click OM generation.
+
+Key elements:
+
+More layout control (multi-column sections, hero images, better typography).
+
+Branding:
+
+Set logo, colors, fonts at OM or org level.
+
+OM-level presets:
+
+“Marina Equity OM Standard Template”
+
+“Lender Package”
+
+Export enhancements:
+
+High-quality PDFs (correct margins, TOC, page numbers, watermarks).
+
+“Generate OM from Project”:
+
+One button that:
+
+Calls AI layout generator.
+
+Creates OM with pages, blocks, data bindings + placeholders.
+
+Drafts text for key sections.
+
+(You can treat this phase as its own Replit prompt later.)
+
+Phase 4 – Collaboration, Versions, Reader View
+
+Later-phase ideas:
+
+Version history for OMs.
+
+External “Read-Only OM Viewer” with access control (share links, NDA gating).
+
+Comments / notes per page or block.
+
+2. Implementation Notes / Guardrails
+
+Keep OM Builder decoupled from internal schema details via the /api/om-data/* facade. That way, if your underwriting model evolves, you only adjust that layer.
+
+Keep templates data-agnostic:
+
+Use generic binding keys (“primary_noi_series”, “primary_revenue_mix”), then map those to specific metrics per project behind the scenes.
+
+Do not overcomplicate layout in P1. Stacked blocks in a single column are fine; you can add 2-column layouts later.
+
+3. Replit-Ready Prompt (Roadmap + Implementation Instructions)
+
+Here’s a prompt you can paste into Replit (or Ghostwriter) to get it to build Phase 1 and scaffold for later phases:
+
+You are Replit Ghostwriter / AI pair programmer working on my full-stack MarinaMatch app (React + TS frontend, Express + TS backend, Drizzle ORM + Postgres, Neon, Tailwind + shadcn/ui, TanStack Query, etc.).
+
+YOUR TASK:
+Implement Phase 1 of a new “OM Builder” (Offering Memorandum Builder) module, and scaffold the structure for later phases.
+
+BEFORE WRITING CODE – SCAN & ALIGN
+1. Scan the repo to identify:
+   - The primary “Project” or “Deal” entity (table + types + routes).
+   - Where underwriting, sales comps, rent comps, and demographic/market modules live, even if we won’t fully integrate them yet.
+   - Existing conventions for:
+     - Drizzle schema definitions.
+     - Express router modules.
+     - API naming.
+     - Frontend module and routing structure.
+   - Existing pattern for HTML-to-PDF or report exports (if any).
+
+2. IMPORTANT:
+   - DO NOT rename or refactor existing modules.
+   - Integrate the OM Builder as an **additive** feature, using existing patterns for auth, error handling, and file structure.
+   - Follow existing TypeScript, linting, and formatting conventions.
+
+PHASE ROADMAP (HIGH LEVEL)
+We are building the OM Builder in phases:
+
+- Phase 0: Confirm foundation (you just did via scanning).
+- Phase 1 (DO THIS NOW): Core OM Editor – OMs + pages + blocks with CRUD, drag-and-drop, simple PDF export, no real AI or data-binding.
+- Phase 2 (SCaffold only): Data binding + AI text generation + basic templates.
+- Phase 3+: Advanced layout, branding, one-click OM.
+
+FOCUS NOW: Implement Phase 1 fully, and scaffold the structure for later phases without fully implementing them.
+
+-----------------------------------------------------------------------------
+PHASE 1 – CORE OM EDITOR IMPLEMENTATION
+-----------------------------------------------------------------------------
+
+OBJECTIVE:
+For each Project, allow users to:
+- Create OMs.
+- Add/reorder pages.
+- Add/reorder blocks on each page (text, KPI, chart placeholder, table placeholder, image, map).
+- Edit block content and basic style.
+- Persist everything in Postgres via Drizzle.
+- Export a basic-but-usable PDF.
+
+A. DATABASE – DRIZZLE SCHEMA & MIGRATIONS
+
+1. Create a new Drizzle schema file, e.g. `/backend/db/schema/om.ts`, respecting current project naming patterns (import paths, schema registries, etc.).
+
+2. Define the following tables (adjust naming to match repo conventions: snake_case or camelCase):
+
+TABLE: oms
+- id: primary key (UUID or whatever is standard).
+- project_id: FK → existing projects/deals table, NOT NULL.
+- name: string.
+- status: enum or constrained text: 'draft' | 'published' | 'archived'.
+- version: integer, default 1.
+- settings: JSON, nullable.
+- created_by: FK to users table, if available; nullable if needed.
+- updated_by: FK to users.
+- created_at, updated_at: timestamps with default now().
+
+TABLE: om_pages
+- id: primary key.
+- om_id: FK → oms.id, NOT NULL.
+- title: string.
+- order_index: integer – page ordering within OM.
+- layout: JSON (page-level layout/branding options, can be minimal for now).
+- created_at, updated_at.
+
+TABLE: om_blocks
+- id: primary key.
+- page_id: FK → om_pages.id, NOT NULL.
+- type: text/enum: 'text' | 'chart' | 'table' | 'kpi' | 'image' | 'map' | 'custom'.
+- order_index: integer – vertical order on the page (for now).
+- content: JSON – block-type-specific content. For Phase 1:
+  - text: `{ markdown: string }`
+  - kpi: `{ label: string, format?: 'currency'|'percent'|'number', fallbackText?: string }`
+  - chart/table/image/map: placeholder objects with basic metadata fields.
+- data_binding: JSON, nullable – leave this for Phase 2.
+- style: JSON, nullable – for block appearance (alignment, typography, card style).
+- ai_metadata: JSON, nullable – reserved for AI usage later.
+- created_at, updated_at.
+
+TABLE: om_templates
+- id: primary key.
+- owner_type: 'global' | 'org' | 'user'.
+- owner_id: nullable FK.
+- name: string.
+- scope: 'block' | 'page' | 'om'.
+- category: string.
+- template_data: JSON.
+- created_by, created_at, updated_at.
+
+3. Create migration(s) for these tables, following existing migration infrastructure. Ensure foreign keys match your current schema.
+
+B. BACKEND – EXPRESS ROUTES & CONTROLLERS
+
+Create a new router module, for example `/backend/routes/omBuilder.ts` or `/backend/routes/om/index.ts`, and wire it into the main Express app under a prefix like `/api`.
+
+Implement the following REST endpoints, using TypeScript and Drizzle queries:
+
+1. OM ROUTES
+
+- `GET /api/projects/:projectId/oms`
+  - Validate that the authenticated user has access to this project.
+  - Return list of OMs for that project with: id, name, status, version, timestamps.
+
+- `POST /api/projects/:projectId/oms`
+  - Body: `{ name: string, status?: 'draft'|'published'|'archived', settings?: any }`.
+  - Create an OM associated with the project.
+  - Default status = 'draft', version = 1.
+  - Return created OM.
+
+- `GET /api/oms/:omId`
+  - Return:
+    ```json
+    {
+      "om": { ... },
+      "pages": [
+        { ...page, "blocks": [ ...blocks ] },
+        ...
+      ]
+    }
+    ```
+  - Use joins or multiple queries to assemble this tree.
+
+- `PATCH /api/oms/:omId`
+  - Allow updates to name, status, settings.
+  - Update updated_by and updated_at.
+
+- `DELETE /api/oms/:omId`
+  - Follow existing pattern (soft delete via deleted_at or hard delete). Ensure pages + blocks are also removed or cascade appropriately.
+
+2. PAGE ROUTES
+
+- `POST /api/oms/:omId/pages`
+  - Body: `{ title: string, order_index?: number, layout?: any }`.
+  - If order_index is undefined, append to end (largest order_index + 1).
+  - Return created page.
+
+- `PATCH /api/om-pages/:pageId`
+  - Body can include `{ title?, order_index?, layout? }`.
+  - Persist changes.
+
+- `PATCH /api/oms/:omId/pages/reorder`
+  - Body: `{ pageOrder: { pageId: string; order_index: number }[] }`.
+  - Batch update order_index for given pages.
+
+- `DELETE /api/om-pages/:pageId`
+  - Delete page and its blocks (cascading or manual).
+
+3. BLOCK ROUTES
+
+- `POST /api/om-pages/:pageId/blocks`
+  - Body:
+    ```ts
+    {
+      type: 'text' | 'chart' | 'table' | 'kpi' | 'image' | 'map' | 'custom';
+      order_index?: number;
+      content?: any;
+      style?: any;
+      data_binding?: any; // can be empty for now
+    }
+    ```
+  - If order_index is undefined, append to end.
+  - Return created block.
+
+- `PATCH /api/om-blocks/:blockId`
+  - Partial update for: order_index, content, data_binding, style.
+
+- `PATCH /api/om-pages/:pageId/blocks/reorder`
+  - Body: `{ blockOrder: { blockId: string; order_index: number }[] }`.
+
+- `DELETE /api/om-blocks/:blockId`
+  - Delete block.
+
+4. PERMISSIONS
+
+Use existing auth middleware and helper functions to:
+- Confirm user is authenticated.
+- Confirm user has access to the project the OM belongs to.
+- Return 403 if unauthorized.
+
+C. FRONTEND – OM BUILDER MODULE
+
+Add a new frontend module for the OM Builder. Use existing file/folder conventions. For example:
+
+- `/frontend/src/modules/om-builder/OmBuilderPage.tsx`
+- `/frontend/src/modules/om-builder/OmSidebar.tsx`
+- `/frontend/src/modules/om-builder/OmCanvas.tsx`
+- `/frontend/src/modules/om-builder/OmInspector.tsx`
+- `/frontend/src/modules/om-builder/BlockRenderer.tsx`
+- `/frontend/src/modules/om-builder/omApi.ts`
+- `/frontend/src/modules/om-builder/omTypes.ts`
+- `/frontend/src/modules/om-builder/OmTemplatePicker.tsx` (stub for later)
+- `/frontend/src/modules/om-builder/OmDataBindingPanel.tsx` (stub for later)
+
+1. ROUTING
+
+Add routes using the existing router (e.g., Wouter / React Router):
+
+- `/projects/:projectId/oms` – OM list:
+  - Table or cards listing OMs for that project.
+  - Button: “Create OM”.
+  - Click an OM → go to builder.
+
+- `/projects/:projectId/oms/:omId/builder` – OM Builder:
+  - Loads OmBuilderPage.
+
+2. TYPES (omTypes.ts)
+
+Define TypeScript types that mirror backend schema, e.g.:
+
+- `OmStatus = 'draft' | 'published' | 'archived'`
+- `Om`, `OmPage`, `OmBlockType`, `OmDataBinding`, `OmBlock`, etc.
+
+3. API HOOKS (omApi.ts)
+
+Create hooks using TanStack Query:
+
+- `useProjectOms(projectId)`
+- `useCreateOm(projectId)`
+- `useOm(omId)` – returns `{ om, pages }`.
+- `useCreatePage(omId)`
+- `useUpdatePage(pageId)`
+- `useReorderPages(omId)`
+- `useCreateBlock(pageId)`
+- `useUpdateBlock(blockId)`
+- `useReorderBlocks(pageId)`
+- (Later phases will add template + data + AI hooks.)
+
+4. OmBuilderPage.tsx
+
+Layout:
+
+- Full-page flex: `sidebar | canvas | inspector`.
+- Track in React state:
+  - `selectedPageId`
+  - `selectedBlockId`
+
+Responsibilities:
+
+- Fetch OM tree via `useOm(omId)`.
+- Provide callbacks to Sidebar / Canvas / Inspector:
+  - Change selected page/block.
+  - Add/remove/reorder pages and blocks.
+  - Update block content/style.
+
+5. OmSidebar.tsx
+
+Include:
+
+- Pages section:
+  - List pages, highlight selected.
+  - Drag-and-drop reorder (dnd-kit or existing solution).
+  - Buttons:
+    - “+ Add Page”.
+- Blocks palette:
+  - Buttons or draggable items for:
+    - Text
+    - KPI
+    - Chart
+    - Table
+    - Image
+    - Map
+  - Implement drag-to-canvas OR click-to-add new block at page bottom.
+
+(Templates + AI sections can be stubbed for now.)
+
+6. OmCanvas.tsx
+
+- Show currently selected page.
+- Render blocks via `BlockRenderer` in order_index sequence.
+- Each block clickable:
+  - On click, set selectedBlockId.
+- Use drag-and-drop to reorder blocks within page (and update via `useReorderBlocks`).
+
+7. BlockRenderer.tsx
+
+Render based on `block.type`:
+
+- `text`:
+  - Render `content.markdown` (simple HTML or basic markdown renderer).
+- `kpi`:
+  - Render a card showing label + placeholder value (we will wire data later).
+- `chart`:
+  - Render placeholder card: “Chart block – configure in Inspector”.
+- `table`:
+  - Placeholder table with headers or “Table block – configure in Inspector”.
+- `image`:
+  - Render image if URL present; else placeholder.
+- `map`:
+  - Placeholder card.
+
+Ensure styles match existing MarinaMatch aesthetic (QuickBooks-like cards, etc.).
+
+8. OmInspector.tsx
+
+Panel content changes based on selection:
+
+- If nothing selected:
+  - Show OM-level settings: OM name, status.
+- If page selected:
+  - Editable page title.
+  - Simple layout settings (store in page.layout JSON).
+- If block selected:
+  - Show:
+    - Block type (read-only).
+    - Content editor:
+      - For text: textarea/markdown input.
+      - For KPI: label input, format dropdown, fallback text.
+      - For image: URL and alt.
+      - For chart/table/map: stub fields for config (we will use them later).
+    - Style editor:
+      - Alignment (left/center/right).
+      - Basic typography options.
+      - Card appearance (border/shadow toggles).
+
+D. PDF EXPORT (BASIC)
+
+Implement a simple export so users can download an OM as PDF.
+
+- Option 1 (Backend rendering):
+  - Add route: `POST /api/oms/:omId/export`.
+  - Backend reconstructs HTML for the OM and uses an existing HTML-to-PDF utility.
+  - Return PDF file buffer or URL for download.
+
+- Option 2 (Frontend print-style PDF):
+  - For Phase 1, you can optionally use `window.print()` style flows: open an “export view” that lays out the entire OM and rely on browser PDF print.
+  - Backend rendering is preferred long-term.
+
+Follow existing patterns in the codebase if there is a reporting or exporting module.
+
+E. SCAFFOLDING FOR LATER PHASES (DO NOT FULLY IMPLEMENT)
+
+Create placeholders for:
+
+- `/api/om-data/underwriting/:projectId`, etc., returning stub JSON.
+- AI routes:
+  - `POST /api/ai/om/generate-layout` – stub implementation returning example layout JSON.
+  - `POST /api/ai/om/generate-text` – stub returning placeholder text.
+
+Create frontend stubs:
+
+- `OmDataBindingPanel.tsx` – for now, show “Data binding coming soon”.
+- In Inspector for text blocks, add an “AI Draft (Coming Soon)” disabled button.
+- In Sidebar, add “Templates (Coming Soon)” section with disabled controls.
+
+These stubs should compile and be easy to enhance in future prompts.
+
+F. QUALITY & NON-BREAKING CHANGES
+
+- Ensure type-safety and compile cleanly.
+- Do not break existing routes or components.
+- Use existing auth and error-handling middleware.
+- Keep code modular so Phase 2 (data binding + AI + real templates) can plug in without major refactoring.
+
+OUTPUT EXPECTATION
+
+- All new backend routes and schema defined and wired.
+- All new frontend components and routes implemented.
+- Able to:
+  - Create an OM for a project.
+  - Add pages and blocks, edit content, reorder.
+  - See changes persisted on refresh.
+  - Produce a basic PDF export.
+- Clear and consistent internal naming and comments for future phases.
+
+If repo structure suggests a better file layout or naming, adapt accordingly—but keep the overall architecture:

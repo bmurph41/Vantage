@@ -1,0 +1,718 @@
+You are Replit Ghostwriter / AI pair programmer working on my full-stack MarinaMatch app (React + TS frontend, Express + TS backend, Drizzle + Postgres, Neon, Tailwind + shadcn/ui, TanStack Query, etc.).
+
+ASSUMPTIONS
+- Phase 1 OM Builder is ALREADY implemented and compiling correctly.
+- We have:
+  - `oms`, `om_pages`, `om_blocks`, `om_templates` tables in Drizzle.
+  - Backend routes for OM/Pages/Blocks CRUD.
+  - Frontend OM Builder module with:
+    - `OmBuilderPage`, `OmSidebar`, `OmCanvas`, `OmInspector`, `BlockRenderer`, `omApi`, `omTypes`, etc.
+  - A basic, stacked-block OM editor and a simple PDF export.
+- Phase 1 may already contain *stubs* for `/api/om-data/*` and `/api/ai/om/*` – you must now IMPLEMENT them properly and wire them to the UI.
+
+YOUR GOAL FOR THIS PHASE (PHASE 2)
+1) Implement a **data facade** for the OM Builder:
+   - `/api/om-data/underwriting/:projectId`
+   - `/api/om-data/sales-comps/:projectId`
+   - `/api/om-data/rent-comps/:projectId`
+   - `/api/om-data/market/:projectId`
+   - `/api/om-data/demographics/:projectId`
+   Each returns a consistent schema exposing `metrics`, `series`, and `tables` for the OM.
+
+2) Implement **AI text generation** for OM text blocks:
+   - `POST /api/ai/om/generate-text`
+   - `POST /api/ai/om/generate-layout` (for “Generate OM from Project” initial layout)
+
+3) Fully wire up the **template system**:
+   - CRUD on `om_templates`.
+   - “Save Block/Page/OM as template” from the UI.
+   - “Apply template” into an OM.
+
+4) On the frontend:
+   - Implement real **data binding UI** (`OmDataBindingPanel`).
+   - Update `BlockRenderer` to actually render KPI/Chart/Table with live data.
+   - Add real **AI buttons** in the Inspector to draft/refine text.
+   - Add **Template** UI in sidebar for saving/applying templates.
+   - Implement a basic “Generate OM from Project” button using AI layout suggestion.
+
+Throughout: DO NOT break existing features. Use current patterns for auth, types, and styling.
+
+=======================================================================
+STEP 0 – SCAN + ALIGN
+=======================================================================
+Before coding:
+1. Scan backend:
+   - Underwriting service/routes/models.
+   - Sales comps, rent comps, market/demographics modules.
+   - Any existing helper functions for summarizing metrics or series.
+2. Scan frontend:
+   - How you already fetch underwriting/comps in other modules (e.g., dashboards).
+   - How charts/tables are implemented elsewhere (chart library, table components).
+3. Reuse existing logic where possible. Do NOT duplicate entire modules if a clean abstraction exists.
+
+=======================================================================
+STEP 1 – OM DATA FACADE ENDPOINTS
+=======================================================================
+Create or update a backend module, e.g. `/backend/routes/omData.ts` and mount under `/api/om-data`.
+
+We want each endpoint to return:
+
+```ts
+export interface OmDataResponse {
+  metrics: Record<string, number | string>;
+  series: {
+    id: string;
+    label: string;
+    unit?: 'currency' | 'percent' | 'count' | 'index';
+    data: { x: string | number | Date; y: number }[];
+  }[];
+  tables: {
+    id: string;
+    label: string;
+    description?: string;
+    columns: { id: string; label: string; align?: 'left' | 'right' | 'center' }[];
+    rows: Record<string, any>[];
+  }[];
+}
+1A. Underwriting Data – /api/om-data/underwriting/:projectId
+Implementation details:
+
+Use your existing underwriting model or financial projections for the given projectId.
+
+Populate:
+
+metrics example keys:
+
+purchasePrice
+
+entryCapRate
+
+noiYear1
+
+noiStabilized
+
+occupancyCurrent
+
+occupancyStabilized
+
+revenueYear1
+
+expenseYear1
+
+series examples:
+
+{ id: 'noiByYear', label: 'NOI by Year', data: [{ x: YYYY, y: NOI }, ...] }
+
+{ id: 'revenueByYear', label: 'Revenue by Year', data: [...] }
+
+{ id: 'occupancyByYear', label: 'Occupancy %', unit: 'percent', data: [...] }
+
+tables:
+
+T-12 P&L summary or Pro Forma summary:
+
+id: 't12Pnl', label: 'T-12 Summary'
+
+columns: ['category', 'amount']
+
+rows: [{ category: 'Total Revenue', amount: ... }, ...]
+
+Make sure:
+
+If data is missing, still return a valid structure with empty arrays/objects.
+
+Shield the OM Builder from raw DB complexity: this is a clean, curated view.
+
+1B. Sales Comps – /api/om-data/sales-comps/:projectId
+Use your sales comps module. For the project:
+
+metrics example:
+
+avgCapRate, minCapRate, maxCapRate
+
+avgPpuSlip (price per slip)
+
+numSalesComps
+
+series example:
+
+capRateDistribution by comp (x = compName or index).
+
+tables:
+
+id: 'salesComps', label: 'Sales Comparables'
+
+columns: e.g. ['name', 'distance', 'price', 'capRate', 'ppuSlip']
+
+rows: 1 row per comp.
+
+1C. Rent Comps – /api/om-data/rent-comps/:projectId
+Similar approach:
+
+metrics: avgWetSlipRate, avgDryRackRate, numRentComps
+
+series: rentRateBySlipSize, etc. if available.
+
+tables: main rent comp table (marina name, distance, slip size, rate, occupancy).
+
+1D. Market – /api/om-data/market/:projectId
+Pull from your market intelligence module:
+
+metrics:
+
+population5mi, population10mi, medianIncome, homeValueMedian, etc.
+
+series:
+
+populationTrend, incomeTrend, etc., if you track them.
+
+tables:
+
+Could be an “Economy Summary” or “Tourism Summary”.
+
+1E. Demographics – /api/om-data/demographics/:projectId
+If separate from Market, expose:
+
+metrics: medianAge, hhCount, highIncomeHouseholds, etc.
+
+series: ageDistribution, incomeDistribution, etc.
+
+tables: demographic breakdowns.
+
+IMPORTANT:
+
+If you don’t have robust data yet, create a real, but minimal mapping using whatever’s available and stub the rest.
+
+The main requirement is: the OM Builder gets a predictable, typed JSON structure for each sourceType.
+
+=======================================================================
+STEP 2 – AI TEXT & LAYOUT ENDPOINTS
+Create a backend service layer, e.g. /backend/services/aiOmService.ts.
+
+Use environment variables (do NOT hardcode keys). For example:
+
+AI_PROVIDER (e.g. 'openai' or 'anthropic')
+
+AI_MODEL_OM_TEXT
+
+AI_MODEL_OM_LAYOUT
+
+Define functions:
+
+ts
+Copy code
+async function generateOmLayout(projectId: string): Promise<GeneratedOmLayout> { ... }
+async function generateOmText(args: {
+  projectId: string;
+  blockType: 'exec_summary' | 'investment_highlights' | 'market_overview' | 'risk_factors' | string;
+  existingText?: string;
+}): Promise<string> { ... }
+GeneratedOmLayout shape:
+
+ts
+Copy code
+export interface GeneratedOmLayout {
+  pages: {
+    title: string;
+    blocks: {
+      type: 'text' | 'kpi' | 'chart' | 'table' | 'image' | 'map';
+      role?: string; // e.g. 'exec_summary', 'investment_highlights', 'noi_chart'
+      dataBinding?: {
+        sourceType?: 'underwriting' | 'sales_comps' | 'rent_comps' | 'market' | 'demographics' | 'manual';
+        bindingRole?: string; // e.g. 'noiByYear', 'salesCompsTable'
+      };
+    }[];
+  }[];
+}
+2A. POST /api/ai/om/generate-text
+Route: /api/ai/om/generate-text
+
+Body:
+
+ts
+Copy code
+{
+  projectId: string;
+  blockType: string; // 'exec_summary' | 'investment_highlights' | 'market_overview' | etc.
+  existingText?: string;
+}
+Process:
+
+Fetch OM Data:
+
+Underwriting, comps, market/demographics – at least the relevant subset.
+
+Build a prompt for the model:
+
+Include:
+
+Deal name, location, key numbers (NOI, cap rate, price, slip count, occupancy).
+
+Data summary from underwriting/comps/market.
+
+Role: what section this is (Exec Summary vs Risk Factors).
+
+If existingText present: instruct AI to refine/rewrite rather than start from scratch.
+
+Call AI provider (OpenAI/Anthropic). Use model in env var.
+
+Return trimmed text.
+
+Ensure:
+
+Basic error handling.
+
+Return 400/500 error messages clearly.
+
+2B. POST /api/ai/om/generate-layout
+Route: /api/ai/om/generate-layout
+
+Body:
+
+ts
+Copy code
+{
+  projectId: string;
+}
+Process:
+
+Build a compact summary of the project: type (marina), size, location, key metrics.
+
+Inform AI what modules exist: underwriting, sales comps, rent comps, market/demographics.
+
+Ask AI to propose a page stack with blocks and abstract roles, e.g.:
+
+Page: “Cover”
+
+Block: image (role: 'cover_image')
+
+Block: text (role: 'cover_title')
+
+Page: “Executive Summary”
+
+Block: text (role: 'exec_summary')
+
+Block: KPI strip (role: 'key_metrics')
+
+Page: “Financial Summary”
+
+Block: chart (role: 'noi_chart', dataBinding.sourceType='underwriting', bindingRole='noiByYear')
+
+Block: table (role: 't12_table', dataBinding.sourceType='underwriting', bindingRole='t12Pnl')
+
+Page: “Sales Comps”
+
+etc.
+
+Parse AI JSON response into GeneratedOmLayout.
+
+Return that JSON.
+
+You are not yet automatically building the OM; the frontend will use this layout to populate a new OM or update an existing one.
+
+=======================================================================
+STEP 3 – TEMPLATE SYSTEM FULL IMPLEMENTATION
+We already have om_templates table. Now:
+
+3A. Backend Template CRUD
+In an OM template route module (e.g. /backend/routes/omTemplates.ts):
+
+Implement:
+
+GET /api/om-templates
+
+Query params: scope?, category?, ownerType?.
+
+Filter to templates visible to the current user/org.
+
+POST /api/om-templates
+
+Body:
+
+ts
+Copy code
+{
+  name: string;
+  scope: 'block' | 'page' | 'om';
+  category?: string;
+  owner_type: 'global' | 'org' | 'user';
+  template_data: any;
+}
+Attach owner_id and created_by from auth context.
+
+Save template.
+
+DELETE /api/om-templates/:templateId
+
+Soft delete or hard delete following your pattern.
+
+3B. Apply Template
+Route: POST /api/oms/:omId/apply-template
+
+Body:
+
+ts
+Copy code
+{
+  templateId: string;
+  pageId?: string; // required if scope='block' and you want to place block on a specific page
+}
+Behavior:
+
+Load template.
+
+If scope='block':
+
+Require pageId.
+
+Create a new om_blocks row on that page from template_data with:
+
+New id.
+
+page_id set.
+
+order_index appended.
+
+content, style, data_binding copied.
+
+If scope='page':
+
+Create an om_pages row:
+
+Title & layout from template_data.
+
+om_id from route param.
+
+order_index appended.
+
+For each block in template_data, create om_blocks rows referencing the new page.
+
+If scope='om':
+
+Typically used when OM is empty.
+
+Create multiple pages and blocks from template_data structure.
+
+Note:
+
+Do NOT remap data_binding yet. That can be handled manually by the user in the Inspector, or we can later implement smarter mapping.
+
+=======================================================================
+STEP 4 – FRONTEND DATA BINDING
+Update the OM Builder frontend module.
+
+4A. Types – OmDataResponse
+Update /frontend/src/modules/om-builder/omTypes.ts:
+
+Add:
+
+ts
+Copy code
+export interface OmDataSeries {
+  id: string;
+  label: string;
+  unit?: 'currency' | 'percent' | 'count' | 'index';
+  data: { x: string | number; y: number }[];
+}
+
+export interface OmDataTable {
+  id: string;
+  label: string;
+  description?: string;
+  columns: { id: string; label: string; align?: 'left' | 'right' | 'center' }[];
+  rows: Record<string, any>[];
+}
+
+export interface OmDataResponse {
+  metrics: Record<string, number | string>;
+  series: OmDataSeries[];
+  tables: OmDataTable[];
+}
+Add a type for sourceType:
+
+ts
+Copy code
+export type OmDataSourceType = 'underwriting' | 'sales_comps' | 'rent_comps' | 'market' | 'demographics' | 'manual';
+Update OmDataBinding type:
+
+ts
+Copy code
+export interface OmDataBinding {
+  sourceType: OmDataSourceType;
+  sourceId?: string | null; // usually projectId for now
+  bindingRole?: string; // e.g. 'noiByYear', 'salesCompsTable', 'population5mi'
+  query?: any;
+}
+4B. Hooks – useOmData
+In omApi.ts:
+
+Create a hook:
+
+ts
+Copy code
+export function useOmData(projectId: string, sourceType: OmDataSourceType) {
+  // Map sourceType -> endpoint path
+  // e.g. underwriting -> `/api/om-data/underwriting/${projectId}`
+  // Use TanStack Query; cache by [ 'omData', projectId, sourceType ]
+}
+Return { data, isLoading, error } with data typed as OmDataResponse | undefined.
+
+4C. OmDataBindingPanel.tsx
+Implement the UI for configuring dataBinding on a selected block.
+
+Inputs:
+
+block: OmBlock
+
+onChangeDataBinding: (newBinding: OmDataBinding) => void
+
+projectId: string
+
+UI:
+
+Source Type dropdown:
+
+Options for: Underwriting, Sales Comps, Rent Comps, Market, Demographics, Manual.
+
+When changed, create/replace block.dataBinding.
+
+If sourceType !== 'manual':
+
+Call useOmData(projectId, sourceType).
+
+Show:
+
+Metrics list (metrics keys).
+
+Series list (series[].id with labels).
+
+Tables list (tables[].id with labels).
+
+Based on block.type:
+
+kpi → show only metrics.
+
+chart → show only series.
+
+table → show only tables.
+
+When user picks one, set bindingRole to the chosen id or metric key.
+
+If sourceType === 'manual':
+
+Option: show explanatory text that values will be manually entered in content.
+
+=======================================================================
+STEP 5 – FRONTEND RENDERING OF DATA-BOUND BLOCKS
+Update BlockRenderer.tsx:
+
+Accept additional props:
+
+projectId: string
+
+Possibly sourceTypeDataCache if helpful, but simplest: call hooks inside.
+
+For each block:
+
+If block.dataBinding && block.dataBinding.sourceType !== 'manual':
+
+Use useOmData(projectId, block.dataBinding.sourceType).
+
+Gracefully handle loading / error with skeletons or placeholders.
+
+Rendering:
+
+kpi:
+
+Read bindingRole from block.dataBinding.
+
+From data.metrics[bindingRole], get value.
+
+Format based on content.format (currency/percent/number).
+
+Fallback to content.fallbackText if value undefined.
+
+chart:
+
+Find series with matching id === bindingRole.
+
+Render using existing chart library (e.g., Recharts) with x = data[i].x, y = data[i].y.
+
+table:
+
+Find table with id === bindingRole.
+
+Render as HTML table using columns + rows.
+
+If no binding or data missing:
+
+Show placeholder text, e.g. “No data bound yet” or “Data unavailable; check data source.”
+
+=======================================================================
+STEP 6 – FRONTEND AI TEXT BUTTONS
+Update OmInspector.tsx:
+
+For block.type === 'text':
+
+Show content textarea / markdown editor as in Phase 1.
+
+Add:
+
+Button: “Draft with AI”
+
+Button: “Refine with AI” (only if block has content.markdown).
+
+Implementation:
+
+Add a hook in omApi.ts:
+
+ts
+Copy code
+export function useGenerateOmText() {
+  // returns a mutation calling POST /api/ai/om/generate-text
+}
+When “Draft with AI” clicked:
+
+Call mutation with:
+
+projectId
+
+blockType inferred from page or from a role field (you can add e.g. block.content.role or block.dataBinding.bindingRole if appropriate).
+
+On success: overwrite block.content.markdown with returned text via useUpdateBlock.
+
+When “Refine with AI” clicked:
+
+Same call but send existingText.
+
+Add loading state and error messages.
+
+=======================================================================
+STEP 7 – FRONTEND TEMPLATES
+Update sidebar + inspector for template operations.
+
+7A. Hooks for Templates
+In omApi.ts, add:
+
+useOmTemplates(params) – GET /api/om-templates
+
+useCreateOmTemplate() – POST /api/om-templates
+
+useApplyTemplate(omId) – POST /api/oms/:omId/apply-template
+
+7B. Save Block/Page/OM as Template
+In OmInspector:
+
+When a block is selected:
+
+Add button: “Save Block as Template”.
+
+On click:
+
+Build template_data from the block (excluding id, pageId).
+
+Call useCreateOmTemplate with:
+
+scope: 'block'
+
+name (prompt user or simple text input).
+
+owner_type = 'user' or 'org' (choose appropriate default).
+
+template_data.
+
+When a page is selected:
+
+Button: “Save Page as Template”.
+
+template_data should include page title/layout and its blocks (excluding DB ids).
+
+You can add a “Save OM as Template” at OM-level later, but do not overcomplicate.
+
+7C. Apply Template
+In OmSidebar:
+
+Add “Templates” tab or section.
+
+Show a list of templates returned by useOmTemplates({ scope: 'page' | 'block' }).
+
+Allow:
+
+Apply a page template → calls useApplyTemplate(omId) with templateId, no pageId.
+
+Apply a block template → when a page is selected, call useApplyTemplate(omId) with templateId and pageId.
+
+After applying, refetch OM via useOm.
+
+=======================================================================
+STEP 8 – ONE-CLICK “GENERATE OM FROM PROJECT” (V1)
+Add a button somewhere in the OM list or builder, e.g.:
+
+On /projects/:projectId/oms:
+
+Button: “Generate OM from Project (AI)”:
+
+Calls /api/ai/om/generate-layout with projectId.
+
+THEN:
+
+Create a new OM via /api/projects/:projectId/oms.
+
+For each generated page:
+
+Create OM page.
+
+For each block:
+
+Create OM block with:
+
+type from layout.
+
+dataBinding from layout’s dataBinding (if present).
+
+content: stub content:
+
+For text blocks with role like 'exec_summary', you may call generate-text and pre-fill; or keep as placeholder and let user click AI in the Builder.
+
+Redirect to /projects/:projectId/oms/:omId/builder.
+
+This is a minimal but functional “one-click OM skeleton”.
+
+=======================================================================
+STEP 9 – QUALITY, TESTING, NON-BREAKING
+Ensure:
+
+New endpoints all require auth.
+
+Data facade returns reasonable values even when upstream modules have partial data.
+
+Frontend handles loading/error states gracefully.
+
+Add at least basic tests for:
+
+GET /api/om-data/underwriting/:projectId returns a valid OmDataResponse.
+
+POST /api/ai/om/generate-text returns string and handles missing project gracefully (error).
+
+Template apply logic creates new pages/blocks correctly.
+
+=======================================================================
+EXPECTED END STATE FOR PHASE 2
+After this work, in the OM Builder I should be able to:
+
+Pick a KPI block, bind it to a real underwriting metric, and see the correct number.
+
+Pick a chart block, bind it to a real series (NOI over time, etc.), and see a real chart.
+
+Pick a table block, bind it to sales or rent comps, and see the actual comp table.
+
+Click “Draft with AI” on a text block and get a credible draft Exec Summary or Market Overview that uses the project’s real numbers and comps.
+
+Save a page or block as a template, and then apply that template on another OM.
+
+Optionally click “Generate OM from Project” to create a starter OM populated with recommended pages/blocks and data bindings.
+
+Please implement all of the above respecting existing conventions, keeping the codebase compiling and type-safe, and minimizing any breaking changes.
+
+makefile
+Copy code

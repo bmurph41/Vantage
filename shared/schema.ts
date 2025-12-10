@@ -15012,6 +15012,138 @@ export const insertAiFilterPatternSchema = createInsertSchema(marinaAiFilterPatt
 export type AiFilterPattern = typeof marinaAiFilterPatterns.$inferSelect;
 
 // ============================================================================
+// OM Builder Module (Offering Memorandum Builder)
+// Tables for building and managing investment offering memorandums
+// ============================================================================
+
+export const omStatusEnum = pgEnum("om_status", ["draft", "review", "published", "archived"]);
+export const omTemplateScopeEnum = pgEnum("om_template_scope", ["block", "page", "om"]);
+export const omTemplateOwnerTypeEnum = pgEnum("om_template_owner_type", ["global", "org", "user"]);
+export const omDatasetTypeEnum = pgEnum("om_dataset_type", ["underwriting", "sales_comps", "rent_comps", "market", "demographics", "custom"]);
+
+export const oms = pgTable("oms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  projectId: varchar("project_id").notNull(),
+  organizationId: varchar("organization_id"),
+  name: text("name").notNull(),
+  status: omStatusEnum("status").notNull().default('draft'),
+  version: integer("version").notNull().default(1),
+  settings: jsonb("settings"),
+  createdBy: varchar("created_by"),
+  updatedBy: varchar("updated_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("oms_project_idx").on(table.projectId),
+  orgIdx: index("oms_org_idx").on(table.organizationId),
+}));
+
+export const omPages = pgTable("om_pages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  omId: varchar("om_id").notNull().references(() => oms.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  orderIndex: integer("order_index").notNull(),
+  layout: jsonb("layout"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  omIdx: index("om_pages_om_idx").on(table.omId),
+}));
+
+export const omBlocks = pgTable("om_blocks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  pageId: varchar("page_id").notNull().references(() => omPages.id, { onDelete: 'cascade' }),
+  type: text("type").notNull(),
+  orderIndex: integer("order_index").notNull(),
+  content: jsonb("content").notNull(),
+  dataBinding: jsonb("data_binding"),
+  style: jsonb("style"),
+  aiMetadata: jsonb("ai_metadata"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  pageIdx: index("om_blocks_page_idx").on(table.pageId),
+}));
+
+export const omTemplates = pgTable("om_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  ownerType: omTemplateOwnerTypeEnum("owner_type").notNull(),
+  ownerId: varchar("owner_id"),
+  name: text("name").notNull(),
+  scope: omTemplateScopeEnum("scope").notNull(),
+  category: text("category"),
+  templateData: jsonb("template_data").notNull(),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  ownerIdx: index("om_templates_owner_idx").on(table.ownerType, table.ownerId),
+  scopeIdx: index("om_templates_scope_idx").on(table.scope),
+}));
+
+export const omDatasets = pgTable("om_datasets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  projectId: varchar("project_id").notNull(),
+  organizationId: varchar("organization_id"),
+  name: text("name").notNull(),
+  type: omDatasetTypeEnum("type").notNull(),
+  sourceFileName: text("source_file_name"),
+  data: jsonb("data").notNull(),
+  sheetNames: text("sheet_names").array(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("om_datasets_project_idx").on(table.projectId),
+  orgIdx: index("om_datasets_org_idx").on(table.organizationId),
+}));
+
+export const insertOmSchema = createInsertSchema(oms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateOmSchema = insertOmSchema.partial();
+export type Om = typeof oms.$inferSelect;
+export type InsertOm = z.infer<typeof insertOmSchema>;
+
+export const insertOmPageSchema = createInsertSchema(omPages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateOmPageSchema = insertOmPageSchema.partial();
+export type OmPage = typeof omPages.$inferSelect;
+export type InsertOmPage = z.infer<typeof insertOmPageSchema>;
+
+export const insertOmBlockSchema = createInsertSchema(omBlocks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateOmBlockSchema = insertOmBlockSchema.partial();
+export type OmBlock = typeof omBlocks.$inferSelect;
+export type InsertOmBlock = z.infer<typeof insertOmBlockSchema>;
+
+export const insertOmTemplateSchema = createInsertSchema(omTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateOmTemplateSchema = insertOmTemplateSchema.partial();
+export type OmTemplate = typeof omTemplates.$inferSelect;
+export type InsertOmTemplate = z.infer<typeof insertOmTemplateSchema>;
+
+export const insertOmDatasetSchema = createInsertSchema(omDatasets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateOmDatasetSchema = insertOmDatasetSchema.partial();
+export type OmDataset = typeof omDatasets.$inferSelect;
+export type InsertOmDataset = z.infer<typeof insertOmDatasetSchema>;
+
+// ============================================================================
 // DockTalk 2.0 Schema Integration
 // Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular

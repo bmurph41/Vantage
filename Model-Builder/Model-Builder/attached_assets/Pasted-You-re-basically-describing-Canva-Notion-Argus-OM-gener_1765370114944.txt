@@ -1,0 +1,453 @@
+You’re basically describing “Canva + Notion + Argus OM generator” that’s wired into your existing datasets. The key is:
+
+AI doesn’t “own” the OM – it proposes layout + language + charts
+
+Your OM editor owns structure – pages, blocks, data bindings, templates
+
+Below is a practical way to architect this in MarinaMatch so it plays nicely with underwriting, comps, and demographics, and lets the user drag/drop sections and save templates.
+
+1. Core Concept: Page/Block OM Editor with Data Bindings
+
+Think of the OM Builder as a page/block editor, not a static PDF generator.
+
+Hierarchy:
+
+Project (underwriting deal)
+
+OM (e.g., “Sunset Marina – Investor OM v1”)
+
+Pages (Cover, Exec Summary, Financials, Comps, Market, Demographics, etc.)
+
+Blocks (text, chart, image, table, map, KPI strip, etc.)
+
+Each block is either:
+
+Static content – user-typed text, uploaded images
+
+Data-bound content – chart/table/text that pulls from:
+
+Underwriting models
+
+Sales comps
+
+Rent comps
+
+Market/demographic datasets
+
+Uploaded docs/parsers (e.g., OM builder can reference parsed P&L)
+
+Then you have Templates:
+
+Block templates (e.g., “Deal Summary blurb”, “Key Metrics strip”)
+
+Page templates (e.g., “Financial Summary page”, “Market Overview page”)
+
+Full OM templates (e.g., “Equity OM – Standard 20 pages”)
+
+Users can drag these from a tool sidebar onto pages, customize, then “Save as Template” for re-use.
+
+2. Suggested Data Model (Postgres/Drizzle)
+
+You can refine this, but roughly:
+
+projects
+
+Already in your app (underwriting projects).
+Key fields: id, name, type, etc.
+
+oms
+
+One OM instance per project or per version.
+
+id
+
+project_id (FK → projects.id)
+
+name (e.g., “Sunset Marina OM – Lender Version”)
+
+status (draft, published, archived)
+
+version (integer)
+
+settings (JSON: branding, colors, fonts, logo, margins)
+
+created_by, updated_by
+
+timestamps
+
+om_pages
+
+id
+
+om_id
+
+title (e.g., “Executive Summary”)
+
+order_index (for page order)
+
+layout (JSON: page size, columns, header/footer settings)
+
+om_blocks
+
+id
+
+page_id
+
+type (text, chart, table, image, kpi, map, custom)
+
+order_index or grid coords (x, y, w, h) if using grid layout
+
+content (JSON – for text blocks; e.g., { markdown: "...", ai_generated: true })
+
+data_binding (JSON – describes what it pulls from)
+
+source_type (underwriting, sales_comp, rent_comp, market, demographics, upload, manual)
+
+source_id (project ID, comp set ID, etc.)
+
+query / selector (e.g., “NOI by year”, “Top 10 rent comps by distance”)
+
+style (JSON – fonts, colors, borders)
+
+ai_metadata (JSON – prompt version, last regen date, etc.)
+
+Templates
+om_templates
+
+id
+
+owner_type (global, user, org)
+
+owner_id (null if global)
+
+name
+
+scope (block, page, om)
+
+template_data (JSON; basically a serialized om/om_page/om_block tree, but with abstracted data bindings)
+
+category (Executive Summary, Financials, Market, etc.)
+
+When a user drags a template in, you:
+
+Clone the template’s definition into new om_pages/om_blocks
+
+Re-bind data sources to the current project (e.g., project_id).
+
+3. Frontend UX: Sidebar + Canvas + Inspector
+
+Build this as a 3-pane layout inside your React app:
+
+Left Sidebar: “OM Builder Tools”
+
+Tabs:
+
+Pages
+
+Page list (sortable, add/remove pages)
+
+“Add Page from Template” (opens template gallery)
+
+Blocks
+
+Draggable block types:
+
+Text section (markdown)
+
+KPI strip
+
+Charts (bar, line, donut, etc.)
+
+Tables (financials, comps, rent rolls)
+
+Images/Logos
+
+Maps/demographics
+
+“Saved Blocks” (user templates)
+
+Templates
+
+Page templates
+
+Full OM templates (preconfigured page stacks)
+
+AI Assist
+
+Buttons:
+
+“Generate Exec Summary”
+
+“Draft Investment Highlights”
+
+“Explain Financials”
+
+“Draft Market Overview”
+
+Use dnd-kit or similar to drag blocks onto the central canvas.
+
+Center: Page Canvas
+
+Shows the active page as a print-friendly layout (letter/landscape, etc.)
+
+Blocks are rendered inside a grid (e.g., react-grid-layout) or simple vertical stack with “move up/down” controls at first.
+
+Clicking a block selects it and highlights it.
+
+Right Panel: Inspector
+
+Changes based on selection:
+
+Page Inspector
+
+Page title, header/footer toggle, background image, etc.
+
+Block Inspector
+
+Content: text editor (markdown), AI buttons (“Improve”, “Make shorter”, “Change tone”)
+
+Data binding:
+
+Source dropdown:
+
+Underwriting
+
+Sales Comps
+
+Rent Comps
+
+Demographics/Market
+
+Then context-specific options (field selectors, metric selectors, comp set selectors, etc.)
+
+Style: font size, weight, alignment, card style.
+
+4. Where AI Drives the Process
+
+You want AI to do the heavy lifting, but keep everything structured.
+
+A. OM Layout Generator
+
+Flow:
+
+User clicks: “New OM from Project”.
+
+You pass to AI:
+
+Project summary (name, location, size, key numbers)
+
+What data modules exist (underwriting ready, comps attached, demographics loaded, etc.)
+
+AI responds with a proposed page list and their block structure, e.g.:
+
+Page 1: Cover (image, title, subtitle, sponsorship info)
+
+Page 2: Investment Highlights (3–6 bullet blocks + metrics)
+
+Page 3: Property Summary (text + photo grid + top KPIs)
+
+Page 4–6: Financials (NOI, T-12 summary, projected 5-year, sensitivity)
+
+Page 7–8: Sales & Rent Comps (maps, tables, charts)
+
+Page 9–10: Market & Demographics (text + graphs + maps)
+
+You convert that into om_pages + om_blocks with data bindings.
+
+B. AI Content Drafting
+
+For any text block, you track:
+
+prompt_base (e.g., “Write an executive summary for this marina investment OM…”)
+
+data_context (structured JSON: metrics, comps summary, location stats)
+
+User actions:
+
+“Draft with AI” → AI returns text → stored in content.markdown with ai_generated: true.
+
+“Refine” → send existing text + instructions (“make more concise”, “LP-friendly tone”, etc.) + same data_context.
+
+Always allow full manual overwrite.
+
+C. AI Chart & Table Suggestions
+
+You can have a feature: “Add Chart from Data”:
+
+User picks source (Underwriting / Sales Comps / Demographics).
+
+You show quick schema (e.g., available fields/time series).
+
+AI suggests:
+
+Chart type (bar for year-by-year NOI, line for occupancy, donut for revenue mix)
+
+Which series to include
+
+Title + axis labels
+
+You store that spec in om_blocks.style or content.chartConfig.
+
+D. AI Re-usable Snippets
+
+Think “snippet library”:
+
+“Risk Factors”
+
+“Business Plan Overview”
+
+“Exit Strategy”
+
+“Sponsor Track Record”
+
+Each snippet is a block template plus an underlying AI prompt that can be re-run per deal.
+
+5. Template System & “Save for Future Use”
+
+You’ll want a clear distinction:
+
+Layout templates – structure and bindings (what data type goes where)
+
+Content templates – prompt structures, not the actual text (because that should be re-generated per deal)
+
+Examples:
+
+Save Page as Template
+
+When user clicks “Save Page as Template”:
+
+Serialize all om_blocks for that page.
+
+Strip out project-specific IDs in data_binding, and instead store abstract roles:
+
+“Primary underwriting model: summary metrics”
+
+“Top 5 sales comps sorted by cap rate”
+
+Save to om_templates with scope = 'page'.
+
+When applied to a new project:
+
+Map abstract roles to that project’s real datasets.
+
+Save Block as Template
+
+For a given block:
+
+Save its layout + style + data binding role.
+
+For AI-powered text, store the base prompt as ai_template_prompt.
+
+When user drags this into a new OM:
+
+You show button: “Generate content from current project data” using that stored prompt pattern.
+
+Save Full OM as Template
+
+Snapshot the entire om tree (pages + blocks).
+
+Remove project-specific IDs in bindings; replace with roles.
+
+Allow user to choose:
+
+Global (available for all their org’s deals)
+
+User only
+
+6. Integration with Existing Modules
+
+For AI + data-binding to be clean, define a data contract per module so the OM Builder doesn’t care how the data is stored internally.
+
+Expose:
+
+/api/om-data/underwriting/:projectId/summary
+
+/api/om-data/underwriting/:projectId/timeseries
+
+/api/om-data/sales-comps/:projectId
+
+/api/om-data/rent-comps/:projectId
+
+/api/om-data/market/:projectId
+
+/api/om-data/demographics/:projectId
+
+Each endpoint returns well-structured JSON with:
+
+metrics (single numbers, e.g., “NOI_Year1”)
+
+series (time series for charts)
+
+tables (rows/cols for comp tables)
+
+Then your OM Builder just:
+
+Reads data_binding.source_type + source_id
+
+Queries appropriate endpoint
+
+Uses chart/table components already in your app (or simplified clones).
+
+7. Recommended Build Phasing
+
+To avoid breaking your app, I’d approach in slices:
+
+Phase 1 – Barebones OM Editor (No AI, Minimal Data Binding)
+
+Build OM, Page, Block tables + CRUD APIs.
+
+Simple UI:
+
+Sidebar: page list + “Add Text Block”, “Add Chart Block” (static placeholder)
+
+Canvas: vertical block list per page
+
+Inspector: text edit, basic style
+
+Allow manual “Export to PDF” of a page stack (even HTML-to-PDF).
+
+Goal: You have a working OM editor with saveable layouts.
+
+Phase 2 – Data-Bound Blocks
+
+Implement data_binding JSON and wire:
+
+Underwriting summary → small KPI blocks
+
+T-12/Pro Forma → table blocks
+
+Sales/rent comps → tables
+
+Market/demographics → a couple of chart types
+
+Add UI for selecting which metric/series a chart pulls from.
+
+Goal: OMs that self-update when the project data changes.
+
+Phase 3 – AI Layout & Content
+
+Add “Generate OM from Project”:
+
+AI proposes page stack + block layout as JSON
+
+You translate to om_pages/om_blocks
+
+Add AI buttons on text blocks to draft/refine copy.
+
+Add block/page templates with saved prompts.
+
+Goal: AI drafts the OM; user edits & arranges visually.
+
+Phase 4 – Templates & Organization-Wide Patterns
+
+Full template library:
+
+Save block/page/OM templates
+
+Share within org, mark favorites
+
+Advanced features:
+
+Version history (snapshots)
+
+“Clone OM for new Offering” (re-bind to new project & comps)

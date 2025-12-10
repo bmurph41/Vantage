@@ -1,0 +1,534 @@
+You are Replit Ghostwriter / AI pair programmer working on my full-stack MarinaMatch app (React + TS, Express + TS, Drizzle + Postgres, Tailwind + shadcn/ui, TanStack Query, etc.).
+
+ASSUMPTIONS
+- Phase 1 OM Builder is fully working:
+  - OMs, pages, blocks stored via Drizzle.
+  - CRUD routes for OMs/pages/blocks.
+  - Basic OM Builder UI (sidebar + canvas + inspector).
+  - Basic PDF export or print flow.
+- Phase 2 is implemented:
+  - `/api/om-data/*` data facade returning `metrics`, `series`, and `tables` for:
+    - Underwriting, Sales Comps, Rent Comps, Market, Demographics.
+  - AI endpoints:
+    - `POST /api/ai/om/generate-text`
+    - `POST /api/ai/om/generate-layout`
+  - Frontend:
+    - Data binding UI for KPI/Chart/Table blocks.
+    - AI draft/refine for text blocks.
+    - Template CRUD and apply (block/page/om).
+    - “Generate OM from Project” initial skeleton.
+
+YOUR GOAL FOR THIS PHASE (PHASE 3)
+Upgrade the OM Builder to feel “pro-level”:
+
+1. **Layout system**: support multiple layout patterns per page and per block (columns, hero sections, image grids).
+2. **Branding system**: OM-level branding config (logo, colors, fonts) applied consistently.
+3. **Export quality**: dedicated export view + improved PDF rendering (headers/footers, page numbers, TOC).
+4. **AI layout integration**: fully wire “Generate OM from Project (AI)” so it creates a real OM with pages and bound blocks, not just a stub.
+5. **Versioning**: simple OM versioning (e.g., v1, v2) and “Clone OM” for lender vs equity versions.
+
+=======================================================================
+STEP 0 – SCAN & ALIGN
+=======================================================================
+Before coding, scan:
+
+1. Backend:
+   - Existing OM schema (`oms`, `om_pages`, `om_blocks`, `om_templates`).
+   - AI OM service implementation (`aiOmService` or similar).
+   - Any existing PDF / reporting utilities.
+2. Frontend:
+   - OM Builder module: how `OmBuilderPage`, `OmCanvas`, `OmInspector`, and `BlockRenderer` are structured.
+   - How charts, tables, and typography are currently styled.
+   - Any shared theme/branding context (colors, fonts).
+
+Follow existing patterns for:
+- Shared UI theme.
+- Shared layout components.
+- API error handling and auth.
+
+=======================================================================
+STEP 1 – PAGE & BLOCK LAYOUT MODEL
+=======================================================================
+We already have `layout` JSON on `om_pages` and `style` on `om_blocks`. Now we will formalize and use them.
+
+### 1A. Define layout types (frontend)
+
+In `omTypes.ts`, define:
+
+```ts
+export type OmPageLayoutType =
+  | 'single-column'
+  | 'two-column'
+  | 'cover'
+  | 'hero-with-body';
+
+export interface OmPageLayoutConfig {
+  layoutType: OmPageLayoutType;
+  showHeader?: boolean;
+  showFooter?: boolean;
+  showPageNumber?: boolean;
+  showTocEntry?: boolean;
+  heroImageUrl?: string;
+  heroOverlay?: boolean;
+  columns?: {
+    leftWidthPercent?: number;  // for two-column
+    rightWidthPercent?: number;
+  };
+}
+Update OmPage type:
+
+ts
+Copy code
+export interface OmPage {
+  // existing
+  layout?: OmPageLayoutConfig;
+}
+For blocks, update style to support positioning in columns:
+
+ts
+Copy code
+export type OmBlockColumn = 'auto' | 'left' | 'right' | 'full';
+
+export interface OmBlockStyle {
+  column?: OmBlockColumn;  // which column this block goes in
+  padding?: string;
+  align?: 'left' | 'center' | 'right';
+  variant?: 'default' | 'card' | 'emphasis';
+  fontSize?: 'sm' | 'md' | 'lg';
+  // extend as needed
+}
+Adjust OmBlock type to have style?: OmBlockStyle.
+
+1B. Persist layout in DB
+Backend:
+
+Ensure om_pages.layout is persisted as JSON and can store OmPageLayoutConfig.
+
+Ensure om_blocks.style persists OmBlockStyle.
+
+No schema change needed if these columns already exist as JSON; just use them consistently.
+
+=======================================================================
+STEP 2 – PAGE LAYOUT UI (INSPECTOR + CANVAS)
+2A. Page Layout Controls (Inspector)
+In OmInspector.tsx, when a page is selected:
+
+Add a “Layout” section:
+
+Dropdown: Layout Type:
+
+Single column
+
+Two column
+
+Cover
+
+Hero with body
+
+Checkboxes:
+
+Show header
+
+Show footer
+
+Show page number
+
+Include in Table of Contents
+
+If layoutType === 'two-column':
+
+Sliders or inputs for left/right width percentage.
+
+If layoutType === 'cover' or 'hero-with-body':
+
+Image URL input for hero.
+
+Toggle for overlay/dim.
+
+When user changes these, call useUpdatePage to update layout JSON.
+
+2B. Block Column Placement (Inspector)
+When a block is selected:
+
+Add a “Layout / Column” section:
+
+Dropdown: “Position”:
+
+Auto
+
+Left column
+
+Right column
+
+Full width
+
+Save this into block.style.column.
+
+2C. Canvas Rendering
+In OmCanvas.tsx:
+
+For each page, inspect page.layout?.layoutType and render differently:
+
+single-column:
+
+Current behavior (stack blocks vertically).
+
+two-column:
+
+Render a CSS grid or flex layout:
+
+Left column and right column.
+
+Partition blocks:
+
+Left: block.style.column === 'left' or auto (default).
+
+Right: block.style.column === 'right'.
+
+Full: block.style.column === 'full' spans both columns (full width).
+
+Use Tailwind grid classes and card styling.
+
+cover:
+
+Top hero image background (from layout.heroImageUrl).
+
+Overlay text blocks (title, subtitle) in a center-aligned block.
+
+Other blocks can be stacked below hero.
+
+hero-with-body:
+
+Large hero section at top (image with overlay).
+
+Body sections below in single or two-column config.
+
+Ensure:
+
+Drag-and-drop still works (block order_index remains the vertical order; column is only layout hint).
+
+=======================================================================
+STEP 3 – BRANDING SYSTEM
+Introduce OM-level branding config stored in oms.settings.
+
+3A. Branding Type
+In omTypes.ts:
+
+ts
+Copy code
+export interface OmBrandingSettings {
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  backgroundColor?: string;
+  fontFamily?: string;
+  logoUrl?: string;
+  headerHeight?: number;
+  footerHeight?: number;
+}
+Update Om type:
+
+ts
+Copy code
+export interface Om {
+  // existing
+  settings?: {
+    branding?: OmBrandingSettings;
+    // keep other settings if present
+  };
+}
+3B. Branding Inspector
+In OmInspector.tsx, when no specific page/block is selected (OM-level selection):
+
+Show “Branding” section:
+
+Logo URL input.
+
+Color pickers or text inputs for:
+
+Primary color
+
+Secondary color
+
+Accent color
+
+Background color
+
+Font family dropdown:
+
+E.g., 'system', 'serif', 'sans', 'mono' or more specific fonts depending on app setup.
+
+On change:
+
+Update om.settings.branding via useUpdateOm.
+
+3C. Apply Branding in UI & Export
+In OmBuilderPage / OmCanvas, provide a local context or props for branding.
+
+Components like BlockRenderer should apply fonts and colors pulled from om.settings.branding:
+
+Default text color, header text color.
+
+Card border/hover states using primaryColor.
+
+For export:
+
+Ensure the export view uses branding settings (logo in header, colors for headings, etc.).
+
+=======================================================================
+STEP 4 – EXPORT VIEW + BETTER PDF
+We want a dedicated “Export View” that lays out the OM exactly as it should appear in PDF.
+
+4A. Export Route (Frontend)
+Add a frontend route:
+
+/projects/:projectId/oms/:omId/export-view
+
+This route:
+
+Fetches the OM tree using useOm(omId).
+
+Renders a “print-optimized” layout:
+
+Each page renders as a full-page section.
+
+Applies:
+
+Branding (logo in header, page number in footer if configured).
+
+Page layout types (single-column, two-column, cover, etc.).
+
+Optionally adds a Table of Contents page if some pages have showTocEntry.
+
+Use CSS (Tailwind + print styles) to control page breaks:
+
+Use CSS properties like break-after: page; between page sections for print.
+
+4B. PDF Export Backend Route
+Refine or add:
+
+POST /api/oms/:omId/export
+
+Implementation options:
+
+If you already have server-side PDF rendering:
+
+Backend uses headless browser or HTML-to-PDF on the same HTML used in export-view.
+
+Endpoint:
+
+Accepts format (pdf) and returns PDF file.
+
+If you rely on client-side print-to-PDF:
+
+Keep export route but just return a URL for the export view.
+
+In the UI, “Export to PDF” triggers window.open(exportViewUrl) plus user uses browser’s built-in PDF print.
+
+This is simpler but less controllable; still acceptable as Phase 3 baseline.
+
+4C. Table of Contents (Optional but nice)
+In export view:
+
+Scan pages where page.layout.showTocEntry === true.
+
+Build a TOC page (page 1 or 2):
+
+List: “1. Executive Summary”, “2. Financial Summary”, etc.
+
+Page numbers can be approximate (based on order) or derived more precisely depending on layout; approximate is ok first.
+
+=======================================================================
+STEP 5 – AI LAYOUT GENERATION → REAL OM CREATION
+Phase 2 created AI layout endpoints. Now we will hook them up so they create a real OM.
+
+5A. Backend Helper – applyGeneratedLayout
+Add a helper in backend, e.g. /backend/services/omLayoutService.ts:
+
+ts
+Copy code
+async function applyGeneratedLayoutToOm(args: {
+  projectId: string;
+  omId: string;
+  layout: GeneratedOmLayout;
+}): Promise<void> {
+  // For each page in layout.pages:
+  //   Create om_pages row.
+  //   For each block:
+  //     Create om_blocks row with:
+  //       type from block.type
+  //       style default or based on role (e.g., exec summary text full width)
+  //       data_binding from block.dataBinding (if provided)
+  //       content: for text-type blocks, you can set role in content: { markdown: '', role: block.role }
+}
+5B. Route – Generate OM via AI
+Add route:
+
+POST /api/projects/:projectId/oms/generate-from-ai
+
+Body:
+
+ts
+Copy code
+{
+  name?: string; // default to e.g. "AI Generated OM"
+}
+Process:
+
+Call existing generateOmLayout(projectId) from AI service.
+
+Create a new OM via existing OM create logic:
+
+Name: from body or default.
+
+Call applyGeneratedLayoutToOm with the returned layout.
+
+Return:
+
+omId
+
+The created OM tree (optional).
+
+Optionally:
+
+For key text blocks with specific roles (exec_summary, investment_highlights, market_overview), you can:
+
+Trigger generateOmText for each in background or sequentially.
+
+Pre-fill content.markdown with AI draft.
+
+For now, you can skip auto-fill and let the user press “Draft with AI” on each section.
+
+5C. Frontend – “Generate OM from Project” Button
+On /projects/:projectId/oms:
+
+Replace/augment existing button with:
+
+“Generate OM from Project (AI)”
+
+On click:
+
+Call POST /api/projects/:projectId/oms/generate-from-ai.
+
+On success, navigate to /projects/:projectId/oms/:omId/builder.
+
+In builder, user sees:
+
+Pre-created pages and blocks.
+
+Data-bound KPI/chart/table blocks.
+
+Empty or partially filled text sections ready for AI refine/draft.
+
+=======================================================================
+STEP 6 – OM VERSIONING
+We want a simple versioning scheme: “Clone OM” and increment version.
+
+6A. Backend – Clone OM Route
+Add:
+
+POST /api/oms/:omId/clone
+
+Body:
+
+ts
+Copy code
+{
+  name?: string;
+  status?: 'draft' | 'published' | 'archived';
+}
+Process:
+
+Fetch OM + pages + blocks for omId.
+
+Compute new version:
+
+For all OMs on same project with same logical base name, get max version and add 1.
+
+Or simpler: newVersion = oldVersion + 1.
+
+Create new OM row:
+
+project_id same.
+
+name from body or originalName + " (Copy)".
+
+version = newVersion.
+
+settings cloned.
+
+For each page:
+
+Create new om_pages row referencing new OM.
+
+For each block:
+
+Create new om_blocks row referencing new pages.
+
+Return new OM id.
+
+6B. Frontend – Clone OM Button
+On /projects/:projectId/oms:
+
+Each OM card/row:
+
+Add “Clone” button (e.g., “… menu → Clone OM”).
+
+On click:
+
+Call /api/oms/:omId/clone.
+
+On success:
+
+Add new OM to list.
+
+Optionally navigate directly to builder for new OM.
+
+In UI, display version number next to OM name (e.g., “Sunset Marina OM (v2)”).
+
+=======================================================================
+STEP 7 – POLISH & NON-BREAKING GUARANTEES
+Be careful to:
+
+Maintain backward-compatibility:
+
+Existing OMs without settings.branding or layout should still render with default layout and styling.
+
+Keep AI usage controlled:
+
+Use environment variables; if AI config is missing, degrade gracefully (buttons disabled with tooltip).
+
+Testing:
+
+Add tests for:
+
+/api/om-data/... still valid.
+
+/api/projects/:projectId/oms/generate-from-ai creates an OM with pages/blocks.
+
+/api/oms/:omId/clone clones structure correctly.
+
+=======================================================================
+EXPECTED END STATE FOR PHASE 3
+After this work, I should be able to:
+
+Choose per-page layout (cover, hero, single/two column) and see blocks placed in left/right/full columns.
+
+Set OM branding (logo, colors, fonts) and see consistent styling across the builder and export view.
+
+Open an “Export View” that shows each page as it will appear in the PDF, with headers/footers/page numbers.
+
+Generate a new OM from a project with a single AI-powered action:
+
+Pages created automatically.
+
+KPI/Charts/Tables pre-bound to underwriting/comps/market data.
+
+Text sections ready for AI draft/refine.
+
+Clone an OM to create new versions (e.g., lender vs equity version) without manually rebuilding.
+
+Implement all of this using the existing code structure, keeping everything compilable, type-safe, and consistent with MarinaMatch’s UI/UX patterns.
+
+pgsql
+Copy code

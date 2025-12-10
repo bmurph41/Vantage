@@ -1,0 +1,85 @@
+MarinaMatch Design System Prompt
+Overall Style
+Enterprise-grade financial dashboard with a professional, data-dense aesthetic. Clean and minimal with strong visual hierarchy, neutral surfaces, and subtle interactive feedback. Prioritizes clarity and scannability for complex financial data.
+
+Color Palette
+Light Mode:
+
+Background: Pure white hsl(0 0% 100%)
+Foreground/Text: Near-black hsl(0 0% 9%)
+Card Background: Very light gray hsl(0 0% 98%)
+Sidebar: Light gray hsl(0 0% 96%)
+Borders: Soft gray hsl(0 0% 89%)
+Primary (Accent): Marine blue hsl(210 100% 45%) with white text
+Secondary: Neutral gray hsl(0 0% 90%)
+Muted Text: Medium gray hsl(0 0% 40%)
+Destructive/Error: Red hsl(0 84% 42%)
+Dark Mode:
+
+Background: Charcoal hsl(0 0% 7%)
+Card Background: Dark gray hsl(0 0% 9%)
+Primary: Brighter azure blue hsl(210 100% 50%)
+Borders/muted elements: Slightly lighter grays
+Typography
+Font Family: IBM Plex Sans (or Inter as fallback), system sans-serif stack
+Headings: H1 = 1.875rem (30px) semibold, H2 = 1.5rem (24px) semibold, H3 = 1.125rem (18px) medium
+Body Text: 1rem (16px) regular, 0.875rem (14px) for dense tables
+Labels/Captions: 0.75rem (12px) medium, often uppercase with letter-spacing
+Numbers/Data: Use tabular-nums for alignment in tables and metrics
+Badges: 0.75rem (12px) uppercase, medium weight
+Buttons
+Border Radius: 6px (rounded-md)
+Sizes: Default 36px height, Small 32px, Large 40px, Icon 36x36px square
+Variants:
+Default: Solid primary blue with matching border
+Secondary: Soft gray fill with subtle border
+Outline: Transparent fill, neutral border
+Ghost: Fully transparent, no border
+Destructive: Solid red
+Hover: Subtle brightness elevation (no dramatic color shifts)
+Focus: 1px ring in primary color
+Text: 14px, medium weight
+Cards & Containers
+Border Radius: 12px (rounded-xl)
+Background: Slightly elevated from page background
+Border: 1px subtle gray
+Shadow: Very subtle (shadow-sm)
+Padding: 24px internal, gap-4 between elements
+Forms & Inputs
+Input Height: 36px
+Border: 1px subtle gray, rounded-md (6px)
+Focus: 2px primary-colored ring
+Labels: Positioned above input, 14px, medium weight
+Helper Text: 14px, muted gray
+Drawers/Modals: 480px wide, fixed footer with Cancel (ghost) + Submit (primary) buttons
+Tables
+Headers: 12-14px, uppercase, tracking-wide, sticky
+Rows: Zebra striping with muted background on alternating rows
+Cell Padding: px-4 py-3
+Numbers: Right-aligned, tabular-nums for alignment
+Hover: Subtle muted tint
+Selected: Slightly elevated background
+Navigation
+Sidebar: 256px width (16rem), collapsible, ghost trigger button
+Tabs: For view switching within pages
+Breadcrumbs: Muted text, slash separators
+Top Header: Contains filters, search, theme toggle
+Icons & Indicators
+Icon Library: Lucide React (16-20px)
+Status Colors: Green for positive trends, red for negative, amber for warnings
+Badges: Small, rounded, uppercase labels with semantic colors
+Tooltips: For explanatory context on hover
+Spacing System
+Base Unit: 4px (0.25rem)
+Card Padding: 16-24px
+Section Gaps: 24-32px vertical
+Grid Gaps: 16-24px
+Container Margins: 16px responsive
+UX Principles
+High data density with clear visual hierarchy
+Consistent alignment and spacing
+Subtle hover/active feedback (brightness shifts, not color changes)
+Explicit focus states for accessibility
+Neutral, trustworthy aesthetic appropriate for financial/enterprise software
+Redundant status signals (color + icon + text)
+Minimal animation/motion
