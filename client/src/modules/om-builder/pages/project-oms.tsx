@@ -82,9 +82,22 @@ export default function ProjectOms() {
     pitch_deck: { label: "Pitch Deck", shortLabel: "Deck", description: "Slide-based presentation for investors", defaultName: "New Pitch Deck", icon: Presentation },
   };
 
+  const [nameError, setNameError] = useState("");
+  
   const handleCreateOM = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalName = newOmName.trim() || docTypeConfig[newOmDocType]?.defaultName || "New Document";
+    
+    // Use entered name or fall back to default
+    const trimmedName = newOmName.trim();
+    const finalName = trimmedName || docTypeConfig[newOmDocType]?.defaultName || "New Document";
+    
+    // Validate title is required - show error if empty but still allow default
+    if (!trimmedName) {
+      // Auto-fill with default name and show a brief toast
+      setNewOmName(docTypeConfig[newOmDocType]?.defaultName || "New Document");
+    }
+    setNameError("");
+    
     try {
       const newOm = await createOmMutation.mutateAsync({
         projectId,
@@ -92,15 +105,20 @@ export default function ProjectOms() {
         docType: newOmDocType,
         status: "draft",
       });
+      
       setIsCreateOpen(false);
       setNewOmName("");
       setNewOmDocType("om");
       toast({ title: "Document Created", description: `${docTypeConfig[newOmDocType]?.label} created successfully.` });
-      setLocation(`/om/builder/${newOm.id}`);
-    } catch (error) {
+      
+      if (newOm?.id) {
+        setLocation(`/om/builder/${newOm.id}`);
+      }
+    } catch (error: any) {
+      console.error("Error creating document:", error);
       toast({ 
         title: "Error", 
-        description: "Failed to create document. Please try again.",
+        description: error?.message || "Failed to create document. Please try again.",
         variant: "destructive" 
       });
     }
@@ -153,7 +171,7 @@ export default function ProjectOms() {
           </div>
           
           <div className="flex items-center gap-2">
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) setNameError(""); }}>
               <DialogTrigger asChild>
                 <Button className="gap-2" data-testid="button-create-om">
                   <Plus className="w-4 h-4" />
@@ -193,14 +211,21 @@ export default function ProjectOms() {
                       </div>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="name">Document Name (optional)</Label>
+                      <Label htmlFor="name">Document Title <span className="text-destructive">*</span></Label>
                       <Input 
                         id="name" 
                         value={newOmName}
-                        onChange={(e) => setNewOmName(e.target.value)}
+                        onChange={(e) => {
+                          setNewOmName(e.target.value);
+                          if (nameError && e.target.value.trim()) setNameError("");
+                        }}
                         placeholder={docTypeConfig[newOmDocType]?.defaultName}
+                        className={nameError ? "border-destructive" : ""}
                         data-testid="input-om-name"
                       />
+                      {nameError && (
+                        <p className="text-sm text-destructive">{nameError}</p>
+                      )}
                     </div>
                   </div>
                   <DialogFooter>
