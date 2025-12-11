@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSe
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "@/hooks/use-toast";
-import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge } from "lucide-react";
+import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -14,11 +14,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { Om, OmPage as OmPageDb, OmBlock as OmBlockDb } from "@shared/schema";
 import type { OmPage, OmBlock, BlockType, OmTheme } from "../types";
 import { defaultThemes } from "../types";
+import { DataBindingPanel } from "../components/data-binding-panel";
 
 interface SortableBlockProps {
   block: OmBlock;
@@ -441,112 +443,151 @@ export default function OMBuilder() {
           <ResizableHandle />
 
           <ResizablePanel defaultSize={25} minSize={20} maxSize={35} className="bg-card border-l border-border">
-            <div className="h-full flex flex-col">
-              <div className="p-3 border-b">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {activeBlock ? 'Block Properties' : 'Page Properties'}
-                </span>
+            <Tabs defaultValue="properties" className="h-full flex flex-col">
+              <div className="p-2 border-b">
+                <TabsList className="w-full grid grid-cols-2">
+                  <TabsTrigger value="properties" className="text-xs" data-testid="tab-properties">
+                    <Settings className="w-3 h-3 mr-1" />
+                    Properties
+                  </TabsTrigger>
+                  <TabsTrigger value="data" className="text-xs" data-testid="tab-data">
+                    <Database className="w-3 h-3 mr-1" />
+                    Data
+                  </TabsTrigger>
+                </TabsList>
               </div>
-              <ScrollArea className="flex-1 p-3">
-                {activeBlock ? (
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-xs">Block Type</Label>
-                      <div className="text-sm font-medium capitalize mt-1">{activeBlock.type}</div>
-                    </div>
-                    
-                    {activeBlock.type === 'text' && (
+              
+              <TabsContent value="properties" className="flex-1 m-0 overflow-hidden">
+                <ScrollArea className="h-full p-3">
+                  {activeBlock ? (
+                    <div className="space-y-4">
                       <div>
-                        <Label className="text-xs">Content</Label>
-                        <Textarea 
-                          value={activeBlock.content?.markdown || ''}
-                          onChange={(e) => updateBlock(activeBlock.id, { 
-                            content: { ...activeBlock.content, markdown: e.target.value }
-                          })}
-                          className="mt-1 min-h-[120px]"
-                          data-testid="textarea-block-content"
-                        />
+                        <Label className="text-xs">Block Type</Label>
+                        <div className="text-sm font-medium capitalize mt-1">{activeBlock.type}</div>
                       </div>
-                    )}
+                      
+                      {activeBlock.type === 'text' && (
+                        <div>
+                          <Label className="text-xs">Content</Label>
+                          <Textarea 
+                            value={activeBlock.content?.markdown || ''}
+                            onChange={(e) => updateBlock(activeBlock.id, { 
+                              content: { ...activeBlock.content, markdown: e.target.value }
+                            })}
+                            className="mt-1 min-h-[120px]"
+                            data-testid="textarea-block-content"
+                          />
+                        </div>
+                      )}
 
-                    {activeBlock.type === 'chart' && (
+                      {activeBlock.type === 'chart' && (
+                        <div>
+                          <Label className="text-xs">Chart Title</Label>
+                          <Input 
+                            value={activeBlock.content?.title || ''}
+                            onChange={(e) => updateBlock(activeBlock.id, { 
+                              content: { ...activeBlock.content, title: e.target.value }
+                            })}
+                            className="mt-1"
+                            data-testid="input-chart-title"
+                          />
+                        </div>
+                      )}
+
+                      {activeBlock.type === 'image' && (
+                        <div>
+                          <Label className="text-xs">Image URL</Label>
+                          <Input 
+                            value={activeBlock.content?.url || ''}
+                            onChange={(e) => updateBlock(activeBlock.id, { 
+                              content: { ...activeBlock.content, url: e.target.value }
+                            })}
+                            className="mt-1"
+                            placeholder="https://..."
+                            data-testid="input-image-url"
+                          />
+                        </div>
+                      )}
+
+                      <div className="pt-4 border-t">
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          className="w-full" 
+                          onClick={deleteBlock}
+                          data-testid="button-delete-block"
+                        >
+                          <Trash2 className="w-3 h-3 mr-2" />
+                          Delete Block
+                        </Button>
+                      </div>
+                    </div>
+                  ) : activePage ? (
+                    <div className="space-y-4">
                       <div>
-                        <Label className="text-xs">Chart Title</Label>
+                        <Label className="text-xs">Page Title</Label>
                         <Input 
-                          value={activeBlock.content?.title || ''}
-                          onChange={(e) => updateBlock(activeBlock.id, { 
-                            content: { ...activeBlock.content, title: e.target.value }
-                          })}
+                          value={activePage.title}
+                          onChange={(e) => {
+                            setPages(prev => prev.map(p => 
+                              p.id === activePageId ? { ...p, title: e.target.value } : p
+                            ));
+                          }}
                           className="mt-1"
-                          data-testid="input-chart-title"
+                          data-testid="input-page-title"
                         />
                       </div>
-                    )}
-
-                    {activeBlock.type === 'image' && (
                       <div>
-                        <Label className="text-xs">Image URL</Label>
-                        <Input 
-                          value={activeBlock.content?.url || ''}
-                          onChange={(e) => updateBlock(activeBlock.id, { 
-                            content: { ...activeBlock.content, url: e.target.value }
-                          })}
-                          className="mt-1"
-                          placeholder="https://..."
-                          data-testid="input-image-url"
-                        />
+                        <Label className="text-xs">Layout</Label>
+                        <Select defaultValue="single-column">
+                          <SelectTrigger className="mt-1" data-testid="select-page-layout">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="single-column">Single Column</SelectItem>
+                            <SelectItem value="two-column">Two Column</SelectItem>
+                            <SelectItem value="cover">Cover Page</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    )}
-
-                    <div className="pt-4 border-t">
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        className="w-full" 
-                        onClick={deleteBlock}
-                        data-testid="button-delete-block"
-                      >
-                        <Trash2 className="w-3 h-3 mr-2" />
-                        Delete Block
-                      </Button>
                     </div>
-                  </div>
-                ) : activePage ? (
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-xs">Page Title</Label>
-                      <Input 
-                        value={activePage.title}
-                        onChange={(e) => {
-                          setPages(prev => prev.map(p => 
-                            p.id === activePageId ? { ...p, title: e.target.value } : p
-                          ));
-                        }}
-                        className="mt-1"
-                        data-testid="input-page-title"
-                      />
+                  ) : (
+                    <div className="text-center text-muted-foreground text-sm py-8">
+                      Select a page or block to edit properties
                     </div>
-                    <div>
-                      <Label className="text-xs">Layout</Label>
-                      <Select defaultValue="single-column">
-                        <SelectTrigger className="mt-1" data-testid="select-page-layout">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="single-column">Single Column</SelectItem>
-                          <SelectItem value="two-column">Two Column</SelectItem>
-                          <SelectItem value="cover">Cover Page</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center text-muted-foreground text-sm py-8">
-                    Select a page or block to edit properties
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
+                  )}
+                </ScrollArea>
+              </TabsContent>
+              
+              <TabsContent value="data" className="flex-1 m-0 overflow-hidden">
+                <ScrollArea className="h-full p-3">
+                  <DataBindingPanel
+                    omId={omId || ''}
+                    dealId={om?.dealId}
+                    modelingProjectId={om?.modelingProjectId}
+                    selectedBlock={activeBlock}
+                    onBindField={(blockId, fieldPath, fieldValue) => {
+                      if (activeBlock?.type === 'text') {
+                        const currentContent = activeBlock.content?.markdown || '';
+                        const insertText = fieldValue !== null && fieldValue !== undefined 
+                          ? String(fieldValue) 
+                          : '';
+                        updateBlock(blockId, {
+                          content: { 
+                            ...activeBlock.content, 
+                            markdown: currentContent + (currentContent ? ' ' : '') + insertText 
+                          }
+                        });
+                        toast({
+                          title: "Field Inserted",
+                          description: `Added value to text block.`,
+                        });
+                      }
+                    }}
+                  />
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
           </ResizablePanel>
 
         </ResizablePanelGroup>
