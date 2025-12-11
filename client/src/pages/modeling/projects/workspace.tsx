@@ -30,7 +30,10 @@ import {
   Layers,
   Link2,
   SlidersHorizontal,
-  FileText
+  FileText,
+  Users,
+  Anchor,
+  Activity
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
 import { FavoriteButton, PinButton } from '@/components/quick-access';
@@ -54,6 +57,10 @@ import CaseConfiguration from './workspace/case-configuration';
 import DealPricing from './workspace/deal-pricing';
 import AnalyticsNormalization from './workspace/analytics-normalization';
 import CapitalStackWorkspace from './workspace/capital-stack';
+import LeaseCashFlowPage from './workspace/lease-cashflow';
+import ProfitCentersPage from './workspace/profit-centers';
+import DCFCalculatorPage from './workspace/dcf-calculator';
+import MonteCarloPage from './workspace/monte-carlo';
 import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
 
 export default function ProjectWorkspace() {
@@ -281,6 +288,22 @@ export default function ProjectWorkspace() {
               <Link2 className="h-4 w-4" />
               <span className="hidden sm:inline">Comps</span>
             </TabsTrigger>
+            <TabsTrigger value="leases" className="gap-2" data-testid="tab-leases">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Leases</span>
+            </TabsTrigger>
+            <TabsTrigger value="profit" className="gap-2" data-testid="tab-profit">
+              <Anchor className="h-4 w-4" />
+              <span className="hidden sm:inline">Profit Ctrs</span>
+            </TabsTrigger>
+            <TabsTrigger value="dcf" className="gap-2" data-testid="tab-dcf">
+              <Calculator className="h-4 w-4" />
+              <span className="hidden sm:inline">DCF</span>
+            </TabsTrigger>
+            <TabsTrigger value="monte-carlo" className="gap-2" data-testid="tab-monte-carlo">
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">Monte Carlo</span>
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -349,6 +372,22 @@ export default function ProjectWorkspace() {
             projectId={projectId!} 
             projectName={project.marinaName} 
           />
+        </TabsContent>
+
+        <TabsContent value="leases" className="space-y-6">
+          <LeaseCashFlowPage />
+        </TabsContent>
+
+        <TabsContent value="profit" className="space-y-6">
+          <ProfitCentersPage />
+        </TabsContent>
+
+        <TabsContent value="dcf" className="space-y-6">
+          <DCFCalculatorPage />
+        </TabsContent>
+
+        <TabsContent value="monte-carlo" className="space-y-6">
+          <MonteCarloPage />
         </TabsContent>
       </Tabs>
     </div>

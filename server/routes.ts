@@ -13490,6 +13490,334 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ============================================================================
+  // MONTE CARLO SIMULATION - Stochastic Analysis Engine
+  // ============================================================================
+
+  // Run full Monte Carlo simulation
+  app.get('/api/modeling/projects/:projectId/monte-carlo', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const iterations = req.query.iterations ? parseInt(req.query.iterations as string) : 10000;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { monteCarloService } = await import('./services/monte-carlo-service');
+      const analysis = await monteCarloService.runSimulation(projectId, orgId, { iterations });
+      res.json(analysis);
+    } catch (error) {
+      console.error('Failed to run Monte Carlo simulation:', error);
+      res.status(500).json({ error: 'Failed to run Monte Carlo simulation' });
+    }
+  });
+
+  // Run Monte Carlo with custom configuration
+  app.post('/api/modeling/projects/:projectId/monte-carlo/run', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { variables, iterations = 10000, confidenceLevel = 0.95 } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { monteCarloService } = await import('./services/monte-carlo-service');
+      // Pass only defined values; service will use defaults for undefined variables
+      const simulationInput: { iterations: number; confidenceLevel: number; variables?: any } = {
+        iterations,
+        confidenceLevel,
+      };
+      if (variables) {
+        simulationInput.variables = variables;
+      }
+      
+      const analysis = await monteCarloService.runSimulation(projectId, orgId, simulationInput);
+      res.json(analysis);
+    } catch (error) {
+      console.error('Failed to run custom Monte Carlo simulation:', error);
+      res.status(500).json({ error: 'Failed to run custom Monte Carlo simulation' });
+    }
+  });
+
+  // Quick simulation for real-time feedback
+  app.get('/api/modeling/projects/:projectId/monte-carlo/quick', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { monteCarloService } = await import('./services/monte-carlo-service');
+      const quickResult = await monteCarloService.quickSimulation(projectId, orgId);
+      res.json(quickResult);
+    } catch (error) {
+      console.error('Failed to run quick Monte Carlo:', error);
+      res.status(500).json({ error: 'Failed to run quick Monte Carlo' });
+    }
+  });
+
+  // ============================================================================
+  // DCF CALCULATOR - Real-Time Discounted Cash Flow Analysis
+  // ============================================================================
+
+  // Perform full DCF analysis with multiple scenarios
+  app.get('/api/modeling/projects/:projectId/dcf', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
+      const analysis = await dcfCalculatorService.performDCFAnalysis(projectId, orgId);
+      res.json(analysis);
+    } catch (error) {
+      console.error('Failed to perform DCF analysis:', error);
+      res.status(500).json({ error: 'Failed to perform DCF analysis' });
+    }
+  });
+
+  // Calculate DCF with custom scenarios
+  app.post('/api/modeling/projects/:projectId/dcf/calculate', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { scenarios } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
+      const analysis = await dcfCalculatorService.performDCFAnalysis(projectId, orgId, scenarios);
+      res.json(analysis);
+    } catch (error) {
+      console.error('Failed to calculate custom DCF:', error);
+      res.status(500).json({ error: 'Failed to calculate custom DCF' });
+    }
+  });
+
+  // Quick IRR calculation for real-time updates
+  app.post('/api/dcf/quick-irr', authenticateUser, async (req: any, res) => {
+    try {
+      const { input } = req.body;
+      
+      const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
+      const irr = dcfCalculatorService.quickIRR(input);
+      res.json({ irr });
+    } catch (error) {
+      console.error('Failed to calculate quick IRR:', error);
+      res.status(500).json({ error: 'Failed to calculate quick IRR' });
+    }
+  });
+
+  // Quick NPV calculation for real-time updates
+  app.post('/api/dcf/quick-npv', authenticateUser, async (req: any, res) => {
+    try {
+      const { input } = req.body;
+      
+      const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
+      const npv = dcfCalculatorService.quickNPV(input);
+      res.json({ npv });
+    } catch (error) {
+      console.error('Failed to calculate quick NPV:', error);
+      res.status(500).json({ error: 'Failed to calculate quick NPV' });
+    }
+  });
+
+  // Generate sensitivity matrix
+  app.post('/api/dcf/sensitivity', authenticateUser, async (req: any, res) => {
+    try {
+      const { baseInput, var1Config, var2Config, metric } = req.body;
+      
+      const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
+      const matrix = dcfCalculatorService.generateSensitivityMatrix(
+        baseInput,
+        var1Config,
+        var2Config,
+        metric
+      );
+      res.json(matrix);
+    } catch (error) {
+      console.error('Failed to generate sensitivity matrix:', error);
+      res.status(500).json({ error: 'Failed to generate sensitivity matrix' });
+    }
+  });
+
+  // ============================================================================
+  // MARINA PROFIT CENTER MODULE - Multi-Revenue Stream Financial Modeling
+  // ============================================================================
+
+  // Get comprehensive marina profit center analysis
+  app.get('/api/modeling/projects/:projectId/profit-centers', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { marinaProfitCenterService } = await import('./services/marina-profit-center-service');
+      const financialModel = await marinaProfitCenterService.calculateMarinaFinancials(projectId, orgId);
+      res.json(financialModel);
+    } catch (error) {
+      console.error('Failed to calculate profit centers:', error);
+      res.status(500).json({ error: 'Failed to calculate profit centers' });
+    }
+  });
+
+  // Get profit center breakdown for a specific year
+  app.get('/api/modeling/projects/:projectId/profit-centers/breakdown', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { marinaProfitCenterService } = await import('./services/marina-profit-center-service');
+      const breakdown = await marinaProfitCenterService.getProfitCenterBreakdown(projectId, orgId, year);
+      res.json(breakdown);
+    } catch (error) {
+      console.error('Failed to get profit center breakdown:', error);
+      res.status(500).json({ error: 'Failed to get profit center breakdown' });
+    }
+  });
+
+  // Calculate with custom assumptions
+  app.post('/api/modeling/projects/:projectId/profit-centers/calculate', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { assumptions } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { marinaProfitCenterService } = await import('./services/marina-profit-center-service');
+      const financialModel = await marinaProfitCenterService.calculateMarinaFinancials(projectId, orgId, assumptions);
+      res.json(financialModel);
+    } catch (error) {
+      console.error('Failed to calculate custom profit centers:', error);
+      res.status(500).json({ error: 'Failed to calculate custom profit centers' });
+    }
+  });
+
+  // ============================================================================
+  // LEASE CASH FLOW ENGINE - Argus-Style Lease-by-Lease DCF
+  // ============================================================================
+
+  // Get full lease-by-lease cash flow analysis
+  app.get('/api/modeling/projects/:projectId/lease-cashflow', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const scenarioType = (req.query.scenario as string) || 'base';
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { leaseCashFlowEngine } = await import('./services/lease-cashflow-engine');
+      const cashFlowData = await leaseCashFlowEngine.calculatePropertyCashFlow(
+        projectId, 
+        orgId, 
+        scenarioType
+      );
+      res.json(cashFlowData);
+    } catch (error) {
+      console.error('Failed to calculate lease cash flow:', error);
+      res.status(500).json({ error: 'Failed to calculate lease cash flow' });
+    }
+  });
+
+  // Get rollover schedule (lease expirations by year)
+  app.get('/api/modeling/projects/:projectId/rollover-schedule', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { leaseCashFlowEngine } = await import('./services/lease-cashflow-engine');
+      const rolloverData = await leaseCashFlowEngine.getRolloverSchedule(projectId, orgId);
+      res.json(rolloverData);
+    } catch (error) {
+      console.error('Failed to get rollover schedule:', error);
+      res.status(500).json({ error: 'Failed to get rollover schedule' });
+    }
+  });
+
+  // Get tenant performance metrics
+  app.get('/api/modeling/projects/:projectId/tenant-performance', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { leaseCashFlowEngine } = await import('./services/lease-cashflow-engine');
+      const tenantData = await leaseCashFlowEngine.getTenantPerformance(projectId, orgId);
+      res.json(tenantData);
+    } catch (error) {
+      console.error('Failed to get tenant performance:', error);
+      res.status(500).json({ error: 'Failed to get tenant performance' });
+    }
+  });
+
+  // Calculate custom scenario with overridden assumptions
+  app.post('/api/modeling/projects/:projectId/lease-cashflow/calculate', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { scenarioType, assumptions } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { leaseCashFlowEngine } = await import('./services/lease-cashflow-engine');
+      const cashFlowData = await leaseCashFlowEngine.calculatePropertyCashFlow(
+        projectId, 
+        orgId, 
+        scenarioType || 'base',
+        assumptions
+      );
+      res.json(cashFlowData);
+    } catch (error) {
+      console.error('Failed to calculate custom scenario:', error);
+      res.status(500).json({ error: 'Failed to calculate custom scenario' });
+    }
+  });
+
+  // ============================================================================
   // OPERATIONS DATA SYNC - Sync Rent Roll, Fuel Sales, Ship Store to Modeling
   // ============================================================================
 
