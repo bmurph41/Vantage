@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useRoute } from "wouter";
-import { ArrowLeft, Download, Printer, FileText, Mail, Share2, FolderLock } from "lucide-react";
+import { ArrowLeft, Download, Printer, FileText, Mail, Share2, FolderLock, Check, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,7 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import type { Om } from "@shared/schema";
+import { VdrFolderPicker } from "../components/vdr-folder-picker";
+import type { Om, VdrFolder } from "@shared/schema";
 
 export default function OMExport() {
   const [, params] = useRoute("/om/export/:omId");
@@ -25,6 +26,8 @@ export default function OMExport() {
   const [exportFormat, setExportFormat] = useState("pdf");
   const [includeAppendix, setIncludeAppendix] = useState(true);
   const [includeToc, setIncludeToc] = useState(true);
+  const [selectedVdrFolder, setSelectedVdrFolder] = useState<VdrFolder | null>(null);
+  const [vdrExportSuccess, setVdrExportSuccess] = useState(false);
 
   const handleExport = () => {
     toast({ 
@@ -58,10 +61,12 @@ export default function OMExport() {
         body: JSON.stringify(data) 
       }),
     onSuccess: () => {
+      setVdrExportSuccess(true);
       toast({ 
         title: "Saved to Data Room", 
-        description: "OM has been saved to the Virtual Data Room." 
+        description: `Document saved to "${selectedVdrFolder?.name}" folder.` 
       });
+      setTimeout(() => setVdrExportSuccess(false), 3000);
     },
     onError: () => {
       toast({ 
@@ -73,10 +78,24 @@ export default function OMExport() {
   });
 
   const handleExportToVdr = () => {
+    if (!selectedVdrFolder) {
+      toast({
+        title: "Select a Folder",
+        description: "Please select a Data Room folder first.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     exportToVdrMutation.mutate({
-      folderId: 'default-folder',
-      projectId: om?.projectId || 'default-project',
+      folderId: selectedVdrFolder.id,
+      projectId: om?.projectId || selectedVdrFolder.projectId,
     });
+  };
+
+  const handleFolderSelect = (folder: VdrFolder) => {
+    setSelectedVdrFolder(folder);
+    setVdrExportSuccess(false);
   };
 
   return (
@@ -187,16 +206,61 @@ export default function OMExport() {
                   <Share2 className="w-4 h-4 mr-2" />
                   Share Link
                 </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FolderLock className="w-4 h-4" />
+                  Save to Data Room
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Export this document directly to the Virtual Data Room
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label className="text-xs mb-1.5 block">Destination Folder</Label>
+                  <VdrFolderPicker
+                    projectId={om?.projectId || null}
+                    onSelect={handleFolderSelect}
+                    selectedFolderId={selectedVdrFolder?.id}
+                  />
+                  {selectedVdrFolder && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1.5">
+                      <FolderOpen className="w-3 h-3" />
+                      <span className="truncate">{selectedVdrFolder.path || selectedVdrFolder.name}</span>
+                    </div>
+                  )}
+                </div>
+                
                 <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
+                  className="w-full" 
                   onClick={handleExportToVdr}
-                  disabled={exportToVdrMutation.isPending}
+                  disabled={exportToVdrMutation.isPending || !selectedVdrFolder}
                   data-testid="button-export-vdr"
                 >
-                  <FolderLock className="w-4 h-4 mr-2" />
-                  {exportToVdrMutation.isPending ? 'Saving...' : 'Save to Data Room'}
+                  {vdrExportSuccess ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Saved Successfully
+                    </>
+                  ) : exportToVdrMutation.isPending ? (
+                    'Saving...'
+                  ) : (
+                    <>
+                      <FolderLock className="w-4 h-4 mr-2" />
+                      Save to Data Room
+                    </>
+                  )}
                 </Button>
+                
+                {!om?.projectId && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    This OM is not linked to a project. Link it to a project to access its Data Room.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
