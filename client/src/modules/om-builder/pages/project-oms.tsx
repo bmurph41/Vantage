@@ -46,7 +46,7 @@ export default function ProjectOms() {
   });
   
   const createOmMutation = useMutation({
-    mutationFn: (data: { projectId: string; name: string; status: string }) =>
+    mutationFn: (data: { projectId: string; name: string; status: string; docType?: string }) =>
       apiRequest('/api/om/oms', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/om/oms/project', projectId] });
@@ -244,7 +244,7 @@ export default function ProjectOms() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredOms.map((om) => {
-              const docType = (om as any).docType || 'om';
+              const docType = om.docType || 'om';
               const config = docTypeConfig[docType] || docTypeConfig.om;
               const DocIcon = config.icon;
               
