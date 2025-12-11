@@ -432,8 +432,8 @@ export default function UnifiedSidebar() {
             {crmExpanded && crmNav.map((item) => (
               <NavLink key={item.name} item={item} />
             ))}
-            {/* Prospecting - shown if user has prospecting pack */}
-            {crmExpanded && canViewSection('prospecting') && hasPack('prospecting') && (
+            {/* Prospecting */}
+            {crmExpanded && (
               <NavLink item={{ name: "Prospecting", href: "/prospecting", icon: Target }} />
             )}
             {crmExpanded && (
