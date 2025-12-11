@@ -671,6 +671,10 @@ function CreateProfileForm({
       cleanedCriteria.capital = Object.fromEntries(capitalEntries);
     }
     cleanedCriteria.operational = criteria.operational;
+    
+    // Include storage mix and department preferences
+    cleanedCriteria.storageMix = criteria.storageMix;
+    cleanedCriteria.departments = criteria.departments;
 
     const payload = {
       ...formData,
@@ -1026,6 +1030,198 @@ function CreateProfileForm({
                     placeholder="15.00%"
                     data-testid="input-min-irr"
                   />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Storage Mix Tab - Per user guidance docs */}
+            <TabsContent value="storagemix" className="space-y-4 pr-4">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-sm mb-2">Storage Revenue Share Target</h4>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Define what percentage of total revenue should come from storage departments. 
+                    Listings below this threshold can be filtered or penalized.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label className="text-sm font-medium">Minimum Storage Share</Label>
+                    <span className="text-sm font-medium">{Math.round(criteria.storageMix.minStorageShare * 100)}%</span>
+                  </div>
+                  <Slider
+                    value={[criteria.storageMix.minStorageShare * 100]}
+                    max={100}
+                    step={5}
+                    onValueChange={([val]) => setCriteria(prev => ({ 
+                      ...prev, 
+                      storageMix: { ...prev.storageMix, minStorageShare: val / 100 } 
+                    }))}
+                    data-testid="slider-min-storage-share"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm">Must-Have (Hard Filter)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Reject listings that don't meet minimum
+                    </p>
+                  </div>
+                  <Switch
+                    checked={criteria.storageMix.storageMixMustHave}
+                    onCheckedChange={(checked) => setCriteria(prev => ({
+                      ...prev,
+                      storageMix: { ...prev.storageMix, storageMixMustHave: checked }
+                    }))}
+                    data-testid="switch-storage-mix-must-have"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label className="text-sm font-medium">Importance Weight</Label>
+                    <span className="text-sm">{criteria.storageMix.storageMixImportance}/5</span>
+                  </div>
+                  <Slider
+                    value={[criteria.storageMix.storageMixImportance]}
+                    min={1}
+                    max={5}
+                    step={1}
+                    onValueChange={([val]) => setCriteria(prev => ({ 
+                      ...prev, 
+                      storageMix: { ...prev.storageMix, storageMixImportance: val } 
+                    }))}
+                    data-testid="slider-storage-mix-importance"
+                  />
+                </div>
+
+                <Separator />
+
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Storage Departments to Include</Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Select which departments count toward "storage revenue"
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {STORAGE_DEPARTMENTS.map((dept) => (
+                      <div key={dept} className="flex items-center gap-2">
+                        <Switch
+                          checked={criteria.storageMix.includedDepartments.includes(dept)}
+                          onCheckedChange={(checked) => {
+                            setCriteria(prev => ({
+                              ...prev,
+                              storageMix: {
+                                ...prev.storageMix,
+                                includedDepartments: checked
+                                  ? [...prev.storageMix.includedDepartments, dept]
+                                  : prev.storageMix.includedDepartments.filter(d => d !== dept)
+                              }
+                            }));
+                          }}
+                          data-testid={`switch-storage-dept-${dept.toLowerCase().replace(/\s+/g, '-')}`}
+                        />
+                        <Label className="text-sm">{dept}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Departments Tab - Per user guidance docs */}
+            <TabsContent value="departments" className="space-y-4 pr-4">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-sm mb-2">Department Preferences</h4>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Configure which departments you prefer or want to avoid.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Exclusion Mode</Label>
+                  <Select
+                    value={criteria.departments.excludeMode}
+                    onValueChange={(val: 'reject' | 'penalty') => setCriteria(prev => ({
+                      ...prev,
+                      departments: { ...prev.departments, excludeMode: val }
+                    }))}
+                  >
+                    <SelectTrigger data-testid="select-exclude-mode">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="reject">Hard Filter (Reject)</SelectItem>
+                      <SelectItem value="penalty">Soft Preference (Penalty)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Hard filter rejects listings with excluded departments. Soft preference reduces match score.
+                  </p>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Excluded Departments</Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Listings with significant revenue from these will be penalized/rejected
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ALL_DEPARTMENTS.map((dept) => (
+                      <div key={`exclude-${dept}`} className="flex items-center gap-2">
+                        <Switch
+                          checked={criteria.departments.excludedDepartments.includes(dept)}
+                          onCheckedChange={(checked) => {
+                            setCriteria(prev => ({
+                              ...prev,
+                              departments: {
+                                ...prev.departments,
+                                excludedDepartments: checked
+                                  ? [...prev.departments.excludedDepartments, dept]
+                                  : prev.departments.excludedDepartments.filter(d => d !== dept)
+                              }
+                            }));
+                          }}
+                          data-testid={`switch-exclude-dept-${dept.toLowerCase().replace(/[\s\/]+/g, '-')}`}
+                        />
+                        <Label className="text-sm">{dept}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Preferred Departments</Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Listings with these departments get bonus points
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ALL_DEPARTMENTS.map((dept) => (
+                      <div key={`prefer-${dept}`} className="flex items-center gap-2">
+                        <Switch
+                          checked={criteria.departments.preferredDepartments.includes(dept)}
+                          onCheckedChange={(checked) => {
+                            setCriteria(prev => ({
+                              ...prev,
+                              departments: {
+                                ...prev.departments,
+                                preferredDepartments: checked
+                                  ? [...prev.departments.preferredDepartments, dept]
+                                  : prev.departments.preferredDepartments.filter(d => d !== dept)
+                              }
+                            }));
+                          }}
+                          data-testid={`switch-prefer-dept-${dept.toLowerCase().replace(/[\s\/]+/g, '-')}`}
+                        />
+                        <Label className="text-sm">{dept}</Label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </TabsContent>
