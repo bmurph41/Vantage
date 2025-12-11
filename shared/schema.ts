@@ -15017,6 +15017,7 @@ export type AiFilterPattern = typeof marinaAiFilterPatterns.$inferSelect;
 // ============================================================================
 
 export const omStatusEnum = pgEnum("om_status", ["draft", "review", "published", "archived"]);
+export const omDocTypeEnum = pgEnum("om_doc_type", ["om", "executive_summary", "ic_memo", "pitch_deck"]);
 export const omTemplateScopeEnum = pgEnum("om_template_scope", ["block", "page", "om"]);
 export const omTemplateOwnerTypeEnum = pgEnum("om_template_owner_type", ["global", "org", "user"]);
 export const omDatasetTypeEnum = pgEnum("om_dataset_type", ["underwriting", "sales_comps", "rent_comps", "market", "demographics", "custom"]);
@@ -15028,6 +15029,7 @@ export const oms = pgTable("oms", {
   dealId: varchar("deal_id").references(() => crmDeals.id, { onDelete: 'set null' }),
   modelingProjectId: varchar("modeling_project_id").references(() => modelingProjects.id, { onDelete: 'set null' }),
   name: text("name").notNull(),
+  docType: omDocTypeEnum("doc_type").notNull().default('om'),
   status: omStatusEnum("status").notNull().default('draft'),
   version: integer("version").notNull().default(1),
   settings: jsonb("settings"),
