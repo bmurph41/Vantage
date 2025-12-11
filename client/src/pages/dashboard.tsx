@@ -20,7 +20,6 @@ import { formatCurrency, formatNumber } from "@/lib/formatUtils";
 import { CRMCharts } from "@/components/dashboard/CRMCharts";
 import { RevenueCharts } from "@/components/dashboard/RevenueCharts";
 import { AddModuleModal } from "@/components/dashboard/AddModuleModal";
-import { WidgetBuilder } from "@/components/dashboard/WidgetBuilder";
 import { SavedLayoutsPanel } from "@/components/dashboard/SavedLayoutsPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DetailPanel } from "@/components/dashboard/DetailPanel";
@@ -418,7 +417,6 @@ export default function Dashboard() {
   }, [salesCompsYear]);
 
   const [isAddModuleModalOpen, setIsAddModuleModalOpen] = useState(false);
-  const [isWidgetBuilderOpen, setIsWidgetBuilderOpen] = useState(false);
   const [isCRMDetailOpen, setIsCRMDetailOpen] = useState(false);
   const [isSalesCompsDetailOpen, setIsSalesCompsDetailOpen] = useState(false);
   const [isFuelDetailOpen, setIsFuelDetailOpen] = useState(false);
@@ -1427,23 +1425,13 @@ export default function Dashboard() {
               selectedModules={selectedModules}
             />
             <Button
-              variant="outline"
               size="sm"
               onClick={() => setIsAddModuleModalOpen(true)}
-              data-testid="button-add-module"
-              className="w-full sm:w-auto"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Module
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setIsWidgetBuilderOpen(true)}
-              data-testid="button-create-widget"
+              data-testid="button-customize-dashboard"
               className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
             >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Create Widget
+              <Plus className="h-4 w-4 mr-2" />
+              Customize Dashboard
             </Button>
             <SavedLayoutsPanel
               currentModuleOrder={moduleOrder}
@@ -1521,12 +1509,7 @@ export default function Dashboard() {
         customModules={customModules}
         onCreateCustomModule={(data) => createCustomModuleMutation.mutate(data)}
         onDeleteCustomModule={(id) => deleteCustomModuleMutation.mutate(id)}
-      />
-
-      <WidgetBuilder
-        open={isWidgetBuilderOpen}
-        onOpenChange={setIsWidgetBuilderOpen}
-        onSave={async (widgetData) => {
+        onSaveWidget={async (widgetData) => {
           console.log('Widget saved:', widgetData);
           toast({
             title: 'Widget Created',

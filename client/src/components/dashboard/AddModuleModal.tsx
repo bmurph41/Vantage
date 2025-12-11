@@ -10,9 +10,10 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { Check, DollarSign, FileText, Building2, TrendingUp, Home, Fuel, ShoppingCart, Store, Plus, Newspaper, Edit, Trash2 } from "lucide-react";
+import { Check, DollarSign, FileText, Building2, TrendingUp, Home, Fuel, ShoppingCart, Store, Plus, Newspaper, Edit, Trash2, BarChart3, PieChart, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EnhancedModuleBuilder } from "./EnhancedModuleBuilder";
+import { WidgetBuilder } from "./WidgetBuilder";
 import type { DashboardCustomModule, VisualizationType, ChartConfig } from "@shared/schema";
 
 interface ModuleDefinition {
@@ -21,6 +22,18 @@ interface ModuleDefinition {
   description: string;
   icon: any;
   category: 'financial' | 'dd' | 'crm' | 'intel' | 'operations';
+}
+
+interface WidgetFormData {
+  title: string;
+  moduleKey: string;
+  metricKey: string;
+  visualizationType: 'kpi_card' | 'bar_chart' | 'line_chart' | 'pie_chart' | 'stat_grid';
+  enableComparison: boolean;
+  comparisonType: 'yoy' | 'mom' | 'qoq' | 'pop';
+  filters: Record<string, any>;
+  size: 'sm' | 'md' | 'lg';
+  refreshInterval?: number;
 }
 
 interface AddModuleModalProps {
@@ -37,6 +50,7 @@ interface AddModuleModalProps {
     chartConfig: ChartConfig;
   }) => void;
   onDeleteCustomModule?: (id: string) => void;
+  onSaveWidget?: (widget: WidgetFormData) => Promise<void>;
 }
 
 const allModules: ModuleDefinition[] = [
@@ -128,9 +142,11 @@ export function AddModuleModal({
   customModules = [],
   onCreateCustomModule,
   onDeleteCustomModule,
+  onSaveWidget,
 }: AddModuleModalProps) {
   const [activeCategory, setActiveCategory] = useState<string>('financial');
   const [showBuilder, setShowBuilder] = useState(false);
+  const [showWidgetBuilder, setShowWidgetBuilder] = useState(false);
 
   const modulesByCategory = allModules.reduce((acc, module) => {
     if (!acc[module.category]) {
@@ -155,13 +171,25 @@ export function AddModuleModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>Add Dashboard Modules</DialogTitle>
+          <DialogTitle>Customize Dashboard</DialogTitle>
           <DialogDescription>
-            Select modules to customize your dashboard. Choose from pre-built modules or create custom ones.
+            Add modules, create custom views, or build widgets to personalize your dashboard.
           </DialogDescription>
         </DialogHeader>
 
-        {showBuilder ? (
+        {showWidgetBuilder ? (
+          <WidgetBuilder
+            open={true}
+            onOpenChange={(isOpen) => {
+              if (!isOpen) setShowWidgetBuilder(false);
+            }}
+            onSave={async (widgetData) => {
+              await onSaveWidget?.(widgetData);
+              setShowWidgetBuilder(false);
+            }}
+            isEditing={false}
+          />
+        ) : showBuilder ? (
           <ScrollArea className="h-[600px]">
             <EnhancedModuleBuilder
               onSave={handleCreateModule}
@@ -170,13 +198,14 @@ export function AddModuleModal({
           </ScrollArea>
         ) : (
           <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="financial" data-testid="tab-financial">Financial</TabsTrigger>
               <TabsTrigger value="dd" data-testid="tab-dd">DD</TabsTrigger>
               <TabsTrigger value="crm" data-testid="tab-crm">CRM</TabsTrigger>
               <TabsTrigger value="intel" data-testid="tab-intel">Intel</TabsTrigger>
-              <TabsTrigger value="operations" data-testid="tab-operations">Operations</TabsTrigger>
+              <TabsTrigger value="operations" data-testid="tab-operations">Ops</TabsTrigger>
               <TabsTrigger value="custom" data-testid="tab-custom">Custom</TabsTrigger>
+              <TabsTrigger value="widgets" data-testid="tab-widgets">Widgets</TabsTrigger>
             </TabsList>
 
           <ScrollArea className="h-[400px] mt-4">
@@ -305,11 +334,47 @@ export function AddModuleModal({
                 )}
               </div>
             </TabsContent>
+            
+            <TabsContent value="widgets" className="mt-0">
+              <div className="space-y-4">
+                <Button 
+                  onClick={() => setShowWidgetBuilder(true)}
+                  className="w-full"
+                  data-testid="button-create-widget"
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Create Custom Widget
+                </Button>
+
+                <div className="text-center py-8 text-gray-500">
+                  <Layers className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm font-medium mb-2">Build Custom Widgets</p>
+                  <p className="text-xs text-gray-400 max-w-sm mx-auto">
+                    Create KPI cards, charts, and stat grids with custom metrics, 
+                    filters, and comparison settings.
+                  </p>
+                  <div className="flex justify-center gap-4 mt-4">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      <span>Bar Charts</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      <span>Line Charts</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <PieChart className="h-3.5 w-3.5" />
+                      <span>Pie Charts</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
           </ScrollArea>
         </Tabs>
         )}
 
-        {!showBuilder && (
+        {!showBuilder && !showWidgetBuilder && (
           <div className="flex justify-between items-center pt-4 border-t">
             <div className="text-sm text-gray-600">
               {selectedModules.length} module{selectedModules.length !== 1 ? 's' : ''} selected
