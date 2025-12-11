@@ -43,6 +43,7 @@ import {
 } from "@shared/schema";
 import { getScrapeStatus, ensureListingsExist, getLastScrapeRun } from "./services/intel-cron";
 import { PLATFORM_CAPABILITIES, getPlatformCapabilities, getRecommendedMethod, invalidateLearnedPatternsCache } from "./services/cre-scraper";
+import { matchScoringService, MARINA_DEPARTMENTS, STORAGE_DEPARTMENTS } from "./services/match-scoring-service";
 const router = Router();
 
 function getOrgId(req: Request): string | null {
@@ -1373,6 +1374,175 @@ router.post("/bulk-rescore", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error bulk rescoring:", error);
     res.status(500).json({ error: "Failed to bulk rescore" });
+  }
+});
+
+// ============================================
+// ENHANCED SCORING ROUTES (Using Match Scoring Service)
+// ============================================
+
+// Get available marina departments for criteria configuration
+router.get("/departments", async (_req: Request, res: Response) => {
+  res.json({
+    allDepartments: MARINA_DEPARTMENTS,
+    storageDepartments: STORAGE_DEPARTMENTS,
+  });
+});
+
+// Get detailed match breakdown for a listing against a specific profile
+router.get("/criteria-profiles/:profileId/matches/:listingId", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { profileId, listingId } = req.params;
+
+    // Load the criteria profile
+    const criteria = await matchScoringService.loadFullCriteriaProfile(profileId, orgId);
+    if (!criteria) {
+      return res.status(404).json({ error: "Criteria profile not found" });
+    }
+
+    // Load the listing
+    const [listing] = await db.select()
+      .from(marinaListings)
+      .where(eq(marinaListings.id, listingId));
+
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    // Compute detailed match score
+    const matchResult = matchScoringService.computeMatchScore(criteria, listing);
+
+    res.json({
+      listing: {
+        id: listing.id,
+        title: listing.title,
+        propertyName: listing.propertyName,
+        city: listing.city,
+        state: listing.state,
+        askingPrice: listing.askingPrice,
+      },
+      profile: {
+        id: criteria.profile.id,
+        name: criteria.profile.name,
+      },
+      match: {
+        overallScore: Math.round(matchResult.overallScore * 100),
+        passesAllMustHave: matchResult.passesAllMustHave,
+        hardFilterFailed: matchResult.hardFilterFailed,
+        failedReasons: matchResult.failedReasons,
+        breakdown: matchResult.breakdown.map(b => ({
+          ...b,
+          scorePercentage: Math.round(b.score * 100),
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Error getting match breakdown:", error);
+    res.status(500).json({ error: "Failed to get match breakdown" });
+  }
+});
+
+// Get all matches for a criteria profile with pagination
+router.get("/criteria-profiles/:profileId/matches", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { profileId } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 20;
+    const minScore = parseInt(req.query.minScore as string) || 0;
+    const onlyPassing = req.query.onlyPassing === 'true';
+
+    // Load criteria profile
+    const criteria = await matchScoringService.loadFullCriteriaProfile(profileId, orgId);
+    if (!criteria) {
+      return res.status(404).json({ error: "Criteria profile not found" });
+    }
+
+    // Get all active listings
+    const listings = await db.select()
+      .from(marinaListings)
+      .where(and(
+        eq(marinaListings.status, 'active'),
+        eq(marinaListings.orgId, orgId)
+      ));
+
+    // Score each listing
+    const scoredListings = listings.map(listing => {
+      const matchResult = matchScoringService.computeMatchScore(criteria, listing);
+      return {
+        listing,
+        score: Math.round(matchResult.overallScore * 100),
+        passesAllMustHave: matchResult.passesAllMustHave,
+        failedReasons: matchResult.failedReasons,
+        breakdown: matchResult.breakdown,
+      };
+    });
+
+    // Filter by minimum score and passing status
+    let filteredListings = scoredListings.filter(l => l.score >= minScore);
+    if (onlyPassing) {
+      filteredListings = filteredListings.filter(l => l.passesAllMustHave);
+    }
+
+    // Sort by score descending
+    filteredListings.sort((a, b) => b.score - a.score);
+
+    // Paginate
+    const total = filteredListings.length;
+    const start = (page - 1) * pageSize;
+    const paginatedListings = filteredListings.slice(start, start + pageSize);
+
+    res.json({
+      profile: {
+        id: criteria.profile.id,
+        name: criteria.profile.name,
+      },
+      listings: paginatedListings.map(l => ({
+        id: l.listing.id,
+        title: l.listing.title,
+        propertyName: l.listing.propertyName,
+        city: l.listing.city,
+        state: l.listing.state,
+        askingPrice: l.listing.askingPrice,
+        totalSlips: l.listing.totalSlips,
+        score: l.score,
+        passesAllMustHave: l.passesAllMustHave,
+        failedReasons: l.failedReasons,
+      })),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    });
+  } catch (error) {
+    console.error("Error getting profile matches:", error);
+    res.status(500).json({ error: "Failed to get profile matches" });
+  }
+});
+
+// Rescore all listings for a specific profile using enhanced scoring
+router.post("/criteria-profiles/:profileId/rescore-all", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { profileId } = req.params;
+
+    const scoredCount = await matchScoringService.scoreAllListingsForProfile(profileId, orgId);
+
+    res.json({ 
+      success: true, 
+      rescored: scoredCount,
+      message: `Scored ${scoredCount} listings against criteria profile` 
+    });
+  } catch (error) {
+    console.error("Error rescoring listings for profile:", error);
+    res.status(500).json({ error: "Failed to rescore listings" });
   }
 });
 

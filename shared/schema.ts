@@ -14573,6 +14573,12 @@ export const investmentCriteriaProfiles = pgTable("investment_criteria_profiles"
   capitalWeight: integer("capital_weight").default(10),
   involvementWeight: integer("involvement_weight").default(5),
   capexWeight: integer("capex_weight").default(10),
+  
+  // Enhanced Alert Settings (from guidance docs)
+  alertEnabled: boolean("alert_enabled").default(true),
+  alertFrequency: varchar("alert_frequency", { length: 20 }).default("daily"), // instant, daily, weekly
+  alertMaxListingsPerEmail: integer("alert_max_listings_per_email").default(20),
+  
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -14591,6 +14597,11 @@ export const investmentCriteriaLocation = pgTable("investment_criteria_location"
   maxDistanceFromCoast: integer("max_distance_from_coast"),
   preferIcwAccess: boolean("prefer_icw_access").default(false),
   preferOceanAccess: boolean("prefer_ocean_access").default(false),
+  
+  // Enhanced with must-have and importance (from guidance docs)
+  geographyMustHave: boolean("geography_must_have").default(true),
+  geographyImportance: integer("geography_importance").default(5), // 1-5 scale
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -14599,18 +14610,52 @@ export const investmentCriteriaFinancial = pgTable("investment_criteria_financia
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
   orgId: varchar("org_id").notNull(),
+  
+  // Price criteria with must-have and importance
   minAskingPrice: numeric("min_asking_price", { precision: 15, scale: 2 }),
   maxAskingPrice: numeric("max_asking_price", { precision: 15, scale: 2 }),
+  priceMustHave: boolean("price_must_have").default(true),
+  priceImportance: integer("price_importance").default(5), // 1-5 scale
+  
+  // Revenue criteria with metric type
   minGrossRevenue: numeric("min_gross_revenue", { precision: 15, scale: 2 }),
   maxGrossRevenue: numeric("max_gross_revenue", { precision: 15, scale: 2 }),
-  minNoi: numeric("min_noi", { precision: 15, scale: 2 }),
-  maxNoi: numeric("max_noi", { precision: 15, scale: 2 }),
-  minEbitda: numeric("min_ebitda", { precision: 15, scale: 2 }),
-  maxEbitda: numeric("max_ebitda", { precision: 15, scale: 2 }),
+  revenueMetricType: varchar("revenue_metric_type", { length: 20 }).default("T12"), // T12, Average3Yr, ProFormaYear1
+  revenueMustHave: boolean("revenue_must_have").default(false),
+  revenueImportance: integer("revenue_importance").default(3),
+  
+  // Cap Rate with type selection
   minCapRate: numeric("min_cap_rate", { precision: 5, scale: 2 }),
   maxCapRate: numeric("max_cap_rate", { precision: 5, scale: 2 }),
+  capRateType: varchar("cap_rate_type", { length: 20 }).default("T12"), // T12, ProFormaYear1, Stabilized
+  capRateMustHave: boolean("cap_rate_must_have").default(false),
+  capRateImportance: integer("cap_rate_importance").default(4),
+  
+  // EBITDA criteria
+  minEbitda: numeric("min_ebitda", { precision: 15, scale: 2 }),
+  maxEbitda: numeric("max_ebitda", { precision: 15, scale: 2 }),
+  ebitdaMetricType: varchar("ebitda_metric_type", { length: 20 }).default("T12"),
+  ebitdaMustHave: boolean("ebitda_must_have").default(false),
+  ebitdaImportance: integer("ebitda_importance").default(3),
+  
+  // NOI criteria
+  minNoi: numeric("min_noi", { precision: 15, scale: 2 }),
+  maxNoi: numeric("max_noi", { precision: 15, scale: 2 }),
+  noiMustHave: boolean("noi_must_have").default(false),
+  noiImportance: integer("noi_importance").default(3),
+  
+  // Operating Margin (EBITDA/Revenue as decimal, e.g., 0.25 = 25%)
+  minOperatingMargin: numeric("min_operating_margin", { precision: 5, scale: 4 }),
+  maxOperatingMargin: numeric("max_operating_margin", { precision: 5, scale: 4 }),
+  operatingMarginMustHave: boolean("operating_margin_must_have").default(false),
+  operatingMarginImportance: integer("operating_margin_importance").default(4),
+  
+  // Price per slip criteria
   minPricePerSlip: numeric("min_price_per_slip", { precision: 12, scale: 2 }),
   maxPricePerSlip: numeric("max_price_per_slip", { precision: 12, scale: 2 }),
+  pricePerSlipMustHave: boolean("price_per_slip_must_have").default(false),
+  pricePerSlipImportance: integer("price_per_slip_importance").default(2),
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -14688,6 +14733,88 @@ export const investmentCriteriaCapex = pgTable("investment_criteria_capex", {
   preferTurnkey: boolean("prefer_turnkey").default(true),
   willingToRenovate: boolean("willing_to_renovate").default(false),
   environmentalIssuesOk: boolean("environmental_issues_ok").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ============================================================================
+// Storage Revenue Mix Criteria - Per guidance docs
+// Allows user to define which departments count as "storage" and min/max % share
+// ============================================================================
+export const investmentCriteriaStorageMix = pgTable("investment_criteria_storage_mix", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  
+  // Which departments to include in the "Storage" bucket
+  // Default: Wet Slips, Lift Slips, Dry Racks, Moorings, Trailer Storage, Indoor Storage
+  includedDepartments: jsonb("included_departments").default(sql`'["Wet Slips", "Lift Slips", "Dry Racks", "Moorings", "Trailer Storage", "Indoor Storage"]'::jsonb`),
+  
+  // Min/max % of total revenue from storage departments (0-1 as decimal)
+  minStorageShare: numeric("min_storage_share", { precision: 5, scale: 4 }),
+  maxStorageShare: numeric("max_storage_share", { precision: 5, scale: 4 }),
+  
+  // Hard filter or soft preference
+  storageMixMustHave: boolean("storage_mix_must_have").default(true),
+  storageMixImportance: integer("storage_mix_importance").default(5), // 1-5 scale
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ============================================================================
+// Department Configuration - Exclusions, Preferences, Max Share Limits
+// Per guidance docs: allow user to exclude, prefer, or cap certain revenue segments
+// ============================================================================
+export const investmentCriteriaDepartments = pgTable("investment_criteria_departments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  
+  // Departments to exclude entirely (hard filter)
+  // Example: ["Boat Sales", "F&B"]
+  excludedDepartments: jsonb("excluded_departments").default(sql`'[]'::jsonb`),
+  
+  // Departments that increase score if present
+  // Example: ["Fuel", "Ship Store"]
+  preferredDepartments: jsonb("preferred_departments").default(sql`'[]'::jsonb`),
+  
+  // Max allowed revenue share per department (soft cap with score penalty)
+  // Example: { "Boat Sales": 0.10, "F&B": 0.20 }
+  maxSharePerDepartment: jsonb("max_share_per_department").default(sql`'{}'::jsonb`),
+  
+  // How strictly to enforce exclusions
+  excludeMode: varchar("exclude_mode", { length: 20 }).default("reject"), // reject = hard, penalize = soft
+  excludeThreshold: numeric("exclude_threshold", { precision: 5, scale: 4 }).default("0.01"), // Revenue % threshold to trigger exclusion
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ============================================================================
+// Storage Types & Rates Criteria - Per guidance docs
+// Define desired storage types and minimum rates per type
+// ============================================================================
+export const investmentCriteriaStorageTypes = pgTable("investment_criteria_storage_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  
+  // Desired storage types
+  // Example: ["Wet Slips", "Lift Slips", "Dry Racks"]
+  desiredTypes: jsonb("desired_types").default(sql`'["Wet Slips"]'::jsonb`),
+  
+  // Minimum total slip/storage count across all types
+  minTotalSlips: integer("min_total_slips"),
+  
+  // Minimum rates per storage type (JSONB array of objects)
+  // Example: [{ "type": "Wet Slips", "minRate": 18, "basis": "$/ft/month" }]
+  storageRates: jsonb("storage_rates").default(sql`'[]'::jsonb`),
+  
+  // Scoring settings
+  storageTypesMustHave: boolean("storage_types_must_have").default(false),
+  storageTypesImportance: integer("storage_types_importance").default(3),
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -14900,6 +15027,19 @@ export const insertInvestmentCriteriaProfileSchema = createInsertSchema(investme
 });
 export const updateInvestmentCriteriaProfileSchema = insertInvestmentCriteriaProfileSchema.partial();
 export type InvestmentCriteriaProfile = typeof investmentCriteriaProfiles.$inferSelect;
+
+// Export types for new criteria tables
+export type InvestmentCriteriaLocation = typeof investmentCriteriaLocation.$inferSelect;
+export type InvestmentCriteriaFinancial = typeof investmentCriteriaFinancial.$inferSelect;
+export type InvestmentCriteriaOperational = typeof investmentCriteriaOperational.$inferSelect;
+export type InvestmentCriteriaSize = typeof investmentCriteriaSize.$inferSelect;
+export type InvestmentCriteriaCapital = typeof investmentCriteriaCapital.$inferSelect;
+export type InvestmentCriteriaInvolvement = typeof investmentCriteriaInvolvement.$inferSelect;
+export type InvestmentCriteriaCapex = typeof investmentCriteriaCapex.$inferSelect;
+export type InvestmentCriteriaStorageMix = typeof investmentCriteriaStorageMix.$inferSelect;
+export type InvestmentCriteriaDepartments = typeof investmentCriteriaDepartments.$inferSelect;
+export type InvestmentCriteriaStorageTypes = typeof investmentCriteriaStorageTypes.$inferSelect;
+export type MarinaListingMatch = typeof marinaListingMatches.$inferSelect;
 
 export const insertMarinaMatchGoalSchema = createInsertSchema(marinaMatchGoals).omit({
   id: true,

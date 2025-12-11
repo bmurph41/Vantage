@@ -388,10 +388,11 @@ export default function ModelingProjectIntegrationPanel({ projectId, projectName
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: comps = [], isLoading } = useQuery<ModelingProjectComp[]>({
+  const { data: compsData, isLoading } = useQuery<ModelingProjectComp[]>({
     queryKey: [`/api/integration/modeling-projects/${projectId}/comps`],
     enabled: !!projectId,
   });
+  const comps = Array.isArray(compsData) ? compsData : [];
 
   const unlinkMutation = useMutation({
     mutationFn: async (compLinkId: string) => {

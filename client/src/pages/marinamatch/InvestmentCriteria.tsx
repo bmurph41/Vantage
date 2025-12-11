@@ -551,6 +551,35 @@ function CreateProfileForm({
   onCancel: () => void;
 }) {
   const [activeTab, setActiveTab] = useState("basic");
+  // Marina departments for storage mix configuration
+  const STORAGE_DEPARTMENTS = [
+    "Wet Slips",
+    "Lift Slips",
+    "Dry Racks", 
+    "Moorings",
+    "Trailer Storage",
+    "Indoor Storage"
+  ];
+
+  const ALL_DEPARTMENTS = [
+    "Wet Slips",
+    "Lift Slips", 
+    "Dry Racks",
+    "Moorings",
+    "Trailer Storage",
+    "Indoor Storage",
+    "RV/Other Storage",
+    "Fuel",
+    "Ship Store/Retail",
+    "Service",
+    "Yard",
+    "F&B / Restaurant",
+    "Boat Sales / Brokerage",
+    "Boat Rentals",
+    "Boat Club",
+    "Other"
+  ];
+
   const [criteria, setCriteria] = useState({
     financial: {
       minAskingPrice: undefined as number | undefined,
@@ -563,6 +592,13 @@ function CreateProfileForm({
       maxCapRate: undefined as number | undefined,
       minPricePerSlip: undefined as number | undefined,
       maxPricePerSlip: undefined as number | undefined,
+      // New: Importance weights and must-have flags
+      priceMustHave: true,
+      priceImportance: 5,
+      capRateMustHave: false,
+      capRateImportance: 4,
+      revenueMustHave: false,
+      revenueImportance: 3,
     },
     size: {
       minTotalSlips: undefined as number | undefined,
@@ -586,6 +622,19 @@ function CreateProfileForm({
       requireShipStore: false,
       requireRepairShop: false,
       requireDryStorage: false,
+    },
+    // New: Storage Mix configuration
+    storageMix: {
+      includedDepartments: STORAGE_DEPARTMENTS,
+      minStorageShare: 0.5, // 50% minimum from storage
+      storageMixMustHave: true,
+      storageMixImportance: 5,
+    },
+    // New: Department preferences
+    departments: {
+      excludedDepartments: [] as string[],
+      preferredDepartments: [] as string[],
+      excludeMode: 'penalty' as 'reject' | 'penalty', // reject = hard filter, penalty = soft
     },
   });
 
@@ -636,11 +685,13 @@ function CreateProfileForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="basic">Basic</TabsTrigger>
             <TabsTrigger value="financial">Financial</TabsTrigger>
             <TabsTrigger value="size">Size</TabsTrigger>
             <TabsTrigger value="capital">Capital</TabsTrigger>
+            <TabsTrigger value="storagemix">Storage Mix</TabsTrigger>
+            <TabsTrigger value="departments">Depts</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="h-[350px] mt-4">
