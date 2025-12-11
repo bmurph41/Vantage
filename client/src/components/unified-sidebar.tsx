@@ -432,6 +432,10 @@ export default function UnifiedSidebar() {
             {crmExpanded && crmNav.map((item) => (
               <NavLink key={item.name} item={item} />
             ))}
+            {/* Prospecting - shown if user has prospecting pack */}
+            {crmExpanded && canViewSection('prospecting') && hasPack('prospecting') && (
+              <NavLink item={{ name: "Prospecting", href: "/prospecting", icon: Target }} />
+            )}
             {crmExpanded && (
               <>
                 {/* Pending Section - Only visible when there are pending items */}
@@ -457,30 +461,6 @@ export default function UnifiedSidebar() {
                       {pendingExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                     </button>
                     {pendingExpanded && pendingNav.map((item) => (
-                      <NavLink key={item.name} item={item} />
-                    ))}
-                  </div>
-                )}
-                {/* Prospecting & Outreach (Premium/Broker Add-On) */}
-                {canViewSection('prospecting') && hasPack('prospecting') && (
-                  <div className="ml-4 mt-1 mb-2">
-                    <button
-                      onClick={() => setProspectingExpanded(!prospectingExpanded)}
-                      className={cn(
-                        "flex items-center justify-between w-full px-4 py-1.5 text-xs font-medium transition-colors rounded-lg",
-                        location.startsWith('/prospecting')
-                          ? "bg-blue-600 text-white hover:bg-blue-700"
-                          : "text-gray-500 hover:text-gray-700"
-                      )}
-                      data-testid="toggle-prospecting"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Target className="w-3.5 h-3.5" />
-                        <span>Prospecting</span>
-                      </div>
-                      {prospectingExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                    </button>
-                    {prospectingExpanded && prospectingNav.map((item) => (
                       <NavLink key={item.name} item={item} />
                     ))}
                   </div>
