@@ -13,7 +13,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Save, Plus, Trash2, DollarSign, Search, Link, Unlink } from "lucide-react";
+import { X, Save, Plus, Trash2, DollarSign, Search, Link, Unlink, ToggleLeft } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { rateCompsApi } from '@/lib/ratecomps/api';
 import { queryKeys } from '@/lib/ratecomps/queryKeys';
 import { useToast } from "@/hooks/use-toast";
@@ -122,6 +123,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   // CRM Property linking state
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>((comp as any)?.propertyId || null);
   
+  // Occupancy N/A toggle state
+  const [occupancyNA, setOccupancyNA] = useState<boolean>(comp?.occupancy === null || (comp as any)?.occupancyNA || false);
+  
   // Portfolio mode state
   const [portfolioTabs, setPortfolioTabs] = useState<Array<{id: string, marinaName: string}>>([
     { id: '1', marinaName: '' },
@@ -168,7 +172,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       waterfront: comp?.waterfront || "",
       region: comp?.region || "",
       acres: comp?.acres ? Number(comp.acres) : "",
-      occupancy: comp?.occupancy ? Number(comp.occupancy) : "",
+      occupancy: comp?.occupancy !== undefined && comp?.occupancy !== null ? Number(comp.occupancy) : "",
       yearBuilt: comp?.yearBuilt || "",
       articleUrls: comp?.articleUrls || [],
       notes: comp?.notes || "",
@@ -389,7 +393,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       wetSlips: data.wetSlips === "" ? undefined : Number(data.wetSlips),
       dryRacks: data.dryRacks === "" ? undefined : Number(data.dryRacks),
       acres: data.acres === "" ? undefined : Number(data.acres),
-      occupancy: data.occupancy === "" ? undefined : Number(data.occupancy),
+      occupancy: occupancyNA || data.occupancy === "" || data.occupancy === "N/A" ? undefined : Number(data.occupancy),
       yearBuilt: data.yearBuilt === "" ? undefined : Number(data.yearBuilt),
       ioBoth: data.ioBoth === "" || data.ioBoth === "none-selected" ? undefined : data.ioBoth,
       storageTypes: data.storageTypes || [],
@@ -730,8 +734,13 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                     if (property.city) form.setValue('city', property.city);
                                     if (property.state) form.setValue('state', property.state);
                                     if (property.address) form.setValue('address', property.address);
+                                    if (property.zip) form.setValue('zip', property.zip);
                                     if (property.wetSlips) form.setValue('wetSlips', property.wetSlips);
                                     if (property.drySlips) form.setValue('dryRacks', property.drySlips);
+                                    if (property.occupancy !== undefined && property.occupancy !== null) {
+                                      form.setValue('occupancy', property.occupancy);
+                                      setOccupancyNA(false);
+                                    }
                                   }}
                                   placeholder="Enter marina name..."
                                 />
@@ -1197,13 +1206,38 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         name="occupancy"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Occupancy (%)</FormLabel>
+                            <div className="flex items-center justify-between">
+                              <FormLabel>Occupancy (%)</FormLabel>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">N/A</span>
+                                <Switch
+                                  checked={occupancyNA}
+                                  onCheckedChange={(checked) => {
+                                    setOccupancyNA(checked);
+                                    if (checked) {
+                                      field.onChange("N/A");
+                                    } else {
+                                      field.onChange("");
+                                    }
+                                  }}
+                                  data-testid="switch-occupancy-na"
+                                />
+                              </div>
+                            </div>
                             <FormControl>
                               <Input 
-                                {...field} 
-                                type="number"
+                                {...field}
+                                value={occupancyNA ? "N/A" : (field.value !== undefined && field.value !== null ? String(field.value) : "")}
+                                type={occupancyNA ? "text" : "number"}
                                 step="0.1"
                                 placeholder="94.2"
+                                disabled={occupancyNA}
+                                className={occupancyNA ? "bg-muted" : ""}
+                                onChange={(e) => {
+                                  if (!occupancyNA) {
+                                    field.onChange(e.target.value);
+                                  }
+                                }}
                                 data-testid="input-occupancy"
                               />
                             </FormControl>

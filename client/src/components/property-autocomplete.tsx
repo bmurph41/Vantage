@@ -13,10 +13,12 @@ interface PropertySearchResult {
   address?: string;
   city?: string;
   state?: string;
+  zip?: string;
   type?: string;
   status?: string;
   wetSlips?: number;
   drySlips?: number;
+  occupancy?: number;
 }
 
 interface PropertyAutocompleteProps {

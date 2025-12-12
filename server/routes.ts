@@ -8126,7 +8126,7 @@ Current context: Project ${req.params.projectId}`;
       )
       .limit(parseInt(limit as string) || 10);
       
-      // Parse specifications to extract city/state if available
+      // Parse specifications to extract city/state/zip/occupancy if available
       const formattedResults = results.map(p => {
         const specs = p.specifications as any || {};
         return {
@@ -8135,10 +8135,12 @@ Current context: Project ${req.params.projectId}`;
           address: p.address,
           city: specs.city || '',
           state: specs.state || '',
+          zip: specs.zip || specs.zipCode || '',
           type: p.type,
           status: p.status,
-          wetSlips: specs.wetSlips || specs.wet_slips,
-          drySlips: specs.drySlips || specs.dry_slips,
+          wetSlips: specs.wetSlips ?? specs.wet_slips,
+          drySlips: specs.drySlips ?? specs.dry_slips,
+          occupancy: specs.occupancy ?? specs.occupancyRate,
         };
       });
       

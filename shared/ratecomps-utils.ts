@@ -48,23 +48,27 @@ export function normalizeRate(tier: {
       method = 'unknown period (assumed monthly)';
   }
   
-  let perFootMonthlyRate = monthlyRate;
+  let normalizedRate = monthlyRate;
+  let normalizedUnit = 'usd_per_ft_per_month';
   
   if (rateUnit === 'flat') {
     const avgLoa = calculateAvgLoa(loaMin, loaMax);
     if (avgLoa > 0) {
-      perFootMonthlyRate = Math.round(monthlyRate / avgLoa);
+      normalizedRate = Math.round(monthlyRate / avgLoa);
       method += ` / ${avgLoa}ft avg LOA`;
     }
   } else if (rateUnit === 'per_foot' || rateUnit === 'per_foot_loa') {
     method += ' (per foot)';
   } else if (rateUnit === 'per_foot_beam') {
     method += ' (per foot beam - converted to LOA estimate)';
+  } else if (rateUnit === 'per_sf') {
+    method += ' (per square foot)';
+    normalizedUnit = 'usd_per_sf_per_month';
   }
   
   return {
-    normalizedValue: perFootMonthlyRate,
-    normalizedUnit: 'usd_per_ft_per_month',
+    normalizedValue: normalizedRate,
+    normalizedUnit,
     normalizedMethod: method,
   };
 }
@@ -102,8 +106,10 @@ export function formatRateDisplay(amountCents: number, rateUnit: string, ratePer
   const unitLabel = rateUnit === 'per_foot' || rateUnit === 'per_foot_loa' 
     ? '/ft' 
     : rateUnit === 'per_foot_beam' 
-      ? '/ft (beam)' 
-      : '';
+      ? '/ft (beam)'
+      : rateUnit === 'per_sf'
+        ? '/SF'
+        : '';
       
   const periodLabel = ratePeriod === 'daily' ? '/day'
     : ratePeriod === 'weekly' ? '/wk'
@@ -115,14 +121,15 @@ export function formatRateDisplay(amountCents: number, rateUnit: string, ratePer
   return `${formattedAmount}${unitLabel}${periodLabel}`;
 }
 
-export function formatNormalizedRate(normalizedValue: number): string {
+export function formatNormalizedRate(normalizedValue: number, normalizedUnit?: string): string {
   const amount = normalizedValue / 100;
+  const suffix = normalizedUnit === 'usd_per_sf_per_month' ? '/SF/mo' : '/ft/mo';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount) + '/ft/mo';
+  }).format(amount) + suffix;
 }
 
 export function formatSizeRange(
@@ -170,6 +177,7 @@ export const RATE_UNIT_LABELS: Record<string, string> = {
   flat: 'Flat Rate',
   per_foot_beam: 'Per Foot (Beam)',
   per_foot_loa: 'Per Foot (LOA)',
+  per_sf: 'Per Square Foot',
 };
 
 export const PROTECTION_LEVEL_LABELS: Record<string, string> = {

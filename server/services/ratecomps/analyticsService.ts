@@ -400,6 +400,7 @@ export interface NormalizedRateTier {
   seasonEndMonth: number | null;
   tierLabel: string | null;
   normalizedRate: number;
+  normalizedUnit: string;
   normalizedRateDisplay: string;
 }
 
@@ -497,7 +498,8 @@ export async function calculateRateTierMetrics(
         seasonEndMonth: tier.seasonEndMonth,
         tierLabel: tier.tierLabel,
         normalizedRate: normResult.normalizedValue,
-        normalizedRateDisplay: formatNormalizedRate(normResult.normalizedValue),
+        normalizedUnit: normResult.normalizedUnit,
+        normalizedRateDisplay: formatNormalizedRate(normResult.normalizedValue, normResult.normalizedUnit),
       };
     })
     .filter(tier => tier.normalizedRate > 0); // Filter out invalid rates
