@@ -1553,12 +1553,25 @@ router.post("/criteria-profiles/:profileId/rescore-all", async (req: Request, re
 router.get("/analytics/overview", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
+    const userId = getUserId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
-    const listings = await db.select().from(marinaListings).where(eq(marinaListings.orgId, orgId));
+    const allListings = await db.select().from(marinaListings).where(eq(marinaListings.orgId, orgId));
     const goals = await db.select().from(marinaMatchGoals).where(eq(marinaMatchGoals.orgId, orgId));
     const profiles = await db.select().from(investmentCriteriaProfiles).where(eq(investmentCriteriaProfiles.orgId, orgId));
     const sources = await db.select().from(marinaScrapeources).where(eq(marinaScrapeources.orgId, orgId));
+
+    // Filter out listings hidden by the current user (same as listings endpoint)
+    let hiddenListingIds: string[] = [];
+    if (userId) {
+      const hiddenListings = await db
+        .select({ listingId: userHiddenListings.listingId })
+        .from(userHiddenListings)
+        .where(eq(userHiddenListings.userId, userId));
+      hiddenListingIds = hiddenListings.map(h => h.listingId);
+    }
+    
+    const listings = allListings.filter(l => !hiddenListingIds.includes(l.id));
 
     const activeListings = listings.filter(l => l.status === "active");
     const highMatchListings = listings.filter(l => (l.bestMatchScore || 0) >= 70);
