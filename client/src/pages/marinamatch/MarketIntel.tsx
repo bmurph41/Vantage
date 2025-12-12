@@ -1700,6 +1700,12 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                               <Badge variant="outline" className={`text-xs ${getSourceBadgeStyle(listing.sourcePlatform)}`}>
                                 {listing.sourcePlatform}
                               </Badge>
+                              {listing.askingPrice && (
+                                <span className="flex items-center gap-1 font-semibold text-green-600 dark:text-green-400 ml-auto text-sm">
+                                  <DollarSign className="h-4 w-4" />
+                                  {formatPrice(listing.askingPrice)}
+                                </span>
+                              )}
                             </div>
                             
                             <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
@@ -1716,12 +1722,6 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                             </div>
 
                             <div className="flex flex-wrap gap-3 text-sm mb-2">
-                              {listing.askingPrice && (
-                                <span className="flex items-center gap-1 font-semibold text-green-600">
-                                  <DollarSign className="h-4 w-4" />
-                                  {formatPrice(listing.askingPrice)}
-                                </span>
-                              )}
                               {listing.totalSlips && (
                                 <span className="flex items-center gap-1">
                                   <Anchor className="h-4 w-4 text-blue-500" />
