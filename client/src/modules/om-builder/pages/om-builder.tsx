@@ -151,7 +151,7 @@ export default function OMBuilder() {
 
   const createPageMutation = useMutation({
     mutationFn: (data: { omId: string; title: string; orderIndex: number }) =>
-      apiRequest('/api/om/pages', { method: 'POST', body: JSON.stringify(data) }),
+      apiRequest('POST', '/api/om/pages', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/om/oms', omId, 'pages'] });
     },
@@ -159,7 +159,7 @@ export default function OMBuilder() {
 
   const createBlockMutation = useMutation({
     mutationFn: (data: { pageId: string; type: string; orderIndex: number; content: any }) =>
-      apiRequest('/api/om/blocks', { method: 'POST', body: JSON.stringify(data) }),
+      apiRequest('POST', '/api/om/blocks', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/om/pages', activePageId, 'blocks'] });
     },

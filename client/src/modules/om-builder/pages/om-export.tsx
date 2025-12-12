@@ -56,10 +56,7 @@ export default function OMExport() {
 
   const exportToVdrMutation = useMutation({
     mutationFn: (data: { folderId: string; projectId: string }) =>
-      apiRequest(`/api/om/oms/${omId}/export-to-vdr`, { 
-        method: 'POST', 
-        body: JSON.stringify(data) 
-      }),
+      apiRequest('POST', `/api/om/oms/${omId}/export-to-vdr`, data),
     onSuccess: () => {
       setVdrExportSuccess(true);
       toast({ 

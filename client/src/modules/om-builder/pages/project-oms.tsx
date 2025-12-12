@@ -47,7 +47,7 @@ export default function ProjectOms() {
   
   const createOmMutation = useMutation({
     mutationFn: (data: { projectId: string; name: string; status: string; docType?: string }) =>
-      apiRequest('/api/om/oms', { method: 'POST', body: JSON.stringify(data) }),
+      apiRequest('POST', '/api/om/oms', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/om/oms/project', projectId] });
     },
@@ -55,7 +55,7 @@ export default function ProjectOms() {
 
   const cloneOmMutation = useMutation({
     mutationFn: (omId: string) =>
-      apiRequest(`/api/om/oms/${omId}/clone`, { method: 'POST' }),
+      apiRequest('POST', `/api/om/oms/${omId}/clone`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/om/oms/project', projectId] });
     },
@@ -63,7 +63,7 @@ export default function ProjectOms() {
 
   const deleteOmMutation = useMutation({
     mutationFn: (omId: string) =>
-      apiRequest(`/api/om/oms/${omId}`, { method: 'DELETE' }),
+      apiRequest('DELETE', `/api/om/oms/${omId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/om/oms/project', projectId] });
     },
