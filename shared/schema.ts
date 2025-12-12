@@ -651,6 +651,7 @@ export const projects = pgTable("projects", {
   leases: jsonb("leases").default(sql`'[]'`), // Array of lease information from deal
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // Project Settings
