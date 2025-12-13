@@ -28,7 +28,7 @@ import debounce from "lodash.debounce";
 import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES, US_REGIONS } from "@shared/salescomps-constants";
 import { AddressInput } from "@/components/address-input";
 import { useCustomStorageTypes, useCreateCustomStorageType } from "@/hooks/ratecomps/useCustomStorageTypes";
-import RateTiersEditor from "./RateTiersEditor";
+import RateTiersDataTable from "./RateTiersDataTable";
 import PropertyAutocomplete from "@/components/property-autocomplete";
 
 const compFormSchema = z.object({
@@ -1278,7 +1278,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       </CardHeader>
                       <CardContent>
                         <div className="max-h-[400px] overflow-auto">
-                          <RateTiersEditor
+                          <RateTiersDataTable
                             rateCompId={comp.id}
                             marinaName={comp.marina}
                             onTiersUpdated={() => {
