@@ -8151,6 +8151,88 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get property details formatted for rate comp auto-population
+  app.get("/api/properties/:id/for-rate-comp", async (req: any, res) => {
+    try {
+      const orgId = req.user?.orgId;
+      if (!orgId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const property = await storage.getCrmProperty(req.params.id);
+      if (!property) {
+        return res.status(404).json({ error: "Property not found" });
+      }
+      
+      const specs = (property.specifications as any) || {};
+      const coords = (property.coordinates as any) || {};
+      
+      // Map CRM property fields to rate comp fields
+      const rateCompData = {
+        // Basic info
+        marina: property.title,
+        propertyId: property.id,
+        address: property.address || '',
+        city: specs.city || '',
+        state: specs.state || '',
+        zip: specs.zip || specs.zipCode || '',
+        lat: coords.lat,
+        lng: coords.lng,
+        
+        // Physical characteristics
+        wetSlips: specs.wetSlips ?? specs.wet_slips ?? null,
+        dryRacks: specs.dryRacks ?? specs.dry_slips ?? null,
+        acres: specs.acres ?? specs.lotSize ?? null,
+        occupancy: specs.occupancy ?? specs.occupancyRate ?? null,
+        yearBuilt: specs.yearBuilt ?? null,
+        
+        // Water & Location
+        waterType: specs.waterType ?? specs.water_type ?? null,
+        bodyOfWater: specs.bodyOfWater ?? specs.body_of_water ?? null,
+        waterBodyName: specs.waterBodyName ?? specs.waterfront ?? null,
+        region: specs.region ?? null,
+        coastalType: specs.coastalType ?? specs.waterType ?? null,
+        
+        // Storage types
+        storageTypes: specs.storageTypes ?? [],
+        ioBoth: specs.ioBoth ?? specs.storageType ?? null,
+        
+        // Profit Centers
+        profitCenterStorage: specs.profitCenterStorage ?? specs.hasStorage ?? false,
+        profitCenterEvents: specs.profitCenterEvents ?? specs.hasEvents ?? false,
+        profitCenterService: specs.profitCenterService ?? specs.hasService ?? false,
+        profitCenterThirdPartyLeases: specs.profitCenterThirdPartyLeases ?? false,
+        profitCenterBoatRentals: specs.profitCenterBoatRentals ?? specs.hasBoatRentals ?? false,
+        profitCenterBoatBrokerage: specs.profitCenterBoatBrokerage ?? false,
+        profitCenterRvPark: specs.profitCenterRvPark ?? false,
+        profitCenterFuel: specs.profitCenterFuel ?? specs.hasFuel ?? false,
+        profitCenterShipStore: specs.profitCenterShipStore ?? specs.hasShipStore ?? false,
+        profitCenterParts: specs.profitCenterParts ?? false,
+        profitCenterBoatClub: specs.profitCenterBoatClub ?? specs.hasBoatClub ?? false,
+        profitCenterBoatSales: specs.profitCenterBoatSales ?? specs.hasBoatSales ?? false,
+        profitCenterFnb: specs.profitCenterFnb ?? specs.hasRestaurant ?? false,
+        profitCenterHospitality: specs.profitCenterHospitality ?? specs.hasLodging ?? false,
+        
+        // Profit Center Operation Types
+        profitCenterBoatRentalsType: specs.profitCenterBoatRentalsType ?? null,
+        profitCenterBoatBrokerageType: specs.profitCenterBoatBrokerageType ?? null,
+        profitCenterFuelType: specs.profitCenterFuelType ?? null,
+        profitCenterShipStoreType: specs.profitCenterShipStoreType ?? null,
+        profitCenterPartsType: specs.profitCenterPartsType ?? null,
+        profitCenterBoatSalesType: specs.profitCenterBoatSalesType ?? null,
+        profitCenterFnbType: specs.profitCenterFnbType ?? null,
+        profitCenterHospitalityType: specs.profitCenterHospitalityType ?? null,
+        profitCenterBoatClubType: specs.profitCenterBoatClubType ?? null,
+        profitCenterBoatClubCompany: specs.profitCenterBoatClubCompany ?? null,
+      };
+      
+      res.json(rateCompData);
+    } catch (error) {
+      console.error("Failed to get property for rate comp:", error);
+      res.status(500).json({ error: "Failed to get property details" });
+    }
+  });
+
   // Property-Contact Links
   app.get("/api/properties/:id/contacts", async (req: any, res) => {
     try {
