@@ -6643,6 +6643,7 @@ export const rateTiers = pgTable('rate_tiers', {
   
   effectiveDate: date('effective_date'),
   expirationDate: date('expiration_date'),
+  rateYear: integer('rate_year'), // Year the rate applies (for historical tracking)
   isCurrentRate: boolean('is_current_rate').default(true),
   
   minTermMonths: integer('min_term_months'),
@@ -6689,6 +6690,7 @@ export const rateTiers = pgTable('rate_tiers', {
   orgLoaIdx: index('rate_tiers_org_loa_idx').on(table.orgId, table.loaMin, table.loaMax),
   orgNormalizedIdx: index('rate_tiers_org_normalized_idx').on(table.orgId, table.normalizedValue),
   orgCurrentIdx: index('rate_tiers_org_current_idx').on(table.orgId, table.isCurrentRate),
+  orgYearIdx: index('rate_tiers_org_year_idx').on(table.orgId, table.rateYear),
 }));
 
 // Rate Tier Relations
