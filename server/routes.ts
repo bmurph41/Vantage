@@ -22578,6 +22578,51 @@ Current context: Project ${req.params.projectId}`;
       );
 
       if (!comp) return res.status(404).json({ message: "Rate comp not found" });
+      
+      // Bidirectional sync: Update CRM property if propertyId is linked
+      // Only sync fields that were explicitly updated in the request
+      const propertyId = (comp as any).propertyId;
+      if (propertyId && Object.keys(updates).length > 0) {
+        try {
+          const existingProperty = await storage.getCrmProperty(propertyId);
+          if (existingProperty && existingProperty.orgId === orgId) {
+            const currentSpecs = (existingProperty.specifications as any) || {};
+            
+            // Only sync fields that were actually in the update request
+            const syncableFields = ['wetSlips', 'dryRacks', 'acres', 'occupancy', 'yearBuilt', 
+              'waterType', 'bodyOfWater', 'waterBodyName', 'region', 'storageTypes',
+              'profitCenterStorage', 'profitCenterEvents', 'profitCenterService', 
+              'profitCenterThirdPartyLeases', 'profitCenterBoatRentals', 'profitCenterBoatBrokerage',
+              'profitCenterRvPark', 'profitCenterFuel', 'profitCenterShipStore', 'profitCenterParts',
+              'profitCenterBoatClub', 'profitCenterBoatSales', 'profitCenterFnb', 'profitCenterHospitality'];
+            
+            const updatedSpecs = { ...currentSpecs };
+            let hasChanges = false;
+            
+            for (const field of syncableFields) {
+              if (field in updates && updates[field] !== undefined) {
+                updatedSpecs[field] = updates[field];
+                hasChanges = true;
+              }
+            }
+            
+            if (hasChanges) {
+              updatedSpecs.lastSyncedFromRateComp = new Date().toISOString();
+              
+              const propertyUpdates: any = { specifications: updatedSpecs };
+              if ('address' in updates && updates.address !== undefined) {
+                propertyUpdates.address = updates.address;
+              }
+              
+              await storage.updateCrmProperty(propertyId, propertyUpdates);
+            }
+          }
+        } catch (syncError) {
+          console.error('Error syncing rate comp to CRM property:', syncError);
+          // Don't fail the request if sync fails - the rate comp update succeeded
+        }
+      }
+      
       res.json(comp);
     } catch (error) {
       console.error("Error updating rate comp:", error);

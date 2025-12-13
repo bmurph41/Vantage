@@ -29,6 +29,7 @@ import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES, US_REGIONS } from "@shared/
 import { AddressInput } from "@/components/address-input";
 import { useCustomStorageTypes, useCreateCustomStorageType } from "@/hooks/ratecomps/useCustomStorageTypes";
 import RateTiersDataTable from "./RateTiersDataTable";
+import RateHistoryView from "../analytics/RateHistoryView";
 import PropertyAutocomplete from "@/components/property-autocomplete";
 
 const compFormSchema = z.object({
@@ -730,16 +731,71 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                       form.setValue('propertyId', undefined);
                                     }
                                   }}
-                                  onPropertyDataPopulate={(property) => {
-                                    if (property.city) form.setValue('city', property.city);
-                                    if (property.state) form.setValue('state', property.state);
-                                    if (property.address) form.setValue('address', property.address);
-                                    if (property.zip) form.setValue('zip', property.zip);
-                                    if (property.wetSlips) form.setValue('wetSlips', property.wetSlips);
-                                    if (property.drySlips) form.setValue('dryRacks', property.drySlips);
-                                    if (property.occupancy !== undefined && property.occupancy !== null) {
-                                      form.setValue('occupancy', property.occupancy);
-                                      setOccupancyNA(false);
+                                  onPropertyDataPopulate={async (property) => {
+                                    // Fetch full property data from the for-rate-comp endpoint
+                                    try {
+                                      const response = await fetch(`/api/properties/${property.id}/for-rate-comp`, {
+                                        credentials: 'include'
+                                      });
+                                      if (response.ok) {
+                                        const fullData = await response.json();
+                                        // Populate all available fields
+                                        if (fullData.city) form.setValue('city', fullData.city);
+                                        if (fullData.state) form.setValue('state', fullData.state);
+                                        if (fullData.address) form.setValue('address', fullData.address);
+                                        if (fullData.zip) form.setValue('zip', fullData.zip);
+                                        if (fullData.wetSlips) form.setValue('wetSlips', fullData.wetSlips);
+                                        if (fullData.dryRacks) form.setValue('dryRacks', fullData.dryRacks);
+                                        if (fullData.occupancy !== undefined && fullData.occupancy !== null) {
+                                          form.setValue('occupancy', fullData.occupancy);
+                                          setOccupancyNA(false);
+                                        }
+                                        if (fullData.acres) form.setValue('acres', fullData.acres);
+                                        if (fullData.yearBuilt) form.setValue('yearBuilt', fullData.yearBuilt);
+                                        if (fullData.waterType) form.setValue('waterType', fullData.waterType);
+                                        if (fullData.bodyOfWater) form.setValue('bodyOfWater', fullData.bodyOfWater);
+                                        if (fullData.waterBodyName) form.setValue('waterBodyName', fullData.waterBodyName);
+                                        if (fullData.region) form.setValue('region', fullData.region);
+                                        if (fullData.storageTypes?.length) form.setValue('storageTypes', fullData.storageTypes);
+                                        if (fullData.ioBoth) form.setValue('ioBoth', fullData.ioBoth);
+                                        // Profit centers
+                                        if (fullData.profitCenterStorage) form.setValue('profitCenterStorage', true);
+                                        if (fullData.profitCenterEvents) form.setValue('profitCenterEvents', true);
+                                        if (fullData.profitCenterService) form.setValue('profitCenterService', true);
+                                        if (fullData.profitCenterThirdPartyLeases) form.setValue('profitCenterThirdPartyLeases', true);
+                                        if (fullData.profitCenterBoatRentals) form.setValue('profitCenterBoatRentals', true);
+                                        if (fullData.profitCenterBoatBrokerage) form.setValue('profitCenterBoatBrokerage', true);
+                                        if (fullData.profitCenterRvPark) form.setValue('profitCenterRvPark', true);
+                                        if (fullData.profitCenterFuel) form.setValue('profitCenterFuel', true);
+                                        if (fullData.profitCenterShipStore) form.setValue('profitCenterShipStore', true);
+                                        if (fullData.profitCenterParts) form.setValue('profitCenterParts', true);
+                                        if (fullData.profitCenterBoatClub) form.setValue('profitCenterBoatClub', true);
+                                        if (fullData.profitCenterBoatSales) form.setValue('profitCenterBoatSales', true);
+                                        if (fullData.profitCenterFnb) form.setValue('profitCenterFnb', true);
+                                        if (fullData.profitCenterHospitality) form.setValue('profitCenterHospitality', true);
+                                        
+                                        toast({
+                                          title: "Property Linked",
+                                          description: `Linked to "${fullData.marina}" from CRM. Fields have been auto-populated.`,
+                                        });
+                                      } else {
+                                        // Fallback to basic property data
+                                        if (property.city) form.setValue('city', property.city);
+                                        if (property.state) form.setValue('state', property.state);
+                                        if (property.address) form.setValue('address', property.address);
+                                        if (property.zip) form.setValue('zip', property.zip);
+                                        if (property.wetSlips) form.setValue('wetSlips', property.wetSlips);
+                                        if (property.drySlips) form.setValue('dryRacks', property.drySlips);
+                                      }
+                                    } catch (error) {
+                                      console.error("Failed to fetch full property data:", error);
+                                      // Fallback to basic property data
+                                      if (property.city) form.setValue('city', property.city);
+                                      if (property.state) form.setValue('state', property.state);
+                                      if (property.address) form.setValue('address', property.address);
+                                      if (property.zip) form.setValue('zip', property.zip);
+                                      if (property.wetSlips) form.setValue('wetSlips', property.wetSlips);
+                                      if (property.drySlips) form.setValue('dryRacks', property.drySlips);
                                     }
                                   }}
                                   placeholder="Enter marina name..."
@@ -1276,7 +1332,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           Rate Tiers
                         </CardTitle>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="space-y-6">
                         <div className="max-h-[400px] overflow-auto">
                           <RateTiersDataTable
                             rateCompId={comp.id}
@@ -1286,6 +1342,10 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                             }}
                           />
                         </div>
+                        <RateHistoryView
+                          rateCompId={comp.id}
+                          marinaName={comp.marina}
+                        />
                       </CardContent>
                     </Card>
                   )}

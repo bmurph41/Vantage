@@ -85,7 +85,7 @@ export default function RateTiersDataTable({ rateCompId, marinaName, onTiersUpda
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data: tiers, isLoading } = useQuery<RateTier[]>({
-    queryKey: ['/api/rate-comps', rateCompId, 'tiers'],
+    queryKey: [`/api/rate-comps/${rateCompId}/tiers`],
   });
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function RateTiersDataTable({ rateCompId, marinaName, onTiersUpda
     }),
     onSuccess: () => {
       toast({ title: "Rate tier created" });
-      qc.invalidateQueries({ queryKey: ['/api/rate-comps', rateCompId, 'tiers'] });
+      qc.invalidateQueries({ queryKey: [`/api/rate-comps/${rateCompId}/tiers`] });
       onTiersUpdated?.();
     },
     onError: (error: any) => {
@@ -116,7 +116,7 @@ export default function RateTiersDataTable({ rateCompId, marinaName, onTiersUpda
     }),
     onSuccess: () => {
       toast({ title: "Rate tier updated" });
-      qc.invalidateQueries({ queryKey: ['/api/rate-comps', rateCompId, 'tiers'] });
+      qc.invalidateQueries({ queryKey: [`/api/rate-comps/${rateCompId}/tiers`] });
       onTiersUpdated?.();
     },
     onError: (error: any) => {
@@ -130,7 +130,7 @@ export default function RateTiersDataTable({ rateCompId, marinaName, onTiersUpda
     }),
     onSuccess: () => {
       toast({ title: "Rate tier deleted" });
-      qc.invalidateQueries({ queryKey: ['/api/rate-comps', rateCompId, 'tiers'] });
+      qc.invalidateQueries({ queryKey: [`/api/rate-comps/${rateCompId}/tiers`] });
       onTiersUpdated?.();
     },
     onError: (error: any) => {
