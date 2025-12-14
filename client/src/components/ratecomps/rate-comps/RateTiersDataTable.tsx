@@ -208,8 +208,15 @@ export default function RateTiersDataTable({
   const handleCancelEdit = (index: number) => {
     const row = rows[index];
     if (row.isNew) {
+      // Remove new unsaved rows
       setRows(rows.filter((_, i) => i !== index));
-    } else if (!isLocalMode) {
+    } else if (isLocalMode) {
+      // In local mode, just exit editing (can't revert since no original stored)
+      const newRows = [...rows];
+      newRows[index] = { ...newRows[index], isEditing: false };
+      setRows(newRows);
+    } else {
+      // In API mode, restore from fetched tiers
       const original = tiers?.find(t => t.id === row.id);
       if (original) {
         const newRows = [...rows];

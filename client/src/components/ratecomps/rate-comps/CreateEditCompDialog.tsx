@@ -28,7 +28,7 @@ import debounce from "lodash.debounce";
 import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES, US_REGIONS } from "@shared/salescomps-constants";
 import { AddressInput } from "@/components/address-input";
 import { useCustomStorageTypes, useCreateCustomStorageType } from "@/hooks/ratecomps/useCustomStorageTypes";
-import RateTiersDataTable from "./RateTiersDataTable";
+import RateTiersDataTable, { TierRowData, rowDataToTier } from "./RateTiersDataTable";
 import RateHistoryView from "../analytics/RateHistoryView";
 import PropertyAutocomplete from "@/components/property-autocomplete";
 
@@ -127,6 +127,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   // Occupancy N/A toggle state
   const [occupancyNA, setOccupancyNA] = useState<boolean>(comp?.occupancy === null || (comp as any)?.occupancyNA || false);
   
+  // Local rate tiers for creation mode (before the comp is saved)
+  const [pendingRateTiers, setPendingRateTiers] = useState<TierRowData[]>([]);
+  
   // Portfolio mode state
   const [portfolioTabs, setPortfolioTabs] = useState<Array<{id: string, marinaName: string}>>([
     { id: '1', marinaName: '' },
@@ -222,6 +225,13 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     }
   }, [comp]);
 
+  // Reset pending rate tiers when dialog opens in create mode
+  useEffect(() => {
+    if (open && !comp) {
+      setPendingRateTiers([]);
+    }
+  }, [open, comp]);
+
   // Marina search function with debouncing
   const searchMarinas = async (query: string) => {
     if (query.length < 2) {
@@ -291,11 +301,38 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
 
   const createMutation = useMutation({
     mutationFn: rateCompsApi.createComp,
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Comp created successfully",
-      });
+    onSuccess: async (newComp) => {
+      // After creating the rate comp, save any pending rate tiers
+      if (pendingRateTiers.length > 0) {
+        try {
+          for (const tier of pendingRateTiers) {
+            if (!tier.isEditing) { // Only save tiers that have been confirmed
+              const tierData = rowDataToTier(tier);
+              await apiRequest(`/api/rate-comps/${newComp.id}/tiers`, {
+                method: 'POST',
+                body: JSON.stringify(tierData),
+              });
+            }
+          }
+          toast({
+            title: "Success",
+            description: `Rate comp created with ${pendingRateTiers.filter(t => !t.isEditing).length} rate tier(s)`,
+          });
+        } catch (error) {
+          toast({
+            title: "Warning",
+            description: "Rate comp created but some rate tiers failed to save",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Success",
+          description: "Comp created successfully",
+        });
+      }
+      
+      setPendingRateTiers([]); // Clear pending tiers
       onClose();
       queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
       // Invalidate project comps if editing in project context
@@ -1358,10 +1395,14 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           Rate Tiers
                         </CardTitle>
                       </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground">
-                          Save the rate comp first, then you can add detailed rate tiers.
-                        </p>
+                      <CardContent className="space-y-6">
+                        <div className="max-h-[400px] overflow-auto">
+                          <RateTiersDataTable
+                            marinaName={form.watch("marina") || "New Marina"}
+                            localTiers={pendingRateTiers}
+                            onLocalTiersChange={setPendingRateTiers}
+                          />
+                        </div>
                       </CardContent>
                     </Card>
                   )}
