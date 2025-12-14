@@ -12,13 +12,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { STORAGE_TYPE_LABELS, RATE_PERIOD_LABELS, RATE_UNIT_LABELS, formatRateDisplay } from "@shared/ratecomps-utils";
 import type { RateTier } from "@shared/schema";
 
-interface RateTiersDataTableProps {
-  rateCompId: string;
-  marinaName: string;
-  onTiersUpdated?: () => void;
-}
-
-interface TierRowData {
+// TierRowData interface - exported for parent components
+export interface TierRowData {
   id?: string;
   storageType: string;
   sizeBasis: string;
@@ -33,7 +28,7 @@ interface TierRowData {
   isNew: boolean;
 }
 
-const EMPTY_ROW: TierRowData = {
+export const EMPTY_ROW: TierRowData = {
   storageType: 'wet_slip',
   sizeBasis: 'loa_range',
   loaMin: '',
@@ -46,6 +41,29 @@ const EMPTY_ROW: TierRowData = {
   isEditing: true,
   isNew: true,
 };
+
+export function rowDataToTier(data: TierRowData): any {
+  return {
+    storageType: data.storageType,
+    sizeBasis: data.sizeBasis,
+    loaMin: data.loaMin ? parseInt(data.loaMin) : null,
+    loaMax: data.loaMax ? parseInt(data.loaMax) : null,
+    rateUnit: data.rateUnit,
+    ratePeriod: data.ratePeriod,
+    amountCents: data.amountCents ? Math.round(parseFloat(data.amountCents) * 100) : 0,
+    rateYear: data.rateYear ? parseInt(data.rateYear) : new Date().getFullYear(),
+    isCurrentRate: data.isCurrentRate,
+  };
+}
+
+interface RateTiersDataTableProps {
+  rateCompId?: string; // Optional - if not provided, works in local-only mode
+  marinaName: string;
+  onTiersUpdated?: () => void;
+  // For local mode (creation):
+  localTiers?: TierRowData[];
+  onLocalTiersChange?: (tiers: TierRowData[]) => void;
+}
 
 function tierToRowData(tier: RateTier): TierRowData {
   return {
@@ -64,35 +82,43 @@ function tierToRowData(tier: RateTier): TierRowData {
   };
 }
 
-function rowDataToTier(data: TierRowData): any {
-  return {
-    storageType: data.storageType,
-    sizeBasis: data.sizeBasis,
-    loaMin: data.loaMin ? parseInt(data.loaMin) : null,
-    loaMax: data.loaMax ? parseInt(data.loaMax) : null,
-    rateUnit: data.rateUnit,
-    ratePeriod: data.ratePeriod,
-    amountCents: data.amountCents ? Math.round(parseFloat(data.amountCents) * 100) : 0,
-    rateYear: data.rateYear ? parseInt(data.rateYear) : new Date().getFullYear(),
-    isCurrentRate: data.isCurrentRate,
-  };
-}
-
-export default function RateTiersDataTable({ rateCompId, marinaName, onTiersUpdated }: RateTiersDataTableProps) {
+export default function RateTiersDataTable({ 
+  rateCompId, 
+  marinaName, 
+  onTiersUpdated,
+  localTiers,
+  onLocalTiersChange 
+}: RateTiersDataTableProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [rows, setRows] = useState<TierRowData[]>([]);
+  
+  // Determine if we're in local mode (no rateCompId) or API mode
+  const isLocalMode = !rateCompId;
+  
+  // Internal state for API mode
+  const [apiRows, setApiRows] = useState<TierRowData[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Use localTiers if in local mode, otherwise use apiRows
+  const rows = isLocalMode ? (localTiers || []) : apiRows;
+  const setRows = isLocalMode 
+    ? (newRows: TierRowData[] | ((prev: TierRowData[]) => TierRowData[])) => {
+        const resolvedRows = typeof newRows === 'function' ? newRows(localTiers || []) : newRows;
+        onLocalTiersChange?.(resolvedRows);
+      }
+    : setApiRows;
+
+  // Only fetch tiers from API when we have a rateCompId
   const { data: tiers, isLoading } = useQuery<RateTier[]>({
     queryKey: [`/api/rate-comps/${rateCompId}/tiers`],
+    enabled: !!rateCompId, // Only run query when rateCompId exists
   });
 
   useEffect(() => {
-    if (tiers) {
-      setRows(tiers.map(tierToRowData));
+    if (tiers && !isLocalMode) {
+      setApiRows(tiers.map(tierToRowData));
     }
-  }, [tiers]);
+  }, [tiers, isLocalMode]);
 
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest(`/api/rate-comps/${rateCompId}/tiers`, {
@@ -157,23 +183,33 @@ export default function RateTiersDataTable({ rateCompId, marinaName, onTiersUpda
       return;
     }
 
-    if (row.isNew) {
-      await createMutation.mutateAsync(tierData);
-    } else if (row.id) {
-      await updateMutation.mutateAsync({ id: row.id, data: tierData });
+    if (isLocalMode) {
+      // In local mode, just mark the row as saved (not editing/new)
+      const newRows = [...rows];
+      newRows[index] = { ...newRows[index], isEditing: false, isNew: false };
+      setRows(newRows);
+      setEditingId(null);
+      toast({ title: "Rate tier added", description: "Will be saved when you save the rate comp" });
+    } else {
+      // In API mode, make the API call
+      if (row.isNew) {
+        await createMutation.mutateAsync(tierData);
+      } else if (row.id) {
+        await updateMutation.mutateAsync({ id: row.id, data: tierData });
+      }
+      
+      const newRows = [...rows];
+      newRows[index] = { ...newRows[index], isEditing: false, isNew: false };
+      setRows(newRows);
+      setEditingId(null);
     }
-    
-    const newRows = [...rows];
-    newRows[index] = { ...newRows[index], isEditing: false, isNew: false };
-    setRows(newRows);
-    setEditingId(null);
   };
 
   const handleCancelEdit = (index: number) => {
     const row = rows[index];
     if (row.isNew) {
       setRows(rows.filter((_, i) => i !== index));
-    } else {
+    } else if (!isLocalMode) {
       const original = tiers?.find(t => t.id === row.id);
       if (original) {
         const newRows = [...rows];
@@ -194,7 +230,11 @@ export default function RateTiersDataTable({ rateCompId, marinaName, onTiersUpda
 
   const handleDeleteRow = async (index: number) => {
     const row = rows[index];
-    if (row.id) {
+    if (isLocalMode) {
+      // In local mode, just remove from state
+      setRows(rows.filter((_, i) => i !== index));
+    } else if (row.id) {
+      // In API mode, make the delete API call
       await deleteMutation.mutateAsync(row.id);
     }
   };
@@ -210,7 +250,8 @@ export default function RateTiersDataTable({ rateCompId, marinaName, onTiersUpda
     return '-';
   };
 
-  if (isLoading) {
+  // Only show loading for API mode
+  if (isLoading && !isLocalMode) {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -225,7 +266,12 @@ export default function RateTiersDataTable({ rateCompId, marinaName, onTiersUpda
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Rate Tiers</h3>
-          <p className="text-sm text-muted-foreground">Manage pricing tiers for {marinaName}</p>
+          <p className="text-sm text-muted-foreground">
+            {isLocalMode 
+              ? "Add pricing tiers (will be saved with the rate comp)"
+              : `Manage pricing tiers for ${marinaName}`
+            }
+          </p>
         </div>
         <Button onClick={handleAddRow} size="sm" data-testid="button-add-tier">
           <Plus className="h-4 w-4 mr-1" />
