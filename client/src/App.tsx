@@ -61,6 +61,8 @@ const SortableListDemo = lazy(() => import("@/pages/demo/SortableListDemo"));
 const MilestoneDemo = lazy(() => import("@/pages/milestone-demo"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const PacksSettings = lazy(() => import("@/pages/packs-settings"));
+const AccountMappingPage = lazy(() => import("@/pages/admin/AccountMappingPage"));
+const FeatureGate = lazy(() => import("@/components/FeatureGate").then(m => ({ default: m.FeatureGate })));
 const CrmTasks = lazy(() => import("@/pages/crm-tasks"));
 const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
 const CalendarSettings = lazy(() => import("@/pages/calendar-settings"));
@@ -248,6 +250,15 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <PacksSettings />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/admin/account-mapping">
+        {() => (
+          <UnifiedLayout>
+            <FeatureGate flag="FINANCIAL_KERNEL_UI_ENABLED">
+              <AccountMappingPage />
+            </FeatureGate>
           </UnifiedLayout>
         )}
       </Route>

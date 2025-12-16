@@ -103,6 +103,9 @@ Preferred communication style: Simple, everyday language.
     - **Marina-Native Dimensions**: Department, slip_type, season, channel dimensions with seeding service for marina-specific financial analysis.
     - **Mapping Layer**: Account aliases (`fk_account_aliases`) to normalize messy accounting data from different source systems.
     - **Multi-System Support**: Designed for QBO (existing integration wrapper), Intacct, and NetSuite connectors.
+    - **QBO Connector**: Bridges existing QuickBooks service to Financial Kernel format with P&L ingestion, auto-mapping, idempotency keys, and posting batch workflow.
+    - **Account Mapping Service**: CRUD operations for canonical accounts and aliases, Jaccard similarity auto-suggest, default marina account seeding.
+    - **Account Mapping UI**: Admin page at `/admin/account-mapping` with statistics cards, canonical accounts list, account mappings table with source system selector.
     - **RBAC Permissions**: `finance_kernel:read`, `finance_kernel:manage`, `integrations:manage` assigned by role.
     - **Audit Logging**: `fk_audit_log` table for complete audit trail of financial data changes.
     - Schema: `shared/finance-kernel-schema.ts`, Services: `server/services/finance-kernel/`, Config: `server/config/featureFlags.ts`

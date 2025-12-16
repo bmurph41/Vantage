@@ -64,6 +64,9 @@ import {
   type AnalyticsFilters as RcAnalyticsFilters,
   type RateTierAnalyticsFilters
 } from "./services/ratecomps/analyticsService";
+import { featureFlags, getPublicFeatureFlags } from "./config/featureFlags";
+import { qboConnectorService } from "./services/finance-kernel/qbo-connector";
+import { accountMappingService } from "./services/finance-kernel/account-mapping-service";
 import { 
   insertProjectSchema, insertProjectSettingsSchema, insertDDTaskSchema, 
   insertProjectTemplateSchema, insertAuditLogSchema,
@@ -377,7 +380,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Feature flags config endpoint (public for frontend gating)
   app.get("/api/config", (req, res) => {
-    const { getPublicFeatureFlags } = require("./config/featureFlags");
     res.json({
       featureFlags: getPublicFeatureFlags()
     });
@@ -490,10 +492,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== FINANCIAL KERNEL ROUTES ====================
   // Feature-flagged routes for enterprise accounting integration
-  
-  const { featureFlags } = require("./config/featureFlags");
-  const { qboConnectorService } = require("./services/finance-kernel/qbo-connector");
-  const { accountMappingService } = require("./services/finance-kernel/account-mapping-service");
 
   // Financial Kernel - Canonical Accounts
   app.get("/api/fk/accounts", authenticateUser, async (req: any, res) => {
