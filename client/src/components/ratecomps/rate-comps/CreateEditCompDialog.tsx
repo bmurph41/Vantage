@@ -1481,301 +1481,206 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                     )}
                   />
                   
-                  {/* Enhanced Profit Center Checkboxes with Operation Types */}
+                  {/* Enhanced Profit Center Checkboxes with Operation Types - Balanced 2-Column Layout */}
                   <div>
                     <FormLabel className="text-base font-semibold">Profit Centers</FormLabel>
-                    <div className="space-y-4 mt-3">
-                      {/* Simple profit centers without operation types */}
-                      <div className="grid grid-cols-2 gap-3">
-                        {[
-                          { key: 'profitCenterStorage', label: 'Storage' },
-                          { key: 'profitCenterEvents', label: 'Events' },
-                          { key: 'profitCenterService', label: 'Service' },
-                          { key: 'profitCenterThirdPartyLeases', label: 'Third-Party Leases' },
-                          { key: 'profitCenterRvPark', label: 'RV Park' },
-                        ].map((profitCenter) => (
-                          <FormField
-                            key={profitCenter.key}
-                            control={form.control}
-                            name={profitCenter.key as keyof CompFormData}
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value === true}
-                                    onCheckedChange={(checked) => field.onChange(checked === true)}
-                                    data-testid={`checkbox-${profitCenter.key.toLowerCase()}`}
-                                  />
-                                </FormControl>
-                                <FormLabel className="text-sm font-normal">
-                                  {profitCenter.label}
-                                </FormLabel>
-                              </FormItem>
-                            )}
-                          />
-                        ))}
-                      </div>
-
-                      {/* Profit centers with In-House/Leased operation types */}
-                      {[
-                        { key: 'profitCenterBoatRentals', typeKey: 'profitCenterBoatRentalsType', label: 'Boat Rentals' },
-                        { key: 'profitCenterBoatBrokerage', typeKey: 'profitCenterBoatBrokerageType', label: 'Boat Brokerage' },
-                        { key: 'profitCenterFuel', typeKey: 'profitCenterFuelType', label: 'Fuel' },
-                        { key: 'profitCenterShipStore', typeKey: 'profitCenterShipStoreType', label: 'Ship Store' },
-                        { key: 'profitCenterParts', typeKey: 'profitCenterPartsType', label: 'Parts' },
-                        { key: 'profitCenterBoatSales', typeKey: 'profitCenterBoatSalesType', label: 'Boat Sales' },
-                        { key: 'profitCenterFnb', typeKey: 'profitCenterFnbType', label: 'F&B' },
-                        { key: 'profitCenterHospitality', typeKey: 'profitCenterHospitalityType', label: 'Hospitality/Accommodations' },
-                      ].map((profitCenter) => (
-                        <div key={profitCenter.key} className="space-y-2">
-                          <FormField
-                            control={form.control}
-                            name={profitCenter.key as keyof CompFormData}
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value === true}
-                                    onCheckedChange={(checked) => field.onChange(checked === true)}
-                                    data-testid={`checkbox-${profitCenter.key.toLowerCase()}`}
-                                  />
-                                </FormControl>
-                                <FormLabel className="text-sm font-normal">
-                                  {profitCenter.label}
-                                </FormLabel>
-                              </FormItem>
-                            )}
-                          />
-                          {form.watch(profitCenter.key as keyof CompFormData) && (
-                            <div className="ml-6">
-                              <FormField
-                                control={form.control}
-                                name={profitCenter.typeKey as keyof CompFormData}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <Select onValueChange={field.onChange} value={field.value?.toString() || ""}>
-                                      <FormControl>
-                                        <SelectTrigger className="w-40" data-testid={`select-${profitCenter.typeKey.toLowerCase()}`}>
-                                          <SelectValue placeholder="Select type" />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        <SelectItem value="none">Select type</SelectItem>
-                                        <SelectItem value="in-house">In-House</SelectItem>
-                                        <SelectItem value="leased">Leased</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-
-                      {/* Boat Club with special In-House/Third-Party selector and company name */}
-                      <div className="space-y-2">
-                        <FormField
-                          control={form.control}
-                          name="profitCenterBoatClub"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value === true}
-                                  onCheckedChange={(checked) => field.onChange(checked === true)}
-                                  data-testid="checkbox-profitcenterboatclub"
-                                />
-                              </FormControl>
-                              <FormLabel className="text-sm font-normal">
-                                Boat Club
-                              </FormLabel>
-                            </FormItem>
-                          )}
-                        />
-                        {form.watch('profitCenterBoatClub') && (
-                          <div className="ml-6 space-y-3">
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-3 mt-3">
+                      {/* All profit centers in balanced columns */}
+                      {(() => {
+                        const allProfitCenters = [
+                          { key: 'profitCenterStorage', label: 'Storage', hasType: false },
+                          { key: 'profitCenterBoatRentals', typeKey: 'profitCenterBoatRentalsType', label: 'Boat Rentals', hasType: true, typeOptions: ['in-house', 'leased'] },
+                          { key: 'profitCenterBoatBrokerage', typeKey: 'profitCenterBoatBrokerageType', label: 'Boat Brokerage', hasType: true, typeOptions: ['in-house', 'leased'] },
+                          { key: 'profitCenterFuel', typeKey: 'profitCenterFuelType', label: 'Fuel', hasType: true, typeOptions: ['in-house', 'leased'] },
+                          { key: 'profitCenterShipStore', typeKey: 'profitCenterShipStoreType', label: 'Ship Store', hasType: true, typeOptions: ['in-house', 'leased'] },
+                          { key: 'profitCenterParts', typeKey: 'profitCenterPartsType', label: 'Parts', hasType: true, typeOptions: ['in-house', 'leased'] },
+                          { key: 'profitCenterBoatSales', typeKey: 'profitCenterBoatSalesType', label: 'Boat Sales', hasType: true, typeOptions: ['in-house', 'leased'] },
+                          { key: 'profitCenterFnb', typeKey: 'profitCenterFnbType', label: 'F&B', hasType: true, typeOptions: ['in-house', 'leased'] },
+                          { key: 'profitCenterHospitality', typeKey: 'profitCenterHospitalityType', label: 'Hospitality/Accommodations', hasType: true, typeOptions: ['in-house', 'leased'] },
+                          { key: 'profitCenterEvents', label: 'Events', hasType: false },
+                          { key: 'profitCenterService', label: 'Service', hasType: false },
+                          { key: 'profitCenterThirdPartyLeases', label: 'Third-Party Leases', hasType: false },
+                          { key: 'profitCenterRvPark', label: 'RV Park', hasType: false },
+                          { key: 'profitCenterBoatClub', typeKey: 'profitCenterBoatClubType', label: 'Boat Club', hasType: true, typeOptions: ['in-house', 'third-party'], hasCompanyName: true },
+                        ];
+                        const midpoint = Math.ceil(allProfitCenters.length / 2);
+                        const leftColumn = allProfitCenters.slice(0, midpoint);
+                        const rightColumn = allProfitCenters.slice(midpoint);
+                        
+                        const renderProfitCenter = (pc: typeof allProfitCenters[0]) => (
+                          <div key={pc.key} className="space-y-2">
                             <FormField
                               control={form.control}
-                              name="profitCenterBoatClubType"
+                              name={pc.key as keyof CompFormData}
                               render={({ field }) => (
-                                <FormItem>
-                                  <Select onValueChange={field.onChange} value={field.value?.toString() || ""}>
-                                    <FormControl>
-                                      <SelectTrigger className="w-40" data-testid="select-profitcenterboatclubtype">
-                                        <SelectValue placeholder="Select type" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="none">Select type</SelectItem>
-                                      <SelectItem value="in-house">In-House</SelectItem>
-                                      <SelectItem value="third-party">Third-Party</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value === true}
+                                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                                      data-testid={`checkbox-${pc.key.toLowerCase()}`}
+                                    />
+                                  </FormControl>
+                                  <FormLabel className="text-sm font-normal">
+                                    {pc.label}
+                                  </FormLabel>
                                 </FormItem>
                               )}
                             />
-                            {form.watch('profitCenterBoatClubType') === 'third-party' && (
-                              <FormField
-                                control={form.control}
-                                name="profitCenterBoatClubCompany"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-sm">Company Name</FormLabel>
-                                    <FormControl>
-                                      <Input 
-                                        {...field} 
-                                        placeholder="Enter company name"
-                                        className="w-64"
-                                        data-testid="input-profitcenterboatclubcompany"
-                                      />
-                                    </FormControl>
-                                  </FormItem>
+                            {pc.hasType && pc.typeKey && form.watch(pc.key as keyof CompFormData) && (
+                              <div className="ml-6 space-y-2">
+                                <FormField
+                                  control={form.control}
+                                  name={pc.typeKey as keyof CompFormData}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <Select onValueChange={field.onChange} value={field.value?.toString() || ""}>
+                                        <FormControl>
+                                          <SelectTrigger className="w-32" data-testid={`select-${pc.typeKey?.toLowerCase()}`}>
+                                            <SelectValue placeholder="Select type" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          <SelectItem value="none">Select type</SelectItem>
+                                          {pc.typeOptions?.map(opt => (
+                                            <SelectItem key={opt} value={opt}>
+                                              {opt === 'in-house' ? 'In-House' : opt === 'leased' ? 'Leased' : 'Third-Party'}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </FormItem>
+                                  )}
+                                />
+                                {pc.hasCompanyName && form.watch(pc.typeKey as keyof CompFormData) === 'third-party' && (
+                                  <FormField
+                                    control={form.control}
+                                    name="profitCenterBoatClubCompany"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormControl>
+                                          <Input 
+                                            {...field} 
+                                            placeholder="Company name"
+                                            className="w-32"
+                                            data-testid="input-profitcenterboatclubcompany"
+                                          />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
                                 )}
-                              />
+                              </div>
                             )}
                           </div>
-                        )}
-                      </div>
+                        );
+                        
+                        return (
+                          <>
+                            <div className="space-y-3">
+                              {leftColumn.map(renderProfitCenter)}
+                            </div>
+                            <div className="space-y-3">
+                              {rightColumn.map(renderProfitCenter)}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
 
-              {/* Notes & Documentation */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Notes & Documentation</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label>Article URLs</Label>
-                    <div className="space-y-2 mt-2">
-                      {articleUrls.map((url, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Input
-                            value={url}
-                            onChange={(e) => updateArticleUrl(index, e.target.value)}
-                            placeholder="https://example.com/article"
-                            data-testid={`input-article-url-${index}`}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeArticleUrl(index)}
-                            data-testid={`button-remove-article-${index}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={addArticleUrl}
-                        data-testid="button-add-article-url"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add URL
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            rows={3}
-                            placeholder="Marina was recently renovated with new docks and electrical systems..."
-                            data-testid="textarea-notes"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-            </form>
-          </Form>
+        {/* Rate Tiers Section */}
+        <Card className="border shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Rate Tiers
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RateTiersDataTable
+              rateCompId={comp?.id}
+              localTiers={!comp ? pendingRateTiers : undefined}
+              onLocalTiersChange={!comp ? setPendingRateTiers : undefined}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      <DialogFooter className="flex gap-2 sticky bottom-0 bg-background pt-4 border-t mt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={createMutation.isPending || updateMutation.isPending}
+          data-testid="button-cancel-comp"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          onClick={form.handleSubmit(onSubmit)}
+          disabled={createMutation.isPending || updateMutation.isPending}
+          data-testid="button-save-comp"
+        >
+          {createMutation.isPending || updateMutation.isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Saving...
+            </>
+          ) : (
+            isEdit ? 'Update' : 'Create'
           )}
-        </div>
+        </Button>
+      </DialogFooter>
+    </DialogContent>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-border">
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              data-testid="button-cancel"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={form.handleSubmit(onSubmit)}
-              disabled={createMutation.isPending || updateMutation.isPending}
-              data-testid="button-save"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {createMutation.isPending || updateMutation.isPending
-                ? isEdit ? 'Updating...' : 'Creating...'
-                : isEdit ? 'Update Comp' : 'Create Comp'
-              }
-            </Button>
+    {/* New Portfolio Dialog */}
+    <Dialog open={showNewPortfolioDialog} onOpenChange={setShowNewPortfolioDialog}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create New Portfolio</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="new-portfolio-name">Portfolio Name</Label>
+            <Input
+              id="new-portfolio-name"
+              value={newPortfolioName}
+              onChange={(e) => setNewPortfolioName(e.target.value)}
+              placeholder="Enter portfolio name"
+              data-testid="input-new-portfolio-name"
+            />
           </div>
         </div>
-      </Card>
-
-      {/* New Portfolio Dialog */}
-      <Dialog open={showNewPortfolioDialog} onOpenChange={setShowNewPortfolioDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Portfolio</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="portfolio-name">Portfolio Name *</Label>
-              <Input
-                id="portfolio-name"
-                value={newPortfolioName}
-                onChange={(e) => setNewPortfolioName(e.target.value)}
-                placeholder="Enter portfolio name..."
-                data-testid="input-new-portfolio-name"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowNewPortfolioDialog(false);
-                setNewPortfolioName("");
-              }}
-              data-testid="button-cancel-new-portfolio"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (newPortfolioName.trim()) {
-                  createPortfolioMutation.mutate(newPortfolioName.trim());
-                }
-              }}
-              disabled={!newPortfolioName.trim() || createPortfolioMutation.isPending}
-              data-testid="button-create-portfolio"
-            >
-              {createPortfolioMutation.isPending ? "Creating..." : "Create Portfolio"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setShowNewPortfolioDialog(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreatePortfolio}
+            disabled={!newPortfolioName.trim() || createPortfolioMutation.isPending}
+          >
+            {createPortfolioMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Creating...
+              </>
+            ) : (
+              'Create Portfolio'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </Dialog>
   );
 }
