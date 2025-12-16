@@ -46,3 +46,8 @@ integrations = ["javascript_database:1.0.0", "javascript_mem_db:1.0.0", "javascr
 
 [userenv.shared]
 VITE_GOOGLE_MAPS_API_KEY = "AIzaSyAXTQZQtPhsjad_BOWC0E-h6HXgpPSZUYE"
+
+[userenv.development]
+INTEGRATIONS_PLATFORM_ENABLED = "true"
+FINANCIAL_KERNEL_UI_ENABLED = "true"
+CONNECTOR_QBO_ENABLED = "true"
