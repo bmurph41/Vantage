@@ -488,6 +488,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== FINANCIAL KERNEL ROUTES ====================
+  // Feature-flagged routes for enterprise accounting integration
+  
+  const { featureFlags } = require("./config/featureFlags");
+  const { qboConnectorService } = require("./services/finance-kernel/qbo-connector");
+  const { accountMappingService } = require("./services/finance-kernel/account-mapping-service");
+
+  // Financial Kernel - Canonical Accounts
+  app.get("/api/fk/accounts", authenticateUser, async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED) {
+      return res.status(403).json({ error: "Financial Kernel is not enabled" });
+    }
+    try {
+      const accounts = await accountMappingService.getCanonicalAccounts(req.user.orgId);
+      res.json(accounts);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/fk/accounts", authenticateUser, requireRole("owner", "admin"), async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED) {
+      return res.status(403).json({ error: "Financial Kernel is not enabled" });
+    }
+    try {
+      const account = await accountMappingService.createCanonicalAccount({
+        ...req.body,
+        orgId: req.user.orgId,
+      });
+      res.json(account);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/fk/accounts/seed", authenticateUser, requireRole("owner", "admin"), async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED) {
+      return res.status(403).json({ error: "Financial Kernel is not enabled" });
+    }
+    try {
+      const count = await accountMappingService.seedDefaultAccounts(req.user.orgId, req.user.id);
+      res.json({ success: true, count });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Financial Kernel - Account Aliases (Mappings)
+  app.get("/api/fk/aliases", authenticateUser, async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED) {
+      return res.status(403).json({ error: "Financial Kernel is not enabled" });
+    }
+    try {
+      const { sourceSystem } = req.query;
+      const aliases = await accountMappingService.getAccountAliasesWithTargets(
+        req.user.orgId, 
+        sourceSystem as string | undefined
+      );
+      res.json(aliases);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/fk/aliases", authenticateUser, requireRole("owner", "admin"), async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED) {
+      return res.status(403).json({ error: "Financial Kernel is not enabled" });
+    }
+    try {
+      const alias = await accountMappingService.createAccountAlias(
+        { ...req.body, orgId: req.user.orgId },
+        req.user.id
+      );
+      res.json(alias);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/fk/aliases/:aliasId", authenticateUser, requireRole("owner", "admin"), async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED) {
+      return res.status(403).json({ error: "Financial Kernel is not enabled" });
+    }
+    try {
+      const alias = await accountMappingService.updateAccountAlias(
+        req.user.orgId,
+        req.params.aliasId,
+        req.body,
+        req.user.id
+      );
+      res.json(alias);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/fk/aliases/:aliasId", authenticateUser, requireRole("owner", "admin"), async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED) {
+      return res.status(403).json({ error: "Financial Kernel is not enabled" });
+    }
+    try {
+      await accountMappingService.deleteAccountAlias(req.user.orgId, req.params.aliasId, req.user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/fk/aliases/stats", authenticateUser, async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED) {
+      return res.status(403).json({ error: "Financial Kernel is not enabled" });
+    }
+    try {
+      const { sourceSystem } = req.query;
+      const stats = await accountMappingService.getMappingStats(req.user.orgId, sourceSystem as string || 'qbo');
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/fk/aliases/suggest", authenticateUser, async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED) {
+      return res.status(403).json({ error: "Financial Kernel is not enabled" });
+    }
+    try {
+      const { sourceAccounts } = req.body;
+      const suggestions = await accountMappingService.suggestMappings(req.user.orgId, sourceAccounts);
+      res.json(suggestions);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Financial Kernel - QBO Connector
+  app.get("/api/fk/qbo/status", authenticateUser, async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED || !featureFlags.CONNECTOR_QBO_ENABLED) {
+      return res.status(403).json({ error: "QBO Connector is not enabled" });
+    }
+    try {
+      const isConnected = await qboConnectorService.isConnected(req.user.orgId);
+      res.json({ isConnected });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/fk/qbo/accounts", authenticateUser, async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED || !featureFlags.CONNECTOR_QBO_ENABLED) {
+      return res.status(403).json({ error: "QBO Connector is not enabled" });
+    }
+    try {
+      const accounts = await qboConnectorService.getChartOfAccounts(req.user.orgId);
+      res.json(accounts);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/fk/qbo/ingest", authenticateUser, requireRole("owner", "admin"), async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED || !featureFlags.CONNECTOR_QBO_ENABLED) {
+      return res.status(403).json({ error: "QBO Connector is not enabled" });
+    }
+    try {
+      const { entityId, startDate, endDate } = req.body;
+      const result = await qboConnectorService.ingestProfitAndLoss({
+        orgId: req.user.orgId,
+        entityId,
+        startDate,
+        endDate,
+        createdBy: req.user.id,
+      });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/fk/batches", authenticateUser, async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED) {
+      return res.status(403).json({ error: "Financial Kernel is not enabled" });
+    }
+    try {
+      const batches = await qboConnectorService.getPostingBatches(req.user.orgId);
+      res.json(batches);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/fk/batches/:batchId/approve", authenticateUser, requireRole("owner", "admin"), async (req: any, res) => {
+    if (!featureFlags.INTEGRATIONS_PLATFORM_ENABLED) {
+      return res.status(403).json({ error: "Financial Kernel is not enabled" });
+    }
+    try {
+      await qboConnectorService.approveBatch(req.user.orgId, req.params.batchId, req.user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Initialize SalesComps services
   const parserService = new ParserService();
   const compService = new CompService(storage, parserService);
