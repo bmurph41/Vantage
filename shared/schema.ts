@@ -15298,3 +15298,10 @@ export type InsertOmDataset = z.infer<typeof insertOmDatasetSchema>;
 // This makes them discoverable to Drizzle migrations while keeping schemas modular
 // ============================================================================
 export * from "./docktalk-schema";
+
+// ============================================================================
+// Financial Kernel Schema Integration
+// Re-export all Financial Kernel tables, types, and schemas
+// This provides the canonical financial data model for integrations platform
+// ============================================================================
+export * from "./finance-kernel-schema";

@@ -21,7 +21,10 @@ export type Permission =
   | 'reports:create'
   | 'settings:manage'
   | 'users:manage'
-  | 'audit:read';
+  | 'audit:read'
+  | 'finance_kernel:read'
+  | 'finance_kernel:manage'
+  | 'integrations:manage';
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   owner: [
@@ -31,6 +34,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'fuel:period:lock', 'fuel:period:unlock',
     'analytics:read', 'reports:create', 'settings:manage',
     'users:manage', 'audit:read',
+    'finance_kernel:read', 'finance_kernel:manage', 'integrations:manage',
   ],
   admin: [
     'fuel:read', 'fuel:create', 'fuel:update', 'fuel:delete',
@@ -39,17 +43,21 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'fuel:period:lock',
     'analytics:read', 'reports:create', 'settings:manage',
     'audit:read',
+    'finance_kernel:read', 'finance_kernel:manage', 'integrations:manage',
   ],
   editor: [
     'fuel:read', 'fuel:create', 'fuel:update',
     'fuel:export', 'fuel:approval:request',
     'analytics:read', 'reports:create',
+    'finance_kernel:read',
   ],
   viewer: [
     'fuel:read', 'analytics:read',
+    'finance_kernel:read',
   ],
   auditor: [
     'fuel:read', 'analytics:read', 'audit:read',
+    'finance_kernel:read',
   ],
 };
 

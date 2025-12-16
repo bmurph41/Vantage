@@ -97,6 +97,15 @@ Preferred communication style: Simple, everyday language.
     - **Article Matching**: Real-time matching against watchlist criteria using geography arrays, title, and content search.
 - **Launch Operations Module (Dockit)**: Manages marina launch and haul scheduling, transient slips, employee assignments, with CRM and Rent Roll integration.
 - **Market Demographics Module**: Regional market analysis using FRED and Census Bureau APIs for state-level economic indicators and location-based demographics with configurable trade areas and caching.
+- **Financial Kernel Module** (Feature-Flagged): Enterprise-grade canonical financial data model for multi-system accounting integration. Features include:
+    - **Feature Flags**: `INTEGRATIONS_PLATFORM_ENABLED`, `CONNECTOR_QBO_ENABLED`, `FINANCIAL_KERNEL_UI_ENABLED` - all default to OFF for safety.
+    - **Canonical Data Model**: Intacct-inspired ledger tables (`fk_entities`, `fk_accounts`, `fk_transactions`, `fk_transaction_lines`, `fk_posting_batches`) for management reporting.
+    - **Marina-Native Dimensions**: Department, slip_type, season, channel dimensions with seeding service for marina-specific financial analysis.
+    - **Mapping Layer**: Account aliases (`fk_account_aliases`) to normalize messy accounting data from different source systems.
+    - **Multi-System Support**: Designed for QBO (existing integration wrapper), Intacct, and NetSuite connectors.
+    - **RBAC Permissions**: `finance_kernel:read`, `finance_kernel:manage`, `integrations:manage` assigned by role.
+    - **Audit Logging**: `fk_audit_log` table for complete audit trail of financial data changes.
+    - Schema: `shared/finance-kernel-schema.ts`, Services: `server/services/finance-kernel/`, Config: `server/config/featureFlags.ts`
 
 ## External Dependencies
 

@@ -375,6 +375,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Feature flags config endpoint (public for frontend gating)
+  app.get("/api/config", (req, res) => {
+    const { getPublicFeatureFlags } = require("./config/featureFlags");
+    res.json({
+      featureFlags: getPublicFeatureFlags()
+    });
+  });
+
   // Organization features endpoint
   app.get("/api/organization/features", authenticateUser, async (req: any, res) => {
     try {
