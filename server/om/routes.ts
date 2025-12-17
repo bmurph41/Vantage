@@ -17,6 +17,7 @@ import { eq } from "drizzle-orm";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { generateOmContent, improveContent, suggestLayout, type GenerateRequest } from "./ai-service";
+import { seedSystemTemplates } from "./seed-templates";
 
 const router = Router();
 
@@ -1212,5 +1213,23 @@ function getDemographicsStub(field: string): any {
   };
   return stubs[field] ?? `[Demographics: ${field}]`;
 }
+
+// ============================================================================
+// System Templates Seeding
+// ============================================================================
+
+router.post("/seed-templates", async (req, res) => {
+  try {
+    const result = await seedSystemTemplates();
+    res.json({
+      success: true,
+      message: `Templates seeded: ${result.created} created, ${result.skipped} already existed`,
+      ...result,
+    });
+  } catch (error) {
+    console.error("Error seeding templates:", error);
+    res.status(500).json({ error: "Failed to seed templates" });
+  }
+});
 
 export default router;
