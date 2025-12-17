@@ -208,11 +208,12 @@ export function AddModuleModal({
           </ScrollArea>
         ) : (
           <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-8">
               <TabsTrigger value="financial" data-testid="tab-financial">Financial</TabsTrigger>
               <TabsTrigger value="dd" data-testid="tab-dd">DD</TabsTrigger>
               <TabsTrigger value="crm" data-testid="tab-crm">CRM</TabsTrigger>
               <TabsTrigger value="intel" data-testid="tab-intel">Intel</TabsTrigger>
+              <TabsTrigger value="analytics" data-testid="tab-analytics">Analytics</TabsTrigger>
               <TabsTrigger value="operations" data-testid="tab-operations">Ops</TabsTrigger>
               <TabsTrigger value="custom" data-testid="tab-custom">Custom</TabsTrigger>
               <TabsTrigger value="widgets" data-testid="tab-widgets">Widgets</TabsTrigger>
