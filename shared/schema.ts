@@ -15247,6 +15247,55 @@ export const omDatasets = pgTable("om_datasets", {
   orgIdx: index("om_datasets_org_idx").on(table.organizationId),
 }));
 
+// ============================================================================
+// OM Builder - Brand Kits
+// ============================================================================
+export const omBrandKits = pgTable("om_brand_kits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  organizationId: varchar("organization_id"),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  tokens: jsonb("tokens").notNull().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("om_brand_kits_org_idx").on(table.organizationId),
+  userIdx: index("om_brand_kits_user_idx").on(table.userId),
+}));
+
+// ============================================================================
+// OM Builder - Document Versions
+// ============================================================================
+export const omDocumentVersions = pgTable("om_document_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  omId: varchar("om_id").notNull().references(() => oms.id, { onDelete: 'cascade' }),
+  versionNumber: integer("version_number").notNull(),
+  snapshotJson: jsonb("snapshot_json").notNull(),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  omIdx: index("om_document_versions_om_idx").on(table.omId),
+  versionIdx: index("om_document_versions_version_idx").on(table.omId, table.versionNumber),
+}));
+
+// ============================================================================
+// OM Builder - Assets
+// ============================================================================
+export const omAssets = pgTable("om_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  userId: varchar("user_id").notNull(),
+  organizationId: varchar("organization_id"),
+  fileUrl: text("file_url").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileName: text("file_name").notNull(),
+  sha256: text("sha256"),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("om_assets_user_idx").on(table.userId),
+  orgIdx: index("om_assets_org_idx").on(table.organizationId),
+}));
+
 export const insertOmSchema = createInsertSchema(oms).omit({
   id: true,
   createdAt: true,
@@ -15291,6 +15340,29 @@ export const insertOmDatasetSchema = createInsertSchema(omDatasets).omit({
 export const updateOmDatasetSchema = insertOmDatasetSchema.partial();
 export type OmDataset = typeof omDatasets.$inferSelect;
 export type InsertOmDataset = z.infer<typeof insertOmDatasetSchema>;
+
+export const insertOmBrandKitSchema = createInsertSchema(omBrandKits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateOmBrandKitSchema = insertOmBrandKitSchema.partial();
+export type OmBrandKit = typeof omBrandKits.$inferSelect;
+export type InsertOmBrandKit = z.infer<typeof insertOmBrandKitSchema>;
+
+export const insertOmDocumentVersionSchema = createInsertSchema(omDocumentVersions).omit({
+  id: true,
+  createdAt: true,
+});
+export type OmDocumentVersion = typeof omDocumentVersions.$inferSelect;
+export type InsertOmDocumentVersion = z.infer<typeof insertOmDocumentVersionSchema>;
+
+export const insertOmAssetSchema = createInsertSchema(omAssets).omit({
+  id: true,
+  createdAt: true,
+});
+export type OmAsset = typeof omAssets.$inferSelect;
+export type InsertOmAsset = z.infer<typeof insertOmAssetSchema>;
 
 // ============================================================================
 // DockTalk 2.0 Schema Integration
