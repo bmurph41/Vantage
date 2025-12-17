@@ -149,6 +149,8 @@ const ProjectWorkspace = lazy(() => import("@/pages/modeling/projects/workspace"
 const ProjectOms = lazy(() => import("@/modules/om-builder/pages/project-oms"));
 const OMBuilder = lazy(() => import("@/modules/om-builder/pages/om-builder"));
 const OMExport = lazy(() => import("@/modules/om-builder/pages/om-export"));
+const OMTemplates = lazy(() => import("@/modules/om-builder/pages/om-templates"));
+const OMBrandKits = lazy(() => import("@/modules/om-builder/pages/om-brand-kits"));
 
 // Lightweight sidebar loader for initial render
 function SidebarLoader() {
@@ -1207,6 +1209,20 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <OMExport />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/om/templates">
+        {() => (
+          <UnifiedLayout>
+            <OMTemplates />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/om/brand-kits">
+        {() => (
+          <UnifiedLayout>
+            <OMBrandKits />
           </UnifiedLayout>
         )}
       </Route>
