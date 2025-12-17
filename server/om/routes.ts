@@ -7,6 +7,7 @@ import {
   insertOmBlockSchema, 
   insertOmTemplateSchema, 
   insertOmDatasetSchema,
+  insertOmBrandKitSchema,
   crmDeals,
   modelingProjects
 } from "@shared/schema";
@@ -901,5 +902,315 @@ router.get("/oms/by-modeling-project/:modelingProjectId", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch OMs" });
   }
 });
+
+// ============================================================================
+// Brand Kit Routes
+// ============================================================================
+
+router.get("/brand-kits", async (req, res) => {
+  try {
+    const organizationId = req.query.organizationId as string | undefined;
+    const kits = await omStorage.getBrandKits(organizationId);
+    res.json(kits);
+  } catch (error) {
+    console.error("Error fetching brand kits:", error);
+    res.status(500).json({ error: "Failed to fetch brand kits" });
+  }
+});
+
+router.get("/brand-kits/:id", async (req, res) => {
+  try {
+    const kit = await omStorage.getBrandKitById(req.params.id);
+    if (!kit) {
+      return res.status(404).json({ error: "Brand kit not found" });
+    }
+    res.json(kit);
+  } catch (error) {
+    console.error("Error fetching brand kit:", error);
+    res.status(500).json({ error: "Failed to fetch brand kit" });
+  }
+});
+
+router.post("/brand-kits", async (req, res) => {
+  try {
+    const parsed = insertOmBrandKitSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: fromZodError(parsed.error).toString(),
+      });
+    }
+    const kit = await omStorage.createBrandKit(parsed.data);
+    res.status(201).json(kit);
+  } catch (error) {
+    console.error("Error creating brand kit:", error);
+    res.status(500).json({ error: "Failed to create brand kit" });
+  }
+});
+
+router.patch("/brand-kits/:id", async (req, res) => {
+  try {
+    const parsed = insertOmBrandKitSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: fromZodError(parsed.error).toString(),
+      });
+    }
+    const kit = await omStorage.updateBrandKit(req.params.id, parsed.data);
+    if (!kit) {
+      return res.status(404).json({ error: "Brand kit not found" });
+    }
+    res.json(kit);
+  } catch (error) {
+    console.error("Error updating brand kit:", error);
+    res.status(500).json({ error: "Failed to update brand kit" });
+  }
+});
+
+router.delete("/brand-kits/:id", async (req, res) => {
+  try {
+    await omStorage.deleteBrandKit(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting brand kit:", error);
+    res.status(500).json({ error: "Failed to delete brand kit" });
+  }
+});
+
+// ============================================================================
+// Document Version Routes
+// ============================================================================
+
+router.get("/oms/:omId/versions", async (req, res) => {
+  try {
+    const versions = await omStorage.getVersionsByOmId(req.params.omId);
+    res.json(versions);
+  } catch (error) {
+    console.error("Error fetching versions:", error);
+    res.status(500).json({ error: "Failed to fetch versions" });
+  }
+});
+
+router.get("/versions/:id", async (req, res) => {
+  try {
+    const version = await omStorage.getVersionById(req.params.id);
+    if (!version) {
+      return res.status(404).json({ error: "Version not found" });
+    }
+    res.json(version);
+  } catch (error) {
+    console.error("Error fetching version:", error);
+    res.status(500).json({ error: "Failed to fetch version" });
+  }
+});
+
+router.post("/oms/:omId/versions", async (req, res) => {
+  try {
+    const om = await omStorage.getOmById(req.params.omId);
+    if (!om) {
+      return res.status(404).json({ error: "OM not found" });
+    }
+
+    const pages = await omStorage.getPagesByOmId(om.id);
+    const pagesWithBlocks = await Promise.all(
+      pages.map(async (page) => {
+        const blocks = await omStorage.getBlocksByPageId(page.id);
+        return { ...page, blocks };
+      })
+    );
+
+    const snapshot = {
+      om,
+      pages: pagesWithBlocks,
+      savedAt: new Date().toISOString(),
+    };
+
+    const userId = req.body.userId;
+    const version = await omStorage.createVersion(req.params.omId, snapshot, userId);
+    res.status(201).json(version);
+  } catch (error) {
+    console.error("Error creating version:", error);
+    res.status(500).json({ error: "Failed to create version" });
+  }
+});
+
+router.post("/oms/:omId/restore/:versionId", async (req, res) => {
+  try {
+    const version = await omStorage.getVersionById(req.params.versionId);
+    if (!version) {
+      return res.status(404).json({ error: "Version not found" });
+    }
+
+    const snapshot = version.snapshotJson as any;
+    if (!snapshot || !snapshot.pages) {
+      return res.status(400).json({ error: "Invalid version snapshot" });
+    }
+
+    const existingPages = await omStorage.getPagesByOmId(req.params.omId);
+    for (const page of existingPages) {
+      await omStorage.deletePage(page.id);
+    }
+
+    for (const pageData of snapshot.pages) {
+      const { id, blocks, ...pageInsert } = pageData;
+      const newPage = await omStorage.createPage({
+        ...pageInsert,
+        omId: req.params.omId,
+      });
+
+      if (blocks && Array.isArray(blocks)) {
+        for (const blockData of blocks) {
+          const { id: blockId, ...blockInsert } = blockData;
+          await omStorage.createBlock({
+            ...blockInsert,
+            pageId: newPage.id,
+          });
+        }
+      }
+    }
+
+    res.json({ success: true, message: `Restored to version ${version.versionNumber}` });
+  } catch (error) {
+    console.error("Error restoring version:", error);
+    res.status(500).json({ error: "Failed to restore version" });
+  }
+});
+
+// ============================================================================
+// PDF Export Route
+// ============================================================================
+
+router.post("/oms/:id/export-pdf", async (req, res) => {
+  try {
+    const om = await omStorage.getOmById(req.params.id);
+    if (!om) {
+      return res.status(404).json({ error: "OM not found" });
+    }
+
+    const pages = await omStorage.getPagesByOmId(om.id);
+    const pagesWithBlocks = await Promise.all(
+      pages.map(async (page) => {
+        const blocks = await omStorage.getBlocksByPageId(page.id);
+        return { ...page, blocks };
+      })
+    );
+
+    const { includeToc = true, includeAppendix = false, brandKitId } = req.body;
+    let brandKit = null;
+    if (brandKitId) {
+      brandKit = await omStorage.getBrandKitById(brandKitId);
+    }
+
+    const exportData = {
+      om,
+      pages: pagesWithBlocks,
+      options: {
+        includeToc,
+        includeAppendix,
+        brandKit,
+      },
+      exportedAt: new Date().toISOString(),
+    };
+
+    res.json({
+      success: true,
+      message: "PDF export data prepared",
+      exportData,
+    });
+  } catch (error) {
+    console.error("Error preparing PDF export:", error);
+    res.status(500).json({ error: "Failed to prepare PDF export" });
+  }
+});
+
+// ============================================================================
+// Data Binding Resolver Route
+// ============================================================================
+
+router.post("/resolve-bindings", async (req, res) => {
+  try {
+    const { bindings, projectId, modelingProjectId, dealId } = req.body;
+
+    if (!bindings || !Array.isArray(bindings)) {
+      return res.status(400).json({ error: "bindings array is required" });
+    }
+
+    const resolved: Record<string, any> = {};
+
+    for (const binding of bindings) {
+      const { key, source, field } = binding;
+      
+      switch (source) {
+        case 'underwriting':
+          resolved[key] = getUnderwritingStub(field);
+          break;
+        case 'salesComps':
+          resolved[key] = getSalesCompsStub(field);
+          break;
+        case 'rentComps':
+          resolved[key] = getRentCompsStub(field);
+          break;
+        case 'demographics':
+          resolved[key] = getDemographicsStub(field);
+          break;
+        case 'dataset':
+          resolved[key] = `[Dataset: ${field}]`;
+          break;
+        default:
+          resolved[key] = `[Unknown source: ${source}]`;
+      }
+    }
+
+    res.json({ resolved });
+  } catch (error) {
+    console.error("Error resolving bindings:", error);
+    res.status(500).json({ error: "Failed to resolve bindings" });
+  }
+});
+
+function getUnderwritingStub(field: string): any {
+  const stubs: Record<string, any> = {
+    'purchasePrice': 5500000,
+    'noi': 425000,
+    'capRate': 0.0773,
+    'totalSlips': 150,
+    'occupancy': 0.92,
+    'grossRevenue': 850000,
+    'operatingExpenses': 425000,
+    'debtService': 320000,
+    'cashOnCash': 0.125,
+    'irr': 0.185,
+    'projectedExitValue': 7200000,
+  };
+  return stubs[field] ?? `[Underwriting: ${field}]`;
+}
+
+function getSalesCompsStub(field: string): any {
+  const stubs: Record<string, any> = {
+    'averagePricePerSlip': 42500,
+    'medianCapRate': 0.072,
+    'recentSalesCount': 8,
+    'priceRange': { min: 2500000, max: 12000000 },
+  };
+  return stubs[field] ?? `[Sales Comps: ${field}]`;
+}
+
+function getRentCompsStub(field: string): any {
+  const stubs: Record<string, any> = {
+    'averageRentPerFoot': 28.50,
+    'occupancyRate': 0.89,
+    'marketGrowthRate': 0.035,
+  };
+  return stubs[field] ?? `[Rent Comps: ${field}]`;
+}
+
+function getDemographicsStub(field: string): any {
+  const stubs: Record<string, any> = {
+    'medianIncome': 95000,
+    'populationGrowth': 0.025,
+    'boatRegistrations': 45000,
+    'waterAccessHouseholds': 125000,
+  };
+  return stubs[field] ?? `[Demographics: ${field}]`;
+}
 
 export default router;

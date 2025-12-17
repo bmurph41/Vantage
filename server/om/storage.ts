@@ -9,14 +9,23 @@ import {
   type InsertOmTemplate,
   type OmDataset,
   type InsertOmDataset,
+  type OmBrandKit,
+  type InsertOmBrandKit,
+  type OmDocumentVersion,
+  type InsertOmDocumentVersion,
+  type OmAsset,
+  type InsertOmAsset,
   oms,
   omPages,
   omBlocks,
   omTemplates,
   omDatasets,
+  omBrandKits,
+  omDocumentVersions,
+  omAssets,
 } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql, max } from "drizzle-orm";
 
 export interface IOmStorage {
   getOmById(id: string): Promise<Om | undefined>;
@@ -53,6 +62,25 @@ export interface IOmStorage {
   createDataset(dataset: InsertOmDataset): Promise<OmDataset>;
   updateDataset(id: string, dataset: Partial<InsertOmDataset>): Promise<OmDataset | undefined>;
   deleteDataset(id: string): Promise<void>;
+
+  // Brand Kits
+  getBrandKits(organizationId?: string): Promise<OmBrandKit[]>;
+  getBrandKitById(id: string): Promise<OmBrandKit | undefined>;
+  createBrandKit(brandKit: InsertOmBrandKit): Promise<OmBrandKit>;
+  updateBrandKit(id: string, brandKit: Partial<InsertOmBrandKit>): Promise<OmBrandKit | undefined>;
+  deleteBrandKit(id: string): Promise<void>;
+
+  // Document Versions
+  getVersionsByOmId(omId: string): Promise<OmDocumentVersion[]>;
+  getVersionById(id: string): Promise<OmDocumentVersion | undefined>;
+  createVersion(omId: string, snapshot: any, userId?: string): Promise<OmDocumentVersion>;
+  getLatestVersionNumber(omId: string): Promise<number>;
+
+  // Assets
+  getAssetsByOrganization(organizationId: string): Promise<OmAsset[]>;
+  getAssetById(id: string): Promise<OmAsset | undefined>;
+  createAsset(asset: InsertOmAsset): Promise<OmAsset>;
+  deleteAsset(id: string): Promise<void>;
 }
 
 export class OmDbStorage implements IOmStorage {
@@ -310,6 +338,106 @@ export class OmDbStorage implements IOmStorage {
 
   async deleteDataset(id: string): Promise<void> {
     await db.delete(omDatasets).where(eq(omDatasets.id, id));
+  }
+
+  // ============================================================================
+  // Brand Kits
+  // ============================================================================
+  async getBrandKits(organizationId?: string): Promise<OmBrandKit[]> {
+    if (organizationId) {
+      return db
+        .select()
+        .from(omBrandKits)
+        .where(eq(omBrandKits.organizationId, organizationId))
+        .orderBy(desc(omBrandKits.updatedAt));
+    }
+    return db.select().from(omBrandKits).orderBy(desc(omBrandKits.updatedAt));
+  }
+
+  async getBrandKitById(id: string): Promise<OmBrandKit | undefined> {
+    const [kit] = await db.select().from(omBrandKits).where(eq(omBrandKits.id, id));
+    return kit;
+  }
+
+  async createBrandKit(brandKit: InsertOmBrandKit): Promise<OmBrandKit> {
+    const [created] = await db.insert(omBrandKits).values(brandKit).returning();
+    return created;
+  }
+
+  async updateBrandKit(id: string, brandKit: Partial<InsertOmBrandKit>): Promise<OmBrandKit | undefined> {
+    const [updated] = await db
+      .update(omBrandKits)
+      .set({ ...brandKit, updatedAt: new Date() })
+      .where(eq(omBrandKits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBrandKit(id: string): Promise<void> {
+    await db.delete(omBrandKits).where(eq(omBrandKits.id, id));
+  }
+
+  // ============================================================================
+  // Document Versions
+  // ============================================================================
+  async getVersionsByOmId(omId: string): Promise<OmDocumentVersion[]> {
+    return db
+      .select()
+      .from(omDocumentVersions)
+      .where(eq(omDocumentVersions.omId, omId))
+      .orderBy(desc(omDocumentVersions.versionNumber));
+  }
+
+  async getVersionById(id: string): Promise<OmDocumentVersion | undefined> {
+    const [version] = await db.select().from(omDocumentVersions).where(eq(omDocumentVersions.id, id));
+    return version;
+  }
+
+  async getLatestVersionNumber(omId: string): Promise<number> {
+    const result = await db
+      .select({ maxVersion: max(omDocumentVersions.versionNumber) })
+      .from(omDocumentVersions)
+      .where(eq(omDocumentVersions.omId, omId));
+    return result[0]?.maxVersion || 0;
+  }
+
+  async createVersion(omId: string, snapshot: any, userId?: string): Promise<OmDocumentVersion> {
+    const latestVersion = await this.getLatestVersionNumber(omId);
+    const [created] = await db
+      .insert(omDocumentVersions)
+      .values({
+        omId,
+        versionNumber: latestVersion + 1,
+        snapshotJson: snapshot,
+        createdBy: userId,
+      })
+      .returning();
+    return created;
+  }
+
+  // ============================================================================
+  // Assets
+  // ============================================================================
+  async getAssetsByOrganization(organizationId: string): Promise<OmAsset[]> {
+    return db
+      .select()
+      .from(omAssets)
+      .where(eq(omAssets.organizationId, organizationId))
+      .orderBy(desc(omAssets.createdAt));
+  }
+
+  async getAssetById(id: string): Promise<OmAsset | undefined> {
+    const [asset] = await db.select().from(omAssets).where(eq(omAssets.id, id));
+    return asset;
+  }
+
+  async createAsset(asset: InsertOmAsset): Promise<OmAsset> {
+    const [created] = await db.insert(omAssets).values(asset).returning();
+    return created;
+  }
+
+  async deleteAsset(id: string): Promise<void> {
+    await db.delete(omAssets).where(eq(omAssets.id, id));
   }
 }
 
