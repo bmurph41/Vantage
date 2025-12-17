@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSe
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "@/hooks/use-toast";
-import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge, Database } from "lucide-react";
+import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge, Database, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,6 +21,7 @@ import type { Om, OmPage as OmPageDb, OmBlock as OmBlockDb } from "@shared/schem
 import type { OmPage, OmBlock, BlockType, OmTheme } from "../types";
 import { defaultThemes } from "../types";
 import { DataBindingPanel } from "../components/data-binding-panel";
+import { VersionHistoryPanel } from "../components/version-history-panel";
 
 interface SortableBlockProps {
   block: OmBlock;
@@ -445,7 +446,7 @@ export default function OMBuilder() {
           <ResizablePanel defaultSize={25} minSize={20} maxSize={35} className="bg-card border-l border-border">
             <Tabs defaultValue="properties" className="h-full flex flex-col">
               <div className="p-2 border-b">
-                <TabsList className="w-full grid grid-cols-2">
+                <TabsList className="w-full grid grid-cols-3">
                   <TabsTrigger value="properties" className="text-xs" data-testid="tab-properties">
                     <Settings className="w-3 h-3 mr-1" />
                     Properties
@@ -453,6 +454,10 @@ export default function OMBuilder() {
                   <TabsTrigger value="data" className="text-xs" data-testid="tab-data">
                     <Database className="w-3 h-3 mr-1" />
                     Data
+                  </TabsTrigger>
+                  <TabsTrigger value="history" className="text-xs" data-testid="tab-history">
+                    <History className="w-3 h-3 mr-1" />
+                    Versions
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -585,6 +590,26 @@ export default function OMBuilder() {
                       }
                     }}
                   />
+                </ScrollArea>
+              </TabsContent>
+              
+              <TabsContent value="history" className="flex-1 m-0 overflow-hidden">
+                <ScrollArea className="h-full p-3">
+                  {omId && (
+                    <VersionHistoryPanel
+                      omId={omId}
+                      currentSnapshot={{ pages }}
+                      onRestore={(snapshot) => {
+                        if (snapshot?.pages) {
+                          setPages(snapshot.pages);
+                          toast({
+                            title: "Version Restored",
+                            description: "Document has been restored to the selected version.",
+                          });
+                        }
+                      }}
+                    />
+                  )}
                 </ScrollArea>
               </TabsContent>
             </Tabs>
