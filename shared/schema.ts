@@ -15377,3 +15377,10 @@ export * from "./docktalk-schema";
 // This provides the canonical financial data model for integrations platform
 // ============================================================================
 export * from "./finance-kernel-schema";
+
+// ============================================================================
+// Institutional Analytics Schema Integration
+// Re-export all Analytics tables, types, and KPI definitions
+// This provides multi-asset class performance metrics and benchmarking
+// ============================================================================
+export * from "./analytics-schema";

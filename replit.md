@@ -97,6 +97,14 @@ Preferred communication style: Simple, everyday language.
     - **Article Matching**: Real-time matching against watchlist criteria using geography arrays, title, and content search.
 - **Launch Operations Module (Dockit)**: Manages marina launch and haul scheduling, transient slips, employee assignments, with CRM and Rent Roll integration.
 - **Market Demographics Module**: Regional market analysis using FRED and Census Bureau APIs for state-level economic indicators and location-based demographics with configurable trade areas and caching.
+- **Analytics Module**: Institutional-grade KPI calculations and performance metrics. Features include:
+    - **Marina KPI Calculator**: Real-time occupancy rate, ADR, RevPALF, NOI margin, cap rate, and DSCR calculations.
+    - **Ancillary Revenue Tracking**: Aggregates Fuel Sales, Ship Store, and service revenue for total revenue analysis.
+    - **Asset Class Support**: Extensible schema for marina, multifamily, retail, office, and hotel asset classes.
+    - **Performance Snapshots**: Historical KPI snapshots stored in `performance_snapshots` table.
+    - **Benchmarking**: KPI definitions with benchmark ranges (low/mid/high) for performance scoring.
+    - Routes: `/api/analytics/marina/kpis`, `/api/analytics/marina/trends`, `/api/analytics/marina/summary`, `/api/analytics/kpi-definitions`
+    - Schema: `shared/analytics-schema.ts`, Services: `server/services/analytics/`
 - **Financial Kernel Module** (Feature-Flagged): Enterprise-grade canonical financial data model for multi-system accounting integration. Features include:
     - **Feature Flags**: `INTEGRATIONS_PLATFORM_ENABLED`, `CONNECTOR_QBO_ENABLED`, `FINANCIAL_KERNEL_UI_ENABLED` - all default to OFF for safety.
     - **Canonical Data Model**: Intacct-inspired ledger tables (`fk_entities`, `fk_accounts`, `fk_transactions`, `fk_transaction_lines`, `fk_posting_batches`) for management reporting.
