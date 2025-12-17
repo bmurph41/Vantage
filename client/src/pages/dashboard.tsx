@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, ChevronDown, ChevronUp, Plus, Calendar } from "lucide-react";
+import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, ChevronDown, ChevronUp, Plus, Calendar, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -426,6 +426,7 @@ export default function Dashboard() {
   const [isDDDetailOpen, setIsDDDetailOpen] = useState(false);
   const [isRentRollDetailOpen, setIsRentRollDetailOpen] = useState(false);
   const [isModelingDetailOpen, setIsModelingDetailOpen] = useState(false);
+  const [isAnalyticsDetailOpen, setIsAnalyticsDetailOpen] = useState(false);
   
   // Period Comparison collapsed state with localStorage persistence
   const [isPeriodComparisonCollapsed, setIsPeriodComparisonCollapsed] = useState<boolean>(() => {
@@ -603,6 +604,12 @@ export default function Dashboard() {
     enabled: isModelingDetailOpen,
   });
 
+  // Fetch marina analytics KPIs for dashboard
+  const { data: marinaAnalyticsData, isLoading: analyticsLoading } = useQuery({
+    queryKey: ['/api/analytics/marina/summary'],
+    queryFn: () => fetch('/api/analytics/marina/summary').then(res => res.json()),
+  });
+
   // Fetch custom modules
   const { data: customModulesData } = useQuery({
     queryKey: ['/api/dashboards/custom-modules'],
@@ -724,6 +731,7 @@ export default function Dashboard() {
     'sales-comps',
     'vdr-activity',
     'docktalk-feed',
+    'marina-analytics',
     'fuel-operations',
     'ship-store',
     'rent-roll',
@@ -1127,6 +1135,111 @@ export default function Dashboard() {
                 maxItems={3}
               />
             </ModuleSection>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'marina-analytics',
+      title: 'Marina Analytics',
+      icon: Activity,
+      link: '/rent-roll',
+      data: marinaAnalyticsData,
+      renderContent: (data) => (
+        <div className="space-y-4">
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
+              label="Occupancy Rate"
+              value={data?.occupancyRate || 0}
+              type="percent"
+              size="md"
+              variant={data?.occupancyRate >= 85 ? "success" : data?.occupancyRate >= 70 ? "warning" : "default"}
+              icon={Activity}
+              testId="analytics-occupancy"
+              tooltip="Percentage of slips currently occupied"
+              onClick={() => setIsAnalyticsDetailOpen(true)}
+              clickable
+              comparison={{
+                label: 'Slips',
+                value: `${data?.occupiedSlips || 0}/${data?.totalSlips || 0}`,
+                type: 'text'
+              }}
+            />
+            <EnhancedMetricCard
+              label="ADR"
+              value={data?.adr || 0}
+              type="currency"
+              size="md"
+              variant="primary"
+              icon={DollarSign}
+              testId="analytics-adr"
+              tooltip="Average Daily Rate per occupied slip"
+              onClick={() => setIsAnalyticsDetailOpen(true)}
+              clickable
+              subtitle="per slip/day"
+            />
+          </MetricGrid>
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
+              label="NOI Margin"
+              value={data?.noiMargin || 0}
+              type="percent"
+              size="sm"
+              variant={data?.noiMargin >= 60 ? "success" : data?.noiMargin >= 50 ? "warning" : "default"}
+              compact={true}
+              testId="analytics-noi-margin"
+              tooltip="Net Operating Income as percentage of gross revenue"
+              onClick={() => setIsAnalyticsDetailOpen(true)}
+              clickable
+            />
+            <EnhancedMetricCard
+              label="DSCR"
+              value={data?.dscr || 0}
+              type="number"
+              size="sm"
+              variant={data?.dscr >= 1.5 ? "success" : data?.dscr >= 1.2 ? "warning" : "default"}
+              compact={true}
+              testId="analytics-dscr"
+              tooltip="Debt Service Coverage Ratio (NOI / Debt Service)"
+              onClick={() => setIsAnalyticsDetailOpen(true)}
+              clickable
+              subtitle="x coverage"
+            />
+          </MetricGrid>
+          <MetricGrid columns={2}>
+            <EnhancedMetricCard
+              label="Gross Revenue"
+              value={data?.grossRevenue || 0}
+              type="currency"
+              size="sm"
+              compact={true}
+              testId="analytics-revenue"
+              tooltip="Total gross revenue including slip rental and ancillary income"
+              onClick={() => setIsAnalyticsDetailOpen(true)}
+              clickable
+            />
+            <EnhancedMetricCard
+              label="Ancillary Revenue"
+              value={data?.ancillaryRevenue || 0}
+              type="currency"
+              size="sm"
+              variant="primary"
+              compact={true}
+              testId="analytics-ancillary"
+              tooltip="Non-slip revenue (fuel, store, services)"
+              onClick={() => setIsAnalyticsDetailOpen(true)}
+              clickable
+            />
+          </MetricGrid>
+          {data?.dataQualityScore !== undefined && (
+            <div className="pt-2 border-t">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500">Data Quality Score</span>
+                <span className={`font-medium ${data.dataQualityScore >= 70 ? 'text-green-600' : data.dataQualityScore >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
+                  {data.dataQualityScore}/100
+                </span>
+              </div>
+            </div>
           )}
         </div>
       ),

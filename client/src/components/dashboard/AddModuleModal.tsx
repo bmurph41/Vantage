@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { Check, DollarSign, FileText, Building2, TrendingUp, Home, Fuel, ShoppingCart, Store, Plus, Newspaper, Edit, Trash2, BarChart3, PieChart, Layers } from "lucide-react";
+import { Check, DollarSign, FileText, Building2, TrendingUp, Home, Fuel, ShoppingCart, Store, Plus, Newspaper, Edit, Trash2, BarChart3, PieChart, Layers, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EnhancedModuleBuilder } from "./EnhancedModuleBuilder";
 import { WidgetBuilder } from "./WidgetBuilder";
@@ -21,7 +21,7 @@ interface ModuleDefinition {
   title: string;
   description: string;
   icon: any;
-  category: 'financial' | 'dd' | 'crm' | 'intel' | 'operations';
+  category: 'financial' | 'dd' | 'crm' | 'intel' | 'operations' | 'analytics';
 }
 
 interface WidgetFormData {
@@ -109,6 +109,15 @@ const allModules: ModuleDefinition[] = [
     category: 'intel',
   },
   
+  // Analytics Modules
+  {
+    id: 'marina-analytics',
+    title: 'Marina Analytics',
+    description: 'Track marina KPIs: occupancy, ADR, RevPALF, NOI margin, and DSCR',
+    icon: Activity,
+    category: 'analytics',
+  },
+  
   // Operations Modules
   {
     id: 'fuel-operations',
@@ -132,6 +141,7 @@ const categoryLabels = {
   crm: 'CRM',
   intel: 'Intelligence',
   operations: 'Operations',
+  analytics: 'Analytics',
 };
 
 export function AddModuleModal({ 
