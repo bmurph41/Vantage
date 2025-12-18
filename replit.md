@@ -37,7 +37,10 @@ The platform utilizes React 18 with TypeScript and Wouter for routing. UI is bui
     - **DD Fees Tracker**: Fee tracking by category (legal, accounting, consulting, inspection, appraisal, environmental, survey, title, lender, broker), contact/company linking, payment status, invoice tracking, and category summaries.
 - **Rent Roll**: Unit occupancy, rental income, Customer Analytics (LTV, retention, churn).
 - **SalesComps**: Marina sales comparables, CSV import/export, Google Maps integration (geocoding, address autocomplete, data quality scoring), validation rules engine, comp history tracking, and adjustment grid.
-- **Modeling Projects**: Marina valuation, dynamic year selector, operations data sync, Exit Strategy Suite, AI-powered Document Intelligence (P&L/Rent Roll parsing, review workflow), Scenario Versioning, QuickBooks Integration, Capital Stack Builder, Pro Forma Engine, Portfolio Roll-ups.
+- **Modeling Projects**: Marina valuation, dynamic year selector, operations data sync, Exit Strategy Suite, AI-powered Document Intelligence (P&L/Rent Roll parsing, review workflow), Scenario Versioning, QuickBooks Integration, Capital Stack Builder, Pro Forma Engine, Portfolio Roll-ups. Enhanced with:
+    - **Multi-Case Modeling**: Database-backed scenarios with N-case support, color-coding (6 preset colors), per-case assumptions storage, lease-up tracking, and case comparison exports.
+    - **Addbacks System**: Line-item EBITDA adjustments with monthly/yearly period support, predefined reasons (one-time, owner-related, non-recurring, normalization), category grouping, and full value history.
+    - **Excel Model Export**: Multi-sheet Excel export including project summary, cases overview, case-specific assumptions, lease-up schedules, addbacks detail, and case comparison reports.
 - **Fund Management (Add-on)**: PE fund lifecycle, capital allocation, fund-level returns, investor capital accounts.
 - **LP Portal (Add-on)**: Dedicated investor portal.
 - **Prospecting (Add-on)**: Premium prospecting and outreach.

@@ -108,14 +108,15 @@ export function PropertyStatusPanel({
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/crm/properties'] });
       queryClient.invalidateQueries({ queryKey: ['/api/crm/properties', property.id] });
-      if (data.compCreated) {
+      const compCreated = data.salesComp != null;
+      if (compCreated) {
         queryClient.invalidateQueries({ queryKey: ['/api/sales-comps'] });
       }
       onUpdate?.();
       setShowCloseDialog(false);
       toast({ 
         title: 'Sale Closed', 
-        description: data.compCreated 
+        description: compCreated 
           ? 'Property closed and sales comp created.' 
           : 'Property has been marked as closed.' 
       });
